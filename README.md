@@ -1026,8 +1026,10 @@ ui.If(open.Get(), ui.Modal("New project", form).
 - Its placement is `ui.OverCenter`, a new overlay placement that centers the
   panel over its anchor. Colors come from `Theme.Scrim` and the surface colors,
   and the modal enters and leaves with the same motion as the command palette.
-- A modal does not stop the app's own key bindings, so a global shortcut still
-  runs while one is open.
+- While a modal is open, keys stop at it: the app's bindings, `OnKeyDown`
+  handlers and typed text outside the modal don't reach anything behind it, and
+  Alt doesn't activate a menu bar. Keys handled inside the modal (a field's
+  editing keys, the modal's own bindings) work as usual.
 
 ### GPU device loss
 

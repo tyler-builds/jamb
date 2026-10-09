@@ -463,6 +463,24 @@ func (rt *Runtime) focusPath() []*node {
 	return path
 }
 
+// keyPath is the path keys travel: the focus path, or, while a modal is open,
+// only its part inside the modal. The app's bindings and key handlers outside
+// the modal then don't run behind it; those inside it (a field's editing
+// keys, the modal's own) still do.
+func (rt *Runtime) keyPath() []*node {
+	path := rt.focusPath()
+	m := rt.topModal()
+	if m == nil {
+		return path
+	}
+	for i, n := range path {
+		if n == m {
+			return path[:i+1]
+		}
+	}
+	return []*node{m}
+}
+
 // chordTimeout is how long a chord waits for its next stroke.
 const chordTimeout = time.Second
 
@@ -542,7 +560,7 @@ func (rt *Runtime) setKeyboardModality(keyboard bool) {
 // key.
 func (rt *Runtime) keyDown(k input.Key, mods input.Modifiers, repeat bool) {
 	e := &KeyEvent{Key: k, Mods: mods, Repeat: repeat}
-	for _, n := range rt.focusPath() {
+	for _, n := range rt.keyPath() {
 		if n.div != nil && n.div.h.onKeyDown != nil {
 			n.div.h.onKeyDown(e)
 			if e.stopped {
@@ -583,12 +601,12 @@ func (rt *Runtime) KeyUp(k input.Key, mods input.Modifiers) {
 	rt.swallowText = false
 	if rt.altArmed {
 		rt.altArmed = false
-		if k == input.KeyUnknown && !mods.Has(input.ModAlt) {
+		if k == input.KeyUnknown && !mods.Has(input.ModAlt) && rt.topModal() == nil {
 			rt.activateMenuBar() // Alt pressed and released alone
 		}
 	}
 	e := &KeyEvent{Key: k, Mods: mods}
-	for _, n := range rt.focusPath() {
+	for _, n := range rt.keyPath() {
 		if n.div != nil && n.div.h.onKeyUp != nil {
 			n.div.h.onKeyUp(e)
 			if e.stopped {
@@ -606,7 +624,7 @@ func (rt *Runtime) bindingKey(s keystroke) bool {
 	if len(rt.pending) > 0 && rt.focusID != rt.chordFocus {
 		rt.pending = nil // focus moved: the chord is dropped, not replayed
 	}
-	path := rt.focusPath()
+	path := rt.keyPath()
 	bs := rt.bindingsOn(path)
 	if s == (keystroke{input.KeyEscape, 0}) && rt.escapeDismisses() {
 		// The field's own Cancel would blur it. While an overlay or tooltip is
@@ -732,7 +750,7 @@ func (rt *Runtime) longestRun(held []pendingStroke) (func(), int) {
 		for i := range seq {
 			seq[i] = held[i].s
 		}
-		path := rt.focusPath()
+		path := rt.keyPath()
 		if fn := exactRun(path, rt.bindingsOn(path), seq); fn != nil {
 			return fn, n
 		}
@@ -761,7 +779,7 @@ func (rt *Runtime) TextInput(s string) {
 // deliverText gives text to the focused element, or else to the nearest
 // ancestor that takes text.
 func (rt *Runtime) deliverText(s string) {
-	for _, n := range rt.focusPath() {
+	for _, n := range rt.keyPath() {
 		if n.div != nil && n.div.h.onTextInput != nil {
 			n.div.h.onTextInput(s)
 			return

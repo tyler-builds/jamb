@@ -267,3 +267,47 @@ func TestOverCenterPlacement(t *testing.T) {
 		t.Errorf("oversized panel at (%v, %v), want the margin (%v, %v)", x, y, overlayMargin, overlayMargin)
 	}
 }
+
+// While a modal is open, the app's bindings and key handlers outside it don't
+// run behind it, but typing in its field still does. Once it closes, they run
+// again.
+func TestModalBlocksShortcutsOutsideIt(t *testing.T) {
+	newAct := NewAction("test.new", "New")
+	open, name := NewSignal(false), NewSignal("")
+	hits, outsideKeys := 0, 0
+	r := newKeyRig(func(ctx *Context) Element {
+		page := Div().Size(Full, Full).
+			OnAction(newAct, func() { hits++ }).
+			OnKeyDown(func(*KeyEvent) { outsideKeys++ })
+		if !open.Get() {
+			return page
+		}
+		return page.Child(Modal("New project", TextInput(name)).
+			OnClose(func() { open.Set(false) }))
+	})
+	r.rt.AddBindings(Bind("ctrl+n", newAct))
+	r.frame()
+	open.Set(true)
+	r.frame()
+
+	r.key(input.KeyN, input.ModCtrl)
+	r.key(input.KeyX, 0)
+	r.rt.TextInput("ab")
+	r.frame()
+	if hits != 0 || outsideKeys != 0 {
+		t.Errorf("with the modal open: action ran %d times, outside OnKeyDown %d times; want 0, 0", hits, outsideKeys)
+	}
+	if name.Peek() != "ab" {
+		t.Errorf("field inside the modal = %q; want typing to reach it (%q)", name.Peek(), "ab")
+	}
+
+	r.key(input.KeyEscape, 0)
+	r.frame()
+	if open.Peek() {
+		t.Fatal("Escape did not close the modal")
+	}
+	r.key(input.KeyN, input.ModCtrl)
+	if hits != 1 {
+		t.Errorf("after closing: action ran %d times; want 1", hits)
+	}
+}
