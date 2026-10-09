@@ -521,6 +521,9 @@ With nothing open, Escape does what it did before. An overlay without
 the auto-repeats of the press that closed it are ignored, so they neither close
 the next overlay nor blur a field; press again to close the next one.
 
+A menu takes Escape itself: the first press closes its open submenu, and the
+next closes the menu (see [Menus](#menus)).
+
 Key presses are handled in this order:
 
 1. the rest of a chord in progress;
@@ -668,6 +671,81 @@ h.ScrollToItem(5000)                    // scrolls the least amount that shows r
 
 Treat a signal's value as immutable. To change a slice or map, build a new
 one and `Set` it. Changing it in place notifies nobody.
+
+### Menus
+
+jamb draws its own menus, so they match the theme, work with a custom title
+bar, and need no platform code. A menu is a list of `ui.MenuItem`s:
+
+```go
+ui.MenuItem{Label: "Open in window", Icon: icons.ArrowUpRight, OnClick: openWindow}
+ui.MenuItem{Action: NewNote}                       // label, shortcut and run come from the action
+ui.MenuItem{Label: "Star", Check: ui.MenuCheckBox, Checked: starred, OnClick: toggleStar}
+ui.MenuItem{Label: "Paused", Check: ui.MenuCheckRadio, Checked: status == paused, OnClick: setPaused}
+ui.MenuItem{Label: "Status", Submenu: []ui.MenuItem{...}} // opens to the right
+ui.MenuItem{Label: "Archive", Disabled: true}      // shown, but cannot be chosen
+ui.MenuSeparator()
+ui.MenuSection("Status")                           // a group label; runs nothing
+```
+
+Three elements open a menu. Each takes a function that builds the items when
+the menu opens:
+
+```go
+// Right-click, or Shift+F10 or the Menu key while the element has focus.
+ui.Div().Focusable().ContextMenu(func() []ui.MenuItem { return rowMenu(p) })
+
+// A click, or Enter, Space or Down while the trigger has focus, opens a menu below it.
+ui.DropdownMenu(ui.Button("Actions").Secondary(), func() []ui.MenuItem { return actions() })
+
+// A row of top-level menus. Pressing and releasing Alt by itself focuses the bar.
+ui.MenuBar(
+	ui.TopMenu{Label: "File", Items: fileMenu},
+	ui.TopMenu{Label: "Edit", Items: editMenu},
+)
+```
+
+![A context menu with a submenu open](docs/screenshots/menu-context.png)
+
+- **Actions.** An item with an `Action` shows the action's binding through
+  `KeysFor`, so a keymap change shows at once. Choosing it closes the menu, returns
+  focus to where it was, and then runs the action through `Dispatch`, so the
+  handler on that focus path runs. An item with `OnClick` runs the function the
+  same way. If an item has both, the action runs.
+- **Keyboard in a menu.** Up and Down wrap and skip separators and disabled
+  items. Home and End go to the first and last items. Right opens a submenu and
+  Left closes it. Enter and Space choose. Escape closes one level. Tab closes the
+  menu and moves focus on. A letter or digit jumps to the next item whose label
+  starts with it.
+- **Submenus and the pointer.** A submenu opens after the pointer rests on its
+  item for 150 ms, and it stays open for the same delay after the pointer leaves
+  for a neighboring item. That lets the pointer move diagonally into the submenu.
+  This is a timed delay, not a triangle.
+- **Placement.** A menu is an `Overlay` below its anchor. It flips above and
+  shifts to stay inside the window, as other overlays do. A submenu opens to the
+  right of its row and flips to the left when there is no room.
+- **Focus.** A menu takes keyboard focus when it opens. Closing it (Escape,
+  choosing an item, or a press outside) returns focus to the element that had it
+  before the press, or to the focused element for a keyboard open. A press
+  outside closes the whole chain. A press on the trigger toggles a dropdown.
+- **Menu bar.** A click opens a top-level menu, and while one is open, the pointer
+  over another label opens that one. Left and Right move between the top-level
+  menus, also from inside an open menu. Down, Enter or Space open the highlighted
+  menu from the focused bar. Escape or Tab leaves the bar. The labels are not in
+  the Tab order.
+- **Look.** Menus use the theme's surface, border, shadow and highlight colors.
+  They enter and leave with the same motion as the command palette.
+- **Roles.** `item.Role()` returns the WAI-ARIA name of an entry (`RoleMenuItem`,
+  `RoleMenuItemCheckbox`, `RoleMenuItemRadio`, `RoleSeparator`, `RoleGroupLabel`),
+  so that UI Automation can expose menus later. Nothing reads it yet.
+- **Not implemented.** Alt+letter mnemonics. The labels take no `&` marks, and
+  Alt followed by another key does not open a menu.
+
+The behavior is covered by tests in `ui/menu_test.go`, and by the demo and notes
+packages. Those tests drive the framework's input methods directly. The
+Windows keyboard path (the Menu key, and an Alt press and release that the
+system would otherwise turn into its own menu) is not covered by them, so
+check it by hand.
 
 ### Variable-height lists
 
@@ -904,7 +982,7 @@ These environment variables work with any jamb app, with no code changes:
 | Variable | Effect |
 |---|---|
 | `JAMB_TRACE=1` | Prints startup timings, per-frame build/layout/paint cost, and frames per second of activity, so you can confirm the app is idle. |
-| `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `devicelost` simulates a GPU device loss; see [GPU device loss](#gpu-device-loss). |
+| `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `devicelost` simulates a GPU device loss; see [GPU device loss](#gpu-device-loss). |
 | `JAMB_STRESS=rebuild\|paint` | Measures sustained frame cost, allocation and GC, prints the results, then exits. |
 | `JAMB_VSYNC=0` | Turns off vsync, for throughput tests. |
 | `JAMB_D3D_DEBUG=1` | Enables the Direct3D debug layer. |
@@ -912,7 +990,7 @@ These environment variables work with any jamb app, with no code changes:
 
 `JAMB_SCRIPT` keys are `enter`, `escape` (or `esc`), `tab`, `backspace`,
 `delete`, `insert`, `space`, the arrows, `home`, `end`, `pageup`, `pagedown`,
-`f1` to `f12`, `a` to `z`, `0` to `9`, `=` and `-`, with the modifiers `ctrl`,
+`menu` (the Apps key), `f1` to `f12`, `a` to `z`, `0` to `9`, `=` and `-`, with the modifiers `ctrl`,
 `shift`, `alt` and `super`. An unknown key or modifier stops the script with an
 error when the script is loaded. `idle` waits for `rt.Settled()`, which ignores
 repeating animations, so a screen with a spinner does not hold the script.
@@ -974,8 +1052,12 @@ On the Projects page:
 - The Activity page has a filter field (matches are highlighted in each row),
   rows of different heights in a `ListOf`, and build rows that expand on a
   click, or on Enter or Space when focused.
+- Right-click a project card for its menu: Open, Open in window, Star (a check
+  mark), a Status submenu with radio items, and a disabled Archive item.
 - The Components page (Ctrl+4) shows the controls, overlays, gradients, rounded
-  clipping, per-side borders, motion and focus styles, one section each.
+  clipping, per-side borders, motion and focus styles, one section each. Its
+  Menus section has a dropdown and a context menu with a submenu; their shortcuts
+  come from the demo's bindings.
 - Keyboard: Ctrl+1 to Ctrl+5 open the Dashboard, Projects, Activity, Components
   and Settings pages, Ctrl+K moves focus to the search field, and Ctrl+Shift+L
   toggles the theme.
@@ -1005,9 +1087,16 @@ features: focus handles, `AutoFocus`, and `FocusWithin`.
 - Tab reaches the tag chips and the note rows near the viewport (see the
   limitations), and shows a focus ring on the focused one. Enter opens a note (as a click does)
   and toggles a tag chip's filter.
-- Ctrl+= / Ctrl+- / Ctrl+0 zoom in, out and reset. The level is remembered
-  in `settings.json` next to the notes file and shown in the status bar when
-  it isn't 100% (click it to reset).
+- Ctrl+= / Ctrl+- / Ctrl+0 zoom in, out and reset. They are the actions
+  `ZoomIn`, `ZoomOut` and `ZoomReset`, so the View menu shows them. The level is
+  remembered in `settings.json` next to the notes file and shown in the status bar
+  when it isn't 100% (click it to reset).
+- A menu bar above the notes has File (New note, Import..., Exit), Edit (undo,
+  redo, cut, copy, paste, select all), and View (toggle theme, zoom, command
+  palette). Each item with a key shows that key. Import... is disabled until the
+  native file dialog exists. It should call `importFiles` with the chosen paths,
+  as a drop does. Alt by itself focuses the bar. Right-click a note in the list
+  for Pin or Unpin, and Delete.
 - The seeded "Languages" note shows ten scripts, ligatures and emoji.
 - With a search query, matches (case-insensitive) are highlighted in each
   listed note's title and snippet.
@@ -1165,7 +1254,13 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   running as administrator.
 - **Startup.** The ~180 ms startup floor is Direct3D driver initialization.
   The framework's own startup cost is about 20 ms.
-- **Not attempted (non-goals).** Accessibility, menus, tray,
+- **Menus.** Alt+letter mnemonics are not implemented. A menu stays open when a
+  key binding moves focus elsewhere. A press outside, Escape or Tab closes it.
+  Focus loss does not close menus, because a click on the trigger of a focusable
+  dropdown would then reopen it. The submenu delay is a timer, not a triangle.
+  The menu bar's labels are not in the Tab order. The roles are in place for
+  UI Automation, which is not wired.
+- **Not attempted (non-goals).** Accessibility, tray,
   dialogs, CSS grid, and the optional utility-class shorthand
   (`.Class("flex col gap-2")`). The shorthand was skipped in favor of typed
   styles.

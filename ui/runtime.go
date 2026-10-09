@@ -315,6 +315,19 @@ type Runtime struct {
 	pendingAt   time.Time
 	chordFocus  uint64
 	swallowText bool
+
+	// Menus (see menu.go). ctxMenu is the open context menu. menuReturn is the
+	// focus that the open menu chain returns to when it closes. pointerFocus is
+	// the focus before the latest press, which a menu opened by the pointer
+	// returns to. menuFn is a submenu's hover change, waiting until menuAt.
+	// altArmed is set while Alt alone is held, so that its release focuses the
+	// menu bar.
+	ctxMenu      *contextMenu
+	menuReturn   *FocusHandle
+	pointerFocus uint64
+	menuAt       time.Time
+	menuFn       func()
+	altArmed     bool
 }
 
 // Services are platform capabilities the runtime uses when available. The
@@ -564,6 +577,11 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 	rt.expirePending(now)
 	if rt.tipCandidate != 0 && rt.tipShown != rt.tipCandidate && rt.tipCandidate != rt.tipDismissed && !now.Before(rt.tipAt) {
 		rt.showTip(rt.tipCandidate)
+	}
+	if rt.menuFn != nil && !now.Before(rt.menuAt) {
+		fn := rt.menuFn
+		rt.menuFn = nil
+		fn()
 	}
 	// Animations that were running re-render now, once per frame. They are not
 	// invalidated while rendering, which would loop within this frame.
@@ -881,6 +899,9 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	if leaving && n.flags&flagOutside != 0 {
 		rt.outside = slices.DeleteFunc(rt.outside, func(o *node) bool { return o.id == n.id })
 	}
+	if leaving && rt.ctxMenu != nil && rt.ctxMenu.id == n.id {
+		rt.closeContextMenu(false) // the element it hung from has gone
+	}
 	// Only an element that was drawn in the last paint has something to fade
 	// out; one that was off screen (culled) simply goes.
 	exits := mayExit && leaving && n.div != nil && n.div.exit != nil && n.paintGen == rt.paintGen
@@ -1039,6 +1060,17 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		}
 		if e.tooltip != "" && rt.tipShown == id {
 			c := rt.tooltipElement(e.tooltip)
+			cid := childID(id, len(e.children), c)
+			if rt.claimed(cid) {
+				cid = rt.duplicateKey(cid, c)
+			}
+			if cn := rt.buildNode(c, n, cid, depth+1, n.ts, owner); cn != nil {
+				n.children = append(n.children, cn)
+				n.lay.Children = append(n.lay.Children, &cn.lay)
+			}
+		}
+		if e.contextMenu != nil && rt.ctxMenu != nil && rt.ctxMenu.id == id {
+			c := contextMenuAt(rt, rt.ctxMenu)
 			cid := childID(id, len(e.children), c)
 			if rt.claimed(cid) {
 				cid = rt.duplicateKey(cid, c)

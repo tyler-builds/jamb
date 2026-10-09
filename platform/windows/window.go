@@ -598,6 +598,14 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		w.emit(e)
 		return 0
 
+	case win32.WM_SYSCOMMAND:
+		// Alt pressed and released alone asks for the system menu (SC_KEYMENU
+		// with no character). The menu bar takes that key itself, so the
+		// system does not open its menu.
+		if wp&0xFFF0 == win32.SC_KEYMENU && lp == 0 {
+			return 0
+		}
+
 	case win32.WM_KEYDOWN, win32.WM_SYSKEYDOWN:
 		w.emit(platform.Event{Kind: platform.EventKeyDown, Key: mapKey(wp), Repeat: lp&(1<<30) != 0})
 		if msg == win32.WM_SYSKEYDOWN {
@@ -758,6 +766,8 @@ func mapKey(vk uintptr) input.Key {
 		return input.KeyMinus
 	case 0x60: // VK_NUMPAD0
 		return input.Key0
+	case win32.VK_APPS:
+		return input.KeyMenu
 	}
 	return input.KeyUnknown
 }

@@ -119,6 +119,7 @@ const (
 	WM_CHAR                 = 0x0102
 	WM_SYSKEYDOWN           = 0x0104
 	WM_SYSKEYUP             = 0x0105
+	WM_SYSCOMMAND           = 0x0112
 	WM_MOUSEMOVE            = 0x0200
 	WM_LBUTTONDOWN          = 0x0201
 	WM_LBUTTONUP            = 0x0202
@@ -197,6 +198,8 @@ const (
 	VK_MENU      = 0x12
 	VK_LWIN      = 0x5B
 	VK_RWIN      = 0x5C
+	VK_APPS      = 0x5D
+	SC_KEYMENU   = 0xF100
 	DPI_AWARE_V2 = ^uintptr(3) // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 == -4
 
 	DWMWA_USE_IMMERSIVE_DARK_MODE  = 20

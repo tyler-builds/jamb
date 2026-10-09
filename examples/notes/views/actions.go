@@ -12,6 +12,11 @@ var (
 	TogglePin   = ui.NewAction("notes.pin", "Pin or unpin note")
 	ToggleTheme = ui.NewAction("notes.theme", "Toggle theme")
 	Palette     = ui.NewAction("notes.palette", "Command palette").Hide()
+	// The zoom keys are the framework's built-in ones; these actions name them so
+	// the View menu can show them, and they step the zoom as those keys do.
+	ZoomIn    = ui.NewAction("notes.zoom-in", "Zoom in")
+	ZoomOut   = ui.NewAction("notes.zoom-out", "Zoom out")
+	ZoomReset = ui.NewAction("notes.zoom-reset", "Reset zoom")
 
 	// The palette's own actions. They are hidden, so the palette does not list them.
 	PaletteUp    = ui.NewAction("palette.up", "Up").Hide()
@@ -25,6 +30,7 @@ var (
 func Actions() []*ui.Action {
 	return []*ui.Action{
 		NewNote, Search, PrevNote, NextNote, TogglePin, ToggleTheme, Palette,
+		ZoomIn, ZoomOut, ZoomReset,
 		PaletteUp, PaletteDown, PaletteRun, PaletteClose,
 	}
 }
@@ -38,6 +44,9 @@ func Bindings() []ui.Binding {
 		ui.Bind("alt+down", NextNote),
 		ui.Bind("ctrl+shift+p", Palette),
 		ui.Bind("ctrl+k ctrl+t", ToggleTheme),
+		ui.Bind("ctrl+=", ZoomIn),
+		ui.Bind("ctrl+-", ZoomOut),
+		ui.Bind("ctrl+0", ZoomReset),
 		// The palette's search field is an Editor inside the palette, so these
 		// bindings must name both: "Palette > Editor" is deeper than the
 		// field's own bindings for the same keys, as in Zed's "Picker > Editor".

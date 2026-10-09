@@ -70,12 +70,14 @@ type DivElement struct {
 	vlist        *listState      // set on the scroll container of a UniformList
 	vrows        *varState       // set on the scroll container of a ListOf
 	h            handlers
-	enter        *motionSpec  // see Enter
-	exit         *motionSpec  // see Exit
-	dragSpec     *DragSpec    // see OnDrag
-	dragging     *Style       // see Dragging
-	drops        []DropTarget // see OnDrop
-	area         WindowArea   // see WindowArea
+	enter        *motionSpec       // see Enter
+	exit         *motionSpec       // see Exit
+	dragSpec     *DragSpec         // see OnDrag
+	dragging     *Style            // see Dragging
+	drops        []DropTarget      // see OnDrop
+	area         WindowArea        // see WindowArea
+	contextMenu  func() []MenuItem // see ContextMenu
+	menuBar      bool              // set by MenuBar on the bar
 }
 
 // Div creates an empty container. Children stack vertically (Column) unless

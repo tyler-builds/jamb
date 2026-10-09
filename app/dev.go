@@ -35,11 +35,12 @@ import (
 //	window N        target window N from now on (1 is the first window opened)
 //	move X Y        move the pointer to logical (X, Y)
 //	click X Y       press and release the left button at (X, Y)
+//	rclick X Y      press and release the right button at (X, Y), which opens a context menu
 //	down X Y / up X Y
 //	scroll X Y DY   scroll by DY logical pixels at (X, Y)
 //	key NAME        press a key: enter, escape, tab, backspace, delete, insert,
 //	                space, left, right, up, down, home, end, pageup, pagedown,
-//	                f1..f12, a..z, 0..9, = (plus), - (minus); optionally with
+//	                menu (the Apps key), f1..f12, a..z, 0..9, = (plus), - (minus); optionally with
 //	                modifiers ctrl, shift, alt, super: ctrl+z, ctrl+shift+left.
 //	                An unknown key or modifier stops the script with an error
 //	type TEXT       type text (rest of the step)
@@ -219,7 +220,7 @@ func parseScript(src string) (*script, error) {
 		}
 		var err error
 		switch op {
-		case "move", "click", "down", "up":
+		case "move", "click", "rclick", "down", "up":
 			if st.x, err = parse(0); err == nil {
 				st.y, err = parse(1)
 			}
@@ -254,7 +255,7 @@ func parseScript(src string) (*script, error) {
 			}
 		case "idle", "exit", "devicelost":
 		default:
-			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, down, up, scroll, key, type, drop, wait, idle, devicelost, shot or exit", op)
+			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, rclick, down, up, scroll, key, type, drop, wait, idle, devicelost, shot or exit", op)
 		}
 		if err != nil {
 			return nil, err
@@ -271,6 +272,7 @@ var keyNames = map[string]input.Key{
 	"pageup": input.KeyPageUp, "pagedown": input.KeyPageDown,
 	"=": input.KeyEqual, "plus": input.KeyEqual, "-": input.KeyMinus, "minus": input.KeyMinus, "0": input.Key0,
 	"home": input.KeyHome, "end": input.KeyEnd, "space": input.KeySpace, "insert": input.KeyInsert,
+	"menu": input.KeyMenu,
 }
 
 // parseKey reads "enter", "a", "5", "f2", "ctrl+z" or "ctrl+shift+left". It
@@ -364,6 +366,10 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 			rt.PointerMove(st.x, st.y, 0)
 			rt.PointerDown(st.x, st.y, input.ButtonLeft, 1, 0)
 			rt.PointerUp(st.x, st.y, input.ButtonLeft, 0)
+		case "rclick":
+			rt.PointerMove(st.x, st.y, 0)
+			rt.PointerDown(st.x, st.y, input.ButtonRight, 1, 0)
+			rt.PointerUp(st.x, st.y, input.ButtonRight, 0)
 		case "down":
 			rt.PointerMove(st.x, st.y, 0)
 			rt.PointerDown(st.x, st.y, input.ButtonLeft, 1, 0)

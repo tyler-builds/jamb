@@ -94,6 +94,7 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 		}).
 		OnClick(func() { s.Selected.Set(p.ID) }).
 		OnDoubleClick(func() { OpenProject(s, p.ID) }).
+		ContextMenu(func() []ui.MenuItem { return projectMenu(s, p) }).
 		OnDrag(ui.Drag(p.ID).Preview(func() ui.Element { return projectPreview(t, p) })).
 		Dragging(ui.Style{Opacity: 0.5}).
 		OnDrop(ui.Drop(func(id int, e *ui.DropEvent) {
@@ -131,6 +132,23 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 		card.Child(insertionLine(t, mark.After))
 	}
 	return card
+}
+
+// projectMenu is the context menu of a project card: opening the project, starring
+// it and setting its status, as the card's own controls do.
+func projectMenu(s *Store, p Project) []ui.MenuItem {
+	status := func(st Status) ui.MenuItem {
+		return ui.MenuItem{Label: st.String(), Check: ui.MenuCheckRadio, Checked: p.Status == st,
+			OnClick: func() { s.SetProjectStatus(p.ID, st) }}
+	}
+	return []ui.MenuItem{
+		{Label: "Open", OnClick: func() { s.Selected.Set(p.ID) }},
+		{Label: "Open in window", Icon: icons.ArrowUpRight, OnClick: func() { OpenProject(s, p.ID) }},
+		{Label: "Star", Check: ui.MenuCheckBox, Checked: p.Starred, OnClick: func() { s.ToggleStar(p.ID) }},
+		{Label: "Status", Submenu: []ui.MenuItem{status(StatusActive), status(StatusPaused), status(StatusDone)}},
+		ui.MenuSeparator(),
+		{Label: "Archive", Disabled: true},
+	}
 }
 
 // insertionLine is the 2 px accent line in the gap above or below a card.

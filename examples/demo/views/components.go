@@ -35,6 +35,7 @@ func Components(s *Store) ui.Element {
 					sample(t, "Small", ui.Button("Small").Small()),
 					sample(t, "Disabled", ui.Button("Disabled").Disabled(true)))).
 				Child(section(t, "Overlays", placements(t))).
+				Child(section(t, "Menus", dropdownSample(t), contextSample(t))).
 				Child(section(t, "Images",
 					fitSample(t, "Cover", ui.FitCover),
 					fitSample(t, "Contain", ui.FitContain),
@@ -112,6 +113,56 @@ func placements(t *ui.Theme) ui.Element {
 		return ui.Div().Gap(12).Child(row).
 			Child(ui.Text("Escape closes an open popover, as a click outside it does.").Size(12).Color(t.TextMuted))
 	})
+}
+
+// dropdownSample is a button that opens a menu below it. The menu's shortcuts
+// are the window's bindings, so they follow any change to the keymap.
+func dropdownSample(t *ui.Theme) ui.Element {
+	return sample(t, "Dropdown", ui.DropdownMenu(ui.Button("Project actions").Key("project-actions").Secondary().Small(), func() []ui.MenuItem {
+		return []ui.MenuItem{
+			{Action: GoProjects},
+			{Action: FocusSearch},
+			ui.MenuSeparator(),
+			{Label: "Dark theme", Action: ToggleTheme, Check: ui.MenuCheckBox, Checked: t.Dark},
+			ui.MenuSeparator(),
+			{Label: "Delete project", Disabled: true},
+		}
+	}))
+}
+
+// contextSample is a box with a context menu, which opens at the pointer, or
+// below the box for Shift+F10 when the box has focus. Its layout and completed
+// flags live in the component, so the menu shows their state when it opens.
+func contextSample(t *ui.Theme) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		layout := ui.Local(ctx, "layout", "Grid")
+		completed := ui.Local(ctx, "completed", false)
+		box := ui.Div().Key("context-menu-sample").Size(ui.Px(240), ui.Px(64)).Radius(8).Border(1, t.Border).Center().
+			Focusable().FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
+			Child(ui.Text("Right-click, or focus it and press Shift+F10").Size(12).Color(t.TextMuted)).
+			ContextMenu(func() []ui.MenuItem {
+				return []ui.MenuItem{
+					{Action: GoProjects},
+					{Action: FocusSearch},
+					ui.MenuSeparator(),
+					{Label: "Layout", Submenu: []ui.MenuItem{
+						layoutItem("Grid", layout), layoutItem("List", layout), layoutItem("Board", layout),
+					}},
+					{Label: "Show completed", Check: ui.MenuCheckBox, Checked: completed.Peek(),
+						OnClick: func() { completed.Set(!completed.Peek()) }},
+					ui.MenuSeparator(),
+					{Label: "Archive", Disabled: true},
+				}
+			})
+		return sample(t, "Context menu", box)
+	})
+}
+
+// layoutItem is one radio item of the Layout submenu: selected when it is the
+// current layout.
+func layoutItem(label string, current *ui.Signal[string]) ui.MenuItem {
+	return ui.MenuItem{Label: label, Check: ui.MenuCheckRadio, Checked: current.Peek() == label,
+		OnClick: func() { current.Set(label) }}
 }
 
 // fitSample is the banner drawn in a box of fixed size with one ImageFit.

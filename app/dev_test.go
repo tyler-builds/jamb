@@ -26,6 +26,8 @@ func TestParseKey(t *testing.T) {
 		{"insert", input.KeyInsert, 0},
 		{"super+d", input.KeyD, input.ModSuper},
 		{"ctrl+plus", input.KeyEqual, input.ModCtrl},
+		{"menu", input.KeyMenu, 0},
+		{"shift+f10", input.KeyF10, input.ModShift},
 	}
 	for _, c := range cases {
 		k, mods, ok := parseKey(c.spec)
@@ -40,6 +42,21 @@ func TestParseKeyRejectsUnknown(t *testing.T) {
 		if _, _, ok := parseKey(spec); ok {
 			t.Errorf("parseKey(%q) succeeded; want an error", spec)
 		}
+	}
+}
+
+// rclick is a right-button press at a point, like click but for the right
+// button; it needs both coordinates.
+func TestScriptReadsRightClick(t *testing.T) {
+	s, err := parseScript("idle; rclick 120 240; exit")
+	if err != nil {
+		t.Fatalf("rclick 120 240: %v", err)
+	}
+	if st := s.steps[1]; st.op != "rclick" || st.x != 120 || st.y != 240 {
+		t.Errorf("step = %+v; want rclick at 120, 240", st)
+	}
+	if _, err := parseScript("rclick 120; exit"); err == nil || !strings.Contains(err.Error(), "missing number") {
+		t.Errorf("rclick 120: err = %v; want a missing-number error", err)
 	}
 }
 

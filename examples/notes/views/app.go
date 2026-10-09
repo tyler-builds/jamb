@@ -73,7 +73,7 @@ func Root(s *store.Store) func(*ui.Context) ui.Element {
 	}
 	return func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
-		return ui.Div().Row().Size(ui.Full, ui.Full).
+		return ui.Div().Row().Size(ui.Full, ui.Full).PaddingEdges(ui.Edges{Top: menuBarHeight}).
 			Background(t.Background).TextColor(t.Text).
 			OnAction(NewNote, a.newNote).
 			OnAction(Search, func() { a.search.Focus() }).
@@ -82,7 +82,11 @@ func Root(s *store.Store) func(*ui.Context) ui.Element {
 			OnAction(TogglePin, a.togglePin).
 			OnAction(ToggleTheme, func() { toggleTheme(ctx) }).
 			OnAction(Palette, func() { a.openPalette(ctx) }).
+			OnAction(ZoomIn, func() { zoomStep(ctx, 1) }).
+			OnAction(ZoomOut, func() { zoomStep(ctx, -1) }).
+			OnAction(ZoomReset, func() { ctx.SetZoom(1) }).
 			OnDrop(ui.Drop(a.importFiles)).
+			Child(a.menuBar(ctx)).
 			Child(a.sidebar()).
 			Child(ui.Div().Width(ui.Px(1)).Height(ui.Full).Background(t.Border)).
 			Child(a.editorPane()).
@@ -347,6 +351,7 @@ func (a *App) noteItem(n *store.Note, selected bool) ui.Element {
 			When(selected, func(d *ui.DivElement) { d.Background(t.SurfaceActive) }).
 			Focusable().FocusVisible(focusRing(t)).
 			OnClick(func() { a.s.Selected.Set(n.ID) }).
+			ContextMenu(func() []ui.MenuItem { return a.noteMenu(n) }).
 			OnDrag(ui.Drag(n).Preview(func() ui.Element {
 				return ui.Div().PaddingX(10).PaddingY(5).Radius(999).Background(t.Surface).
 					Border(1, t.Accent).Shadow(ui.ShadowMd).

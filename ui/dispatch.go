@@ -267,6 +267,7 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 	x, y = x/rt.zoom, y/rt.zoom
 	rt.mouseX, rt.mouseY, rt.mouseIn = x, y, true
 	rt.setKeyboardModality(false)
+	rt.pointerFocus, rt.altArmed = rt.focusID, false
 	rt.updateHover()
 	if b == input.ButtonLeft && rt.scrollbarDown(x, y) {
 		return
@@ -279,6 +280,13 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 	rt.showTip(0)
 	rt.tipCandidate = 0
 	rt.clickOutside(path)
+	if b == input.ButtonRight && rt.ctxMenu == nil {
+		// A context menu that survived the press was pressed inside: it stays.
+		if n := menuTarget(path); n != nil {
+			e := rt.mouseEvent(n, x, y)
+			rt.openContextMenu(n, e.LocalX, e.LocalY, false)
+		}
+	}
 	if b == input.ButtonLeft {
 		rt.notePress(path, x, y)
 		rt.pressSeg = rt.segmentAt(path, x, y)
@@ -479,7 +487,9 @@ type pendingStroke struct {
 //     press are ignored, so holding Escape closes one overlay
 //  4. Enter or Space (without modifiers, not a repeat) runs the focused
 //     element's OnClick; a text field keeps these keys
-//  5. Tab (which also reveals the element it moves to) and the zoom keys
+//  5. Tab (which also reveals the element it moves to), the Menu key and
+//     Shift+F10 (which open the focused element's context menu), and the zoom
+//     keys
 //
 // So a key that is both a binding and the start of a longer chord waits up to
 // a second before it runs. A chord that starts with a printable key, such as
@@ -487,6 +497,7 @@ type pendingStroke struct {
 // or a context such as "!Editor".
 func (rt *Runtime) KeyDown(k input.Key, mods input.Modifiers, repeat bool) {
 	rt.swallowText = false
+	rt.altArmed = k == input.KeyUnknown && mods == input.ModAlt
 	if k != input.KeyUnknown {
 		rt.setKeyboardModality(true)
 	}
@@ -552,6 +563,8 @@ func (rt *Runtime) keyDown(k input.Key, mods input.Modifiers, repeat bool) {
 	switch {
 	case k == input.KeyTab:
 		rt.cycleFocus(mods.Has(input.ModShift))
+	case !repeat && (k == input.KeyMenu || (k == input.KeyF10 && mods == input.ModShift)):
+		rt.openFocusedMenu()
 	case rt.zoomKeys && mods.Has(input.ModCtrl) && k == input.KeyEqual:
 		rt.ZoomIn()
 	case rt.zoomKeys && mods.Has(input.ModCtrl) && k == input.KeyMinus:
@@ -565,6 +578,12 @@ func (rt *Runtime) keyDown(k input.Key, mods input.Modifiers, repeat bool) {
 // and its release, so the release also ends any swallowing of text.
 func (rt *Runtime) KeyUp(k input.Key, mods input.Modifiers) {
 	rt.swallowText = false
+	if rt.altArmed {
+		rt.altArmed = false
+		if k == input.KeyUnknown && !mods.Has(input.ModAlt) {
+			rt.activateMenuBar() // Alt pressed and released alone
+		}
+	}
 	e := &KeyEvent{Key: k, Mods: mods}
 	for _, n := range rt.focusPath() {
 		if n.div != nil && n.div.h.onKeyUp != nil {

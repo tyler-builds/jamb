@@ -112,4 +112,6 @@ const (
 	// KeyEqual is the =/+ key (and numpad +); KeyMinus is -/_ (and numpad -).
 	KeyEqual
 	KeyMinus
+	// KeyMenu is the Menu (Apps) key, which opens a context menu.
+	KeyMenu
 )
