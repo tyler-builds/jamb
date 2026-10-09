@@ -2,6 +2,8 @@
 *.exe
 /bin/
 /out/
+# Release output of jamb package, written to <app>/dist. It can hold test certificates.
+dist/
 *.prof
 *.test
 coverage.out

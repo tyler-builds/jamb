@@ -23,7 +23,8 @@ Windows 10+ and Go 1.27+. Nothing else.
 go run ./examples/demo                         # run the demo
 go run ./examples/notes                        # run the notes app
 go run ./cmd/jamb dev ./examples/notes         # rebuild + restart on every save, window position preserved
-go test ./... ./examples/demo/... ./examples/notes/...   # headless tests (no window, no GPU)
+go run ./cmd/jamb package --test-cert ./examples/demo   # Windows zip and MSIX in examples/demo/dist (see Packaging)
+go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/...   # headless tests (no window, no GPU)
 go build -trimpath -ldflags "-s -w -H windowsgui" -o jamb-demo.exe ./examples/demo   # ~7 MB release build
 ```
 
@@ -37,7 +38,7 @@ Results against the performance targets are in [BENCHMARKS.md](BENCHMARKS.md):
 ## Repository layout
 
 ```
-go.work             workspace: the framework (.), examples/demo and examples/notes
+go.work             workspace: the framework (.), cmd/jamb, examples/demo and examples/notes
 go.mod             module "github.com/tyler-builds/jamb", the framework
 app/               runs an app: window + renderer + ui runtime, dev hooks
 ui/                declarative API: Div, Text, Button, TextInput, TextArea, Icon, Image,
@@ -56,10 +57,12 @@ platform/          adapter contract; platform/windows (Win32), darwin + linux pl
 internal/win32/    minimal cgo-free Win32 bindings
 internal/watch/    directory change notifications for live keymap reload (Win32 change
                    notifications; polling elsewhere)
-cmd/jamb/          `jamb dev` runner
+cmd/jamb/          `jamb dev` runner and `jamb package`; module "github.com/tyler-builds/jamb/cmd/jamb"
+                   (its own module, so packaging dependencies stay out of the framework's go.mod)
 examples/demo/     module "github.com/tyler-builds/jamb/examples/demo", consumes the framework like any app
   views/           sidebar, header, Dashboard, Projects, Activity, Settings
   assets/          embedded images
+  jamb.json, icon.png   packaging settings and icon (see Packaging)
 examples/notes/    module "github.com/tyler-builds/jamb/examples/notes", a note-taking app (see below)
   store/           notes as signals, ordering, JSON persistence on a background goroutine
   views/           sidebar, note list, editor pane, actions and the command palette
@@ -991,8 +994,9 @@ ctx.Window().MessageBox(dialog.MessageOptions{
 - File dialogs use `IFileOpenDialog` and `IFileSaveDialog`, called through
   their vtables from pure Go. Message boxes use `MessageBoxW`: `TaskDialog`
   shows richer boxes, but it needs a common-controls version 6 manifest, which
-  packaging will add. Message boxes can then move to it without changing the
-  API.
+  `jamb package` adds to a packaged app. A `go run` build does not have that
+  manifest. Message boxes can move to `TaskDialog`, with `MessageBoxW` as the
+  fallback, without changing the API.
 - The notes and demo apps use these dialogs. The Components page of the demo
   shows each one.
 
@@ -1075,6 +1079,9 @@ it does not reset the driver.
 
 ## Tools for humans and coding agents
 
+The `jamb` command in `cmd/jamb` has two commands: `jamb dev`, the watch-and-restart
+runner, and `jamb package`, which builds the Windows release (see [Packaging](#packaging)).
+
 These environment variables work with any jamb app, with no code changes:
 
 | Variable | Effect |
@@ -1114,6 +1121,153 @@ The headless tools are:
 See `ui/runtime_test.go`, `ui/editor_test.go`,
 `examples/demo/views/dump_test.go` and `examples/notes/views/views_test.go` (the notes app
 driven headlessly: Ctrl+N, typing, search, saving).
+
+## Packaging
+
+`jamb package` turns an app into an ordinary Windows program: an executable with
+its icon, version information and manifest, in a zip, and an MSIX package that
+installs it. It reads the app's `jamb.json` (below).
+
+```
+go run ./cmd/jamb package ./examples/demo              # zip only; an MSIX must be signed to install
+go run ./cmd/jamb package --test-cert ./examples/demo  # zip and MSIX, signed with a test certificate
+go run ./cmd/jamb package --cert release.pfx ./examples/notes   # zip, and MSIX, signed with a certificate
+```
+
+Outputs go to `<app>/dist/`, which git ignores:
+
+- `<name>-<version>-windows-<arch>.zip`: the executable at the root, and any
+  `LICENSE*` and `NOTICE*` files of the app directory beside it. Always built.
+- `<name>-<version>-windows-<arch>.msix`: a full-trust desktop package. `<arch>`
+  is `amd64` or `arm64`. Built only when a signing option is given and the
+  Windows SDK is installed, because Windows installs only signed packages.
+- With `--test-cert`: `<name>-test.pfx` and `<name>-test.cer`.
+
+### jamb.json
+
+Every field is required except `copyright`. An unknown field is an error, so a
+misspelled name stops the build, and every problem is reported in one message.
+
+| Field | Meaning |
+|---|---|
+| `name` | The executable's name without `.exe`: starts with a letter, then letters, digits, `-` and `_`, at most 64 characters. |
+| `displayName` | The name users see: Start, the taskbar and the package. |
+| `description` | A short description, shown in file properties and the package. |
+| `version` | A semantic version, `MAJOR.MINOR.PATCH`. Each part is 0 to 65535, and Windows stores it as `MAJOR.MINOR.PATCH.0`. Pre-release and build suffixes have no Windows form and are rejected. |
+| `publisher` | The publisher's display name, shown as the company in file properties and in the package. |
+| `publisherSubject` | The subject of the signing certificate, starting with `CN=`, such as `CN=Example`. The MSIX publisher must equal the certificate's subject exactly, so for a certificate from a certificate authority copy the whole subject. `--test-cert` accepts only a `CN=` subject. |
+| `identityName` | The package identity: 3 to 50 characters of letters, digits, `.` and `-`, starting and ending with a letter or digit. Windows uses it to identify the app, so it must stay the same across versions that should upgrade one another. |
+| `copyright` | Optional. Shown as the legal copyright in file properties. |
+| `icon` | A square PNG, at least 48 px, relative to the app directory. 256 px or larger is recommended, and packaging warns below that. It becomes the executable's icon and the MSIX logos. |
+
+File associations and extra capabilities are not supported yet. The manifest
+requests only `runFullTrust`.
+
+### Commands and flags
+
+`jamb package [flags] [package dir]`. The directory defaults to `.`, and flags may
+come before or after it.
+
+| Flag | Effect |
+|---|---|
+| `--arch amd64\|arm64` | The target architecture. Default `amd64`. |
+| `--no-msix` | Build the zip only, even when signing is requested. |
+| `--cert FILE.pfx` | Sign the executable and the MSIX with this certificate. Its password is read from the `JAMB_CERT_PASSWORD` environment variable, never from a flag. |
+| `--test-cert` | Sign with a self-signed test certificate kept in `dist` (see below). Cannot be combined with `--cert`. |
+| `--timestamp URL` | An RFC 3161 timestamp server for the signatures. Needs `--cert` or `--test-cert`. |
+| `--sdk-bin DIR` | The directory with `makeappx.exe` and `signtool.exe`. Default: the newest SDK under `C:\Program Files (x86)\Windows Kits\10\bin`. |
+
+### What the executable contains
+
+- The icon, in 16, 24, 32, 48, 64, 128 and 256 px.
+- Version information: file and product version (`version` with `.0`), company,
+  product name, description, original and internal file names, and copyright.
+- An application manifest with per-monitor v2 DPI awareness, which matches what
+  the framework sets at run time; Common Controls version 6, which `TaskDialog`
+  needs; Windows 10 and 11 as the supported OS; long path names; and `asInvoker`,
+  so the app never asks for elevation.
+- A build with `-trimpath -ldflags "-s -w -H=windowsgui"`, `GOOS=windows`,
+  `CGO_ENABLED=0`. The GUI subsystem means no console window opens.
+
+The manifest does not set `activeCodePage` to UTF-8. The framework calls only the
+wide-character Win32 functions, so the active code page does not affect it, and
+leaving the system's code page alone is the safer default for any ANSI call.
+
+While it builds, `jamb package` writes a resource object,
+`jamb_package_windows_<arch>.syso`, into the app's directory and removes it when
+packaging ends, on failure and on Ctrl+C too. If a file with that name already
+exists, packaging stops rather than overwrite it.
+
+### Signing
+
+- **`--cert`.** signtool can read a PFX password only from its command line, so
+  jamb decrypts the PFX with the password in `JAMB_CERT_PASSWORD` and writes a copy
+  with no password to a temporary directory. The copy holds the private key
+  unencrypted while packaging runs. It is deleted when packaging ends, including
+  on Ctrl+C. Check that this is acceptable for your key-handling policy.
+- **`--test-cert`.** A self-signed code-signing certificate, RSA 2048, valid for
+  one year, with the subject from `publisherSubject`. It is stored in `dist` as
+  `<name>-test.pfx` (no password) and `<name>-test.cer`, and it is never added to a
+  certificate store. It is reused while it matches the subject and has more than
+  30 days left. Use it for install tests only.
+- Files are signed with `signtool sign /fd SHA256`, and with a timestamp when
+  `--timestamp` is set.
+- Signing policy varies by organization. Confirm the signing arrangement with
+  your security or legal contacts before you distribute a build.
+
+### Requirements
+
+- Windows 10 or 11 and Go 1.27 or later. The zip needs nothing else.
+- MSIX and signing need the Windows SDK, with its **Windows SDK Signing Tools for
+  Desktop Apps** feature, which provides `makeappx.exe` and `signtool.exe`. Get it
+  from <https://developer.microsoft.com/windows/downloads/windows-sdk/>. A build
+  without a signing option needs no SDK and writes the zip. A build with
+  `--cert` or `--test-cert` stops with a message when `signtool.exe` is missing,
+  and writes nothing, so it never produces an unsigned release. When only
+  `makeappx.exe` is missing, the signed zip is written and the MSIX is skipped
+  with a warning. Use `--sdk-bin` if the tools are somewhere else.
+
+### Installing the MSIX on this PC (test certificate)
+
+Windows does not trust a self-signed certificate, so the MSIX installs only after
+its certificate is trusted on this machine. These steps change system settings, so
+`jamb package` only prints them. Replace `<repo>` with the repository's path.
+
+1. Build the package with the test certificate:
+   `go run ./cmd/jamb package --test-cert ./examples/demo`
+2. In an administrator PowerShell, trust the certificate on this machine:
+
+   ```
+   certutil -addstore -f TrustedPeople "<repo>\examples\demo\dist\jamb-demo-test.cer"
+   ```
+
+3. Install the package, from any PowerShell:
+
+   ```
+   Add-AppxPackage -Path "<repo>\examples\demo\dist\jamb-demo-0.1.0-windows-amd64.msix"
+   ```
+
+   Start "Jamb Demo" from the Start menu.
+4. Remove it when you are done:
+
+   ```
+   Get-AppxPackage -Name "JambExamples.Demo" | Remove-AppxPackage
+   certutil -delstore TrustedPeople <thumbprint>
+   ```
+
+   `jamb package` prints the thumbprint. The notes app works the same way with
+   `examples\notes` and `JambExamples.Notes`.
+
+### Packaging dependencies
+
+`cmd/jamb` is its own Go module, listed in `go.work`, so the framework's `go.mod`
+and the modules that import it gain nothing from packaging. Its dependencies are
+`github.com/tc-hib/winres` (writes the resource object; ISC-style license),
+`software.sslmate.com/src/go-pkcs12` (reads PFX files; BSD-3-Clause),
+`golang.org/x/image` (resizes the icon; BSD-3-Clause) and `golang.org/x/crypto`
+(used by go-pkcs12; BSD-3-Clause). winres depends on `github.com/nfnt/resize`
+(ISC-style license). The Windows SDK tools are external programs and are not
+redistributed.
 
 ## Icons
 
@@ -1376,13 +1530,22 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   The menu bar's labels are not in the Tab order. The roles are in place for
   UI Automation, which is not wired.
 - **Dialogs and clipboard.** Native dialogs run on Windows only. Message boxes
-  use `MessageBoxW`, not `TaskDialog`, which needs the common-controls version 6
-  manifest that packaging will add. The clipboard is plain text only: images and
+  use `MessageBoxW`, not `TaskDialog`. `TaskDialog` needs the common-controls
+  version 6 manifest, which `jamb package` adds to a packaged app but a `go run`
+  build does not have, so the switch (with a `MessageBoxW` fallback) is future
+  work. The clipboard is plain text only: images and
   HTML are not supported. On Windows 11 the file, folder and message box dialogs
   were driven through UI Automation and window messages. They opened owned by
   their window, returned their results, and canceled correctly, and the window
   stayed disabled and kept drawing while a dialog was open. Not checked: dialogs
   in other languages, and high-contrast themes.
+- **Packaging.** Windows only (see [Packaging](#packaging)). Not done: Microsoft Store submission, signing with
+  hardware tokens or cloud key services (only PFX files), file associations and
+  capabilities beyond `runFullTrust`, localized resources, the wide and splash
+  logos and target-size logos of the MSIX, an MSI or installer UI, and automatic
+  updates. The arm64 build is compiled but has not been run. The MSIX install
+  steps are for a person to run; the package's structure and signature are
+  checked by the SDK tools.
 - **Not attempted (non-goals).** Accessibility, tray,
   CSS grid, and the optional utility-class shorthand
   (`.Class("flex col gap-2")`). The shorthand was skipped in favor of typed

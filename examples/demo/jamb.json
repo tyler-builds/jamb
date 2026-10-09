@@ -1,0 +1,11 @@
+{
+  "name": "jamb-demo",
+  "displayName": "Jamb Demo",
+  "description": "A demo of the jamb framework: widgets, layout, paint and native dialogs.",
+  "version": "0.1.0",
+  "publisher": "Jamb Examples",
+  "publisherSubject": "CN=Jamb Examples",
+  "identityName": "JambExamples.Demo",
+  "copyright": "Copyright 2026 The jamb Authors",
+  "icon": "icon.png"
+}

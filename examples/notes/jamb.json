@@ -1,0 +1,11 @@
+{
+  "name": "jamb-notes",
+  "displayName": "Jamb Notes",
+  "description": "A note-taking app built with the jamb framework.",
+  "version": "0.1.0",
+  "publisher": "Jamb Examples",
+  "publisherSubject": "CN=Jamb Examples",
+  "identityName": "JambExamples.Notes",
+  "copyright": "Copyright 2026 The jamb Authors",
+  "icon": "icon.png"
+}

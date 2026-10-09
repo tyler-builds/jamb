@@ -1,6 +1,7 @@
-// Command jamb is the development companion for jamb applications.
+// Command jamb is the development and packaging companion for jamb applications.
 //
 //	jamb dev [package dir]
+//	jamb package [flags] [package dir]
 //
 // dev builds the application, runs it, and watches the source of every
 // non-standard-library package it depends on (including the framework in a
@@ -8,9 +9,15 @@
 // restarts the app, keeping the window where you left it. A failed build
 // prints the compiler errors and leaves the running app alone.
 //
+// package builds a Windows release of the application into dist/: a zip, and an
+// MSIX when it is signed and the Windows SDK is installed. The app's jamb.json
+// holds its name, version, publisher and icon. The README's Packaging section
+// describes it.
+//
 // Run it from the repository root with:
 //
 //	go run ./cmd/jamb dev ./examples/demo
+//	go run ./cmd/jamb package --test-cert ./examples/demo
 package main
 
 import (
@@ -30,14 +37,22 @@ import (
 
 func usage() {
 	fmt.Fprintln(os.Stderr, `usage: jamb dev [package dir]
+       jamb package [flags] [package dir]
 
-  dev   build, run, and rebuild/restart on source changes`)
+  dev      build, run, and rebuild/restart on source changes
+  package  build the Windows zip, and a signed MSIX, of an app (see the README, Packaging)`)
 	os.Exit(2)
 }
 
 func main() {
-	if len(os.Args) < 2 || os.Args[1] != "dev" {
+	if len(os.Args) < 2 || (os.Args[1] != "dev" && os.Args[1] != "package") {
 		usage()
+	}
+	if os.Args[1] == "package" {
+		if err := packageCmd(os.Args[2:]); err != nil {
+			fatal(err)
+		}
+		return
 	}
 	dir := "."
 	if len(os.Args) > 2 {

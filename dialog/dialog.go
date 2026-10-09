@@ -9,8 +9,9 @@
 //
 // On Windows, file dialogs use IFileOpenDialog and IFileSaveDialog, and
 // message boxes use MessageBoxW. TaskDialog would show richer boxes, but it
-// needs a common-controls version 6 manifest, which packaging will add. Then
-// message boxes can move to TaskDialog without changing this package.
+// needs a common-controls version 6 manifest, which `jamb package` adds to a
+// packaged app. A plain `go run` build does not have it. Message boxes can move
+// to TaskDialog, with MessageBoxW as the fallback, without changing this package.
 package dialog
 
 // FileKind selects the file dialog to show.
