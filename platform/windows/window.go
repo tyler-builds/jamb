@@ -401,6 +401,13 @@ func (w *window) trackMouse() {
 	}
 }
 
+// showsMenuBar reports whether the handler's window has an app menu bar, which
+// takes a lone Alt press (see platform.MenuBarHandler).
+func showsMenuBar(h platform.Handler) bool {
+	mb, ok := h.(platform.MenuBarHandler)
+	return ok && mb.HasMenuBar()
+}
+
 func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	w := windows[hwnd]
 	if w == nil && msg == win32.WM_NCCREATE && creating != nil {
@@ -419,6 +426,10 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	case win32.WM_TIMER:
 		if wp == wakeTimerID {
 			w.onTimer()
+			return 0
+		}
+		if wp == dialogTimerID {
+			pumpFrames()
 			return 0
 		}
 
@@ -600,9 +611,9 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 
 	case win32.WM_SYSCOMMAND:
 		// Alt pressed and released alone asks for the system menu (SC_KEYMENU
-		// with no character). The menu bar takes that key itself, so the
-		// system does not open its menu.
-		if wp&0xFFF0 == win32.SC_KEYMENU && lp == 0 {
+		// with no character). An app menu bar takes that key itself, so the
+		// system does not open its menu; a window without one keeps it.
+		if wp&0xFFF0 == win32.SC_KEYMENU && lp == 0 && showsMenuBar(w.handler) {
 			return 0
 		}
 

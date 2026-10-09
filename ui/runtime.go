@@ -250,6 +250,7 @@ type Runtime struct {
 	hoverIDs       []uint64 // deepest first
 	pressIDs       []uint64
 	focusID        uint64
+	blurring       uint64 // the element whose OnBlur is running, see setFocus
 	// keyboardModality is true when the last input was a key press and false
 	// after a pointer press. FocusVisible styles show only while it is true.
 	keyboardModality bool
@@ -328,6 +329,11 @@ type Runtime struct {
 	menuAt       time.Time
 	menuFn       func()
 	altArmed     bool
+
+	// Modals (see modal.go): the open ones, with the focus each returns to, and
+	// the one whose initial focus is set once the next build is done.
+	modals       []modalFrame
+	pendingModal uint64
 }
 
 // Services are platform capabilities the runtime uses when available. The
@@ -795,6 +801,14 @@ func (rt *Runtime) rebuildDirty() {
 			rt.setFocus(id)
 		}
 	}
+	if id := rt.pendingModal; id != 0 {
+		rt.pendingModal = 0
+		if n := rt.byID[id]; n != nil {
+			if f := rt.modalFocus(n); f != 0 {
+				rt.setFocus(f)
+			}
+		}
+	}
 }
 
 func (rt *Runtime) rootTextStyle() textStyle {
@@ -901,6 +915,9 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	}
 	if leaving && rt.ctxMenu != nil && rt.ctxMenu.id == n.id {
 		rt.closeContextMenu(false) // the element it hung from has gone
+	}
+	if leaving && n.div != nil && n.div.modal != nil {
+		rt.modalClosed(n)
 	}
 	// Only an element that was drawn in the last paint has something to fade
 	// out; one that was off screen (culled) simply goes.
@@ -1137,6 +1154,9 @@ func (rt *Runtime) attachFocus(n *node) {
 	}
 	if d.autoFocus && n.fresh {
 		rt.pendingFocus = n.id
+	}
+	if d.modal != nil && n.fresh {
+		rt.modalMounted(n)
 	}
 }
 

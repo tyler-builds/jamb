@@ -132,6 +132,11 @@ func MenuBar(menus ...TopMenu) Element {
 	})
 }
 
+// HasMenuBar reports whether the window's tree has a MenuBar. The platform
+// asks through the app when Alt is pressed alone, so the system menu stays
+// shut over the app's own bar.
+func (rt *Runtime) HasMenuBar() bool { return rt.menuBarNode() != nil }
+
 // menuBarNode returns the bar made by MenuBar in the tree, or nil.
 func (rt *Runtime) menuBarNode() *node {
 	var find func(n *node) *node

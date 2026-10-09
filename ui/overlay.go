@@ -18,6 +18,7 @@ const (
 	AboveEnd
 	RightStart // right of the anchor, top edges aligned
 	LeftStart  // left of the anchor, top edges aligned
+	OverCenter // over the anchor, centered in both directions (a Modal's panel)
 )
 
 // overlayMargin is how far inside the window an overlay is kept.
@@ -44,6 +45,9 @@ type overlayItem struct {
 // overlayMargin inside the view.
 func placeOverlay(p Placement, gap float32, a scene.Rect, w, h float32, view scene.Rect) (x, y float32) {
 	switch p {
+	case OverCenter:
+		x = a.X + (a.W-w)/2
+		y = a.Y + (a.H-h)/2
 	case BelowStart, BelowCenter, BelowEnd, AboveStart, AboveCenter, AboveEnd:
 		below := p <= BelowEnd
 		roomBelow := view.Y + view.H - (a.Y + a.H + gap)

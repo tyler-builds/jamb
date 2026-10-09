@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/text"
 )
 
@@ -95,6 +96,12 @@ func TestWindowAreaOnlyPaintedElements(t *testing.T) {
 type fakeWindow struct {
 	maximized, focused bool
 	calls              []string
+	// The dialogs are recorded in calls; their callbacks are kept, so a test
+	// answers a dialog by calling fileDone or msgDone.
+	fileOpts []dialog.FileOptions
+	fileDone func(dialog.FileResult)
+	msgOpts  []dialog.MessageOptions
+	msgDone  func(dialog.Button)
 }
 
 func (f *fakeWindow) Minimize()         { f.calls = append(f.calls, "minimize") }
@@ -103,6 +110,26 @@ func (f *fakeWindow) Maximized() bool   { return f.maximized }
 func (f *fakeWindow) Close()            { f.calls = append(f.calls, "close") }
 func (f *fakeWindow) SetTitle(s string) { f.calls = append(f.calls, "title:"+s) }
 func (f *fakeWindow) Focused() bool     { return f.focused }
+
+func (f *fakeWindow) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
+	f.calls = append(f.calls, "open")
+	f.fileOpts, f.fileDone = append(f.fileOpts, o), done
+}
+
+func (f *fakeWindow) SaveFile(o dialog.FileOptions, done func(dialog.FileResult)) {
+	f.calls = append(f.calls, "save")
+	f.fileOpts, f.fileDone = append(f.fileOpts, o), done
+}
+
+func (f *fakeWindow) PickFolder(o dialog.FileOptions, done func(dialog.FileResult)) {
+	f.calls = append(f.calls, "folder")
+	f.fileOpts, f.fileDone = append(f.fileOpts, o), done
+}
+
+func (f *fakeWindow) MessageBox(o dialog.MessageOptions, done func(dialog.Button)) {
+	f.calls = append(f.calls, "message")
+	f.msgOpts, f.msgDone = append(f.msgOpts, o), done
+}
 
 func TestWindowStateIsReactive(t *testing.T) {
 	win := &fakeWindow{}

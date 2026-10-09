@@ -18,6 +18,7 @@ package platform
 import (
 	"time"
 
+	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/input"
 )
 
@@ -76,6 +77,14 @@ type TitleBarHandler interface {
 	TitleArea(w Window, x, y float32) TitleArea
 }
 
+// MenuBarHandler is optionally implemented by a Handler whose window shows an
+// application menu bar. When Alt is pressed and released alone, the adapter
+// asks it, and if the bar takes that key itself, the system menu does not
+// open. Windows without a menu bar keep the system's behavior.
+type MenuBarHandler interface {
+	HasMenuBar() bool
+}
+
 // FrameWaiter is optionally implemented by a Handler whose frames the GPU paces.
 // FrameWaitable returns a handle that is signaled when the window can take its
 // next frame, or 0 when it has none. The adapter renders such a window once the
@@ -128,6 +137,13 @@ type Window interface {
 	// in physical client pixels) so input-method windows appear next to it.
 	// A zero rect means no text field has focus.
 	SetTextInputRect(r Rect)
+
+	// ShowFileDialog opens a file or folder dialog owned by this window. It
+	// returns at once, and done runs on the UI thread when the dialog closes.
+	ShowFileDialog(kind dialog.FileKind, o dialog.FileOptions, done func(dialog.FileResult))
+	// ShowMessageBox opens a message box owned by this window, and calls done
+	// on the UI thread with the button chosen when it closes.
+	ShowMessageBox(o dialog.MessageOptions, done func(dialog.Button))
 }
 
 // Handler receives everything the adapter produces. All methods are called on

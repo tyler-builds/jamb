@@ -24,9 +24,9 @@ func (a *App) menuBar(ctx *ui.Context) ui.Element {
 			ui.TopMenu{Label: "File", Items: func() []ui.MenuItem {
 				return []ui.MenuItem{
 					{Action: NewNote},
-					// Import... waits for the native file dialog. The dialog should
-					// call a.importFiles with the paths it returns, as a drop does.
-					{Label: "Import...", Disabled: true},
+					{Label: "Import...", OnClick: func() { a.importNotes(ctx) }},
+					{Label: "Export note...", Disabled: a.s.Find(a.s.Selected.Peek()) == nil,
+						OnClick: func() { a.exportNote(ctx) }},
 					ui.MenuSeparator(),
 					{Label: "Exit", OnClick: ctx.Window().Close},
 				}

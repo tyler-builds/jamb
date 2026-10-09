@@ -65,18 +65,6 @@ func TestFileMenuNewNote(t *testing.T) {
 	}
 }
 
-// Import... waits for the file dialog, so it is disabled: it does not run and the
-// menu stays open.
-func TestFileMenuImportIsDisabled(t *testing.T) {
-	r := newRig(t)
-	r.clickKey("jamb.menubar.0")
-	before := len(r.s.Notes.Peek())
-	r.clickKey("jamb.menu.0.1")
-	if !r.menuOpen() || len(r.s.Notes.Peek()) != before {
-		t.Errorf("Import...: menu open %v, notes %d (was %d); want open and no change", r.menuOpen(), len(r.s.Notes.Peek()), before)
-	}
-}
-
 // Edit and View show the shortcuts of the window's real bindings.
 func TestMenuBarShowsShortcuts(t *testing.T) {
 	r := newRig(t)
@@ -136,6 +124,33 @@ func TestNoteRowMenuPinsAndDeletes(t *testing.T) {
 	r.clickKey("jamb.menu.0.2") // Delete
 	if r.s.Selected.Peek() != n.ID {
 		t.Errorf("Delete selected %q, want the note %q", r.s.Selected.Peek(), n.ID)
+	}
+}
+
+// Delete asks for confirmation in the editor, with Cancel and Delete buttons:
+// Cancel keeps the note, and Delete removes it.
+func TestDeleteAsksForConfirmation(t *testing.T) {
+	r := newRig(t)
+	n := r.s.Create()
+	r.s.Create() // a second note, so the first is not the selected one
+	r.frame()
+	before := len(r.s.Notes.Peek())
+
+	r.rightClickKey(t, n.ID)
+	r.clickKey("jamb.menu.0.2") // Delete: asks, and deletes nothing yet
+	if !strings.Contains(r.dump(), "Delete this note?") || len(r.s.Notes.Peek()) != before {
+		t.Fatalf("Delete did not ask first: notes %d (was %d)", len(r.s.Notes.Peek()), before)
+	}
+	r.clickKey("confirm-cancel")
+	if len(r.s.Notes.Peek()) != before || strings.Contains(r.dump(), "Delete this note?") {
+		t.Errorf("Cancel changed the notes (%d, was %d) or left the question open", len(r.s.Notes.Peek()), before)
+	}
+
+	r.rightClickKey(t, n.ID)
+	r.clickKey("jamb.menu.0.2")
+	r.clickKey("confirm-delete")
+	if len(r.s.Notes.Peek()) != before-1 || r.s.Find(n.ID) != nil {
+		t.Errorf("Delete left %d notes (was %d) or kept the note", len(r.s.Notes.Peek()), before)
 	}
 }
 

@@ -34,7 +34,11 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			}).
 			Child(Sidebar(s)).
 			Child(ui.Div().Width(ui.Px(1)).Height(ui.Full).Background(t.Border)).
-			Child(Main(s))
+			Child(Main(s)).
+			// Last, so the modals cover the window: the New Project form and the
+			// form sample of the Components page.
+			Child(newProjectModal(s)).
+			Child(sampleModal(s))
 	}
 }
 
@@ -239,5 +243,5 @@ func header(ctx *ui.Context, s *Store, page Page, focused bool) ui.Element {
 					Style(ui.Style{Width: ui.Px(240), MinWidth: ui.Px(140)}). // shrinks in narrow windows
 					OnChange(func(string) { s.Page.Set(PageProjects) }))).
 			Child(ui.IconButton(icons.Bell).Tooltip("Notifications")).
-			Child(ui.Button("New Project").Icon(icons.Plus).OnClick(s.AddProject)))
+			Child(ui.Button("New Project").Key("new-project").Icon(icons.Plus).OnClick(s.OpenNewProject)))
 }

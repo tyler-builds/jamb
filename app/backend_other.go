@@ -31,3 +31,5 @@ func newRenderer(w platform.Window, width, height int) (render.Renderer, error) 
 func releaseDevice() {}
 
 func rebuildDevice() error { return fmt.Errorf("no GPU backend for %s yet", runtime.GOOS) }
+
+func gpuAdapter() string { return "" }

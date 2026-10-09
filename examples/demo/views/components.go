@@ -36,6 +36,7 @@ func Components(s *Store) ui.Element {
 					sample(t, "Disabled", ui.Button("Disabled").Disabled(true)))).
 				Child(section(t, "Overlays", placements(t))).
 				Child(section(t, "Menus", dropdownSample(t), contextSample(t))).
+				Child(dialogsSection(ctx, t, s)).
 				Child(section(t, "Images",
 					fitSample(t, "Cover", ui.FitCover),
 					fitSample(t, "Contain", ui.FitContain),

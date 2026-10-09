@@ -560,6 +560,9 @@ func (rt *Runtime) keyDown(k input.Key, mods input.Modifiers, repeat bool) {
 	if !repeat && mods == 0 && (k == input.KeyEnter || k == input.KeySpace) && rt.activateFocused() {
 		return
 	}
+	if !repeat && mods == 0 && k == input.KeyEnter && rt.modalDefault() {
+		return
+	}
 	switch {
 	case k == input.KeyTab:
 		rt.cycleFocus(mods.Has(input.ModShift))
@@ -780,8 +783,18 @@ func (rt *Runtime) setFocus(id uint64) {
 		return
 	}
 	oldID := rt.focusID
-	if old := rt.byID[oldID]; old != nil && old.div != nil && old.div.h.onBlur != nil {
+	if old := rt.byID[oldID]; old != nil && old.div != nil && old.div.h.onBlur != nil && rt.blurring != oldID {
+		// Focus stays on the old element while its OnBlur runs. A focus change
+		// the handler makes then finds blurring set, so it does not call OnBlur
+		// for the same element again.
+		rt.blurring = oldID
 		old.div.h.onBlur()
+		rt.blurring = 0
+		// OnBlur moved focus on. That change ran the focus callbacks and restyles
+		// for its own elements, so this one stops here.
+		if rt.focusID != oldID {
+			return
+		}
 	}
 	rt.focusID = id
 	if n := rt.byID[id]; n != nil && n.div != nil && n.div.h.onFocus != nil {
@@ -830,8 +843,13 @@ func (rt *Runtime) tabOrder() []uint64 {
 			walk(c)
 		}
 	}
-	if rt.tree != nil {
-		walk(rt.tree)
+	// While a modal is open, Tab stays inside it.
+	root := rt.tree
+	if m := rt.topModal(); m != nil {
+		root = m
+	}
+	if root != nil {
+		walk(root)
 	}
 	if len(first) == 0 {
 		return rest

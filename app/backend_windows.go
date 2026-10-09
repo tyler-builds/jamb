@@ -35,6 +35,15 @@ func releaseDevice() {
 // recreates its swap chain; see rebuildGPU.
 func rebuildDevice() error { return gpu.Recover() }
 
+// gpuAdapter names the adapter the shared device runs on, for the recovery
+// message: the hardware GPU, or WARP after a fallback.
+func gpuAdapter() string {
+	if gpu == nil {
+		return ""
+	}
+	return gpu.Adapter()
+}
+
 func newRenderer(w platform.Window, width, height int) (render.Renderer, error) {
 	if gpu == nil {
 		dev, err := d3d11.NewDevice()

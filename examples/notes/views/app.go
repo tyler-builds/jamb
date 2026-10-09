@@ -102,9 +102,15 @@ func (a *App) newNote() {
 // maxImport is the largest file that can be imported, in bytes.
 const maxImport = 1 << 20
 
-// importNotice is the status line that says what the last drop imported. It
-// is "" when there is none.
-var importNotice = ui.NewSignal("")
+// notice is the status line's message about the last import, drop or export.
+// It is "" when there is none.
+var notice = ui.NewSignal("")
+
+// showNotice shows msg in the status line for a few seconds.
+func showNotice(msg string) {
+	notice.Set(msg)
+	time.AfterFunc(6*time.Second, func() { notice.Set("") }) // Set is safe from any goroutine
+}
 
 // importFiles makes a note from each dropped .txt or .md file up to 1 MB, titled
 // with the file name, and selects the last one. Other files are skipped. The
@@ -130,8 +136,7 @@ func (a *App) importFiles(files ui.Files, _ *ui.DropEvent) {
 	if skipped > 0 {
 		msg += fmt.Sprintf(", skipped %d %s", skipped, plural(skipped, "file"))
 	}
-	importNotice.Set(msg)
-	time.AfterFunc(6*time.Second, func() { importNotice.Set("") }) // Set is safe from any goroutine
+	showNotice(msg)
 }
 
 // importFile reads one file as a note, or returns nil if it is not an
@@ -382,8 +387,8 @@ func (a *App) status(count int) ui.Element {
 			label = "All changes saved"
 		}
 		msg := keymapError.Get()
-		if notice := importNotice.Get(); notice != "" && st.Err == "" {
-			label, color = notice, t.TextMuted
+		if line := notice.Get(); line != "" && st.Err == "" {
+			label, color = line, t.TextMuted
 		}
 		bar := ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).PaddingX(16).Height(ui.Px(40)).Shrink(0).
 			Child(ui.Div().Row().Align(ui.Center).Gap(6).MinWidth(ui.Px(0)).

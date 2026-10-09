@@ -153,3 +153,28 @@ func TestScriptAcceptsDeviceLost(t *testing.T) {
 		t.Fatalf("devicelost: %v", err)
 	}
 }
+
+// The recovery message names the adapter the rebuilt device runs on, so a
+// fallback to WARP shows in the log. Without an adapter name it is left out.
+func TestRecoveryMessageNamesAdapter(t *testing.T) {
+	now := time.Unix(1000, 0)
+	cases := []struct {
+		adapter func() string
+		want    string
+	}{
+		{func() string { return "WARP software rasterizer" }, "GPU device recovered on WARP software rasterizer; redrawing every window"},
+		{func() string { return "hardware" }, "GPU device recovered on hardware; redrawing every window"},
+		{nil, "GPU device recovered; redrawing every window"},
+	}
+	for _, c := range cases {
+		g, msgs := recoveryTest()
+		g.adapter = c.adapter
+		g.lose(now, errSimulatedLoss)
+		if _, recovered, _ := g.poll(now, func() error { return nil }); !recovered {
+			t.Fatal("poll after loss did not recover")
+		}
+		if got := (*msgs)[len(*msgs)-1]; got != c.want {
+			t.Errorf("recovery message %q, want %q", got, c.want)
+		}
+	}
+}

@@ -70,7 +70,7 @@ func TestDroppedFilesImportOnlyTextNotes(t *testing.T) {
 	if n == nil || n.Title.Peek() != "Lisbon trip" || n.Body.Peek() != "Packing list" {
 		t.Errorf("imported note = %+v; want the file name without extension as title and its text as body", n)
 	}
-	if want := "Imported 1 note, skipped 1 file"; importNotice.Peek() != want {
-		t.Errorf("status = %q; want %q", importNotice.Peek(), want)
+	if want := "Imported 1 note, skipped 1 file"; notice.Peek() != want {
+		t.Errorf("status = %q; want %q", notice.Peek(), want)
 	}
 }

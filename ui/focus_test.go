@@ -87,3 +87,34 @@ func TestFocusNowOfRemovedFieldDoesNotWait(t *testing.T) {
 		t.Error("the restore waited and took focus when the field came back")
 	}
 }
+
+// An OnBlur that moves focus to another element finishes, leaves focus there,
+// and runs no blur for the element that was focused by the move. Before the
+// fix, the old element was still focused while OnBlur ran, so the move called
+// its OnBlur again and recursed without end.
+func TestOnBlurCanMoveFocus(t *testing.T) {
+	a, b, c := NewFocusHandle(), NewFocusHandle(), NewFocusHandle()
+	var blurA, blurB, focusC int
+	r := newKeyRig(func(ctx *Context) Element {
+		return Div().Column().
+			Child(Div().FocusHandle(a).OnBlur(func() {
+				blurA++
+				c.FocusNow()
+			})).
+			Child(Div().FocusHandle(b).OnBlur(func() { blurB++ })).
+			Child(Div().FocusHandle(c).OnFocus(func() { focusC++ }))
+	})
+	a.FocusNow()
+	r.frame()
+	b.FocusNow()
+	if !c.Focused() {
+		t.Errorf("after OnBlur moved focus, focus is %d; want the element it moved to", r.rt.focusID)
+	}
+	if blurA != 1 || blurB != 0 || focusC != 1 {
+		t.Errorf("blur A %d, blur B %d, focus C %d; want 1, 0, 1", blurA, blurB, focusC)
+	}
+	r.frame()
+	if !c.Focused() || b.Focused() {
+		t.Error("after a frame, focus is not on the element OnBlur chose")
+	}
+}

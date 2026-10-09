@@ -75,6 +75,15 @@ type Store struct {
 	Windows *ui.Signal[map[int]bool]
 	// Search is the header's search field, which Ctrl+K focuses.
 	Search *ui.FocusHandle
+	// NewOpen shows the New Project form, whose fields are NewName and NewDesc.
+	NewOpen *ui.Signal[bool]
+	NewName *ui.Signal[string]
+	NewDesc *ui.Signal[string]
+	// SampleOpen shows the form sample of the Components page. SampleName is its
+	// field, and SampleResult is what it last saved.
+	SampleOpen   *ui.Signal[bool]
+	SampleName   *ui.Signal[string]
+	SampleResult *ui.Signal[string]
 
 	nextID, nextMsg int
 	// details are the project windows open, by project ID. Only the UI thread
@@ -109,20 +118,26 @@ func NewStore() *Store {
 		{Name: "Dev Runner", Description: "Watch, rebuild and restart with preserved window geometry.", Status: StatusPaused, Progress: 0.05, Tasks: 7, Updated: now.Add(-9 * 24 * time.Hour), Icon: icons.GitBranch},
 	}
 	s := &Store{
-		Page:       ui.NewSignal(PageProjects),
-		Query:      ui.NewSignal(""),
-		Filter:     ui.NewSignal(-1),
-		Selected:   ui.NewSignal(0),
-		Deploys:    ui.NewSignal(12),
-		Notify:     ui.NewSignal(true),
-		Compact:    ui.NewSignal(false),
-		DropMark:   ui.NewSignal(dropMark{}),
-		EventQuery: ui.NewSignal(""),
-		Expanded:   ui.NewSignal(map[int]bool{}),
-		Windows:    ui.NewSignal(map[int]bool{}),
-		Search:     ui.NewFocusHandle(),
-		details:    map[int]*app.WindowHandle{},
-		activity:   ui.NewListHandle(),
+		Page:         ui.NewSignal(PageProjects),
+		Query:        ui.NewSignal(""),
+		Filter:       ui.NewSignal(-1),
+		Selected:     ui.NewSignal(0),
+		Deploys:      ui.NewSignal(12),
+		Notify:       ui.NewSignal(true),
+		Compact:      ui.NewSignal(false),
+		DropMark:     ui.NewSignal(dropMark{}),
+		EventQuery:   ui.NewSignal(""),
+		Expanded:     ui.NewSignal(map[int]bool{}),
+		Windows:      ui.NewSignal(map[int]bool{}),
+		Search:       ui.NewFocusHandle(),
+		NewOpen:      ui.NewSignal(false),
+		NewName:      ui.NewSignal(""),
+		NewDesc:      ui.NewSignal(""),
+		SampleOpen:   ui.NewSignal(false),
+		SampleName:   ui.NewSignal(""),
+		SampleResult: ui.NewSignal(""),
+		details:      map[int]*app.WindowHandle{},
+		activity:     ui.NewListHandle(),
 	}
 	for i := range seed {
 		s.nextID++
@@ -136,17 +151,32 @@ func NewStore() *Store {
 	return s
 }
 
-var newNames = []string{"Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa"}
+// defaultDescription is a new project's description when its form leaves it empty.
+const defaultDescription = "Freshly created. Add a description and some tasks."
 
-// AddProject appends a new project and selects it.
-func (s *Store) AddProject() {
+// OpenNewProject shows the New Project form, empty.
+func (s *Store) OpenNewProject() {
+	s.NewName.Set("")
+	s.NewDesc.Set("")
+	s.NewOpen.Set(true)
+}
+
+// CloseNewProject hides the New Project form.
+func (s *Store) CloseNewProject() { s.NewOpen.Set(false) }
+
+// CreateProject adds a project with the name and description given, puts it at
+// the top of the list and selects it, and shows the Projects page with every
+// project listed. An empty description gets defaultDescription.
+func (s *Store) CreateProject(name, desc string) {
+	if desc == "" {
+		desc = defaultDescription
+	}
 	s.nextID++
 	id := s.nextID
-	name := "Project " + newNames[(id-7+len(newNames)*8)%len(newNames)]
 	ics := []*icons.Icon{icons.Star, icons.Folder, icons.Activity, icons.Box, icons.Layers}
 	s.Projects.Update(func(ps []Project) []Project {
 		p := Project{
-			ID: id, Name: name, Description: "Freshly created. Add a description and some tasks.",
+			ID: id, Name: name, Description: desc,
 			Status: StatusActive, Progress: 0, Tasks: 0, Updated: time.Now(),
 			Icon: ics[id%len(ics)], Color: ui.Hex(palette[id%len(palette)]),
 		}

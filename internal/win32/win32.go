@@ -78,6 +78,11 @@ var (
 	procGetCurrentThreadId            = kernel32.NewProc("GetCurrentThreadId")
 	procPostThreadMessageW            = user32.NewProc("PostThreadMessageW")
 	procDwmExtendFrameIntoClientArea  = dwmapi.NewProc("DwmExtendFrameIntoClientArea")
+	procIsWindow                      = user32.NewProc("IsWindow")
+	procMessageBoxW                   = user32.NewProc("MessageBoxW")
+	procCoCreateInstance              = ole32.NewProc("CoCreateInstance")
+	procCoTaskMemFree                 = ole32.NewProc("CoTaskMemFree")
+	procSHCreateItemFromParsingName   = shell32.NewProc("SHCreateItemFromParsingName")
 
 	procFindFirstChangeNotificationW = kernel32.NewProc("FindFirstChangeNotificationW")
 	procFindNextChangeNotification   = kernel32.NewProc("FindNextChangeNotification")
@@ -612,6 +617,50 @@ func GetCurrentThreadID() uint32 {
 func PostThreadMessage(thread uint32, msg uint32) {
 	procPostThreadMessageW.Call(uintptr(thread), uintptr(msg), 0, 0)
 }
+
+// ---- dialogs ----
+
+// The button IDs MessageBox returns.
+const (
+	IDOK     = 1
+	IDCANCEL = 2
+	IDYES    = 6
+	IDNO     = 7
+)
+
+// MessageBox shows a message box owned by owner, which it makes modal to that
+// window. It returns the button's ID, or 0 if the box could not be shown.
+func MessageBox(owner uintptr, text, caption string, flags uint32) int {
+	t, _ := syscall.UTF16PtrFromString(text)
+	c, _ := syscall.UTF16PtrFromString(caption)
+	r, _, _ := procMessageBoxW.Call(owner, uintptr(unsafe.Pointer(t)), uintptr(unsafe.Pointer(c)), uintptr(flags))
+	return int(r)
+}
+
+// IsWindow reports whether hwnd is still a window.
+func IsWindow(hwnd uintptr) bool {
+	r, _, _ := procIsWindow.Call(hwnd)
+	return r != 0
+}
+
+// CoCreateInstance creates an in-process COM object of class clsid, and stores
+// its interface iid in obj. It returns the HRESULT.
+func CoCreateInstance(clsid, iid unsafe.Pointer, obj *uintptr) uintptr {
+	const clsctxInprocServer = 1
+	r, _, _ := procCoCreateInstance.Call(uintptr(clsid), 0, clsctxInprocServer, uintptr(iid), uintptr(unsafe.Pointer(obj)))
+	return r
+}
+
+// SHCreateItemFromParsingName creates a shell item for the path, which must be
+// NUL-terminated UTF-16, and stores its IShellItem interface iid in item. It
+// returns the HRESULT.
+func SHCreateItemFromParsingName(path *uint16, iid unsafe.Pointer, item *uintptr) uintptr {
+	r, _, _ := procSHCreateItemFromParsingName.Call(uintptr(unsafe.Pointer(path)), 0, uintptr(iid), uintptr(unsafe.Pointer(item)))
+	return r
+}
+
+// CoTaskMemFree frees memory that a COM call returned, such as a path string.
+func CoTaskMemFree(p uintptr) { procCoTaskMemFree.Call(p) }
 
 // ---- timers ----
 

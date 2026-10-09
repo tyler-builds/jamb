@@ -28,6 +28,7 @@ type ButtonElement struct {
 	tooltip  string
 	style    Style
 	key      string
+	handle   *FocusHandle // set by Modal.Default, so the modal can focus the button
 }
 
 // Button creates a button with a text label. The default variant is Primary.
@@ -98,6 +99,9 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		// Enabled buttons take part in Tab navigation and respond to Enter and
 		// Space. The focus ring is a spread shadow, so it adds no layout shift.
 		d.Focusable()
+		if b.handle != nil {
+			d.FocusHandle(b.handle)
+		}
 		if b.onClick != nil {
 			d.OnClick(b.onClick)
 		}

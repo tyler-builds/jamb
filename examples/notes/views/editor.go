@@ -40,8 +40,8 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 		if confirming {
 			actions.
 				Child(ui.Text("Delete this note?").Size(13).Color(t.TextMuted).NoWrap()).
-				Child(ui.Button("Cancel").Ghost().Small().OnClick(func() { a.confirm.Set("") })).
-				Child(ui.Button("Delete").Danger().Small().Icon(icons.Trash).OnClick(func() {
+				Child(ui.Button("Cancel").Key("confirm-cancel").Ghost().Small().OnClick(func() { a.confirm.Set("") })).
+				Child(ui.Button("Delete").Key("confirm-delete").Danger().Small().Icon(icons.Trash).OnClick(func() {
 					a.confirm.Set("")
 					a.s.Delete(n)
 				}))

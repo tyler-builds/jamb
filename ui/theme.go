@@ -30,6 +30,7 @@ type Theme struct {
 
 	Scrollbar Color
 	FocusRing Color
+	Scrim     Color // the dimmed backdrop behind a Modal
 
 	Radius   float32
 	FontSize float32
@@ -59,6 +60,7 @@ var DarkTheme = &Theme{
 	Danger:        Hex("#ef4444"),
 	Scrollbar:     Hex("#ffffff33"),
 	FocusRing:     Hex("#818cf8"),
+	Scrim:         Hex("#00000099"),
 	Radius:        8,
 	FontSize:      14,
 }
@@ -86,6 +88,7 @@ var LightTheme = &Theme{
 	Danger:        Hex("#dc2626"),
 	Scrollbar:     Hex("#0000003d"),
 	FocusRing:     Hex("#6366f1"),
+	Scrim:         Hex("#18181b59"),
 	Radius:        8,
 	FontSize:      14,
 }

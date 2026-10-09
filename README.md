@@ -44,6 +44,7 @@ ui/                declarative API: Div, Text, Button, TextInput, TextArea, Icon
                    Style, Theme, Signal, Component, FocusHandle, Animate; runtime (build → layout → paint, events)
 keymap/            key bindings from JSON files (Parse, Load, File); uses only ui's exported API
 ease/              easing functions for animation (Linear, OutCubic, Bounce...); imports nothing
+dialog/            native dialog types (file open, save and folder; message box), shared by ui and platform
 layout/            flexbox-subset layout engine (no drawing, no text)
 scene/             GPU-friendly primitives (Quad/shadow, Glyph, Image, Clip, Transform)
 render/            Renderer interface; render/d3d11 = Direct3D 11 backend
@@ -215,6 +216,11 @@ inside the nearest scroll container. Text is shaped with HarfBuzz (via
 and font fallback for other writing systems all work. Input-method windows
 open at the caret.
 
+App code reads and writes the clipboard's plain text with `ctx.Clipboard()`,
+which returns the text and whether there is any, and `ctx.SetClipboard(s)`.
+Text fields use the same clipboard. Only plain text is supported for now;
+images and HTML are future work.
+
 ### Gradients
 
 ```go
@@ -304,6 +310,9 @@ when that changes.
   `FocusHandle` while Tab skips it.
 - **Tab reveals.** Tab scrolls the element it moves to into view, in its nearest
   vertically scrolling ancestor.
+- **Focus moves in OnBlur.** An `OnBlur` handler may move focus to another
+  element. The move takes effect, and the element it left is not blurred a
+  second time.
 
 ### Rich text
 
@@ -732,7 +741,8 @@ ui.MenuBar(
   over another label opens that one. Left and Right move between the top-level
   menus, also from inside an open menu. Down, Enter or Space open the highlighted
   menu from the focused bar. Escape or Tab leaves the bar. The labels are not in
-  the Tab order.
+  the Tab order. A window without a menu bar keeps Windows' own Alt behavior,
+  which opens the system menu; with one, a lone Alt press is taken by the bar.
 - **Look.** Menus use the theme's surface, border, shadow and highlight colors.
   They enter and leave with the same motion as the command palette.
 - **Roles.** `item.Role()` returns the WAI-ARIA name of an entry (`RoleMenuItem`,
@@ -935,6 +945,90 @@ ui.Div().Row().Height(ui.Px(32)).WindowArea(ui.AreaDrag).Justify(ui.End).
   lets Windows 11 show Snap Layouts over the maximize button.
 - Windows with the operating system's title bar ignore areas.
 
+### Native dialogs
+
+`ctx.Window()` opens the system's own dialogs, each owned by the window: a file
+open dialog, a file save dialog, a folder picker and a message box. A dialog
+returns at once. Its result goes to a callback on the UI thread when the dialog
+closes, so a handler does not wait inside the dialog's message loop:
+
+```go
+ctx.Window().OpenFiles(dialog.FileOptions{
+	Title:    "Import notes",
+	Filters:  []dialog.Filter{{Name: "Notes", Patterns: []string{"*.md", "*.txt"}}},
+	Multiple: true, // several files; Folder and Name also apply (see the dialog package)
+}, func(r dialog.FileResult) {
+	switch {
+	case r.Err != nil: // the dialog could not open
+	case r.Canceled:   // the user closed it without choosing: a result, not an error
+	default:           // r.Paths, as the dialog returns them
+	}
+})
+
+ctx.Window().SaveFile(dialog.FileOptions{Name: "Untitled.md", Extension: "md", Filters: filters}, done)
+ctx.Window().PickFolder(dialog.FileOptions{Title: "Choose a folder"}, done)
+ctx.Window().MessageBox(dialog.MessageOptions{
+	Title: "Delete note", Text: "Delete this note?", Icon: dialog.IconQuestion,
+	Buttons: dialog.ButtonsYesNo, Default: dialog.No, // Enter chooses No
+}, func(b dialog.Button) { /* dialog.Yes, dialog.No, dialog.OK or dialog.Cancel */ })
+```
+
+- Icons are `IconInfo`, `IconWarning`, `IconError` and `IconQuestion`. Button
+  sets are `ButtonsOK`, `ButtonsOKCancel`, `ButtonsYesNo` and
+  `ButtonsYesNoCancel`. `Default` is the button Enter chooses; zero means the
+  first button of the set.
+- A callback is not run on a headless runtime, which has no window.
+- The owner window is disabled while its dialog is open, as Windows does for
+  any modal dialog, so it takes no input. Its frames, and those of the app's
+  other windows, keep drawing: a timer on the owner renders them while the
+  dialog's own message loop runs.
+- The callbacks are asynchronous on purpose. A blocking call would run the
+  dialog's loop inside the event that opened it, while the runtime is still
+  handling that event. The callback shape also matches a macOS sheet, which
+  reports its result the same way.
+- Calls go from `ui` through the app to `platform.Window`. `ui` does not import
+  `platform`.
+- File dialogs use `IFileOpenDialog` and `IFileSaveDialog`, called through
+  their vtables from pure Go. Message boxes use `MessageBoxW`: `TaskDialog`
+  shows richer boxes, but it needs a common-controls version 6 manifest, which
+  packaging will add. Message boxes can then move to it without changing the
+  API.
+- The notes and demo apps use these dialogs. The Components page of the demo
+  shows each one.
+
+### Modal dialogs
+
+`ui.Modal` is a dialog in the app's own look: a dimmed backdrop, and a panel
+centered on it with a title, a body and footer buttons. Build it only while it
+is open, and place it last in the window's root element, which must fill the
+window:
+
+```go
+ui.If(open.Get(), ui.Modal("New project", form).
+	Footer(cancel, create).
+	Default(create).             // Enter runs it; it takes focus if the body has no field
+	InitialFocus(h).             // optional: the element that takes focus when it opens
+	CloseOnBackdrop().           // optional: a press on the backdrop closes it
+	OnClose(closeFn))            // Escape, or a backdrop press when CloseOnBackdrop is set
+```
+
+![A modal form over the Projects page](docs/screenshots/modal-new-project.png)
+
+- Focus moves into the modal when it opens: to the first field of the body that
+  Tab reaches, else to the default button. Tab and Shift+Tab cycle through the
+  modal only. When the modal closes, focus returns to the element that had it,
+  unless focus has moved elsewhere.
+- Escape closes the modal through the overlay rules (see
+  [Escape and overlays](#actions-and-key-bindings)). Enter presses a focused
+  button as usual, and otherwise runs the default button. A multi-line field
+  takes Enter as a newline. A single-line field with no `OnSubmit` passes Enter
+  on to the default button.
+- Its placement is `ui.OverCenter`, a new overlay placement that centers the
+  panel over its anchor. Colors come from `Theme.Scrim` and the surface colors,
+  and the modal enters and leaves with the same motion as the command palette.
+- A modal does not stop the app's own key bindings, so a global shortcut still
+  runs while one is open.
+
 ### GPU device loss
 
 When the GPU device is removed or reset (a driver update or crash, a remote
@@ -948,6 +1042,8 @@ needs no code for this, and the ui state of every window is kept.
   first, then WARP, as at startup), its pipelines and states, and then each
   window's swap chain. The windows draw again. One loss causes one rebuild, however
   many windows are open.
+- The recovery log line names the adapter the device runs on, `hardware` or
+  `WARP software rasterizer`, so a fallback to WARP shows in the log.
 - Textures are uploaded again from memory, and nothing is decoded or rasterized
   twice. Each image and glyph atlas keeps its CPU pixels for its whole life, so
   this needs no extra memory: width × height × 4 bytes per image, and each glyph
@@ -982,7 +1078,7 @@ These environment variables work with any jamb app, with no code changes:
 | Variable | Effect |
 |---|---|
 | `JAMB_TRACE=1` | Prints startup timings, per-frame build/layout/paint cost, and frames per second of activity, so you can confirm the app is idle. |
-| `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `devicelost` simulates a GPU device loss; see [GPU device loss](#gpu-device-loss). |
+| `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `type TEXT` types everything after the one space that follows `type`, spaces included. `devicelost` simulates a GPU device loss; see [GPU device loss](#gpu-device-loss). |
 | `JAMB_STRESS=rebuild\|paint` | Measures sustained frame cost, allocation and GC, prints the results, then exits. |
 | `JAMB_VSYNC=0` | Turns off vsync, for throughput tests. |
 | `JAMB_D3D_DEBUG=1` | Enables the Direct3D debug layer. |
@@ -1058,6 +1154,16 @@ On the Projects page:
   clipping, per-side borders, motion and focus styles, one section each. Its
   Menus section has a dropdown and a context menu with a submenu; their shortcuts
   come from the demo's bindings.
+- **New Project** opens a modal form with a name and a description. Create adds
+  the project, selects it and shows the Projects page. It is disabled until the
+  name has text. Cancel, Escape and a press on the backdrop close the form
+  without adding a project.
+- The Components page's **Dialogs** section opens each native dialog and shows
+  what it returned, by file name only, never by folder. Its Clipboard buttons
+  copy and paste plain text, and **Form in a modal** opens a modal form.
+
+![The Dialogs section of the Components page](docs/screenshots/components-dialogs.png)
+
 - Keyboard: Ctrl+1 to Ctrl+5 open the Dashboard, Projects, Activity, Components
   and Settings pages, Ctrl+K moves focus to the search field, and Ctrl+Shift+L
   toggles the theme.
@@ -1091,12 +1197,19 @@ features: focus handles, `AutoFocus`, and `FocusWithin`.
   `ZoomIn`, `ZoomOut` and `ZoomReset`, so the View menu shows them. The level is
   remembered in `settings.json` next to the notes file and shown in the status bar
   when it isn't 100% (click it to reset).
-- A menu bar above the notes has File (New note, Import..., Exit), Edit (undo,
-  redo, cut, copy, paste, select all), and View (toggle theme, zoom, command
-  palette). Each item with a key shows that key. Import... is disabled until the
-  native file dialog exists. It should call `importFiles` with the chosen paths,
-  as a drop does. Alt by itself focuses the bar. Right-click a note in the list
-  for Pin or Unpin, and Delete.
+- A menu bar above the notes has File (New note, Import..., Export note...,
+  Exit), Edit (undo, redo, cut, copy, paste, select all), and View (toggle theme,
+  zoom, command palette). Each item with a key shows that key. Alt by itself
+  focuses the bar. Right-click a note in the list for Pin or Unpin, and Delete.
+- **Import...** opens the native file dialog with `*.md` and `*.txt` offered and
+  several files allowed. The files chosen go through the same import as a drop,
+  and the status line reports the count. **Export note...** saves the selected
+  note: the file is plain text when the chosen name ends in `.txt`, and Markdown,
+  with the title as a heading, otherwise. The dialog offers the title as the
+  name. The status line names the file, not its folder.
+- Delete in the editor asks for confirmation inline, with Cancel and Delete
+  buttons. It does not use a message box, so the notes app shows no native
+  dialog for it.
 - The seeded "Languages" note shows ten scripts, ligatures and emoji.
 - With a search query, matches (case-insensitive) are highlighted in each
   listed note's title and snippet.
@@ -1260,8 +1373,16 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   dropdown would then reopen it. The submenu delay is a timer, not a triangle.
   The menu bar's labels are not in the Tab order. The roles are in place for
   UI Automation, which is not wired.
+- **Dialogs and clipboard.** Native dialogs run on Windows only. Message boxes
+  use `MessageBoxW`, not `TaskDialog`, which needs the common-controls version 6
+  manifest that packaging will add. The clipboard is plain text only: images and
+  HTML are not supported. On Windows 11 the file, folder and message box dialogs
+  were driven through UI Automation and window messages. They opened owned by
+  their window, returned their results, and canceled correctly, and the window
+  stayed disabled and kept drawing while a dialog was open. Not checked: dialogs
+  in other languages, and high-contrast themes.
 - **Not attempted (non-goals).** Accessibility, tray,
-  dialogs, CSS grid, and the optional utility-class shorthand
+  CSS grid, and the optional utility-class shorthand
   (`.Class("flex col gap-2")`). The shorthand was skipped in favor of typed
   styles.
 

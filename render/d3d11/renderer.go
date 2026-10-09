@@ -82,6 +82,7 @@ type Device struct {
 	device  *com
 	ctx     *com
 	factory *com // IDXGIFactory2 of the adapter, creates the window swap chains
+	warp    bool // the device runs on the WARP software rasterizer, not the hardware
 	cbuf    *com
 	blend   *com
 	// blendDual blends subpixel glyphs with dual-source blending; nil when
@@ -283,7 +284,17 @@ func (d *Device) createOn(driver, flags uintptr, levels []uint32) error {
 		return fail(err)
 	}
 	d.device, d.ctx, d.factory = device, ctx, factory
+	d.warp = driver == d3dDriverTypeWARP
 	return nil
+}
+
+// Adapter names the adapter the device runs on, for diagnostics: "hardware",
+// or "WARP software rasterizer" when Direct3D fell back to WARP.
+func (d *Device) Adapter() string {
+	if d.warp {
+		return "WARP software rasterizer"
+	}
+	return "hardware"
 }
 
 // createSwapChain creates the window's swap chain. The preferred one is a

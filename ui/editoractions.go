@@ -285,9 +285,16 @@ func (rt *Runtime) editorDeleteStep(id uint64, dir int, word bool) {
 }
 
 func (rt *Runtime) editorConfirm(id uint64) {
-	if n, _, v := rt.editorOf(id); n != nil && n.editor.onSubmit != nil {
-		n.editor.onSubmit(v)
+	n, _, v := rt.editorOf(id)
+	if n == nil {
+		return
 	}
+	if n.editor.onSubmit != nil {
+		n.editor.onSubmit(v)
+		return
+	}
+	// A field without OnSubmit passes Enter to the open modal's default button.
+	rt.modalDefault()
 }
 
 func (rt *Runtime) editorSelectAll(id uint64) {

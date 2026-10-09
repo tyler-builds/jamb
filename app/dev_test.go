@@ -71,3 +71,33 @@ func TestScriptRejectsUnknownKey(t *testing.T) {
 		t.Fatalf("cmd+k: err = %v; want an error naming the key", err)
 	}
 }
+
+// type keeps its text exactly after the one space that follows the step name:
+// the leading spaces of the text are typed, and so are trailing ones.
+func TestScriptTypeKeepsText(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"type  and after", " and after"},
+		{"type hi", "hi"},
+		{"type hi ", "hi "},
+		{"idle; type a b ; exit", "a b "},
+		{"type   three", "  three"},
+	}
+	for _, c := range cases {
+		s, err := parseScript(c.src)
+		if err != nil {
+			t.Fatalf("parseScript(%q): %v", c.src, err)
+		}
+		var got string
+		for _, st := range s.steps {
+			if st.op == "type" {
+				got = st.arg
+			}
+		}
+		if got != c.want {
+			t.Errorf("parseScript(%q): type text %q, want %q", c.src, got, c.want)
+		}
+	}
+	if _, err := parseScript("type"); err == nil {
+		t.Error("a type step with no text parsed; want an error")
+	}
+}

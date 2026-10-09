@@ -78,6 +78,8 @@ type DivElement struct {
 	area         WindowArea        // see WindowArea
 	contextMenu  func() []MenuItem // see ContextMenu
 	menuBar      bool              // set by MenuBar on the bar
+	modal        *modalSpec        // set on the backdrop of a Modal (see modal.go)
+	modalFooter  bool              // set on a Modal's footer, which the initial focus skips
 }
 
 // Div creates an empty container. Children stack vertically (Column) unless

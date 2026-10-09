@@ -43,7 +43,8 @@ import (
 //	                menu (the Apps key), f1..f12, a..z, 0..9, = (plus), - (minus); optionally with
 //	                modifiers ctrl, shift, alt, super: ctrl+z, ctrl+shift+left.
 //	                An unknown key or modifier stops the script with an error
-//	type TEXT       type text (rest of the step)
+//	type TEXT       type TEXT exactly as written after the one space that follows
+//	                "type"; other spaces are kept, and a ';' ends the step
 //	drop X Y PATH... drop files at (X, Y), as if dragged in from the desktop;
 //	                paths are separated by spaces
 //	wait MS         wait MS milliseconds (rendering continues)
@@ -198,15 +199,25 @@ type script struct {
 	idleCount int
 }
 
+// typeText returns the text of a type step: everything after the single space
+// that separates it from "type". Other spaces, leading or trailing, are kept.
+func typeText(seg string) string {
+	_, text, _ := strings.Cut(strings.TrimLeft(seg, " \t"), " ")
+	return text
+}
+
 func parseScript(src string) (*script, error) {
 	s := &script{target: 1}
-	for _, raw := range strings.Split(src, ";") {
-		raw = strings.TrimSpace(raw)
+	for _, seg := range strings.Split(src, ";") {
+		raw := strings.TrimSpace(seg)
 		if raw == "" {
 			continue
 		}
 		op, rest, _ := strings.Cut(raw, " ")
 		st := step{op: op, arg: strings.TrimSpace(rest)}
+		if op == "type" {
+			st.arg = typeText(seg)
+		}
 		nums := strings.Fields(rest)
 		parse := func(i int) (float32, error) {
 			if i >= len(nums) {

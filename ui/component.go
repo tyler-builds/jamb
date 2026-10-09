@@ -138,6 +138,15 @@ func (c *Context) Zoom() float32 { return c.rt.zoom }
 // SetZoom scales the whole UI (see Runtime.SetZoom).
 func (c *Context) SetZoom(z float32) { c.rt.SetZoom(z) }
 
+// Clipboard returns the clipboard's plain text, with LF line endings, and false
+// when it holds none. Text fields use the same clipboard. Only plain text is
+// supported; images and HTML are not yet. Headless runtimes keep a clipboard of
+// their own.
+func (c *Context) Clipboard() (string, bool) { return c.rt.clipboard() }
+
+// SetClipboard replaces the clipboard's plain text (see Clipboard).
+func (c *Context) SetClipboard(s string) { c.rt.setClipboard(s) }
+
 // Invalidate re-renders the current component on the next frame.
 func (c *Context) Invalidate() {
 	if c.inst != nil {

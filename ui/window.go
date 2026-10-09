@@ -3,6 +3,7 @@ package ui
 import (
 	"time"
 
+	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/icons"
 )
 
@@ -73,6 +74,20 @@ type WindowControls interface {
 	// Focused reports whether the window has keyboard focus. Read inside a
 	// component, it is reactive.
 	Focused() bool
+
+	// OpenFiles shows the system's file-open dialog, owned by this window. It
+	// returns at once; done runs on the UI thread when the dialog closes, with
+	// the files chosen or Canceled set. See the dialog package.
+	OpenFiles(o dialog.FileOptions, done func(dialog.FileResult))
+	// SaveFile shows the system's file-save dialog, owned by this window. done
+	// runs as for OpenFiles.
+	SaveFile(o dialog.FileOptions, done func(dialog.FileResult))
+	// PickFolder shows the system's folder dialog, owned by this window. done
+	// runs as for OpenFiles.
+	PickFolder(o dialog.FileOptions, done func(dialog.FileResult))
+	// MessageBox shows a message box, owned by this window, and runs done with
+	// the button chosen.
+	MessageBox(o dialog.MessageOptions, done func(dialog.Button))
 }
 
 // windowRef is what Context.Window returns. Its actions go to the app's
@@ -107,6 +122,33 @@ func (w windowRef) SetTitle(title string) {
 
 func (w windowRef) Maximized() bool { return w.rt.maximized.Get() }
 func (w windowRef) Focused() bool   { return w.rt.focused.Get() }
+
+// The dialogs go to the app's controls. A headless runtime has no window, so
+// they do nothing and done is not called.
+
+func (w windowRef) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
+	if c := w.rt.windowCtl; c != nil {
+		c.OpenFiles(o, done)
+	}
+}
+
+func (w windowRef) SaveFile(o dialog.FileOptions, done func(dialog.FileResult)) {
+	if c := w.rt.windowCtl; c != nil {
+		c.SaveFile(o, done)
+	}
+}
+
+func (w windowRef) PickFolder(o dialog.FileOptions, done func(dialog.FileResult)) {
+	if c := w.rt.windowCtl; c != nil {
+		c.PickFolder(o, done)
+	}
+}
+
+func (w windowRef) MessageBox(o dialog.MessageOptions, done func(dialog.Button)) {
+	if c := w.rt.windowCtl; c != nil {
+		c.MessageBox(o, done)
+	}
+}
 
 // SetWindowControls connects the runtime to its window. The app calls it once,
 // before the first frame.

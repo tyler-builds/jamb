@@ -34,6 +34,9 @@ type gpuRecovery struct {
 	reported map[string]bool // failure messages already printed for this loss
 	// logf receives the recovery messages; nil prints them to stderr.
 	logf func(format string, args ...any)
+	// adapter names the adapter the rebuilt device runs on, for the recovery
+	// message; nil leaves the name out.
+	adapter func() string
 }
 
 // lose marks the device as lost at now. It reports whether the device was not
@@ -70,7 +73,11 @@ func (g *gpuRecovery) poll(now time.Time, rebuild func() error) (ready, recovere
 		return false, false, g.retryAt
 	}
 	g.lost, g.failures, g.reported = false, 0, nil
-	g.print("GPU device recovered; redrawing every window")
+	msg := "GPU device recovered"
+	if g.adapter != nil {
+		msg += " on " + g.adapter()
+	}
+	g.print("%s; redrawing every window", msg)
 	return true, true, time.Time{}
 }
 

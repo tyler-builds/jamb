@@ -23,6 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/internal/watch"
 	"github.com/tyler-builds/jamb/keymap"
 	"github.com/tyler-builds/jamb/platform"
@@ -130,6 +131,7 @@ func (a *App) RunE(w Window) error {
 	}
 	w = withDefaults(w)
 	application.dev = loadDevOptions()
+	application.gpu.adapter = gpuAdapter
 	// Parse fonts and warm the shaper while the first window and GPU device
 	// are being created; the first window's runtime picks the result up.
 	ready := make(chan *text.System, 1)
@@ -492,6 +494,9 @@ func (h *host) OnClose(w platform.Window) bool {
 	return true
 }
 
+// HasMenuBar implements platform.MenuBarHandler.
+func (h *host) HasMenuBar() bool { return h.rt != nil && h.rt.HasMenuBar() }
+
 // TitleArea implements platform.TitleBarHandler: it maps a point in physical
 // client pixels to the title-bar area the ui marked there.
 func (h *host) TitleArea(w platform.Window, x, y float32) platform.TitleArea {
@@ -636,6 +641,22 @@ func (c windowControls) Maximized() bool   { return c.h.win.Maximized() }
 func (c windowControls) Close()            { c.h.win.Close() }
 func (c windowControls) SetTitle(s string) { c.h.win.SetTitle(s) }
 func (c windowControls) Focused() bool     { return c.h.focused }
+
+func (c windowControls) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
+	c.h.win.ShowFileDialog(dialog.Open, o, done)
+}
+
+func (c windowControls) SaveFile(o dialog.FileOptions, done func(dialog.FileResult)) {
+	c.h.win.ShowFileDialog(dialog.Save, o, done)
+}
+
+func (c windowControls) PickFolder(o dialog.FileOptions, done func(dialog.FileResult)) {
+	c.h.win.ShowFileDialog(dialog.Folder, o, done)
+}
+
+func (c windowControls) MessageBox(o dialog.MessageOptions, done func(dialog.Button)) {
+	c.h.win.ShowMessageBox(o, done)
+}
 
 // FrameWaitable implements platform.FrameWaiter: the window's swap chain
 // signals when it can take another frame, so the adapter renders it then.
