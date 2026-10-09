@@ -48,6 +48,9 @@ import (
 //	wait MS         wait MS milliseconds (rendering continues)
 //	idle            wait until all animations have settled (repeating ones never
 //	                settle, so they are not waited for)
+//	devicelost      simulate a GPU device loss: the device is released, and the
+//	                loss is handled as if the next Present had failed, so every
+//	                window rebuilds its swap chain (see recovery.go)
 //	shot PATH       save a PNG screenshot of the next frame
 //	exit            close the window
 //
@@ -249,9 +252,9 @@ func parseScript(src string) (*script, error) {
 			if err == nil && st.n < 1 {
 				err = fmt.Errorf("JAMB_SCRIPT step %q: windows are numbered from 1", raw)
 			}
-		case "idle", "exit":
+		case "idle", "exit", "devicelost":
 		default:
-			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, down, up, scroll, key, type, drop, wait, idle, shot or exit", op)
+			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, down, up, scroll, key, type, drop, wait, idle, devicelost, shot or exit", op)
 		}
 		if err != nil {
 			return nil, err
@@ -397,6 +400,8 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 				return true
 			}
 			s.idleCount = 0
+		case "devicelost":
+			simulateDeviceLoss()
 		case "shot":
 			s.shotPath = st.arg
 			s.i++

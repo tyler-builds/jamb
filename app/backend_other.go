@@ -26,3 +26,8 @@ func quitUI() {}
 func newRenderer(w platform.Window, width, height int) (render.Renderer, error) {
 	return nil, fmt.Errorf("no GPU backend for %s yet", runtime.GOOS)
 }
+
+// No backend reports a lost device, so these are never reached.
+func releaseDevice() {}
+
+func rebuildDevice() error { return fmt.Errorf("no GPU backend for %s yet", runtime.GOOS) }

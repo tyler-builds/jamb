@@ -60,8 +60,10 @@ func check(what string, r uintptr) error {
 
 func hint(h hresult) string {
 	switch uint32(h) {
-	case 0x887A0005:
+	case dxgiErrorDeviceRemoved:
 		return " (DXGI_ERROR_DEVICE_REMOVED: the GPU was reset or the driver crashed)"
+	case dxgiErrorDeviceReset:
+		return " (DXGI_ERROR_DEVICE_RESET: the GPU was reset)"
 	case 0x887A0001:
 		return " (DXGI_ERROR_INVALID_CALL: a parameter or struct layout is wrong)"
 	case 0x80070057:
@@ -94,6 +96,8 @@ const (
 	dxgiScalingNone           = 1
 	dxgiMWANoAltEnter         = 2
 	dxgiStatusOccluded        = 0x087A0001
+	dxgiErrorDeviceRemoved    = 0x887A0005
+	dxgiErrorDeviceReset      = 0x887A0007
 	d3dUsageDefault           = 0
 	d3dUsageDynamic           = 2
 	d3dUsageStaging           = 3

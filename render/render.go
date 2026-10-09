@@ -5,10 +5,17 @@
 package render
 
 import (
+	"errors"
 	"image"
 
 	"github.com/tyler-builds/jamb/scene"
 )
+
+// ErrDeviceLost is returned, wrapped, by BeginFrame and EndFrame when the GPU
+// device was removed or reset (a driver update or crash, a remote desktop
+// switch, sleep and resume). Nothing can be drawn until the device and the
+// window's surface are recreated; see the backend's Recover and Recreate.
+var ErrDeviceLost = errors.New("render: GPU device lost")
 
 // Renderer draws scene primitives into a window surface.
 //

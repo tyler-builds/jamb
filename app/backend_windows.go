@@ -23,6 +23,18 @@ func postUI(fn func()) { windows.Post(fn) }
 
 func quitUI() { windows.Quit() }
 
+// releaseDevice releases the shared device and its objects, as a removal
+// leaves them; see simulateDeviceLoss.
+func releaseDevice() {
+	if gpu != nil {
+		gpu.ReleaseDevice()
+	}
+}
+
+// rebuildDevice recreates the shared device after a loss. Each window then
+// recreates its swap chain; see rebuildGPU.
+func rebuildDevice() error { return gpu.Recover() }
+
 func newRenderer(w platform.Window, width, height int) (render.Renderer, error) {
 	if gpu == nil {
 		dev, err := d3d11.NewDevice()

@@ -94,7 +94,12 @@ type Device struct {
 	// dualSource is set when subpixel glyphs can use dual-source blending.
 	dualSource bool
 	// textures are uploaded once per device, so a glyph atlas or image is
-	// shared by every window that draws it.
+	// shared by every window that draws it. After Recover the map is empty, and
+	// each texture is uploaded again from its scene.Texture.Pix. That copy lives
+	// as long as the texture, so recovery repeats no decode or rasterization. It
+	// costs no memory beyond what the texture already holds: w*h*4 bytes for an
+	// image, and each glyph atlas at its current size (up to 16 MB grayscale and
+	// 64 MB ClearType).
 	textures map[uint64]*gpuTexture
 }
 
@@ -160,27 +165,56 @@ func (r *Renderer) SetVSync(on bool) { r.noVSync = !on }
 
 var _ render.Renderer = (*Renderer)(nil)
 
+// errDeviceReleased is returned for a window created or recreated on a device
+// that was released and not recovered yet.
+var errDeviceReleased = errors.New("d3d11: the GPU device was released and has not been recovered")
+
 // NewDevice creates the Direct3D 11 device and the pipelines and states every
 // window shares. Call it once; NewRenderer adds a window to it.
 func NewDevice() (*Device, error) {
 	d := &Device{textures: map[uint64]*gpuTexture{}}
-	if err := d.createDevice(); err != nil {
-		return nil, err
-	}
-	if err := d.createPipelines(); err != nil {
-		d.Close()
-		return nil, err
-	}
-	if err := d.createStates(); err != nil {
+	if err := d.create(); err != nil {
 		d.Close()
 		return nil, err
 	}
 	return d, nil
 }
 
+// create creates the Direct3D device and every object it owns: pipelines,
+// blend, raster and sampler states, and the constant buffer.
+func (d *Device) create() error {
+	if err := d.createDevice(); err != nil {
+		return err
+	}
+	if err := d.createPipelines(); err != nil {
+		return err
+	}
+	return d.createStates()
+}
+
+// Recover recreates the device and every object it owns after a loss (or after
+// ReleaseDevice). The shaders come from the bytecode cache. Textures are not
+// recreated here: each is uploaded again from its CPU pixels the next time a
+// frame draws it, so glyph atlases and images come back without being
+// rasterized or decoded again. Each window then calls Renderer.Recreate. Recover
+// may fail while the GPU is still unavailable; it can be called again.
+func (d *Device) Recover() error {
+	d.release()
+	return d.create()
+}
+
+// ReleaseDevice releases the device and every object it owns, as a removal
+// leaves them, without waiting for one. It is the simulation hook for the
+// devicelost script step (see app/dev.go): nothing may draw until Recover runs.
+// The windows' swap chains are released by Renderer.Recreate.
+func (d *Device) ReleaseDevice() { d.release() }
+
 // NewRenderer creates a swap chain of width×height physical pixels for the
 // window hwnd, on this device.
 func (d *Device) NewRenderer(hwnd uintptr, width, height int) (*Renderer, error) {
+	if d.device == nil {
+		return nil, errDeviceReleased
+	}
 	r := &Renderer{Device: d, hwnd: hwnd, width: width, height: height}
 	if err := r.createSwapChain(); err != nil {
 		return nil, err
@@ -325,13 +359,13 @@ func (d *Device) limitLatency() {
 func (r *Renderer) createTarget() error {
 	var back *com
 	hr, _, _ := syscall.SyscallN(r.swap.fn(9), r.swap.this(), 0, uintptr(unsafe.Pointer(&iidID3D11Texture2D)), uintptr(unsafe.Pointer(&back))) // GetBuffer
-	if err := check("IDXGISwapChain::GetBuffer", hr); err != nil {
+	if err := r.checkDevice("IDXGISwapChain::GetBuffer", hr); err != nil {
 		return err
 	}
 	defer back.Release()
 	var rtv *com
 	hr, _, _ = syscall.SyscallN(r.device.fn(9), r.device.this(), back.this(), 0, uintptr(unsafe.Pointer(&rtv))) // CreateRenderTargetView
-	if err := check("ID3D11Device::CreateRenderTargetView", hr); err != nil {
+	if err := r.checkDevice("ID3D11Device::CreateRenderTargetView", hr); err != nil {
 		return err
 	}
 	r.rtv = rtv
@@ -343,7 +377,7 @@ func (r *Renderer) resize(w, h int) error {
 	r.rtv.Release()
 	r.rtv = nil
 	hr, _, _ := syscall.SyscallN(r.swap.fn(13), r.swap.this(), 0, uintptr(w), uintptr(h), dxgiFormatUnknown, uintptr(r.swapFlags)) // ResizeBuffers
-	if err := check("IDXGISwapChain::ResizeBuffers", hr); err != nil {
+	if err := r.checkDevice("IDXGISwapChain::ResizeBuffers", hr); err != nil {
 		return err
 	}
 	r.width, r.height = w, h
@@ -662,7 +696,7 @@ func (r *Renderer) EndFrame() error {
 	// Constants.
 	var m mappedSubresource
 	hr, _, _ := syscall.SyscallN(r.ctx.fn(14), r.ctx.this(), r.cbuf.this(), 0, d3dMapWriteDiscard, 0, uintptr(unsafe.Pointer(&m))) // Map
-	if err := check("Map(constants)", hr); err != nil {
+	if err := r.checkDevice("Map(constants)", hr); err != nil {
 		return err
 	}
 	consts := [8]float32{float32(r.width), float32(r.height), 0, 0, r.text.Gamma, r.text.Contrast, r.text.Level}
@@ -735,7 +769,7 @@ func (r *Renderer) EndFrame() error {
 	if hr == dxgiStatusOccluded {
 		return nil
 	}
-	return check("IDXGISwapChain::Present", hr)
+	return r.checkDevice("IDXGISwapChain::Present", hr)
 }
 
 func (r *Renderer) upload(p pipelineKind, data unsafe.Pointer, count int) error {
@@ -753,7 +787,7 @@ func (r *Renderer) upload(p pipelineKind, data unsafe.Pointer, count int) error 
 		desc := bufferDesc{ByteWidth: uint32(capacity), Usage: d3dUsageDynamic, BindFlags: d3dBindVertexBuffer, CPUAccessFlags: d3dCPUAccessWrite}
 		var buf *com
 		hr, _, _ := syscall.SyscallN(r.device.fn(3), r.device.this(), uintptr(unsafe.Pointer(&desc)), 0, uintptr(unsafe.Pointer(&buf))) // CreateBuffer
-		if err := check("CreateBuffer(instances)", hr); err != nil {
+		if err := r.checkDevice("CreateBuffer(instances)", hr); err != nil {
 			vb.buf, vb.capacity = nil, 0
 			return err
 		}
@@ -761,7 +795,7 @@ func (r *Renderer) upload(p pipelineKind, data unsafe.Pointer, count int) error 
 	}
 	var m mappedSubresource
 	hr, _, _ := syscall.SyscallN(r.ctx.fn(14), r.ctx.this(), vb.buf.this(), 0, d3dMapWriteDiscard, 0, uintptr(unsafe.Pointer(&m))) // Map
-	if err := check("Map(instances)", hr); err != nil {
+	if err := r.checkDevice("Map(instances)", hr); err != nil {
 		return err
 	}
 	copy(unsafe.Slice((*byte)(ptrFrom(m.PData)), size), unsafe.Slice((*byte)(data), size))
@@ -788,11 +822,11 @@ func (r *Renderer) syncTexture(t *scene.Texture) error {
 		init := subresourceData{PSysMem: uintptr(unsafe.Pointer(&t.Pix[0])), SysMemPitch: uint32(t.Width * t.BytesPerPixel())}
 		g = &gpuTexture{width: t.Width, height: t.Height}
 		hr, _, _ := syscall.SyscallN(r.device.fn(5), r.device.this(), uintptr(unsafe.Pointer(&desc)), uintptr(unsafe.Pointer(&init)), uintptr(unsafe.Pointer(&g.tex))) // CreateTexture2D
-		if err := check(fmt.Sprintf("CreateTexture2D(%dx%d)", t.Width, t.Height), hr); err != nil {
+		if err := r.checkDevice(fmt.Sprintf("CreateTexture2D(%dx%d)", t.Width, t.Height), hr); err != nil {
 			return err
 		}
 		hr, _, _ = syscall.SyscallN(r.device.fn(7), r.device.this(), g.tex.this(), 0, uintptr(unsafe.Pointer(&g.srv))) // CreateShaderResourceView
-		if err := check("CreateShaderResourceView", hr); err != nil {
+		if err := r.checkDevice("CreateShaderResourceView", hr); err != nil {
 			g.tex.Release()
 			return err
 		}
@@ -849,25 +883,60 @@ func (r *Renderer) readBack() (*image.RGBA, error) {
 // Close implements render.Renderer. It releases the window's swap chain; the
 // device stays for the other windows.
 func (r *Renderer) Close() {
-	if r.waitable != 0 {
-		win32.CloseHandle(r.waitable)
-	}
 	if r.ctx != nil {
 		syscall.SyscallN(r.ctx.fn(33), r.ctx.this(), 0, 0, 0) // OMSetRenderTargets(0, nil, nil)
 	}
+	r.releaseSwap()
+	*r = Renderer{Device: r.Device}
+}
+
+// releaseSwap releases the window's swap chain, its render target and its
+// waitable object. It is safe for a window whose chain was never created or
+// was already released.
+func (r *Renderer) releaseSwap() {
+	if r.waitable != 0 {
+		win32.CloseHandle(r.waitable)
+		r.waitable = 0
+	}
 	r.rtv.Release()
 	r.swap.Release()
-	*r = Renderer{Device: r.Device}
+	r.rtv, r.swap = nil, nil
+}
+
+// Recreate builds the window's swap chain and render target again on the
+// device, after Device.Recover. The Renderer stays the same object, so the
+// window's ui runtime and its state are untouched. The new chain has no size of
+// its own here: the next BeginFrame resizes it to the window's current size.
+func (r *Renderer) Recreate() error {
+	if r.device == nil {
+		return errDeviceReleased
+	}
+	r.releaseSwap()
+	r.flip, r.swap1 = false, false
+	r.width, r.height = 0, 0
+	// Reset so the next frame sets the background color on the new chain.
+	r.clear = scene.Color{}
+	if err := r.createSwapChain(); err != nil {
+		return err
+	}
+	return r.createTarget()
 }
 
 // Close releases the device and every GPU resource it owns. The windows
 // rendering with it must be closed first.
 func (d *Device) Close() {
+	d.release()
+	*d = Device{}
+}
+
+// release releases the device and every object it owns, and leaves the Device
+// with an empty texture map. It accepts a Device whose creation failed part way
+// or that was already released.
+func (d *Device) release() {
 	for _, t := range d.textures {
 		t.srv.Release()
 		t.tex.Release()
 	}
-	d.textures = nil
 	for i := range d.vbufs {
 		d.vbufs[i].buf.Release()
 	}
@@ -889,7 +958,27 @@ func (d *Device) Close() {
 	d.ctx.Release()
 	d.factory.Release()
 	d.device.Release()
-	*d = Device{}
+	*d = Device{textures: map[uint64]*gpuTexture{}}
+}
+
+// checkDevice is check for a call on the device. When the device was removed
+// or reset, the error wraps render.ErrDeviceLost. A call can also fail for
+// another reason while the device is gone, so the device is asked for its
+// removal reason before the error is returned as an ordinary one.
+func (d *Device) checkDevice(what string, hr uintptr) error {
+	err := check(what, hr)
+	if err == nil || d.device == nil {
+		return err
+	}
+	if h := hresult(hr); h == dxgiErrorDeviceRemoved || h == dxgiErrorDeviceReset {
+		return fmt.Errorf("%w: %v", render.ErrDeviceLost, err)
+	}
+	// GetDeviceRemovedReason (ID3D11Device vtable index 39) is S_OK while the
+	// device is healthy.
+	if reason, _, _ := syscall.SyscallN(d.device.fn(39), d.device.this()); hresult(reason) != 0 {
+		return fmt.Errorf("%w: %v", render.ErrDeviceLost, err)
+	}
+	return err
 }
 
 // ptrFrom converts a pointer returned by Direct3D (not Go memory).

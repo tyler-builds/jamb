@@ -857,6 +857,46 @@ ui.Div().Row().Height(ui.Px(32)).WindowArea(ui.AreaDrag).Justify(ui.End).
   lets Windows 11 show Snap Layouts over the maximize button.
 - Windows with the operating system's title bar ignore areas.
 
+### GPU device loss
+
+When the GPU device is removed or reset (a driver update or crash, a remote
+desktop switch, a hybrid-GPU switch, sleep and resume), jamb rebuilds it. The app
+needs no code for this, and the ui state of every window is kept.
+
+- A frame detects the loss from `Present`, `ResizeBuffers`, `Map`, resource
+  creation, or the device's removal reason, and reports it as
+  `render.ErrDeviceLost`.
+- The first window to draw afterwards recreates the shared device (hardware
+  first, then WARP, as at startup), its pipelines and states, and then each
+  window's swap chain. The windows draw again. One loss causes one rebuild, however
+  many windows are open.
+- Textures are uploaded again from memory, and nothing is decoded or rasterized
+  twice. Each image and glyph atlas keeps its CPU pixels for its whole life, so
+  this needs no extra memory: width × height × 4 bytes per image, and each glyph
+  atlas at its current size (up to 16 MB for grayscale and 64 MB for ClearType).
+  The atlases are not reset, so glyphs stay cached.
+- While the device is unavailable, a failed rebuild is retried after 250 ms, and
+  the delay doubles up to 5 s. Each distinct failure is printed once per loss.
+  Windows do not draw in between, and they stay responsive, so closing one still
+  works.
+
+Known limits:
+
+- A window opened while the device is lost does not open; it fails with a message
+  and can be opened again once the device is back.
+- If the hardware device cannot be created, the WARP software fallback may succeed.
+  The app then keeps drawing on WARP until it restarts.
+- A device lost while every window is minimized is noticed when a window is
+  restored.
+- The rebuild has been checked with the simulation below, which releases the
+  device itself. A real removal from the driver has not been checked automatically.
+
+`JAMB_SCRIPT` step `devicelost` simulates a loss. It releases the device and its
+objects, then handles the loss as if the next `Present` had reported
+`DXGI_ERROR_DEVICE_REMOVED`. The next frame rebuilds the device and redraws every
+window. It is the only way to exercise this path without a real driver reset, and
+it does not reset the driver.
+
 ## Tools for humans and coding agents
 
 These environment variables work with any jamb app, with no code changes:
@@ -864,7 +904,7 @@ These environment variables work with any jamb app, with no code changes:
 | Variable | Effect |
 |---|---|
 | `JAMB_TRACE=1` | Prints startup timings, per-frame build/layout/paint cost, and frames per second of activity, so you can confirm the app is idle. |
-| `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. |
+| `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `devicelost` simulates a GPU device loss; see [GPU device loss](#gpu-device-loss). |
 | `JAMB_STRESS=rebuild\|paint` | Measures sustained frame cost, allocation and GC, prints the results, then exits. |
 | `JAMB_VSYNC=0` | Turns off vsync, for throughput tests. |
 | `JAMB_D3D_DEBUG=1` | Enables the Direct3D debug layer. |
@@ -1053,7 +1093,9 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   these by hand: dragging the title bar to move the window and to snap it to an
   edge, Win+ arrows, the drop shadow and the rounded corners.
   Images and glyph textures are shared per device and stay resident after
-  the window that used them closes.
+  the window that used them closes. A lost GPU device is rebuilt
+  automatically; see [GPU device loss](#gpu-device-loss) for what was checked
+  and what was not.
 - **Text.** Shaping, bidi display, fallback, selection, clipboard and undo
   work. Still missing:
   - **IME.** Composition text appears in the system's window at the caret,

@@ -217,6 +217,7 @@ var application struct {
 	opened    int          // windows opened so far
 	script    *script      // JAMB_SCRIPT, which drives the windows
 	quitting  bool         // a QuitWhenClosed window is closing all windows
+	gpu       gpuRecovery  // the shared GPU device, while it is lost; see recovery.go
 }
 
 func withDefaults(w Window) Window {
@@ -307,6 +308,11 @@ type host struct {
 func (h *host) OnCreate(w platform.Window) error {
 	t0 := time.Now()
 	h.win = w
+	if application.gpu.lost {
+		// The device is rebuilt on a frame, not here; a window opened before
+		// that cannot be given a swap chain yet.
+		return errors.New("the GPU device was lost and has not been rebuilt yet; open the window again in a moment")
+	}
 	width, height := w.Size()
 	r, err := newRenderer(w, width, height)
 	if err != nil {
@@ -514,6 +520,9 @@ func (h *host) OnFrame(w platform.Window) bool {
 	}
 	h.updateViewport(w)
 	frameStart := time.Now()
+	if !h.gpuReady(frameStart) {
+		return false // the device is lost; the window is woken when it may draw
+	}
 	if h.stress != nil {
 		h.stress.begin(h, h.dev.stressSecs)
 	}
@@ -531,6 +540,10 @@ func (h *host) OnFrame(w platform.Window) bool {
 	}
 	t0 := time.Now()
 	if err := render.Draw(h.r, sc, width, height); err != nil {
+		if errors.Is(err, render.ErrDeviceLost) {
+			loseGPU(err)
+			return false
+		}
 		if h.err == nil {
 			fmt.Fprintln(os.Stderr, "jamb: rendering failed:", err)
 		}
@@ -627,6 +640,9 @@ func (c windowControls) Focused() bool     { return c.h.focused }
 // FrameWaitable implements platform.FrameWaiter: the window's swap chain
 // signals when it can take another frame, so the adapter renders it then.
 func (h *host) FrameWaitable() uintptr {
+	if application.gpu.lost {
+		return 0 // a lost chain may never signal; OnFrame waits for the rebuild instead
+	}
 	if wr, ok := h.r.(interface{ FrameWaitable() uintptr }); ok {
 		return wr.FrameWaitable()
 	}
