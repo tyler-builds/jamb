@@ -1,0 +1,28 @@
+//go:build !windows
+
+package app
+
+import (
+	"fmt"
+	"runtime"
+
+	"github.com/tyler-builds/jamb/platform"
+	"github.com/tyler-builds/jamb/render"
+)
+
+func runPlatform(start func() error) error {
+	return fmt.Errorf("the %s platform adapter is not implemented yet; this experiment currently runs on Windows only "+
+		"(see platform/%s for what an adapter must provide)", runtime.GOOS, runtime.GOOS)
+}
+
+func openPlatform(opts platform.WindowOptions, h platform.Handler) (platform.Window, error) {
+	return nil, fmt.Errorf("no window adapter for %s yet", runtime.GOOS)
+}
+
+func postUI(fn func()) {}
+
+func quitUI() {}
+
+func newRenderer(w platform.Window, width, height int) (render.Renderer, error) {
+	return nil, fmt.Errorf("no GPU backend for %s yet", runtime.GOOS)
+}

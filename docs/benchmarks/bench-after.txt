@@ -1,0 +1,27 @@
+goos: windows
+goarch: amd64
+pkg: goui/ui
+BenchmarkScale/nodes=100/full-rebuild-12         	   17078	    142407 ns/op	       102.0 built/op	         0.01382 gc/op	       102.0 laidout/op	       102.0 nodes	        73.00 painted	        21.00 rendered/op	  189306 B/op	     694 allocs/op
+BenchmarkScale/nodes=100/single-signal-update-12 	   35905	     66094 ns/op	         5.000 built/op	         0.001003 gc/op	         7.000 laidout/op	       102.0 nodes	        73.00 painted	         1.000 rendered/op	   14062 B/op	      91 allocs/op
+BenchmarkScale/nodes=100/hover-change-12         	   49665	     48556 ns/op	         0 built/op	         0 gc/op	         0 laidout/op	       102.0 nodes	        73.00 painted	         0 rendered/op	      48 B/op	       1 allocs/op
+BenchmarkScale/nodes=100/repaint-only-12         	   52621	     45855 ns/op	         0 built/op	         0 gc/op	         0 laidout/op	       102.0 nodes	        73.00 painted	         0 rendered/op	       0 B/op	       0 allocs/op
+BenchmarkScale/nodes=100/window-resize-12        	   41198	     56762 ns/op	         0 built/op	         0 gc/op	        82.00 laidout/op	       102.0 nodes	        73.00 painted	         0 rendered/op	       0 B/op	       0 allocs/op
+BenchmarkScale/nodes=1000/full-rebuild-12        	    2229	    976037 ns/op	      1002 built/op	         0.1140 gc/op	      1002 laidout/op	      1002 nodes	        73.00 painted	       201.0 rendered/op	 1848769 B/op	    6109 allocs/op
+BenchmarkScale/nodes=1000/single-signal-update-12         	   29658	     80634 ns/op	         5.000 built/op	         0.0008767 gc/op	         7.000 laidout/op	      1002 nodes	        73.00 painted	         1.000 rendered/op	   13980 B/op	      86 allocs/op
+BenchmarkScale/nodes=1000/hover-change-12                 	   48090	     49898 ns/op	         0 built/op	         0 gc/op	         0 laidout/op	      1002 nodes	        73.00 painted	         0 rendered/op	      48 B/op	       1 allocs/op
+BenchmarkScale/nodes=1000/repaint-only-12                 	   50258	     45254 ns/op	         0 built/op	         0 gc/op	         0 laidout/op	      1002 nodes	        73.00 painted	         0 rendered/op	       0 B/op	       0 allocs/op
+BenchmarkScale/nodes=1000/window-resize-12                	   18157	    135943 ns/op	         0 built/op	         0 gc/op	       802.0 laidout/op	      1002 nodes	        73.00 painted	         0 rendered/op	       0 B/op	       0 allocs/op
+BenchmarkScale/nodes=10000/full-rebuild-12                	     188	  12596895 ns/op	     10002 built/op	         0.4734 gc/op	     10002 laidout/op	     10002 nodes	        73.00 painted	      2001 rendered/op	18488264 B/op	   61874 allocs/op
+BenchmarkScale/nodes=10000/single-signal-update-12        	    8158	    301218 ns/op	         5.000 built/op	         0.0004903 gc/op	         7.000 laidout/op	     10002 nodes	        73.00 painted	         1.000 rendered/op	   13787 B/op	      86 allocs/op
+BenchmarkScale/nodes=10000/hover-change-12                	   35235	     67943 ns/op	         0 built/op	         0 gc/op	         0 laidout/op	     10002 nodes	        73.00 painted	         0 rendered/op	      48 B/op	       1 allocs/op
+BenchmarkScale/nodes=10000/repaint-only-12                	   36362	     65733 ns/op	         0 built/op	         0 gc/op	         0 laidout/op	     10002 nodes	        73.00 painted	         0 rendered/op	       0 B/op	       0 allocs/op
+BenchmarkScale/nodes=10000/window-resize-12               	     954	   3037444 ns/op	         0 built/op	         0 gc/op	      7994 laidout/op	     10002 nodes	        73.00 painted	         0 rendered/op	       0 B/op	       0 allocs/op
+BenchmarkInitialBuild/nodes=100-12                        	   10438	    213464 ns/op	         0.02347 gc/op	  323856 B/op	    1094 allocs/op
+BenchmarkInitialBuild/nodes=1000-12                       	    1929	   1057208 ns/op	         0.1493 gc/op	 2192293 B/op	    7436 allocs/op
+BenchmarkInitialBuild/nodes=10000-12                      	     211	  11170099 ns/op	         0.9384 gc/op	20874431 B/op	   74422 allocs/op
+BenchmarkUniformList/build/list/100k-12                   	   10000	    219539 ns/op	  428041 B/op	    1447 allocs/op
+BenchmarkUniformList/build/div/10k-12                     	      38	  58066982 ns/op	104308235 B/op	  352178 allocs/op
+BenchmarkUniformList/list/100k-12                         	   15158	    164238 ns/op	       195.0 nodes	   98960 B/op	     478 allocs/op
+BenchmarkUniformList/div/10k-12                           	    6882	    345905 ns/op	     50002 nodes	    6436 B/op	      99 allocs/op
+PASS
+ok  	goui/ui	52.889s

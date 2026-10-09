@@ -1,0 +1,20 @@
+# Build output stays out of the repository; Go's shared caches hold everything else.
+*.exe
+/bin/
+/out/
+*.prof
+*.test
+coverage.out
+
+# Screenshots saved by JAMB_SCRIPT "shot" or internal/iconsheet into the repository
+# root. docs/screenshots is tracked and is not matched by this pattern.
+/*.png
+
+# Local Claude Code configuration and design notes; not part of the project.
+.claude/
+/docs/spec.md
+
+# OS metadata
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,418 @@
+# Benchmarks (Milestone 5)
+
+Measured 2026-10-06 on the demo app (`examples/demo/`) unless noted.
+
+After a code review the runtime was made incremental: components keep their
+realized nodes between frames, and layout keeps its cache. See
+[Incremental updates and scaling](#incremental-updates-and-scaling) for
+those numbers.
+
+The windowed FPS and stress rows below were measured before that change.
+Re-running them afterwards wasn't possible because the display had gone to
+sleep: DWM then throttles vsync-paced presentation to about 4 Hz. With
+vsync off the app ran at 6,471 FPS, which shows `Present` wasn't really
+compositing. The CPU-side cost per frame is covered by the headless
+benchmarks instead.
+
+| | |
+|---|---|
+| Machine | Desktop PC: 6-core CPU, discrete GPU, 32 GB RAM, 165 Hz display at 100% scale |
+| OS / toolchain | Windows 11, Go 1.27.1 windows/amd64, no cgo |
+| Demo | 4 pages; 210 nodes on Projects, 227 on Activity (10,000 events in a `UniformList`) |
+
+## Summary
+
+| Metric | Result | Target |
+|---|---|---|
+| Incremental build (edit a demo or framework file) | **250–370 ms** for edits that don't change APIs, **~550–840 ms** for real edits (relink) | well under 1 s ✅ |
+| No-op rebuild | 219 ms | |
+| Cold build (empty GOCACHE, compiles the std lib too) | 7.7 s | |
+| Save → new window on screen (`jamb dev`) | **1.05–1.36 s** | |
+| Binary size | 10.4 MB default, **7.1 MB** with `-trimpath -ldflags "-s -w"` (2026-10-08; was 5.4 / 3.9 MB before HarfBuzz shaping and later features) | 5–30 MB ✅ |
+| Repository size | 487 KB (≈9k lines of Go, including tests) | |
+| Dependencies | `golang.org/x/image` only (plus pieces of `x/text` and `x/sys`); 59 MB in the module cache | |
+| Build cache produced by a cold build | 51 MB (in the shared GOCACHE, not the repo) | |
+| Startup (process start → first frame on screen) | **~200 ms**, of which ~180 ms is `D3D11CreateDeviceAndSwapChain` | perceptually instant ✅ |
+| Idle CPU | **0 ms of CPU in 10 s** (1 frame rendered in total) | ≈0% ✅ |
+| Idle memory | 41 MB private working set (Task Manager's Memory column; 74 MB working set, 102 MB private bytes); Go heap ~14 MB (2026-10-08; see below) | reasonably small ✅ |
+| Interactive FPS | holds 164 FPS (display refresh) in every mode tested | 60 / 120 FPS ✅ |
+| Uncapped throughput (vsync off) | 319 FPS repaint-only, 285 FPS with a full re-render every frame | |
+| CPU per frame, full re-render of every component | **~0.3 ms** avg (build + layout + paint + GPU submit) | budget 8.3 ms at 120 Hz |
+| CPU per frame, repaint of retained tree | **~0.13 ms** avg | |
+| One signal change, 10,000-node tree | **0.59 ms**: 1 component re-rendered, 5 nodes rebuilt, 7 re-laid out | |
+| Allocation | 3–6 KB/frame repainting; 110 KB/frame (≈550 objects) for a full re-render | |
+| GC | 0.2 cycles/s repainting; 3.5–5.7 cycles/s during continuous full re-render, 3–4 ms total pause over 4 s | |
+| Virtualized list, 100,000 rows: one 120 px scroll step and frame | **169 µs**, 195 nodes built (a plain container of 10,000 rows: 13.3 ms, 50,002 nodes) | |
+
+## How each number was produced
+
+All of these hooks are in the framework, so they work for any jamb app.
+
+### Build and footprint
+
+```
+bash scripts/bench.sh
+```
+
+The script builds into a throwaway `GOCACHE` for the cold build, so your
+real cache is untouched. For incremental builds it appends a declaration to
+a file, rebuilds, then restores the file. The first rebuild after each
+restore is slower (~700 ms) because the restored content has to be
+recompiled too; the table above reports steady-state numbers.
+
+Edits that change a package's export data, such as a new string in a view,
+force dependents to recompile and the binary to relink. That's the
+550–840 ms band, and it's what `jamb dev` reports in practice. Skipping
+DWARF (`-ldflags=-w`) saved only about 40 ms, so the runner uses default
+flags.
+
+### Startup
+
+```
+JAMB_TRACE=1 JAMB_SCRIPT="exit" ./demo.exe
+jamb: renderer ready in 180ms
+jamb: first frame presented 202ms after process start
+```
+
+The window is created hidden and shown only after the first frame is
+presented, so there's no white flash. Startup breaks down as follows:
+
+| Phase | Time |
+|---|---|
+| Direct3D device and swap chain creation | 176–184 ms |
+| Render target, pipelines and states (shader bytecode is cached on disk after the first run; compiling the HLSL costs ~50 ms once) | ~2 ms |
+| First UI build, layout and paint, including font loading and glyph rasterization | ~6–10 ms |
+| Everything else (window class, window, Go runtime) | ~10 ms |
+
+The floor is GPU driver initialization. Creating the device on a goroutine
+while the window is created would save at most ~20 ms.
+
+### Idle CPU and memory
+
+Launch the demo, wait 3 s, then read `TotalProcessorTime` before and after
+10 s (PowerShell `Get-Process`). With `JAMB_TRACE=1` the app also prints how
+many frames it renders per second of activity. When idle it renders nothing:
+the Win32 loop blocks in `GetMessage` and only wakes for input or a
+signal change.
+
+One run measured 10% CPU. That run had the mouse moving over the window,
+which is real hover work, not idle overhead.
+
+Working set and private bytes are dominated by the Direct3D driver. The Go
+heap is 6–9 MB (reported by the stress mode below).
+
+**Re-measured 2026-10-08** (memory of a default `go build` of the demo,
+three runs each, after 6 s idle):
+
+- Private working set (Task Manager's "Memory"): 41–42 MB. One earlier run
+  read 73 MB for the same binary; Windows decides how much stays resident,
+  so single readings vary. `go run` adds its own `go.exe` (~13 MB), which
+  Task Manager groups with the app under the terminal.
+- A window showing only "hello" uses the same as the demo, so the demo's
+  content costs little. The Go heap is ~10 MB for "hello" (two 1024×1024
+  glyph atlases, grayscale and ClearType, ~5 MB; Segoe UI and its parsed
+  tables ~2 MB) and ~14 MB for the demo (its images and UI tree).
+- The rest is outside Go: the GPU driver's user-mode libraries alone are
+  mapped at ~190 MB, mostly shared with other processes. Windows Notepad
+  measures about the same (40 MB private working set, 124 MB working set).
+- Private bytes dropped from 133 MB to 102 MB after the shader cache key
+  stopped using `crypto/sha256`: in current Go that import links the FIPS
+  crypto module, whose DRBG reserves a 32 MB buffer in every jamb binary. The
+  renderer now names cache files with FNV-128, and jamb imports no crypto
+  package.
+
+### Multiple windows
+
+Measured 2026-10-09 with the same machine as above, the demo's main window
+(custom title bar, 1200×760) and a project window (640×420, native title
+bar), using `JAMB_TRACE=1` and PowerShell `Get-Process` (one run each, so
+treat the numbers as rough):
+
+| | Renderer ready | First frame presented |
+|---|---|---|
+| First window (creates the Direct3D device, fonts ready) | 186–196 ms | 213–231 ms after process start |
+| Second window (device shared, swap chain only) | 1.1–1.6 ms | 4.2–4.9 ms after `app.Open` |
+
+Memory, one window running for 1.2 s, then two windows open for about 5 s:
+
+| | Private bytes | Working set |
+|---|---|---|
+| One window (before the project window opens) | 103.0 MB | 73.3 MB |
+| Two windows (project window open) | 119.1 MB | 89.9 MB |
+| Delta | +16.1 MB | +16.6 MB |
+
+The delta covers the second window's runtime, its swap chain and its
+resources, plus anything the process allocated for the first time while it
+was open. It was not broken down further.
+
+Idle CPU with the main window and a project window open and nothing
+animating: 0 ms of `TotalProcessorTime` over 10 s.
+
+Textures (glyph atlases, images) are uploaded once per device and shared by
+every window. A second window that shows the same text does not upload the
+atlas again.
+
+#### Frame pacing with two animating windows
+
+Two windows that both animate used to run at half the display rate each: one
+device-wide frame latency of one, and the windows rendering one after another,
+so each `Present` waited for a vblank in turn. Each swap chain now has its own
+frame latency waitable object (`IDXGISwapChain2::SetMaximumFrameLatency(1)`),
+and the event loop renders a window when its waitable is signaled, sleeping in
+`MsgWaitForMultipleObjectsEx` on the waitables and the message queue when none
+is.
+
+Measured on the same 165 Hz display, with `JAMB_TRACE=1` (frames in the last
+1.0 s, one run each, a looping `ui.Animate` in a 500×300 window):
+
+| | Before | After |
+|---|---|---|
+| One window | 166 fps | 165–166 fps |
+| Two windows, each | 83 fps | 166 fps |
+
+The demo's projects page scrolled with scripted wheel steps renders 166 fps
+while scrolling. Idle CPU with a main window and a project window open is 0 ms
+over 10 s once the windows have settled. The first 10 s after launch read
+15.6 ms, one timer tick, which is startup work.
+
+### Frame cost, FPS, allocation and GC
+
+```
+JAMB_STRESS=paint   JAMB_STRESS_SECONDS=4 ./demo.exe   # repaint every frame
+JAMB_STRESS=rebuild JAMB_STRESS_SECONDS=4 ./demo.exe   # re-render every component every frame
+JAMB_VSYNC=0 JAMB_STRESS=rebuild ./demo.exe            # uncapped
+```
+
+Sample output (vsync on, 165 Hz display):
+
+```
+jamb stress mode=rebuild nodes=210 frames=657 elapsed=4.00s fps=164.2
+  cpu per frame (build+layout+paint+submit): avg=342µs p50=499µs p99=1.044ms max=7.501ms
+  alloc: 112.7 KB/frame, 550 objects/frame, 18.96 MB/s; GC cycles=14 (3.5/s), pause total=3.7616ms; heap=8.6 MB
+```
+
+Per-frame CPU excludes time blocked in `Present`. On Windows, Go's
+monotonic clock has ~0.5 ms granularity, so averages are meaningful but
+p50/p99 values are quantized. The `max` values (6–7 ms) are the first
+frames, where fonts are loaded and glyphs rasterized.
+
+"Rebuild" is the worst case: it ignores signals and re-runs every
+component every frame. Normal updates are incremental, as described in the
+next section.
+
+## Incremental updates and scaling
+
+```
+go test ./ui -run xxx -bench 'Scale|InitialBuild' -benchtime 1s
+```
+
+The benchmark list is a scrolling column of keyed row components. Each row
+has 5 nodes (row, icon box, text column, two text lines) and reads its own
+signal. Times are total CPU per operation through `Runtime.Frame`: build,
+layout and paint. GPU submission isn't included.
+
+| Operation | 100 nodes | 1,000 nodes | 10,000 nodes |
+|---|---|---|---|
+| Initial build (startup, theme switch) | 162–213 µs | 1.01–1.06 ms | 10.5–11.2 ms |
+| Full re-render of every component (`InvalidateAll`) | 124–165 µs | 930–976 µs | 11.6–12.6 ms |
+| One signal change | **61–66 µs** | **77–81 µs** | **295–302 µs** |
+| Hover moves to another row | 44–49 µs | 46–50 µs | 65–68 µs |
+| Repaint only (animation frame) | 43–46 µs | 44–45 µs | 63–66 µs |
+| Window resize (width-dependent re-layout) | 52–57 µs | 133–136 µs | 1.90–3.04 ms |
+| Nodes painted by the frame (`painted`) | 73 | 73 | 73 |
+
+Measured 2026-10-08 with culling, in three runs of `docs/benchmarks/bench-after.txt`'s
+command. Each cell is the range across the runs. The machine is noisy: the
+spread is up to a third at 100 nodes and at 10,000 nodes for window resize.
+
+**Culling landed 2026-10-08.** Layout computes each node's *ink*, the
+rectangle its drawing can reach (its box, shadows, offsets, scale, glyph
+overshoot and content). Paint skips any subtree whose ink misses the visible
+area, and hit testing visits only the nodes the last paint drew. The
+benchmark's scroll column has 73 nodes on screen at every size, so painting
+and hovering a 10,000-node tree now cost about what a 100-node tree did. The
+same benchmark, run earlier the same day before culling:
+
+| Operation | 100 nodes | 1,000 nodes | 10,000 nodes |
+|---|---|---|---|
+| Initial build | 191 µs | 1.02 ms | 10.2 ms |
+| Full re-render | 114 µs | 849 µs | 10.6 ms |
+| One signal change | 62 µs | 99 µs | 904 µs |
+| Hover moves to another row | 44 µs | 92 µs | 1.30 ms |
+| Repaint only | 43 µs | 70 µs | 632 µs |
+| Window resize | 48 µs | 125 µs | 2.36 ms |
+| Nodes painted | 102 | 1,002 | 10,002 |
+
+The 2026-10-06 values, from before the overlay, list and animation work, were:
+initial build 174 µs, 1.09 ms, 9.6 ms; full re-render 111 µs, 884 µs, 10.2 ms;
+one signal change 48 µs, 74 µs, 588 µs; hover 42 µs, 67 µs, 682 µs; repaint
+40 µs, 57 µs, 378 µs; resize 44 µs, 98 µs, 1.10 ms.
+
+**Re-measured 2026-10-08, with culling.** At 10,000 nodes, repaint went from
+632 µs to about 64 µs, a hover from 1.30 ms to about 66 µs, and one signal
+change from 904 µs to about 300 µs (its frame includes a paint). The full
+re-render is 10–20% slower at 1,000 and 10,000 nodes. The extra work is the
+ink pass in layout, which measures leaves a second time to find their
+overflow; I have not profiled it further. Window resize at 10,000 nodes
+ranges 1.90–3.04 ms against 2.36 ms before, which is more noise than change.
+The earlier figure of 0.93 ms for a 10,000-node repaint came from another
+run; the same-day baseline above measured 0.63 ms.
+
+Paint still pays per-node cost for what is on screen: a node is about 1 KB, so
+a tree whose nodes are all visible is not made cheaper by culling. The compact
+per-node paint struct is the remaining step. `ui.UniformList` avoids the cost
+for long lists today.
+
+The work the runtime reports for each operation, the same at every size:
+
+| Operation | Components rendered | Nodes built | Nodes re-laid out | Allocations |
+|---|---|---|---|---|
+| One signal change | 1 | 5 | 7 | 35 (8.6 KB) |
+| Hover | 0 | 0 | 0 | 1 (48 B) |
+| Repaint | 0 | 0 | 0 | 0 |
+
+A full re-render at 10,000 nodes allocates 16 MB (61,800 objects) and
+triggers about 0.6 GCs per operation.
+
+How an update stays local:
+
+- **Signal change.** It marks the component that read the signal dirty.
+  Only that component re-renders, and only its subtree is rebuilt and
+  spliced into the retained tree in place; siblings and ancestors keep
+  their nodes.
+- **Layout.** Layout is invalidated from the changed node up to the root.
+  Clean subtrees answer from their cached measurements, and a subtree is
+  only re-arranged if it changed or its box changed size.
+- **Hover, press and focus.** These restyle just the elements whose state
+  flipped. They trigger layout only if the new style changes a layout
+  property.
+
+`ui/incremental_test.go` asserts this: exactly 1 render and 3 nodes built
+for a one-row change, the other nodes kept by identity, and an unmoved
+sibling at the same position.
+
+The costs that remain at 10,000 nodes are not rebuilds:
+
+- **Paint tests every child of every visible node.** Culling skips the
+  subtrees that are off screen, but a visible container still runs the
+  ink test on each of its children. The list here has 2,000 of them and
+  about 14 are on screen. A container with 10,000 children runs 10,000
+  tests per paint; each is a few comparisons, but the cost still grows
+  with the child count.
+- **A changed row's parent re-runs flex over all of its children.** The
+  list has 2,000 children, and each is answered from cache. That's
+  O(siblings), not O(tree).
+
+## Virtualized lists
+
+`ui.UniformList` builds, lays out, paints and hit-tests only the rows in view
+plus an overscan of four rows. Each operation below is a 120 px wheel step
+followed by one frame:
+
+```
+go test ./ui -run xxx -bench UniformList -benchtime 2s
+```
+
+| Operation | UniformList, 100,000 rows | Plain ScrollY Div, 10,000 rows |
+|---|---|---|
+| Initial build (runtime and first frame) | 213–220 µs | 58.1–58.4 ms |
+| Scroll step and frame | **157–164 µs** | 341–346 µs |
+| Nodes in the tree | **195–201** | 50,002 |
+| Allocations per step | 478 (99 KB) | 98–99 (6 KB) |
+
+Measured 2026-10-08 with culling. Before culling the plain container's step
+took 9.7 ms (13.3 ms in the earlier table): paint and the hover update after
+each scroll both visited all 50,000 nodes. Now they visit only the rows on
+screen, and the plain container's step is 341 µs.
+
+Rows are the five-node rows of the scale benchmarks. The list rebuilds its
+window roughly every other step, which accounts for its allocations. The plain
+container's allocations are a different matter. This benchmark wraps through
+all 10,000 rows, so most rows that enter view have had their text layouts
+dropped from the text cache (entries unused for 240 frames are removed), and
+those layouts are built again. Scrolling within rows that are still cached
+allocates 2 per step. Turning culling off gives about the same wrap-around
+count (97 per step measured, against 105 with culling), so culling does not
+cause it. The 2 allocations per step recorded before culling came from the
+same benchmark doing far fewer steps: at 13 ms a step, a 2 s run made about
+150 steps, never passing frame 240, so no text layout had been evicted yet.
+At today's speed the run makes thousands of steps and scrolls into evicted
+rows. With a fixed step count the numbers agree: 10 allocations per step over
+150 steps, 88 over 2,000 (`-benchtime 150x` / `2000x`).
+
+### ListOf: variable-height rows
+
+`ui.ListOf` builds only the rows in view, as `UniformList` does, but each row
+can have its own height. Its rows here alternate between 20 and 60 px and each
+is a wrapper, a row and a text node. Both lists were measured in the same run:
+
+```
+go test ./ui -run xxx -bench 'ListOf|UniformList' -benchtime 2s
+```
+
+| Operation | ListOf, 100,000 rows (varied heights) | UniformList, 100,000 rows |
+|---|---|---|
+| Initial build (runtime and first frame) | 12.6 ms (includes indexing the 100,000 keys) | 207 µs |
+| Scroll step and frame | **78 µs** | 153 µs |
+| Nodes in the tree | **126** | 195 |
+| Allocations per step | 527 (125 KB) | 480 (102 KB) |
+| Rebuild after the items slice changes | 13.6 ms, 200,887 allocations | not applicable |
+
+The rebuild is the O(n) pass that runs when the items are a new slice: it calls
+the key function for every item and reads each key's measured height. In this
+benchmark the key function is `fmt.Sprintf`, so most of the 12 ms is formatting
+the keys. A re-render with the same slice does no rebuild, so ordinary frames
+do not pay it.
+
+## Text and editing
+
+The text stack was later rebuilt on `go-text/typesetting` (a pure-Go
+HarfBuzz port with Unicode line breaking and bidi), and an editor was added
+for the notes app. These numbers measure that version.
+
+```
+go test ./text -run xxx -bench . -benchtime 300x
+```
+
+| Measurement | Result |
+|---|---|
+| Shape and wrap a ~900-character paragraph, uncached | 0.37 ms |
+| One keystroke in an 11,000-character, 50-paragraph note | **0.11 ms** (only the edited paragraph is re-shaped) |
+| Notes app, first-frame layout | 3–11 ms (fonts and shaper warmed on a goroutine during GPU device creation; 23–36 ms before that) |
+| CPU while the caret blinks | 31 ms per 10 s (two tiny frames per second, scheduled with a timer) |
+| CPU after 15 s without typing (caret solid) | 16 ms per 10 s, the measurement floor |
+| Release binary (`-trimpath -ldflags "-s -w"`) | demo 6.4 MB (was 3.9 MB before HarfBuzz), notes app 7.1 MB |
+| Module cache added | `go-text/typesetting` 23 MB |
+
+### Micro-benchmarks
+
+```
+go test ./layout -bench . -run xxx
+go test ./ui     -bench . -run xxx
+```
+
+| Benchmark | Result |
+|---|---|
+| Layout, 259 nodes | ~0.1 ms, 0 allocs |
+| Layout, 1,093–1,555 nodes (deep or wide synthetic trees, every leaf wrapping text) | ~0.7 ms, 0 allocs |
+| `ui` full rebuild + layout + paint, 251-node list | 146 µs, 559 allocs |
+| Layout after one leaf changes (50-row list) | only the leaf's 4 ancestors re-arranged (`TestIncrementalLayoutSkipsCleanSubtrees`) |
+
+## Conclusion for the experiment
+
+The question was whether Go can give a GPUI-like experience with simpler
+tooling and faster iteration without giving up runtime quality. On this
+evidence, yes:
+
+- Iteration is sub-second to build and about 1 s from save to a running window.
+- There's no native toolchain: no cgo, no C compiler, no Rust, no Node.
+- The repository is under 0.5 MB and the release binary is about 7 MB (4 MB before HarfBuzz shaping).
+- Idle CPU is zero, and frame costs are 25–60× under a 120 Hz budget.
+- Updates are incremental: a signal change in a 10,000-node tree costs about 0.6 ms.
+- The GC is not a problem at this scale: sub-millisecond pauses, a few cycles per second only under a pathological full-rebuild loop.
+
+The open risks are elsewhere, as expected:
+
+- Text: there's no complex shaping, bidi, IME or color emoji yet.
+- Platforms: macOS and Linux adapters still have to be written.
+- Rich text editing.
