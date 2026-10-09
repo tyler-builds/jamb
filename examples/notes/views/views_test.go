@@ -19,7 +19,7 @@ type rig struct {
 }
 
 func newRig(t *testing.T) *rig {
-	s, err := store.Open(filepath.Join(t.TempDir(), "notes.json"))
+	s, err := openStore(t, filepath.Join(t.TempDir(), "notes.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,6 +29,17 @@ func newRig(t *testing.T) *rig {
 	r := &rig{t, s, rt}
 	r.frame()
 	return r
+}
+
+// openStore opens a store for a test. Its pending changes are saved before
+// the test's temporary directories are removed (cleanups run last first), so
+// the background saver can't recreate a directory afterwards.
+func openStore(t *testing.T, path string) (*store.Store, error) {
+	s, err := store.Open(path)
+	if err == nil {
+		t.Cleanup(func() { s.Flush() })
+	}
+	return s, err
 }
 
 func (r *rig) frame() { r.rt.Frame(time.Now()) }
@@ -117,7 +128,7 @@ func TestAltArrowsAndDelete(t *testing.T) {
 
 func TestEditsAreSaved(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notes.json")
-	s, err := store.Open(path)
+	s, err := openStore(t, path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +138,7 @@ func TestEditsAreSaved(t *testing.T) {
 	if err := s.Flush(); err != nil {
 		t.Fatal(err)
 	}
-	s2, err := store.Open(path)
+	s2, err := openStore(t, path)
 	if err != nil {
 		t.Fatal(err)
 	}

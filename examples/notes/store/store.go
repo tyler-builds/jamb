@@ -52,6 +52,10 @@ type Store struct {
 	mu      sync.Mutex
 	pending bool
 	kick    chan struct{}
+	// saving is held from the pending check through the write, by the saver
+	// and by Flush, so once Flush returns no write is in flight or still to
+	// come for the changes it saw.
+	saving sync.Mutex
 }
 
 type fileNote struct {
@@ -368,15 +372,18 @@ func (s *Store) saver() {
 			}
 			break
 		}
+		s.saving.Lock()
 		s.mu.Lock()
 		if !s.pending {
 			s.mu.Unlock()
+			s.saving.Unlock()
 			continue
 		}
 		s.pending = false
 		s.mu.Unlock()
 		s.Save.Set(SaveState{Saving: true, At: s.Save.Peek().At})
 		err := s.write()
+		s.saving.Unlock()
 		st := SaveState{At: time.Now()}
 		if err != nil {
 			st.Err = err.Error()
@@ -387,6 +394,8 @@ func (s *Store) saver() {
 
 // Flush writes pending changes immediately (call before exiting).
 func (s *Store) Flush() error {
+	s.saving.Lock()
+	defer s.saving.Unlock()
 	s.mu.Lock()
 	pending := s.pending
 	s.pending = false

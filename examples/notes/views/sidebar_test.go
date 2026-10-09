@@ -11,8 +11,6 @@ import (
 
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/ui"
-
-	"github.com/tyler-builds/jamb/examples/notes/store"
 )
 
 // seededRig opens a store with n notes whose snippets vary in length.
@@ -36,7 +34,7 @@ func seededRig(t *testing.T, n int) *rig {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.Open(path)
+	s, err := openStore(t, path)
 	if err != nil {
 		t.Fatal(err)
 	}

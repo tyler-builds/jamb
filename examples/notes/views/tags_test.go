@@ -175,7 +175,7 @@ func TestTagChipsWrapInsideSidebar(t *testing.T) {
 
 func TestTagsPersist(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notes.json")
-	s, err := store.Open(path)
+	s, err := openStore(t, path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestTagsPersist(t *testing.T) {
 	if err := s.Flush(); err != nil {
 		t.Fatal(err)
 	}
-	s2, err := store.Open(path)
+	s2, err := openStore(t, path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestOldFileWithoutTagsLoads(t *testing.T) {
 	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.Open(path)
+	s, err := openStore(t, path)
 	if err != nil {
 		t.Fatal(err)
 	}
