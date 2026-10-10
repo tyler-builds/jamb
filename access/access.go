@@ -112,18 +112,22 @@ func (r Role) Interactive() bool {
 type State uint32
 
 const (
-	StateFocusable State = 1 << iota // the node can take keyboard focus
-	StateFocused                     // the node has keyboard focus
-	StateDisabled                    // the node is shown but cannot be operated
-	StateChecked                     // a check box, switch or radio button is on; a menu item is checked
-	StateMixed                       // a check box is in the indeterminate state
-	StateExpanded                    // the node is open (a menu, a tree item)
-	StateSelected                    // the node is selected (a list item, a tab)
-	StateReadOnly                    // a text field can be read but not edited
-	StateRequired                    // a field must be filled in
-	StateInvalid                     // a field's value is not valid
-	StateOffscreen                   // the node is clipped out of view by a scroll container
-	StateMultiLine                   // a text field takes several lines
+	StateFocusable          State = 1 << iota // the node can take keyboard focus
+	StateFocused                              // the node has keyboard focus
+	StateDisabled                             // the node is shown but cannot be operated
+	StateChecked                              // a check box, switch or radio button is on; a menu item is checked
+	StateMixed                                // a check box is in the indeterminate state
+	StateExpanded                             // the node is open (a menu, a tree item)
+	StateSelected                             // the node is selected (a list item, a tab)
+	StateReadOnly                             // a text field can be read but not edited
+	StateRequired                             // a field must be filled in
+	StateInvalid                              // a field's value is not valid
+	StateOffscreen                            // the node is clipped out of view by a scroll container
+	StateMultiLine                            // a text field takes several lines
+	StateExpandable                           // the node opens and closes; StateExpanded says whether it is open
+	StateSelectable                           // the node is one item of a selection; StateSelected says whether it is chosen
+	StateSelectionContainer                   // the node holds selection items, such as the chips of a filter
+	StateToggle                               // the node has an on or off state; StateChecked says whether it is on
 )
 
 // Has reports whether all the flags in f are set.
@@ -145,6 +149,10 @@ var stateNames = [...]struct {
 	{StateInvalid, "invalid"},
 	{StateOffscreen, "offscreen"},
 	{StateMultiLine, "multi-line"},
+	{StateExpandable, "expandable"},
+	{StateSelectable, "selectable"},
+	{StateSelectionContainer, "selection container"},
+	{StateToggle, "toggle"},
 }
 
 // String lists the flags that are set, such as "focusable focused".
@@ -163,29 +171,72 @@ func (s State) String() string {
 type Action uint8
 
 const (
-	ActionClick          Action = iota // invoke: press the control
-	ActionFocus                        // move keyboard focus to the node
-	ActionExpand                       // open the node
-	ActionCollapse                     // close the node
-	ActionToggle                       // change a check box or switch
-	ActionSelect                       // select a list item, tab or radio button
-	ActionSetValue                     // replace a text field's value
-	ActionScrollIntoView               // scroll the node into view
-	ActionIncrement                    // raise a value (a slider or spin box)
-	ActionDecrement                    // lower a value
+	ActionClick            Action = iota // invoke: press the control
+	ActionFocus                          // move keyboard focus to the node
+	ActionExpand                         // open the node
+	ActionCollapse                       // close the node
+	ActionToggle                         // change a check box or switch
+	ActionSelect                         // select a list item, tab or radio button
+	ActionSetValue                       // replace a text field's value
+	ActionScrollIntoView                 // scroll the node into view
+	ActionIncrement                      // raise a value (a slider or spin box)
+	ActionDecrement                      // lower a value
+	ActionScroll                         // scroll a container by a fraction of its view (see Request)
+	ActionSetScrollPercent               // scroll a container to a percent of its range (see Request)
 )
 
 var actionNames = [...]string{
-	ActionClick:          "click",
-	ActionFocus:          "focus",
-	ActionExpand:         "expand",
-	ActionCollapse:       "collapse",
-	ActionToggle:         "toggle",
-	ActionSelect:         "select",
-	ActionSetValue:       "set value",
-	ActionScrollIntoView: "scroll into view",
-	ActionIncrement:      "increment",
-	ActionDecrement:      "decrement",
+	ActionClick:            "click",
+	ActionFocus:            "focus",
+	ActionExpand:           "expand",
+	ActionCollapse:         "collapse",
+	ActionToggle:           "toggle",
+	ActionSelect:           "select",
+	ActionSetValue:         "set value",
+	ActionScrollIntoView:   "scroll into view",
+	ActionIncrement:        "increment",
+	ActionDecrement:        "decrement",
+	ActionScroll:           "scroll",
+	ActionSetScrollPercent: "set scroll percent",
+}
+
+// Request is an action with its argument, which the bridge passes to the
+// runtime. Value is the new text for ActionSetValue. X and Y are the position
+// for ActionSetScrollPercent, in percent of each axis's scrollable range, where
+// a negative value leaves that axis alone. For ActionScroll they are the
+// fraction of the view to move, positive down and right.
+type Request struct {
+	Action Action
+	Value  string
+	X, Y   float64
+}
+
+// Scroll describes a scroll container. A node with Container set exposes the
+// scroll pattern; the other fields are read by the adapter.
+type Scroll struct {
+	Container    bool    // the node is a scroll container
+	CanX, CanY   bool    // the content is larger than the view on that axis
+	X, Y         float64 // the position on each axis, in percent of the scrollable range
+	ViewX, ViewY float64 // the visible part of the content on each axis, in percent
+}
+
+// Property names a property of a node that a client can watch for changes.
+type Property uint8
+
+const (
+	PropertyName     Property = iota // the name
+	PropertyValue                    // the value of a text field
+	PropertyToggle                   // the on or off state of a toggle
+	PropertyExpanded                 // whether an expandable node is open
+	PropertySelected                 // whether a selection item is chosen
+	PropertyEnabled                  // whether the node can be operated
+)
+
+// PropertyChange records that a property of a node changed between two
+// snapshots.
+type PropertyChange struct {
+	ID       ID
+	Property Property
 }
 
 // String returns the action's name, such as "click".
@@ -245,7 +296,7 @@ type Node struct {
 	// Key is the element's key in the ui package, exposed as the automation
 	// ID so that tests can find a node by something other than its name.
 	Key         string
-	Value       string // the current value of a text field (phase B)
+	Value       string // the current value of a text field
 	States      State
 	Actions     []Action
 	Bounds      Rect
@@ -258,6 +309,7 @@ type Node struct {
 	PosInSet    int  // 1-based position among its siblings in a set, such as a row of a list; 0 when not in a set
 	SetSize     int  // the number of items in the set; 0 when not in a set
 	Level       int  // the nesting depth of a menu or tree item, 1 for the top; 0 when not set
+	Scroll      Scroll
 }
 
 // Has reports whether the node supports action a.
@@ -282,7 +334,7 @@ func (n *Node) Equal(o *Node) bool {
 	return n.ID == o.ID && n.Role == o.Role && n.Name == o.Name && n.Description == o.Description &&
 		n.Key == o.Key && n.Value == o.Value && n.States == o.States && n.Bounds == o.Bounds &&
 		n.Parent == o.Parent && n.Heading == o.Heading && n.PosInSet == o.PosInSet &&
-		n.SetSize == o.SetSize && n.Level == o.Level &&
+		n.SetSize == o.SetSize && n.Level == o.Level && n.Scroll == o.Scroll &&
 		equalIDs(n.Children, o.Children) && equalIDs(n.LabelledBy, o.LabelledBy) &&
 		equalIDs(n.DescribedBy, o.DescribedBy) && equalIDs(n.Controls, o.Controls) &&
 		equalActions(n.Actions, o.Actions)

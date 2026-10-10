@@ -18,10 +18,10 @@ func (a *App) tagChips() ui.Element {
 		if len(tags) == 0 {
 			return nil
 		}
-		chips := ui.Div().Row().Wrap().Gap(6).PaddingX(12).PaddingY(6).Shrink(0)
+		chips := ui.Div().Row().Wrap().Gap(6).PaddingX(12).PaddingY(6).Shrink(0).SelectionContainer().Label("Filter by tag")
 		for _, tag := range tags {
 			on := tag == active
-			chips.Child(ui.Div().Row().Align(ui.Center).Gap(3).PaddingX(9).PaddingY(3).Radius(999).
+			chips.Child(ui.Div().Selected(on).Row().Align(ui.Center).Gap(3).PaddingX(9).PaddingY(3).Radius(999).
 				Border(1, t.Border).Cursor(ui.CursorPointer).Transition(fast).
 				Hover(ui.Style{Background: t.SurfaceHover}).
 				When(on, func(d *ui.DivElement) {

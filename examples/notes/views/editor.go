@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 
@@ -44,13 +45,15 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 				Child(ui.Button("Delete").Key("confirm-delete").Danger().Small().Icon(icons.Trash).OnClick(func() {
 					a.confirm.Set("")
 					a.s.Delete(n)
+					ui.Announce("Note deleted", access.Polite)
 				}))
 		} else {
-			pin := ui.IconButton(icons.Star).OnClick(func() { a.s.TogglePin(n) })
-			if n.Pinned.Get() {
-				pin.Style(ui.Style{TextColor: t.Warning}).Label("Unpin note").Tooltip("Unpin")
-			} else {
-				pin.Label("Pin note").Tooltip("Pin")
+			// The pin is a toggle button: its name stays "Pin note", and its state
+			// says whether the note is pinned.
+			pinned := n.Pinned.Get()
+			pin := ui.IconButton(icons.Star).Label("Pin note").Checked(pinned).Tooltip("Pin").OnClick(func() { a.s.TogglePin(n) })
+			if pinned {
+				pin.Style(ui.Style{TextColor: t.Warning}).Tooltip("Unpin")
 			}
 			themeIcon := icons.Sun
 			if !t.Dark {
@@ -60,7 +63,7 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 				Child(pin).
 				Child(ui.IconButton(icons.Trash).Label("Delete note").Tooltip("Delete note").OnClick(func() { a.confirm.Set(n.ID) })).
 				Child(ui.Div().Width(ui.Px(1)).Height(ui.Px(20)).MarginX(4).Background(t.Border)).
-				Child(ui.IconButton(themeIcon).Label("Toggle theme").Tooltip("Toggle theme (" + ctx.KeysFor(ToggleTheme) + ")").OnClick(func() { toggleTheme(ctx) }))
+				Child(ui.IconButton(themeIcon).Label("Toggle theme").Checked(t.Dark).Tooltip("Toggle theme (" + ctx.KeysFor(ToggleTheme) + ")").OnClick(func() { toggleTheme(ctx) }))
 		}
 		return bar.Child(actions)
 	}).Key("toolbar-" + n.ID)

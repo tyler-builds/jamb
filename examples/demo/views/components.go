@@ -16,7 +16,7 @@ func Components(s *Store) ui.Element {
 		return ui.Div().Grow(1).ScrollY().
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(1100)).
 				Child(ui.Div().Gap(4).
-					Child(ui.Text("Components").Size(26).Semibold()).
+					Child(ui.Div().Heading(1).Child(ui.Text("Components").Size(26).Semibold())).
 					Child(ui.Text("One section per part of the framework. Hover, click and Tab to try them.").Color(t.TextMuted))).
 				Child(section(t, "Text",
 					sample(t, "Italic", ui.Text("Italic text").Italic()),

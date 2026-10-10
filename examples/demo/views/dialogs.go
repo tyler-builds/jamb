@@ -3,6 +3,7 @@ package views
 import (
 	"strings"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -20,12 +21,13 @@ func newProjectModal(s *Store) ui.Element {
 			Disabled(strings.TrimSpace(s.NewName.Get()) == "").
 			OnClick(func() {
 				s.CreateProject(strings.TrimSpace(s.NewName.Peek()), strings.TrimSpace(s.NewDesc.Peek()))
+				ui.Announce("Project created", access.Polite)
 				s.CloseNewProject()
 			})
 		cancel := ui.Button("Cancel").Key("project-cancel").Secondary().OnClick(s.CloseNewProject)
 		form := ui.Div().Column().Gap(12).
-			Child(labeledField(t, "Name", ui.TextInput(s.NewName).Label("Name").Placeholder("Project name"))).
-			Child(labeledField(t, "Description", ui.TextArea(s.NewDesc).Label("Description").Placeholder("What the project is for (optional)").MinRows(3)))
+			Child(labeledField(t, "Name", ui.TextInput(s.NewName).Label("Name").LabelledBy(fieldLabel("Name")).Placeholder("Project name"))).
+			Child(labeledField(t, "Description", ui.TextArea(s.NewDesc).Label("Description").LabelledBy(fieldLabel("Description")).Placeholder("What the project is for (optional)").MinRows(3)))
 		return ui.Modal("New project", form).Footer(cancel, create).Default(create).
 			OnClose(s.CloseNewProject).CloseOnBackdrop()
 	})
@@ -45,7 +47,7 @@ func sampleModal(s *Store) ui.Element {
 				s.SampleOpen.Set(false)
 			})
 		cancel := ui.Button("Cancel").Secondary().OnClick(func() { s.SampleOpen.Set(false) })
-		body := labeledField(t, "Name", ui.TextInput(s.SampleName).Label("Name").Placeholder("A name for the sample"))
+		body := labeledField(t, "Name", ui.TextInput(s.SampleName).Label("Name").LabelledBy(fieldLabel("Name")).Placeholder("A name for the sample"))
 		return ui.Modal("Form in a modal", body).Footer(cancel, save).Default(save).
 			OnClose(func() { s.SampleOpen.Set(false) }).CloseOnBackdrop()
 	})
@@ -54,6 +56,6 @@ func sampleModal(s *Store) ui.Element {
 // labeledField is a field with its label above it.
 func labeledField(t *ui.Theme, label string, field ui.Element) ui.Element {
 	return ui.Div().Column().Gap(6).
-		Child(ui.Text(label).Size(12).Medium().Color(t.TextMuted)).
+		Child(ui.Text(label).Size(12).Medium().Color(t.TextMuted).Key(fieldLabel(label))).
 		Child(field)
 }

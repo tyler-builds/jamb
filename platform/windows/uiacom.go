@@ -32,10 +32,18 @@ const wordSize = unsafe.Sizeof(uintptr(0))
 
 // Vtables. They are filled by initVtbls.
 var (
-	simpleVtbl   [7]uintptr // IRawElementProviderSimple
-	fragmentVtbl [9]uintptr // IRawElementProviderFragment
-	rootVtbl     [5]uintptr // IRawElementProviderFragmentRoot (its base is IUnknown)
-	invokeVtbl   [4]uintptr // IInvokeProvider
+	simpleVtbl     [7]uintptr  // IRawElementProviderSimple
+	fragmentVtbl   [9]uintptr  // IRawElementProviderFragment
+	rootVtbl       [5]uintptr  // IRawElementProviderFragmentRoot (its base is IUnknown)
+	invokeVtbl     [4]uintptr  // IInvokeProvider
+	windowVtbl     [12]uintptr // IWindowProvider
+	toggleVtbl     [5]uintptr  // IToggleProvider
+	expandVtbl     [6]uintptr  // IExpandCollapseProvider
+	selItemVtbl    [8]uintptr  // ISelectionItemProvider
+	selectionVtbl  [6]uintptr  // ISelectionProvider
+	valueVtbl      [6]uintptr  // IValueProvider
+	scrollVtbl     [11]uintptr // IScrollProvider
+	scrollItemVtbl [4]uintptr  // IScrollItemProvider
 )
 
 // iface is an interface an object implements, with its vtable.
@@ -49,31 +57,70 @@ var (
 	ifaceFragment     = iface{iidRawElementProviderFragment, fragmentVtbl[:]}
 	ifaceFragmentRoot = iface{iidRawElementProviderFragmentRoot, rootVtbl[:]}
 	ifaceInvoke       = iface{iidInvokeProvider, invokeVtbl[:]}
+	ifaceWindow       = iface{iidWindowProvider, windowVtbl[:]}
+	ifaceToggle       = iface{iidToggleProvider, toggleVtbl[:]}
+	ifaceExpand       = iface{iidExpandCollapseProvider, expandVtbl[:]}
+	ifaceSelectItem   = iface{iidSelectionItemProvider, selItemVtbl[:]}
+	ifaceSelection    = iface{iidSelectionProvider, selectionVtbl[:]}
+	ifaceValue        = iface{iidValueProvider, valueVtbl[:]}
+	ifaceScroll       = iface{iidScrollProvider, scrollVtbl[:]}
+	ifaceScrollItem   = iface{iidScrollItemProvider, scrollItemVtbl[:]}
 )
 
-// The interface IIDs, from the uuid attributes in UIAutomationCore.idl.
+// The interface IIDs, from the uuid attributes in UIAutomationCore.idl. The
+// test TestPatternIIDsMatchTheSDK checks them against the strings.
 var (
 	iidIUnknown                       = guid{0, 0, 0, [8]byte{0xC0, 0, 0, 0, 0, 0, 0, 0x46}}
 	iidRawElementProviderSimple       = guid{0xd6dd68d1, 0x86fd, 0x4332, [8]byte{0x86, 0x66, 0x9a, 0xbe, 0xde, 0xa2, 0xd2, 0x4c}}
 	iidRawElementProviderFragment     = guid{0xf7063da8, 0x8359, 0x439c, [8]byte{0x92, 0x97, 0xbb, 0xc5, 0x29, 0x9a, 0x7d, 0x87}}
 	iidRawElementProviderFragmentRoot = guid{0x620ce2a5, 0xab8f, 0x40a9, [8]byte{0x86, 0xcb, 0xde, 0x3c, 0x75, 0x59, 0x9b, 0x58}}
 	iidInvokeProvider                 = guid{0x54fcb24b, 0xe18e, 0x47a2, [8]byte{0xb4, 0xd3, 0xec, 0xcb, 0xe7, 0x75, 0x99, 0xa2}}
+	iidWindowProvider                 = guid{0x987df77b, 0xdb06, 0x4d77, [8]byte{0x8f, 0x8a, 0x86, 0xa9, 0xc3, 0xbb, 0x90, 0xb9}}
+	iidToggleProvider                 = guid{0x56d00bd0, 0xc4f4, 0x433c, [8]byte{0xa8, 0x36, 0x1a, 0x52, 0xa5, 0x7e, 0x08, 0x92}}
+	iidExpandCollapseProvider         = guid{0xd847d3a5, 0xcab0, 0x4a98, [8]byte{0x8c, 0x32, 0xec, 0xb4, 0x5c, 0x59, 0xad, 0x24}}
+	iidSelectionItemProvider          = guid{0x2acad808, 0xb2d4, 0x452d, [8]byte{0xa4, 0x07, 0x91, 0xff, 0x1a, 0xd1, 0x67, 0xb2}}
+	iidSelectionProvider              = guid{0xfb8b03af, 0x3bdf, 0x48d4, [8]byte{0xbd, 0x36, 0x1a, 0x65, 0x79, 0x3b, 0xe1, 0x68}}
+	iidValueProvider                  = guid{0xc7935180, 0x6fb3, 0x4201, [8]byte{0xb1, 0x74, 0x7d, 0xf7, 0x3a, 0xdb, 0xf6, 0x4a}}
+	iidScrollProvider                 = guid{0xb38b8077, 0x1fc3, 0x42a5, [8]byte{0x8c, 0xae, 0xd4, 0x0c, 0x22, 0x15, 0x05, 0x5a}}
+	iidScrollItemProvider             = guid{0x2360c714, 0x4bf1, 0x4b26, [8]byte{0xba, 0x65, 0x9b, 0x21, 0x31, 0x61, 0x27, 0xeb}}
 )
 
-// coreKind says what an object stands for.
+// coreKind says what an object stands for. Each kind of pattern has its own
+// object, so that a node with two patterns has two objects, one per pattern.
 type coreKind uint8
 
 const (
-	kindRoot    coreKind = iota // the window's fragment root
-	kindNode                    // a node of the access tree
-	kindPattern                 // the Invoke pattern of a node
+	kindRoot       coreKind = iota // the window's fragment root
+	kindNode                       // a node of the access tree
+	kindInvoke                     // the Invoke pattern of a node
+	kindToggle                     // the Toggle pattern of a node
+	kindExpand                     // the ExpandCollapse pattern of a node
+	kindSelectItem                 // the SelectionItem pattern of a node
+	kindSelection                  // the Selection pattern of a container
+	kindValue                      // the Value pattern of a text field
+	kindScroll                     // the Scroll pattern of a scroll container
+	kindScrollItem                 // the ScrollItem pattern of a node
+	kindWindow                     // the Window pattern of a dialog
 )
+
+// patternKinds lists the kinds of pattern objects. Like nodes, each pattern
+// object is kept per node until the node leaves the tree.
+var patternKinds = []coreKind{kindInvoke, kindToggle, kindExpand, kindSelectItem, kindSelection,
+	kindValue, kindScroll, kindScrollItem, kindWindow}
 
 // kindIfaces lists the interfaces that each kind of object implements.
 var kindIfaces = [...][]*iface{
-	kindRoot:    {&ifaceSimple, &ifaceFragment, &ifaceFragmentRoot},
-	kindNode:    {&ifaceSimple, &ifaceFragment},
-	kindPattern: {&ifaceInvoke},
+	kindRoot:       {&ifaceSimple, &ifaceFragment, &ifaceFragmentRoot},
+	kindNode:       {&ifaceSimple, &ifaceFragment},
+	kindInvoke:     {&ifaceInvoke},
+	kindToggle:     {&ifaceToggle},
+	kindExpand:     {&ifaceExpand},
+	kindSelectItem: {&ifaceSelectItem},
+	kindSelection:  {&ifaceSelection},
+	kindValue:      {&ifaceValue},
+	kindScroll:     {&ifaceScroll},
+	kindScrollItem: {&ifaceScrollItem},
+	kindWindow:     {&ifaceWindow},
 }
 
 // core is the Go-side state of an object. Its views share it.
@@ -141,6 +188,58 @@ func initVtbls() {
 		}
 		invokeVtbl = [...]uintptr{qi, ar, rl,
 			syscall.NewCallback(uiaInvoke),
+		}
+		toggleVtbl = [...]uintptr{qi, ar, rl,
+			syscall.NewCallback(uiaToggle),
+			syscall.NewCallback(uiaToggleState),
+		}
+		expandVtbl = [...]uintptr{qi, ar, rl,
+			syscall.NewCallback(uiaExpand),
+			syscall.NewCallback(uiaCollapse),
+			syscall.NewCallback(uiaExpandCollapseState),
+		}
+		selItemVtbl = [...]uintptr{qi, ar, rl,
+			syscall.NewCallback(uiaSelect),
+			syscall.NewCallback(uiaAddToSelection),
+			syscall.NewCallback(uiaRemoveFromSelection),
+			syscall.NewCallback(uiaIsSelected),
+			syscall.NewCallback(uiaSelectionContainer),
+		}
+		selectionVtbl = [...]uintptr{qi, ar, rl,
+			syscall.NewCallback(uiaGetSelection),
+			syscall.NewCallback(uiaCanSelectMultiple),
+			syscall.NewCallback(uiaIsSelectionRequired),
+		}
+		valueVtbl = [...]uintptr{qi, ar, rl,
+			syscall.NewCallback(uiaSetValue),
+			syscall.NewCallback(uiaValue),
+			syscall.NewCallback(uiaIsReadOnly),
+		}
+		// IScrollProvider's SetScrollPercent takes two doubles, so it goes through
+		// the same trampoline as ElementProviderFromPoint (see uia_amd64.s).
+		scrollVtbl = [...]uintptr{qi, ar, rl,
+			syscall.NewCallback(uiaScroll),
+			newSetScrollPercentSlot(),
+			syscall.NewCallback(uiaHorizontalScrollPercent),
+			syscall.NewCallback(uiaVerticalScrollPercent),
+			syscall.NewCallback(uiaHorizontalViewSize),
+			syscall.NewCallback(uiaVerticalViewSize),
+			syscall.NewCallback(uiaHorizontallyScrollable),
+			syscall.NewCallback(uiaVerticallyScrollable),
+		}
+		scrollItemVtbl = [...]uintptr{qi, ar, rl,
+			syscall.NewCallback(uiaScrollIntoView),
+		}
+		windowVtbl = [...]uintptr{qi, ar, rl,
+			syscall.NewCallback(uiaSetVisualState),
+			syscall.NewCallback(uiaCloseWindow),
+			syscall.NewCallback(uiaWaitForInputIdle),
+			syscall.NewCallback(uiaCanMaximize),
+			syscall.NewCallback(uiaCanMinimize),
+			syscall.NewCallback(uiaIsModal),
+			syscall.NewCallback(uiaWindowVisualState),
+			syscall.NewCallback(uiaWindowInteractionState),
+			syscall.NewCallback(uiaIsTopmost),
 		}
 	})
 }
@@ -300,6 +399,9 @@ func (c *core) provide(id access.ID, iid guid) uintptr {
 // dropObjects releases when the node leaves the tree.
 var objs = map[objKey]uintptr{} // to the handle of the object
 
+// objKinds lists the kinds of object that a node has in objs.
+var objKinds = append([]coreKind{kindNode}, patternKinds...)
+
 type objKey struct {
 	hwnd uintptr // the window, since node IDs are only unique within one window
 	kind coreKind
@@ -333,7 +435,7 @@ func cachedObject(kind coreKind, id access.ID, b *access.Bridge, hwnd uintptr, i
 // dropObjects releases the registry's references to the objects of node id. It
 // runs when the node has left the tree.
 func dropObjects(hwnd uintptr, id access.ID) {
-	for _, kind := range []coreKind{kindNode, kindPattern} {
+	for _, kind := range objKinds {
 		k := objKey{hwnd, kind, id}
 		regMu.Lock()
 		var c *core
@@ -656,4 +758,333 @@ func uiaInvoke(this uintptr) uintptr {
 		return hrFail
 	}
 	return c.invoke()
+}
+
+// The pattern interfaces. Each method runs its core method, which answers from
+// the snapshot and posts an action to the UI thread, as the Invoke pattern does.
+
+// boolOf returns the BOOL value of b for an out parameter.
+func boolOf(b bool) int32 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// IToggleProvider.
+
+func uiaToggle(this uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	return c.toggle()
+}
+
+func uiaToggleState(this, out uintptr) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	v, hr := c.toggleState()
+	if hr != hrOK {
+		return hr
+	}
+	*(*int32)(ptr(out)) = v
+	return hrOK
+}
+
+// IExpandCollapseProvider.
+
+func uiaExpand(this uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	return c.expand(true)
+}
+
+func uiaCollapse(this uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	return c.expand(false)
+}
+
+func uiaExpandCollapseState(this, out uintptr) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	v, hr := c.expandState()
+	if hr != hrOK {
+		return hr
+	}
+	*(*int32)(ptr(out)) = v
+	return hrOK
+}
+
+// ISelectionItemProvider.
+
+func uiaSelect(this uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	return c.selectItem()
+}
+
+// uiaAddToSelection selects the item: a container holds one selection.
+func uiaAddToSelection(this uintptr) uintptr { return uiaSelect(this) }
+
+// uiaRemoveFromSelection is refused: a selection is always one item, which
+// another item replaces.
+func uiaRemoveFromSelection(this uintptr) uintptr {
+	if coreOf(this) == nil {
+		return hrFail
+	}
+	return hrInvalidOperation
+}
+
+func uiaIsSelected(this, out uintptr) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	v, hr := c.isSelected()
+	if hr != hrOK {
+		return hr
+	}
+	*(*int32)(ptr(out)) = boolOf(v)
+	return hrOK
+}
+
+func uiaSelectionContainer(this, out uintptr) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	v, hr := c.selectionContainer()
+	if hr != hrOK {
+		return hr
+	}
+	putPtr(out, v)
+	return hrOK
+}
+
+// ISelectionProvider.
+
+func uiaGetSelection(this, out uintptr) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	v, hr := c.selection()
+	if hr != hrOK {
+		return hr
+	}
+	putPtr(out, v)
+	return hrOK
+}
+
+// uiaCanSelectMultiple reports that a container holds one selection.
+func uiaCanSelectMultiple(this, out uintptr) uintptr {
+	if _, hr := enter(this, out); hr != hrOK {
+		return hr
+	}
+	*(*int32)(ptr(out)) = 0
+	return hrOK
+}
+
+// uiaIsSelectionRequired reports that a selection may be empty.
+func uiaIsSelectionRequired(this, out uintptr) uintptr {
+	if _, hr := enter(this, out); hr != hrOK {
+		return hr
+	}
+	*(*int32)(ptr(out)) = 0
+	return hrOK
+}
+
+// IValueProvider.
+
+func uiaSetValue(this, val uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	return c.setValue(val)
+}
+
+func uiaValue(this, out uintptr) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	v, hr := c.value()
+	if hr != hrOK {
+		return hr
+	}
+	putPtr(out, v)
+	return hrOK
+}
+
+func uiaIsReadOnly(this, out uintptr) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	v, hr := c.isReadOnly()
+	if hr != hrOK {
+		return hr
+	}
+	*(*int32)(ptr(out)) = boolOf(v)
+	return hrOK
+}
+
+// IScrollProvider. Its amounts are ScrollAmount values, and the percents are
+// doubles (the trampoline moves them into the integer registers).
+
+func uiaScroll(this, horizontal, vertical uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	return c.scroll(int32(horizontal), int32(vertical))
+}
+
+func uiaSetScrollPercent(this, horizontal, vertical uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	return c.setScrollPercent(math.Float64frombits(uint64(horizontal)), math.Float64frombits(uint64(vertical)))
+}
+
+// scrollOut answers one getter of IScrollProvider: f picks the value from the
+// node's scroll state.
+func scrollOut(this, out uintptr, f func(s scrollState) float64) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	s, hr := c.scrollState()
+	if hr != hrOK {
+		return hr
+	}
+	*(*float64)(ptr(out)) = f(s)
+	return hrOK
+}
+
+func uiaHorizontalScrollPercent(this, out uintptr) uintptr {
+	return scrollOut(this, out, func(s scrollState) float64 { return s.percentX() })
+}
+
+func uiaVerticalScrollPercent(this, out uintptr) uintptr {
+	return scrollOut(this, out, func(s scrollState) float64 { return s.percentY() })
+}
+
+func uiaHorizontalViewSize(this, out uintptr) uintptr {
+	return scrollOut(this, out, func(s scrollState) float64 { return s.viewX() })
+}
+
+func uiaVerticalViewSize(this, out uintptr) uintptr {
+	return scrollOut(this, out, func(s scrollState) float64 { return s.viewY() })
+}
+
+func uiaHorizontallyScrollable(this, out uintptr) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	s, hr := c.scrollState()
+	if hr != hrOK {
+		return hr
+	}
+	*(*int32)(ptr(out)) = boolOf(s.canX())
+	return hrOK
+}
+
+func uiaVerticallyScrollable(this, out uintptr) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	s, hr := c.scrollState()
+	if hr != hrOK {
+		return hr
+	}
+	*(*int32)(ptr(out)) = boolOf(s.canY())
+	return hrOK
+}
+
+// IScrollItemProvider.
+
+func uiaScrollIntoView(this uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	return c.scrollIntoView()
+}
+
+// IWindowProvider. A dialog is a modal window: it is always topmost, and it is
+// closed by the application, not through the pattern, so Close and SetVisualState
+// are not supported.
+
+// windowOut answers one getter of IWindowProvider, a BOOL or an enum value, from
+// the node that the object stands for.
+func windowOut(this, out uintptr, f func(n *access.Node) int32) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	n, _, ok := c.current()
+	if !ok {
+		return hrElementNotAvailable
+	}
+	*(*int32)(ptr(out)) = f(n)
+	return hrOK
+}
+
+func uiaSetVisualState(this, state uintptr) uintptr {
+	if coreOf(this) == nil {
+		return hrFail
+	}
+	return hrNotSupported
+}
+
+func uiaCloseWindow(this uintptr) uintptr {
+	if coreOf(this) == nil {
+		return hrFail
+	}
+	return hrNotSupported
+}
+
+func uiaWaitForInputIdle(this, out uintptr) uintptr {
+	return windowOut(this, out, func(*access.Node) int32 { return 1 })
+}
+
+func uiaCanMaximize(this, out uintptr) uintptr {
+	return windowOut(this, out, func(*access.Node) int32 { return 0 })
+}
+
+func uiaCanMinimize(this, out uintptr) uintptr {
+	return windowOut(this, out, func(*access.Node) int32 { return 0 })
+}
+
+func uiaIsModal(this, out uintptr) uintptr {
+	return windowOut(this, out, func(n *access.Node) int32 { return boolOf(n.Role == access.RoleDialog) })
+}
+
+func uiaWindowVisualState(this, out uintptr) uintptr {
+	return windowOut(this, out, func(*access.Node) int32 { return windowVisualNormal })
+}
+
+func uiaWindowInteractionState(this, out uintptr) uintptr {
+	return windowOut(this, out, func(*access.Node) int32 { return windowReadyForInput })
+}
+
+func uiaIsTopmost(this, out uintptr) uintptr {
+	return windowOut(this, out, func(n *access.Node) int32 { return boolOf(n.Role == access.RoleDialog) })
 }

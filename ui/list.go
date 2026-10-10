@@ -11,11 +11,12 @@ import (
 // Every row must have the same height: the list measures one row and
 // positions the rest from that.
 type UniformListElement struct {
-	count  int
-	row    func(i int) Element
-	style  Style
-	key    string
-	handle *ListHandle
+	count      int
+	row        func(i int) Element
+	style      Style
+	key        string
+	handle     *ListHandle
+	selectable bool // see SelectionContainer
 }
 
 // UniformList creates a list of count rows. row(i) is called only for rows
@@ -38,6 +39,10 @@ func (l *UniformListElement) Style(s Style) *UniformListElement { l.style = l.st
 
 // Handle connects h so the list can be scrolled from code.
 func (l *UniformListElement) Handle(h *ListHandle) *UniformListElement { l.handle = h; return l }
+
+// SelectionContainer makes the list the group that holds its rows as selection
+// items, such as the notes in a sidebar. Rows that call Selected are the items.
+func (l *UniformListElement) SelectionContainer() *UniformListElement { l.selectable = true; return l }
 
 // ListHandle scrolls a UniformList or a ListOf from code.
 type ListHandle struct {
@@ -167,9 +172,12 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 		if k, ok := r.(keyed); ok && k.elementKey() != "" {
 			key = "jamb.row:" + k.elementKey()
 		}
-		spacer.Child(Div().Key(key).Absolute().Top(float32(i)*ls.rowH).Left(0).Right(0).Child(r).listItem(i+1, l.count))
+		wrap := Div().Key(key).Absolute().Top(float32(i) * ls.rowH).Left(0).Right(0).Child(r)
+		setListPosition(wrap, r, i+1, l.count)
+		spacer.Child(wrap)
 	}
 	container := Div().ScrollY().Style(l.style).Role(access.RoleList)
+	container.access().container = l.selectable
 	container.vlist = ls
 	return container.Child(spacer)
 }

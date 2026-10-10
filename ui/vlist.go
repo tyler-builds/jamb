@@ -12,15 +12,16 @@ import (
 // ListElement is a scrolling list whose rows may differ in height. Create one
 // with ListOf.
 type ListElement struct {
-	ident   unsafe.Pointer // backing array of the items, compared to detect a change
-	count   int
-	keyAt   func(i int) string
-	rowAt   func(i int) Element
-	key     string
-	style   Style
-	handle  *ListHandle
-	bottom  bool
-	onAtEnd func(atEnd bool)
+	ident      unsafe.Pointer // backing array of the items, compared to detect a change
+	count      int
+	keyAt      func(i int) string
+	rowAt      func(i int) Element
+	key        string
+	selectable bool // see SelectionContainer
+	style      Style
+	handle     *ListHandle
+	bottom     bool
+	onAtEnd    func(atEnd bool)
 }
 
 // ListOf creates a scrolling list of items whose rows may differ in height.
@@ -56,6 +57,10 @@ func (l *ListElement) Style(s Style) *ListElement { l.style = l.style.Merge(s); 
 
 // Handle connects h so the list can be scrolled from code.
 func (l *ListElement) Handle(h *ListHandle) *ListElement { l.handle = h; return l }
+
+// SelectionContainer makes the list the group that holds its rows as selection
+// items, such as the notes in a sidebar. Rows that call Selected are the items.
+func (l *ListElement) SelectionContainer() *ListElement { l.selectable = true; return l }
 
 // Bottom is for chat-like lists. When the rows are shorter than the viewport
 // they sit at its bottom. While the list is at its end, appended items (and
@@ -245,10 +250,14 @@ func (l *ListElement) expand(ctx *Context) Element {
 	spacer := Div().Key("jamb.list.spacer").Shrink(0).Height(Px(vs.pad + float32(vs.hidx.total())))
 	for i := from; i < to; i++ {
 		top := vs.pad + float32(vs.hidx.prefix(i))
-		spacer.Child(Div().Key("jamb.vrow:"+vs.keys[i]).Absolute().Top(top).Left(0).Right(0).Child(l.rowAt(i)).listItem(i+1, vs.count))
+		r := l.rowAt(i)
+		wrap := Div().Key("jamb.vrow:" + vs.keys[i]).Absolute().Top(top).Left(0).Right(0).Child(r)
+		setListPosition(wrap, r, i+1, vs.count)
+		spacer.Child(wrap)
 	}
 	vs.builtFrom, vs.built = from, to
 	container := Div().ScrollY().Style(l.style).Role(access.RoleList)
+	container.access().container = l.selectable
 	container.vrows = vs
 	return container.Child(spacer)
 }

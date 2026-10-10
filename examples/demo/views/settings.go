@@ -14,7 +14,7 @@ func Settings(s *Store) ui.Element {
 		return ui.Div().Grow(1).ScrollY().
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(760)).
 				Child(ui.Div().Gap(4).
-					Child(ui.Text("Settings").Size(26).Semibold()).
+					Child(ui.Div().Heading(1).Child(ui.Text("Settings").Size(26).Semibold())).
 					Child(ui.Text("Preferences are plain signals; toggles re-render only this page.").Color(t.TextMuted))).
 				Child(Card(t).Gap(14).
 					Child(SectionTitle(t, "Appearance")).
@@ -25,14 +25,14 @@ func Settings(s *Store) ui.Element {
 							} else {
 								ctx.SetTheme(ui.LightTheme)
 							}
-						}).Label("Dark mode"))).
+						}).Label("Dark mode").LabelledBy(settingLabel("Dark mode")))).
 					Child(ui.Divider()).
 					Child(SettingRow(t, "Compact activity", "Tighter rows on the Activity page.",
-						Toggle(t, s.Compact.Get(), s.Compact.Set).Label("Compact activity")))).
+						Toggle(t, s.Compact.Get(), s.Compact.Set).Label("Compact activity").LabelledBy(settingLabel("Compact activity"))))).
 				Child(Card(t).Gap(14).
 					Child(SectionTitle(t, "Notifications")).
 					Child(SettingRow(t, "Desktop notifications", "Show a notification when a build finishes.",
-						Toggle(t, s.Notify.Get(), s.Notify.Set).Label("Desktop notifications"))).
+						Toggle(t, s.Notify.Get(), s.Notify.Set).Label("Desktop notifications").LabelledBy(settingLabel("Desktop notifications")))).
 					Child(ui.Divider()).
 					Child(SettingRow(t, "Danger zone", "Remove every project from this workspace.",
 						ui.Button("Delete all").Danger().Small().Icon(icons.Trash).OnClick(func() {

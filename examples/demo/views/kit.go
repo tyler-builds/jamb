@@ -19,9 +19,16 @@ func Card(t *ui.Theme) *ui.DivElement {
 }
 
 // SectionTitle is a small heading above a group of content.
-func SectionTitle(t *ui.Theme, title string) *ui.TextElement {
-	return ui.Text(title).Size(15).Semibold().Color(t.Text)
+func SectionTitle(t *ui.Theme, title string) *ui.DivElement {
+	return ui.Div().Heading(2).Child(ui.Text(title).Size(15).Semibold().Color(t.Text))
 }
+
+// settingLabel is the key of a setting's title. The setting's control is
+// labelled by the title, so that a switch reads as "Dark mode, switch".
+func settingLabel(title string) string { return "setting:" + title }
+
+// fieldLabel is the key of a form field's label above it.
+func fieldLabel(label string) string { return "field:" + label }
 
 // Badge is a small pill with a dot and a label.
 func Badge(label string, c ui.Color) ui.Element {
@@ -75,7 +82,7 @@ func Toggle(t *ui.Theme, on bool, onChange func(bool)) *ui.DivElement {
 func SettingRow(t *ui.Theme, title, desc string, control ui.Element) ui.Element {
 	return ui.Div().Row().Align(ui.Center).Gap(16).PaddingY(4).
 		Child(ui.Div().Grow(1).Gap(3).
-			Child(ui.Text(title).Medium()).
+			Child(ui.Text(title).Medium().Key(settingLabel(title))).
 			Child(ui.Text(desc).Size(13).Color(t.TextMuted))).
 		Child(control)
 }

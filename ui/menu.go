@@ -390,8 +390,23 @@ func (m *menuView) row(k, i int, it MenuItem, path []int, gutter bool) Element {
 	hl := k < len(path) && path[k] == i
 	r := Div().Keyf("jamb.menu.%d.%d", k, i).Row().Align(Center).Gap(8).Height(Px(28)).PaddingX(8).Radius(4).Shrink(0).
 		FontSize(13).TextColor(t.Text)
-	r.access().role, r.access().disabled, r.access().checked = menuAccessRole(it.Role()), it.Disabled, it.Checked
-	r.access().level = k + 1
+	// The name is the label alone: the shortcut is shown, but assistive technology
+	// reads the label, as a menu does.
+	a := r.access()
+	a.role, a.disabled, a.checked, a.checkedSet = menuAccessRole(it.Role()), it.Disabled, it.Checked, true
+	a.name = it.text()
+	a.level = k + 1
+	if len(it.Submenu) > 0 {
+		// Expand opens the submenu and Collapse closes it, as the keys do.
+		a.expandable, a.expanded = true, k+1 < len(path) && path[k] == i
+		a.setExpanded = func(open bool) {
+			if open {
+				m.openSub(k, i, true)
+			} else if p := m.path.Peek(); k+1 < len(p) {
+				m.set(p[:k+1])
+			}
+		}
+	}
 	if !on {
 		r.TextColor(t.TextSubtle)
 	}
@@ -492,7 +507,7 @@ func DropdownMenu(trigger Element, build func() []MenuItem) Element {
 			path.Set(highlightPath(built, keyboard))
 			open.Set(true)
 		}
-		d := Div().AlignSelf(Start).Shrink(0).
+		d := Div().AlignSelf(Start).Shrink(0).Expanded(open.Get()).
 			OnClick(func() {
 				if open.Peek() {
 					closeMenu(true)
@@ -510,6 +525,14 @@ func DropdownMenu(trigger Element, build func() []MenuItem) Element {
 				}
 			}).
 			Child(trigger)
+		if b, ok := trigger.(*ButtonElement); ok {
+			// The wrapper is the control that assistive technology sees: it takes
+			// the button's name, and the button is left out of the tree. Focus goes
+			// to the button, so the wrapper takes focus for it.
+			b.inert = true
+			d.Label(b.name)
+			d.access().focusInside = !b.disabled
+		}
 		if open.Get() {
 			m := &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: closeMenu}
 			d.Child(m.top(4))

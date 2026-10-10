@@ -3,7 +3,9 @@
 package windows
 
 import (
+	"runtime"
 	"sync"
+	"syscall"
 	"unicode/utf16"
 	"unsafe"
 
@@ -61,9 +63,73 @@ const (
 	propIsDialog             = 30174
 
 	// Patterns and events.
-	patternInvoke               = 10000
+	patternInvoke         = 10000
+	patternSelection      = 10001
+	patternValue          = 10002
+	patternScroll         = 10004
+	patternExpandCollapse = 10005
+	patternSelectionItem  = 10010
+	patternToggle         = 10015
+	patternScrollItem     = 10017
+	patternWindow         = 10009
+
 	eventStructureChanged       = 20002
+	eventPropertyChanged        = 20004
 	eventAutomationFocusChanged = 20005
+	eventMenuClosed             = 20007
+	eventMenuOpened             = 20003
+	eventWindowOpened           = 20016
+	eventWindowClosed           = 20017
+
+	// Properties of the patterns, and IsXPatternAvailable.
+	propLabeledBy                = 30018
+	propIsInvokeAvailable        = 30031
+	propIsExpandCollapseAvail    = 30028
+	propIsScrollAvailable        = 30034
+	propIsScrollItemAvailable    = 30035
+	propIsSelectionItemAvail     = 30036
+	propIsSelectionAvailable     = 30037
+	propIsToggleAvailable        = 30041
+	propIsValueAvailable         = 30043
+	propIsWindowAvailable        = 30044
+	propWindowIsModal            = 30077
+	propValue                    = 30045
+	propIsReadOnly               = 30046
+	propScrollHorizontalPercent  = 30053
+	propScrollHorizontalView     = 30054
+	propScrollVerticalPercent    = 30055
+	propScrollVerticalView       = 30056
+	propScrollHorizontallyScroll = 30057
+	propScrollVerticallyScroll   = 30058
+	propExpandCollapseState      = 30070
+	propIsSelected               = 30079
+	propToggleState              = 30086
+	propDescribedBy              = 30105
+	propHeadingLevel             = 30173
+
+	// The states of the patterns.
+	toggleStateOff           = 0
+	toggleStateOn            = 1
+	toggleStateIndeterminate = 2
+	expandCollapseCollapsed  = 0
+	expandCollapseExpanded   = 1
+	headingLevel1            = 80051 // HeadingLevel1; the others follow it
+
+	// WindowVisualState and WindowInteractionState values.
+	windowVisualNormal  = 0
+	windowReadyForInput = 2
+
+	// ScrollAmount values.
+	scrollLargeDecrement = 0
+	scrollSmallDecrement = 1
+	scrollLargeIncrement = 3
+	scrollSmallIncrement = 4
+
+	// NotificationKind_Other, and the NotificationProcessing values that
+	// announcements use (see announce).
+	notificationKindOther           = 4
+	notificationImportantMostRecent = 1
+	notificationAll                 = 2
 
 	// ProviderOptions.
 	providerClientSide             = 0x1
@@ -92,8 +158,11 @@ const (
 	// VARIANT types and values.
 	vtEmpty    = 0
 	vtI4       = 3
+	vtR8       = 5
 	vtBSTR     = 8
+	vtUnknown  = 13
 	vtBool     = 11
+	vtArray    = 0x2000
 	variantOn  = -1 // VARIANT_TRUE
 	variantOff = 0  // VARIANT_FALSE
 )
@@ -106,6 +175,8 @@ const (
 	hrPointer             = 0x80004003
 	hrFail                = 0x80004005
 	hrElementNotAvailable = 0x80040201 // UIA_E_ELEMENTNOTAVAILABLE
+	hrInvalidOperation    = 0x80131509 // UIA_E_INVALIDOPERATION
+	hrNotSupported        = 0x80040204 // UIA_E_NOTSUPPORTED
 )
 
 // controlType returns the UI Automation control type of a role.
@@ -216,6 +287,57 @@ func bstrOf(s string) uintptr {
 	return win32.SysAllocStringLen(utf16.Encode([]rune(s)))
 }
 
+// newVariant returns a VARIANT on the heap. A pointer to a VARIANT that is given to
+// COM must not be on the goroutine stack: a callback can grow the stack and move
+// the variable, and the callback then writes to the old copy. Returning the
+// pointer makes the compiler allocate on the heap, which the call does not
+// change; passing the pointer as a uintptr would not keep a stack variable.
+//
+//go:noinline
+func newVariant() *variant { return new(variant) }
+
+// newWord returns a pointer-sized word on the heap, for the same reason as
+// newVariant.
+//
+//go:noinline
+func newWord() *uintptr { return new(uintptr) }
+
+// variantDouble returns a VARIANT that holds f.
+func variantDouble(f float64) variant {
+	v := variant{vt: vtR8}
+	*(*float64)(unsafe.Pointer(&v.data[0])) = f
+	return v
+}
+
+// variantUnknown returns a VARIANT that holds the interface pointer p, which the
+// VARIANT owns once UI Automation has it.
+func variantUnknown(p uintptr) variant {
+	v := variant{vt: vtUnknown}
+	*(*uintptr)(unsafe.Pointer(&v.data[0])) = p
+	return v
+}
+
+// variantUnknownArray returns a VARIANT that holds the SAFEARRAY psa of
+// interface pointers, which the VARIANT owns once UI Automation has it.
+func variantUnknownArray(psa uintptr) variant {
+	v := variant{vt: vtUnknown | vtArray}
+	*(*uintptr)(unsafe.Pointer(&v.data[0])) = psa
+	return v
+}
+
+// wideString copies the NUL-terminated UTF-16 string at p, such as the value a
+// client passes to SetValue. A null pointer is the empty string.
+func wideString(p uintptr) string {
+	if p == 0 {
+		return ""
+	}
+	n := 0
+	for *(*uint16)(ptr(p + uintptr(2*n))) != 0 {
+		n++
+	}
+	return syscall.UTF16ToString(unsafe.Slice((*uint16)(ptr(p)), n))
+}
+
 // nodeProperty returns the VARIANT of property id for node n. focused says
 // whether n has keyboard focus. Properties the node does not have are VT_EMPTY.
 func nodeProperty(id int32, n *access.Node, focused bool) variant {
@@ -256,6 +378,195 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 		if n.Role == access.RoleDialog {
 			return variantBool(true)
 		}
+	case propValue:
+		if isText(n.Role) {
+			return variantBSTR(n.Value)
+		}
+	case propIsReadOnly:
+		if isText(n.Role) {
+			return variantBool(n.States.Has(access.StateReadOnly))
+		}
+	case propToggleState:
+		if n.States.Has(access.StateToggle) {
+			return variantI4(toggleStateOf(n.States))
+		}
+	case propExpandCollapseState:
+		if n.States.Has(access.StateExpandable) {
+			return variantI4(expandStateOf(n.States))
+		}
+	case propIsSelected:
+		if n.States.Has(access.StateSelectable) {
+			return variantBool(n.States.Has(access.StateSelected))
+		}
+	case propWindowIsModal:
+		if n.Role == access.RoleDialog {
+			return variantBool(true)
+		}
+	case propHeadingLevel:
+		if n.Heading > 0 {
+			return variantI4(headingLevel1 + int32(n.Heading) - 1)
+		}
+	case propScrollHorizontalPercent, propScrollHorizontalView, propScrollVerticalPercent,
+		propScrollVerticalView, propScrollHorizontallyScroll, propScrollVerticallyScroll:
+		if n.Scroll.Container {
+			return scrollProperty(id, scrollState(n.Scroll))
+		}
+	}
+	if k, ok := availableKind(id); ok {
+		return variantBool(supports(k, n))
+	}
+	return variant{}
+}
+
+// isText reports whether a role is an editable text field.
+func isText(r access.Role) bool { return r == access.RoleTextField || r == access.RoleTextArea }
+
+// toggleStateOf returns the ToggleState of a node: on when checked, indeterminate
+// when mixed, off otherwise.
+func toggleStateOf(s access.State) int32 {
+	switch {
+	case s.Has(access.StateMixed):
+		return toggleStateIndeterminate
+	case s.Has(access.StateChecked):
+		return toggleStateOn
+	}
+	return toggleStateOff
+}
+
+// expandStateOf returns the ExpandCollapseState of an expandable node.
+func expandStateOf(s access.State) int32 {
+	if s.Has(access.StateExpanded) {
+		return expandCollapseExpanded
+	}
+	return expandCollapseCollapsed
+}
+
+// patternKindOf returns the kind of pattern object for a pattern ID.
+func patternKindOf(id int32) (coreKind, bool) {
+	switch id {
+	case patternInvoke:
+		return kindInvoke, true
+	case patternToggle:
+		return kindToggle, true
+	case patternExpandCollapse:
+		return kindExpand, true
+	case patternSelectionItem:
+		return kindSelectItem, true
+	case patternSelection:
+		return kindSelection, true
+	case patternValue:
+		return kindValue, true
+	case patternScroll:
+		return kindScroll, true
+	case patternScrollItem:
+		return kindScrollItem, true
+	case patternWindow:
+		return kindWindow, true
+	}
+	return 0, false
+}
+
+// availableKind returns the pattern kind that an IsXPatternAvailable property
+// reports on.
+func availableKind(id int32) (coreKind, bool) {
+	switch id {
+	case propIsInvokeAvailable:
+		return kindInvoke, true
+	case propIsToggleAvailable:
+		return kindToggle, true
+	case propIsExpandCollapseAvail:
+		return kindExpand, true
+	case propIsSelectionItemAvail:
+		return kindSelectItem, true
+	case propIsSelectionAvailable:
+		return kindSelection, true
+	case propIsValueAvailable:
+		return kindValue, true
+	case propIsScrollAvailable:
+		return kindScroll, true
+	case propIsScrollItemAvailable:
+		return kindScrollItem, true
+	case propIsWindowAvailable:
+		return kindWindow, true
+	}
+	return 0, false
+}
+
+// supports reports whether node n has the pattern of kind k. A pattern follows
+// the node's role and states, so a disabled control still has its pattern, and
+// reports it as disabled.
+func supports(k coreKind, n *access.Node) bool {
+	switch k {
+	case kindInvoke:
+		return n.Has(access.ActionClick)
+	case kindToggle:
+		return n.States.Has(access.StateToggle)
+	case kindExpand:
+		return n.States.Has(access.StateExpandable)
+	case kindSelectItem:
+		return n.States.Has(access.StateSelectable)
+	case kindSelection:
+		return n.States.Has(access.StateSelectionContainer)
+	case kindValue:
+		return isText(n.Role)
+	case kindScroll:
+		return n.Scroll.Container
+	case kindScrollItem:
+		return n.Has(access.ActionScrollIntoView)
+	case kindWindow:
+		return n.Role == access.RoleDialog
+	}
+	return false
+}
+
+// scrollState is the Scroll pattern's view of a container.
+type scrollState access.Scroll
+
+// canX reports whether the container scrolls horizontally.
+func (s scrollState) canX() bool { return s.CanX }
+
+// canY reports whether the container scrolls vertically.
+func (s scrollState) canY() bool { return s.CanY }
+
+// percentX returns the horizontal position, or -1 when the container does not
+// scroll horizontally, as UI Automation defines it.
+func (s scrollState) percentX() float64 {
+	if !s.CanX {
+		return -1
+	}
+	return s.X
+}
+
+// percentY returns the vertical position, or -1 when the container does not
+// scroll vertically.
+func (s scrollState) percentY() float64 {
+	if !s.CanY {
+		return -1
+	}
+	return s.Y
+}
+
+// viewX returns the visible part of the content horizontally, in percent.
+func (s scrollState) viewX() float64 { return s.ViewX }
+
+// viewY returns the visible part of the content vertically, in percent.
+func (s scrollState) viewY() float64 { return s.ViewY }
+
+// scrollProperty returns the VARIANT of a scroll property of a container.
+func scrollProperty(id int32, s scrollState) variant {
+	switch id {
+	case propScrollHorizontalPercent:
+		return variantDouble(s.percentX())
+	case propScrollHorizontalView:
+		return variantDouble(s.viewX())
+	case propScrollVerticalPercent:
+		return variantDouble(s.percentY())
+	case propScrollVerticalView:
+		return variantDouble(s.viewY())
+	case propScrollHorizontallyScroll:
+		return variantBool(s.canX())
+	case propScrollVerticallyScroll:
+		return variantBool(s.canY())
 	}
 	return variant{}
 }
@@ -526,24 +837,261 @@ func (c *core) property(id int32) (variant, uintptr) {
 	if !ok {
 		return variant{}, hrElementNotAvailable
 	}
+	switch id {
+	case propLabeledBy:
+		// The element that labels this one is a provider, not a value.
+		if c.kind == kindNode && len(n.LabelledBy) > 0 {
+			if p := c.provide(n.LabelledBy[0], iidRawElementProviderSimple); p != 0 {
+				return variantUnknown(p), hrOK
+			}
+		}
+		return variant{}, hrOK
+	case propDescribedBy:
+		return c.describedBy(n)
+	}
 	return nodeProperty(id, n, t != nil && t.Focus == n.ID), hrOK
 }
 
-// pattern returns a new reference to the Invoke pattern of c when the node
-// supports ActionClick, and 0 otherwise.
+// describedBy returns the VARIANT of the DescribedBy property of n: an array of
+// the providers that describe it, or VT_EMPTY when nothing describes it.
+func (c *core) describedBy(n *access.Node) (variant, uintptr) {
+	var ps []uintptr
+	if c.kind == kindNode {
+		for _, id := range n.DescribedBy {
+			if p := c.provide(id, iidRawElementProviderSimple); p != 0 {
+				ps = append(ps, p)
+			}
+		}
+	}
+	if len(ps) == 0 {
+		return variant{}, hrOK
+	}
+	psa := win32.SafeArrayCreateVector(vtUnknown, 0, uint32(len(ps)))
+	if psa == 0 {
+		releaseAll(ps)
+		return variant{}, hrFail
+	}
+	for i, p := range ps {
+		win32.SafeArrayPutUnknown(psa, int32(i), p)
+	}
+	releaseAll(ps) // the array holds its own references
+	return variantUnknownArray(psa), hrOK
+}
+
+// releaseAll releases the references in ps.
+func releaseAll(ps []uintptr) {
+	for _, p := range ps {
+		release(p)
+	}
+}
+
+// pattern returns a new reference to the pattern object of kind c.id supports
+// for the pattern id, and 0 when the node does not have that pattern.
 func (c *core) pattern(id int32) (uintptr, uintptr) {
-	if c.kind != kindNode || id != patternInvoke {
+	k, ok := patternKindOf(id)
+	if c.kind != kindNode || !ok {
 		return 0, hrOK
 	}
 	n, _, ok := c.current()
 	if !ok {
 		return 0, hrElementNotAvailable
 	}
-	if !n.Has(access.ActionClick) {
+	if !supports(k, n) {
 		return 0, hrOK
 	}
-	return cachedObject(kindPattern, c.id, c.bridge, c.hwnd, iidInvokeProvider), hrOK
+	return cachedObject(k, c.id, c.bridge, c.hwnd, kindIfaces[k][0].iid), hrOK
 }
+
+// perform asks the runtime to run action a on c, from any thread. It returns
+// the HRESULT: the node may have gone.
+func (c *core) perform(a access.Action) uintptr {
+	if _, _, ok := c.current(); !ok {
+		return hrElementNotAvailable
+	}
+	c.bridge.Perform(c.id, a)
+	return hrOK
+}
+
+// toggle runs the toggle of a check box, switch or toggle button.
+func (c *core) toggle() uintptr { return c.perform(access.ActionToggle) }
+
+// toggleState returns the ToggleState of c.
+func (c *core) toggleState() (int32, uintptr) {
+	n, _, ok := c.current()
+	if !ok {
+		return 0, hrElementNotAvailable
+	}
+	return toggleStateOf(n.States), hrOK
+}
+
+// expand opens or closes c.
+func (c *core) expand(open bool) uintptr {
+	if open {
+		return c.perform(access.ActionExpand)
+	}
+	return c.perform(access.ActionCollapse)
+}
+
+// expandState returns the ExpandCollapseState of c.
+func (c *core) expandState() (int32, uintptr) {
+	n, _, ok := c.current()
+	if !ok {
+		return 0, hrElementNotAvailable
+	}
+	return expandStateOf(n.States), hrOK
+}
+
+// selectItem chooses c in its container. An item that is chosen already stays so.
+func (c *core) selectItem() uintptr { return c.perform(access.ActionSelect) }
+
+// isSelected reports whether c is chosen.
+func (c *core) isSelected() (bool, uintptr) {
+	n, _, ok := c.current()
+	if !ok {
+		return false, hrElementNotAvailable
+	}
+	return n.States.Has(access.StateSelected), hrOK
+}
+
+// selectionContainer returns a new reference to the nearest selection container
+// above c, or 0 when there is none.
+func (c *core) selectionContainer() (uintptr, uintptr) {
+	n, t, ok := c.current()
+	if !ok {
+		return 0, hrElementNotAvailable
+	}
+	for id := n.Parent; id != 0; {
+		p := t.Node(id)
+		if p == nil {
+			break
+		}
+		if p.States.Has(access.StateSelectionContainer) {
+			return c.provide(p.ID, iidRawElementProviderSimple), hrOK
+		}
+		id = p.Parent
+	}
+	return 0, hrOK
+}
+
+// selection returns a new SAFEARRAY of the chosen items below the container c,
+// which the caller owns. An empty container gives an empty array.
+func (c *core) selection() (uintptr, uintptr) {
+	n, t, ok := c.current()
+	if !ok {
+		return 0, hrElementNotAvailable
+	}
+	var ids []access.ID
+	collectSelected(t, n, &ids)
+	ps := make([]uintptr, 0, len(ids))
+	for _, id := range ids {
+		if p := c.provide(id, iidRawElementProviderSimple); p != 0 {
+			ps = append(ps, p)
+		}
+	}
+	psa := win32.SafeArrayCreateVector(vtUnknown, 0, uint32(len(ps)))
+	if psa == 0 {
+		releaseAll(ps)
+		return 0, hrFail
+	}
+	for i, p := range ps {
+		win32.SafeArrayPutUnknown(psa, int32(i), p)
+	}
+	releaseAll(ps)
+	return psa, hrOK
+}
+
+// collectSelected appends the chosen items below n to out. It does not look
+// inside a nested selection container, which answers for its own items.
+func collectSelected(t *access.Tree, n *access.Node, out *[]access.ID) {
+	for _, id := range n.Children {
+		c := t.Node(id)
+		if c == nil {
+			continue
+		}
+		if c.States.Has(access.StateSelectable) && c.States.Has(access.StateSelected) {
+			*out = append(*out, id)
+		}
+		if !c.States.Has(access.StateSelectionContainer) {
+			collectSelected(t, c, out)
+		}
+	}
+}
+
+// setValue replaces the text of c with the NUL-terminated string at val. The
+// runtime sets the field's signal on the UI thread, as typing does.
+func (c *core) setValue(val uintptr) uintptr {
+	if _, _, ok := c.current(); !ok {
+		return hrElementNotAvailable
+	}
+	c.bridge.Do(c.id, access.Request{Action: access.ActionSetValue, Value: wideString(val)})
+	return hrOK
+}
+
+// value returns a new BSTR holding the value of c, which the caller owns.
+func (c *core) value() (uintptr, uintptr) {
+	n, _, ok := c.current()
+	if !ok {
+		return 0, hrElementNotAvailable
+	}
+	return bstrOf(n.Value), hrOK
+}
+
+// isReadOnly reports whether the text of c can only be read.
+func (c *core) isReadOnly() (bool, uintptr) {
+	n, _, ok := c.current()
+	if !ok {
+		return false, hrElementNotAvailable
+	}
+	return n.States.Has(access.StateReadOnly), hrOK
+}
+
+// scroll moves the container c by the ScrollAmount values of each axis: a small
+// amount is a tenth of the view, a large one nine tenths (see ActionScroll).
+func (c *core) scroll(horizontal, vertical int32) uintptr {
+	if _, _, ok := c.current(); !ok {
+		return hrElementNotAvailable
+	}
+	c.bridge.Do(c.id, access.Request{Action: access.ActionScroll,
+		X: scrollFraction(horizontal), Y: scrollFraction(vertical)})
+	return hrOK
+}
+
+// scrollFraction returns the fraction of the view that a ScrollAmount moves.
+func scrollFraction(amount int32) float64 {
+	switch amount {
+	case scrollLargeDecrement:
+		return -0.9
+	case scrollSmallDecrement:
+		return -0.1
+	case scrollLargeIncrement:
+		return 0.9
+	case scrollSmallIncrement:
+		return 0.1
+	}
+	return 0 // NoAmount
+}
+
+// setScrollPercent moves the container c to horizontal and vertical percents of
+// its range. A negative percent leaves its axis where it is.
+func (c *core) setScrollPercent(horizontal, vertical float64) uintptr {
+	if _, _, ok := c.current(); !ok {
+		return hrElementNotAvailable
+	}
+	c.bridge.Do(c.id, access.Request{Action: access.ActionSetScrollPercent, X: horizontal, Y: vertical})
+	return hrOK
+}
+
+// scrollState returns the scroll state of the container c.
+func (c *core) scrollState() (scrollState, uintptr) {
+	n, _, ok := c.current()
+	if !ok {
+		return scrollState{}, hrElementNotAvailable
+	}
+	return scrollState(n.Scroll), hrOK
+}
+
+// scrollIntoView scrolls c into view in its scroll container.
+func (c *core) scrollIntoView() uintptr { return c.perform(access.ActionScrollIntoView) }
 
 // setFocus asks the runtime to move keyboard focus to c. The root has nothing to
 // focus and does nothing.
@@ -608,8 +1156,10 @@ func (w *window) answerAccess(wp, lp uintptr) (uintptr, bool) {
 	return win32.UiaReturnRawElementProvider(w.hwnd, wp, lp, w.uiaRoot), true
 }
 
-// onAccess reports a published snapshot to UI Automation. It raises nothing when
-// no client listens, and does nothing for announcements (see the design).
+// onAccess reports a published snapshot to UI Automation. It drops the objects
+// of nodes that left the tree, and raises the events the snapshot implies, but
+// only when a client listens. The events are derived from the Update, which
+// the runtime makes once per published snapshot, so they are coalesced per frame.
 func (w *window) onAccess(b *access.Bridge, u access.Update) {
 	for _, id := range u.Removed {
 		dropObjects(w.hwnd, id)
@@ -617,15 +1167,116 @@ func (w *window) onAccess(b *access.Bridge, u access.Update) {
 	if w.uiaRoot == 0 || !win32.UiaClientsAreListening() {
 		return
 	}
-	if u.FocusChanged && u.Focus != 0 && b.Tree().Node(u.Focus) != nil {
-		if p := create(kindNode, u.Focus, b, w.hwnd, iidRawElementProviderSimple); p != 0 {
-			win32.UiaRaiseAutomationEvent(p, eventAutomationFocusChanged)
-			release(p)
-		}
+	t := b.Tree()
+	if u.FocusChanged && u.Focus != 0 {
+		w.raiseOn(b, u.Focus, eventAutomationFocusChanged)
 	}
 	if u.Structure {
 		win32.UiaRaiseStructureChangedEvent(w.uiaRoot, structureChildrenInvalidated, 0, 0)
 	}
+	for _, pc := range u.Properties {
+		if n := t.Node(pc.ID); n != nil {
+			w.raiseProperty(b, n, pc.Property, t.Focus == n.ID)
+		}
+	}
+	for _, p := range u.Opened {
+		event := int32(eventMenuOpened)
+		if p.Role == access.RoleDialog {
+			event = eventWindowOpened
+		}
+		w.raiseOn(b, p.ID, event)
+	}
+	for _, p := range u.Closed {
+		// The popup has left the tree, so its closing is raised on the window.
+		event := int32(eventMenuClosed)
+		if p.Role == access.RoleDialog {
+			event = eventWindowClosed
+		}
+		win32.UiaRaiseAutomationEvent(w.uiaRoot, event)
+	}
+	for _, a := range u.Announcements {
+		w.announce(a)
+	}
+}
+
+// raiseOn raises the automation event for node id, if the node is in the
+// snapshot. The provider is the node's object, so the client sees the element
+// it is told about.
+func (w *window) raiseOn(b *access.Bridge, id access.ID, event int32) {
+	if b.Tree().Node(id) == nil {
+		return
+	}
+	p := cachedObject(kindNode, id, b, w.hwnd, iidRawElementProviderSimple)
+	if p == 0 {
+		return
+	}
+	win32.UiaRaiseAutomationEvent(p, event)
+	release(p)
+}
+
+// raiseProperty raises the property-changed event of n for prop, with the value
+// that the property has now. The old value is empty: the adapter does not keep
+// the values it reported before. The new value is copied by UI Automation, so
+// the BSTR it holds is freed here.
+func (w *window) raiseProperty(b *access.Bridge, n *access.Node, prop access.Property, focused bool) {
+	id := propertyID(prop)
+	p := cachedObject(kindNode, n.ID, b, w.hwnd, iidRawElementProviderSimple)
+	if p == 0 {
+		return
+	}
+	oldV, newV := newVariant(), newVariant()
+	*newV = nodeProperty(id, n, focused)
+	win32.UiaRaiseAutomationPropertyChangedEvent(p, id, uintptr(unsafe.Pointer(oldV)), uintptr(unsafe.Pointer(newV)))
+	runtime.KeepAlive(oldV) // the VARIANTs are given as uintptrs, which do not keep them alive
+	runtime.KeepAlive(newV)
+	if newV.vt == vtBSTR {
+		win32.SysFreeString(variantBSTRValue(*newV))
+	}
+	release(p)
+}
+
+// propertyID returns the UI Automation property that an access property is.
+func propertyID(prop access.Property) int32 {
+	switch prop {
+	case access.PropertyValue:
+		return propValue
+	case access.PropertyToggle:
+		return propToggleState
+	case access.PropertyExpanded:
+		return propExpandCollapseState
+	case access.PropertySelected:
+		return propIsSelected
+	case access.PropertyEnabled:
+		return propIsEnabled
+	}
+	return propName
+}
+
+// variantBSTRValue returns the BSTR that a VARIANT holds.
+func variantBSTRValue(v variant) uintptr { return *(*uintptr)(unsafe.Pointer(&v.data[0])) }
+
+// announce raises a notification event on the window for an announcement. A
+// polite announcement is queued behind the ones before it, and an assertive one
+// interrupts the speech in progress and then says the most recent one. The
+// activity ID names the source of the notification.
+func (w *window) announce(a access.Announcement) {
+	display, activity := bstrOf(a.Text), bstrOf("jamb")
+	win32.UiaRaiseNotificationEvent(w.uiaRoot, notificationKindOther, notificationProcessingOf(a.Politeness), display, activity)
+	win32.SysFreeString(display)
+	win32.SysFreeString(activity)
+}
+
+// notificationProcessingOf returns the NotificationProcessing of an announcement
+// with the politeness p. Polite is All: presented when possible, and every
+// message is delivered. Assertive is ImportantMostRecent: presented as soon as
+// possible, and a newer message supersedes an older one. Microsoft warns that
+// ImportantAll can flood the user, and ImportantCurrentThenMostRecent exists
+// only from Windows build 26100.
+func notificationProcessingOf(p access.Politeness) int32 {
+	if p == access.Assertive {
+		return notificationImportantMostRecent
+	}
+	return notificationAll
 }
 
 // endAccess ends the window's accessibility when it is destroyed. It stops the

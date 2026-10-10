@@ -110,13 +110,16 @@ var (
 	procSafeArrayPutElement   = oleaut32.NewProc("SafeArrayPutElement")
 	procSafeArrayGetElement   = oleaut32.NewProc("SafeArrayGetElement")
 	procSafeArrayDestroy      = oleaut32.NewProc("SafeArrayDestroy")
+	procSafeArrayGetUBound    = oleaut32.NewProc("SafeArrayGetUBound")
 
-	procUiaReturnRawElementProvider   = uiautomationcore.NewProc("UiaReturnRawElementProvider")
-	procUiaHostProviderFromHwnd       = uiautomationcore.NewProc("UiaHostProviderFromHwnd")
-	procUiaRaiseAutomationEvent       = uiautomationcore.NewProc("UiaRaiseAutomationEvent")
-	procUiaRaiseStructureChangedEvent = uiautomationcore.NewProc("UiaRaiseStructureChangedEvent")
-	procUiaDisconnectProvider         = uiautomationcore.NewProc("UiaDisconnectProvider")
-	procUiaClientsAreListening        = uiautomationcore.NewProc("UiaClientsAreListening")
+	procUiaReturnRawElementProvider            = uiautomationcore.NewProc("UiaReturnRawElementProvider")
+	procUiaHostProviderFromHwnd                = uiautomationcore.NewProc("UiaHostProviderFromHwnd")
+	procUiaRaiseAutomationEvent                = uiautomationcore.NewProc("UiaRaiseAutomationEvent")
+	procUiaRaiseAutomationPropertyChangedEvent = uiautomationcore.NewProc("UiaRaiseAutomationPropertyChangedEvent")
+	procUiaRaiseNotificationEvent              = uiautomationcore.NewProc("UiaRaiseNotificationEvent")
+	procUiaRaiseStructureChangedEvent          = uiautomationcore.NewProc("UiaRaiseStructureChangedEvent")
+	procUiaDisconnectProvider                  = uiautomationcore.NewProc("UiaDisconnectProvider")
+	procUiaClientsAreListening                 = uiautomationcore.NewProc("UiaClientsAreListening")
 )
 
 const (
@@ -843,10 +846,35 @@ func SafeArrayPutInt32(psa uintptr, i, v int32) uintptr {
 	return r
 }
 
+// SafeArrayPutUnknown stores p, an interface pointer, at index i of the SAFEARRAY
+// of IUnknown pointers psa, and returns the HRESULT. For an interface array the
+// element is the pointer itself, not the address of a variable that holds it. The
+// array AddRefs the element, so the caller keeps its own reference.
+func SafeArrayPutUnknown(psa uintptr, i int32, p uintptr) uintptr {
+	r, _, _ := procSafeArrayPutElement.Call(psa, uintptr(unsafe.Pointer(&i)), p)
+	return r
+}
+
 // SafeArrayGetInt32 reads the element at index i of the SAFEARRAY of 4-byte
 // integers psa. It returns the HRESULT.
 func SafeArrayGetInt32(psa uintptr, i int32, v *int32) uintptr {
 	r, _, _ := procSafeArrayGetElement.Call(psa, uintptr(unsafe.Pointer(&i)), uintptr(unsafe.Pointer(v)))
+	return r
+}
+
+// SafeArrayUBound returns the upper bound of the first dimension of the SAFEARRAY
+// psa. For a vector, that is one less than its length.
+func SafeArrayUBound(psa uintptr) int32 {
+	var ub int32
+	procSafeArrayGetUBound.Call(psa, 1, uintptr(unsafe.Pointer(&ub)))
+	return ub
+}
+
+// SafeArrayGetUnknown reads the interface pointer at index i of the SAFEARRAY of
+// IUnknown pointers psa into out. The element is AddRef-ed, so the caller
+// releases it. It returns the HRESULT.
+func SafeArrayGetUnknown(psa uintptr, i int32, out *uintptr) uintptr {
+	r, _, _ := procSafeArrayGetElement.Call(psa, uintptr(unsafe.Pointer(&i)), uintptr(unsafe.Pointer(out)))
 	return r
 }
 
@@ -899,4 +927,22 @@ func UiaDisconnectProvider(provider uintptr) uintptr {
 func UiaClientsAreListening() bool {
 	r, _, _ := procUiaClientsAreListening.Call()
 	return r != 0
+}
+
+// UiaRaiseAutomationPropertyChangedEvent raises a property-changed event for the
+// property id of provider, an IRawElementProviderSimple. oldValue and newValue
+// are the addresses of VARIANTs. A VARIANT is larger than a register, so the
+// ABI passes it by address; UI Automation copies them, and the caller keeps
+// ownership of any BSTR in them.
+func UiaRaiseAutomationPropertyChangedEvent(provider uintptr, id int32, oldValue, newValue uintptr) uintptr {
+	r, _, _ := procUiaRaiseAutomationPropertyChangedEvent.Call(provider, uintptr(id), oldValue, newValue)
+	return r
+}
+
+// UiaRaiseNotificationEvent raises a notification event for provider, an
+// IRawElementProviderSimple, with the kind and processing of the notification
+// and the BSTRs display and activity. The caller keeps ownership of the BSTRs.
+func UiaRaiseNotificationEvent(provider uintptr, kind, processing int32, display, activity uintptr) uintptr {
+	r, _, _ := procUiaRaiseNotificationEvent.Call(provider, uintptr(kind), uintptr(processing), display, activity)
+	return r
 }

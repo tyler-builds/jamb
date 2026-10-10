@@ -179,11 +179,90 @@ func TestBridgeActivatesOnceAndPublishes(t *testing.T) {
 func TestBridgePerformsActionsThroughTheRuntime(t *testing.T) {
 	b := NewBridge()
 	var gotID ID
-	var gotAction Action
-	b.SetHooks(nil, func(id ID, a Action) { gotID, gotAction = id, a })
+	var got Request
+	b.SetHooks(nil, func(id ID, r Request) { gotID, got = id, r })
 	b.Perform(7, ActionFocus)
-	if gotID != 7 || gotAction != ActionFocus {
-		t.Fatalf("perform got %d %v", gotID, gotAction)
+	if gotID != 7 || got.Action != ActionFocus {
+		t.Fatalf("perform got %d %v", gotID, got.Action)
+	}
+	b.Do(8, Request{Action: ActionSetValue, Value: "draft"})
+	if gotID != 8 || got.Action != ActionSetValue || got.Value != "draft" {
+		t.Fatalf("do got %d %+v", gotID, got)
+	}
+	b.Do(9, Request{Action: ActionSetScrollPercent, X: 25, Y: -1})
+	if gotID != 9 || got.X != 25 || got.Y != -1 {
+		t.Fatalf("scroll request got %d %+v", gotID, got)
+	}
+}
+
+func TestDiffReportsPropertyChanges(t *testing.T) {
+	prev := NewTree(0, []*Node{
+		{ID: RootID, Role: RoleWindow, Children: []ID{2, 3}},
+		{ID: 2, Role: RoleSwitch, Name: "Dark mode", Parent: RootID, States: StateToggle, Value: ""},
+		{ID: 3, Role: RoleButton, Name: "Open", Parent: RootID, States: StateExpandable},
+	})
+	next := NewTree(0, []*Node{
+		{ID: RootID, Role: RoleWindow, Children: []ID{2, 3}},
+		{ID: 2, Role: RoleSwitch, Name: "Dark mode", Parent: RootID, States: StateToggle | StateChecked},
+		{ID: 3, Role: RoleButton, Name: "Closed", Parent: RootID, States: StateExpandable | StateExpanded | StateDisabled},
+	})
+	u := Diff(prev, next)
+	want := []PropertyChange{
+		{2, PropertyToggle},
+		{3, PropertyName},
+		{3, PropertyExpanded},
+		{3, PropertyEnabled},
+	}
+	if len(u.Properties) != len(want) {
+		t.Fatalf("Properties = %v, want %v", u.Properties, want)
+	}
+	for i := range want {
+		if u.Properties[i] != want[i] {
+			t.Fatalf("Properties = %v, want %v", u.Properties, want)
+		}
+	}
+
+	// A value change is a property change of its text field, and nothing else.
+	field := func(v string) *Tree {
+		return NewTree(0, []*Node{
+			{ID: RootID, Role: RoleWindow, Children: []ID{2}},
+			{ID: 2, Role: RoleTextField, Name: "Search", Parent: RootID, Value: v},
+		})
+	}
+	if u := Diff(field("a"), field("ab")); len(u.Properties) != 1 || u.Properties[0] != (PropertyChange{2, PropertyValue}) {
+		t.Fatalf("value change produced %v", u.Properties)
+	}
+	if u := Diff(nil, field("a")); len(u.Properties) != 0 {
+		t.Fatalf("a first snapshot reports property changes: %v", u.Properties)
+	}
+}
+
+func TestDiffReportsDialogsAndMenusOpenedAndClosed(t *testing.T) {
+	window := &Node{ID: RootID, Role: RoleWindow, Children: []ID{2}}
+	menu := &Node{ID: 5, Role: RoleMenu, Parent: RootID}
+	dialog := &Node{ID: 6, Role: RoleDialog, Parent: RootID}
+	closed := NewTree(0, []*Node{window, {ID: 2, Role: RoleButton, Parent: RootID}})
+	open := NewTree(0, []*Node{{ID: RootID, Role: RoleWindow, Children: []ID{2, 5, 6}},
+		{ID: 2, Role: RoleButton, Parent: RootID}, menu, dialog})
+	u := Diff(closed, open)
+	if len(u.Opened) != 2 || u.Opened[0].ID != 5 || u.Opened[1].ID != 6 || len(u.Closed) != 0 {
+		t.Fatalf("opened %v closed %v, want [5 6] and none", u.Opened, u.Closed)
+	}
+	u = Diff(open, closed)
+	if len(u.Closed) != 2 || u.Closed[0].ID != 5 || u.Closed[1].ID != 6 || len(u.Opened) != 0 {
+		t.Fatalf("opened %v closed %v, want none and [5 6]", u.Opened, u.Closed)
+	}
+}
+
+func TestNodeEqualComparesScroll(t *testing.T) {
+	a := &Node{ID: 1, Scroll: Scroll{Container: true, CanY: true, Y: 10}}
+	b := &Node{ID: 1, Scroll: Scroll{Container: true, CanY: true, Y: 10}}
+	if !a.Equal(b) {
+		t.Fatal("equal scroll positions differ")
+	}
+	b.Scroll.Y = 20
+	if a.Equal(b) {
+		t.Fatal("a different scroll position compares equal")
 	}
 }
 

@@ -122,7 +122,7 @@ func MenuBar(menus ...TopMenu) Element {
 						show(i, false)
 					}
 				}).
-				Child(Text(tm.Label).NoWrap()).Role(access.RoleMenuItem)
+				Child(Text(tm.Label).NoWrap()).Role(access.RoleMenuItem).Expanded(i == cur)
 			if i == cur {
 				lbl.Background(t.SurfaceActive)
 				lbl.Child(panel.top(2))

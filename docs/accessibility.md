@@ -1,8 +1,9 @@
 # Accessibility design
 
-Status: accepted. Phase A (Foundation) is done, with the changes listed under
-"Phase A: what changed from this design". Phases B to E have not started. This
-document describes how jamb exposes its UI
+Status: accepted. Phases A (Foundation) and B (Controls) are done, with the
+changes listed under "Phase A: what changed from this design" and "Phase B: what
+changed from this design". Phases C to E have not started. This document
+describes how jamb exposes its UI
 to assistive technology (screen readers, magnifiers, voice control) and the
 order in which the work is done.
 
@@ -217,3 +218,175 @@ Open after Phase A:
   a client that outlives its window gets an error from UI Automation. A walk that
   races a page change can also get `UIA_E_ELEMENTNOTAVAILABLE` for a node that
   just left the tree, which is the expected answer for a removed node.
+
+## Phase B: what changed from this design
+
+Phase B is in place on Windows: the control patterns, the events, the relations,
+headings, announcements, and the warnings for them. These are the decisions made
+in building it, and why.
+
+- **Patterns follow roles and states.** Toggle for check boxes, switches and
+  check menu items, and for buttons made toggle buttons with `Checked`.
+  ExpandCollapse for elements with `Expanded`: disclosure rows, dropdown
+  triggers, submenu items and the labels of a menu bar. SelectionItem for
+  elements with `Selected`, which includes radio buttons and radio menu items.
+  Selection on the groups that hold them (`SelectionContainer`, tab lists, and
+  menus that hold radio items). Value on text fields and text areas. Scroll on
+  scroll containers, and ScrollItem on the rows and controls inside one. Invoke
+  is unchanged. A pattern is present on a disabled element, which reports it
+  disabled, as UI Automation expects.
+- **Expand, select and toggle run on the UI thread.** An expand, collapse or
+  select that asks for the state the element already has does nothing. Otherwise
+  the element's click handler runs, so an expandable element's handler must
+  change its own state, as a click does. A submenu item is the exception: its
+  expansion is not a click, so it opens and closes its submenu directly. Toggle
+  always runs the click.
+- **Selection is declared by the app.** `Selected(on)` gives an item its state,
+  and `SelectionContainer()` marks the group. An item reports the nearest
+  container above it. A tab list, and a menu with radio items, are containers
+  without a call. A container reports one selection: CanSelectMultiple and
+  IsSelectionRequired are false. RemoveFromSelection is refused with
+  `UIA_E_INVALIDOPERATION`, since a choice is replaced, not cleared.
+- **Value.** A text field's and a text area's text is its Value. SetValue sets the
+  bound signal through the editor's own edit path, so `OnChange` runs as it does
+  for typing, and the undo history is kept. IsReadOnly is false, because no field
+  is read-only yet.
+- **Scroll.** A scroll container reports the position and the visible part of
+  each axis, in percent. SetScrollPercent moves to a percent of the scrollable
+  range, and a negative value leaves an axis alone. Scroll with a ScrollAmount
+  moves a tenth of the view for a small amount and nine tenths for a large one.
+  That is an approximation, since UI Automation's amounts are not defined in
+  pixels. ScrollIntoView reveals the least amount, as `ListHandle.ScrollToItem`
+  does.
+- **Virtualized lists.** Rows report their position in the full list, as in
+  Phase A, and ScrollItem works for the rows that are built. ItemContainer and
+  VirtualizedItem are not implemented: a client cannot name a row that is not
+  built, so it cannot ask for that row to be realized. A row that declares its
+  own role (a list item with a selection) is the item itself, so it is not nested
+  in a second list item.
+- **Events.** They are derived from the snapshot's `Diff`, once per published
+  frame, and raised only when a client listens. Property-changed events cover
+  Name, Value, ToggleState, ExpandCollapseState, IsSelected and IsEnabled, with
+  the new value; the old value is empty, since the adapter keeps no history.
+  Menu opened and closed are raised for each menu that appears or goes away.
+  Window opened and closed are raised for dialogs, but see the open items.
+- **Announcements.** Each `ui.Announce` is a Notification event on the window.
+  Polite maps to `NotificationProcessing_All`: presented when possible, and
+  every message is delivered, so a burst of status messages is heard in order
+  (the examples debounce their own repeats). Assertive maps to
+  `ImportantMostRecent`: presented as soon as possible, and a newer message
+  supersedes an older one. `ImportantAll` is avoided because
+  [Microsoft's documentation](https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/ne-uiautomationcore-notificationprocessing)
+  warns it can flood the user, and `ImportantCurrentThenMostRecent` exists only
+  from Windows build 26100.
+- **A Window pattern for dialogs.** It is not in the design's list. A dialog has
+  the Window pattern, so that it reports IsModal, IsTopmost and
+  WindowInteractionState. Close and SetVisualState are not supported: the
+  application closes its dialogs.
+- **Relations and headings.** `Heading(level)` maps to HeadingLevel1 to 9.
+  `LabelledBy(keys...)` and `DescribedBy(keys...)` name the elements by their
+  `Key`. A node's LabeledBy is its first label, and DescribedBy is an array of
+  providers. TextInput and TextArea take the same two methods. A key that matches
+  no exposed element is a development warning.
+- **Menu items and dropdowns.** A menu item's name is its label, and the shortcut
+  is shown but not read as part of the name. A DropdownMenu's trigger button is
+  inert in the tree: the menu's wrapper is the control, takes the button's name,
+  and has the expanded state. The wrapper is focusable, and a focus request on it
+  moves keyboard focus to the button.
+- **Developer warnings** added: a check box, switch or radio button with no
+  `Checked` call, a selection item outside a selection container, and a
+  LabelledBy or DescribedBy key that matches nothing. Each element is reported
+  once.
+- **Adapter notes.** A COM out parameter must not be on the goroutine stack. A
+  callback can grow the stack, which moves the variable, and the result is
+  written to the old copy: a test's Name read returned an empty VARIANT for this
+  reason. `newVariant` and `newWord` return heap pointers for that purpose. For an
+  interface array, `SafeArrayPutElement` takes the interface pointer itself, not
+  the address of a variable that holds it. SetScrollPercent takes two doubles, so
+  it goes through the amd64 trampoline, as ElementProviderFromPoint does; the other
+  architectures report E_NOTIMPL.
+- **The examples.** The demo: its switches are labelled by their row titles; the
+  page titles and section titles are headings; the filter chips, the navigation
+  and the theme options are selection items; the project list is a selection
+  container, and each card is a focusable list item; the star is a toggle button;
+  the Activity build rows expand; the result count of a filter is announced once
+  the typing pauses for 600 ms; a created project and a copied text are announced.
+  The notes app: note rows are selection items in the sidebar's selection
+  container; pin and theme are toggles; tag chips are a selection group; a
+  finished save is announced once per save; an import, an export or a deletion is
+  announced as its status message is shown.
+
+### Phase B: verification
+
+The unit tests cover each pattern's mapping, the events derived from snapshots,
+the list positions, the relations, the announcements, the warnings, and the
+adapter's VARIANT and SAFEARRAY types. The examples' tests check the roles and
+states on each page and that the actions change the app, with zero warnings.
+
+Live checks were made against the built demo and notes apps, with the .NET
+UI Automation client, using a temporary notes file. For each pattern the client
+read the state, performed the action, and read the result:
+
+- Toggle: the Settings switch flips, the theme follows, and the property-changed
+  event carries the new state. A project's star toggles, and the Dark theme check
+  item in a dropdown toggles the theme and closes the menu.
+- ExpandCollapse: an Activity build row and the dropdown trigger expand and
+  collapse, with a property-changed event; the dropdown raises a menu-opened
+  event, and closing it raises a menu-closed event.
+- Selection: the Done filter chip is selected and the list shows its one project;
+  a project card is selected and reports the list as its container, and
+  GetSelection returns it. A note row is selected exclusively, a tag chip is
+  selected in its group, and RemoveFromSelection is refused.
+- Value: SetValue on the search field filters the projects; the Title field of a
+  note takes a value.
+- Scroll and ScrollItem: SetScrollPercent(50) lands at 50%, and the rows change;
+  ScrollIntoView brings a built row into the list's bounds.
+- Events: the notification events for a created project, a note's save, and a
+  deleted note; the Name field's LabeledBy is its label.
+- Focus, ElementFromPoint and the tree walk were re-checked from Phase A. The
+  project card takes keyboard focus, and the dropdown trigger takes focus through
+  its wrapper.
+
+Memory was measured with a walker that reads each element's name and control
+type, in a loop of 400 walks of the demo's tree (about 50 nodes):
+
+| Walk | Per element read | Growth over 400 walks |
+|---|---|---|
+| Demo, names only | 1.27 to 1.34 KB | 25 to 27 MB |
+| Demo, GetCurrentPattern on each supported pattern | 1.48 to 1.57 KB | 29 to 31 MB |
+| Notepad, names only (Phase A's baseline) | 1.15 KB | 22 MB |
+| Notepad, GetCurrentPattern on each supported pattern | 2.1 KB | 41 MB |
+
+A pattern query adds about 0.1 to 0.2 KB in the demo, and about 0.5 KB in
+Notepad, so the adapter's share is below the native provider's. The growth is
+not released by a collection in the client either, so it is UI Automation's own
+per-client state, as Phase A concluded. The zero-allocation guard
+(`uia_alloc_test.go`) covers the new hot paths: the pattern lookup, the state
+reads, and the scroll and selection reads.
+
+### Phase B: open items
+
+- **Window events are not delivered in the live check.** Window opened and closed
+  are raised, for the dialog and for the window's root, and the dialog has the
+  Window pattern. A .NET client that subscribed to them, on the window or at the
+  desktop root, received neither, while the menu events, raised on the same root,
+  were received. The cause is not isolated. Until it is, a dialog is announced by
+  its focus, its IsDialog and its IsModal properties.
+- **An action requested through UI Automation may not run while a context menu
+  opened from the keyboard is open.** The live check was: focus a project card,
+  press Shift+F10, then call Expand on the menu's Status item. The request was
+  posted to the UI thread, but no frame ran it, while key presses and dropdown
+  menus were not affected. The cause is not isolated. The likely place to look
+  is the frame request and wake path (`ui.Runtime.requestFrame` and
+  `platform/windows/window.go`), not the access tree.
+- ItemContainer and VirtualizedItem, as above. A client cannot find an unbuilt
+  row.
+- A context menu's own items are not exposed as a dropdown: a context menu opens
+  from the keyboard or a pointer press on the element it hangs from, and that
+  element has no expand state.
+- The mixed (indeterminate) state is in the model and the adapter, but no public
+  API sets it.
+- RangeValue is not implemented: no slider exists in the framework yet.
+- The Text pattern for text fields and text areas is Phase C. Until then, a
+  text area exposes its Value only, as a text field does.
+- Screen reader checks (NVDA, Narrator, Accessibility Insights) are Phase E.

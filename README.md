@@ -1060,17 +1060,52 @@ What is automatic, with no app code:
 - Tooltips are nodes under the element they hang from, so an overlay reads in
   place rather than at the end of the window.
 
+The controls, with no app code, once their roles and states are set:
+
+- A check box, switch or radio button has its check state. A `Checked` element
+  is a toggle, so Toggle works, and a `ui.IconButton(...).Checked(on)` is a
+  toggle button with its state.
+- A `DropdownMenu` trigger, a menu item with a submenu, and a menu bar label
+  expand and collapse. A menu of radio items is a selection group.
+- A `TextInput` or `TextArea` has its text as its value, which assistive
+  technology can read and set.
+- A scroll container reports its position and its visible part, and can be
+  scrolled and scrolled to a percent. A row or control inside one can be
+  scrolled into view.
+
 The API, on the elements that already exist:
 
 ```go
 ui.Div().Role(access.RoleCheckBox).Label("Notifications").Checked(on)
+ui.Div().Expanded(open)                    // a row that opens and closes; its click toggles it
+ui.Div().Role(access.RoleButton).Selected(on).OnClick(choose) // one item of a selection
+ui.Div().Label("Status").SelectionContainer() // the group that holds the items
+ui.Div().Heading(2).Child(ui.Text("Appearance"))
+ui.Text("Name").Key("name-label")          // a label, named by key
+ui.TextInput(name).Label("Name").LabelledBy("name-label").DescribedBy("name-help")
+ui.ListOf(items, key, row).SelectionContainer() // also UniformList
 ui.Div().Description("Saves the file to disk")
 ui.Div().Hidden() // leaves the element and its children out of the tree
 ui.IconButton(icons.Bell).Label("Notifications")
 ui.TextInput(query).Label("Search projects") // also TextArea
 ui.Image(avatar).Alt("Account avatar")
-ui.Announce("Saved", access.Polite) // queued; spoken once announcements are wired (see Known limitations)
+ui.Announce("Saved", access.Polite) // spoken as a notification; Assertive interrupts
 ```
+
+`Expanded` and `Selected` declare the state; the element's click handler makes
+the change, so a click on an expandable row must toggle it. Expand and select
+run that handler only when the state is not already the one asked for.
+`SelectionContainer` marks the group that holds the selected items, and a tab
+list, or a menu with radio items, is one without a call. `Heading` takes a level
+from 1 to 6. `LabelledBy` and `DescribedBy` name an element by the `Key` of
+other elements, such as a visible label above a field.
+
+Announcements are spoken as notifications. A polite one waits its turn, in
+order, after the speech in progress; an assertive one is spoken as soon as
+possible, and a newer assertive one replaces it. Announce
+the result of an action or a status change that has no focus to carry it, such
+as "Saved" or "3 results", and keep repeated messages to one per change: a burst
+of keystrokes should be announced once it pauses.
 
 A name comes from the first of these that is set: the `Label`, then the text
 inside a control, then its tooltip. `Description` (or the tooltip, when it is
@@ -1083,8 +1118,10 @@ its updates) are the platform-neutral model; `access/accesstest` has helpers
 that find a node by its role and name in a unit test.
 
 Development warnings report what a user cannot identify: an interactive element
-with no accessible name, and an image without `Alt`. Each element is reported
-once, to stderr, in runs with `JAMB_TRACE=1`, under `jamb dev`, or with
+with no accessible name, an image without `Alt`, a check box, switch or radio
+button with no `Checked` call, a selection item outside a selection container,
+and a `LabelledBy` or `DescribedBy` key that matches no element. Each element is
+reported once, to stderr, in runs with `JAMB_TRACE=1`, under `jamb dev`, or with
 `JAMB_A11Y_WARN=1`.
 
 To see the tree as text, use the `a11ydump PATH` script step, or call
@@ -1685,15 +1722,17 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   version has not been tested. The arm64 build is compiled but has not been run.
   The MSIX install steps are for a person to run; the SDK tools check the
   package's structure.
-- **Accessibility.** Phase A of [docs/accessibility.md](docs/accessibility.md)
-  is in place on Windows: the access tree, names and roles, bounds and focus,
-  Invoke for buttons, links and menu items, focus-changed events, the dump and
-  the development warnings. Still to come, in the design's order: Toggle,
-  ExpandCollapse, Selection, Value and Scroll patterns (phase B), so a check
-  box, switch or menu cannot yet be toggled or expanded through UI Automation;
-  announcements from `ui.Announce` are queued but not spoken; heading levels
-  and label relations are not exposed; the Text pattern for text fields (phase
-  C); high contrast, text size and reduced motion (phase D). The caption
+- **Accessibility.** Phases A and B of [docs/accessibility.md](docs/accessibility.md)
+  are in place on Windows: the access tree, names and roles, bounds and focus,
+  Invoke, Toggle, ExpandCollapse, SelectionItem and Selection, Value, Scroll and
+  ScrollItem, Window for dialogs, focus, menu, property-changed and notification
+  events, headings and label relations, the dump and the development warnings.
+  Open from phase B: the window opened and closed events were raised but not
+  seen by a .NET client, an action sent through UI Automation while a context
+  menu opened from the keyboard is open may not run, and virtualized rows that
+  are not built cannot be found or realized (see the design's phase B open
+  items). Still to come: the Text pattern for text fields (phase C); high
+  contrast, text size and reduced motion (phase D). The caption
   buttons (Minimize, Maximize, Close) have their roles and names, but their
   invoke path has not been checked live. Building the tree for the demo's
   dashboard takes about 18 µs, measured with a benchmark; the cost grows with

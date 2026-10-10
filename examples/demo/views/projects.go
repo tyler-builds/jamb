@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -23,7 +24,7 @@ func Projects(s *Store) ui.Element {
 			}
 		}
 
-		list := ui.Div().Gap(10)
+		list := ui.Div().Gap(10).Role(access.RoleList).SelectionContainer()
 		for _, p := range visible {
 			list.Child(projectCard(t, s, p, p.ID == selected, open[p.ID]))
 		}
@@ -35,7 +36,7 @@ func Projects(s *Store) ui.Element {
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(1100)).
 				Child(ui.Div().Row().Align(ui.End).Justify(ui.SpaceBetween).Gap(16).
 					Child(ui.Div().Gap(4).
-						Child(ui.Text("Projects").Size(26).Semibold()).
+						Child(ui.Div().Heading(1).Child(ui.Text("Projects").Size(26).Semibold())).
 						Child(ui.Textf("%d projects · %d active", len(all), active).Color(t.TextMuted))).
 					Child(filters(t, s))).
 				Child(list))
@@ -48,7 +49,7 @@ func filters(t *ui.Theme, s *Store) ui.Element {
 	current := s.Filter.Get()
 	chip := func(label string, value int) ui.Element {
 		on := current == value
-		return ui.Div().Key("filter-"+label).Row().PaddingX(12).Height(ui.Px(30)).Radius(8).Center().
+		return ui.Div().Key("filter-"+label).Selected(on).Row().PaddingX(12).Height(ui.Px(30)).Radius(8).Center().
 			TextColor(t.TextMuted).FontSize(13).FontWeight(ui.FontMedium).Transition(fast).
 			Hover(ui.Style{TextColor: t.Text}).
 			When(on, func(d *ui.DivElement) {
@@ -62,6 +63,7 @@ func filters(t *ui.Theme, s *Store) ui.Element {
 			Child(ui.Text(label))
 	}
 	return ui.Div().Row().Padding(3).Gap(2).Radius(10).Background(t.SurfaceActive.Alpha(0.6)).
+		SelectionContainer().Label("Status filter").
 		Child(chip("All", -1)).
 		Child(chip("Active", int(StatusActive))).
 		Child(chip("Paused", int(StatusPaused))).
@@ -83,11 +85,13 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 	star := ui.Div().Size(ui.Px(30), ui.Px(30)).Radius(7).Center().
 		TextColor(t.TextSubtle).Transition(fast).
 		Hover(ui.Style{Background: t.SurfaceActive, TextColor: t.Text}).
-		Label(starLabel(p.Starred)).
+		Label("Star project").Checked(p.Starred).
 		OnClick(func() { s.ToggleStar(p.ID) }).
 		Child(ui.Icon(icons.Star).Size(16).Color(starColor(t, p.Starred)))
 
-	card := ui.Div().Key(fmt.Sprint(p.ID)).Row().Align(ui.Center).Gap(16).Padding(16).Radius(12).
+	// The card takes focus, so Enter selects it and Shift+F10 opens its menu.
+	card := ui.Div().Key(fmt.Sprint(p.ID)).Role(access.RoleListItem).Selected(selected).
+		Focusable().FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).Row().Align(ui.Center).Gap(16).Padding(16).Radius(12).
 		Background(t.Surface).Border(1, t.Border).Shadow(ui.ShadowSm).Transition(150*time.Millisecond).
 		Hover(ui.Style{BorderColor: t.BorderStrong, Background: t.SurfaceHover}).
 		When(selected, func(d *ui.DivElement) {
@@ -175,15 +179,6 @@ func starColor(t *ui.Theme, on bool) ui.Color {
 		return t.Warning
 	}
 	return ui.Color{}
-}
-
-// starLabel names the star toggle of a project for assistive technology: what
-// pressing it will do.
-func starLabel(starred bool) string {
-	if starred {
-		return "Unstar project"
-	}
-	return "Star project"
 }
 
 func emptyState(t *ui.Theme, s *Store) ui.Element {

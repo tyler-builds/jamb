@@ -1,6 +1,7 @@
 package access
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -137,8 +138,21 @@ type Update struct {
 	Changed      []ID // nodes present in both whose content differs
 	// Structure is set when nodes were added, removed or re-parented.
 	Structure bool
+	// Properties are the properties of nodes present in both snapshots that
+	// changed. Adapters raise a property-changed event for each.
+	Properties []PropertyChange
+	// Opened are the dialogs and menus that were added, and Closed the ones that
+	// were removed (taken from the previous snapshot).
+	Opened []Popup
+	Closed []Popup
 	// Announcements are the status messages queued since the last snapshot.
 	Announcements []Announcement
+}
+
+// Popup is a dialog or a menu that appeared or went away.
+type Popup struct {
+	ID   ID
+	Role Role
 }
 
 // Diff compares two snapshots. prev may be nil, in which case every node is
@@ -159,11 +173,17 @@ func Diff(prev, next *Tree) Update {
 		case old == nil:
 			u.Added = append(u.Added, n.ID)
 			u.Structure = true
+			if n.Role == RoleDialog || n.Role == RoleMenu {
+				u.Opened = append(u.Opened, Popup{n.ID, n.Role})
+			}
 		case old.Parent != n.Parent:
 			u.Changed = append(u.Changed, n.ID)
 			u.Structure = true
 		case !old.Equal(n):
 			u.Changed = append(u.Changed, n.ID)
+		}
+		if old != nil {
+			u.Properties = appendPropertyChanges(u.Properties, old, n)
 		}
 		return true
 	})
@@ -171,13 +191,47 @@ func Diff(prev, next *Tree) Update {
 		if next.Node(n.ID) == nil {
 			u.Removed = append(u.Removed, n.ID)
 			u.Structure = true
+			if n.Role == RoleDialog || n.Role == RoleMenu {
+				u.Closed = append(u.Closed, Popup{n.ID, n.Role})
+			}
 		}
 		return true
 	})
 	slices.Sort(u.Added)
 	slices.Sort(u.Removed)
 	slices.Sort(u.Changed)
+	slices.SortFunc(u.Opened, comparePopups)
+	slices.SortFunc(u.Closed, comparePopups)
 	return u
+}
+
+// comparePopups orders popups by ID.
+func comparePopups(a, b Popup) int { return cmp.Compare(a.ID, b.ID) }
+
+// appendPropertyChanges appends a change for each property of n that differs
+// from old, in the order of the Property constants.
+func appendPropertyChanges(out []PropertyChange, old, n *Node) []PropertyChange {
+	const toggle = StateChecked | StateMixed
+	diff := func(mask State) bool { return old.States&mask != n.States&mask }
+	if old.Name != n.Name {
+		out = append(out, PropertyChange{n.ID, PropertyName})
+	}
+	if old.Value != n.Value {
+		out = append(out, PropertyChange{n.ID, PropertyValue})
+	}
+	if diff(toggle) {
+		out = append(out, PropertyChange{n.ID, PropertyToggle})
+	}
+	if diff(StateExpanded) {
+		out = append(out, PropertyChange{n.ID, PropertyExpanded})
+	}
+	if diff(StateSelected) {
+		out = append(out, PropertyChange{n.ID, PropertySelected})
+	}
+	if diff(StateDisabled) {
+		out = append(out, PropertyChange{n.ID, PropertyEnabled})
+	}
+	return out
 }
 
 // Bridge connects the ui runtime that owns a window's tree with the platform
@@ -193,7 +247,7 @@ type Bridge struct {
 	mu       sync.Mutex
 	active   atomic.Bool
 	activate func()
-	perform  func(ID, Action)
+	perform  func(ID, Request)
 	listener func(Update)
 }
 
@@ -228,12 +282,16 @@ func (b *Bridge) Activate() {
 // Perform asks the runtime to run action a on node id. It returns at once and
 // is safe from any goroutine; the runtime runs the action on the UI thread, and
 // ignores it if the node no longer exists.
-func (b *Bridge) Perform(id ID, a Action) {
+func (b *Bridge) Perform(id ID, a Action) { b.Do(id, Request{Action: a}) }
+
+// Do is Perform for a request that carries an argument, such as the text for
+// ActionSetValue. The same rules apply.
+func (b *Bridge) Do(id ID, r Request) {
 	b.mu.Lock()
 	fn := b.perform
 	b.mu.Unlock()
 	if fn != nil {
-		fn(id, a)
+		fn(id, r)
 	}
 }
 
@@ -250,8 +308,8 @@ func (b *Bridge) Publish(t *Tree, u Update) {
 }
 
 // SetHooks connects the runtime. activate runs on the UI thread once, when the
-// tree is first asked for. perform receives actions from any goroutine.
-func (b *Bridge) SetHooks(activate func(), perform func(ID, Action)) {
+// tree is first asked for. perform receives requests from any goroutine.
+func (b *Bridge) SetHooks(activate func(), perform func(ID, Request)) {
 	b.mu.Lock()
 	b.activate, b.perform = activate, perform
 	b.mu.Unlock()

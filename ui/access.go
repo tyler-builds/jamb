@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 
@@ -24,9 +25,29 @@ type accessInfo struct {
 	hidden      bool
 	disabled    bool
 	checked     bool
-	setPos      int // 1-based position in a set, such as a row of a list
-	setSize     int // the number of items in the set
-	level       int // the depth of a menu, 1 at the top
+	checkedSet  bool // Checked was called, so a toggle or radio button has a state
+	toggle      bool // the element is a toggle button (see ButtonElement.Checked)
+	setPos      int  // 1-based position in a set, such as a row of a list
+	setSize     int  // the number of items in the set
+	level       int  // the depth of a menu, 1 at the top
+	heading     int  // the level of a heading, 1 to 6
+	expandable  bool
+	expanded    bool
+	// setExpanded runs an expand or collapse that is not a click, such as the
+	// submenu of a menu item. Nil means a click toggles the element.
+	setExpanded func(open bool)
+	selectable  bool
+	selected    bool
+	container   bool // the element holds selection items
+	labelledBy  []string
+	describedBy []string
+	// inert leaves the element out of the tree while its children stay in it.
+	// A DropdownMenu's trigger is inert, since the menu's wrapper is the control.
+	inert bool
+	// focusInside is set on an element whose keyboard focus lands on an inert child
+	// (see DropdownMenu): the element takes focus for it, and an action to focus
+	// the element moves focus to that child.
+	focusInside bool
 }
 
 // access returns the element's accessibility settings, creating them on use.
@@ -49,9 +70,67 @@ func (d *DivElement) Label(s string) *DivElement { d.access().name = s; return d
 // Description adds help text, which assistive technology reads after the name.
 func (d *DivElement) Description(s string) *DivElement { d.access().description = s; return d }
 
-// Checked sets whether a check box, switch, radio button or checkable menu item
-// is on. Assistive technology reads it after the name.
-func (d *DivElement) Checked(on bool) *DivElement { d.access().checked = on; return d }
+// Checked gives the element an on or off state: whether a check box, switch,
+// radio button, toggle button or checkable menu item is on. Assistive technology
+// reports the state after the name, and the element can be toggled. A check box,
+// switch or radio button needs a state, so the development warnings ask for this
+// call. A radio button is a choice in a group (see Selected), not a toggle.
+func (d *DivElement) Checked(on bool) *DivElement {
+	a := d.access()
+	a.checked, a.checkedSet, a.toggle = on, true, true
+	return d
+}
+
+// Expanded marks the element as one that opens and closes, such as a row with
+// details or a dropdown trigger, and says whether it is open. Assistive
+// technology reports the state and can open or close the element. Opening and
+// closing run the element's click handler, which must toggle the state, when
+// the element is not already in the requested state.
+func (d *DivElement) Expanded(open bool) *DivElement {
+	a := d.access()
+	a.expandable, a.expanded = true, open
+	return d
+}
+
+// Selected marks the element as one item of a selection, such as the selected
+// note in a list, and says whether it is chosen. The item must be inside a
+// SelectionContainer. Selecting an item that is not chosen runs its click
+// handler, which must choose it.
+func (d *DivElement) Selected(on bool) *DivElement {
+	a := d.access()
+	a.selectable, a.selected = true, on
+	return d
+}
+
+// SelectionContainer marks the element as the group that holds selection items,
+// such as the filter chips or the list of notes. Each item reports the group
+// it belongs to, and the group reports its chosen items.
+func (d *DivElement) SelectionContainer() *DivElement { d.access().container = true; return d }
+
+// Heading makes the element a heading of the given level, 1 to 6. Its text is
+// its name. Heading panics for any other level.
+func (d *DivElement) Heading(level int) *DivElement {
+	if level < 1 || level > 6 {
+		panic(fmt.Sprintf("ui.Heading(%d): the level must be 1 to 6", level))
+	}
+	a := d.access()
+	a.role, a.heading = access.RoleHeading, level
+	return d
+}
+
+// LabelledBy names the element by the text of the elements with the given keys,
+// such as a visible label above a field. The keys are the Key of those elements.
+func (d *DivElement) LabelledBy(keys ...string) *DivElement {
+	d.access().labelledBy = keys
+	return d
+}
+
+// DescribedBy describes the element by the text of the elements with the given
+// keys, read after its name.
+func (d *DivElement) DescribedBy(keys ...string) *DivElement {
+	d.access().describedBy = keys
+	return d
+}
 
 // Hidden leaves the element and its children out of the accessibility tree.
 // It does not change how the element is drawn.
@@ -63,6 +142,19 @@ func (d *DivElement) listItem(pos, size int) *DivElement {
 	a := d.access()
 	a.role, a.setPos, a.setSize = access.RoleListItem, pos, size
 	return d
+}
+
+// setListPosition marks the row r, an element of the list whose wrapper is w, as the
+// pos-th of size items. A row that declares its own role, such as a list item
+// with a selection, is the item and takes the position itself; otherwise the
+// wrapper is the item.
+func setListPosition(w *DivElement, r Element, pos, size int) {
+	if d, ok := r.(*DivElement); ok && d.acc != nil && d.acc.role != access.RoleUnknown {
+		a := d.access()
+		a.setPos, a.setSize = pos, size
+		return
+	}
+	w.listItem(pos, size)
 }
 
 // menuAccessRole maps a menu entry's role to the access role.
@@ -202,15 +294,15 @@ func (rt *Runtime) publishAccess() {
 	}
 }
 
-// performAccess runs an action requested through the bridge. The bridge may
-// call it from any goroutine, so it is posted to the UI thread.
-func (rt *Runtime) performAccess(id access.ID, act access.Action) {
-	rt.Post(func() { rt.runAccess(id, act) })
+// performAccess runs a request made through the bridge. The bridge may call it
+// from any goroutine, so it is posted to the UI thread.
+func (rt *Runtime) performAccess(id access.ID, req access.Request) {
+	rt.Post(func() { rt.runAccess(id, req) })
 }
 
-// runAccess runs an action on the UI thread. An action on a node that has gone
+// runAccess runs a request on the UI thread. A request on a node that has gone
 // since the last published tree does nothing.
-func (rt *Runtime) runAccess(id access.ID, act access.Action) {
+func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 	a := rt.acc
 	if a == nil {
 		return
@@ -220,8 +312,9 @@ func (rt *Runtime) runAccess(id access.ID, act access.Action) {
 		return
 	}
 	n := t.node
-	switch act {
-	case access.ActionClick:
+	role, _ := accessRole(n)
+	switch req.Action {
+	case access.ActionClick, access.ActionToggle:
 		if t.seg >= 0 {
 			if fn := n.rich.segs[t.seg].onClick; fn != nil {
 				fn()
@@ -229,12 +322,115 @@ func (rt *Runtime) runAccess(id access.ID, act access.Action) {
 		} else if n.div != nil && n.div.h.onClick != nil {
 			n.div.h.onClick()
 		}
+	case access.ActionExpand, access.ActionCollapse:
+		if n.div != nil && n.div.acc != nil && n.div.acc.expandable {
+			rt.setExpandedFrom(n, req.Action == access.ActionExpand)
+		}
+	case access.ActionSelect:
+		if n.div != nil && n.div.acc != nil && n.div.acc.selectable && !isSelected(role, n.div.acc) {
+			rt.clickNode(n)
+		}
 	case access.ActionFocus:
 		if n.div == nil || n.div.focusable || n.kind == kindEditor {
 			rt.setFocus(n.id)
+		} else if n.div.acc != nil && n.div.acc.focusInside {
+			rt.focusChild(n)
 		}
+	case access.ActionSetValue:
+		if n.kind == kindEditor {
+			rt.editorSet(n.id, req.Value, len(req.Value), editOther)
+		}
+	case access.ActionScrollIntoView:
+		rt.scrollIntoView(n)
+	case access.ActionScroll:
+		rt.scrollBy(n, float32(req.X), float32(req.Y))
+	case access.ActionSetScrollPercent:
+		rt.scrollToPercent(n, req.X, req.Y)
 	}
 	rt.requestFrame()
+}
+
+// clickNode runs the click handler of an element, if it has one.
+func (rt *Runtime) clickNode(n *node) {
+	if n.div != nil && n.div.h.onClick != nil {
+		n.div.h.onClick()
+	}
+}
+
+// setExpandedFrom opens or closes an expandable element that is not already in
+// the requested state. An element with setExpanded runs it; otherwise a click
+// toggles the element, so its handler does the work.
+func (rt *Runtime) setExpandedFrom(n *node, open bool) {
+	a := n.div.acc
+	if a.expanded == open {
+		return
+	}
+	if a.setExpanded != nil {
+		a.setExpanded(open)
+		return
+	}
+	rt.clickNode(n)
+}
+
+// scrollContainer returns the nearest scroll container above n, or nil.
+func scrollContainer(n *node) *node {
+	for p := n.parent; p != nil; p = p.parent {
+		if isScroll(p) {
+			return p
+		}
+	}
+	return nil
+}
+
+// scrollIntoView scrolls the nearest scroll container the least amount that
+// shows n completely. The offset of n is the sum of the layout offsets from n up
+// to the container, which the layout gives relative to each parent.
+func (rt *Runtime) scrollIntoView(n *node) {
+	c := scrollContainer(n)
+	if c == nil || c.st == nil {
+		return
+	}
+	var top float32
+	for p := n; p != nil && p != c; p = p.parent {
+		top += p.lay.Y
+	}
+	revealRange(c, top, top+n.lay.H)
+	rt.needPaint = true
+	rt.scrolled = true
+}
+
+// scrollBy moves a scroll container by fractions of its view, positive down and
+// right, clamped to its range.
+func (rt *Runtime) scrollBy(n *node, fx, fy float32) {
+	st := n.st
+	if st == nil || !isScroll(n) {
+		return
+	}
+	maxX := max(n.lay.ContentW-n.lay.W, 0)
+	maxY := max(n.lay.ContentH-n.lay.H, 0)
+	st.targetX = min(max(st.targetX+fx*n.lay.W, 0), maxX)
+	st.targetY = min(max(st.targetY+fy*n.lay.H, 0), maxY)
+	rt.needPaint = true
+	rt.scrolled = true
+}
+
+// scrollToPercent moves a scroll container to a percent of its range on each
+// axis. A negative percent leaves that axis where it is.
+func (rt *Runtime) scrollToPercent(n *node, px, py float64) {
+	st := n.st
+	if st == nil || !isScroll(n) {
+		return
+	}
+	maxX := max(n.lay.ContentW-n.lay.W, 0)
+	maxY := max(n.lay.ContentH-n.lay.H, 0)
+	if px >= 0 {
+		st.targetX = min(max(float32(px/100)*maxX, 0), maxX)
+	}
+	if py >= 0 {
+		st.targetY = min(max(float32(py/100)*maxY, 0), maxY)
+	}
+	rt.needPaint = true
+	rt.scrolled = true
 }
 
 // accID converts a node's ID to an access ID. The top bit keeps element IDs
@@ -250,12 +446,26 @@ type accessBuilder struct {
 	byID    map[access.ID]*access.Node
 	targets map[access.ID]accessTarget
 	focus   access.ID // the node that carries focus, found before the walk
+	keys    map[string]access.ID
+	rels    []accessRelation
+	// issues holds the problem found with an element while it was built, one
+	// message per element, reported with the other warnings.
+	issues map[access.ID]string
+}
+
+// accessRelation is a LabelledBy or DescribedBy whose keys are resolved once
+// every element is built.
+type accessRelation struct {
+	node        *access.Node
+	labelledBy  []string
+	describedBy []string
 }
 
 // buildAccess builds the tree from the runtime's nodes and the targets of its
 // actions. It warns about elements that need a name, when warnings are on.
 func (rt *Runtime) buildAccess() (*access.Tree, map[access.ID]accessTarget) {
-	b := &accessBuilder{rt: rt, byID: map[access.ID]*access.Node{}, targets: map[access.ID]accessTarget{}}
+	b := &accessBuilder{rt: rt, byID: map[access.ID]*access.Node{}, targets: map[access.ID]accessTarget{},
+		keys: map[string]access.ID{}, issues: map[access.ID]string{}}
 	b.focus = b.focusTarget()
 	root := &access.Node{ID: access.RootID, Role: access.RoleWindow}
 	root.Bounds = access.Rect{W: round(rt.viewW * rt.scale), H: round(rt.viewH * rt.scale)}
@@ -266,15 +476,41 @@ func (rt *Runtime) buildAccess() (*access.Tree, map[access.ID]accessTarget) {
 			root.Children = append(root.Children, id)
 		}
 	}
+	for _, r := range b.rels {
+		r.node.LabelledBy = b.resolve(r.node, r.labelledBy, "LabelledBy")
+		r.node.DescribedBy = b.resolve(r.node, r.describedBy, "DescribedBy")
+	}
 	nodes := make([]*access.Node, 0, len(b.byID))
 	for _, n := range b.byID {
 		nodes = append(nodes, n)
 	}
 	t := access.NewTree(b.focus, nodes)
 	if rt.acc != nil && rt.acc.warn {
-		t.Walk(func(n *access.Node) bool { rt.warnNode(n); return true })
+		t.Walk(func(n *access.Node) bool { rt.warnNode(n, t, b.issues[n.ID]); return true })
 	}
 	return t, b.targets
+}
+
+// resolve returns the IDs of the elements with the keys. A key that no exposed
+// element has is an issue of the element that names it.
+func (b *accessBuilder) resolve(owner *access.Node, keys []string, rel string) []access.ID {
+	var ids []access.ID
+	for _, k := range keys {
+		id, ok := b.keys[k]
+		if !ok {
+			b.issue(owner.ID, fmt.Sprintf("%s key %q matches no exposed element", rel, k))
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// issue records a problem with the element id, unless it has one already.
+func (b *accessBuilder) issue(id access.ID, msg string) {
+	if _, ok := b.issues[id]; !ok {
+		b.issues[id] = msg
+	}
 }
 
 // focusTarget returns the access ID of the node that should carry focus: the
@@ -319,6 +555,13 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 	if d == nil || (d.acc != nil && d.acc.hidden) {
 		return nil
 	}
+	if d.acc != nil && d.acc.inert {
+		var kids []access.ID
+		for _, c := range n.children {
+			kids = append(kids, b.emit(c, true)...)
+		}
+		return kids
+	}
 	role, ok := accessRole(n)
 	absorbs := ok && absorbsText(role)
 	var kids []access.ID
@@ -333,16 +576,53 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 	an.Name = b.name(n, absorbs)
 	an.Description = d.acc.descriptionOr(d.tooltip, an.Name)
 	an.Bounds = b.bounds(n)
-	an.States = b.states(n, id)
-	an.Actions = b.actions(n)
+	an.States = b.states(n, id, role)
+	if role == access.RoleMenu && b.hasRadio(kids) {
+		an.States |= access.StateSelectionContainer
+	}
+	an.Actions = b.actions(n, role, an.States)
+	an.Scroll = b.scroll(n)
 	if d.acc != nil && d.acc.setSize > 0 {
 		an.PosInSet, an.SetSize = d.acc.setPos, d.acc.setSize
 	}
 	if d.acc != nil {
 		an.Level = d.acc.level
+		an.Heading = d.acc.heading
 	}
+	b.checkState(an, d.acc, role)
+	b.relate(an, d.acc)
 	b.add(an, n, kids)
 	return []access.ID{id}
+}
+
+// hasRadio reports whether one of the nodes is a radio item of a menu.
+func (b *accessBuilder) hasRadio(ids []access.ID) bool {
+	for _, id := range ids {
+		if n := b.byID[id]; n != nil && n.Role == access.RoleMenuItemRadio {
+			return true
+		}
+	}
+	return false
+}
+
+// checkState records an issue for a check box, switch or radio button whose
+// state was never set, since it would be reported as off without a reason.
+func (b *accessBuilder) checkState(an *access.Node, a *accessInfo, role access.Role) {
+	if !toggleRole(role) && !radioRole(role) {
+		return
+	}
+	if a != nil && a.checkedSet {
+		return
+	}
+	b.issue(an.ID, fmt.Sprintf("%s has no checked state; call Checked on the element", role))
+}
+
+// relate records the LabelledBy and DescribedBy keys of an element, to resolve
+// once every element is built.
+func (b *accessBuilder) relate(an *access.Node, a *accessInfo) {
+	if a != nil && (len(a.labelledBy) > 0 || len(a.describedBy) > 0) {
+		b.rels = append(b.rels, accessRelation{node: an, labelledBy: a.labelledBy, describedBy: a.describedBy})
+	}
 }
 
 // descriptionOr returns the element's description, or the tooltip when that is
@@ -364,9 +644,14 @@ func (b *accessBuilder) add(an *access.Node, n *node, kids []access.ID) {
 		b.byID[k].Parent = an.ID
 	}
 	b.byID[an.ID] = an
+	if an.Key != "" {
+		if _, ok := b.keys[an.Key]; !ok {
+			b.keys[an.Key] = an.ID
+		}
+	}
 	// Only what a user or an assistive technology can operate has a target.
 	operable := an.Role.Interactive() && !an.States.Has(access.StateDisabled)
-	if operable || n.kind == kindEditor || (n.div != nil && n.div.focusable) {
+	if len(an.Actions) > 0 || operable || n.kind == kindEditor || (n.div != nil && n.div.focusable) {
 		b.targets[an.ID] = accessTarget{node: n, seg: -1}
 	}
 }
@@ -387,6 +672,9 @@ func accessRole(n *node) (access.Role, bool) {
 	if d == nil {
 		return access.RoleUnknown, false
 	}
+	if d.acc != nil && d.acc.inert {
+		return access.RoleUnknown, false
+	}
 	if d.acc != nil && d.acc.role != access.RoleUnknown {
 		return d.acc.role, true
 	}
@@ -396,10 +684,32 @@ func accessRole(n *node) (access.Role, bool) {
 	if d.acc != nil && d.acc.name != "" {
 		return access.RoleGroup, true
 	}
-	if d.style.OverflowX == OverflowScroll || d.style.OverflowY == OverflowScroll {
+	if isScroll(n) {
 		return access.RoleScrollArea, true
 	}
 	return access.RoleUnknown, false
+}
+
+// isScroll reports whether a node is a scroll container: its style scrolls on
+// at least one axis.
+func isScroll(n *node) bool {
+	return n.div != nil && (n.div.style.OverflowX == OverflowScroll || n.div.style.OverflowY == OverflowScroll)
+}
+
+// toggleRole reports whether a role has an on or off state of its own.
+func toggleRole(r access.Role) bool {
+	return r == access.RoleCheckBox || r == access.RoleSwitch || r == access.RoleMenuItemCheck
+}
+
+// radioRole reports whether a role is one choice of a group, with a selected state.
+func radioRole(r access.Role) bool {
+	return r == access.RoleRadioButton || r == access.RoleMenuItemRadio
+}
+
+// isSelected reports whether a selection item is chosen. A radio button or radio
+// menu item is chosen when it is checked.
+func isSelected(role access.Role, a *accessInfo) bool {
+	return a.selected || (radioRole(role) && a.checked)
 }
 
 // absorbsText reports whether a control's name is the text inside it.
@@ -407,7 +717,7 @@ func absorbsText(r access.Role) bool {
 	switch r {
 	case access.RoleButton, access.RoleCheckBox, access.RoleSwitch, access.RoleRadioButton,
 		access.RoleLink, access.RoleMenuItem, access.RoleMenuItemCheck, access.RoleMenuItemRadio,
-		access.RoleListItem, access.RoleTab, access.RoleTooltip:
+		access.RoleListItem, access.RoleTab, access.RoleTooltip, access.RoleHeading:
 		return true
 	}
 	return false
@@ -451,22 +761,41 @@ func collectText(n *node, parts *[]string) {
 }
 
 // states returns the states of an exposed div.
-func (b *accessBuilder) states(n *node, id access.ID) access.State {
+func (b *accessBuilder) states(n *node, id access.ID, role access.Role) access.State {
 	var s access.State
 	d := n.div
-	if d.focusable {
+	a := d.acc
+	if d.focusable || (a != nil && a.focusInside) {
 		s |= access.StateFocusable
 	}
-	if d.acc != nil && d.acc.disabled {
+	if a != nil && a.disabled {
 		s |= access.StateDisabled
 	}
-	if d.acc != nil && d.acc.checked {
+	if a != nil && a.checked {
 		s |= access.StateChecked
 	}
 	if id == b.focus {
 		s |= access.StateFocused
 	}
 	s |= b.offscreen(n)
+	if toggleRole(role) || (a != nil && a.toggle && !radioRole(role)) {
+		s |= access.StateToggle
+	}
+	if a != nil && a.expandable {
+		s |= access.StateExpandable
+		if a.expanded {
+			s |= access.StateExpanded
+		}
+	}
+	if radioRole(role) || (a != nil && a.selectable) {
+		s |= access.StateSelectable
+		if a != nil && isSelected(role, a) {
+			s |= access.StateSelected
+		}
+	}
+	if role == access.RoleTabList || (a != nil && a.container) {
+		s |= access.StateSelectionContainer
+	}
 	return s
 }
 
@@ -479,8 +808,10 @@ func (b *accessBuilder) offscreen(n *node) access.State {
 	return 0
 }
 
-// actions returns the actions a div node supports.
-func (b *accessBuilder) actions(n *node) []access.Action {
+// actions returns the actions a div node supports. A disabled node supports
+// none. A node inside a scroll container can be scrolled into view when it is a
+// list row, a control, or can take focus.
+func (b *accessBuilder) actions(n *node, role access.Role, st access.State) []access.Action {
 	d := n.div
 	if d.acc != nil && d.acc.disabled {
 		return nil
@@ -489,10 +820,66 @@ func (b *accessBuilder) actions(n *node) []access.Action {
 	if d.h.onClick != nil {
 		out = append(out, access.ActionClick)
 	}
-	if d.focusable {
+	if st.Has(access.StateFocusable) {
 		out = append(out, access.ActionFocus)
 	}
+	if st.Has(access.StateToggle) {
+		out = append(out, access.ActionToggle)
+	}
+	if st.Has(access.StateExpandable) {
+		out = append(out, access.ActionExpand, access.ActionCollapse)
+	}
+	if st.Has(access.StateSelectable) {
+		out = append(out, access.ActionSelect)
+	}
+	if isScroll(n) {
+		out = append(out, access.ActionScroll, access.ActionSetScrollPercent)
+	}
+	if scrollContainer(n) != nil && (role == access.RoleListItem || d.focusable || role.Interactive()) {
+		out = append(out, access.ActionScrollIntoView)
+	}
 	return out
+}
+
+// scroll returns the scroll state of a scroll container, and the zero value for
+// any other node. The position is the one the container is moving to, so that
+// a scroll in progress reads as its target.
+func (b *accessBuilder) scroll(n *node) access.Scroll {
+	if !isScroll(n) {
+		return access.Scroll{}
+	}
+	maxX := max(n.lay.ContentW-n.lay.W, 0)
+	maxY := max(n.lay.ContentH-n.lay.H, 0)
+	s := access.Scroll{
+		Container: true,
+		CanX:      n.div.style.OverflowX == OverflowScroll && maxX > 0,
+		CanY:      n.div.style.OverflowY == OverflowScroll && maxY > 0,
+		ViewX:     viewPercent(n.lay.W, n.lay.ContentW),
+		ViewY:     viewPercent(n.lay.H, n.lay.ContentH),
+	}
+	if st := n.st; st != nil {
+		s.X = percentOf(st.targetX, maxX)
+		s.Y = percentOf(st.targetY, maxY)
+	}
+	return s
+}
+
+// percentOf returns part as a percent of whole, from 0 to 100. A whole that is
+// empty gives 0.
+func percentOf(part, whole float32) float64 {
+	if whole <= 0 {
+		return 0
+	}
+	return math.Min(math.Max(float64(part)/float64(whole)*100, 0), 100)
+}
+
+// viewPercent returns the visible part of the content, in percent. Content that
+// is not measured yet counts as all visible.
+func viewPercent(view, content float32) float64 {
+	if content <= 0 {
+		return 100
+	}
+	return percentOf(view, content)
 }
 
 // bounds returns a node's rectangle in physical client pixels. A node that was
@@ -513,7 +900,7 @@ func (b *accessBuilder) emitText(n *node, absorbed bool) []access.ID {
 		return nil
 	}
 	id := accID(n.id)
-	an := &access.Node{ID: id, Role: access.RoleStaticText, Name: s, Bounds: b.bounds(n)}
+	an := &access.Node{ID: id, Role: access.RoleStaticText, Name: s, Key: n.key, Bounds: b.bounds(n)}
 	an.States = b.offscreen(n)
 	if n.rich != nil {
 		for i, seg := range n.rich.segs {
@@ -543,7 +930,8 @@ func (b *accessBuilder) emitImage(n *node) []access.ID {
 	return []access.ID{id}
 }
 
-// emitField returns a text field node for an editor.
+// emitField returns a text field node for an editor. Its value is the text it
+// holds, and it can be set by an assistive technology.
 func (b *accessBuilder) emitField(n *node) []access.ID {
 	id := accID(n.id)
 	role := access.RoleTextField
@@ -551,7 +939,8 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 		role = access.RoleTextArea
 	}
 	an := &access.Node{ID: id, Role: role, Name: n.editor.name, Key: n.key, Bounds: b.bounds(n),
-		Actions: []access.Action{access.ActionFocus}}
+		Value:   n.editor.value.Peek(),
+		Actions: []access.Action{access.ActionFocus, access.ActionSetValue}}
 	an.States = access.StateFocusable | b.offscreen(n)
 	if id == b.focus {
 		an.States |= access.StateFocused
@@ -559,31 +948,71 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 	if n.editor.multiline {
 		an.States |= access.StateMultiLine
 	}
+	b.relate(an, n.div.acc)
 	b.add(an, n, nil)
 	return []access.ID{id}
 }
 
-// warnNode reports an element that a user operates without a name, or an
-// image without alternative text. Each element is reported once.
-func (rt *Runtime) warnNode(an *access.Node) {
-	a := rt.acc
-	if a == nil || a.warned[uint64(an.ID)] {
-		return
-	}
+// warnNode reports an element that a user operates without a name, an image
+// without alternative text, a selection item outside a selection container, or
+// a problem recorded while the element was built (issue, when not empty). Each
+// element is reported once.
+func (rt *Runtime) warnNode(an *access.Node, t *access.Tree, issue string) {
 	var msg string
 	switch {
+	case issue != "":
+		msg = issue
 	case an.Role == access.RoleImage && an.Name == "":
 		msg = "image has no alternative text; set Alt on the Image"
 	case an.Role.Interactive() && an.Name == "":
 		msg = fmt.Sprintf("%s has no accessible name; set Label on the element or give it visible text", an.Role)
+	case an.States.Has(access.StateSelectable) && !inSelectionContainer(t, an):
+		msg = fmt.Sprintf("%s is a selection item outside a selection container; call SelectionContainer on the group that holds it", an.Role)
 	default:
 		return
 	}
-	a.warned[uint64(an.ID)] = true
 	if an.Key != "" {
 		msg += fmt.Sprintf(" (key %q)", an.Key)
 	}
+	rt.warnOnce(an.ID, msg)
+}
+
+// warnOnce reports msg as the accessibility warning for the element id, unless
+// that element was reported already.
+func (rt *Runtime) warnOnce(id access.ID, msg string) {
+	a := rt.acc
+	if a == nil || a.warned[uint64(id)] {
+		return
+	}
+	a.warned[uint64(id)] = true
 	if rt.warn != nil {
 		rt.warn("accessibility: " + msg)
+	}
+}
+
+// inSelectionContainer reports whether a selection item has a selection
+// container above it in the tree.
+func inSelectionContainer(t *access.Tree, n *access.Node) bool {
+	for id := n.Parent; id != 0; {
+		p := t.Node(id)
+		if p == nil {
+			return false
+		}
+		if p.States.Has(access.StateSelectionContainer) {
+			return true
+		}
+		id = p.Parent
+	}
+	return false
+}
+
+// focusChild moves keyboard focus to the first focusable child of n, for an
+// element that takes focus for its child (see accessInfo.focusInside).
+func (rt *Runtime) focusChild(n *node) {
+	for _, c := range n.children {
+		if c.div != nil && c.div.focusable {
+			rt.setFocus(c.id)
+			return
+		}
 	}
 }

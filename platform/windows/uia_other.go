@@ -17,3 +17,14 @@ func uiaElementFromPointUnsupported(this, x, y, out uintptr) uintptr {
 	}
 	return hrNotImpl
 }
+
+// newSetScrollPercentSlot returns the vtable entry of SetScrollPercent. Its
+// doubles cannot be read without the amd64 trampoline, so the method reports
+// E_NOTIMPL, and a client falls back to the Scroll method or the scroll bar.
+func newSetScrollPercentSlot() uintptr {
+	return syscall.NewCallback(uiaSetScrollPercentUnsupported)
+}
+
+func uiaSetScrollPercentUnsupported(this, horizontal, vertical uintptr) uintptr {
+	return hrNotImpl
+}

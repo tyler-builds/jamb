@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -139,22 +140,20 @@ func Activity(s *Store) ui.Element {
 		expanded := s.Expanded.Get()
 		shown := s.matchingEvents(query)
 
-		count := fmt.Sprintf("%s events", thousands(len(shown)))
-		if len(shown) == 1 {
-			count = "1 event"
+		// The page announces the count the filter settles on (see announceQuiet).
+		said := ui.Local(ctx, "said", 0)
+		if n := s.Notice.Get(); n.Seq != said.Peek() {
+			said.Set(n.Seq)
+			ui.Announce(n.Text, access.Polite)
 		}
-		if strings.TrimSpace(query) != "" {
-			count = fmt.Sprintf("%s matching events", thousands(len(shown)))
-			if len(shown) == 1 {
-				count = "1 matching event"
-			}
-		}
+		count := eventCountText(len(shown), query)
 
 		// Wrap keeps the toolbar on two lines in a narrow window.
 		toolbar := ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(12).Wrap().Shrink(0).MaxWidth(ui.Px(900)).
 			Child(ui.Div().Row().Align(ui.Center).Gap(12).
 				Child(ui.TextInput(s.EventQuery).Label("Filter events").Placeholder("Filter events").Icon(icons.Search).
-					Style(ui.Style{Width: ui.Px(260), MinWidth: ui.Px(140)})).
+					Style(ui.Style{Width: ui.Px(260), MinWidth: ui.Px(140)}).
+					OnChange(func(q string) { s.announceQuiet(eventCountText(len(s.matchingEvents(q)), q)) })).
 				Child(ui.Text(count).Size(12).Color(t.TextMuted).NoWrap())).
 			Child(ui.Div().Row().Align(ui.Center).Gap(8).
 				Child(ui.Button("Jump to top").Icon(icons.ChevronUp).Secondary().Small().Key("jump-top").
@@ -172,11 +171,26 @@ func Activity(s *Store) ui.Element {
 		}
 		return ui.Div().Grow(1).MinHeight(ui.Px(0)).PaddingX(32).PaddingY(28).Gap(20).
 			Child(ui.Div().Gap(4).Shrink(0).
-				Child(ui.Text("Activity").Size(26).Semibold()).
+				Child(ui.Div().Heading(1).Child(ui.Text("Activity").Size(26).Semibold())).
 				Child(ui.Textf("%s events from %d people", thousands(len(events)), len(people)).Color(t.TextMuted))).
 			Child(toolbar).
 			Child(Card(t).MaxWidth(ui.Px(900)).Grow(1).MinHeight(ui.Px(0)).Gap(0).Padding(6).Child(body))
 	})
+}
+
+// eventCountText is the count of events that the page shows and announces: all
+// of them, or the matches of the filter.
+func eventCountText(n int, query string) string {
+	if strings.TrimSpace(query) != "" {
+		if n == 1 {
+			return "1 matching event"
+		}
+		return fmt.Sprintf("%s matching events", thousands(n))
+	}
+	if n == 1 {
+		return "1 event"
+	}
+	return fmt.Sprintf("%s events", thousands(n))
 }
 
 // eventRow is one timeline entry with its divider. The project name links to
@@ -222,6 +236,7 @@ func eventRow(t *ui.Theme, s *Store, e event, compact, open bool, query string) 
 			chevron = icons.ChevronDown
 		}
 		row.Focusable().FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
+			Expanded(open).
 			OnClick(func() { s.ToggleExpanded(e.id) }).
 			Child(ui.Icon(chevron).Size(14).Color(t.TextSubtle).Style(ui.Style{Margin: ui.Edges{Top: 2}}))
 	}

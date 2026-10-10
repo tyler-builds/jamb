@@ -25,3 +25,21 @@ func newElementFromPointSlot() uintptr {
 	elementFromPointCB = syscall.NewCallback(uiaElementFromPoint)
 	return elementFromPointStubAddr()
 }
+
+// setScrollPercentCB is the callback that the SetScrollPercent trampoline jumps
+// to. The trampoline reads it.
+var setScrollPercentCB uintptr
+
+// setScrollPercentStub is the trampoline of SetScrollPercent. It is written in
+// assembly, as elementFromPointStub is.
+func setScrollPercentStub()
+
+// setScrollPercentStubAddr returns the address of setScrollPercentStub.
+func setScrollPercentStubAddr() uintptr
+
+// newSetScrollPercentSlot returns the vtable entry of IScrollProvider::
+// SetScrollPercent.
+func newSetScrollPercentSlot() uintptr {
+	setScrollPercentCB = syscall.NewCallback(uiaSetScrollPercent)
+	return setScrollPercentStubAddr()
+}

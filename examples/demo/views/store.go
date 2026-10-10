@@ -69,6 +69,11 @@ type Store struct {
 	EventQuery *ui.Signal[string]
 	// Expanded holds the build events whose details are open, by event ID.
 	Expanded *ui.Signal[map[int]bool]
+	// Notice is the status message that the Activity page announces, with a
+	// sequence number so that each one is announced once (see announceQuiet).
+	Notice *ui.Signal[notice]
+	quiet  *time.Timer // the pending announceQuiet, UI thread only
+	quietN int         // the sequence number of the last announceQuiet
 	// Threads holds each project's comments, by project ID.
 	Threads *ui.Signal[map[int][]Message]
 	// Windows holds the projects open in a window of their own, by project ID.
@@ -128,6 +133,7 @@ func NewStore() *Store {
 		DropMark:     ui.NewSignal(dropMark{}),
 		EventQuery:   ui.NewSignal(""),
 		Expanded:     ui.NewSignal(map[int]bool{}),
+		Notice:       ui.NewSignal(notice{}),
 		Windows:      ui.NewSignal(map[int]bool{}),
 		Search:       ui.NewFocusHandle(),
 		NewOpen:      ui.NewSignal(false),
@@ -339,4 +345,28 @@ func (s *Store) Project(id int) (Project, bool) {
 		}
 	}
 	return Project{}, false
+}
+
+// notice is a status message for assistive technology, numbered.
+type notice struct {
+	Text string
+	Seq  int
+}
+
+// quietFor is how long the user must stop before a debounced announcement is
+// made.
+const quietFor = 600 * time.Millisecond
+
+// announceQuiet announces text once the user has been quiet for quietFor. Each
+// call restarts the wait, so a burst of keystrokes is announced once. The timer
+// runs on its own goroutine, so it sets the Notice signal, and the Activity page
+// makes the announcement when it renders (ui.Announce is queued for the next
+// published tree, which a frame makes).
+func (s *Store) announceQuiet(text string) {
+	if s.quiet != nil {
+		s.quiet.Stop()
+	}
+	s.quietN++
+	n := notice{Text: text, Seq: s.quietN}
+	s.quiet = time.AfterFunc(quietFor, func() { s.Notice.Set(n) })
 }

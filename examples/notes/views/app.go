@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 
@@ -109,6 +110,7 @@ var notice = ui.NewSignal("")
 // showNotice shows msg in the status line for a few seconds.
 func showNotice(msg string) {
 	notice.Set(msg)
+	ui.Announce(msg, access.Polite)
 	time.AfterFunc(6*time.Second, func() { notice.Set("") }) // Set is safe from any goroutine
 }
 
@@ -240,9 +242,8 @@ func (a *App) sidebar() ui.Element {
 				if e.note == nil {
 					return sectionLabel(t, e.label)
 				}
-				return ui.Div().Style(ui.Style{Padding: ui.Edges{Top: 1, Bottom: 1}}).
-					Child(a.noteItem(e.note, e.note.ID == selected))
-			}).Key("sidebar").Style(ui.Style{Grow: 1, Padding: ui.Edges{Top: 4, Bottom: 4, Left: 8, Right: 8}}).Handle(a.list)
+				return a.noteRow(t, e.note, e.note.ID == selected)
+			}).SelectionContainer().Key("sidebar").Style(ui.Style{Grow: 1, Padding: ui.Edges{Top: 4, Bottom: 4, Left: 8, Right: 8}}).Handle(a.list)
 		}
 
 		search := ui.TextInput(a.s.Query).Label("Search notes").Placeholder("Search notes").Icon(icons.Search).
@@ -262,7 +263,7 @@ func (a *App) sidebar() ui.Element {
 				Child(ui.Div().Row().Align(ui.Center).Gap(10).
 					Child(ui.Div().Size(ui.Px(26), ui.Px(26)).Radius(7).Background(t.Accent).Center().
 						Child(ui.Icon(icons.Layers).Size(15).Color(ui.Hex("#ffffff")))).
-					Child(ui.Text("Notes").Size(17).Bold())).
+					Child(ui.Div().Heading(1).Child(ui.Text("Notes").Size(17).Bold()))).
 				Child(ui.IconButton(icons.Plus).Label("New note").Tooltip("New note (" + ctx.KeysFor(NewNote) + ")").OnClick(a.newNote))).
 			Child(ui.Div().PaddingX(12).PaddingY(4).Shrink(0).
 				Child(ui.Div().Row().Align(ui.Center).Gap(6).
@@ -335,8 +336,31 @@ func titleOf(n *store.Note) string {
 	return "Untitled"
 }
 
-// noteItem is its own component: typing in a note re-renders only its item.
-func (a *App) noteItem(n *store.Note, selected bool) ui.Element {
+// noteRow is a row of the sidebar's note list. The row is the list item: it says
+// whether its note is selected, and takes the clicks, focus and drag. Its text is
+// a component of its own (see noteBody), so typing in a note re-renders only that
+// text.
+func (a *App) noteRow(t *ui.Theme, n *store.Note, selected bool) ui.Element {
+	// Tab reaches the row; Enter opens the note, as a click does.
+	return ui.Div().Role(access.RoleListItem).Selected(selected).MarginY(1).
+		Gap(3).PaddingX(10).PaddingY(9).Radius(8).Transition(fast).
+		Hover(ui.Style{Background: t.SurfaceHover}).
+		When(selected, func(d *ui.DivElement) { d.Background(t.SurfaceActive) }).
+		Focusable().FocusVisible(focusRing(t)).
+		OnClick(func() { a.s.Selected.Set(n.ID) }).
+		ContextMenu(func() []ui.MenuItem { return a.noteMenu(n) }).
+		OnDrag(ui.Drag(n).Preview(func() ui.Element {
+			return ui.Div().PaddingX(10).PaddingY(5).Radius(999).Background(t.Surface).
+				Border(1, t.Accent).Shadow(ui.ShadowMd).
+				Child(ui.Text(titleOf(n)).Size(13).Semibold().NoWrap()) // reads the title, so it follows edits
+		})).
+		Dragging(ui.Style{Opacity: 0.5}).
+		Child(a.noteBody(n))
+}
+
+// noteBody is the title and snippet of a note row. It is its own component: typing
+// in a note re-renders only its row's text.
+func (a *App) noteBody(n *store.Note) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
 		q := a.s.Query.Get()
@@ -350,19 +374,7 @@ func (a *App) noteItem(n *store.Note, selected bool) ui.Element {
 		if line := firstLine(n.Body.Get()); line != "" {
 			snippet = ui.Text(line).HighlightMatches(q, matchHighlight(t))
 		}
-		// Tab reaches the row; Enter opens the note, as a click does.
-		return ui.Div().Gap(3).PaddingX(10).PaddingY(9).Radius(8).Transition(fast).
-			Hover(ui.Style{Background: t.SurfaceHover}).
-			When(selected, func(d *ui.DivElement) { d.Background(t.SurfaceActive) }).
-			Focusable().FocusVisible(focusRing(t)).
-			OnClick(func() { a.s.Selected.Set(n.ID) }).
-			ContextMenu(func() []ui.MenuItem { return a.noteMenu(n) }).
-			OnDrag(ui.Drag(n).Preview(func() ui.Element {
-				return ui.Div().PaddingX(10).PaddingY(5).Radius(999).Background(t.Surface).
-					Border(1, t.Accent).Shadow(ui.ShadowMd).
-					Child(ui.Text(titleOf(n)).Size(13).Semibold().NoWrap()) // reads the title, so it follows edits
-			})).
-			Dragging(ui.Style{Opacity: 0.5}).
+		return ui.Div().Gap(3).
 			Child(ui.Div().Row().Align(ui.Center).Gap(6).
 				Child(ui.If(n.Pinned.Get(), ui.Icon(icons.Star).Size(12).Color(t.Warning))).
 				Child(title.Semibold().Truncate().Grow(1)).
@@ -377,6 +389,13 @@ func (a *App) status(count int) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
 		st := a.s.Save.Get()
+		// A save that finished is announced once. The saver waits for a pause in
+		// typing before it writes, so this is one announcement per pause, not per key.
+		saved := ui.Local(ctx, "saved", time.Time{})
+		if st.Err == "" && !st.Saving && !st.At.IsZero() && !st.At.Equal(saved.Peek()) {
+			saved.Set(st.At)
+			ui.Announce("Saved", access.Polite)
+		}
 		label, color := "Saved", t.TextSubtle
 		switch {
 		case st.Err != "":

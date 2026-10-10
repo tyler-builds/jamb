@@ -3,6 +3,7 @@
 package windows
 
 import (
+	"runtime"
 	"syscall"
 	"testing"
 	"unsafe"
@@ -261,9 +262,25 @@ func TestHitTest(t *testing.T) {
 
 // vtable calls on a view. Each returns the HRESULT.
 
+// qiCall calls QueryInterface and stores the view in out. The view is written to
+// the heap first: a callback can grow the goroutine stack, which would move a
+// variable on it, so COM never gets a pointer to the stack.
 func qiCall(v uintptr, iid guid, out *uintptr) uintptr {
-	hr, _, _ := syscall.SyscallN(comMethod(v, 0), v, uintptr(unsafe.Pointer(&iid)), uintptr(unsafe.Pointer(out)))
+	p := newWord()
+	hr, _, _ := syscall.SyscallN(comMethod(v, 0), v, uintptr(unsafe.Pointer(&iid)), uintptr(unsafe.Pointer(p)))
+	runtime.KeepAlive(p)
+	*out = *p
 	return hr
+}
+
+// getOut calls a COM method that takes the view obj, the arguments and an out
+// pointer, and returns what it wrote and the HRESULT. The out pointer is on the
+// heap, for the reason given at qiCall.
+func getOut(method, obj uintptr, args ...uintptr) (uintptr, uintptr) {
+	p := newWord()
+	hr, _, _ := syscall.SyscallN(method, append(append([]uintptr{obj}, args...), uintptr(unsafe.Pointer(p)))...)
+	runtime.KeepAlive(p)
+	return *p, hr
 }
 
 func addRefCall(v uintptr) uintptr {
@@ -278,9 +295,10 @@ func releaseCall(v uintptr) uintptr {
 
 // propCall calls GetPropertyValue (index 5 of IRawElementProviderSimple).
 func propCall(v uintptr, id int32) (variant, uintptr) {
-	var out variant
-	hr, _, _ := syscall.SyscallN(comMethod(v, 5), v, uintptr(id), uintptr(unsafe.Pointer(&out)))
-	return out, hr
+	out := newVariant()
+	hr, _, _ := syscall.SyscallN(comMethod(v, 5), v, uintptr(id), uintptr(unsafe.Pointer(out)))
+	runtime.KeepAlive(out) // the pointer was given as a uintptr, which does not keep it alive
+	return *out, hr
 }
 
 func TestQueryInterfaceAndRefcounts(t *testing.T) {
@@ -358,7 +376,7 @@ func TestMissingNodeIsElementNotAvailable(t *testing.T) {
 	if _, hr := propCall(v, propName); hr != hrElementNotAvailable {
 		t.Errorf("GetPropertyValue on a missing node = 0x%08X, want UIA_E_ELEMENTNOTAVAILABLE", uint32(hr))
 	}
-	if hr, _, _ := syscall.SyscallN(comMethod(v, 4), v, patternInvoke, uintptr(unsafe.Pointer(new(uintptr)))); uint32(hr) != hrElementNotAvailable {
+	if hr, _, _ := syscall.SyscallN(comMethod(v, 4), v, patternInvoke, uintptr(unsafe.Pointer(newWord()))); uint32(hr) != hrElementNotAvailable {
 		t.Errorf("GetPatternProvider on a missing node = 0x%08X, want UIA_E_ELEMENTNOTAVAILABLE", uint32(hr))
 	}
 }
@@ -393,15 +411,14 @@ func TestInvokePatternPerformsClick(t *testing.T) {
 	b := testTree(0, node(access.RootID, 0, 2, 3), n, plain)
 	var got []access.Action
 	var ids []access.ID
-	b.SetHooks(nil, func(id access.ID, a access.Action) {
+	b.SetHooks(nil, func(id access.ID, r access.Request) {
 		ids = append(ids, id)
-		got = append(got, a)
+		got = append(got, r.Action)
 	})
 	v := create(kindNode, 2, b, 0x7005, iidRawElementProviderSimple)
 	defer releaseCall(v)
 
-	var pattern uintptr
-	syscall.SyscallN(comMethod(v, 4), v, patternInvoke, uintptr(unsafe.Pointer(&pattern)))
+	pattern, _ := getOut(comMethod(v, 4), v, patternInvoke)
 	if pattern == 0 {
 		t.Fatal("GetPatternProvider(Invoke) on a clickable node returned NULL")
 	}
@@ -413,10 +430,9 @@ func TestInvokePatternPerformsClick(t *testing.T) {
 	}
 	releaseCall(pattern)
 
-	var none uintptr
 	pv := create(kindNode, 3, b, 0x7005, iidRawElementProviderSimple)
 	defer releaseCall(pv)
-	syscall.SyscallN(comMethod(pv, 4), pv, patternInvoke, uintptr(unsafe.Pointer(&none)))
+	none, _ := getOut(comMethod(pv, 4), pv, patternInvoke)
 	if none != 0 {
 		t.Error("GetPatternProvider(Invoke) on a node without a click returned a pattern")
 	}
@@ -427,19 +443,17 @@ func TestRootNavigatesAndReportsRuntimeIDs(t *testing.T) {
 	root := rootView(0x7006, b, iidRawElementProviderFragment)
 	defer releaseCall(root)
 
-	var child uintptr
-	hr, _, _ := syscall.SyscallN(comMethod(root, 3), root, navFirstChild, uintptr(unsafe.Pointer(&child)))
+	child, hr := getOut(comMethod(root, 3), root, navFirstChild)
 	if hr != hrOK || child == 0 {
 		t.Fatalf("Navigate(FirstChild) = 0x%08X, view %#x", uint32(hr), child)
 	}
 	defer releaseCall(child)
 
-	var psa uintptr
-	if hr, _, _ := syscall.SyscallN(comMethod(root, 4), root, uintptr(unsafe.Pointer(&psa))); hr != hrOK || psa != 0 {
+	if psa, hr := getOut(comMethod(root, 4), root); hr != hrOK || psa != 0 {
 		t.Errorf("GetRuntimeId on the root = 0x%08X, array %#x; want NULL", uint32(hr), psa)
 	}
-	psa = 0
-	if hr, _, _ := syscall.SyscallN(comMethod(child, 4), child, uintptr(unsafe.Pointer(&psa))); hr != hrOK || psa == 0 {
+	psa, hr := getOut(comMethod(child, 4), child)
+	if hr != hrOK || psa == 0 {
 		t.Fatalf("GetRuntimeId on a node = 0x%08X, array %#x", uint32(hr), psa)
 	}
 	var first, last int32

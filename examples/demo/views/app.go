@@ -54,7 +54,7 @@ func Sidebar(s *Store) ui.Element {
 		nav := func(p Page, ic *icons.Icon, label string, badge int, a *ui.Action) ui.Element {
 			active := p == page
 			// Tab reaches each item; Enter or Space opens its page.
-			item := ui.Div().Key("nav-"+label).Row().Align(ui.Center).Gap(10).Height(ui.Px(36)).PaddingX(10).Radius(8).
+			item := ui.Div().Key("nav-"+label).Selected(active).Row().Align(ui.Center).Gap(10).Height(ui.Px(36)).PaddingX(10).Radius(8).
 				TextColor(t.TextMuted).Transition(fast).Tooltip(tip(ctx, label, a)).
 				Hover(ui.Style{Background: t.SurfaceHover, TextColor: t.Text}).
 				When(active, func(d *ui.DivElement) {
@@ -77,7 +77,7 @@ func Sidebar(s *Store) ui.Element {
 		}
 
 		return ui.Div().Width(ui.Px(244)).Height(ui.Full).Shrink(0).
-			Background(t.Sidebar).PaddingX(12).PaddingY(14).Gap(2).
+			Background(t.Sidebar).PaddingX(12).PaddingY(14).Gap(2).SelectionContainer().Label("Navigation").
 			Child(brand(t, focused)).
 			Child(sectionLabel(t, "Menu")).
 			Child(nav(PageDashboard, icons.Dashboard, "Dashboard", 0, GoDashboard)).
@@ -114,7 +114,7 @@ func themeSwitch(ctx *ui.Context) ui.Element {
 	t := ctx.Theme()
 	option := func(ic *icons.Icon, label string, theme *ui.Theme) ui.Element {
 		active := t == theme
-		return ui.Div().Row().Grow(1).Height(ui.Px(30)).Radius(6).Center().Gap(6).
+		return ui.Div().Row().Grow(1).Height(ui.Px(30)).Radius(6).Center().Gap(6).Selected(active).
 			TextColor(t.TextMuted).Transition(fast).Tooltip(tip(ctx, label+" theme", ToggleTheme)).
 			Hover(ui.Style{TextColor: t.Text}).
 			When(active, func(d *ui.DivElement) {
@@ -125,6 +125,7 @@ func themeSwitch(ctx *ui.Context) ui.Element {
 			Child(ui.Text(label).Size(13).Medium())
 	}
 	return ui.Div().Row().Padding(3).Gap(3).Radius(9).Background(t.SurfaceActive.Alpha(0.6)).MarginBottom(10).
+		SelectionContainer().Label("Theme").
 		Child(option(icons.Moon, "Dark", ui.DarkTheme)).
 		Child(option(icons.Sun, "Light", ui.LightTheme))
 }

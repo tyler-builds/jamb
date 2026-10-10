@@ -95,6 +95,8 @@ type editorElement struct {
 	value       *Signal[string]
 	placeholder string
 	name        string // the accessible name, see TextInputElement.Label
+	labelledBy  []string
+	describedBy []string
 	multiline   bool
 	onSubmit    func(string)
 	onChange    func(string)
@@ -160,6 +162,9 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	}
 	d.h.onTextInput = func(s string) { rt.editorInsert(id, s, editTyping) }
 	d.h.onFocus = func() { rt.editorTouched(id) }
+	if len(e.labelledBy) > 0 || len(e.describedBy) > 0 {
+		d.access().labelledBy, d.access().describedBy = e.labelledBy, e.describedBy
+	}
 	n.div = d
 	rt.setOverhang(n)
 }

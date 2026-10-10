@@ -16,3 +16,19 @@ TEXT ·elementFromPointStubAddr(SB),NOSPLIT,$0-8
 	LEAQ	·elementFromPointStub(SB), AX
 	MOVQ	AX, ret+0(FP)
 	RET
+
+// setScrollPercentStub is the vtable entry of IScrollProvider::SetScrollPercent,
+// which takes two doubles like ElementProviderFromPoint. It moves them from XMM1
+// and XMM2 into DX and R8, as elementFromPointStub does, and jumps to the
+// callback that setScrollPercentCB holds.
+TEXT ·setScrollPercentStub(SB),NOSPLIT|NOFRAME,$0-0
+	MOVQ	X1, DX
+	MOVQ	X2, R8
+	MOVQ	·setScrollPercentCB(SB), AX
+	JMP	AX
+
+// func setScrollPercentStubAddr() uintptr
+TEXT ·setScrollPercentStubAddr(SB),NOSPLIT,$0-8
+	LEAQ	·setScrollPercentStub(SB), AX
+	MOVQ	AX, ret+0(FP)
+	RET
