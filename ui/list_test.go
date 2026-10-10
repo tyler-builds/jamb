@@ -233,3 +233,101 @@ func TestUniformListNearJumpAnimates(t *testing.T) {
 		t.Fatalf("after one frame the offset is %v toward a target of %v; want it between 0 and the target", st.scrollY, st.targetY)
 	}
 }
+
+// listShape places a list in a tree. list builds the list from the current
+// count; the shape returns the root of the app.
+type listShape struct {
+	name string
+	root func(list func(*Context) Element) func(*Context) Element
+}
+
+var listShapes = []listShape{
+	{"uniform list under a parent", func(list func(*Context) Element) func(*Context) Element {
+		return func(*Context) Element { return Div().Child(Component(list)) }
+	}},
+	{"uniform list as the root", func(list func(*Context) Element) func(*Context) Element {
+		return list
+	}},
+	{"uniform list under If", func(list func(*Context) Element) func(*Context) Element {
+		return func(*Context) Element { return Div().Child(If(true, Component(list))) }
+	}},
+	{"uniform list under Map", func(list func(*Context) Element) func(*Context) Element {
+		return func(*Context) Element {
+			return Div().Children(Map([]int{0}, func(int, int) Element { return Component(list) })...)
+		}
+	}},
+}
+
+// TestListRowCountChangesUnderParent rebuilds a list whose row count changes
+// while the list sits in several places in the tree. The count goes up, to
+// zero, and back, and the rows follow each change.
+func TestListRowCountChangesUnderParent(t *testing.T) {
+	for _, s := range listShapes {
+		t.Run(s.name, func(t *testing.T) {
+			count := NewSignal(20)
+			list := func(ctx *Context) Element {
+				return UniformList(count.Get(), listRow).Key("list").Style(Style{Height: Px(400)})
+			}
+			r := newOverlayRig(s.root(list), 800, 600)
+			for _, n := range []int{100, 0, 3, 0, 40} {
+				count.Set(n)
+				r.frame()
+				checkListRows(t, r, n)
+			}
+		})
+	}
+}
+
+// TestListOfRowCountChangesUnderParent is the ListOf equivalent of the test
+// above: a ListOf returned directly from a component under a parent.
+func TestListOfRowCountChangesUnderParent(t *testing.T) {
+	count := NewSignal(20)
+	items := func() []int {
+		out := make([]int, count.Get())
+		for i := range out {
+			out[i] = i
+		}
+		return out
+	}
+	key := func(i int) string { return fmt.Sprint(i) }
+	root := func(*Context) Element {
+		return Div().Child(Component(func(*Context) Element {
+			return ListOf(items(), key, listRowOf).Key("list").Style(Style{Height: Px(400)})
+		}))
+	}
+	r := newOverlayRig(root, 800, 600)
+	// A short list that grows must keep its first rows: 3 to 100 is growth
+	// from a list that fits its viewport.
+	for _, n := range []int{100, 0, 40, 3, 100} {
+		count.Set(n)
+		r.frame()
+		checkListRows(t, r, n)
+	}
+}
+
+// checkListRows checks that a list holds n rows: row 0 is built when n is
+// positive, the rows past n are not, and the scroll extent is n rows tall.
+func checkListRows(t *testing.T, r *overlayRig, n int) {
+	t.Helper()
+	if n == 0 {
+		if _, ok := r.rt.Find("row-0"); ok {
+			t.Error("row-0 is built with no rows")
+		}
+	} else {
+		r.find(t, "row-0")
+		if n <= 3 {
+			r.find(t, fmt.Sprintf("row-%d", n-1))
+		}
+	}
+	if _, ok := r.rt.Find(fmt.Sprintf("row-%d", n)); ok {
+		t.Errorf("row-%d is built in a list of %d rows", n, n)
+	}
+	// The rows sit in one spacer, sized for every row of the list.
+	if got, want := r.rt.findKey(r.rt.tree, "list").children[0].lay.H, float32(n*40); got != want {
+		t.Errorf("spacer height %v, want %v", got, want)
+	}
+}
+
+// listRowOf is listRow for an item of a ListOf, whose rows are keyed by the
+// ListOf's key function instead.
+func listRowOf(i int) Element { return listRow(i) }

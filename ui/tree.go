@@ -282,9 +282,8 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 				c.Label(tv.name)
 			}
 		}
-		// The list sits in a column that takes the sizing, so that the list fills
-		// it. A list returned directly from a component cannot change its rows
-		// while it is nested under a parent, so the column is the component's root.
+		// The list sits in a column that takes the tree's style, so that the list
+		// fills the space the style gives it.
 		return Div().Column().Style(tv.style).Child(list)
 	})
 }

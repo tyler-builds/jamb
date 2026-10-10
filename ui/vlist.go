@@ -100,6 +100,7 @@ type varState struct {
 	top              float32 // offset of the spacer in the scroll container
 	pad              float32 // space above the rows (Bottom)
 	atEnd            bool    // the list was at its end at the last paint
+	overflow         bool    // the rows were taller than the viewport at the last paint
 	endKnown         bool    // a paint has recorded atEnd
 	warned           bool
 	rebuilds         int // O(n) index rebuilds, for tests and benchmarks
@@ -177,7 +178,10 @@ type vAnchor struct {
 
 // capture takes the anchor from the current scroll offset.
 func (vs *varState) capture(st *nodeState, atEnd bool) vAnchor {
-	a := vAnchor{atEnd: atEnd}
+	// A list that fits its viewport is at its end trivially. It follows the
+	// end only when it is a Bottom list or it overflows; otherwise growing it
+	// would scroll it to the end and hide its first rows.
+	a := vAnchor{atEnd: atEnd && (vs.bottom || vs.overflow)}
 	if vs.hidx == nil {
 		return a
 	}
@@ -301,6 +305,7 @@ func (rt *Runtime) checkVList(n *node, sy float32) {
 	}
 	vs.top = spacer.lay.Y
 	maxY := n.lay.ContentH - n.lay.H
+	vs.overflow = maxY > 0
 	if vs.count == 0 {
 		vs.setAtEnd(st.targetY >= maxY-1)
 		if h := vs.handle; h != nil {

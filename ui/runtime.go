@@ -860,6 +860,12 @@ func (rt *Runtime) rerender(inst *componentInstance) {
 		rt.drag.previewStale = true
 		return
 	}
+	// An owner whose output is this instance's output (a UniformList returned
+	// directly from a component) realized to the same node. It has to follow
+	// the new one, or its next rebuild cannot find the node in its parent.
+	for o := inst.parent; o != nil && o.root == old; o = o.parent {
+		o.root = n
+	}
 	if p := inst.parentNode; p == nil {
 		rt.setTree(n)
 	} else {
