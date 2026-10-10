@@ -1628,7 +1628,9 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   version has not been tested. The arm64 build is compiled but has not been run.
   The MSIX install steps are for a person to run; the SDK tools check the
   package's structure.
-- **Not attempted (non-goals).** Accessibility, tray,
+- **Accessibility.** Not available yet; screen readers see nothing. The design
+  and plan are in [docs/accessibility.md](docs/accessibility.md).
+- **Not attempted (non-goals).** Tray,
   CSS grid, and the optional utility-class shorthand
   (`.Class("flex col gap-2")`). The shorthand was skipped in favor of typed
   styles.
