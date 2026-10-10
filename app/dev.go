@@ -27,6 +27,9 @@ import (
 //	JAMB_VSYNC=0        present without waiting for vblank (throughput tests)
 //	JAMB_GEOMETRY_FILE  remember the window position/size in this file
 //	                    (set by the `jamb dev` runner across restarts)
+//	JAMB_A11Y_WARN=1    warn about accessibility problems, such as an unlabeled
+//	                    button or an image without Alt. Also on under JAMB_TRACE=1
+//	                    and `jamb dev`.
 //
 // A script is a ';'-separated list of steps run after the first frame. The
 // steps drive the target window, which is the first window until a
@@ -54,6 +57,7 @@ import (
 //	                loss is handled as if the next Present had failed, so every
 //	                window rebuilds its swap chain (see recovery.go)
 //	shot PATH       save a PNG screenshot of the next frame
+//	a11ydump PATH   write the accessibility tree as text (see ui.Runtime.AccessTree)
 //	exit            close the window
 //
 // Example: JAMB_SCRIPT="idle; shot a.png; click 600 400; idle; shot b.png; exit"
@@ -65,6 +69,7 @@ type devOptions struct {
 	noVSync    bool
 	geometry   string
 	devStarted int64 // unix nanos when the dev runner noticed a change
+	a11yWarn   bool  // development warnings about accessibility (see ui.Runtime.SetAccessWarnings)
 }
 
 func loadDevOptions() devOptions {
@@ -77,6 +82,9 @@ func loadDevOptions() devOptions {
 		geometry:   os.Getenv("JAMB_GEOMETRY_FILE"),
 	}
 	d.devStarted, _ = strconv.ParseInt(os.Getenv("JAMB_DEV_CHANGED_AT"), 10, 64)
+	// Accessibility warnings belong to development runs: a traced run, a run
+	// under `jamb dev`, or one that asks for them.
+	d.a11yWarn = d.trace || d.devStarted > 0 || os.Getenv("JAMB_A11Y_WARN") == "1"
 	if v, err := strconv.ParseFloat(os.Getenv("JAMB_STRESS_SECONDS"), 64); err == nil && v > 0 {
 		d.stressSecs = v
 	}
@@ -251,7 +259,7 @@ func parseScript(src string) (*script, error) {
 			st.paths = nums[min(2, len(nums)):]
 		case "wait":
 			st.n, err = parse(0)
-		case "key", "type", "shot":
+		case "key", "type", "shot", "a11ydump":
 			if st.arg == "" {
 				err = fmt.Errorf("JAMB_SCRIPT step %q: missing argument", raw)
 			} else if op == "key" {
@@ -266,7 +274,7 @@ func parseScript(src string) (*script, error) {
 			}
 		case "idle", "exit", "devicelost":
 		default:
-			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, rclick, down, up, scroll, key, type, drop, wait, idle, devicelost, shot or exit", op)
+			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, rclick, down, up, scroll, key, type, drop, wait, idle, devicelost, shot, a11ydump or exit", op)
 		}
 		if err != nil {
 			return nil, err
@@ -424,6 +432,10 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 			s.i++
 			rt.Invalidate()
 			return true // capture happens on the next frame
+		case "a11ydump":
+			if err := os.WriteFile(st.arg, []byte(rt.AccessTree().Dump()), 0o644); err != nil {
+				fmt.Fprintln(os.Stderr, "jamb: a11ydump failed:", err)
+			}
 		case "window":
 			s.target = int(st.n)
 			t := s.current()

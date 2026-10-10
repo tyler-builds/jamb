@@ -96,7 +96,7 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 func rename(s *Store, id int, name string) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		draft := ui.Local(ctx, "name", name)
-		return ui.TextInput(draft).Key("name").Borderless().Placeholder("Project name").
+		return ui.TextInput(draft).Key("name").Label("Project name").Borderless().Placeholder("Project name").
 			Style(ui.Style{FontSize: 20, FontWeight: ui.FontSemibold}).
 			OnChange(func(v string) {
 				if v = strings.TrimSpace(v); v != "" {

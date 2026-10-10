@@ -23,6 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/internal/watch"
 	"github.com/tyler-builds/jamb/keymap"
@@ -335,6 +336,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rt.SetWakeFunc(w.Wake)
 	h.rt.SetServices(ui.Services{Clipboard: w.Clipboard, SetClipboard: w.SetClipboard, WakeAt: w.WakeAt})
 	h.rt.SetWindowControls(windowControls{h})
+	h.rt.SetAccessWarnings(h.dev.a11yWarn)
 	h.rt.SetMaximized(w.Maximized())
 	h.rt.AddBindings(h.cfg.Bindings...)
 	if h.cfg.KeymapFile != "" {
@@ -496,6 +498,15 @@ func (h *host) OnClose(w platform.Window) bool {
 
 // HasMenuBar implements platform.MenuBarHandler.
 func (h *host) HasMenuBar() bool { return h.rt != nil && h.rt.HasMenuBar() }
+
+// AccessBridge implements platform.AccessHandler. It is nil until the runtime
+// exists, which the adapter treats as no accessibility support yet.
+func (h *host) AccessBridge() *access.Bridge {
+	if h.rt == nil {
+		return nil
+	}
+	return h.rt.AccessBridge()
+}
 
 // TitleArea implements platform.TitleBarHandler: it maps a point in physical
 // client pixels to the title-bar area the ui marked there.

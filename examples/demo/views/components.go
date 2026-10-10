@@ -169,7 +169,7 @@ func layoutItem(label string, current *ui.Signal[string]) ui.MenuItem {
 // fitSample is the banner drawn in a box of fixed size with one ImageFit.
 func fitSample(t *ui.Theme, label string, fit ui.ImageFit) ui.Element {
 	return sample(t, label, ui.Div().Radius(8).Background(t.SurfaceActive).
-		Child(ui.Image(banner).Size(ui.Px(150), ui.Px(90)).Fit(fit).Radius(8)))
+		Child(ui.Image(banner).Alt("Sample banner").Size(ui.Px(150), ui.Px(90)).Fit(fit).Radius(8)))
 }
 
 var (
@@ -286,6 +286,6 @@ func focusWithinSample(t *ui.Theme) ui.Element {
 		draft := ui.Local(ctx, "draft", "")
 		return ui.Div().Width(ui.Px(220)).Padding(8).Radius(8).Border(1, t.Border).
 			FocusWithin(ui.Style{BorderColor: t.Accent}).
-			Child(ui.TextInput(draft).Placeholder("Click inside the frame"))
+			Child(ui.TextInput(draft).Label("Draft").Placeholder("Click inside the frame"))
 	})
 }

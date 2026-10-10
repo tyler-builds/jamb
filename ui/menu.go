@@ -6,6 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/input"
 )
@@ -365,7 +366,9 @@ func (m *menuView) box(k int, items []MenuItem, path []int) *DivElement {
 	d := Div().Padding(4).MinWidth(Px(200)).Background(t.Surface).Border(1, t.Border).
 		Radius(t.Radius).Shadow(ShadowMd).
 		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
-		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond})
+		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
+		Role(access.RoleMenu)
+	d.access().level = k + 1
 	for i, it := range items {
 		d.Child(m.row(k, i, it, path, gutter))
 	}
@@ -378,7 +381,7 @@ func (m *menuView) row(k, i int, it MenuItem, path []int, gutter bool) Element {
 	t := m.t
 	switch it.Kind {
 	case MenuKindSeparator:
-		return Div().Height(Px(1)).Shrink(0).MarginY(4).Background(t.Border)
+		return Div().Height(Px(1)).Shrink(0).MarginY(4).Background(t.Border).Role(access.RoleSeparator)
 	case MenuKindSection:
 		return Div().PaddingX(8).PaddingY(4).
 			Child(Text(it.text()).Size(12).Medium().Color(t.TextSubtle).NoWrap())
@@ -387,6 +390,8 @@ func (m *menuView) row(k, i int, it MenuItem, path []int, gutter bool) Element {
 	hl := k < len(path) && path[k] == i
 	r := Div().Keyf("jamb.menu.%d.%d", k, i).Row().Align(Center).Gap(8).Height(Px(28)).PaddingX(8).Radius(4).Shrink(0).
 		FontSize(13).TextColor(t.Text)
+	r.access().role, r.access().disabled, r.access().checked = menuAccessRole(it.Role()), it.Disabled, it.Checked
+	r.access().level = k + 1
 	if !on {
 		r.TextColor(t.TextSubtle)
 	}

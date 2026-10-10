@@ -95,6 +95,7 @@ type ImageElement struct {
 	style Style
 	fit   ImageFit
 	key   string
+	alt   string // the alternative text, see Alt
 }
 
 // Image creates an image element. Without an explicit size it uses the
@@ -115,6 +116,13 @@ func (i *ImageElement) Radius(r float32) *ImageElement { i.style.Radius = r; ret
 
 // Fit chooses cover (default), contain or fill.
 func (i *ImageElement) Fit(f ImageFit) *ImageElement { i.fit = f; return i }
+
+// Alt describes the image for assistive technology, such as "Avatar of Dana
+// Lee", and is read in place of the image. An image without alternative text
+// is reported by the development warnings. Images are always exposed; there is
+// no decorative flag yet, so an image that adds nothing should be left out of
+// the element tree.
+func (i *ImageElement) Alt(s string) *ImageElement { i.alt = s; return i }
 
 // Opacity fades the image.
 func (i *ImageElement) Opacity(o float32) *ImageElement { i.style.Opacity = o; return i }

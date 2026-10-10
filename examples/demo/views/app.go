@@ -148,7 +148,7 @@ func userCard(s *Store) ui.Element {
 		card := ui.Div().Key("user-card").Row().Align(ui.Center).Gap(10).Padding(8).Radius(10).
 			Transition(fast).Hover(ui.Style{Background: t.SurfaceHover}).
 			OnClick(toggle).
-			Child(ui.Image(avatar).Size(ui.Px(34), ui.Px(34)).Radius(17)).
+			Child(ui.Image(avatar).Alt("Account avatar").Size(ui.Px(34), ui.Px(34)).Radius(17)).
 			Child(ui.Div().Grow(1).Gap(1).
 				Child(ui.Text("Alex Rivera").Size(13).Semibold().Truncate()).
 				Child(ui.Text("alex@example.com").Size(12).Color(t.TextSubtle).Truncate())).
@@ -239,9 +239,9 @@ func header(ctx *ui.Context, s *Store, page Page, focused bool) ui.Element {
 		Child(ui.Div().Row().Align(ui.Center).Gap(8).
 			// The wrapper carries the tooltip, since a text field has none.
 			Child(ui.Div().Tooltip(tip(ctx, "Search", FocusSearch)).
-				Child(ui.TextInput(s.Query).Placeholder("Search projects…").Icon(icons.Search).FocusHandle(s.Search).
+				Child(ui.TextInput(s.Query).Label("Search projects").Placeholder("Search projects…").Icon(icons.Search).FocusHandle(s.Search).
 					Style(ui.Style{Width: ui.Px(240), MinWidth: ui.Px(140)}). // shrinks in narrow windows
 					OnChange(func(string) { s.Page.Set(PageProjects) }))).
-			Child(ui.IconButton(icons.Bell).Tooltip("Notifications")).
+			Child(ui.IconButton(icons.Bell).Label("Notifications").Tooltip("Notifications")).
 			Child(ui.Button("New Project").Key("new-project").Icon(icons.Plus).OnClick(s.OpenNewProject)))
 }

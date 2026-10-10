@@ -141,7 +141,7 @@ func Comments(s *Store, id int, h *ui.ListHandle) ui.Element {
 				Child(SectionTitle(t, "Comments")).
 				Child(ui.Text(fmt.Sprintf("%d", len(thread))).Size(12).Color(t.TextSubtle))).
 			Child(Card(t).Padding(12).Grow(1).MinHeight(ui.Px(0)).Gap(0).Child(body)).
-			Child(ui.TextInput(draft).Placeholder("Write a comment and press Enter").
+			Child(ui.TextInput(draft).Label("Comment").Placeholder("Write a comment and press Enter").
 				OnSubmit(send).Key("composer"))
 	})
 }

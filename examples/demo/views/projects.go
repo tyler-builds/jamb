@@ -83,6 +83,7 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 	star := ui.Div().Size(ui.Px(30), ui.Px(30)).Radius(7).Center().
 		TextColor(t.TextSubtle).Transition(fast).
 		Hover(ui.Style{Background: t.SurfaceActive, TextColor: t.Text}).
+		Label(starLabel(p.Starred)).
 		OnClick(func() { s.ToggleStar(p.ID) }).
 		Child(ui.Icon(icons.Star).Size(16).Color(starColor(t, p.Starred)))
 
@@ -121,7 +122,7 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 					Child(ui.Textf("%d open tasks", p.Tasks).Size(12))))).
 		Child(ui.Div().Align(ui.End).Gap(8).Shrink(0).
 			Child(ui.Div().Row().Align(ui.Center).Gap(4).
-				Child(ui.IconButton(icons.ArrowUpRight).Tooltip("Open in window").OnClick(func() { OpenProject(s, p.ID) })).
+				Child(ui.IconButton(icons.ArrowUpRight).Label("Open in window").Tooltip("Open in window").OnClick(func() { OpenProject(s, p.ID) })).
 				Child(star)).
 			Child(ui.Div().Row().Align(ui.Center).Gap(5).TextColor(t.TextSubtle).
 				Child(ui.Icon(icons.Clock).Size(13)).
@@ -174,6 +175,15 @@ func starColor(t *ui.Theme, on bool) ui.Color {
 		return t.Warning
 	}
 	return ui.Color{}
+}
+
+// starLabel names the star toggle of a project for assistive technology: what
+// pressing it will do.
+func starLabel(starred bool) string {
+	if starred {
+		return "Unstar project"
+	}
+	return "Star project"
 }
 
 func emptyState(t *ui.Theme, s *Store) ui.Element {

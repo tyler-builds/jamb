@@ -245,7 +245,7 @@ func (a *App) sidebar() ui.Element {
 			}).Key("sidebar").Style(ui.Style{Grow: 1, Padding: ui.Edges{Top: 4, Bottom: 4, Left: 8, Right: 8}}).Handle(a.list)
 		}
 
-		search := ui.TextInput(a.s.Query).Placeholder("Search notes").Icon(icons.Search).
+		search := ui.TextInput(a.s.Query).Label("Search notes").Placeholder("Search notes").Icon(icons.Search).
 			FocusHandle(a.search).
 			OnSubmit(func(string) { // Enter opens the first match
 				for _, n := range a.s.Notes.Peek() {
@@ -263,11 +263,11 @@ func (a *App) sidebar() ui.Element {
 					Child(ui.Div().Size(ui.Px(26), ui.Px(26)).Radius(7).Background(t.Accent).Center().
 						Child(ui.Icon(icons.Layers).Size(15).Color(ui.Hex("#ffffff")))).
 					Child(ui.Text("Notes").Size(17).Bold())).
-				Child(ui.IconButton(icons.Plus).Tooltip("New note (" + ctx.KeysFor(NewNote) + ")").OnClick(a.newNote))).
+				Child(ui.IconButton(icons.Plus).Label("New note").Tooltip("New note (" + ctx.KeysFor(NewNote) + ")").OnClick(a.newNote))).
 			Child(ui.Div().PaddingX(12).PaddingY(4).Shrink(0).
 				Child(ui.Div().Row().Align(ui.Center).Gap(6).
 					Child(search.Style(ui.Style{Grow: 1})).
-					Child(ui.If(q != "", ui.IconButton(icons.X).Small().Tooltip("Clear search").OnClick(func() { a.s.Query.Set("") }))))).
+					Child(ui.If(q != "", ui.IconButton(icons.X).Small().Label("Clear search").Tooltip("Clear search").OnClick(func() { a.s.Query.Set("") }))))).
 			Child(a.tagChips()).
 			Child(list).
 			Child(a.status(len(notes)))

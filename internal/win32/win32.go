@@ -17,6 +17,9 @@ var (
 	ole32    = syscall.NewLazyDLL("ole32.dll")
 	imm32    = syscall.NewLazyDLL("imm32.dll")
 	shell32  = syscall.NewLazyDLL("shell32.dll")
+	oleaut32 = syscall.NewLazyDLL("oleaut32.dll")
+
+	uiautomationcore = syscall.NewLazyDLL("UIAutomationCore.dll")
 
 	procOpenClipboard           = user32.NewProc("OpenClipboard")
 	procCloseClipboard          = user32.NewProc("CloseClipboard")
@@ -93,6 +96,27 @@ var (
 	procCloseHandle                  = kernel32.NewProc("CloseHandle")
 	procWaitForSingleObject          = kernel32.NewProc("WaitForSingleObject")
 	procMsgWaitForMultipleObjectsEx  = user32.NewProc("MsgWaitForMultipleObjectsEx")
+
+	procClientToScreen        = user32.NewProc("ClientToScreen")
+	procGetWindowTextW        = user32.NewProc("GetWindowTextW")
+	procGetWindowTextLengthW  = user32.NewProc("GetWindowTextLengthW")
+	procGetProcessHeap        = kernel32.NewProc("GetProcessHeap")
+	procHeapAlloc             = kernel32.NewProc("HeapAlloc")
+	procHeapFree              = kernel32.NewProc("HeapFree")
+	procSysAllocStringLen     = oleaut32.NewProc("SysAllocStringLen")
+	procSysFreeString         = oleaut32.NewProc("SysFreeString")
+	procSysStringLen          = oleaut32.NewProc("SysStringLen")
+	procSafeArrayCreateVector = oleaut32.NewProc("SafeArrayCreateVector")
+	procSafeArrayPutElement   = oleaut32.NewProc("SafeArrayPutElement")
+	procSafeArrayGetElement   = oleaut32.NewProc("SafeArrayGetElement")
+	procSafeArrayDestroy      = oleaut32.NewProc("SafeArrayDestroy")
+
+	procUiaReturnRawElementProvider   = uiautomationcore.NewProc("UiaReturnRawElementProvider")
+	procUiaHostProviderFromHwnd       = uiautomationcore.NewProc("UiaHostProviderFromHwnd")
+	procUiaRaiseAutomationEvent       = uiautomationcore.NewProc("UiaRaiseAutomationEvent")
+	procUiaRaiseStructureChangedEvent = uiautomationcore.NewProc("UiaRaiseStructureChangedEvent")
+	procUiaDisconnectProvider         = uiautomationcore.NewProc("UiaDisconnectProvider")
+	procUiaClientsAreListening        = uiautomationcore.NewProc("UiaClientsAreListening")
 )
 
 const (
@@ -148,6 +172,7 @@ const (
 	WM_NCLBUTTONDOWN        = 0x00A1
 	WM_NCLBUTTONUP          = 0x00A2
 	WM_NCLBUTTONDBLCLK      = 0x00A3
+	WM_GETOBJECT            = 0x003D
 	WM_NCMOUSELEAVE         = 0x02A2
 	WM_TIMER                = 0x0113
 	WM_IME_STARTCOMPOSITION = 0x010D
@@ -312,6 +337,13 @@ func GetClientRect(hwnd uintptr) RECT {
 	var r RECT
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))
 	return r
+}
+
+// GetClientRectTo writes the client rectangle of hwnd to r. Unlike GetClientRect,
+// it does not make a local that escapes to the heap, so a caller that keeps r
+// in a long-lived place pays nothing per call.
+func GetClientRectTo(hwnd uintptr, r *RECT) {
+	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(r)))
 }
 
 func SetWindowText(hwnd uintptr, s string) {
@@ -734,4 +766,137 @@ func MsgWaitForAny(handles []uintptr) uint32 {
 		return WAIT_FAILED
 	}
 	return uint32(r) - WAIT_OBJECT_0
+}
+
+// ---- UI Automation ----
+
+// HEAP_ZERO_MEMORY makes HeapAlloc clear the block it returns.
+const HEAP_ZERO_MEMORY = 0x00000008
+
+// ClientToScreen converts the client point p of hwnd to screen coordinates, in
+// place. The result is in physical pixels for a per-monitor aware process.
+func ClientToScreen(hwnd uintptr, p *POINT) {
+	procClientToScreen.Call(hwnd, uintptr(unsafe.Pointer(p)))
+}
+
+// GetWindowText returns the title of hwnd, or "" if it has none.
+func GetWindowText(hwnd uintptr) string {
+	n, _, _ := procGetWindowTextLengthW.Call(hwnd)
+	buf := make([]uint16, n+1)
+	r, _, _ := procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+	return syscall.UTF16ToString(buf[:r])
+}
+
+// GetProcessHeap returns the process's default heap.
+func GetProcessHeap() uintptr {
+	r, _, _ := procGetProcessHeap.Call()
+	return r
+}
+
+// HeapAlloc allocates size bytes on heap, with flags such as HEAP_ZERO_MEMORY,
+// and returns the address, or 0 on failure. The memory is outside the Go heap.
+func HeapAlloc(heap uintptr, flags uint32, size uintptr) uintptr {
+	r, _, _ := procHeapAlloc.Call(heap, uintptr(flags), size)
+	return r
+}
+
+// HeapFree frees a block that HeapAlloc returned.
+func HeapFree(heap uintptr, flags uint32, p uintptr) {
+	procHeapFree.Call(heap, uintptr(flags), p)
+}
+
+// SysAllocStringLen returns a new BSTR holding a copy of s, which may be empty.
+// The caller frees it with SysFreeString.
+func SysAllocStringLen(s []uint16) uintptr {
+	var p uintptr
+	if len(s) > 0 {
+		p = uintptr(unsafe.Pointer(&s[0]))
+	}
+	r, _, _ := procSysAllocStringLen.Call(p, uintptr(len(s)))
+	return r
+}
+
+// SysFreeString frees a BSTR. It does nothing for 0.
+func SysFreeString(bstr uintptr) {
+	if bstr != 0 {
+		procSysFreeString.Call(bstr)
+	}
+}
+
+// SysStringLen returns the number of characters in a BSTR.
+func SysStringLen(bstr uintptr) uint32 {
+	r, _, _ := procSysStringLen.Call(bstr)
+	return uint32(r)
+}
+
+// SafeArrayCreateVector creates a one-dimensional SAFEARRAY of n elements of
+// type vt, indexed from lbound. It returns 0 on failure.
+func SafeArrayCreateVector(vt uint16, lbound int32, n uint32) uintptr {
+	r, _, _ := procSafeArrayCreateVector.Call(uintptr(vt), uintptr(lbound), uintptr(n))
+	return r
+}
+
+// SafeArrayPutInt32 stores v at index i of the SAFEARRAY of 4-byte integers psa,
+// and returns the HRESULT.
+func SafeArrayPutInt32(psa uintptr, i, v int32) uintptr {
+	r, _, _ := procSafeArrayPutElement.Call(psa, uintptr(unsafe.Pointer(&i)), uintptr(unsafe.Pointer(&v)))
+	return r
+}
+
+// SafeArrayGetInt32 reads the element at index i of the SAFEARRAY of 4-byte
+// integers psa. It returns the HRESULT.
+func SafeArrayGetInt32(psa uintptr, i int32, v *int32) uintptr {
+	r, _, _ := procSafeArrayGetElement.Call(psa, uintptr(unsafe.Pointer(&i)), uintptr(unsafe.Pointer(v)))
+	return r
+}
+
+// SafeArrayDestroy frees a SAFEARRAY and its elements. It does nothing for 0.
+func SafeArrayDestroy(psa uintptr) {
+	if psa != 0 {
+		procSafeArrayDestroy.Call(psa)
+	}
+}
+
+// UiaReturnRawElementProvider answers a WM_GETOBJECT message with the provider
+// el, and returns the LRESULT to return from the window procedure.
+func UiaReturnRawElementProvider(hwnd, wp, lp, el uintptr) uintptr {
+	r, _, _ := procUiaReturnRawElementProvider.Call(hwnd, wp, lp, el)
+	return r
+}
+
+// UiaHostProviderFromHwnd writes to out the host provider of the window hwnd,
+// the native element that UI Automation makes for a window. It returns the
+// HRESULT.
+func UiaHostProviderFromHwnd(hwnd, out uintptr) uintptr {
+	r, _, _ := procUiaHostProviderFromHwnd.Call(hwnd, out)
+	return r
+}
+
+// UiaRaiseAutomationEvent raises the event id for provider, an
+// IRawElementProviderSimple.
+func UiaRaiseAutomationEvent(provider uintptr, id int32) uintptr {
+	r, _, _ := procUiaRaiseAutomationEvent.Call(provider, uintptr(id))
+	return r
+}
+
+// UiaRaiseStructureChangedEvent raises a structure-changed event of kind change
+// for provider, an IRawElementProviderSimple. The runtime ID arguments are
+// optional: pass 0 and 0.
+func UiaRaiseStructureChangedEvent(provider uintptr, change int32, runtimeID uintptr, n int32) uintptr {
+	r, _, _ := procUiaRaiseStructureChangedEvent.Call(provider, uintptr(change), runtimeID, uintptr(n))
+	return r
+}
+
+// UiaDisconnectProvider disconnects provider, an IRawElementProviderSimple,
+// from UI Automation.
+func UiaDisconnectProvider(provider uintptr) uintptr {
+	r, _, _ := procUiaDisconnectProvider.Call(provider)
+	return r
+}
+
+// UiaClientsAreListening reports whether an assistive technology is listening
+// for UI Automation events.
+func UiaClientsAreListening() bool {
+	r, _, _ := procUiaClientsAreListening.Call()
+	return r != 0
 }

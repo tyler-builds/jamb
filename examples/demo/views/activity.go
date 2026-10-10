@@ -153,7 +153,7 @@ func Activity(s *Store) ui.Element {
 		// Wrap keeps the toolbar on two lines in a narrow window.
 		toolbar := ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(12).Wrap().Shrink(0).MaxWidth(ui.Px(900)).
 			Child(ui.Div().Row().Align(ui.Center).Gap(12).
-				Child(ui.TextInput(s.EventQuery).Placeholder("Filter events").Icon(icons.Search).
+				Child(ui.TextInput(s.EventQuery).Label("Filter events").Placeholder("Filter events").Icon(icons.Search).
 					Style(ui.Style{Width: ui.Px(260), MinWidth: ui.Px(140)})).
 				Child(ui.Text(count).Size(12).Color(t.TextMuted).NoWrap())).
 			Child(ui.Div().Row().Align(ui.Center).Gap(8).

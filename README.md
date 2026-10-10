@@ -1035,6 +1035,62 @@ ui.If(open.Get(), ui.Modal("New project", form).
   Alt doesn't activate a menu bar. Keys handled inside the modal (a field's
   editing keys, the modal's own bindings) work as usual.
 
+### Accessibility
+
+On Windows, jamb exposes its UI to screen readers and other assistive
+technology through UI Automation. The design is in
+[docs/accessibility.md](docs/accessibility.md). Nothing is built until an
+assistive technology asks for the window's UI, so an app run without one pays
+nothing extra. The exception is a development run with warnings on (see below),
+which builds the tree to check it.
+
+What is automatic, with no app code:
+
+- Buttons, including icon-only buttons, are named by their text. A clickable
+  element with no role is a button too.
+- Text fields and text areas have the role. Give them a name with `Label`.
+- Plain text is the name of its container, or a static text node when it stands
+  alone. Decorative icons and layout containers with no role or name are left
+  out, so their children sit in the parent.
+- Menus, menu bars and menu items carry their roles, checked and disabled
+  states, and nesting level. A `Modal` is a dialog named by its title.
+- A `UniformList` or `ListOf` exposes its built rows as list items, each with
+  its position in the full list ("40 of 10,000"). Only the rows that are built
+  are in the tree.
+- Tooltips are nodes under the element they hang from, so an overlay reads in
+  place rather than at the end of the window.
+
+The API, on the elements that already exist:
+
+```go
+ui.Div().Role(access.RoleCheckBox).Label("Notifications").Checked(on)
+ui.Div().Description("Saves the file to disk")
+ui.Div().Hidden() // leaves the element and its children out of the tree
+ui.IconButton(icons.Bell).Label("Notifications")
+ui.TextInput(query).Label("Search projects") // also TextArea
+ui.Image(avatar).Alt("Account avatar")
+ui.Announce("Saved", access.Polite) // queued; spoken once announcements are wired (see Known limitations)
+```
+
+A name comes from the first of these that is set: the `Label`, then the text
+inside a control, then its tooltip. `Description` (or the tooltip, when it is
+not the name) is the help text read after the name. Set `Label` where an
+element has no visible text, and on every text field, since a field has no
+name of its own. The placeholder is not used as a name.
+
+`access.Role` and the other names in `access` (states, actions, the tree and
+its updates) are the platform-neutral model; `access/accesstest` has helpers
+that find a node by its role and name in a unit test.
+
+Development warnings report what a user cannot identify: an interactive element
+with no accessible name, and an image without `Alt`. Each element is reported
+once, to stderr, in runs with `JAMB_TRACE=1`, under `jamb dev`, or with
+`JAMB_A11Y_WARN=1`.
+
+To see the tree as text, use the `a11ydump PATH` script step, or call
+`rt.AccessTree().Dump()` in a test. Each line is a role, its name and states,
+its bounds in physical pixels, and its ID.
+
 ### GPU device loss
 
 When the GPU device is removed or reset (a driver update or crash, a remote
@@ -1086,8 +1142,9 @@ These environment variables work with any jamb app, with no code changes:
 
 | Variable | Effect |
 |---|---|
-| `JAMB_TRACE=1` | Prints startup timings, per-frame build/layout/paint cost, and frames per second of activity, so you can confirm the app is idle. |
-| `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `type TEXT` types everything after the one space that follows `type`, spaces included. `devicelost` simulates a GPU device loss; see [GPU device loss](#gpu-device-loss). |
+| `JAMB_TRACE=1` | Prints startup timings, per-frame build/layout/paint cost, and frames per second of activity, so you can confirm the app is idle. Also turns on the accessibility warnings (see [Accessibility](#accessibility)). |
+| `JAMB_A11Y_WARN=1` | Prints accessibility warnings: an interactive element with no name, and an image without `Alt`. Each is reported once. On by default under `jamb dev`. |
+| `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `type TEXT` types everything after the one space that follows `type`, spaces included. `devicelost` simulates a GPU device loss; see [GPU device loss](#gpu-device-loss). `a11ydump PATH` writes the accessibility tree as text (see [Accessibility](#accessibility)). |
 | `JAMB_STRESS=rebuild\|paint` | Measures sustained frame cost, allocation and GC, prints the results, then exits. |
 | `JAMB_VSYNC=0` | Turns off vsync, for throughput tests. |
 | `JAMB_D3D_DEBUG=1` | Enables the Direct3D debug layer. |
@@ -1628,8 +1685,25 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   version has not been tested. The arm64 build is compiled but has not been run.
   The MSIX install steps are for a person to run; the SDK tools check the
   package's structure.
-- **Accessibility.** Not available yet; screen readers see nothing. The design
-  and plan are in [docs/accessibility.md](docs/accessibility.md).
+- **Accessibility.** Phase A of [docs/accessibility.md](docs/accessibility.md)
+  is in place on Windows: the access tree, names and roles, bounds and focus,
+  Invoke for buttons, links and menu items, focus-changed events, the dump and
+  the development warnings. Still to come, in the design's order: Toggle,
+  ExpandCollapse, Selection, Value and Scroll patterns (phase B), so a check
+  box, switch or menu cannot yet be toggled or expanded through UI Automation;
+  announcements from `ui.Announce` are queued but not spoken; heading levels
+  and label relations are not exposed; the Text pattern for text fields (phase
+  C); high contrast, text size and reduced motion (phase D). The caption
+  buttons (Minimize, Maximize, Close) have their roles and names, but their
+  invoke path has not been checked live. Building the tree for the demo's
+  dashboard takes about 18 µs, measured with a benchmark; the cost grows with
+  the tree. A UI Automation client that walks the whole tree over and over makes
+  the process's private memory rise about 0.05 MB per walk of the demo's 46 nodes;
+  the same walk against Windows Notepad grows at the same rate per element, so it
+  is UI Automation's own per-client state, not a jamb leak (see
+  [docs/accessibility.md](docs/accessibility.md)). A client that walks past the window's close gets `E_UNEXPECTED`
+  from UI Automation. Not yet checked with NVDA, Narrator or Accessibility
+  Insights.
 - **Not attempted (non-goals).** Tray,
   CSS grid, and the optional utility-class shorthand
   (`.Class("flex col gap-2")`). The shorthand was skipped in favor of typed

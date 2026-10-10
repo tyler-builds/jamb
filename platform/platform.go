@@ -18,6 +18,7 @@ package platform
 import (
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/input"
 )
@@ -92,6 +93,16 @@ type MenuBarHandler interface {
 // animating run in parallel.
 type FrameWaiter interface {
 	FrameWaitable() uintptr
+}
+
+// AccessHandler is optionally implemented by a Handler whose UI is exposed to
+// assistive technology. AccessBridge returns the bridge that the window's UI
+// runtime publishes its access tree on, or nil before the runtime exists. The
+// adapter activates the bridge when an assistive technology first asks for the
+// window's tree, and receives the tree and its updates through the bridge (see
+// access.Bridge).
+type AccessHandler interface {
+	AccessBridge() *access.Bridge
 }
 
 // Window is a native window owned by an adapter.

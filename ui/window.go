@@ -3,6 +3,7 @@ package ui
 import (
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/icons"
 )
@@ -177,7 +178,19 @@ func TitleBarButtons() Element {
 				Hover(Style{Background: t.SurfaceHover, TextColor: t.Text}).
 				Pressed(Style{Background: t.SurfaceActive, TextColor: t.Text}).
 				WindowArea(area).
-				Child(Icon(ic).Size(10))
+				Child(Icon(ic).Size(10)).
+				// The native hit test does the press, so the click handler only
+				// serves assistive technology, which invokes the button.
+				Role(access.RoleButton).Label(label).OnClick(func() {
+				switch area {
+				case AreaMinimize:
+					win.Minimize()
+				case AreaMaximize:
+					win.ToggleMaximize()
+				case AreaClose:
+					win.Close()
+				}
+			})
 			// Windows shows its own Snap Layouts flyout over the maximize button, so
 			// that button gets no tooltip of ours.
 			if area != AreaMaximize {

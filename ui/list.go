@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 	"math"
+
+	"github.com/tyler-builds/jamb/access"
 )
 
 // UniformListElement is a scrolling list that builds only the rows in view.
@@ -165,9 +167,9 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 		if k, ok := r.(keyed); ok && k.elementKey() != "" {
 			key = "jamb.row:" + k.elementKey()
 		}
-		spacer.Child(Div().Key(key).Absolute().Top(float32(i) * ls.rowH).Left(0).Right(0).Child(r))
+		spacer.Child(Div().Key(key).Absolute().Top(float32(i)*ls.rowH).Left(0).Right(0).Child(r).listItem(i+1, l.count))
 	}
-	container := Div().ScrollY().Style(l.style)
+	container := Div().ScrollY().Style(l.style).Role(access.RoleList)
 	container.vlist = ls
 	return container.Child(spacer)
 }

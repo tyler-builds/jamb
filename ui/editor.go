@@ -94,6 +94,7 @@ func clampToRune(s string, i int) int {
 type editorElement struct {
 	value       *Signal[string]
 	placeholder string
+	name        string // the accessible name, see TextInputElement.Label
 	multiline   bool
 	onSubmit    func(string)
 	onChange    func(string)

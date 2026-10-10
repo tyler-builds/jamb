@@ -4,6 +4,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 )
 
@@ -28,6 +29,7 @@ type ButtonElement struct {
 	tooltip  string
 	style    Style
 	key      string
+	name     string       // the accessible name, see Label
 	handle   *FocusHandle // set by Modal.Default, so the modal can focus the button
 }
 
@@ -52,6 +54,10 @@ func (b *ButtonElement) Ghost() *ButtonElement                  { return b.Varia
 func (b *ButtonElement) Danger() *ButtonElement                 { return b.Variant(Danger) }
 func (b *ButtonElement) Small() *ButtonElement                  { b.small = true; return b }
 func (b *ButtonElement) Disabled(d bool) *ButtonElement         { b.disabled = d; return b }
+
+// Label names the button for assistive technology. A button with text needs
+// no label, since its text is its name; an icon-only button does.
+func (b *ButtonElement) Label(s string) *ButtonElement { b.name = s; return b }
 
 // Tooltip shows s below the button after the pointer rests on it.
 func (b *ButtonElement) Tooltip(s string) *ButtonElement { b.tooltip = s; return b }
@@ -107,6 +113,7 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		}
 	}
 	d.Style(b.style).Tooltip(b.tooltip)
+	d.access().role, d.access().name, d.access().disabled = access.RoleButton, b.name, b.disabled
 	if !b.disabled {
 		ring := Shadow{Spread: 2, Color: t.FocusRing}
 		d.FocusVisible(Style{Shadows: append(slices.Clone(d.style.Shadows), ring)})
@@ -128,6 +135,7 @@ func (dividerElement) expand(ctx *Context) Element {
 type fieldOptions struct {
 	value       *Signal[string]
 	placeholder string
+	name        string // the accessible name, see Label
 	icon        *icons.Icon
 	onSubmit    func(string)
 	onChange    func(string)
@@ -152,8 +160,12 @@ func TextInput(value *Signal[string]) *TextInputElement {
 func (*TextInputElement) isElement()            {}
 func (ti *TextInputElement) elementKey() string { return ti.key }
 
-func (ti *TextInputElement) Key(k string) *TextInputElement             { ti.key = k; return ti }
-func (ti *TextInputElement) Placeholder(s string) *TextInputElement     { ti.placeholder = s; return ti }
+func (ti *TextInputElement) Key(k string) *TextInputElement         { ti.key = k; return ti }
+func (ti *TextInputElement) Placeholder(s string) *TextInputElement { ti.placeholder = s; return ti }
+
+// Label names the field for assistive technology. A field has no visible
+// name of its own, so it should be given one; the placeholder is not used.
+func (ti *TextInputElement) Label(s string) *TextInputElement           { ti.name = s; return ti }
 func (ti *TextInputElement) Icon(ic *icons.Icon) *TextInputElement      { ti.icon = ic; return ti }
 func (ti *TextInputElement) OnSubmit(fn func(string)) *TextInputElement { ti.onSubmit = fn; return ti }
 func (ti *TextInputElement) OnChange(fn func(string)) *TextInputElement { ti.onChange = fn; return ti }
@@ -198,8 +210,11 @@ func TextArea(value *Signal[string]) *TextAreaElement {
 func (*TextAreaElement) isElement()            {}
 func (ta *TextAreaElement) elementKey() string { return ta.key }
 
-func (ta *TextAreaElement) Key(k string) *TextAreaElement             { ta.key = k; return ta }
-func (ta *TextAreaElement) Placeholder(s string) *TextAreaElement     { ta.placeholder = s; return ta }
+func (ta *TextAreaElement) Key(k string) *TextAreaElement         { ta.key = k; return ta }
+func (ta *TextAreaElement) Placeholder(s string) *TextAreaElement { ta.placeholder = s; return ta }
+
+// Label names the field for assistive technology; see TextInputElement.Label.
+func (ta *TextAreaElement) Label(s string) *TextAreaElement           { ta.name = s; return ta }
 func (ta *TextAreaElement) OnChange(fn func(string)) *TextAreaElement { ta.onChange = fn; return ta }
 
 // Style is merged into the editor's frame, as for TextInputElement.Style.
@@ -236,7 +251,7 @@ func (f *fieldOptions) expand(ctx *Context, multiline bool, minRows int) Element
 		h = st.focus
 	}
 	ed := &editorElement{
-		value: f.value, placeholder: f.placeholder, multiline: multiline,
+		value: f.value, placeholder: f.placeholder, name: f.name, multiline: multiline,
 		onSubmit: f.onSubmit, onChange: f.onChange, autoFocus: f.autoFocus, handle: h,
 		style: Style{Grow: 1},
 	}

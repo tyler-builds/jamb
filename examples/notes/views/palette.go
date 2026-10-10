@@ -86,7 +86,7 @@ func (a *App) palette() ui.Element {
 				}
 			}).
 			OnAction(PaletteClose, a.dismissPalette).
-			Child(ui.TextInput(a.paletteQuery).Borderless().AutoFocus().Placeholder("Type a command…").
+			Child(ui.TextInput(a.paletteQuery).Label("Command").Borderless().AutoFocus().Placeholder("Type a command…").
 				Style(ui.Style{Padding: ui.XY(10, 6)}).
 				OnChange(func(string) { a.paletteSel.Set(0) })).
 			Child(rows)

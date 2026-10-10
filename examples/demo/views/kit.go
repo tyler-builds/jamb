@@ -3,6 +3,7 @@ package views
 import (
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -64,6 +65,7 @@ func Toggle(t *ui.Theme, on bool, onChange func(bool)) *ui.DivElement {
 	}
 	return ui.Div().Size(ui.Px(38), ui.Px(22)).Shrink(0).Radius(11).Background(track).
 		Transition(fast).Hover(ui.Style{Background: track.Lighten(0.08)}).
+		Role(access.RoleSwitch).Checked(on).
 		OnClick(func() { onChange(!on) }).
 		Child(ui.Div().Absolute().Left(knobX).Top(3).Size(ui.Px(16), ui.Px(16)).Radius(8).
 			Background(ui.Hex("#ffffff")).Shadow(ui.ShadowSm))

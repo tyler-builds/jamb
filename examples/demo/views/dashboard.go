@@ -48,7 +48,7 @@ func Dashboard(s *Store) ui.Element {
 
 func welcome(t *ui.Theme) ui.Element {
 	return ui.Div().Height(ui.Px(150)).Radius(14).ClipContent().Shadow(ui.ShadowMd).
-		Child(ui.Image(banner).Size(ui.Full, ui.Full)).
+		Child(ui.Image(banner).Alt("Project banner").Size(ui.Full, ui.Full)).
 		Child(ui.Div().Inset(0).Padding(28).Justify(ui.Center).Gap(6).
 			Background(ui.Color{A: 0.12}).
 			Child(ui.Text("Welcome back, Alex").Size(26).Bold().Color(ui.Hex("#ffffff"))).

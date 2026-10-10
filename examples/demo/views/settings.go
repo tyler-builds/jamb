@@ -25,14 +25,14 @@ func Settings(s *Store) ui.Element {
 							} else {
 								ctx.SetTheme(ui.LightTheme)
 							}
-						}))).
+						}).Label("Dark mode"))).
 					Child(ui.Divider()).
 					Child(SettingRow(t, "Compact activity", "Tighter rows on the Activity page.",
-						Toggle(t, s.Compact.Get(), s.Compact.Set)))).
+						Toggle(t, s.Compact.Get(), s.Compact.Set).Label("Compact activity")))).
 				Child(Card(t).Gap(14).
 					Child(SectionTitle(t, "Notifications")).
 					Child(SettingRow(t, "Desktop notifications", "Show a notification when a build finishes.",
-						Toggle(t, s.Notify.Get(), s.Notify.Set))).
+						Toggle(t, s.Notify.Get(), s.Notify.Set).Label("Desktop notifications"))).
 					Child(ui.Divider()).
 					Child(SettingRow(t, "Danger zone", "Remove every project from this workspace.",
 						ui.Button("Delete all").Danger().Small().Icon(icons.Trash).OnClick(func() {

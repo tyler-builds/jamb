@@ -48,9 +48,9 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 		} else {
 			pin := ui.IconButton(icons.Star).OnClick(func() { a.s.TogglePin(n) })
 			if n.Pinned.Get() {
-				pin.Style(ui.Style{TextColor: t.Warning}).Tooltip("Unpin")
+				pin.Style(ui.Style{TextColor: t.Warning}).Label("Unpin note").Tooltip("Unpin")
 			} else {
-				pin.Tooltip("Pin")
+				pin.Label("Pin note").Tooltip("Pin")
 			}
 			themeIcon := icons.Sun
 			if !t.Dark {
@@ -58,9 +58,9 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 			}
 			actions.
 				Child(pin).
-				Child(ui.IconButton(icons.Trash).Tooltip("Delete note").OnClick(func() { a.confirm.Set(n.ID) })).
+				Child(ui.IconButton(icons.Trash).Label("Delete note").Tooltip("Delete note").OnClick(func() { a.confirm.Set(n.ID) })).
 				Child(ui.Div().Width(ui.Px(1)).Height(ui.Px(20)).MarginX(4).Background(t.Border)).
-				Child(ui.IconButton(themeIcon).Tooltip("Toggle theme (" + ctx.KeysFor(ToggleTheme) + ")").OnClick(func() { toggleTheme(ctx) }))
+				Child(ui.IconButton(themeIcon).Label("Toggle theme").Tooltip("Toggle theme (" + ctx.KeysFor(ToggleTheme) + ")").OnClick(func() { toggleTheme(ctx) }))
 		}
 		return bar.Child(actions)
 	}).Key("toolbar-" + n.ID)
@@ -75,12 +75,12 @@ func (a *App) noteEditor(n *store.Note) ui.Element {
 				a.confirm.Set("")
 			}
 		}
-		title := ui.TextInput(n.Title).Borderless().Placeholder("Untitled").
+		title := ui.TextInput(n.Title).Label("Title").Borderless().Placeholder("Untitled").
 			FocusHandle(a.title).
 			Style(ui.Style{FontSize: 28, FontWeight: ui.FontBold}).
 			OnChange(changed).
 			OnSubmit(func(string) { a.body.Focus() }) // Enter continues into the body
-		body := ui.TextArea(n.Body).Borderless().MinRows(18).Placeholder("Start writing…").
+		body := ui.TextArea(n.Body).Label("Body").Borderless().MinRows(18).Placeholder("Start writing…").
 			FocusHandle(a.body).
 			Style(ui.Style{FontSize: 15, LineHeight: 1.6}).
 			OnChange(changed)

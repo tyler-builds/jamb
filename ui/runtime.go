@@ -334,6 +334,11 @@ type Runtime struct {
 	// the one whose initial focus is set once the next build is done.
 	modals       []modalFrame
 	pendingModal uint64
+
+	// acc is the accessibility tree's state (see access.go). It is nil until
+	// the tree is first asked for, so a runtime without assistive technology
+	// keeps none of it.
+	acc *accessState
 }
 
 // Services are platform capabilities the runtime uses when available. The
@@ -638,6 +643,7 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 		rt.scrolled = false
 		rt.updateHover()
 	}
+	rt.publishAccess()
 	rt.stats.Nodes = len(rt.byID)
 	rt.stats.Quads, rt.stats.Glyphs = len(rt.scene.Quads), len(rt.scene.Glyphs)
 	rt.text.EndFrame()
@@ -655,6 +661,7 @@ func (rt *Runtime) buildDirty() {
 // layout computes the layout of the whole tree.
 func (rt *Runtime) layout() {
 	t0 := time.Now()
+	rt.markAccess()
 	rt.engine.Compute(&rt.tree.lay, rt.viewW, rt.viewH)
 	rt.needLayout, rt.needPaint = false, true
 	rt.stats.LaidOut = true
@@ -667,6 +674,7 @@ func (rt *Runtime) layout() {
 // asked for its scroll container to move.
 func (rt *Runtime) paintFrame(dt float32) {
 	t0 := time.Now()
+	rt.markAccess() // paint moves nodes (scrolling) and records which are drawn
 	rt.hasTextInput = false
 	rt.paint(dt)
 	if rt.revealCaret() {
@@ -771,6 +779,7 @@ func (rt *Runtime) claimed(id uint64) bool {
 // their new subtrees into the retained tree.
 func (rt *Runtime) rebuildDirty() {
 	rt.gen++
+	rt.markAccess()
 	rt.hasDirty.Store(false)
 	rt.dirtyMu.Lock()
 	queue := rt.dirty

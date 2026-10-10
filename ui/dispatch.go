@@ -800,6 +800,7 @@ func (rt *Runtime) setFocus(id uint64) {
 	if id == rt.focusID {
 		return
 	}
+	rt.markAccess()
 	oldID := rt.focusID
 	if old := rt.byID[oldID]; old != nil && old.div != nil && old.div.h.onBlur != nil && rt.blurring != oldID {
 		// Focus stays on the old element while its OnBlur runs. A focus change

@@ -16,6 +16,7 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/win32"
 	"github.com/tyler-builds/jamb/platform"
@@ -51,6 +52,12 @@ type window struct {
 	// caption is the title-bar button the mouse went down on; its action runs
 	// when the button is released over it.
 	caption platform.TitleArea
+	// uiaRoot is the window's UI Automation root object, as a
+	// IRawElementProviderSimple view. The window holds one reference to it
+	// until it is destroyed. uiaBridge is the bridge the window listens to; it
+	// is nil until the window first answers UI Automation.
+	uiaRoot   uintptr
+	uiaBridge *access.Bridge
 }
 
 // The state of the UI thread, shared by all windows of the process.
@@ -659,6 +666,11 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		w.emit(platform.Event{Kind: platform.EventFileDrop, X: float32(p.X), Y: float32(p.Y), Paths: paths})
 		return 0
 
+	case win32.WM_GETOBJECT:
+		if r, ok := w.answerAccess(wp, lp); ok {
+			return r
+		}
+
 	case win32.WM_CLOSE:
 		if !w.handler.OnClose(w) {
 			return 0
@@ -668,6 +680,7 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 
 	case win32.WM_DESTROY:
 		delete(windows, hwnd)
+		w.endAccess()
 		if w.ready {
 			w.ready = false
 			w.handler.OnDestroy(w)

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 )
 
@@ -55,7 +56,7 @@ func MenuBar(menus ...TopMenu) Element {
 			rt.menuClosed(false)
 		}
 
-		bar := Div().Row().Align(Center).Gap(2)
+		bar := Div().Row().Align(Center).Gap(2).Role(access.RoleMenuBar)
 		bar.menuBar = true
 		bar.OnClickOutside(leave)
 		bar.OnKeyDown(func(e *KeyEvent) {
@@ -121,7 +122,7 @@ func MenuBar(menus ...TopMenu) Element {
 						show(i, false)
 					}
 				}).
-				Child(Text(tm.Label).NoWrap())
+				Child(Text(tm.Label).NoWrap()).Role(access.RoleMenuItem)
 			if i == cur {
 				lbl.Background(t.SurfaceActive)
 				lbl.Child(panel.top(2))

@@ -61,10 +61,10 @@ func (a *App) tagEditor(n *store.Note) ui.Element {
 					Cursor(ui.CursorPointer).Transition(fast).
 					Hover(ui.Style{Background: t.SurfaceHover}).
 					OnClick(func() { a.s.RemoveTag(n, tag) }).
-					Key("remove-" + tag).
+					Key("remove-" + tag).Label("Remove tag " + tag).
 					Child(ui.Icon(icons.X).Size(10))))
 		}
-		row.Child(ui.TextInput(draft).Small().Placeholder("Add tag…").Icon(icons.Tag).Width(ui.Px(140)).
+		row.Child(ui.TextInput(draft).Label("New tag").Small().Placeholder("Add tag…").Icon(icons.Tag).Width(ui.Px(140)).
 			Key("add-tag").
 			OnSubmit(func(v string) {
 				a.s.AddTag(n, v)

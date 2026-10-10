@@ -5,6 +5,8 @@ import (
 	"math"
 	"strconv"
 	"unsafe"
+
+	"github.com/tyler-builds/jamb/access"
 )
 
 // ListElement is a scrolling list whose rows may differ in height. Create one
@@ -243,10 +245,10 @@ func (l *ListElement) expand(ctx *Context) Element {
 	spacer := Div().Key("jamb.list.spacer").Shrink(0).Height(Px(vs.pad + float32(vs.hidx.total())))
 	for i := from; i < to; i++ {
 		top := vs.pad + float32(vs.hidx.prefix(i))
-		spacer.Child(Div().Key("jamb.vrow:" + vs.keys[i]).Absolute().Top(top).Left(0).Right(0).Child(l.rowAt(i)))
+		spacer.Child(Div().Key("jamb.vrow:"+vs.keys[i]).Absolute().Top(top).Left(0).Right(0).Child(l.rowAt(i)).listItem(i+1, vs.count))
 	}
 	vs.builtFrom, vs.built = from, to
-	container := Div().ScrollY().Style(l.style)
+	container := Div().ScrollY().Style(l.style).Role(access.RoleList)
 	container.vrows = vs
 	return container.Child(spacer)
 }

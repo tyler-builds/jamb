@@ -3,6 +3,7 @@ package ui
 import (
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/scene"
 )
 
@@ -120,7 +121,7 @@ func (rt *Runtime) tooltipElement(s string) Element {
 		TextColor(rt.theme.Text).FontSize(12).
 		Enter(Fade(), Animation{Duration: 120 * time.Millisecond}).
 		Exit(Fade(), Animation{Duration: 80 * time.Millisecond}).
-		Child(Text(s).NoWrap())
+		Child(Text(s).NoWrap()).Role(access.RoleTooltip)
 }
 
 // showTip makes id the element whose tooltip is displayed (0 hides it),

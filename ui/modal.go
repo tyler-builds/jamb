@@ -4,6 +4,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 )
 
@@ -122,7 +123,8 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		OnClickOutside(closeFn).
 		Child(Text(m.title).Size(16).Semibold()).
 		Child(Div().Column().Gap(12).Child(m.body)).
-		Child(footer)
+		Child(footer).
+		Role(access.RoleDialog).Label(m.title)
 
 	backdrop := Div().Absolute().Inset(0).Background(t.Scrim).
 		Focusable().TabStop(false).
