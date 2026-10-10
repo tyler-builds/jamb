@@ -61,6 +61,7 @@ const (
 	RoleSpinner                   // a number within a range, with an edit field (see Node.Range)
 	RoleTree                      // a hierarchy of nodes that open and close, such as a file tree
 	RoleTreeItem                  // one node of a tree, with its Level and its position in its siblings
+	RoleProgressBar               // progress: a read-only Range when determinate, no range when busy (see Node.Range)
 )
 
 var roleNames = [...]string{
@@ -96,6 +97,7 @@ var roleNames = [...]string{
 	RoleSpinner:       "spinner",
 	RoleTree:          "tree",
 	RoleTreeItem:      "tree item",
+	RoleProgressBar:   "progress bar",
 }
 
 // String returns the role's name, such as "check box".

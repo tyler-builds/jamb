@@ -35,8 +35,8 @@ func TestDemoAccessibility(t *testing.T) {
 		for _, nav := range []string{"Dashboard", "Activity", "Components", "Settings"} {
 			accesstest.Find(t, tr, access.RoleButton, nav)
 		}
-		// The Projects item shows its project count after its label.
-		if n := tr.Find(access.RoleButton, "Projects "+strconv.Itoa(len(s.Projects.Get()))); n == nil {
+		// The Projects item names its project count, as a badge on the item does.
+		if n := tr.Find(access.RoleButton, "Projects, "+strconv.Itoa(len(s.Projects.Get()))+" items"); n == nil {
 			t.Fatalf("no Projects navigation button:\n%s", tr.Dump())
 		}
 		accesstest.Find(t, tr, access.RoleButton, "Minimize")

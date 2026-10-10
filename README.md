@@ -452,6 +452,79 @@ ui.TreeView(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[
   A double-click opens or closes it. Keys are kept by node key, so focus and the
   selection stay with their node as the rows scroll.
 
+### Feedback
+
+Progress bars, busy rings, toasts and badges. They use the theme's colors, follow
+high contrast, the Text size and reduced motion, and show their state by a shape or
+a word as well as by a color.
+
+```go
+ui.ProgressBar(0.45).Label("Upload").Color(accent)    // determinate: 0 to 1, or .Range(lo, hi); Color is the fill
+ui.BadgeText("Active").Variant(ui.BadgeAccent).Dot() // a word with a dot in front
+ui.ProgressBar(3).Range(0, 8).Label("Setup steps").
+	Format(func(v float64) string { return fmt.Sprintf("%.0f of 8", v) })
+ui.IndeterminateProgressBar().Label("Searching")      // work of unknown length
+ui.ProgressRing().Size(ui.RingSmall).Label("Sending reply") // busy: RingSmall, RingMedium, RingLarge
+ui.Badge(6).Noun("items").Variant(ui.BadgeAccent)     // a count; above Max (99) it shows 99+
+ui.BadgeText("New").Variant(ui.BadgeSuccess)          // a word
+ui.BadgeDot().Variant(ui.BadgeDanger)                 // a dot only
+ui.Div().Label("Projects").Badged(ui.Badge(6).Noun("items")) // a badge on an element
+ui.Toaster().Key("toaster")                           // once, as the last child of the window's root
+ctx.Toast(ui.ToastSuccess, "Project created").Action("Undo", undo) // in a handler
+```
+
+- **Progress bar.** A determinate bar is a read-only range: its value is clamped to
+  its range, and its readout is the percentage of the range, or what `Format` returns.
+  An indeterminate bar slides across its track and repeats. With reduced motion it
+  stays in the middle, and it never asks for frames.
+  `Color` sets the fill for an app that has a color of its own; the default is the
+  theme's accent. The default fill is 3:1 or more against the track in both themes.
+  An app color is the app's responsibility: the fill is a graphical object and needs
+  3:1 against the track (WCAG 1.4.11). Under high contrast the fill is Highlight, and
+  `Color` is not used.
+- **Busy ring.** Eight dots, four of them lit, turn around the ring. It has no value,
+  so it has no range. With reduced motion it is drawn still: dimmed dots, or solid ones
+  under high contrast. Its name is "Loading…" unless `Label` gives another. Its sizes
+  (`RingSmall`, `RingMedium`, `RingLarge`) are fixed in pixels, as icon sizes are, so
+  they do not grow with the Text size; an app that needs a larger ring passes a larger
+  size.
+- **Badge.** A count of zero draws nothing, so a badge can stay in place while its
+  count is empty. `Variant` sets the color: `BadgeNeutral`, `BadgeAccent`,
+  `BadgeSuccess`, `BadgeWarning` or `BadgeDanger`. Under high contrast a badge is
+  outlined, and its text carries the meaning. A badge's text is dark on the bright
+  Success and Warning fills, and light on the others, in both themes. Every variant's
+  text is 4.5:1 or more against its fill in both themes, and under both high contrast
+  schemes. `Dot()` puts a dot in front of a text badge, as a status chip has one; the dot
+  is hidden from assistive technology.
+- **Badge on an element.** `Badged` adds the badge to the end of the element and adds
+  its text to the element's accessible name, as in "Projects, 6 items". The badge is
+  then hidden from assistive technology, so the element is read once, with its count.
+  A badge that stands alone is a group named by its text, such as "3 unread".
+- **Toasts.** `ctx.Toast` shows a notification in the window's `Toaster`. It takes a
+  variant: `ToastInfo`, `ToastSuccess`, `ToastWarning` or `ToastError`, each with its
+  icon. The toast can add an `Action` button (running it dismisses the toast), set its
+  own time with `Duration`, stay until dismissed with `Sticky`, or go with `Dismiss`.
+  By default an info toast stays 5 seconds, a success toast 4, a warning toast 8, and an
+  error toast until it is dismissed. Its time does not run while the pointer is over it
+  or keyboard focus is in it. The stack shows 3 toasts at most (`Toaster().Max(n)`).
+  When a new toast would pass the limit, the oldest toast that is neither hovered nor
+  holding keyboard focus goes. A toast a user is reading or using is kept, and if every
+  toast is in use the stack grows for the time being. The stack sits in the window's
+  bottom-right corner over the content, so put the `Toaster` last in the root element.
+  Its enter and exit motion jumps to its end under reduced motion.
+- **Toasts and focus.** A toast does not take focus. F6 moves focus into the toast
+  region, named "Notifications", and F6 again returns it to the element that had it,
+  as Windows moves between the regions of a window
+  ([Keyboard accessibility](https://learn.microsoft.com/en-us/windows/apps/design/accessibility/keyboard-accessibility)).
+  Shift+F6 does the same. Tab reaches the actions and close buttons of the toasts.
+  Escape on a toast dismisses it, and focus moves to the next toast or back to the
+  element it had. Escape in the region returns focus. F6 toggling is what the framework
+  does for now: full cycling through several regions (the sidebar, the header, the
+  content, the toasts), as Microsoft's guidance describes, is future work.
+- **Toast announcements.** Each toast is announced through `Announce`: politely for
+  info and success, and assertively for warning and error, as the existing
+  announcements are. Its group is named by its text.
+
 ### Rich text
 
 `ui.Rich` joins segments into one text element. It wraps, truncates and
@@ -1247,6 +1320,11 @@ The controls, with no app code, once their roles and states are set:
 - A scroll container reports its position and its visible part, and can be
   scrolled and scrolled to a percent. A row or control inside one can be
   scrolled into view.
+- A `ProgressBar` is a progress bar whose range is read-only: assistive technology
+  reads its value and cannot set it. An indeterminate bar and a `ProgressRing` are
+  progress bars with no range. The Toaster's region is a group named "Notifications",
+  and each toast is a group named by its text. A badge attached to an element is
+  part of that element's name (see Feedback above).
 
 The API, on the elements that already exist:
 
@@ -1267,6 +1345,9 @@ ui.Image(avatar).Alt("Account avatar")
 ui.Announce("Saved", access.Polite) // spoken as a notification; Assertive interrupts
 ui.CheckboxTri("All", all)            // a check box in the mixed state is set by its CheckState
 ui.Slider(v, 0, 100, 5).Label("Volume") // a slider: RangeValue, with the Range of the value
+ui.ProgressBar(0.45).Label("Upload")    // a progress bar: read-only RangeValue
+ui.ProgressRing().Label("Sending reply") // a busy indicator: no range, named "Loading…" by default
+ui.Div().Label("Projects").Badged(ui.Badge(6).Noun("items")) // named "Projects, 6 items"
 ```
 
 `Expanded` and `Selected` declare the state; the element's click handler makes
@@ -1447,7 +1528,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\a11y-check.ps1
 ```
 
 The script builds both examples into a temporary folder and starts them. The
-notes app runs with a temporary notes file, never your own. It runs 32 checks:
+notes app runs with a temporary notes file, never your own. It runs 42 checks:
 names and roles, Invoke, Toggle, ExpandCollapse, Selection, Value, Scroll,
 focus with its event, and the Text pattern on the word "small". The demo's form
 controls are checked too: a check box's Toggle, including its indeterminate
@@ -1753,6 +1834,17 @@ On the Projects page:
   normal and disabled states, with a readout of its value, and a notification
   preferences form that uses several of them together. Its "All alerts" check box
   is the parent of the three alerts, and is mixed when only some are on.
+- The Components page's **Feedback** section shows progress bars (determinate, with
+  a range, and indeterminate), busy rings in three sizes, a toast button for each
+  variant, a toast with an Undo action, and the badges. Its toasts appear bottom-right.
+- Creating a project shows a "Project created" toast with an Undo action, which
+  removes the project. The bell in the header counts the unread notifications; it
+  lists the recent ones, and "Mark all read" clears the count. Every toast the app
+  shows is also in the list.
+- The sidebar's Projects item shows the project count as a badge. The project cards
+  and the project window show each project's progress as a progress bar, and each
+  status as a badge. A teammate's reply in a project's comments shows a "typing"
+  busy ring until it arrives.
 
 ![The Form controls section of the Components page](docs/screenshots/form-controls.png)
 

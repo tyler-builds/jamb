@@ -72,6 +72,11 @@ type Store struct {
 	// Notice is the status message that the Activity page announces, with a
 	// sequence number so that each one is announced once (see announceQuiet).
 	Notice *ui.Signal[notice]
+	// Inbox holds the notifications the bell lists, newest first. Each toast
+	// made by the app is also put here (see notify).
+	Inbox *ui.Signal[[]inboxItem]
+	// Typing is the project whose teammate is typing a reply, 0 for none.
+	Typing *ui.Signal[int]
 	quiet  *time.Timer // the pending announceQuiet, UI thread only
 	quietN int         // the sequence number of the last announceQuiet
 	// Threads holds each project's comments, by project ID.
@@ -134,6 +139,8 @@ func NewStore() *Store {
 		EventQuery:   ui.NewSignal(""),
 		Expanded:     ui.NewSignal(map[int]bool{}),
 		Notice:       ui.NewSignal(notice{}),
+		Inbox:        ui.NewSignal([]inboxItem(nil)),
+		Typing:       ui.NewSignal(0),
 		Windows:      ui.NewSignal(map[int]bool{}),
 		Search:       ui.NewFocusHandle(),
 		NewOpen:      ui.NewSignal(false),
@@ -172,8 +179,9 @@ func (s *Store) CloseNewProject() { s.NewOpen.Set(false) }
 
 // CreateProject adds a project with the name and description given, puts it at
 // the top of the list and selects it, and shows the Projects page with every
-// project listed. An empty description gets defaultDescription.
-func (s *Store) CreateProject(name, desc string) {
+// project listed. An empty description gets defaultDescription. It returns the
+// new project's ID.
+func (s *Store) CreateProject(name, desc string) int {
 	if desc == "" {
 		desc = defaultDescription
 	}
@@ -191,6 +199,18 @@ func (s *Store) CreateProject(name, desc string) {
 	s.Selected.Set(id)
 	s.Filter.Set(-1)
 	s.Page.Set(PageProjects)
+	return id
+}
+
+// DeleteProject removes a project that has no thread yet. It is the undo of
+// CreateProject, so it clears the selection when the project was selected.
+func (s *Store) DeleteProject(id int) {
+	s.Projects.Update(func(ps []Project) []Project {
+		return slices.DeleteFunc(slices.Clone(ps), func(p Project) bool { return p.ID == id })
+	})
+	if s.Selected.Peek() == id {
+		s.Selected.Set(0)
+	}
 }
 
 // ToggleStar flips a project's star.

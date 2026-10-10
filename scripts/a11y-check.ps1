@@ -82,6 +82,30 @@ public static class FocusCounter
 }
 '@
 
+# A Notification event is raised for each announcement (Announce). The event's
+# arguments do not carry the text, so the check counts the events and reads the
+# text from the toast that the announcement belongs to.
+Add-Type -ReferencedAssemblies UIAutomationClient, UIAutomationTypes -TypeDefinition @'
+using System.Threading;
+using System.Windows.Automation;
+
+public static class NotificationCounter
+{
+    public static int Count;
+
+    public static void Handler(object sender, AutomationEventArgs e)
+    {
+        Interlocked.Increment(ref Count);
+    }
+
+    public static void Start(AutomationElement window)
+    {
+        Automation.AddAutomationEventHandler(AutomationElement.NotificationEvent, window, TreeScope.Subtree,
+            new AutomationEventHandler(Handler));
+    }
+}
+'@
+
 # Brings a window to the foreground, so that keys sent with SendKeys reach it.
 Add-Type -TypeDefinition @'
 using System;
@@ -119,6 +143,7 @@ $CT = @{
     Group    = [System.Windows.Automation.ControlType]::Group
     RadioButton = [System.Windows.Automation.ControlType]::RadioButton
     Slider   = [System.Windows.Automation.ControlType]::Slider
+    ProgressBar = [System.Windows.Automation.ControlType]::ProgressBar
     Spinner  = [System.Windows.Automation.ControlType]::Spinner
     Text     = [System.Windows.Automation.ControlType]::Text
     Tab      = [System.Windows.Automation.ControlType]::Tab
@@ -300,7 +325,7 @@ try {
         foreach ($n in 'Dashboard', 'Settings', 'Components', 'Activity', 'New Project', 'Notifications') {
             Assert (@(Find-Named $win $n $CT.Button).Count -eq 1) "'$n' is not one button"
         }
-        Assert (@(Find-Named $win 'Projects 6' $CT.Button).Count -eq 1) "'Projects 6' is not one button"
+        Assert (@(Find-Named $win 'Projects, 6 items' $CT.Button).Count -eq 1) "'Projects, 6 items' is not one button"
     }
 
     Check 'demo: Invoke opens the Activity page' {
@@ -309,7 +334,7 @@ try {
     }
 
     Check 'demo: a star toggles with Toggle, and has no Invoke pattern' {
-        Invoke-Named $win 'Projects 6' $CT.Button
+        Invoke-Named $win 'Projects, 6 items' $CT.Button
         Wait-For { $null -ne (Find-Named $win 'Star project' $CT.Button | Select-Object -First 1) } 'the project list' | Out-Null
         $star = Find-Named $win 'Star project' $CT.Button | Where-Object { -not $_.Current.IsOffscreen } | Select-Object -First 1
         Assert ($null -ne $star) 'no star on screen'
@@ -337,7 +362,7 @@ try {
     }
 
     Check 'demo: the Done filter is selected in its group' {
-        Invoke-Named $win 'Projects 6' $CT.Button
+        Invoke-Named $win 'Projects, 6 items' $CT.Button
         Wait-For { $null -ne (Find-Named $win 'Status filter' | Select-Object -First 1) } 'the filter group' | Out-Null
         $done = Find-One $win 'Done' $CT.Button
         $item = Require-Pattern $done ([System.Windows.Automation.SelectionItemPattern]::Pattern) 'SelectionItem'
@@ -394,7 +419,7 @@ try {
     }
 
     Check 'demo: Shift+F10 on a project card opens its menu, and Down moves the focus through the items' {
-        Invoke-Named $win 'Projects 6' $CT.Button
+        Invoke-Named $win 'Projects, 6 items' $CT.Button
         Wait-For { $null -ne (Find-Named $win 'Star project' $CT.Button | Select-Object -First 1) } 'the project list' | Out-Null
         $card = Wait-For {
             $all = $win.FindAll($Descendants, [System.Windows.Automation.Condition]::TrueCondition)
@@ -628,6 +653,120 @@ try {
             Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
             "$errors errors"
         }
+    }
+
+    # ---- Demo: feedback (progress, busy rings, toasts, badges) ---------------
+    # The Feedback section is the last section of the Components page. Each
+    # check scrolls the Info button into view, which is in the section.
+    [NotificationCounter]::Start($win)
+    Invoke-Named $win 'Components' $CT.Button
+    Wait-For { $null -ne (Find-Named $win 'Info toast' $CT.Button | Select-Object -First 1) } 'the Feedback section' | Out-Null
+    $infoItem = Require-Pattern (Find-One $win 'Info toast' $CT.Button) ([System.Windows.Automation.ScrollItemPatternIdentifiers]::Pattern) 'ScrollItem'
+    $infoItem.ScrollIntoView()
+    $focusIs = {
+        param([string]$Name, $Type)
+        $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+        $null -ne $f -and $f.Current.Name -eq $Name -and $f.Current.ControlType -eq $Type
+    }
+
+    Check 'demo: a determinate progress bar is a ProgressBar with a read-only RangeValue' {
+        $bar = Find-One $win 'Determinate progress' $CT.ProgressBar
+        $rv = Require-Pattern $bar ([System.Windows.Automation.RangeValuePatternIdentifiers]::Pattern) 'RangeValue'
+        Assert ([Math]::Abs($rv.Current.Value - 0.6) -lt 0.001) "the value is $($rv.Current.Value), want 0.6"
+        Assert ($rv.Current.Minimum -eq 0 -and $rv.Current.Maximum -eq 1) "the range is $($rv.Current.Minimum) to $($rv.Current.Maximum)"
+        Assert $rv.Current.IsReadOnly 'the progress bar is not read-only'
+    }
+
+    Check 'demo: an indeterminate bar and a busy ring are ProgressBars with no RangeValue' {
+        foreach ($n in 'Searching', 'Small busy indicator') {
+            $el = Find-One $win $n $CT.ProgressBar
+            Assert ($null -eq (Get-Pattern $el ([System.Windows.Automation.RangeValuePatternIdentifiers]::Pattern))) "'$n' has a RangeValue; it must not"
+        }
+    }
+
+    Check 'demo: a toast is a group named by its text, and its announcement raises a Notification event' {
+        $before = [NotificationCounter]::Count
+        Invoke-Named $win 'Info toast' $CT.Button
+        Wait-For { $null -ne (Find-Named $win 'Sync started' $CT.Group | Select-Object -First 1) } 'the toast' | Out-Null
+        Wait-For { if ([NotificationCounter]::Count -gt $before) { $true } else { $null } } 'a Notification event' | Out-Null
+        Find-One $win 'Notifications' $CT.Group | Out-Null
+    }
+
+    Check 'demo: a toast action runs from its button, and the toast leaves' {
+        Invoke-Named $win 'Increment' $CT.Button
+        Wait-For { $null -ne (Find-Named $win 'Count is 1' $CT.Group | Select-Object -First 1) } 'the Count toast' | Out-Null
+        Invoke-Named $win 'Undo' $CT.Button
+        Wait-Gone { Find-Named $win 'Count is 1' $CT.Group | Select-Object -First 1 } 'the Count toast to leave' | Out-Null
+        Find-One $win 'Toast with Undo: count 0' | Out-Null
+    }
+
+    Check 'demo: F6 moves the focus into the notifications and back, and Escape on a toast dismisses it' {
+        # A sticky error toast stays up, so that the Escape check has one to close.
+        Invoke-Named $win 'Error toast' $CT.Button
+        Wait-For { $null -ne (Find-Named $win 'Upload failed. It stays until you dismiss it.' $CT.Group | Select-Object -First 1) } 'the error toast' | Out-Null
+        $inc = Find-One $win 'Increment' $CT.Button
+        $inc.SetFocus()
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        Start-Sleep -Milliseconds 300
+        [System.Windows.Forms.SendKeys]::SendWait('{F6}')
+        Wait-For { & $focusIs 'Notifications' $CT.Group } 'F6 to move the focus to the notifications' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{F6}')
+        Wait-For { & $focusIs 'Increment' $CT.Button } 'F6 again to return the focus' | Out-Null
+
+        [System.Windows.Forms.SendKeys]::SendWait('{F6}')
+        Wait-For { & $focusIs 'Notifications' $CT.Group } 'F6 to enter the notifications again' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+        Wait-For { & $focusIs 'Dismiss notification' $CT.Button } 'Tab to reach the first toast' | Out-Null
+        $before = @(Find-Named $win 'Dismiss notification' $CT.Button).Count
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-For { (@(Find-Named $win 'Dismiss notification' $CT.Button).Count) -eq ($before - 1) } 'Escape to dismiss the toast' | Out-Null
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Feedback section with a toast visible' {
+            Invoke-Named $win 'Warning toast' $CT.Button
+            Wait-For { $null -ne (Find-Named $win 'Disk nearly full' $CT.Group | Select-Object -First 1) } 'the warning toast' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-feedback'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+
+        Check 'demo: AxeWindowsCLI scan of the notifications list open from the bell' {
+            $bellCond = New-Object System.Windows.Automation.PropertyCondition -ArgumentList ([System.Windows.Automation.AutomationElement]::ControlTypeProperty), $CT.Button
+            $bell = @($win.FindAll($Descendants, $bellCond) | Where-Object { $_.Current.Name -match '^Notifications(, \d+ unread)?$' })[0]
+            (Require-Pattern $bell ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke').Invoke()
+            Wait-For { $null -ne (Find-Named $win 'Mark all read' $CT.Button | Select-Object -First 1) } 'the notifications list' | Out-Null
+            try {
+                $errors = Invoke-AxeScan $demo 'demo-notifications'
+            } finally {
+                (Require-Pattern $bell ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke').Invoke()
+            }
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+
+        Check 'demo: AxeWindowsCLI scan of the Projects page, with its progress bars and badges' {
+            Invoke-Named $win 'Projects, 6 items' $CT.Button
+            Wait-For { $null -ne (Find-Named $win 'Project Alpha progress' $CT.ProgressBar | Select-Object -First 1) } 'the Projects page' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-projects'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+
+        Check 'demo: AxeWindowsCLI scan of the Dashboard page' {
+            Invoke-Named $win 'Dashboard' $CT.Button
+            Wait-For { $null -ne (Find-Named $win '+18%' | Select-Object -First 1) } 'the Dashboard page' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-dashboard'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+    }
+
+    Check 'demo: the bell names its unread count, and its badge is not a separate element' {
+        $bellCond = New-Object System.Windows.Automation.PropertyCondition -ArgumentList ([System.Windows.Automation.AutomationElement]::ControlTypeProperty), $CT.Button
+        $names = @($win.FindAll($Descendants, $bellCond) | ForEach-Object { $_.Current.Name } | Where-Object { $_ -match '^Notifications(, \d+ unread)?$' })
+        Assert ($names.Count -eq 1) "found $($names.Count) bells named Notifications"
+        Assert ($names[0] -match ', \d+ unread$') "the bell is named '$($names[0])'; it must name the unread count"
     }
 
     # ---- Notes ---------------------------------------------------------------

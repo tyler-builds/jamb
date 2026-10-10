@@ -83,7 +83,7 @@ func chart(t *ui.Theme) *ui.DivElement {
 			Child(ui.Div().Gap(2).
 				Child(SectionTitle(t, "Weekly activity")).
 				Child(ui.Text("Commits per day, last two weeks").Size(12).Color(t.TextSubtle))).
-			Child(Badge(t, "+18%", t.Success))).
+			Child(ui.BadgeText("+18%").Variant(ui.BadgeSuccess).Dot())).
 		Child(ui.Animate("weekly-bars", grow, func(p float32) ui.Element {
 			bars := ui.Div().Row().Align(ui.End).Gap(8).Height(ui.Px(150))
 			for i, v := range weekly {

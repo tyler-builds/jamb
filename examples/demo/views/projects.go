@@ -77,13 +77,12 @@ func filters(t *ui.Theme, s *Store) ui.Element {
 // its name and description, and open marks a project that has a window of its
 // own.
 func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Element {
-	status := StatusColor(t, p.Status)
 	q := s.Query.Peek()
 	titles := ui.Div().Row().Align(ui.Center).Gap(10).
 		Child(ui.Text(p.Name).Size(15).Semibold().Truncate().HighlightMatches(q, matchHighlight(t))).
-		Child(Badge(t, p.Status.String(), status))
+		Child(statusBadge(p.Status))
 	if open {
-		titles.Child(Badge(t, "Open in window", t.Accent))
+		titles.Child(ui.BadgeText("Open in window").Variant(ui.BadgeAccent).Dot())
 	}
 	star := ui.Div().Size(ui.Px(30), ui.Px(30)).Radius(7).Center().
 		TextColor(t.TextSubtle).Transition(fast).
@@ -122,8 +121,7 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 			Child(titles).
 			Child(ui.Text(p.Description).Size(13).Color(t.TextMuted).Truncate().HighlightMatches(q, matchHighlight(t))).
 			Child(ui.Div().Row().Align(ui.Center).Gap(12).MarginTop(4).
-				Child(ProgressBar(t, p.Progress, p.Color).MaxWidth(ui.Px(280))).
-				Child(ui.Textf("%.0f%%", p.Progress*100).Size(12).Medium().Color(t.TextMuted)).
+				Child(ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").Width(336)).
 				Child(ui.Div().Row().Align(ui.Center).Gap(5).TextColor(t.TextSubtle).
 					Child(ui.Icon(icons.Check).Size(13)).
 					Child(ui.Textf("%d open tasks", p.Tasks).Size(12))))).

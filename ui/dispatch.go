@@ -590,6 +590,9 @@ func (rt *Runtime) keyDown(k input.Key, mods input.Modifiers, repeat bool) {
 		// F10 by itself activates the menu bar, as Windows does for a lone Alt
 		// tap. A window without a menu bar does nothing.
 		rt.activateMenuBar()
+	case !repeat && k == input.KeyF6 && (mods == 0 || mods == input.ModShift):
+		// F6 moves focus into the toast region and back (see Toaster).
+		rt.toggleToastFocus()
 	case rt.zoomKeys && mods.Has(input.ModCtrl) && k == input.KeyEqual:
 		rt.ZoomIn()
 	case rt.zoomKeys && mods.Has(input.ModCtrl) && k == input.KeyMinus:

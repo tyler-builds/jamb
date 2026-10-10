@@ -3,7 +3,6 @@ package views
 import (
 	"strings"
 
-	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -20,8 +19,8 @@ func newProjectModal(s *Store) ui.Element {
 		create := ui.Button("Create project").Key("project-create").Icon(icons.Plus).
 			Disabled(strings.TrimSpace(s.NewName.Get()) == "").
 			OnClick(func() {
-				s.CreateProject(strings.TrimSpace(s.NewName.Peek()), strings.TrimSpace(s.NewDesc.Peek()))
-				ui.Announce("Project created", access.Polite)
+				id := s.CreateProject(strings.TrimSpace(s.NewName.Peek()), strings.TrimSpace(s.NewDesc.Peek()))
+				notify(ctx, s, ui.ToastSuccess, "Project created").Action("Undo", func() { s.DeleteProject(id) })
 				s.CloseNewProject()
 			})
 		cancel := ui.Button("Cancel").Key("project-cancel").Secondary().OnClick(s.CloseNewProject)

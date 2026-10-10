@@ -111,6 +111,8 @@ func contrastPairs(th *Theme) []contrastPair {
 		contrastPair{name: "Success_text_on_Surface", role: "status text, not used as text by built-ins", fg: th.Success, bg: th.Surface},
 		contrastPair{name: "Warning_text_on_Surface", role: "status text, not used as text by built-ins", fg: th.Warning, bg: th.Surface},
 	)
+	ps = append(ps, badgePairs(th)...)
+	ps = append(ps, progressPairs(th)...)
 	for _, s := range surfaces[:3] {
 		ps = append(ps,
 			// widgets.go: the focus ring is a spread shadow in FocusRing.
@@ -165,4 +167,53 @@ func relLuminance(c Color) float64 {
 		return math.Pow((x+0.055)/1.055, 2.4)
 	}
 	return 0.2126*lin(c.R) + 0.7152*lin(c.G) + 0.0722*lin(c.B)
+}
+
+// badgePairs lists the text and fill of each badge variant (badge.go). Badge
+// text is 11 px, so every pair uses 4.5:1.
+func badgePairs(th *Theme) []contrastPair {
+	var ps []contrastPair
+	for _, v := range []struct {
+		name string
+		v    BadgeVariant
+	}{
+		{"Neutral", BadgeNeutral}, {"Accent", BadgeAccent}, {"Success", BadgeSuccess},
+		{"Warning", BadgeWarning}, {"Danger", BadgeDanger},
+	} {
+		fill, ink := badgeColors(th, v.v)
+		ps = append(ps, contrastPair{name: "Badge_" + v.name, role: "badge text (badge.go badgeColors) on its fill", fg: ink, bg: fill, min: minText})
+	}
+	return ps
+}
+
+// TestBadgeContrastHighContrast checks the badge pairs under the two
+// representative high contrast schemes. A badge is outlined there, so its text
+// is the text color on the surface.
+func TestBadgeContrastHighContrast(t *testing.T) {
+	for _, sc := range []struct {
+		name string
+		c    SystemColors
+	}{{"black", HighContrastBlack()}, {"white", HighContrastWhite()}} {
+		th := HighContrastTheme(sc.c, DarkTheme)
+		for _, p := range append(badgePairs(th), progressPairs(th)...) {
+			r := contrastRatio(p.fg, p.bg)
+			t.Logf("high contrast %s: %s %.2f", sc.name, p.name, r)
+			if r < p.min {
+				t.Errorf("high contrast %s: %s is %.2f, below %.1f", sc.name, p.name, r, p.min)
+			}
+		}
+	}
+}
+
+// progressPairs lists the fill of a determinate progress bar against its track
+// (progress.go). The fill is a graphical object, so it needs 3:1. Under high
+// contrast the fill is Highlight on an outlined Surface track.
+func progressPairs(th *Theme) []contrastPair {
+	track, fill := th.SurfaceActive, th.Accent
+	if th.HighContrast {
+		track = th.Surface
+	}
+	return []contrastPair{
+		{name: "ProgressFill_on_Track", role: "determinate bar fill (Accent) on its track (SurfaceActive)", fg: fill, bg: track, min: minNonText},
+	}
 }

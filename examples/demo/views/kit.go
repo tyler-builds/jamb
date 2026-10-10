@@ -29,12 +29,20 @@ func settingLabel(title string) string { return "setting:" + title }
 // fieldLabel is the key of a form field's label above it.
 func fieldLabel(label string) string { return "field:" + label }
 
-// Badge is a small pill with a dot and a label.
-func Badge(t *ui.Theme, label string, c ui.Color) ui.Element {
-	return ui.Div().Row().Align(ui.Center).Gap(6).PaddingX(8).Height(ui.Px(22)).Radius(11).
-		Background(tintOf(t, c, 0.14)).Shrink(0).
-		Child(ui.Div().Size(ui.Px(6), ui.Px(6)).Radius(3).Background(c)).
-		Child(ui.Text(label).Size(12).Medium().Color(c).NoWrap())
+// statusBadge is the badge that names a project's status.
+func statusBadge(s Status) *ui.BadgeElement {
+	return ui.BadgeText(s.String()).Variant(statusVariant(s)).Dot()
+}
+
+// statusVariant maps a project status to a badge variant.
+func statusVariant(s Status) ui.BadgeVariant {
+	switch s {
+	case StatusPaused:
+		return ui.BadgeWarning
+	case StatusDone:
+		return ui.BadgeSuccess
+	}
+	return ui.BadgeAccent
 }
 
 // StatusColor maps a project status to a theme color.
@@ -46,18 +54,6 @@ func StatusColor(t *ui.Theme, s Status) ui.Color {
 		return t.Success
 	}
 	return t.Accent.Lighten(0.25)
-}
-
-// ProgressBar draws a thin track with a filled portion.
-func ProgressBar(t *ui.Theme, v float32, c ui.Color) *ui.DivElement {
-	if t.HighContrast {
-		// The track is an outlined empty box and the fill is solid Highlight, so the
-		// empty part does not read as filled.
-		return ui.Div().Height(ui.Px(8)).Radius(3).Background(t.Surface).Border(1, t.Text).Grow(1).ClipContent().
-			Child(ui.Div().Height(ui.Full).Width(ui.Percent(v * 100)).Background(t.Accent))
-	}
-	return ui.Div().Height(ui.Px(6)).Radius(3).Background(t.SurfaceActive).Grow(1).ClipContent().
-		Child(ui.Div().Height(ui.Full).Width(ui.Percent(v * 100)).Radius(3).Background(c))
 }
 
 // IconTile is a rounded square with a tinted icon.
@@ -101,4 +97,15 @@ func starIcon(t *ui.Theme, on bool) *icons.Icon {
 		return icons.StarFilled
 	}
 	return icons.Star
+}
+
+// progressColor is a project's color as the fill of its progress bar. The
+// palette is light, and in the light theme its fills fall below 3:1 against the
+// track, so they are darkened there by 0.35, which clears 3:1 for every color in
+// the palette (see ui.ProgressBar.Color, where the contrast is the app's).
+func progressColor(t *ui.Theme, c ui.Color) ui.Color {
+	if t.Dark || t.HighContrast {
+		return c
+	}
+	return c.Darken(0.35)
 }

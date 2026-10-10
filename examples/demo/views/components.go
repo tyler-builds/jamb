@@ -50,7 +50,8 @@ func Components(s *Store) ui.Element {
 					sample(t, "Stops 0.3 to 0.7", gradientBox(ui.LinearGradient(90, gradFrom, gradTo).Stops(0.3, 0.7))))).
 				Child(clipSection(t)).
 				Child(motionSection(t)).
-				Child(focusSection(t)))
+				Child(focusSection(t)).
+				Child(feedbackSection(ctx, t, s)))
 	})
 }
 

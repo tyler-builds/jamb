@@ -21,6 +21,7 @@ import (
 type accessInfo struct {
 	role        access.Role
 	name        string // an explicit label; wins over the text the element contains
+	badge       string // the name of an attached badge, added to the name (see Badged)
 	description string
 	hidden      bool
 	disabled    bool
@@ -761,6 +762,19 @@ func absorbsText(r access.Role) bool {
 // then the text the element contains (for a control whose name is its text),
 // then its tooltip.
 func (b *accessBuilder) name(n *node, absorbs bool) string {
+	s := b.ownName(n, absorbs)
+	if n.div.acc == nil || n.div.acc.badge == "" {
+		return s
+	}
+	// An attached badge adds to the name, as in "Projects, 6 items".
+	if s == "" {
+		return n.div.acc.badge
+	}
+	return s + ", " + n.div.acc.badge
+}
+
+// ownName is the name of an exposed div before any attached badge is added.
+func (b *accessBuilder) ownName(n *node, absorbs bool) string {
 	if n.div.acc != nil && n.div.acc.name != "" {
 		return n.div.acc.name
 	}

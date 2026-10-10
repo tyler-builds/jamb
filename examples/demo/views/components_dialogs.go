@@ -6,7 +6,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -66,7 +65,7 @@ func dialogsSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 			Child(ui.Button("Copy text").Secondary().OnClick(func() {
 				ctx.SetClipboard("Copied from the Components page")
 				result.Set("Copied the sample text to the clipboard.")
-				ui.Announce("Copied to the clipboard", access.Polite)
+				notify(ctx, s, ui.ToastSuccess, "Copied to the clipboard")
 			})).
 			Child(ui.Button("Paste").Secondary().OnClick(func() {
 				text, ok := ctx.Clipboard()

@@ -115,9 +115,11 @@ func Comments(s *Store, id int, h *ui.ListHandle) ui.Element {
 			s.Comment(id, me, text)
 			h.ScrollToEnd()
 			reply := replies[s.nextMsg%len(replies)]
+			s.Typing.Set(id) // the teammate is typing until the reply lands
 			go func() {
 				time.Sleep(replyDelay)
 				ctx.Post(func() {
+					s.Typing.Set(0)
 					s.Comment(id, teammate, reply)
 				})
 			}()
@@ -135,14 +137,20 @@ func Comments(s *Store, id int, h *ui.ListHandle) ui.Element {
 					OnClick(h.ScrollToEnd)))
 		}
 
-		return ui.Div().Grow(1).MinHeight(ui.Px(0)).Gap(10).
+		column := ui.Div().Grow(1).MinHeight(ui.Px(0)).Gap(10).
 			Child(ui.Div().Row().Align(ui.Center).Gap(8).
 				Child(ui.Icon(icons.Inbox).Size(15).Color(t.TextMuted)).
 				Child(SectionTitle(t, "Comments")).
 				Child(ui.Text(fmt.Sprintf("%d", len(thread))).Size(12).Color(t.TextSubtle))).
-			Child(Card(t).Padding(12).Grow(1).MinHeight(ui.Px(0)).Gap(0).Child(body)).
-			Child(ui.TextInput(draft).Label("Comment").Placeholder("Write a comment and press Enter").
-				OnSubmit(send).Key("composer"))
+			Child(Card(t).Padding(12).Grow(1).MinHeight(ui.Px(0)).Gap(0).Child(body))
+		if s.Typing.Get() == id {
+			// A busy ring, not a counter: the reply has no known time.
+			column.Child(ui.Div().Row().Align(ui.Center).Gap(8).
+				Child(ui.ProgressRing().Size(ui.RingSmall).Label(teammate + " is typing")).
+				Child(ui.Text(teammate + " is typing…").Size(12).Color(t.TextMuted)))
+		}
+		return column.Child(ui.TextInput(draft).Label("Comment").Placeholder("Write a comment and press Enter").
+			OnSubmit(send).Key("composer"))
 	})
 }
 

@@ -29,6 +29,7 @@ const (
 	ctMenu        = 50009
 	ctMenuBar     = 50010
 	ctMenuItem    = 50011
+	ctProgressBar = 50012
 	ctRadioButton = 50013
 	ctSlider      = 50015
 	ctSpinner     = 50016
@@ -218,6 +219,7 @@ const (
 //	tab list, tab             Tab, TabItem      tab list, tab
 //	tree                      Tree              tree
 //	tree item                 TreeItem          tree item
+//	progress bar, busy ring   ProgressBar      progress bar (read-only RangeValue when determinate)
 //	unknown                   Pane              unknown
 //
 // A text area is an Edit, not a Document: a Document is for read-only rich
@@ -273,6 +275,8 @@ func controlType(r access.Role) int32 {
 		return ctTree
 	case access.RoleTreeItem:
 		return ctTreeItem
+	case access.RoleProgressBar:
+		return ctProgressBar
 	}
 	return ctPane
 }

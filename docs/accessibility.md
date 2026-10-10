@@ -1507,3 +1507,153 @@ decisions, and are marked as such.
   `UiaCoreApi.UiaGetPropertyValue`, found by reflection. A Windows or .NET update could
   change it. The Go adapter tests check the values independently.
 - **Tab panel state** is not kept across tab changes (see above).
+
+## Phase H: what changed from this design
+
+Phase H adds the feedback widgets: a progress bar, a busy indicator, toasts and
+badges. It also fixes two list bugs that the tree work exposed. The decisions and
+their sources are below. Where a source states a convention, the entry cites it; the
+others are design decisions and are marked as such.
+
+- **Progress bar roles (sourced).** `access.RoleProgressBar` is appended to the role
+  enum, so the existing values do not change. It maps to the ProgressBar control type
+  (50012). A determinate bar's range is read-only. Microsoft's ProgressBar control type
+  page says a progress bar that takes a numeric range must implement the RangeValue
+  pattern, that its `IsReadOnly` is TRUE, and that SmallChange and LargeChange are not
+  required because progress bars are read-only
+  ([ProgressBar control type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportprogressbarcontroltype)).
+  The range has no setter, so the bar offers no SetValue action.
+- **Indeterminate bars and busy rings (sourced, then decided).** Microsoft's progress
+  guidance defines a determinate state, which shows a percentage, and an indeterminate
+  state, which shows that work is under way with no known end. It says a progress
+  control is read only and not interactive
+  ([Guidelines for progress controls](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/progress-controls)).
+  An indeterminate bar therefore exposes no range, since there is no value to read. The
+  busy ring is the ProgressRing of that guidance. It is exposed as a ProgressBar with no
+  range, which is a design choice. The Microsoft pages reviewed here do not say what a
+  WinUI ProgressRing exposes, so that mapping is not verified against Windows' own
+  control.
+- **Name of the busy indicator (decided).** The API is `ProgressRing`, not `Spinner`,
+  because `RoleSpinner` is the number field's spin box (see Phase C). A second meaning
+  of "spinner" would be ambiguous. The ring is named "Loading…" unless `Label` gives
+  another name.
+- **Reduced motion (decided).** With reduced motion on, an indeterminate bar is drawn
+  in the middle of its track, and a busy ring is drawn with all its dots still. Neither
+  asks for frames.
+- **Badges (decided).** A count of zero draws nothing. A badge is a pill with its text,
+  and under high contrast it is outlined, so the variant is also told by its text. A
+  badge attached to an element with `Badged` adds its text to the element's name, as in
+  "Projects, 6 items". The attached badge is hidden from the access tree, so the element
+  is read once, with its count. The naming rule is a design decision; no Microsoft page
+  was consulted for it. A standalone badge is a group named by its text.
+- **Toast keyboard access (sourced).** Microsoft's keyboard guidance says F6 is
+  commonly used to move focus between application panes, that Shift+F6 traverses the
+  same cycle in reverse, and that "you must implement F6 navigation explicitly in your
+  app; it is not provided automatically". Each region should have a name
+  ([Keyboard accessibility](https://learn.microsoft.com/en-us/windows/apps/design/accessibility/keyboard-accessibility)).
+  The Toaster's region is a focusable group named "Notifications". F6 and Shift+F6
+  toggle focus between the region and the element that had it. Tab reaches the actions
+  and close buttons inside the toasts. Escape on a focused toast dismisses it, and focus
+  moves to the next toast or back to the saved element. Escape in the region returns
+  focus.
+- **Toasts do not steal focus (sourced in part).** Focus stays where it was when a
+  toast appears. The keyboard guidance above asks that focus not move unexpectedly. The
+  InfoBar guidance is the natural source for in-app notifications, but the page was not
+  retrieved in this phase (the URL tried returned 404), so the rule is also a design
+  decision.
+- **Announcement politeness (existing mapping).** Each toast is announced through
+  `ui.Announce` with the mapping the framework already has: polite for info and success,
+  assertive for warning and error. The adapter raises a UIA Notification event for each
+  announcement. The event's arguments do not carry the text, so the live check counts the
+  events and reads the toast's text from its group.
+- **Auto-dismiss (decided).** Info toasts stay 5 seconds, success 4, warning 8, and an
+  error stays until it is dismissed. The time does not run while the pointer is over the
+  toast or keyboard focus is in it. Each of these can be changed (`Duration`, `Sticky`).
+  The pause follows the usual reading of WCAG 2.2.1 (Timing Adjustable); that
+  criterion's text was not retrieved in this phase.
+- **Maximum stack (decided).** Three toasts show at most. When a new toast would pass
+  the limit, the oldest toast that is neither hovered nor holding keyboard focus goes. A
+  toast a user is reading or using is kept, and if every toast is in use the stack grows
+  for the time being. `Toaster().Max(n)` changes the limit.
+- **Badge contrast (measured).** The text of each badge variant is measured against its
+  fill, in the pairs `badgePairs` in `ui/contrast_test.go`. The test enforces 4.5:1 for
+  dark and light, and `TestBadgeContrastHighContrast` checks both high contrast schemes.
+  The results are in the table below. No token failed, so none changed.
+
+  | Variant | Dark | Light | High contrast (black, white) |
+  |---|---|---|---|
+  | Neutral (Text on SurfaceActive) | 13.55 | 13.96 | 21.00, 21.00 |
+  | Accent (AccentText on Accent) | 4.56 | 6.29 | 21.00, 21.00 |
+  | Success (dark text on Success) | 8.58 | 5.38 | 21.00, 21.00 |
+  | Warning (dark text on Warning) | 9.10 | 5.56 | 21.00, 21.00 |
+  | Danger (AccentText on Danger) | 5.01 | 5.15 | 21.00, 21.00 |
+
+  The dark Accent badge is the closest to the target at 4.56:1. A high contrast badge is
+  outlined in the text color on Surface.
+- **Progress fill contrast (measured).** A determinate bar's fill (Accent by default)
+  is a graphical object and needs 3:1 against its track (SurfaceActive; Surface under
+  high contrast). `progressPairs` checks it: dark 3.27, light 4.96, high contrast black
+  14.37 and white 8.59. An app `Color` is the app's responsibility, as the README says.
+  The demo's project colors are a light palette, which falls below 3:1 on the light
+  track (1.3 to 2.4). The demo darkens them by 0.35 in the light theme only; every
+  palette color then clears 3:1 (darkening only raises the ratio against a light track).
+- **List fixes found while testing.** A UniformList or ListOf returned directly from a
+  component under a parent panicked when its row count changed. The list rebuilt its own
+  instance, and the component that owned the list kept the replaced node, so the next
+  rebuild could not find its slot. The owner now follows the node. Separately, a ListOf
+  that fits its viewport scrolled to its end when it grew, which hid its first rows: a
+  list follows its end only when it overflows or is a Bottom list. Regression tests are
+  in `ui/list_test.go`.
+
+### Phase H: verification
+
+- Unit tests in `ui/feedback_test.go` (13 tests): the determinate range and its
+  read-only state, the readout and clamping, the indeterminate bar with no range, the
+  ring's name and bounds, reduced motion for both (no frames asked), the high-contrast
+  outline, badge counts and the 99+ cap, a count of zero drawing nothing, the attached
+  badge's name and its hidden node, the dot, and the high-contrast badge.
+- Unit tests in `ui/toast_test.go` (16 tests): announcements by variant (politeness),
+  the region and toasts named, no focus steal, auto-dismiss timing on a controlled clock,
+  pause while hovered and while focused, the sticky error, the max stack, the action that
+  runs and dismisses, the close button, F6 in and out, Escape on a toast and in the
+  region, the frame request while toasts run, and the icons differing by shape.
+- Regression tests in `ui/list_test.go`: `TestListRowCountChangesUnderParent` (four
+  shapes: under a parent, as the root, under If, and under Map) and
+  `TestListOfRowCountChangesUnderParent`. Each changes the count to 100, 0, 40 and back,
+  and the ListOf test also grows a short list from 3 to 100. Both failed before the fix
+  (the first with an index-out-of-range panic in `rerender`, the second with a missing
+  first row) and pass after it.
+- Demo tests in `examples/demo/views/feedback_test.go` (3 tests): Undo removes the new
+  project and clears the selection; the bell's unread count and Mark all read; the
+  inbox's limit. `access_test.go` now expects the Projects item to read "Projects, 6
+  items".
+- `scripts/a11y-check.ps1` runs 42 checks, and all pass in the normal, high contrast and
+  225 percent modes. Eleven are new: the determinate bar's read-only RangeValue; the
+  indeterminate bar and the busy ring with no RangeValue; a toast as a group named by its
+  text with a Notification event; an action run from its button; F6 in and out with focus
+  events; Escape dismissing a toast; the bell's name with the unread count; and four
+  AxeWindowsCLI scans (the Feedback section with a toast visible, the notifications list
+  open from the bell, the Projects page, and the Dashboard page), each with zero errors in
+  the three modes. The Projects item's name in the earlier checks changed to "Projects,
+  6 items".
+- Screenshots in `docs/screenshots`: `feedback.png` (dark), `feedback-light.png`,
+  `feedback-hc.png` (high contrast), `feedback-225.png` (225 percent), `toasts.png` (the
+  stack), `notifications.png` (the bell's list), `projects.png` and `dashboard.png` (the
+  changed pages). They were taken with `JAMB_SCRIPT` `shot`.
+
+### Phase H: open items
+
+- **Narrator and NVDA** passes for the feedback widgets are pending, as for earlier
+  phases, and are for a person to run. In particular, the busy ring's UIA type and the
+  announcement of a toast's text (the Notification event carries no text) need a screen
+  reader to confirm.
+- **The ProgressRing peer** is mapped to the ProgressBar control type by this design. It
+  is not verified against Windows' own control.
+- **The busy ring's size** is fixed in pixels (16, 24 and 40), as icon sizes are, and
+  does not grow with the Text size. Apps that need it larger pass a larger `Size`.
+- **Progress fills** take the theme's accent by default, or an app color through `Color`,
+  whose contrast against the track is the app's responsibility (see above).
+- **Toast removal** no longer drops a focused or hovered toast; the oldest one that is
+  in neither state goes (see Maximum stack).
+- **F6 with more regions** is future work. F6 toggles between the toast region and the
+  content. A window with more regions needs the full cycle that Microsoft describes.

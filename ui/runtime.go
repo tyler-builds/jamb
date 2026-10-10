@@ -249,6 +249,13 @@ type Runtime struct {
 	looping               bool                 // a repeating Animate runs: the next frame must come, but it never ends
 	animInsts             []*componentInstance // Animate instances that were running; re-rendered by the next Frame
 	listStale             bool                 // a UniformList must rebuild its rows before the frame ends
+	toasts                []*toastEntry        // the stack of toasts, oldest first (see Context.Toast)
+	toastNext             uint64               // the ID of the last toast made
+	toastVer              *Signal[int]         // changes when the stack changes; the Toaster renders it
+	toastAt               time.Time            // when the toasts last ran their time
+	toastMax              int                  // how many toasts show at once (0: the default)
+	toastRegion           uint64               // the node ID of the toast region, 0 when none is shown
+	toastReturn           uint64               // the focus before the toast region took it (F6)
 	scrolled              bool
 	wake                  func()
 	warn                  func(string)
@@ -406,6 +413,7 @@ func NewRuntime(root func(ctx *Context) Element, theme *Theme, ts *text.System) 
 		appTheme:   theme,
 		sys:        SystemSettings{TextScale: 100, CaretBlink: defaultCaretBlink, CaretWidth: 1},
 		textFactor: 1,
+		toastVer:   NewSignal(0),
 		caretWidth: defaultCaretWidth,
 		text:       ts,
 		maximized:  NewSignal(false),
@@ -575,7 +583,7 @@ func (rt *Runtime) Stats() FrameStats { return rt.stats }
 
 // NeedsFrame reports whether something changed since the last Frame.
 func (rt *Runtime) NeedsFrame() bool {
-	return rt.looping || !rt.Settled()
+	return rt.looping || !rt.Settled() || len(rt.toasts) > 0 // toasts run their time one frame at a time
 }
 
 // Settled reports whether the UI has come to rest: nothing changed since the
@@ -604,6 +612,7 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 
 	rt.runPosted()
 	rt.expirePending(now)
+	rt.tickToasts(now)
 	if rt.tipCandidate != 0 && rt.tipShown != rt.tipCandidate && rt.tipCandidate != rt.tipDismissed && !now.Before(rt.tipAt) {
 		rt.showTip(rt.tipCandidate)
 	}

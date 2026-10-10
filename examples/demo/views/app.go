@@ -3,7 +3,6 @@ package views
 import (
 	"time"
 
-	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 
@@ -39,7 +38,9 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			// Last, so the modals cover the window: the New Project form and the
 			// form sample of the Components page.
 			Child(newProjectModal(s)).
-			Child(sampleModal(s))
+			Child(sampleModal(s)).
+			// Last of all, so the toasts sit above the modals. One Toaster shows every toast.
+			Child(ui.Toaster().Key("toaster"))
 	}
 }
 
@@ -72,9 +73,7 @@ func Sidebar(s *Store) ui.Element {
 				Child(ui.Icon(ic).Size(17)).
 				Child(ui.Text(label).Medium().Grow(1).NoWrap())
 			if badge > 0 {
-				item.Child(ui.Div().PaddingX(7).MinHeight(ui.Px(20)).Radius(10).Center().
-					Background(t.AccentSoft).
-					Child(ui.Textf("%d", badge).Size(12).Semibold().Color(t.Text)))
+				item.Badged(ui.Badge(badge).Variant(ui.BadgeNeutral).Noun("items"))
 			}
 			if active {
 				item.Child(ui.Div().Absolute().Left(-12).Top(9).Size(ui.Px(3), ui.Px(18)).Radius(2).Background(t.Accent))
@@ -249,8 +248,7 @@ func header(ctx *ui.Context, s *Store, page Page, focused bool) ui.Element {
 				Child(ui.TextInput(s.Query).Label("Search projects").Placeholder("Search projects…").Icon(icons.Search).FocusHandle(s.Search).
 					Style(ui.Style{Width: ui.Px(240 * layoutScale(ctx))}). // wraps to a new line when the header is narrow
 					OnChange(func(string) { s.Page.Set(PageProjects) }))).
-			Child(ui.IconButton(icons.Bell).Label("Notifications").Tooltip("Notifications").
-				OnClick(func() { ui.Announce("No new notifications", access.Polite) })).
+			Child(inboxButton(ctx, s)).
 			Child(ui.Button("New Project").Key("new-project").Icon(icons.Plus).OnClick(s.OpenNewProject)))
 }
 
