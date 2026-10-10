@@ -3,6 +3,7 @@ package views
 import (
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 
@@ -243,6 +244,7 @@ func header(ctx *ui.Context, s *Store, page Page, focused bool) ui.Element {
 				Child(ui.TextInput(s.Query).Label("Search projects").Placeholder("Search projects…").Icon(icons.Search).FocusHandle(s.Search).
 					Style(ui.Style{Width: ui.Px(240), MinWidth: ui.Px(140)}). // shrinks in narrow windows
 					OnChange(func(string) { s.Page.Set(PageProjects) }))).
-			Child(ui.IconButton(icons.Bell).Label("Notifications").Tooltip("Notifications")).
+			Child(ui.IconButton(icons.Bell).Label("Notifications").Tooltip("Notifications").
+				OnClick(func() { ui.Announce("No new notifications", access.Polite) })).
 			Child(ui.Button("New Project").Key("new-project").Icon(icons.Plus).OnClick(s.OpenNewProject)))
 }

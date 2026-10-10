@@ -241,7 +241,7 @@ func TestAccessMenuItemsAndRoles(t *testing.T) {
 	})
 	r.rt.openContextMenu(r.nodeByKey(t, "target"), 20, 20, false)
 	tr := r.tree()
-	accesstest.Find(t, tr, access.RoleMenu, "")
+	accesstest.Find(t, tr, access.RoleMenu, "Actions")
 	accesstest.Check(t, accesstest.Find(t, tr, access.RoleMenuItem, "Open"), access.RoleMenuItem, "Open", 0)
 	accesstest.Check(t, accesstest.Find(t, tr, access.RoleMenuItemCheck, "Pinned"), access.RoleMenuItemCheck, "Pinned", access.StateChecked)
 	accesstest.Check(t, accesstest.Find(t, tr, access.RoleMenuItem, "Locked"), access.RoleMenuItem, "Locked", access.StateDisabled)

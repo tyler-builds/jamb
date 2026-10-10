@@ -163,6 +163,44 @@ func TestPatternsFollowRolesAndStates(t *testing.T) {
 	}
 }
 
+// TestInvokeFollowsTogglesAndDisabledButtons checks that a toggle button has
+// Toggle and not Invoke (Axe.Windows reports both together), and that a disabled
+// button keeps Invoke with no action.
+func TestInvokeFollowsTogglesAndDisabledButtons(t *testing.T) {
+	nodes := []*access.Node{
+		{ID: access.RootID, Role: access.RoleWindow, Children: []access.ID{2, 3, 4}},
+		{ID: 2, Role: access.RoleButton, Parent: access.RootID, States: access.StateToggle | access.StateChecked,
+			Actions: []access.Action{access.ActionClick, access.ActionToggle}},
+		{ID: 3, Role: access.RoleButton, Parent: access.RootID, States: access.StateDisabled},
+		{ID: 4, Role: access.RoleButton, Parent: access.RootID, Actions: []access.Action{access.ActionClick}},
+	}
+	b := access.NewBridge()
+	b.Publish(access.NewTree(0, nodes), access.Update{})
+	want := map[access.ID][]int32{
+		2: {patternToggle},
+		3: {patternInvoke},
+		4: {patternInvoke},
+	}
+	testHwnd++
+	for id := access.ID(2); id <= 4; id++ {
+		v := create(kindNode, id, b, testHwnd, iidRawElementProviderSimple)
+		for _, p := range []int32{patternInvoke, patternToggle} {
+			got, hr := getOut(comMethod(v, 4), v, uintptr(p))
+			wanted := false
+			for _, w := range want[id] {
+				wanted = wanted || w == p
+			}
+			if hr != hrOK || (got != 0) != wanted {
+				t.Errorf("node %d has pattern %d = %v (HRESULT 0x%08X), want %v", id, p, got != 0, uint32(hr), wanted)
+			}
+			if got != 0 {
+				releaseCall(got)
+			}
+		}
+		releaseCall(v)
+	}
+}
+
 func TestTogglePatternTogglesTheNode(t *testing.T) {
 	n := &access.Node{ID: 2, Role: access.RoleSwitch, Parent: access.RootID, States: access.StateToggle | access.StateChecked}
 	b := testTree(0, node(access.RootID, 0, 2), n)

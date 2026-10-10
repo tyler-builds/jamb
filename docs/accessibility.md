@@ -3,8 +3,10 @@
 Status: accepted. Phases A (Foundation), B (Controls) and C (Text) are done, with
 the changes listed under "Phase A: what changed from this design", "Phase B: what
 changed from this design" and "Phase C: what changed from this design". The
-magnifier caret of phase D is done too; the rest of phase D and phase E have not
-started. This document
+magnifier caret of phase D is done too; the rest of phase D has not started.
+Phase E's automated checks are done (see "Phase E: what changed from this
+design"); its manual screen reader pass is pending, and is described in
+[accessibility-testing.md](accessibility-testing.md). This document
 describes how jamb exposes its UI
 to assistive technology (screen readers, magnifiers, voice control) and the
 order in which the work is done.
@@ -236,7 +238,8 @@ in building it, and why.
   menus that hold radio items). Value on text fields and text areas. Scroll on
   scroll containers, and ScrollItem on the rows and controls inside one. Invoke
   is unchanged. A pattern is present on a disabled element, which reports it
-  disabled, as UI Automation expects.
+  disabled, as UI Automation expects. (Phase E changed Invoke for toggles and for
+  disabled buttons: see "Phase E: what changed from this design".)
 - **Expand, select and toggle run on the UI thread.** An expand, collapse or
   select that asks for the state the element already has does nothing. Otherwise
   the element's click handler runs, so an expandable element's handler must
@@ -466,7 +469,9 @@ Narrator and NVDA, are left for Phase E, with Narrator testing.
 - RangeValue is not implemented: no slider exists in the framework yet.
 - The Text pattern for text fields and text areas was Phase C, and is done (see
   below).
-- Screen reader checks (NVDA, Narrator, Accessibility Insights) are Phase E.
+- Screen reader checks: the Accessibility Insights rules are done in Phase E; the
+  NVDA and Narrator passes are pending (see
+  [accessibility-testing.md](accessibility-testing.md)).
 
 ## Phase C: what changed from this design
 
@@ -671,7 +676,8 @@ focus on a button destroyed it (no caret), and focus on the body restored it. A
 magnified screenshot shows jamb's single caret and no second caret.
 
 Phase A and B were re-checked on the notes app: a raw tree walk reached 23
-elements, the Pin note toggle went from Off to On, and Invoke on New note added
+elements, the Pin note toggle went from Off to On (by Invoke, which Phase E removed
+from toggles, so the check now uses Toggle), and Invoke on New note added
 the note's fields.
 
 ### Memory
@@ -744,3 +750,152 @@ frees them when destroyed.
   does not. Notepad makes no Go garbage per call, which is why its column is flat.
 - **Visible ranges and scrolling.** Visible ranges are the whole text, and a
   rectangle outside the field is dropped rather than scrolled into view.
+
+## Phase E: what changed from this design
+
+Phase E's automated parts are in place: the Axe.Windows rules (the engine of
+Accessibility Insights) run on both examples in every significant state through
+AxeWindowsCLI, the errors they found are fixed, a live
+UI Automation check runs in `scripts/a11y-check.ps1`, and the manual screen reader
+script is in [accessibility-testing.md](accessibility-testing.md). The NVDA and
+Narrator pass is for a person to run, and is pending.
+
+### Tools
+
+- **AxeWindowsCLI 2.4.2** (the Axe.Windows rules engine), from the official
+  release at github.com/microsoft/axe-windows. The winget package
+  `Microsoft.AxeWindows` is that release's MSI. Its install needs elevation, because
+  the MSI's .NET 6 runtime dependency is installed machine-wide, so the signed zip
+  was used instead, unpacked to `%LOCALAPPDATA%\Programs\AxeWindowsCLI`. Every
+  executable and DLL in it carries a valid Microsoft or .NET Authenticode
+  signature.
+- **Accessibility Insights for Windows 1.1.2924.1**, the latest stable release
+  from github.com/microsoft/accessibility-insights-windows. It is not in winget.
+  Its MSI is a machine-wide install that needs elevation, so the MSI was extracted
+  with an administrative install to `%LOCALAPPDATA%\Programs\AccessibilityInsights`.
+  The extracted app is signed by Microsoft and starts. It is not registered: there
+  is no Start menu entry and no uninstall entry.
+
+The scans use AxeWindowsCLI. The Accessibility Insights app was installed and
+started, but its own assessment and FastPass tests were not run, since they are
+interactive. The CLI runs the same rules non-interactively.
+
+Axe.Windows 2.4.2 has 154 rules: 76 at Error, 16 at Warning and 62 at
+NeedsReview. The CLI reports errors. No scan log had warning or needs-review
+output.
+
+### Scan results
+
+Errors per state, as reported by AxeWindowsCLI, before and after the fixes. The
+demo's states are on the Projects page unless noted.
+
+| State | Before | After |
+| --- | --- | --- |
+| Demo, Dashboard | 1 | 0 |
+| Demo, Projects (default) | 7 | 0 |
+| Demo, Activity (one build row expanded, filter "build") | 1 | 0 |
+| Demo, Components, top | 7 | 0 |
+| Demo, Components, scrolled 600 px | 7 | 0 |
+| Demo, Components, scrolled 1200 px | 7 | 0 |
+| Demo, Components, scrolled 2400 px | 7 | 0 |
+| Demo, Components, dropdown open | 8 | 0 |
+| Demo, Settings | 1 | 0 |
+| Demo, New Project dialog | 8 | 0 |
+| Demo, context menu with the Status submenu open | 8 | 0 |
+| Demo, project detail window (comments) | 8 | 0 |
+| Notes, default | 2 | 0 |
+| Notes, command palette open | 2 | 0 |
+| Notes, File menu open | 3 | 0 |
+| Notes, Edit menu open | 3 | 0 |
+| Notes, View menu open | 3 | 0 |
+| Notes, tag editor (New tag field focused) | 2 | 0 |
+
+Three rules produced all the errors before the fixes:
+
+- **ButtonInvokeAndTogglePatterns** (Error, WCAG 4.1.2): a toggle button exposed
+  both Invoke and Toggle. It hit every star, the Pin note toggle and the Toggle
+  theme button.
+- **ButtonShouldHavePatterns** (Error, WCAG 4.1.2): a button had none of Invoke,
+  Toggle or ExpandCollapse. It hit the disabled Create project button and the
+  disabled Components sample, the Components sample buttons with no action, and
+  the Notifications bell, which had no action.
+- **NameNotNull** (Error, Section 508 502.3.1): a focusable menu panel had no name.
+  It hit the Components dropdown menu, the context menu and the notes menu bar's
+  File, Edit and View popups.
+
+### Fixes
+
+Framework (the generic problems):
+
+- `platform/windows/uia.go`: a toggle has Toggle and not Invoke. A disabled button
+  keeps its Invoke pattern, which the design already says a disabled element does.
+  The pattern is still absent for an enabled element with no action.
+- `ui/menu.go`, `ui/menubar.go` and `ui/widgets.go`: a menu panel takes a name. A
+  dropdown's menu takes its trigger's name, a menu bar popup takes its menu's
+  name, and a context menu takes the name of the element it hangs from, or
+  "Actions" when that element has none. `ButtonElement.accessName` gives the
+  trigger's name, in the same order the access tree uses: Label, text, tooltip.
+
+Examples (app content):
+
+- `examples/demo/views/app.go`: the Notifications bell announces "No new
+  notifications" when it is pressed. The demo has no notifications feature, so the
+  text is a placeholder to confirm.
+- `examples/demo/views/components.go`: the five enabled sample buttons (Primary,
+  Secondary, Ghost, Danger, Small) announce "<name> pressed" through a `pressed`
+  helper. They had no action. The text is a placeholder to confirm.
+
+Regression tests: `ui/access_controls_test.go` (a request on a disabled button does
+nothing, menu panels are named, a context menu is named by its element);
+`platform/windows/uia_controls_test.go` (`TestInvokeFollowsTogglesAndDisabledButtons`).
+Two existing tests looked up unnamed menus, and now look up "Actions", the name
+a context menu gets. A request on a disabled button already does nothing, since a
+disabled element has no request target (the rule that makes targets, in
+`ui/access.go`, leaves out a disabled element that has no actions), so that test
+needed no code change.
+
+### Justified exceptions
+
+None. Every error the rules raised was a real defect, and each is fixed above. The
+two placeholder actions are content decisions, listed under open items.
+
+### Live checks
+
+`scripts/a11y-check.ps1` builds both examples, runs them (the notes app with a
+temporary notes file), checks them through UI Automation and scans them with
+AxeWindowsCLI. It ran 18 checks, all passing, on this tree:
+
+- Names and roles on the navigation, the toolbar and the notes menu bar.
+- Invoke opens a page; a toggle has Toggle and no Invoke (the star and the Pin
+  note).
+- Expand and collapse on an Activity build row, the dropdown trigger and the File
+  menu, with the menu named after its trigger.
+- Selection on the filter chips, with the group reporting its one selection.
+- Value on the search field and the note title, with SetValue.
+- Focus moves to the search field, and a focus event is raised for it.
+- Scroll: the Components page scrolls to 50 percent with SetScrollPercent.
+- A disabled button keeps Invoke (Create project); Cancel closes the dialog.
+- Settings switches toggle with Toggle.
+- The note body: its text holds the welcome sentence; FindText finds "small";
+  Select selects it; the selection and the word unit are "small"; the word has one
+  bounding rectangle.
+- AxeWindowsCLI reports no errors on the demo's Settings page and on the notes
+  editor.
+
+The script was also run against the commit before this phase (extracted from git,
+with the same script). It failed seven checks: the star and Pin toggles (Invoke
+present), the dropdown and File menus (not named), Create project (no Invoke), and
+the two Axe scans (2 and 3 errors). Those are the defects the fixes address.
+
+### Open items
+
+- **Manual passes.** NVDA and Narrator are for a person to run, with
+  [accessibility-testing.md](accessibility-testing.md).
+- **The two placeholder actions.** The Notifications bell and the sample buttons
+  now announce something. Confirm the wording, or give the bell a real action.
+- **The `idle` script step.** After the Components page is scrolled three times,
+  `idle` did not return within 40 seconds, while the same scroll followed by `wait`
+  did. The app's frames were not measured, and this was not investigated. The
+  scans and checks use `wait`, so they are not affected.
+- **Scanner coverage.** The CLI reports errors only, and this phase did not run
+  the Accessibility Insights assessment, which needs a person.

@@ -529,7 +529,12 @@ func availableKind(id int32) (coreKind, bool) {
 func supports(k coreKind, n *access.Node) bool {
 	switch k {
 	case kindInvoke:
-		return n.Has(access.ActionClick)
+		// A toggle is changed by Toggle, not by Invoke, so it has Toggle alone. A
+		// disabled button keeps Invoke, as a disabled element keeps its patterns.
+		if n.States.Has(access.StateToggle) {
+			return false
+		}
+		return n.Has(access.ActionClick) || n.Role == access.RoleButton && n.States.Has(access.StateDisabled)
 	case kindToggle:
 		return n.States.Has(access.StateToggle)
 	case kindExpand:

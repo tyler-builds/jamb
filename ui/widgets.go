@@ -62,6 +62,18 @@ func (b *ButtonElement) Disabled(d bool) *ButtonElement         { b.disabled = d
 // no label, since its text is its name; an icon-only button does.
 func (b *ButtonElement) Label(s string) *ButtonElement { b.name = s; return b }
 
+// accessName is the name the button is exposed with: its Label, then its text,
+// then its tooltip.
+func (b *ButtonElement) accessName() string {
+	switch {
+	case b.name != "":
+		return b.name
+	case b.label != "":
+		return b.label
+	}
+	return b.tooltip
+}
+
 // Checked makes the button a toggle button, such as a pin that is on or off.
 // Assistive technology reports its state, and the button's click handler
 // changes it. Give an icon-only toggle a Label that names what it toggles.

@@ -68,6 +68,7 @@ examples/notes/    module "github.com/tyler-builds/jamb/examples/notes", a note-
   views/           sidebar, note list, editor pane, actions and the command palette
 docs/              screenshots/ (PNG captures), benchmarks/ (bench-before.txt, bench-after.txt)
 scripts/bench.sh   reproduces the build and footprint numbers
+scripts/a11y-check.ps1  live UI Automation checks of the examples (see Tools)
 ```
 
 ## Architecture
@@ -1142,6 +1143,11 @@ To see the tree as text, use the `a11ydump PATH` script step, or call
 `rt.AccessTree().Dump()` in a test. Each line is a role, its name and states,
 its bounds in physical pixels, and its ID.
 
+The automated checks, the Accessibility Insights scans and the live UI Automation
+check are in [Tools](#tools-for-humans-and-coding-agents). The manual pass with
+Narrator and NVDA, with the expected results for each task in the demo and the
+notes app, is in [docs/accessibility-testing.md](docs/accessibility-testing.md).
+
 ### GPU device loss
 
 When the GPU device is removed or reset (a driver update or crash, a remote
@@ -1229,6 +1235,39 @@ The headless tools are:
 See `ui/runtime_test.go`, `ui/editor_test.go`,
 `examples/demo/views/dump_test.go` and `examples/notes/views/views_test.go` (the notes app
 driven headlessly: Ctrl+N, typing, search, saving).
+
+### Accessibility checks
+
+`scripts/a11y-check.ps1` checks the demo and notes apps through Windows UI
+Automation. It uses Windows PowerShell and the .NET UI Automation client that
+come with Windows, and the Go toolchain to build the examples. Run it from the
+repository root:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\a11y-check.ps1
+```
+
+The script builds both examples into a temporary folder and starts them. The
+notes app runs with a temporary notes file, never your own. It runs 18 checks:
+names and roles, Invoke, Toggle, ExpandCollapse, Selection, Value, Scroll, focus
+with its event, and the Text pattern on the word "small". Each prints PASS or
+FAIL, and the script exits 1 if any fails. Options: `-TimeoutSeconds N` (default
+30) and `-SkipAxe`. The processes and temporary files are removed on exit, after a
+failure too.
+
+When AxeWindowsCLI is installed, the script also scans each app with it, and a scan
+that finds errors is a failure. The script looks for it at
+`%LOCALAPPDATA%\Programs\AxeWindowsCLI\AxeWindowsCLI.exe` and then on PATH.
+AxeWindowsCLI runs the Axe.Windows rules, the engine of Accessibility Insights for
+Windows, from the command line. Get it from the official
+[axe-windows releases](https://github.com/microsoft/axe-windows/releases) (the
+zip needs no elevation). To scan an app by hand while it runs:
+`AxeWindowsCLI.exe --processid <pid> --verbosity verbose`. Accessibility Insights
+for Windows is the interactive form of the same rules:
+[github.com/microsoft/accessibility-insights-windows](https://github.com/microsoft/accessibility-insights-windows).
+
+The manual pass with NVDA and Narrator is not automated. Its steps and expected
+results are in [docs/accessibility-testing.md](docs/accessibility-testing.md).
 
 ## Packaging
 
@@ -1736,8 +1775,8 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   version has not been tested. The arm64 build is compiled but has not been run.
   The MSIX install steps are for a person to run; the SDK tools check the
   package's structure.
-- **Accessibility.** Phases A, B and C of [docs/accessibility.md](docs/accessibility.md)
-  are in place on Windows: the access tree, names and roles, bounds and focus,
+- **Accessibility.** Phases A, B and C, and the automated parts of phase E, of
+  [docs/accessibility.md](docs/accessibility.md) are in place on Windows: the access tree, names and roles, bounds and focus,
   Invoke, Toggle, ExpandCollapse, SelectionItem and Selection, Value, Scroll and
   ScrollItem, Text for text fields and text areas (with the system caret for
   magnifiers), Window for dialogs, focus, menu, property-changed, text-changed
@@ -1757,8 +1796,15 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   the same walk against Windows Notepad grows at the same rate per element, so it
   is UI Automation's own per-client state, not a jamb leak (see
   [docs/accessibility.md](docs/accessibility.md)). A client that walks past the window's close gets `E_UNEXPECTED`
-  from UI Automation. Not yet checked with NVDA, Narrator or Accessibility
-  Insights.
+  from UI Automation. The Axe.Windows rules (AxeWindowsCLI, the engine of
+  Accessibility Insights) report no errors in the examples' 18 scanned states, and
+  the live checks in `scripts/a11y-check.ps1` pass. Not yet checked with NVDA or
+  Narrator: that pass is for a person, with
+  [docs/accessibility-testing.md](docs/accessibility-testing.md). Two placeholder
+  actions need a decision: the demo's Notifications bell and its sample buttons
+  announce a message when pressed. The dev script step `idle` did not return after
+  the Components page was scrolled three times (`wait` works); it was not
+  investigated.
 - **Not attempted (non-goals).** Tray,
   CSS grid, and the optional utility-class shorthand
   (`.Class("flex col gap-2")`). The shorthand was skipped in favor of typed

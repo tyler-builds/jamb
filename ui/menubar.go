@@ -92,6 +92,7 @@ func MenuBar(menus ...TopMenu) Element {
 		var panel *menuView
 		if cur >= 0 {
 			panel = &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: hide,
+				label: menus[cur].Label,
 				move: func(dir int) {
 					if at := open.Peek(); at >= 0 {
 						show((at+dir+len(menus))%len(menus), true)

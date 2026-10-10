@@ -188,6 +188,9 @@ type menuView struct {
 	// move, set by a menu bar, opens the neighboring top-level menu dir steps
 	// away (+1 or -1) when Left or Right has nothing else to do here.
 	move func(dir int)
+	// label is the accessible name of the menu: the trigger's name, or the
+	// menu's title in a menu bar. It is left out when empty.
+	label string
 }
 
 // set replaces the path, dropping a submenu change that is still waiting.
@@ -349,9 +352,13 @@ func (m *menuView) typeahead(s string) {
 // top is the top panel: a floating panel below its anchor that takes keyboard
 // focus, and closes when the pointer presses outside it.
 func (m *menuView) top(gap float32) *DivElement {
-	return m.box(0, m.items, m.path.Get()).Key("jamb.menu").Overlay(BelowStart).OverlayGap(gap).
+	d := m.box(0, m.items, m.path.Get()).Key("jamb.menu").Overlay(BelowStart).OverlayGap(gap).
 		AutoFocus().TabStop(false).OnKeyDown(m.keyDown).OnTextInput(m.typeahead).
 		OnClickOutside(func() { m.close(false) })
+	if m.label != "" {
+		d.Label(m.label)
+	}
+	return d
 }
 
 // box is the surface of one panel at level k, with its rows stacked.
@@ -463,7 +470,8 @@ type contextMenu struct {
 	id       uint64
 	x, y     float32
 	items    []MenuItem
-	keyboard bool // opened from the keyboard: the first item is highlighted
+	keyboard bool   // opened from the keyboard: the first item is highlighted
+	label    string // the name of the element it is open on, for the menu's name
 }
 
 // ContextMenu opens a menu when the element is right-clicked, or when it has
@@ -525,16 +533,18 @@ func DropdownMenu(trigger Element, build func() []MenuItem) Element {
 				}
 			}).
 			Child(trigger)
+		var name string
 		if b, ok := trigger.(*ButtonElement); ok {
 			// The wrapper is the control that assistive technology sees: it takes
 			// the button's name, and the button is left out of the tree. Focus goes
 			// to the button, so the wrapper takes focus for it.
 			b.inert = true
-			d.Label(b.name)
+			name = b.accessName()
+			d.Label(name)
 			d.access().focusInside = !b.disabled
 		}
 		if open.Get() {
-			m := &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: closeMenu}
+			m := &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: closeMenu, label: name}
 			d.Child(m.top(4))
 		}
 		return d
@@ -603,7 +613,7 @@ func (rt *Runtime) openContextMenu(n *node, x, y float32, keyboard bool) {
 		return
 	}
 	rt.menuOpened()
-	rt.ctxMenu = &contextMenu{id: n.id, x: x, y: y, items: items, keyboard: keyboard}
+	rt.ctxMenu = &contextMenu{id: n.id, x: x, y: y, items: items, keyboard: keyboard, label: menuLabel(n)}
 	if n.owner != nil {
 		n.owner.invalidate()
 	}
@@ -644,7 +654,18 @@ func contextMenuAt(rt *Runtime, c *contextMenu) Element {
 		Component(func(ctx *Context) Element {
 			m := &menuView{ctx: ctx, t: ctx.Theme(), items: c.items,
 				path:  Local(ctx, "path", highlightPath(c.items, c.keyboard)),
-				close: rt.closeContextMenu}
+				close: rt.closeContextMenu, label: c.label}
 			return m.top(0)
 		}))
+}
+
+// menuLabel is the name of a context menu: the name of the element it hangs
+// from, or "Actions" when that element has none. A menu must have a name, since
+// it takes keyboard focus.
+func menuLabel(n *node) string {
+	role, ok := accessRole(n)
+	if s := (&accessBuilder{}).name(n, ok && absorbsText(role)); s != "" {
+		return s
+	}
+	return "Actions"
 }

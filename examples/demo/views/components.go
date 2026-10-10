@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/ease"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -28,11 +29,11 @@ func Components(s *Store) ui.Element {
 					sample(t, "Highlight: Background", wordHighlight("Background", ui.Highlight{Background: t.AccentSoft, Color: t.Text})),
 					clickSample(t))).
 				Child(section(t, "Buttons",
-					sample(t, "Primary", ui.Button("Primary").Primary()),
-					sample(t, "Secondary", ui.Button("Secondary").Secondary()),
-					sample(t, "Ghost", ui.Button("Ghost").Ghost()),
-					sample(t, "Danger", ui.Button("Danger").Danger()),
-					sample(t, "Small", ui.Button("Small").Small()),
+					sample(t, "Primary", ui.Button("Primary").Primary().OnClick(pressed("Primary"))),
+					sample(t, "Secondary", ui.Button("Secondary").Secondary().OnClick(pressed("Secondary"))),
+					sample(t, "Ghost", ui.Button("Ghost").Ghost().OnClick(pressed("Ghost"))),
+					sample(t, "Danger", ui.Button("Danger").Danger().OnClick(pressed("Danger"))),
+					sample(t, "Small", ui.Button("Small").Small().OnClick(pressed("Small"))),
 					sample(t, "Disabled", ui.Button("Disabled").Disabled(true)))).
 				Child(section(t, "Overlays", placements(t))).
 				Child(section(t, "Menus", dropdownSample(t), contextSample(t))).
@@ -61,6 +62,12 @@ func section(t *ui.Theme, title string, samples ...ui.Element) ui.Element {
 // sample is one labeled example in a section.
 func sample(t *ui.Theme, label string, el ui.Element) ui.Element {
 	return ui.Div().Gap(6).Child(el).Child(ui.Text(label).Size(11).Color(t.TextSubtle))
+}
+
+// pressed is the action of a sample button. It announces the press, so that a
+// screen reader user hears that the button ran.
+func pressed(label string) func() {
+	return func() { ui.Announce(label+" pressed", access.Polite) }
 }
 
 // wordHighlight is a word styled by one Highlight.

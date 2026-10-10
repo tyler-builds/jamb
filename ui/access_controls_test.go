@@ -369,7 +369,7 @@ func TestAccessRadioMenuItemsAreSelectionItems(t *testing.T) {
 	if !done.States.Has(access.StateSelectable) || done.States.Has(access.StateSelected) {
 		t.Fatalf("an unchosen radio item has states [%s]", done.States)
 	}
-	menu := accesstest.Find(t, tr, access.RoleMenu, "")
+	menu := accesstest.Find(t, tr, access.RoleMenu, "Actions")
 	if !menu.States.Has(access.StateSelectionContainer) {
 		t.Fatalf("a menu of radio items is not a selection container: [%s]", menu.States)
 	}
@@ -463,4 +463,67 @@ func TestAccessDropdownTriggerTakesFocus(t *testing.T) {
 	if tr := r.tree(); tr.Focus != btn.ID {
 		t.Fatalf("focus is on node %d after Focus, want the trigger %d:\n%s", tr.Focus, btn.ID, tr.Dump())
 	}
+}
+
+// A disabled button is exposed with its Invoke pattern, but a request on it does
+// nothing: the element cannot be operated.
+func TestAccessDisabledElementRefusesRequests(t *testing.T) {
+	clicked := false
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().Child(Button("Create project").Disabled(true).OnClick(func() { clicked = true }))
+	})
+	btn := accesstest.Find(t, r.tree(), access.RoleButton, "Create project")
+	if !btn.States.Has(access.StateDisabled) {
+		t.Fatalf("the button is not disabled: [%s]", btn.States)
+	}
+	r.bridge.Perform(btn.ID, access.ActionClick)
+	r.frame()
+	if clicked {
+		t.Fatal("a click request ran the handler of a disabled button")
+	}
+}
+
+// Each menu panel has a name, since it takes keyboard focus: a dropdown menu has
+// its trigger's name, and a menu bar's popup has its menu's name.
+func TestAccessMenuPanelsAreNamed(t *testing.T) {
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().
+			Child(DropdownMenu(Button("Project actions").Secondary(), func() []MenuItem {
+				return []MenuItem{{Label: "Open", OnClick: func() {}}}
+			})).
+			Child(MenuBar(TopMenu{Label: "File", Items: func() []MenuItem {
+				return []MenuItem{{Label: "Save", OnClick: func() {}}}
+			}}))
+	})
+	btn := accesstest.Find(t, r.tree(), access.RoleButton, "Project actions")
+	r.bridge.Perform(btn.ID, access.ActionExpand)
+	r.frame()
+	accesstest.Find(t, r.tree(), access.RoleMenu, "Project actions")
+	r.bridge.Perform(btn.ID, access.ActionCollapse)
+	r.frame()
+	if err := r.rt.ClickKey("jamb.menubar.0"); err != nil {
+		t.Fatal(err)
+	}
+	r.frame()
+	accesstest.Find(t, r.tree(), access.RoleMenu, "File")
+	if len(r.warnings) != 0 {
+		t.Fatalf("warnings: %v", r.warnings)
+	}
+}
+
+// A context menu is named by the element it hangs from, or "Actions" when that
+// element has no name.
+func TestAccessContextMenuIsNamedByItsElement(t *testing.T) {
+	menu := func() []MenuItem { return []MenuItem{{Label: "Open", OnClick: func() {}}} }
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().
+			Child(Div().Key("card").Role(access.RoleListItem).Label("Project Alpha").Size(Full, Px(40)).ContextMenu(menu)).
+			Child(Div().Key("plain").Size(Full, Px(40)).ContextMenu(menu))
+	})
+	r.rt.openContextMenu(r.nodeByKey(t, "card"), 20, 20, false)
+	accesstest.Find(t, r.tree(), access.RoleMenu, "Project Alpha")
+	r.rt.closeContextMenu(false)
+	r.frame()
+	r.rt.openContextMenu(r.nodeByKey(t, "plain"), 20, 60, false)
+	accesstest.Find(t, r.tree(), access.RoleMenu, "Actions")
 }
