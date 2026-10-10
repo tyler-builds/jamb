@@ -116,6 +116,19 @@ type Context struct {
 // Theme returns the active theme.
 func (c *Context) Theme() *Theme { return c.rt.theme }
 
+// HighContrast reports whether Windows high contrast is on, and the theme is
+// then the high contrast one (see HighContrastTheme). Use it to pick solid
+// colors for content that does not take its colors from the theme.
+func (c *Context) HighContrast() bool { return c.rt.sys.HighContrast }
+
+// ReducedMotion reports whether the user asked for less motion. Animations
+// that the app runs itself should then jump to their end (see Animate).
+func (c *Context) ReducedMotion() bool { return c.rt.sys.ReducedMotion }
+
+// TextScale returns the Text size setting in percent, from 100 to 225. Text
+// sizes are scaled by it already; use it for sizes the app computes itself.
+func (c *Context) TextScale() int { return c.rt.sys.TextScale }
+
 // SetTheme switches the theme and re-renders everything.
 func (c *Context) SetTheme(t *Theme) { c.rt.SetTheme(t) }
 
@@ -208,3 +221,7 @@ func (c *Context) isFocused() bool {
 // Custom elements draw their focus ring with it. The component re-renders
 // when it changes.
 func (c *Context) KeyboardFocus() bool { return c.isFocused() && c.rt.keyboardModality }
+
+// AppTheme returns the theme the app set with SetTheme, which under high
+// contrast is not the active theme (see Theme).
+func (c *Context) AppTheme() *Theme { return c.rt.appTheme }

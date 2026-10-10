@@ -105,7 +105,7 @@ func MenuBar(menus ...TopMenu) Element {
 			if i == cur {
 				hover = t.SurfaceActive
 			}
-			lbl := Div().Keyf("jamb.menubar.%d", i).Row().Align(Center).Height(Px(26)).PaddingX(10).Radius(4).Shrink(0).
+			lbl := Div().Keyf("jamb.menubar.%d", i).Row().Align(Center).MinHeight(Px(26)).PaddingX(10).Radius(4).Shrink(0).
 				FontSize(13).TextColor(t.Text).
 				Hover(Style{Background: hover}).
 				FocusVisible(Style{Background: t.SurfaceHover}).

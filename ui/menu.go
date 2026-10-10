@@ -395,13 +395,14 @@ func (m *menuView) row(k, i int, it MenuItem, path []int, gutter bool) Element {
 	}
 	on := it.selectable()
 	hl := k < len(path) && path[k] == i
-	r := Div().Keyf("jamb.menu.%d.%d", k, i).Row().Align(Center).Gap(8).Height(Px(28)).PaddingX(8).Radius(4).Shrink(0).
+	r := Div().Keyf("jamb.menu.%d.%d", k, i).Row().Align(Center).Gap(8).MinHeight(Px(28)).PaddingX(8).Radius(4).Shrink(0).
 		FontSize(13).TextColor(t.Text)
 	// The name is the label alone: the shortcut is shown, but assistive technology
 	// reads the label, as a menu does.
 	a := r.access()
 	a.role, a.disabled, a.checked, a.checkedSet = menuAccessRole(it.Role()), it.Disabled, it.Checked, true
 	a.name = it.text()
+	a.highlighted = hl && on
 	a.level = k + 1
 	if len(it.Submenu) > 0 {
 		// Expand opens the submenu and Collapse closes it, as the keys do.
@@ -415,7 +416,7 @@ func (m *menuView) row(k, i int, it MenuItem, path []int, gutter bool) Element {
 		}
 	}
 	if !on {
-		r.TextColor(t.TextSubtle)
+		r.TextColor(t.Disabled)
 	}
 	if hl && on {
 		r.Background(t.AccentSoft)

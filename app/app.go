@@ -337,6 +337,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rt.SetServices(ui.Services{Clipboard: w.Clipboard, SetClipboard: w.SetClipboard, WakeAt: w.WakeAt})
 	h.rt.SetWindowControls(windowControls{h})
 	h.rt.SetAccessWarnings(h.dev.a11yWarn)
+	h.applySettings()
 	h.rt.SetMaximized(w.Maximized())
 	h.rt.AddBindings(h.cfg.Bindings...)
 	if h.cfg.KeymapFile != "" {
@@ -426,6 +427,8 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 		h.saveGeometry(w)
 	case platform.EventMoved:
 		h.saveGeometry(w)
+	case platform.EventSettingsChanged:
+		h.applySettings()
 	case platform.EventWindowState:
 		h.rt.SetMaximized(w.Maximized())
 	case platform.EventFileDrop:

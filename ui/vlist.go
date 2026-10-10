@@ -136,6 +136,7 @@ func (vs *varState) rebuild(rt *Runtime, l *ListElement) {
 	}
 	vs.heights = heights
 	vs.hidx = newHeightIndex(hs)
+	vs.hidx.def = defaultRowHeight * float64(rt.textFactor) // rows grow with the Text size
 	vs.ident, vs.count = l.ident, n
 	if dup != "" && !vs.warned && rt.warn != nil {
 		vs.warned = true
@@ -378,12 +379,13 @@ type heightIndex struct {
 	cnt    []int     // Fenwick tree of measured counts
 	totSum float64
 	totCnt int
+	def    float64 // the estimate before any item is measured (see defaultRowHeight)
 }
 
 // newHeightIndex takes ownership of hs. Its entries are 0 for unmeasured items.
 func newHeightIndex(hs []float32) *heightIndex {
 	n := len(hs)
-	h := &heightIndex{n: n, hs: hs, sum: make([]float64, n+1), cnt: make([]int, n+1)}
+	h := &heightIndex{n: n, hs: hs, sum: make([]float64, n+1), cnt: make([]int, n+1), def: defaultRowHeight}
 	for i, v := range hs {
 		if v > 0 {
 			h.sum[i+1], h.cnt[i+1] = float64(v), 1
@@ -403,7 +405,7 @@ func newHeightIndex(hs []float32) *heightIndex {
 // est is the estimate for unmeasured items: the mean of the measured ones.
 func (h *heightIndex) est() float64 {
 	if h.totCnt == 0 {
-		return defaultRowHeight
+		return h.def
 	}
 	return h.totSum / float64(h.totCnt)
 }

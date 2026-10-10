@@ -153,7 +153,11 @@ func messageRow(t *ui.Theme, m Message) ui.Element {
 	bubble := ui.Div().Gap(4).PaddingX(12).PaddingY(8).Radius(12).MaxWidth(ui.Px(460)).
 		Background(t.SurfaceHover).Border(1, t.Border)
 	if mine {
-		bubble.Background(t.AccentSoft).Border(1, t.AccentSoft)
+		edge := t.AccentSoft
+		if t.HighContrast {
+			edge = t.Accent // the tint is the window color there, so the edge marks the message
+		}
+		bubble.Background(t.AccentSoft).Border(1, edge)
 	}
 	bubble.Child(ui.Div().Row().Align(ui.Center).Gap(8).
 		Child(ui.Text(m.Author).Size(12).Semibold().Color(t.TextMuted)).

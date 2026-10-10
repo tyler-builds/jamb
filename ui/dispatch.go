@@ -586,6 +586,10 @@ func (rt *Runtime) keyDown(k input.Key, mods input.Modifiers, repeat bool) {
 		rt.cycleFocus(mods.Has(input.ModShift))
 	case !repeat && (k == input.KeyMenu || (k == input.KeyF10 && mods == input.ModShift)):
 		rt.openFocusedMenu()
+	case !repeat && k == input.KeyF10 && mods == 0 && rt.topModal() == nil:
+		// F10 by itself activates the menu bar, as Windows does for a lone Alt
+		// tap. A window without a menu bar does nothing.
+		rt.activateMenuBar()
 	case rt.zoomKeys && mods.Has(input.ModCtrl) && k == input.KeyEqual:
 		rt.ZoomIn()
 	case rt.zoomKeys && mods.Has(input.ModCtrl) && k == input.KeyMinus:

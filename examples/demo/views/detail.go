@@ -71,11 +71,11 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 
 		content := ui.Div().Grow(1).MinHeight(ui.Px(0)).Padding(28).Gap(18).
 			Child(ui.Div().Row().Align(ui.Center).Gap(16).
-				Child(IconTile(p.Icon, p.Color, 52)).
+				Child(IconTile(t, p.Icon, p.Color, 52)).
 				Child(ui.Div().Grow(1).Gap(6).MinWidth(ui.Px(0)).
 					Child(rename(s, id, p.Name)).
 					Child(ui.Div().Row().Align(ui.Center).Gap(8).
-						Child(Badge(p.Status.String(), StatusColor(t, p.Status))).
+						Child(Badge(t, p.Status.String(), StatusColor(t, p.Status))).
 						Child(ui.Text("Updated " + ago(p.Updated)).Size(12).Color(t.TextSubtle))))).
 			Child(ui.Text(p.Description).Color(t.TextMuted)).
 			Child(ui.Div().Row().Align(ui.Center).Gap(12).

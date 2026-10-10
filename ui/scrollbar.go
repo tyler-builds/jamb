@@ -177,7 +177,7 @@ func (rt *Runtime) paintScrollbars(n *node, opacity float32) {
 		case rt.isHovered(n.id):
 			c = c.Alpha(0.6)
 		default:
-			c = c.Alpha(0.35)
+			c = c.Alpha(0.5)
 		}
 		thick := float32(sbThin)
 		if hot {

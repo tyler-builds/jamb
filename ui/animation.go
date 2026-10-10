@@ -67,6 +67,15 @@ func (a *AnimateElement) expand(ctx *Context) Element {
 		p -= float32(math.Floor(float64(p)))
 	}
 	p = min(max(p, 0), 1)
+	if rt.sys.ReducedMotion {
+		// With reduced motion a finite animation jumps to its end, and a
+		// repeating one stops at its first frame, so nothing asks for a frame.
+		running, looping = false, false
+		p = 1
+		if a.anim.Repeat && a.anim.Duration > 0 {
+			p = 0
+		}
+	}
 	if running {
 		if looping {
 			rt.looping = true

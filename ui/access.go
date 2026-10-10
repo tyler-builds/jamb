@@ -48,6 +48,10 @@ type accessInfo struct {
 	// (see DropdownMenu): the element takes focus for it, and an action to focus
 	// the element moves focus to that child.
 	focusInside bool
+	// highlighted marks the row a menu highlights (its keyboard position). The
+	// menu's panel passes focus to that row, so the highlight is what a screen
+	// reader hears (see focusTarget).
+	highlighted bool
 }
 
 // access returns the element's accessibility settings, creating them on use.
@@ -531,6 +535,12 @@ func (b *accessBuilder) focusTarget() access.ID {
 			return 0
 		}
 		if n.kind == kindEditor || exposed(n) {
+			// A menu that has focus passes it to the row it highlights, so that
+			// moving the highlight with the keys moves the focus the screen reader
+			// announces.
+			if row := highlightedRow(n); row != nil {
+				return accID(row.id)
+			}
 			return accID(n.id)
 		}
 	}
@@ -1027,4 +1037,25 @@ func (rt *Runtime) focusChild(n *node) {
 			return
 		}
 	}
+}
+
+// highlightedRow returns the row that a menu highlights, when n is a menu: the
+// deepest highlighted row in its subtree, so that a submenu's row wins over the
+// row that opened it. It returns nil for anything else.
+func highlightedRow(n *node) *node {
+	if n.div == nil || n.div.acc == nil || n.div.acc.role != access.RoleMenu {
+		return nil
+	}
+	var found *node
+	var walk func(*node)
+	walk = func(c *node) {
+		for _, k := range c.children {
+			if k.div != nil && k.div.acc != nil && k.div.acc.highlighted {
+				found = k
+			}
+			walk(k)
+		}
+	}
+	walk(n)
+	return found
 }

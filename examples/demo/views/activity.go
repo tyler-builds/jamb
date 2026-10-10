@@ -227,7 +227,7 @@ func eventRow(t *ui.Theme, s *Store, e event, compact, open bool, query string) 
 
 	row := ui.Div().Row().Align(ui.Start).Gap(14).PaddingX(12).PaddingY(pad).Radius(8).
 		Transition(fast).Hover(ui.Style{Background: t.SurfaceHover}).
-		Child(IconTile(e.icon, c, 32)).
+		Child(IconTile(t, e.icon, c, 32)).
 		Child(text)
 	if e.kind == buildEvent {
 		// Enter and Space expand it too, as a click does.

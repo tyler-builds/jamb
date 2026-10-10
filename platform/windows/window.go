@@ -383,6 +383,16 @@ func (w *window) emit(e platform.Event) {
 	w.handler.OnEvent(w, e)
 }
 
+// ownsF10 reports whether the F10 key is the application's. F10 is a system
+// key, and the system's default handling turns it into the menu bar's keyboard
+// mode, which then takes the keys that follow (Down, Tab) from the window, so the
+// application would never see them; a context menu opened with Shift+F10 is then
+// stuck. The application handles F10 itself, so the default is not run for it.
+// Alt+F10 keeps the system's handling.
+func ownsF10(wp uintptr) bool {
+	return wp == win32.VK_F10 && win32.GetKeyState(win32.VK_MENU) >= 0
+}
+
 func currentMods() input.Modifiers {
 	var m input.Modifiers
 	if win32.GetKeyState(win32.VK_SHIFT) < 0 {
@@ -638,14 +648,14 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 
 	case win32.WM_KEYDOWN, win32.WM_SYSKEYDOWN:
 		w.emit(platform.Event{Kind: platform.EventKeyDown, Key: mapKey(wp), Repeat: lp&(1<<30) != 0})
-		if msg == win32.WM_SYSKEYDOWN {
+		if msg == win32.WM_SYSKEYDOWN && !ownsF10(wp) {
 			break // keep Alt+F4 and the system menu working
 		}
 		return 0
 
 	case win32.WM_KEYUP, win32.WM_SYSKEYUP:
 		w.emit(platform.Event{Kind: platform.EventKeyUp, Key: mapKey(wp)})
-		if msg == win32.WM_SYSKEYUP {
+		if msg == win32.WM_SYSKEYUP && !ownsF10(wp) {
 			break
 		}
 		return 0
@@ -677,6 +687,12 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		paths, p := win32.DroppedFiles(wp)
 		w.emit(platform.Event{Kind: platform.EventFileDrop, X: float32(p.X), Y: float32(p.Y), Paths: paths})
 		return 0
+
+	case win32.WM_SETTINGCHANGE, win32.WM_SYSCOLORCHANGE:
+		// Every WM_SETTINGCHANGE is reported, not only the settings that
+		// ReadSettings reads, because the application's reader is cheap. The
+		// default handling below still runs for both messages.
+		w.emit(platform.Event{Kind: platform.EventSettingsChanged})
 
 	case win32.WM_GETOBJECT:
 		if r, ok := w.answerAccess(wp, lp); ok {

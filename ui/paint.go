@@ -124,6 +124,11 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	case kindDiv, kindEditor:
 		radii := rt.corners(s.radii())
 		for _, sh := range s.Shadows {
+			if rt.sys.HighContrast && (sh.Blur != 0 || sh.X != 0 || sh.Y != 0 || sh.Spread <= 0) {
+				// High contrast draws no shadows. A crisp ring, as a focus ring
+				// is, stays.
+				continue
+			}
 			if !visible && sh.Blur == 0 {
 				continue
 			}
@@ -155,6 +160,10 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		}
 		be := s.borderEdges()
 		grad := s.Gradient
+		if rt.sys.HighContrast && !grad.isZero() {
+			// High contrast draws solid colors: a gradient becomes its first color.
+			bg, grad = grad.From, Gradient{}
+		}
 		if visible && (bg.A > 0 || !grad.isZero() || (!be.isZero() && border.A > 0)) {
 			q := scene.Quad{
 				Bounds:     rt.px(n.abs),
@@ -190,7 +199,8 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	case kindIcon:
 		if visible {
 			c := fg
-			if !n.icon.color.IsZero() {
+			if !n.icon.color.IsZero() && !rt.sys.HighContrast {
+				// High contrast draws icons in the text color, as Microsoft's guidance asks.
 				c = n.icon.color
 			}
 			rt.paintIcon(n, x, y, c.Alpha(opacity))
@@ -338,16 +348,23 @@ func (rt *Runtime) scrollStep(n *node, dt float32) (float32, float32) {
 	st.scrollY = min(st.scrollY, maxY)
 	k := 1 - float32(math.Exp(float64(-dt*20)))
 	step := func(cur, target float32) float32 {
+		if rt.sys.ReducedMotion {
+			return target // with reduced motion a scroll jumps to its target
+		}
 		if d := target - cur; d > 0.5 || d < -0.5 {
 			rt.animating = true
 			return cur + d*k
 		}
 		return target
 	}
+	ox, oy := st.scrollX, st.scrollY
 	st.scrollX = step(st.scrollX, st.targetX)
 	st.scrollY = step(st.scrollY, st.targetY)
 	if st.scrollX != st.targetX || st.scrollY != st.targetY {
 		rt.scrolled = true
+	}
+	if rt.sys.ReducedMotion && (st.scrollX != ox || st.scrollY != oy) {
+		rt.scrolled = true // the content jumped, so the hover under the pointer is updated
 	}
 	return st.scrollX, st.scrollY
 }
@@ -384,7 +401,8 @@ func (rt *Runtime) visual(n *node, fg Color, dt float32) visual {
 // animate eases the node's displayed values toward their targets. The first
 // paint shows the targets at once.
 func (rt *Runtime) animate(st *nodeState, to visual, dur, dt float32) visual {
-	if !st.animReady {
+	if !st.animReady || rt.sys.ReducedMotion {
+		// With reduced motion a transition jumps to its target.
 		st.shown, st.animReady = to, true
 		return to
 	}

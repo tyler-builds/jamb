@@ -13,6 +13,7 @@ import (
 
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/platform"
+	"github.com/tyler-builds/jamb/ui"
 )
 
 // Development hooks, controlled by environment variables so that application
@@ -30,6 +31,17 @@ import (
 //	JAMB_A11Y_WARN=1    warn about accessibility problems, such as an unlabeled
 //	                    button or an image without Alt. Also on under JAMB_TRACE=1
 //	                    and `jamb dev`.
+//
+// Settings overrides, for testing only. The real Windows settings are used in
+// normal use, and each variable below replaces the matching setting for this
+// run only, and changes no system setting. An unset variable keeps the real
+// setting.
+//
+//	JAMB_HIGH_CONTRAST=1      high contrast on, with the representative black
+//	                          scheme (ui.HighContrastBlack); "white" uses the
+//	                          white scheme (ui.HighContrastWhite); 0 turns it off
+//	JAMB_TEXT_SCALE=150       the Text size setting in percent, 100 to 225
+//	JAMB_REDUCED_MOTION=1     reduced motion on; 0 turns it off
 //
 // A script is a ';'-separated list of steps run after the first frame. The
 // steps drive the target window, which is the first window until a
@@ -70,16 +82,27 @@ type devOptions struct {
 	geometry   string
 	devStarted int64 // unix nanos when the dev runner noticed a change
 	a11yWarn   bool  // development warnings about accessibility (see ui.Runtime.SetAccessWarnings)
+	// The settings overrides (see the package comment): highContrast is the
+	// variable's value, textScale is a percent (0 when unset), reducedMotion
+	// the variable's value.
+	highContrast  string
+	textScale     int
+	reducedMotion string
 }
 
 func loadDevOptions() devOptions {
 	d := devOptions{
-		trace:      os.Getenv("JAMB_TRACE") == "1",
-		script:     os.Getenv("JAMB_SCRIPT"),
-		stress:     os.Getenv("JAMB_STRESS"),
-		stressSecs: 5,
-		noVSync:    os.Getenv("JAMB_VSYNC") == "0",
-		geometry:   os.Getenv("JAMB_GEOMETRY_FILE"),
+		trace:         os.Getenv("JAMB_TRACE") == "1",
+		script:        os.Getenv("JAMB_SCRIPT"),
+		stress:        os.Getenv("JAMB_STRESS"),
+		stressSecs:    5,
+		noVSync:       os.Getenv("JAMB_VSYNC") == "0",
+		geometry:      os.Getenv("JAMB_GEOMETRY_FILE"),
+		highContrast:  os.Getenv("JAMB_HIGH_CONTRAST"),
+		reducedMotion: os.Getenv("JAMB_REDUCED_MOTION"),
+	}
+	if v, err := strconv.Atoi(os.Getenv("JAMB_TEXT_SCALE")); err == nil && v > 0 {
+		d.textScale = min(max(v, 100), 225)
 	}
 	d.devStarted, _ = strconv.ParseInt(os.Getenv("JAMB_DEV_CHANGED_AT"), 10, 64)
 	// Accessibility warnings belong to development runs: a traced run, a run
@@ -89,6 +112,30 @@ func loadDevOptions() devOptions {
 		d.stressSecs = v
 	}
 	return d
+}
+
+// overrideSettings applies the settings overrides to s (see the package comment).
+func (d devOptions) overrideSettings(s ui.SystemSettings) ui.SystemSettings {
+	switch d.highContrast {
+	case "":
+	case "0":
+		s.HighContrast = false
+	case "white":
+		s.HighContrast, s.Colors = true, ui.HighContrastWhite()
+	default:
+		s.HighContrast, s.Colors = true, ui.HighContrastBlack()
+	}
+	if d.textScale > 0 {
+		s.TextScale = d.textScale
+	}
+	switch d.reducedMotion {
+	case "":
+	case "0":
+		s.ReducedMotion = false
+	default:
+		s.ReducedMotion = true
+	}
+	return s
 }
 
 func (d devOptions) loadGeometry() platform.Rect {

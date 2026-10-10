@@ -93,7 +93,7 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		px = (h - iconSize) / 2
 	}
 	d := Div().Row().Align(Center).Justify(Center).Gap(7).
-		Height(Px(h)).PaddingX(px).Radius(t.Radius).
+		MinHeight(Px(h)).PaddingX(px).Radius(t.Radius).
 		FontSize(fs).FontWeight(FontMedium).
 		Transition(110 * time.Millisecond).Shrink(0)
 	switch b.variant {
@@ -101,15 +101,19 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		d.Background(t.Accent).TextColor(t.AccentText).Shadow(ShadowSm).
 			Hover(Style{Background: t.AccentHover}).Pressed(Style{Background: t.AccentActive})
 	case Secondary:
-		d.Background(t.Surface).Border(1, t.Border).TextColor(t.Text).Shadow(ShadowSm).
-			Hover(Style{Background: t.SurfaceHover, BorderColor: t.BorderStrong}).
+		d.Background(t.Surface).Border(1, t.BorderStrong).TextColor(t.Text).Shadow(ShadowSm).
+			Hover(Style{Background: t.SurfaceHover, BorderColor: t.TextMuted}).
 			Pressed(Style{Background: t.SurfaceActive})
 	case Ghost:
 		d.TextColor(t.TextMuted).
 			Hover(Style{Background: t.SurfaceHover, TextColor: t.Text}).
 			Pressed(Style{Background: t.SurfaceActive})
 	case Danger:
-		d.Background(t.Danger).TextColor(Hex("#ffffff")).Shadow(ShadowSm).
+		label := Hex("#ffffff")
+		if t.HighContrast {
+			label = t.Background // the Danger fill is the window's text color there
+		}
+		d.Background(t.Danger).TextColor(label).Shadow(ShadowSm).
 			Hover(Style{Background: t.Danger.Lighten(0.08)}).Pressed(Style{Background: t.Danger.Darken(0.1)})
 	}
 	if b.icon != nil {
@@ -119,7 +123,13 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		d.Child(Text(b.label).NoWrap())
 	}
 	if b.disabled {
-		d.Opacity(0.5).Cursor(CursorNotAllowed)
+		d.Cursor(CursorNotAllowed)
+		if t.HighContrast {
+			// High contrast draws disabled controls in GrayText, not dimmed.
+			d.Background(t.Surface).TextColor(t.Disabled).Border(1, t.Disabled)
+		} else {
+			d.Opacity(0.5)
+		}
 		d.hover, d.pressed = nil, nil
 	} else {
 		// Enabled buttons take part in Tab navigation and respond to Enter and
@@ -312,7 +322,7 @@ func (f *fieldOptions) expand(ctx *Context, multiline bool, minRows int) Element
 		if f.style.FontSize > 0 {
 			size = f.style.FontSize
 		}
-		ed.style.MinHeight = Px(float32(minRows) * size * 1.4)
+		ed.style.MinHeight = Px(float32(minRows) * size * float32(ctx.TextScale()) / 100 * 1.4)
 	}
 	if f.borderless {
 		box := Div().Row().Align(Start).Gap(8).Cursor(CursorText).
@@ -323,9 +333,9 @@ func (f *fieldOptions) expand(ctx *Context, multiline bool, minRows int) Element
 		return box.Child(ed).Style(f.style)
 	}
 	box := Div().Row().Gap(8).PaddingX(10).
-		Radius(t.Radius).Background(t.Surface).Border(1, t.Border).
+		Radius(t.Radius).Background(t.Surface).Border(1, t.BorderStrong).
 		Cursor(CursorText).Transition(110 * time.Millisecond).
-		Hover(Style{BorderColor: t.BorderStrong}).
+		Hover(Style{BorderColor: t.TextMuted}).
 		FocusWithin(Style{BorderColor: t.Accent}).
 		// Clicks on the frame (padding, icon) still focus the text.
 		OnMouseDown(func(*MouseEvent) { h.Focus() })
@@ -333,9 +343,9 @@ func (f *fieldOptions) expand(ctx *Context, multiline bool, minRows int) Element
 	case multiline:
 		box.Align(Start).PaddingY(8)
 	case f.small:
-		box.Align(Center).Height(Px(28)).PaddingX(8).FontSize(13)
+		box.Align(Center).MinHeight(Px(28)).PaddingX(8).FontSize(13)
 	default:
-		box.Align(Center).Height(Px(34))
+		box.Align(Center).MinHeight(Px(34))
 	}
 	if f.icon != nil {
 		box.Child(Icon(f.icon).Size(16).Color(t.TextSubtle))

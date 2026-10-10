@@ -176,6 +176,53 @@ type Handler interface {
 	OnDestroy(w Window)
 }
 
+// Settings are the operating system's accessibility and text settings, as the
+// platform's ReadSettings reports them. The application re-reads them when
+// EventSettingsChanged arrives.
+type Settings struct {
+	HighContrast  bool          // the high contrast theme is on (SPI_GETHIGHCONTRAST, HCF_HIGHCONTRASTON)
+	Colors        SystemColors  // the system colors (GetSysColor)
+	TextScale     int           // percent, 100..225 (Settings > Accessibility > Text size)
+	ReducedMotion bool          // client area animations are off (SPI_GETCLIENTAREAANIMATION false)
+	CaretBlink    time.Duration // GetCaretBlinkTime in ms; 0 means the caret does not blink (INFINITE)
+	CaretWidth    int           // SPI_GETCARETWIDTH, in device pixels (the text cursor thickness; default 1)
+}
+
+// SystemColors are the system colors of the current theme, each as a 0x00RRGGBB
+// value. The field names are the COLOR_* indices of GetSysColor, whose standard
+// numeric values are noted on each field. A zero value means the color is not
+// known (see DefaultSettings).
+type SystemColors struct {
+	Window        uint32 // COLOR_WINDOW (5)
+	WindowText    uint32 // COLOR_WINDOWTEXT (8)
+	Highlight     uint32 // COLOR_HIGHLIGHT (13)
+	HighlightText uint32 // COLOR_HIGHLIGHTTEXT (14)
+	HotLight      uint32 // COLOR_HOTLIGHT (26)
+	GrayText      uint32 // COLOR_GRAYTEXT (17)
+	ButtonFace    uint32 // COLOR_BTNFACE (15)
+	ButtonText    uint32 // COLOR_BTNTEXT (18)
+	ButtonShadow  uint32 // COLOR_BTNSHADOW (16)
+	WindowFrame   uint32 // COLOR_WINDOWFRAME (6)
+	CaptionText   uint32 // COLOR_CAPTIONTEXT (9)
+	ActiveCaption uint32 // COLOR_ACTIVECAPTION (2)
+	Menu          uint32 // COLOR_MENU (4)
+	MenuText      uint32 // COLOR_MENUTEXT (7)
+	InfoBack      uint32 // COLOR_INFOBK (24)
+}
+
+// DefaultSettings returns the settings that the platform reports when it cannot
+// read the operating system's settings. Platforms that do not read settings
+// use it as well. The colors are zero, so the application uses its own.
+func DefaultSettings() Settings {
+	return Settings{
+		HighContrast:  false,
+		TextScale:     100,
+		ReducedMotion: false,
+		CaretBlink:    530 * time.Millisecond,
+		CaretWidth:    1,
+	}
+}
+
 // EventKind identifies the kind of an Event.
 type EventKind uint8
 
@@ -200,6 +247,11 @@ const (
 	// EventFileDrop is sent when files are dropped on the window from the
 	// operating system. X and Y give the drop point, and Paths the files.
 	EventFileDrop
+	// EventSettingsChanged is sent when an operating system setting that the
+	// application reads through Settings changed (high contrast, text size,
+	// animation effects, caret, or system colors). The application re-reads
+	// them with the platform's ReadSettings.
+	EventSettingsChanged
 )
 
 // Event is a flat, allocation-free event record. Which fields are meaningful

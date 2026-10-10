@@ -34,7 +34,7 @@ func Dashboard(s *Store) ui.Element {
 
 		return ui.Div().Grow(1).ScrollY().
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(1100)).
-				Child(welcome(t)).
+				Child(welcome(t, ctx.HighContrast())).
 				Child(ui.Div().Row().Gap(14).
 					Child(stat(t, icons.Folder, "Projects", ui.Textf("%d", len(projects)), "+2 this month", t.Accent.Lighten(0.2))).
 					Child(stat(t, icons.Zap, "Active", ui.Textf("%d", active), "running now", t.Success)).
@@ -46,7 +46,16 @@ func Dashboard(s *Store) ui.Element {
 	})
 }
 
-func welcome(t *ui.Theme) ui.Element {
+// welcome is the banner. Under high contrast it is a plain panel with the
+// theme's text: the picture is decoration, and its gradient cannot hold the
+// text's contrast.
+func welcome(t *ui.Theme, highContrast bool) ui.Element {
+	if highContrast {
+		return ui.Div().Height(ui.Px(150)).Radius(14).Padding(28).Justify(ui.Center).Gap(6).
+			Background(t.Surface).Border(1, t.Border).
+			Child(ui.Text("Welcome back, Alex").Size(26).Bold().Color(t.Text)).
+			Child(ui.Text("Three projects moved forward today. The renderer is idle at 0% CPU.").Color(t.Text))
+	}
 	return ui.Div().Height(ui.Px(150)).Radius(14).ClipContent().Shadow(ui.ShadowMd).
 		Child(ui.Image(banner).Alt("Project banner").Size(ui.Full, ui.Full)).
 		Child(ui.Div().Inset(0).Padding(28).Justify(ui.Center).Gap(6).
@@ -60,7 +69,7 @@ func stat(t *ui.Theme, ic *icons.Icon, label string, value *ui.TextElement, hint
 	return Card(t).Grow(1).Basis(ui.Px(0)).
 		Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).
 			Child(ui.Text(label).Size(13).Medium().Color(t.TextMuted)).
-			Child(IconTile(ic, c, 30))).
+			Child(IconTile(t, ic, c, 30))).
 		Child(value.Size(28).Semibold()).
 		Child(ui.Text(hint).Size(12).Color(t.TextSubtle))
 }
@@ -74,7 +83,7 @@ func chart(t *ui.Theme) *ui.DivElement {
 			Child(ui.Div().Gap(2).
 				Child(SectionTitle(t, "Weekly activity")).
 				Child(ui.Text("Commits per day, last two weeks").Size(12).Color(t.TextSubtle))).
-			Child(Badge("+18%", t.Success))).
+			Child(Badge(t, "+18%", t.Success))).
 		Child(ui.Animate("weekly-bars", grow, func(p float32) ui.Element {
 			bars := ui.Div().Row().Align(ui.End).Gap(8).Height(ui.Px(150))
 			for i, v := range weekly {
@@ -84,7 +93,7 @@ func chart(t *ui.Theme) *ui.DivElement {
 				}
 				bars.Child(ui.Div().Grow(1).Height(ui.Percent(v * 100 * p)).
 					RadiusCorners(ui.Corners{TopLeft: 4, TopRight: 4}).
-					Background(c.Alpha(0.85)).Transition(fast).
+					Background(barFill(t, c)).Transition(fast).
 					Hover(ui.Style{Background: c.Lighten(0.2)}))
 			}
 			return bars

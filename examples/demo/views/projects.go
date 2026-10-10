@@ -54,6 +54,9 @@ func filters(t *ui.Theme, s *Store) ui.Element {
 			Hover(ui.Style{TextColor: t.Text}).
 			When(on, func(d *ui.DivElement) {
 				d.Background(t.Surface).TextColor(t.Text).Shadow(ui.ShadowSm)
+				if t.HighContrast {
+					d.Border(1, t.Text) // no shadow there: the outline marks the selected filter
+				}
 			}).
 			OnClick(func() { s.Filter.Set(value) }).
 			When(value >= 0, func(d *ui.DivElement) {
@@ -78,16 +81,16 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 	q := s.Query.Peek()
 	titles := ui.Div().Row().Align(ui.Center).Gap(10).
 		Child(ui.Text(p.Name).Size(15).Semibold().Truncate().HighlightMatches(q, matchHighlight(t))).
-		Child(Badge(p.Status.String(), status))
+		Child(Badge(t, p.Status.String(), status))
 	if open {
-		titles.Child(Badge("Open in window", t.Accent))
+		titles.Child(Badge(t, "Open in window", t.Accent))
 	}
 	star := ui.Div().Size(ui.Px(30), ui.Px(30)).Radius(7).Center().
 		TextColor(t.TextSubtle).Transition(fast).
 		Hover(ui.Style{Background: t.SurfaceActive, TextColor: t.Text}).
 		Label("Star project").Checked(p.Starred).
 		OnClick(func() { s.ToggleStar(p.ID) }).
-		Child(ui.Icon(icons.Star).Size(16).Color(starColor(t, p.Starred)))
+		Child(ui.Icon(starIcon(t, p.Starred)).Size(16).Color(starColor(t, p.Starred)))
 
 	// The card takes focus, so Enter selects it and Shift+F10 opens its menu.
 	card := ui.Div().Key(fmt.Sprint(p.ID)).Role(access.RoleListItem).Selected(selected).
@@ -114,7 +117,7 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 				}
 			}).
 			Leave(func() { s.DropMark.Set(dropMark{}) })).
-		Child(IconTile(p.Icon, p.Color, 44)).
+		Child(IconTile(t, p.Icon, p.Color, 44)).
 		Child(ui.Div().Grow(1).Gap(6).
 			Child(titles).
 			Child(ui.Text(p.Description).Size(13).Color(t.TextMuted).Truncate().HighlightMatches(q, matchHighlight(t))).
@@ -170,7 +173,7 @@ func insertionLine(t *ui.Theme, after bool) ui.Element {
 func projectPreview(t *ui.Theme, p Project) ui.Element {
 	return ui.Div().Row().Align(ui.Center).Gap(8).PaddingX(10).PaddingY(6).Radius(10).
 		Background(t.Surface).Border(1, t.Accent).Shadow(ui.ShadowMd).
-		Child(IconTile(p.Icon, p.Color, 22)).
+		Child(IconTile(t, p.Icon, p.Color, 22)).
 		Child(ui.Text(p.Name).Size(13).Semibold().NoWrap())
 }
 
@@ -183,7 +186,7 @@ func starColor(t *ui.Theme, on bool) ui.Color {
 
 func emptyState(t *ui.Theme, s *Store) ui.Element {
 	return ui.Div().Padding(48).Gap(10).Align(ui.Center).Radius(12).Border(1, t.Border).
-		Child(IconTile(icons.Search, t.TextMuted, 48)).
+		Child(IconTile(t, icons.Search, t.TextMuted, 48)).
 		Child(ui.Text("No projects match").Size(15).Semibold()).
 		Child(ui.Text("Try a different search or filter.").Color(t.TextMuted)).
 		Child(ui.Button("Clear filters").Secondary().Small().Style(ui.Style{Margin: ui.Edges{Top: 6}}).OnClick(func() {

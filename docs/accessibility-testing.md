@@ -85,21 +85,45 @@ Do these tasks with the mouse unplugged or not touched, in both apps.
   menus and radio groups. Escape closes menus, the palette and dialogs.
 - Record any control that cannot be reached or activated from the keyboard.
 
-## High contrast and text size
+## High contrast, text size, reduced motion and the caret
 
-These checks show what jamb does today. jamb does not yet follow the Windows
-high contrast theme or the Text size setting; that is Phase D of the design
-([accessibility.md](accessibility.md#phases)). Record what you see, so that Phase D
-can be checked against it.
+These checks use the real Windows settings, so they change what a person sees on
+this PC for the whole session. Do them on a PC you are at, not over a remote
+session, and put every setting back afterwards. The apps read the settings when
+they start and again when a setting changes, so a change does not need a restart.
 
-- **High contrast:** turn on a contrast theme (Settings, Accessibility, Contrast
-  themes). Note whether the text, the focus ring and the controls remain visible.
-- **Text size:** set Settings, Accessibility, Text size to the largest value. Note
-  whether the demo's text and the notes text change size, and whether anything is
-  cut off.
-- **Magnifier:** turn on Magnifier (Windows key + Plus). In the notes body, type
-  and move the caret. The view should follow the caret. The caret is drawn by jamb,
-  and only one caret appears.
+- **High contrast:** Settings, Accessibility, Contrast themes. Choose a theme (for
+  example Aquatic) and turn the theme on. Start the demo. The window's colors
+  change to the system colors: the text, the selected item (Highlight), the focus
+  ring and the control borders must stay visible, and the Dashboard banner is a plain
+  panel. Turn it off again: the dark theme returns. The keyboard shortcut Left Alt +
+  Left Shift + Print Screen toggles the theme quickly.
+- **Text size:** Settings, Accessibility, Text size. Move the slider to 225%. Start
+  the demo and the notes app, and check each page: the navigation, the header (it
+  wraps onto a second line when it is narrow, and no label is cut), the title bar, and
+  the Activity and Settings rows. Text is larger; the window's zoom is unchanged. Put
+  the slider back to 100%.
+- **Animation effects:** Settings, Accessibility, Visual effects, Animation effects.
+  Turn them off. In the demo, the Components page's Motion bars stop at their first
+  frame, a transition (hover a button) is immediate, and a scroll jumps. Turn them on
+  again.
+- **Text cursor:** Settings, Accessibility, Text cursor. Change the indicator
+  thickness and, if offered, the blink rate (a rate of none keeps the caret solid),
+  then click into the notes body. The caret's width and blink follow the setting.
+  Put them back afterwards. The names of these options vary with the Windows version.
+- **Magnifier:** turn on Magnifier (Windows key + Plus) and type in the notes body.
+  The view follows the caret, and only one caret appears (jamb's own).
+
+The registry value that jamb reads for the text size (`TextScaleFactor` under
+`HKCU\Software\Microsoft\Accessibility`) is not in Microsoft's official documentation.
+Check it with the Settings page: the value must match the slider. A person at the
+PC can confirm it with `reg query "HKCU\Software\Microsoft\Accessibility" /v TextScaleFactor`
+after moving the slider (a read only; do not change it).
+
+Without a PC to hand, the same states can be simulated: `JAMB_HIGH_CONTRAST=1`,
+`JAMB_TEXT_SCALE=225` and `JAMB_REDUCED_MOTION=1` run the apps with those settings for
+one run and change no system setting. They are for testing; normal use reads the real
+settings.
 
 ## Recording a result
 

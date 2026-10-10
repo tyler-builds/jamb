@@ -35,7 +35,7 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
 		confirming := a.confirm.Get() == n.ID
-		bar := ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).PaddingX(16).Height(ui.Px(56)).Shrink(0).
+		bar := ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).PaddingX(16).MinHeight(ui.Px(56)).Shrink(0).
 			Child(ui.Text("Edited " + relative(n.Updated.Get())).Size(13).Color(t.TextSubtle).Truncate())
 		actions := ui.Div().Row().Align(ui.Center).Gap(4)
 		if confirming {
@@ -51,7 +51,11 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 			// The pin is a toggle button: its name stays "Pin note", and its state
 			// says whether the note is pinned.
 			pinned := n.Pinned.Get()
-			pin := ui.IconButton(icons.Star).Label("Pin note").Checked(pinned).Tooltip("Pin").OnClick(func() { a.s.TogglePin(n) })
+			pinIcon := icons.Star
+			if pinned && t.HighContrast {
+				pinIcon = icons.StarFilled // the pinned state shows in the shape under high contrast
+			}
+			pin := ui.IconButton(pinIcon).Label("Pin note").Checked(pinned).Tooltip("Pin").OnClick(func() { a.s.TogglePin(n) })
 			if pinned {
 				pin.Style(ui.Style{TextColor: t.Warning}).Tooltip("Unpin")
 			}

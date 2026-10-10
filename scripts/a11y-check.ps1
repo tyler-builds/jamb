@@ -21,8 +21,19 @@
 .PARAMETER SkipAxe
     Do not run the AxeWindowsCLI scans.
 
+.PARAMETER HighContrast
+    Start the apps with JAMB_HIGH_CONTRAST=1, which turns on high contrast with
+    the representative black scheme. The system setting is not changed.
+
+.PARAMETER TextScale
+    Start the apps with JAMB_TEXT_SCALE set to this Text size in percent, 100 to
+    225. The default, 100, is no override. The system setting is not changed.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\a11y-check.ps1
+
+.EXAMPLE
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\a11y-check.ps1 -HighContrast -TextScale 225
 
 .NOTES
     Exit code 0 when every check passes, 1 when any check fails.
@@ -30,7 +41,10 @@
 [CmdletBinding()]
 param(
     [int]$TimeoutSeconds = 30,
-    [switch]$SkipAxe
+    [switch]$SkipAxe,
+    [switch]$HighContrast,
+    [ValidateRange(100, 225)]
+    [int]$TextScale = 100
 )
 
 Set-StrictMode -Version 3
@@ -68,6 +82,18 @@ public static class FocusCounter
 }
 '@
 
+# Brings a window to the foreground, so that keys sent with SendKeys reach it.
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class ForegroundWindow
+{
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+}
+'@
+
 $repo = Split-Path -Parent $PSScriptRoot
 $axe = Join-Path $env:LOCALAPPDATA 'Programs\AxeWindowsCLI\AxeWindowsCLI.exe'
 if (-not (Test-Path $axe)) {
@@ -87,6 +113,7 @@ $CT = @{
     Edit     = [System.Windows.Automation.ControlType]::Edit
     Menu     = [System.Windows.Automation.ControlType]::Menu
     MenuItem = [System.Windows.Automation.ControlType]::MenuItem
+    ListItem = [System.Windows.Automation.ControlType]::ListItem
 }
 $Passed = 0
 $Failed = 0
@@ -177,6 +204,8 @@ function Start-App([string]$Exe, [string]$NotesFile) {
     $psi.WorkingDirectory = Split-Path $Exe
     $psi.UseShellExecute = $false
     if ($NotesFile) { $psi.EnvironmentVariables['JAMB_NOTES_FILE'] = $NotesFile }
+    if ($HighContrast) { $psi.EnvironmentVariables['JAMB_HIGH_CONTRAST'] = '1' }
+    if ($TextScale -ne 100) { $psi.EnvironmentVariables['JAMB_TEXT_SCALE'] = "$TextScale" }
     $proc = [System.Diagnostics.Process]::Start($psi)
     $script:Procs += $proc
     return $proc
@@ -231,6 +260,10 @@ try {
     }
     $notesFile = Join-Path $Work 'notes.json'
 
+    $overrides = @()
+    if ($HighContrast) { $overrides += 'high contrast' }
+    if ($TextScale -ne 100) { $overrides += "text size $TextScale percent" }
+    Write-Output "Overrides: $(if ($overrides) { $overrides -join ', ' } else { 'none' })"
     Write-Output "AxeWindowsCLI: $(if ($axe) { $axe } else { 'not found, scans skipped' })"
     [FocusCounter]::Start()
 
@@ -336,6 +369,35 @@ try {
         Wait-Gone { Find-Named $win 'Project actions' $CT.Menu | Select-Object -First 1 } 'the menu to close' | Out-Null
     }
 
+    Check 'demo: Shift+F10 on a project card opens its menu, and Down moves the focus through the items' {
+        Invoke-Named $win 'Projects 6' $CT.Button
+        Wait-For { $null -ne (Find-Named $win 'Star project' $CT.Button | Select-Object -First 1) } 'the project list' | Out-Null
+        $card = Wait-For {
+            $all = $win.FindAll($Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+            $all | Where-Object { $_.Current.ControlType -eq $CT.ListItem -and $_.Current.Name -like 'Project Alpha*' } | Select-Object -First 1
+        } 'the first project card'
+        $card.SetFocus()
+        # The keys go to the window that has the focus, so it is brought forward first.
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        Start-Sleep -Milliseconds 300
+        [System.Windows.Forms.SendKeys]::SendWait('+{F10}')
+        $focusIs = {
+            param([string]$Name, $Type)
+            $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+            $null -ne $f -and $f.Current.Name -eq $Name -and $f.Current.ControlType -eq $Type
+        }
+        Wait-For { & $focusIs 'Open' $CT.MenuItem } 'Open, the first item of the card menu, to take focus' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+        Wait-For { & $focusIs 'Open in window' $CT.MenuItem } 'Down to move the focus to Open in window' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+        Wait-For { & $focusIs 'Star' $CT.MenuItem } 'Down to move the focus to Star' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-For {
+            $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+            $null -ne $f -and $f.Current.Name -like 'Project Alpha*' -and $f.Current.ControlType -eq $CT.ListItem
+        } 'the focus back on the card after Escape' | Out-Null
+    }
+
     Check 'demo: New Project opens a dialog; its disabled Create keeps Invoke; Cancel closes it' {
         Invoke-Named $win 'New Project' $CT.Button
         Wait-For { $null -ne (Find-Named $win 'New project' | Select-Object -First 1) } 'the New project dialog' | Out-Null
@@ -384,6 +446,24 @@ try {
         $ec.Expand()
         Wait-For { $null -ne (Find-Named $nwin 'File' $CT.Menu | Select-Object -First 1) } 'the File menu' | Out-Null
         $ec.Collapse()
+        Wait-Gone { Find-Named $nwin 'File' $CT.Menu | Select-Object -First 1 } 'the File menu to close' | Out-Null
+    }
+
+    Check 'notes: F10 focuses the menu bar, and Down opens File on its first item' {
+        $search = Find-One $nwin 'Search notes' $CT.Edit
+        $search.SetFocus()
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$nwin.Current.NativeWindowHandle) | Out-Null
+        Start-Sleep -Milliseconds 300
+        [System.Windows.Forms.SendKeys]::SendWait('{F10}')
+        Wait-For { $f = [System.Windows.Automation.AutomationElement]::FocusedElement; $null -ne $f -and $f.Current.Name -eq 'File' -and $f.Current.ControlType -eq $CT.MenuItem } 'F10 to focus the File label' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+        Wait-For { $null -ne (Find-Named $nwin 'File' $CT.Menu | Select-Object -First 1) } 'Down to open the File menu' | Out-Null
+        $menu = Find-One $nwin 'File' $CT.Menu
+        $first = $menu.FindFirst([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+        Assert ($null -ne $first) 'the File menu has no items'
+        $expected = $first.Current.Name
+        Wait-For { $f = [System.Windows.Automation.AutomationElement]::FocusedElement; $null -ne $f -and $f.Current.Name -eq $expected -and $f.Current.ControlType -eq $CT.MenuItem } "the first File item '$expected' to take focus" | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
         Wait-Gone { Find-Named $nwin 'File' $CT.Menu | Select-Object -First 1 } 'the File menu to close' | Out-Null
     }
 

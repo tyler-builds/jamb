@@ -18,7 +18,7 @@ const menuBarHeight = 30
 func (a *App) menuBar(ctx *ui.Context) ui.Element {
 	t := ctx.Theme()
 	return ui.Div().Absolute().Top(0).Left(0).Right(0).
-		Row().Align(ui.Center).Height(ui.Px(menuBarHeight)).PaddingX(4).
+		Row().Align(ui.Center).MinHeight(ui.Px(menuBarHeightFor(ctx))).PaddingX(4).
 		Background(t.Sidebar).BorderEdges(ui.Edges{Bottom: 1}, t.Border).
 		Child(ui.MenuBar(
 			ui.TopMenu{Label: "File", Items: func() []ui.MenuItem {
@@ -88,4 +88,10 @@ func (a *App) noteMenu(n *store.Note) []ui.MenuItem {
 			a.confirm.Set(n.ID)
 		}},
 	}
+}
+
+// menuBarHeightFor is the menu bar's height. It grows with the Text size, so
+// that the bar's text fits and the content below it starts under the bar.
+func menuBarHeightFor(ctx *ui.Context) float32 {
+	return menuBarHeight * min(float32(ctx.TextScale())/100, 1.5)
 }

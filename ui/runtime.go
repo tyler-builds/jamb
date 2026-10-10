@@ -147,7 +147,9 @@ func (ts textStyle) inherit(s *Style) textStyle {
 }
 
 func (n *node) textStyle() text.Style {
-	st := text.Style{Family: n.ts.family, Size: n.ts.size, Weight: n.ts.weight, LineHeight: n.ts.lineHeight}
+	// The Text size setting scales the font, and the line height with it, since
+	// the line height is a multiple of the size.
+	st := text.Style{Family: n.ts.family, Size: n.ts.size * n.rt.textFactor, Weight: n.ts.weight, LineHeight: n.ts.lineHeight}
 	if n.textEl != nil {
 		st.MaxLines = n.textEl.maxLines
 		st.NoWrap = n.textEl.noWrap
@@ -204,12 +206,18 @@ type FrameStats struct {
 type Runtime struct {
 	rootEl   *ComponentElement
 	rootInst *componentInstance
-	theme    *Theme
-	text     *text.System
-	engine   layout.Engine
-	scene    scene.Scene
-	tree     *node
-	byID     map[uint64]*node
+	theme    *Theme // the effective theme: the app's, or the high contrast one
+	appTheme *Theme // the theme the app set with SetTheme
+	sys      SystemSettings
+	// textFactor scales the font size of text (see textStyle); caretWidth is the
+	// width of the text caret in logical pixels. Both follow sys.
+	textFactor float32
+	caretWidth float32
+	text       *text.System
+	engine     layout.Engine
+	scene      scene.Scene
+	tree       *node
+	byID       map[uint64]*node
 
 	instances map[uint64]*componentInstance
 	states    map[uint64]*nodeState
@@ -393,21 +401,25 @@ func NewRuntime(root func(ctx *Context) Element, theme *Theme, ts *text.System) 
 		ts = text.NewSystem()
 	}
 	return &Runtime{
-		rootEl:    Component(root),
-		theme:     theme,
-		text:      ts,
-		maximized: NewSignal(false),
-		focused:   NewSignal(false),
-		byID:      map[uint64]*node{},
-		instances: map[uint64]*componentInstance{},
-		states:    map[uint64]*nodeState{},
-		keymap:    DefaultBindings(), // first, so bindings added later win at the same depth
-		scale:     1,
-		paintGen:  1, // nodes start at 0, so none counts as painted before the first paint
-		devScale:  1,
-		zoom:      1,
-		zoomKeys:  true,
-		warn:      func(s string) { fmt.Fprintln(os.Stderr, "jamb:", s) },
+		rootEl:     Component(root),
+		theme:      theme,
+		appTheme:   theme,
+		sys:        SystemSettings{TextScale: 100, CaretBlink: defaultCaretBlink, CaretWidth: 1},
+		textFactor: 1,
+		caretWidth: defaultCaretWidth,
+		text:       ts,
+		maximized:  NewSignal(false),
+		focused:    NewSignal(false),
+		byID:       map[uint64]*node{},
+		instances:  map[uint64]*componentInstance{},
+		states:     map[uint64]*nodeState{},
+		keymap:     DefaultBindings(), // first, so bindings added later win at the same depth
+		scale:      1,
+		paintGen:   1, // nodes start at 0, so none counts as painted before the first paint
+		devScale:   1,
+		zoom:       1,
+		zoomKeys:   true,
+		warn:       func(s string) { fmt.Fprintln(os.Stderr, "jamb:", s) },
 	}
 }
 
@@ -540,9 +552,14 @@ func (rt *Runtime) InvalidateAll() {
 
 // SetTheme switches the theme and re-renders all components.
 func (rt *Runtime) SetTheme(t *Theme) {
-	rt.theme = t
+	rt.appTheme = t
+	rt.applyTheme()
 	rt.InvalidateAll()
 }
+
+// AppTheme returns the theme the app set with SetTheme. Under high contrast the
+// active theme is the high contrast one, so this is the theme to show as chosen.
+func (rt *Runtime) AppTheme() *Theme { return rt.appTheme }
 
 // Theme returns the active theme.
 func (rt *Runtime) Theme() *Theme { return rt.theme }
@@ -931,7 +948,7 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	}
 	// Only an element that was drawn in the last paint has something to fade
 	// out; one that was off screen (culled) simply goes.
-	exits := mayExit && leaving && n.div != nil && n.div.exit != nil && n.paintGen == rt.paintGen
+	exits := mayExit && leaving && n.div != nil && n.div.exit != nil && n.paintGen == rt.paintGen && !rt.sys.ReducedMotion
 	if exits {
 		n.st.leaveAt = rt.now()
 		rt.ghosts = append(rt.ghosts, n)

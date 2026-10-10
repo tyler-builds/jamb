@@ -61,3 +61,7 @@ func newRenderer(w platform.Window, width, height int) (render.Renderer, error) 
 	}
 	return r, nil
 }
+
+// readPlatformSettings reads the operating system's accessibility and text
+// settings (see platform.Settings).
+func readPlatformSettings() platform.Settings { return windows.ReadSettings() }

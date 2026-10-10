@@ -74,7 +74,7 @@ func Root(s *store.Store) func(*ui.Context) ui.Element {
 	}
 	return func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
-		return ui.Div().Row().Size(ui.Full, ui.Full).PaddingEdges(ui.Edges{Top: menuBarHeight}).
+		return ui.Div().Row().Size(ui.Full, ui.Full).PaddingEdges(ui.Edges{Top: menuBarHeightFor(ctx)}).
 			Background(t.Background).TextColor(t.Text).
 			OnAction(NewNote, a.newNote).
 			OnAction(Search, func() { a.search.Focus() }).
@@ -259,7 +259,7 @@ func (a *App) sidebar() ui.Element {
 			})
 
 		return ui.Div().Width(ui.Px(300)).Height(ui.Full).Shrink(0).Background(t.Sidebar).
-			Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(16).Height(ui.Px(56)).Shrink(0).
+			Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(16).MinHeight(ui.Px(56)).Shrink(0).
 				Child(ui.Div().Row().Align(ui.Center).Gap(10).
 					Child(ui.Div().Size(ui.Px(26), ui.Px(26)).Radius(7).Background(t.Accent).Center().
 						Child(ui.Icon(icons.Layers).Size(15).Color(ui.Hex("#ffffff")))).
@@ -409,7 +409,7 @@ func (a *App) status(count int) ui.Element {
 		if line := notice.Get(); line != "" && st.Err == "" {
 			label, color = line, t.TextMuted
 		}
-		bar := ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).PaddingX(16).Height(ui.Px(40)).Shrink(0).
+		bar := ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).PaddingX(16).MinHeight(ui.Px(40)).Shrink(0).
 			Child(ui.Div().Row().Align(ui.Center).Gap(6).MinWidth(ui.Px(0)).
 				Child(ui.Icon(icons.Check).Size(13).Color(color)).
 				Child(ui.Text(label).Size(12).Color(color).Truncate())).

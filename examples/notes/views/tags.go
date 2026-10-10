@@ -64,7 +64,9 @@ func (a *App) tagEditor(n *store.Note) ui.Element {
 					Key("remove-" + tag).Label("Remove tag " + tag).
 					Child(ui.Icon(icons.X).Size(10))))
 		}
-		row.Child(ui.TextInput(draft).Label("New tag").Small().Placeholder("Add tag…").Icon(icons.Tag).Width(ui.Px(140)).
+		// The field widens with the Text size so that its placeholder fits.
+		fieldW := 140 * min(float32(ctx.TextScale())/100, 1.5)
+		row.Child(ui.TextInput(draft).Label("New tag").Small().Placeholder("Add tag…").Icon(icons.Tag).Width(ui.Px(fieldW)).
 			Key("add-tag").
 			OnSubmit(func(v string) {
 				a.s.AddTag(n, v)

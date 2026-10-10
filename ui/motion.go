@@ -98,7 +98,7 @@ func (rt *Runtime) motion(n *node, v *visual) {
 		return
 	}
 	now := rt.now()
-	if sp := n.div.enter; sp != nil && !st.enterAt.IsZero() {
+	if sp := n.div.enter; sp != nil && !st.enterAt.IsZero() && !rt.sys.ReducedMotion {
 		p, running := sp.progress(now, st.enterAt)
 		rt.animating = rt.animating || running
 		op, x, y, sc := sp.m.pose(sp.a.easing()(p))
@@ -107,7 +107,7 @@ func (rt *Runtime) motion(n *node, v *visual) {
 		v.offY += y
 		v.scale *= sc
 	}
-	if sp := n.div.exit; sp != nil && !st.leaveAt.IsZero() {
+	if sp := n.div.exit; sp != nil && !st.leaveAt.IsZero() && !rt.sys.ReducedMotion {
 		p, running := sp.progress(now, st.leaveAt)
 		rt.animating = rt.animating || running
 		// The exit runs the pose backwards: eased progress 0 is the normal look.

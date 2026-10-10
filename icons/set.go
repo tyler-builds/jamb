@@ -86,6 +86,21 @@ var (
 		b.Z()
 	})
 
+	// StarFilled is Star with its inside filled. Starred and pinned states use
+	// it, so the state shows in the shape and not only in the color.
+	StarFilled = newIcon("star-filled", func(b *builder) {
+		var coords []float32
+		for i := 1; i <= 10; i++ {
+			a := float64(i)*math.Pi/5 - math.Pi/2
+			r := float32(10)
+			if i%2 == 1 {
+				r = 4.2
+			}
+			coords = append(coords, 12+r*float32(math.Cos(a)), 12.5+r*float32(math.Sin(a)))
+		}
+		b.Poly(coords...)
+	})
+
 	Clock = newIcon("clock", func(b *builder) {
 		b.Circle(12, 12, 10).M(12, 6).L(12, 12).L(16, 14)
 	})

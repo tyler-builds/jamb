@@ -17,7 +17,6 @@ import (
 // handles keyboard, mouse, clipboard and undo itself.
 
 const (
-	caretBlink     = 530 * time.Millisecond
 	caretBlinkStop = 15 * time.Second // after this long without activity the caret stays solid
 	undoGroupTime  = time.Second
 	maxUndo        = 500
@@ -444,7 +443,8 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	}
 
 	if focused {
-		caret := scene.Rect{X: tx + caretX - 0.75, Y: cy + caretTop, W: 1.5, H: l.LineHeight}
+		caretW := rt.caretWidth
+		caret := scene.Rect{X: tx + caretX - caretW/2, Y: cy + caretTop, W: caretW, H: l.LineHeight}
 		rt.textInput = caret
 		rt.hasTextInput = true
 		if es.reveal {
@@ -460,16 +460,18 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	}
 }
 
-// caretVisible implements blinking: on for 530 ms, off for 530 ms, starting
-// at the last activity, and solid after a while of inactivity. While it
-// blinks it schedules exactly the frames needed to toggle it.
+// caretVisible implements blinking: on, then off, each for the system's blink
+// time (530 ms by default), starting at the last activity, and solid after a
+// while of inactivity or when the system's blink is off. While it blinks it
+// schedules exactly the frames needed to toggle it.
 func (rt *Runtime) caretVisible(es *editState) bool {
 	since := rt.lastFrame.Sub(es.activity)
-	if since < 0 || since >= caretBlinkStop {
+	if since < 0 || since >= caretBlinkStop || rt.sys.CaretBlinkOff {
 		return true
 	}
-	phase := int(since / caretBlink)
-	next := es.activity.Add(time.Duration(phase+1) * caretBlink)
+	blink := rt.sys.CaretBlink
+	phase := int(since / blink)
+	next := es.activity.Add(time.Duration(phase+1) * blink)
 	rt.wakeAt(next)
 	return phase%2 == 0
 }

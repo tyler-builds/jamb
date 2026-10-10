@@ -33,3 +33,7 @@ func releaseDevice() {}
 func rebuildDevice() error { return fmt.Errorf("no GPU backend for %s yet", runtime.GOOS) }
 
 func gpuAdapter() string { return "" }
+
+// readPlatformSettings reports the defaults: no platform adapter reads the
+// settings yet.
+func readPlatformSettings() platform.Settings { return platform.DefaultSettings() }

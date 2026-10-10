@@ -135,5 +135,5 @@ var All = []*Icon{
 	Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Clock, Copy, Maximize, Minimize, Restore,
 	Dashboard, Download, Eye, File, Filter, Folder, GitBranch, Hash, Heart, Home, Inbox, Info,
 	Layers, Link, Lock, Menu, Minus, Moon, MoreHorizontal, Pencil, Pin, Plus, Refresh, Search,
-	Settings, Star, Sun, Tag, Trash, Upload, Users, X, Zap,
+	Settings, Star, StarFilled, Sun, Tag, Trash, Upload, Users, X, Zap,
 }

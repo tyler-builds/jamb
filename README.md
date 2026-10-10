@@ -459,6 +459,13 @@ straight away. It is drawn above its former siblings while it exits. It is a
 ghost: it cannot be hit, focused or found, and it disappears when its exit ends.
 Showing it again during its exit drops the ghost.
 
+With Windows' Animation effects turned off (Settings, Accessibility, Visual
+effects), jamb asks for reduced motion (`ctx.ReducedMotion()`). Then `Transition`,
+`Enter` and `Exit` jump to their end, and smooth scrolling jumps to its target. An
+`Animate` that is finite jumps to its last frame, and a repeating one stops at its
+first frame, so nothing asks for more frames. Apps should check `ctx.ReducedMotion()`
+before they run their own motion.
+
 ### Actions and key bindings
 
 An action is a named command. Elements handle it with `OnAction`, key
@@ -753,6 +760,10 @@ ui.MenuBar(
   menu from the focused bar. Escape or Tab leaves the bar. The labels are not in
   the Tab order. A window without a menu bar keeps Windows' own Alt behavior,
   which opens the system menu; with one, a lone Alt press is taken by the bar.
+  F10 by itself activates the bar the same way, as Windows does for its menu bars:
+  the first label takes focus. Without a menu bar F10 does nothing. Shift+F10 is the
+  context-menu key, not the bar's. The application takes F10 from Windows, so that
+  Windows' menu mode does not swallow the keys that follow.
 - **Look.** Menus use the theme's surface, border, shadow and highlight colors.
   They enter and leave with the same motion as the command palette.
 - **Roles.** `item.Role()` returns the WAI-ARIA name of an entry (`RoleMenuItem`,
@@ -858,6 +869,19 @@ Some event semantics to know:
 
 Theming: `ctx.Theme()` returns semantic colors, and `ctx.SetTheme(ui.LightTheme)`
 re-renders everything. `ui.DarkTheme` and `ui.LightTheme` are built in.
+
+High contrast is automatic. When Windows high contrast is on (Settings, Accessibility,
+Contrast themes), the runtime uses `ui.HighContrastTheme`, a theme built from the
+system colors (`GetSysColor`): window and text colors for surfaces and text,
+Highlight and HighlightText for selection and the primary action, and no tints,
+gradients or shadows. Icons take the text color, and a focus ring stays. The app
+keeps its own theme: `ctx.AppTheme()` (or `rt.AppTheme()`) is what `SetTheme` set,
+and `ctx.Theme().HighContrast` or `ctx.HighContrast()` tells the app that the
+high contrast theme is in use, for content that picks its own colors. There is no
+opt-out. Details are in [docs/accessibility.md](docs/accessibility.md#phase-d-what-changed-from-this-design).
+
+Contrast of the built-in tokens is checked by `ui/contrast_test.go` against the
+WCAG 2 ratios of each pair the built-in widgets use, in both themes.
 
 Zoom: Ctrl+= (or Ctrl++, numpad +) zooms in, Ctrl+- zooms out, Ctrl+0
 resets, and Ctrl+mouse wheel zooms. Levels run 50% to 300% (`ui.ZoomLevels`).
@@ -1148,6 +1172,43 @@ check are in [Tools](#tools-for-humans-and-coding-agents). The manual pass with
 Narrator and NVDA, with the expected results for each task in the demo and the
 notes app, is in [docs/accessibility-testing.md](docs/accessibility-testing.md).
 
+#### System settings
+
+jamb reads four Windows settings and applies them to every window (the app needs
+no code):
+
+- **Text size** (Settings, Accessibility, Text size, 100 to 225%, read from
+  `HKCU\Software\Microsoft\Accessibility\TextScaleFactor`). It scales text only:
+  font sizes and line heights. The zoom and the display scale work as before.
+  Heights of controls are minimums that grow with their content. Apps with fixed
+  sizes read `ctx.TextScale()` (percent) to scale them. See
+  [Microsoft's guidance on text scaling](https://learn.microsoft.com/en-us/windows/apps/design/accessibility/text-size).
+- **High contrast** (`SystemParametersInfo` with `SPI_GETHIGHCONTRAST`). See
+  Themes above.
+- **Reduced motion** (`SPI_GETCLIENTAREAANIMATION`, Animation effects). See
+  Animation above.
+- **Text cursor.** The caret of a text field blinks at the system's blink time
+  (`GetCaretBlinkTime`; a blink time of infinity keeps it solid) and is as thick as
+  the system's cursor thickness (`SPI_GETCARETWIDTH`) times 1.5 logical pixels.
+
+The settings are read at start and again on `WM_SETTINGCHANGE` and
+`WM_SYSCOLORCHANGE`, so a change shows without a restart. jamb reads them and
+never writes them.
+
+For testing, three variables simulate the settings for one run, and change no system
+setting. Real settings are used in normal use; a variable replaces its setting only
+when it is set:
+
+```
+set JAMB_HIGH_CONTRAST=1        (or "white" for the white scheme, 0 for off)
+set JAMB_TEXT_SCALE=225         (100 to 225)
+set JAMB_REDUCED_MOTION=1       (0 for off)
+go run ./examples/demo
+```
+
+The black and white schemes are representative values
+(`ui.HighContrastBlack`, `ui.HighContrastWhite`), not read from a system.
+
 ### GPU device loss
 
 When the GPU device is removed or reset (a driver update or crash, a remote
@@ -1252,7 +1313,9 @@ notes app runs with a temporary notes file, never your own. It runs 18 checks:
 names and roles, Invoke, Toggle, ExpandCollapse, Selection, Value, Scroll, focus
 with its event, and the Text pattern on the word "small". Each prints PASS or
 FAIL, and the script exits 1 if any fails. Options: `-TimeoutSeconds N` (default
-30) and `-SkipAxe`. The processes and temporary files are removed on exit, after a
+30), `-SkipAxe`, `-HighContrast` (run the apps with `JAMB_HIGH_CONTRAST=1`) and
+`-TextScale N` (run them with `JAMB_TEXT_SCALE=N`, 100 to 225). The overrides are
+described under System settings in the Accessibility section. The processes and temporary files are removed on exit, after a
 failure too.
 
 When AxeWindowsCLI is installed, the script also scans each app with it, and a scan
@@ -1644,6 +1707,18 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
 
 ## Known limitations and next steps
 
+- **Disabled controls.** In the normal themes a disabled control is dimmed with
+  `Opacity` (0.5), as before. WCAG 1.4.3 exempts inactive components from the
+  contrast ratio, so the dimmed text is not held to 4.5:1. Under high contrast a
+  disabled control is drawn in GrayText (outline and text) and is not dimmed, as
+  Microsoft's guidance asks, and that GrayText is kept at 4.5:1 or more on the window.
+- **Large text in single-line fields.** A single-line text field scrolls its text
+  horizontally when the text is wider than the field, as any input does. At 225%
+  the notes title can be longer than its field.
+- **Repeating animations at rest.** A repeating `Animate` (the demo's Motion bars)
+  keeps the frame loop running at the display's rate, as it must while it moves. Only
+  the animated elements repaint; the rest of the page is not rebuilt. Stopping
+  repeating animations that are off screen is not done.
 - **Focus.** Tab reaches only the rows of a virtualized list (`ListOf`)
   that are built, which are the rows near the viewport; rows beyond them
   are reached by scrolling and then Tab. Tab reveals vertically only,
@@ -1787,7 +1862,7 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   rows that are not built cannot be found or realized (see the design's phase B
   open items). Open from phase C: IME composition, the Text pattern for static
   and rich text, annotations and embedded objects (see the design's phase C open
-  items). Still to come: high contrast, text size and reduced motion (phase D). The caption
+  items). The caption
   buttons (Minimize, Maximize, Close) have their roles and names, but their
   invoke path has not been checked live. Building the tree for the demo's
   dashboard takes about 18 µs, measured with a benchmark; the cost grows with

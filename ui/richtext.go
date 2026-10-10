@@ -250,7 +250,7 @@ func (rt *Runtime) runPaint(n *node, span int, base Color, opacity float32) text
 	color := hl.Color
 	switch {
 	case color.IsZero() && p.accent:
-		color = rt.theme.Accent
+		color = rt.theme.Link
 	case color.IsZero():
 		color = base
 	}

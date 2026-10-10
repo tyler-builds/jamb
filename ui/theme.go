@@ -5,6 +5,9 @@ package ui
 type Theme struct {
 	Name string
 	Dark bool
+	// HighContrast is true for the high contrast theme, which HighContrastTheme
+	// builds from the system colors. Apps can read it to choose their own colors.
+	HighContrast bool
 
 	Background    Color // window background
 	Sidebar       Color // secondary panels
@@ -18,7 +21,12 @@ type Theme struct {
 	TextMuted  Color
 	TextSubtle Color
 
-	Accent       Color
+	Accent Color
+	Link   Color // hyperlink text; a separate token so that Accent can fill buttons
+	// Disabled is the color of disabled text, icons and borders. Under high
+	// contrast it is GrayText; in the normal themes disabled controls are dimmed
+	// with Opacity instead, so it equals TextSubtle there.
+	Disabled     Color
 	AccentHover  Color
 	AccentActive Color
 	AccentText   Color // text on Accent
@@ -46,19 +54,21 @@ var DarkTheme = &Theme{
 	SurfaceHover:  Hex("#1f1f23"),
 	SurfaceActive: Hex("#27272a"),
 	Border:        Hex("#26262b"),
-	BorderStrong:  Hex("#3a3a41"),
+	BorderStrong:  Hex("#66666d"),
 	Text:          Hex("#f4f4f5"),
 	TextMuted:     Hex("#a1a1aa"),
-	TextSubtle:    Hex("#71717a"),
-	Accent:        Hex("#6366f1"),
-	AccentHover:   Hex("#7376f4"),
+	TextSubtle:    Hex("#8e8e96"),
+	Accent:        Hex("#6265ed"),
+	Link:          Hex("#a5b4fc"), // 4.5:1 or more on every dark surface
+	Disabled:      Hex("#8e8e96"), // = TextSubtle
+	AccentHover:   Hex("#5b5ee7"),
 	AccentActive:  Hex("#5457e0"),
 	AccentText:    Hex("#ffffff"),
 	AccentSoft:    Hex("#6366f126"),
 	Success:       Hex("#22c55e"),
 	Warning:       Hex("#f59e0b"),
-	Danger:        Hex("#ef4444"),
-	Scrollbar:     Hex("#ffffff33"),
+	Danger:        Hex("#d62828"),
+	Scrollbar:     Hex("#ffffff"),
 	FocusRing:     Hex("#818cf8"),
 	Scrim:         Hex("#00000099"),
 	Radius:        8,
@@ -74,19 +84,21 @@ var LightTheme = &Theme{
 	SurfaceHover:  Hex("#f4f4f5"),
 	SurfaceActive: Hex("#e4e4e7"),
 	Border:        Hex("#e4e4e7"),
-	BorderStrong:  Hex("#d4d4d8"),
+	BorderStrong:  Hex("#8a8a92"),
 	Text:          Hex("#18181b"),
 	TextMuted:     Hex("#52525b"),
-	TextSubtle:    Hex("#a1a1aa"),
+	TextSubtle:    Hex("#62626a"),
 	Accent:        Hex("#4f46e5"),
+	Link:          Hex("#4338ca"), // 4.5:1 or more on every light surface
+	Disabled:      Hex("#62626a"), // = TextSubtle
 	AccentHover:   Hex("#5b53f0"),
 	AccentActive:  Hex("#4338ca"),
 	AccentText:    Hex("#ffffff"),
 	AccentSoft:    Hex("#4f46e51f"),
 	Success:       Hex("#16a34a"),
 	Warning:       Hex("#d97706"),
-	Danger:        Hex("#dc2626"),
-	Scrollbar:     Hex("#0000003d"),
+	Danger:        Hex("#d12a2a"),
+	Scrollbar:     Hex("#000000"),
 	FocusRing:     Hex("#6366f1"),
 	Scrim:         Hex("#18181b59"),
 	Radius:        8,

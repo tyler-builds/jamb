@@ -80,7 +80,7 @@ func (b *accessBuilder) textInfo(n *node, es *editState, v string) *access.TextI
 		Scale:      rt.scale,
 		Clip:       b.bounds(n),
 		FontName:   n.ts.family,
-		FontSize:   float64(n.ts.size) * 0.75, // logical pixels to points, at 96 per inch
+		FontSize:   float64(n.ts.size*n.rt.textFactor) * 0.75, // logical pixels to points, at 96 per inch
 		FontWeight: int(n.ts.weight),
 	}
 }

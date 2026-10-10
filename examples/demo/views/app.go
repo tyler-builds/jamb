@@ -55,21 +55,26 @@ func Sidebar(s *Store) ui.Element {
 		nav := func(p Page, ic *icons.Icon, label string, badge int, a *ui.Action) ui.Element {
 			active := p == page
 			// Tab reaches each item; Enter or Space opens its page.
-			item := ui.Div().Key("nav-"+label).Selected(active).Row().Align(ui.Center).Gap(10).Height(ui.Px(36)).PaddingX(10).Radius(8).
+			item := ui.Div().Key("nav-"+label).Selected(active).Row().Align(ui.Center).Gap(10).MinHeight(ui.Px(36)).PaddingX(10).Radius(8).
 				TextColor(t.TextMuted).Transition(fast).Tooltip(tip(ctx, label, a)).
 				Hover(ui.Style{Background: t.SurfaceHover, TextColor: t.Text}).
 				When(active, func(d *ui.DivElement) {
-					d.Background(t.SurfaceActive).TextColor(t.Text)
+					// High contrast fills the selection with Highlight, whose text is AccentText.
+					on := t.Text
+					if t.HighContrast {
+						on = t.AccentText
+					}
+					d.Background(t.SurfaceActive).TextColor(on)
 				}).
 				FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
 				Focusable().
 				OnClick(func() { s.Page.Set(p) }).
 				Child(ui.Icon(ic).Size(17)).
-				Child(ui.Text(label).Medium().Grow(1))
+				Child(ui.Text(label).Medium().Grow(1).NoWrap())
 			if badge > 0 {
-				item.Child(ui.Div().PaddingX(7).Height(ui.Px(20)).Radius(10).Center().
+				item.Child(ui.Div().PaddingX(7).MinHeight(ui.Px(20)).Radius(10).Center().
 					Background(t.AccentSoft).
-					Child(ui.Textf("%d", badge).Size(12).Semibold().Color(t.Accent.Lighten(0.3))))
+					Child(ui.Textf("%d", badge).Size(12).Semibold().Color(t.Text)))
 			}
 			if active {
 				item.Child(ui.Div().Absolute().Left(-12).Top(9).Size(ui.Px(3), ui.Px(18)).Radius(2).Background(t.Accent))
@@ -77,7 +82,7 @@ func Sidebar(s *Store) ui.Element {
 			return item
 		}
 
-		return ui.Div().Width(ui.Px(244)).Height(ui.Full).Shrink(0).
+		return ui.Div().Width(ui.Px(244 * layoutScale(ctx))).Height(ui.Full).Shrink(0).
 			Background(t.Sidebar).PaddingX(12).PaddingY(14).Gap(2).SelectionContainer().Label("Navigation").
 			Child(brand(t, focused)).
 			Child(sectionLabel(t, "Menu")).
@@ -114,7 +119,7 @@ func sectionLabel(t *ui.Theme, s string) ui.Element {
 func themeSwitch(ctx *ui.Context) ui.Element {
 	t := ctx.Theme()
 	option := func(ic *icons.Icon, label string, theme *ui.Theme) ui.Element {
-		active := t == theme
+		active := ctx.AppTheme() == theme
 		return ui.Div().Row().Grow(1).Height(ui.Px(30)).Radius(6).Center().Gap(6).Selected(active).
 			TextColor(t.TextMuted).Transition(fast).Tooltip(tip(ctx, label+" theme", ToggleTheme)).
 			Hover(ui.Style{TextColor: t.Text}).
@@ -210,7 +215,7 @@ var pageTitles = map[Page]string{
 // the title, the strip drags the window. It dims while the window is
 // unfocused. Main and project windows both use it.
 func titleBar(t *ui.Theme, focused bool, title string) ui.Element {
-	bar := ui.Div().Row().Align(ui.Center).Height(ui.Px(32)).Shrink(0).WindowArea(ui.AreaDrag)
+	bar := ui.Div().Row().Align(ui.Center).MinHeight(ui.Px(32)).Shrink(0).WindowArea(ui.AreaDrag)
 	if title != "" {
 		bar.Child(ui.Div().Grow(1).MinWidth(ui.Px(0)).PaddingX(12).Opacity(focusOpacity(focused)).
 			Child(ui.Text(title).Size(12).Medium().Color(t.TextSubtle).Truncate()))
@@ -232,19 +237,26 @@ func focusOpacity(focused bool) float32 {
 // Its background drags the window; the controls in it do not.
 func header(ctx *ui.Context, s *Store, page Page, focused bool) ui.Element {
 	t := ctx.Theme()
-	return ui.Div().Row().Height(ui.Px(60)).Shrink(0).Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(24).Gap(16).
+	return ui.Div().Row().Wrap().MinHeight(ui.Px(60)).Shrink(0).Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(24).Gap(16).
 		WindowArea(ui.AreaDrag).
 		Child(ui.Div().Row().Align(ui.Center).Gap(8).MinWidth(ui.Px(0)).Opacity(focusOpacity(focused)).
 			Child(ui.Text("Workspace").Color(t.TextSubtle).Truncate()). // gives way first when narrow
 			Child(ui.Icon(icons.ChevronRight).Size(14).Color(t.TextSubtle)).
-			Child(ui.Text(pageTitles[page]).Medium())).
+			Child(ui.Text(pageTitles[page]).Medium().Truncate())).
 		Child(ui.Div().Row().Align(ui.Center).Gap(8).
 			// The wrapper carries the tooltip, since a text field has none.
 			Child(ui.Div().Tooltip(tip(ctx, "Search", FocusSearch)).
 				Child(ui.TextInput(s.Query).Label("Search projects").Placeholder("Search projects…").Icon(icons.Search).FocusHandle(s.Search).
-					Style(ui.Style{Width: ui.Px(240), MinWidth: ui.Px(140)}). // shrinks in narrow windows
+					Style(ui.Style{Width: ui.Px(240 * layoutScale(ctx))}). // wraps to a new line when the header is narrow
 					OnChange(func(string) { s.Page.Set(PageProjects) }))).
 			Child(ui.IconButton(icons.Bell).Label("Notifications").Tooltip("Notifications").
 				OnClick(func() { ui.Announce("No new notifications", access.Polite) })).
 			Child(ui.Button("New Project").Key("new-project").Icon(icons.Plus).OnClick(s.OpenNewProject)))
+}
+
+// layoutScale grows the widths of the wide controls with the Text size, up to
+// 150%, so that their labels fit. Heights need no help: they are minimums that
+// grow with their content.
+func layoutScale(ctx *ui.Context) float32 {
+	return min(float32(ctx.TextScale())/100, 1.5)
 }

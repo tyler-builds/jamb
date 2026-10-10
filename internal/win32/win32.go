@@ -232,6 +232,7 @@ const (
 	VK_SHIFT     = 0x10
 	VK_CONTROL   = 0x11
 	VK_MENU      = 0x12
+	VK_F10       = 0x79
 	VK_LWIN      = 0x5B
 	VK_RWIN      = 0x5C
 	VK_APPS      = 0x5D
