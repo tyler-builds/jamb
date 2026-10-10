@@ -36,6 +36,8 @@ const (
 	ctTabItem     = 50019
 	ctText        = 50020
 	ctToolTip     = 50022
+	ctTree        = 50023
+	ctTreeItem    = 50024
 	ctCustom      = 50025
 	ctGroup       = 50026
 	ctDocument    = 50030
@@ -124,6 +126,7 @@ const (
 	toggleStateIndeterminate = 2
 	expandCollapseCollapsed  = 0
 	expandCollapseExpanded   = 1
+	expandCollapseLeafNode   = 3     // a tree item with no children, which cannot open or close
 	headingLevel1            = 80051 // HeadingLevel1; the others follow it
 
 	// WindowVisualState and WindowInteractionState values.
@@ -213,6 +216,8 @@ const (
 //	tooltip                   ToolTip           tooltip
 //	scroll area, tab panel    Pane              scroll area, tab panel
 //	tab list, tab             Tab, TabItem      tab list, tab
+//	tree                      Tree              tree
+//	tree item                 TreeItem          tree item
 //	unknown                   Pane              unknown
 //
 // A text area is an Edit, not a Document: a Document is for read-only rich
@@ -264,6 +269,10 @@ func controlType(r access.Role) int32 {
 		return ctTab
 	case access.RoleTab:
 		return ctTabItem
+	case access.RoleTree:
+		return ctTree
+	case access.RoleTreeItem:
+		return ctTreeItem
 	}
 	return ctPane
 }
@@ -462,8 +471,8 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 			return variantI4(toggleStateOf(n.States))
 		}
 	case propExpandCollapseState:
-		if n.States.Has(access.StateExpandable) {
-			return variantI4(expandStateOf(n.States))
+		if n.States.Has(access.StateExpandable) || n.Role == access.RoleTreeItem {
+			return variantI4(expandStateOf(n))
 		}
 	case propIsSelected:
 		if n.States.Has(access.StateSelectable) {
@@ -508,9 +517,14 @@ func toggleStateOf(s access.State) int32 {
 	return toggleStateOff
 }
 
-// expandStateOf returns the ExpandCollapseState of an expandable node.
-func expandStateOf(s access.State) int32 {
-	if s.Has(access.StateExpanded) {
+// expandStateOf returns the ExpandCollapseState of a node that can expand, or of a
+// tree item. A tree item with no children is a leaf node: UI Automation requires
+// every tree item to support ExpandCollapse, and a leaf reports LeafNode.
+func expandStateOf(n *access.Node) int32 {
+	if n.Role == access.RoleTreeItem && !n.States.Has(access.StateExpandable) {
+		return expandCollapseLeafNode
+	}
+	if n.States.Has(access.StateExpanded) {
 		return expandCollapseExpanded
 	}
 	return expandCollapseCollapsed
@@ -590,7 +604,7 @@ func supports(k coreKind, n *access.Node) bool {
 	case kindToggle:
 		return n.States.Has(access.StateToggle)
 	case kindExpand:
-		return n.States.Has(access.StateExpandable)
+		return n.States.Has(access.StateExpandable) || n.Role == access.RoleTreeItem
 	case kindSelectItem:
 		return n.States.Has(access.StateSelectable)
 	case kindSelection:
@@ -1030,7 +1044,7 @@ func (c *core) expandState() (int32, uintptr) {
 	if !ok {
 		return 0, hrElementNotAvailable
 	}
-	return expandStateOf(n.States), hrOK
+	return expandStateOf(n), hrOK
 }
 
 // selectItem chooses c in its container. An item that is chosen already stays so.

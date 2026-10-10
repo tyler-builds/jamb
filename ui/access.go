@@ -751,7 +751,7 @@ func absorbsText(r access.Role) bool {
 	switch r {
 	case access.RoleButton, access.RoleCheckBox, access.RoleSwitch, access.RoleRadioButton,
 		access.RoleLink, access.RoleMenuItem, access.RoleMenuItemCheck, access.RoleMenuItemRadio,
-		access.RoleListItem, access.RoleTab, access.RoleTooltip, access.RoleHeading:
+		access.RoleListItem, access.RoleTab, access.RoleTreeItem, access.RoleTooltip, access.RoleHeading:
 		return true
 	}
 	return false
@@ -860,7 +860,9 @@ func (b *accessBuilder) actions(n *node, role access.Role, st access.State) []ac
 		return nil
 	}
 	var out []access.Action
-	if d.h.onClick != nil {
+	// A tab is chosen with Select, not invoked, so it has no Invoke pattern
+	// (Microsoft's Tab control rules; see the Tabs widget).
+	if d.h.onClick != nil && role != access.RoleTab {
 		out = append(out, access.ActionClick)
 	}
 	if st.Has(access.StateFocusable) {
@@ -1071,11 +1073,16 @@ func (rt *Runtime) focusChild(n *node) {
 	}
 }
 
-// highlightedRow returns the row that a menu or a list highlights, when n is one:
-// the deepest highlighted row in its subtree, so that a submenu's row wins over
-// the row that opened it. It returns nil for anything else.
+// highlightedRow returns the row that a menu, a list or a tree highlights, when n
+// is one: the deepest highlighted row in its subtree, so that a submenu's row wins
+// over the row that opened it. It returns nil for anything else.
 func highlightedRow(n *node) *node {
-	if n.div == nil || n.div.acc == nil || (n.div.acc.role != access.RoleMenu && n.div.acc.role != access.RoleList) {
+	if n.div == nil || n.div.acc == nil {
+		return nil
+	}
+	switch n.div.acc.role {
+	case access.RoleMenu, access.RoleList, access.RoleTree:
+	default:
 		return nil
 	}
 	var found *node

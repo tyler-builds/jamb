@@ -141,6 +141,7 @@ README.
 | D. System settings | Windows high contrast, the Text size setting, reduced animations, a contrast audit of the built-in themes, caret tracking for magnifiers, and the text caret blink and width |
 | E. Verification | Accessibility Insights for Windows checks on the examples, a manual NVDA and Narrator script, automated tests that read the real UI Automation tree |
 | F. Form controls | Check boxes with a mixed state, switches, radio groups, selects, sliders and number fields; the RangeValue pattern; the Windows ComboBox, Slider and Spinner control types |
+| G. Navigation and layout | Tabs with automatic activation, Ctrl+Tab, and lazily built panels; collapsible sections and an accordion; a tree view that builds only its visible rows, with Tree and TreeItem control types, levels and positions in their sets |
 
 ## Testing
 
@@ -1344,3 +1345,165 @@ was not implemented. The decisions and their sources are below.
   run.
 - **Existing layout.** The Menus sample on the Components page has a fixed height,
   so its text overlaps at 225 percent. This predates phase F and was not changed.
+
+## Phase G: what changed from this design
+
+Phase G adds the navigation and layout widgets: tabs, collapsible sections, an
+accordion and a tree view. The decisions and their sources are below. Where a
+source states a keyboard convention, the entry cites it; the others are design
+decisions, and are marked as such.
+
+- **Access roles.** `access.RoleTree` and `access.RoleTreeItem` are appended to the
+  role enum, so the existing values do not change. They map to the Tree control
+  type (50023) and the TreeItem control type (50024), as UIAutomationClient.h names
+  them ([Control Type Identifiers](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-controltype-ids)).
+  Tab lists and tabs were already mapped to Tab (50018) and TabItem (50019).
+- **Tabs.** `ui.Tabs(selected, tabs...)` takes `Tab[T]` values, each with a value, a
+  label, an optional icon, a disabled flag and a `Panel` func. Only the selected
+  panel is built. The tab list is one Tab stop, at the selected tab. This follows
+  [Microsoft's TabView guidance](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/tab-view),
+  which says that when focus moves into the tab strip, "the selected TabViewItem
+  gains focus".
+- **Tab activation (deviation).** Left and Right select the neighbouring enabled tab
+  at once: automatic activation, as the task asked. TabView's guidance says the arrows
+  move focus and not the selection, and that Space or Enter selects. The design keeps
+  automatic activation and records the difference. Home and End go to the first and
+  last enabled tab. Arrows do not wrap, as in TabView.
+- **Ctrl+Tab (decided).** Ctrl+Tab and Ctrl+Shift+Tab select the next and previous
+  enabled tab and wrap around. TabView's guidance lists them as its adjacent-tab
+  shortcuts and says the tab list "is looped". The shortcut is bound on the whole
+  tab group, so it works from the tab list and from the panel, and focus moves to
+  the selected tab. The framework bound Ctrl+Tab nowhere else: it moved focus before,
+  and inside a tab group it now selects a tab. Tab itself is not changed.
+- **Tab accessibility.** The tab list is a Tab control with the selection-container
+  state. Each tab is a TabItem with SelectionItem and Select, and it has no Invoke
+  pattern. The panel is a Pane named by its tab's label, and LabelledBy names it by
+  the tab too. A tab list reports IsSelectionRequired, since it always shows its
+  selected tab. The adapter used to report that a selection may be empty for every
+  container; the change is for tab lists only. The Axe scans found three defects
+  that this phase fixed: a TabItem supported Invoke, a tab list did not report
+  IsSelectionRequired, and a tab list's name repeated its control type word (so the
+  demo's labels avoid "tab").
+- **Panel state (gap).** Panels are keyed by their tab's value, so a panel is rebuilt
+  when its tab is selected again, and its state is not kept. The app keeps its data
+  in signals. Keeping every panel's state would build every panel, which the lazy
+  panels exist to avoid.
+- **Collapsible.** The header is a button with the Expanded state, and a click toggles
+  it. Enter and Space run the click, as they do for a focusable element with OnClick,
+  so both open and close the section. This matches the Phase B semantics, where an
+  expandable row's click toggles it. The content is a group named by its title, and
+  LabelledBy names it by the header. The content is not built while the section is
+  closed.
+- **Expander UIA type (decided).** Microsoft's Expander page says the header is the
+  part a user activates, and that the content area is the region it shows
+  ([Expander](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/expander)).
+  The WinUI ExpanderAutomationPeer implements IExpandCollapseProvider on the control
+  itself ([ExpanderAutomationPeer](https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.automation.peers.expanderautomationpeer)).
+  The Expander page does not name a UIA control type. jamb therefore uses a Button for
+  the header, which is what a user activates, with ExpandCollapse, and a Group for the
+  content. This is a design decision.
+- **Accordion.** Sections are independent by default. `SingleOpen` makes opening one
+  section close the others, as Microsoft's guidance on groups of expanders describes
+  (the same Expander page: the Expanding event can close the other expanders, and the
+  page says to offer it as an option). A section's `OnChange` runs when the accordion
+  closes it too.
+- **Tree view keys.** The keys follow the WAI-ARIA tree view pattern
+  ([Tree View Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/treeview/)): Down and
+  Up move to the next and previous visible node without wrapping; Right opens a closed
+  node and otherwise moves to its first child; Left closes an open node and otherwise
+  moves to the parent; Home and End go to the ends; typing letters selects the next node
+  whose label starts with them, and a pause of a second starts a new search; `*` opens
+  the closed siblings, which the pattern marks as optional. The pattern's multi-select
+  keys are not implemented, since the selection is single. Enter and Space open and
+  close a node that has children. The pattern gives Enter the job of activating a node,
+  and this tree has no activation of its own, so that is a design decision. The
+  Microsoft TreeView page fetched for this phase has no keyboard section, so the keys
+  were not checked against a Windows source. Selection follows the arrows; that is also
+  a design decision.
+- **Tree view focus.** The tree is one focusable element, so Tab reaches it once. Its
+  keys act on the selected node, which is also the highlighted row. The access layer
+  passes focus to a highlighted row inside a tree, as it already does for a menu and a
+  list, so a screen reader hears the selected row, and the focus event moves with the
+  selection. The rows are keyed by node key, so a row keeps its identity as the list
+  scrolls.
+- **Tree view accessibility.** Each row is a TreeItem named by its label, with
+  ExpandCollapse, SelectionItem, the Selected and Expanded states, its Level, and its
+  position among its siblings (PositionInSet and SizeOfSet). The tree is a Tree with
+  the selection-container state. Every tree item has ExpandCollapse, as the TreeItem
+  page requires, and a leaf reports the LeafNode state (3). That page says tree items
+  "are leaf nodes when they are not expanded or collapsed". The chevron is inert, so
+  it is not a second button in the tree.
+- **Tree view structure (deviation).** The UIA Tree page describes the content view as
+  nested TreeItems. The rows of a virtualized tree are siblings under the Tree, with
+  Level. Nesting them would mean building the children of the open parents in the
+  access tree, which the virtualization exists to avoid. This is a deviation, and it is
+  listed in the README's known limitations.
+- **Virtualization.** The tree is a `UniformList` of the visible rows, flattened from
+  the open nodes. Only the built rows are in the access tree: the 10,000-node tree
+  builds 18 tree items at a time, for a 300 px tree with 26 px rows and the list's
+  overscan. Children are asked for only while a node
+  is open. A tree that has never been drawn builds only its first row, so an
+  assistive technology should scroll the tree into view before it expands an item out
+  of view. The live check does this.
+- **Framework finding (not fixed).** A `UniformList` returned directly by a component
+  that sits under a parent node panics when its row count changes. The list is its own
+  instance, and the instance's root is not found among the parent's children. The
+  panic is pre-existing: a plain list reproduces it on HEAD. The tree avoids it by
+  returning a column that holds the list. The fix belongs to the instance code and was
+  not in scope for this phase.
+- **Runtime and adapter changes.** `UniformListElement` has two unexported hooks, a
+  `decorate` func for the scroll container and an `ownPos` flag for rows that set their
+  own positions. `highlightedRow` accepts a tree. `absorbsText` names a tree item by its
+  text. `actions` leaves the Click action off a tab. The adapter maps the tree control
+  types, reports LeafNode for a tree item with no children, and supports ExpandCollapse
+  on every tree item.
+
+### Phase G: verification
+
+- Unit tests in `ui/navigation_test.go` (18 tests): the panels built only while
+  selected; arrow, Home and End selection that skips disabled tabs and does not wrap;
+  one Tab stop; Ctrl+Tab and Ctrl+Shift+Tab from the tab list and from the panel, with
+  focus moving; the tab accessibility tree, the Select action and the absence of Invoke;
+  the high contrast label colour, the 225 percent height, and reduced motion; the
+  collapsible's click, Space and Enter, its actions and its disabled state; the
+  accordion's single-open and independent modes; the tree's keys (Right, Left, Up, Down,
+  Home, End, Enter, Space), `*` and type-ahead; levels and positions; the item actions;
+  a 10,000-node tree that builds at most 40 items, keeps the selection, and gives focus
+  to the selected row; and high contrast, 225 percent and reduced motion for the tree.
+- Adapter tests in `platform/windows/uia_tree_test.go` (3 tests): the Tree and TreeItem
+  control types with their identifiers, the ExpandCollapse states of tree items
+  including LeafNode, and that other roles have no ExpandCollapse state.
+- Demo tests in `examples/demo/views/navigation_test.go` (3 tests): the roles and states
+  of the Components samples, with no warnings; the large tree builds only its visible
+  rows; the project window opens on its Overview tab. The Settings and chat tests were
+  updated for the tabs: the shortcuts test clicks the Keyboard shortcuts tab, and the
+  chat rig clicks the Comments tab first.
+- `scripts/a11y-check.ps1` runs 32 checks, and all pass in the normal, high contrast
+  and 225 percent modes. Five are new: a tab list's Tab, TabItem and SelectionItem, with
+  Select moving the panel; a collapsible's ExpandCollapse; a tree whose items expand,
+  with their level and position in their set (read through the client's raw property
+  reader, since the .NET client rejects these property IDs); Down, Right, Left and Up
+  moving the focus through the tree by SendKeys, with focus events; and the AxeWindowsCLI
+  scan of the navigation section.
+- Axe: zero errors for the Settings page, the Components page scrolled to the navigation
+  section and to the form controls, and the same page with a select open, in the three
+  modes. For the project window, zero errors for both tabs (Overview and Comments) in
+  the three modes. Those scans used `AxeWindowsCLI --processid`, which scanned both
+  windows of the process.
+- Screenshots in `docs/screenshots`: `navigation-layout.png` (dark),
+  `navigation-layout-light.png`, `navigation-layout-hc.png` (high contrast),
+  `navigation-layout-225.png` (225 percent), `tree-view.png` (both trees),
+  `settings-tabs.png`, `project-window-tabs.png` and `project-window-comments.png`.
+
+### Phase G: open items
+
+- **Animated expansion and a sliding tab indicator** are optional and are not
+  implemented. Reduced motion has nothing to skip for them yet.
+- **Narrator and NVDA** passes for the navigation widgets are pending, as for earlier
+  phases, and are for a person to run.
+- **Tree multi-select** is not implemented. The open state of a tree is kept by the
+  tree, and the app cannot set or read it; `OnSelect` reports the selection only.
+- **Live level and position reads** go through the .NET client's internal
+  `UiaCoreApi.UiaGetPropertyValue`, found by reflection. A Windows or .NET update could
+  change it. The Go adapter tests check the values independently.
+- **Tab panel state** is not kept across tab changes (see above).

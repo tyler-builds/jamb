@@ -52,6 +52,7 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 	return func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
 		focused := ctx.Window().Focused()
+		tab := ui.Local(ctx, "tab", "overview")
 		p, ok := s.Project(id)
 		if !ok {
 			return ui.Div().Child(titleBar(t, focused, "")).
@@ -69,6 +70,8 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 			Child(ui.Icon(icons.Star).Size(16).Color(starColor(t, p.Starred))).
 			Child(ui.Text(label).Size(13).Medium())
 
+		// The overview is the header and the details; the comments have a tab of their
+		// own, so the thread gets the height under the tabs.
 		content := ui.Div().Grow(1).MinHeight(ui.Px(0)).Padding(28).Gap(18).
 			Child(ui.Div().Row().Align(ui.Center).Gap(16).
 				Child(IconTile(t, p.Icon, p.Color, 52)).
@@ -77,14 +80,21 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 					Child(ui.Div().Row().Align(ui.Center).Gap(8).
 						Child(Badge(t, p.Status.String(), StatusColor(t, p.Status))).
 						Child(ui.Text("Updated " + ago(p.Updated)).Size(12).Color(t.TextSubtle))))).
-			Child(ui.Text(p.Description).Color(t.TextMuted)).
-			Child(ui.Div().Row().Align(ui.Center).Gap(12).
-				Child(ProgressBar(t, p.Progress, p.Color).MaxWidth(ui.Px(320))).
-				Child(ui.Textf("%.0f%%", p.Progress*100).Size(12).Medium().Color(t.TextMuted))).
-			Child(ui.Div().Row().Align(ui.Center).Gap(16).
-				Child(ui.Text(fmt.Sprintf("%d open tasks", p.Tasks)).Size(13).Color(t.TextMuted)).
-				Child(star)).
-			Child(Comments(s, id, thread))
+			Child(ui.Tabs(tab,
+				ui.Tab[string]{Value: "overview", Label: "Overview", Panel: func() ui.Element {
+					return ui.Div().Column().Gap(18).
+						Child(ui.Text(p.Description).Color(t.TextMuted)).
+						Child(ui.Div().Row().Align(ui.Center).Gap(12).
+							Child(ProgressBar(t, p.Progress, p.Color).MaxWidth(ui.Px(320))).
+							Child(ui.Textf("%.0f%%", p.Progress*100).Size(12).Medium().Color(t.TextMuted))).
+						Child(ui.Div().Row().Align(ui.Center).Gap(16).
+							Child(ui.Text(fmt.Sprintf("%d open tasks", p.Tasks)).Size(13).Color(t.TextMuted)).
+							Child(star))
+				}},
+				ui.Tab[string]{Value: "comments", Label: "Comments", Panel: func() ui.Element {
+					return Comments(s, id, thread)
+				}},
+			).Key("detail-tabs").Label("Project sections"))
 		return ui.Div().Size(ui.Full, ui.Full).Background(t.Background).TextColor(t.Text).
 			Child(titleBar(t, focused, p.Name)).
 			Child(content)

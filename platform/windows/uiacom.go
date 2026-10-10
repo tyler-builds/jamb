@@ -949,12 +949,22 @@ func uiaCanSelectMultiple(this, out uintptr) uintptr {
 	return hrOK
 }
 
-// uiaIsSelectionRequired reports that a selection may be empty.
+// uiaIsSelectionRequired reports whether a selection must hold an item. A tab list
+// always shows its selected tab, so it is required; any other container may be empty.
 func uiaIsSelectionRequired(this, out uintptr) uintptr {
-	if _, hr := enter(this, out); hr != hrOK {
+	c, hr := enter(this, out)
+	if hr != hrOK {
 		return hr
 	}
-	*(*int32)(ptr(out)) = 0
+	n, _, ok := c.current()
+	if !ok {
+		return hrElementNotAvailable
+	}
+	v := int32(0)
+	if n.Role == access.RoleTabList {
+		v = 1
+	}
+	*(*int32)(ptr(out)) = v
 	return hrOK
 }
 

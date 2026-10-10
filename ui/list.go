@@ -17,6 +17,12 @@ type UniformListElement struct {
 	key        string
 	handle     *ListHandle
 	selectable bool // see SelectionContainer
+	// decorate, when set, adjusts the scroll container. A TreeView sets its role,
+	// keys and focus with it.
+	decorate func(c *DivElement)
+	// ownPos leaves the positions of the rows to the rows. A tree item's position
+	// is among its siblings, not among the visible rows.
+	ownPos bool
 }
 
 // UniformList creates a list of count rows. row(i) is called only for rows
@@ -173,12 +179,17 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 			key = "jamb.row:" + k.elementKey()
 		}
 		wrap := Div().Key(key).Absolute().Top(float32(i) * ls.rowH).Left(0).Right(0).Child(r)
-		setListPosition(wrap, r, i+1, l.count)
+		if !l.ownPos {
+			setListPosition(wrap, r, i+1, l.count)
+		}
 		spacer.Child(wrap)
 	}
 	container := Div().ScrollY().Style(l.style).Role(access.RoleList)
 	container.access().container = l.selectable
 	container.vlist = ls
+	if l.decorate != nil {
+		l.decorate(container)
+	}
 	return container.Child(spacer)
 }
 

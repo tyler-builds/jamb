@@ -121,6 +121,11 @@ $CT = @{
     Slider   = [System.Windows.Automation.ControlType]::Slider
     Spinner  = [System.Windows.Automation.ControlType]::Spinner
     Text     = [System.Windows.Automation.ControlType]::Text
+    Tab      = [System.Windows.Automation.ControlType]::Tab
+    TabItem  = [System.Windows.Automation.ControlType]::TabItem
+    Tree     = [System.Windows.Automation.ControlType]::Tree
+    TreeItem = [System.Windows.Automation.ControlType]::TreeItem
+    Pane     = [System.Windows.Automation.ControlType]::Pane
 }
 $Passed = 0
 $Failed = 0
@@ -197,6 +202,18 @@ function Get-Pattern($El, $Pattern) {
     $p = $null
     if ($El.TryGetCurrentPattern($Pattern, [ref]$p)) { return $p }
     return $null
+}
+
+# Get-Prop reads a property by its UI Automation ID. The .NET client accepts only the
+# properties it names, so the call goes to the client's own raw reader with the
+# element's native handle (UiaGetPropertyValue, which the client calls itself).
+function Get-Prop($El, [int]$Id) {
+    $api = [System.Windows.Automation.AutomationElement].Assembly.GetType('MS.Internal.Automation.UiaCoreApi')
+    $read = $api.GetMethod('UiaGetPropertyValue', [Reflection.BindingFlags]'Static,NonPublic,Public')
+    $handle = [System.Windows.Automation.AutomationElement].GetField('_hnode', [Reflection.BindingFlags]'Instance,NonPublic').GetValue($El)
+    $callArgs = [object[]]@($handle, [int]$Id, $null)
+    [void]$read.Invoke($null, $callArgs)
+    return $callArgs[2]
 }
 
 function Require-Pattern($El, $Pattern, [string]$Label) {
@@ -497,6 +514,94 @@ try {
         $rv.SetValue(10)
         Wait-For { if ($vp.Current.Value -eq '10') { $true } else { $null } } 'the text to show 10' | Out-Null
         $rv.SetValue($before)
+    }
+
+    # ---- Demo: navigation and layout on the Components page ------------------
+    # The section is above the form controls, and its controls are built with it.
+    Check 'demo: a tab list is a Tab, its tabs are TabItems with SelectionItem, and Select shows the panel' {
+        $list = Find-One $win 'Plain sections' $CT.Tab
+        $alpha = Find-One $list 'Alpha' $CT.TabItem
+        $gamma = Find-One $list 'Gamma' $CT.TabItem
+        $ai = Require-Pattern $alpha ([System.Windows.Automation.SelectionItemPatternIdentifiers]::Pattern) 'SelectionItem'
+        $gi = Require-Pattern $gamma ([System.Windows.Automation.SelectionItemPatternIdentifiers]::Pattern) 'SelectionItem'
+        Require-Pattern $list ([System.Windows.Automation.SelectionPatternIdentifiers]::Pattern) 'Selection' | Out-Null
+        Assert ($ai.Current.IsSelected) 'Alpha is not selected at the start'
+        $gi.Select()
+        Wait-For { if ($gi.Current.IsSelected -and -not $ai.Current.IsSelected) { $true } else { $null } } 'Gamma to be selected' | Out-Null
+        Wait-For { $null -ne (Find-Named $win 'Gamma panel' $CT.Text | Select-Object -First 1) } 'the Gamma panel to be shown' | Out-Null
+        Assert ($null -eq (Find-Named $win 'Alpha panel' $CT.Text | Select-Object -First 1)) 'the Alpha panel is still shown'
+        Find-One $win 'Gamma' $CT.Pane | Out-Null
+        $ai.Select()
+        Wait-For { if ($ai.Current.IsSelected) { $true } else { $null } } 'Alpha to be selected again' | Out-Null
+    }
+
+    Check 'demo: a collapsible header is a Button with ExpandCollapse, and its content opens and closes' {
+        $header = Find-One $win 'Advanced options' $CT.Button
+        $ec = Require-Pattern $header ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+        Assert ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) 'the header is not collapsed at the start'
+        $ec.Expand()
+        Wait-For { $null -ne (Find-Named $win 'The options are shown while the section is open.' $CT.Text | Select-Object -First 1) } 'the content to open' | Out-Null
+        $ec.Collapse()
+        Wait-Gone { Find-Named $win 'The options are shown while the section is open.' $CT.Text | Select-Object -First 1 } 'the content to close' | Out-Null
+    }
+
+    Check 'demo: a tree is a Tree whose items expand, with levels and positions in their sets' {
+        $tree = Find-One $win 'Project files' $CT.Tree
+        $src = Find-One $tree 'src' $CT.TreeItem
+        $ec = Require-Pattern $src ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+        # The tree is virtualized: its rows are built once it has been drawn, so the tree
+        # is scrolled into view of the page before its items are expanded.
+        $item = Require-Pattern $tree ([System.Windows.Automation.ScrollItemPatternIdentifiers]::Pattern) 'ScrollItem'
+        $item.ScrollIntoView()
+        Wait-For { if ($src.Current.BoundingRectangle.Height -gt 0) { $true } else { $null } } 'src to be drawn' | Out-Null
+        $pos = Get-Prop $src 30152
+        $size = Get-Prop $src 30153
+        $level = Get-Prop $src 30154
+        Assert ($pos -eq 1 -and $size -eq 3 -and $level -eq 1) "src is at $pos of $size, level $level; want 1 of 3, level 1"
+        $ec.Expand()
+        Wait-For { $null -ne (Find-Named $win 'main.go' $CT.TreeItem | Select-Object -First 1) } 'the children of src' | Out-Null
+        $main = Find-One $win 'main.go' $CT.TreeItem
+        $level = Get-Prop $main 30154
+        Assert ($level -eq 2) "main.go is at level $level, want 2"
+        $ec.Collapse()
+        Wait-Gone { Find-Named $win 'main.go' $CT.TreeItem | Select-Object -First 1 } 'the children of src to close' | Out-Null
+    }
+
+    Check 'demo: Down and Right move through the tree with the keys, and focus follows the selection' {
+        $tree = Find-One $win 'Project files' $CT.Tree
+        $focusIs = {
+            param([string]$Name, $Type)
+            $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+            $null -ne $f -and $f.Current.Name -eq $Name -and $f.Current.ControlType -eq $Type
+        }
+        $tree.SetFocus()
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        Start-Sleep -Milliseconds 300
+        Wait-For { & $focusIs 'src' $CT.TreeItem } 'the selected tree item to take focus' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+        Wait-For { & $focusIs 'docs' $CT.TreeItem } 'Down to move the focus to docs' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}')
+        Wait-For { $null -ne (Find-Named $win 'readme.md' $CT.TreeItem | Select-Object -First 1) } 'Right to open docs' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}')
+        Wait-For { & $focusIs 'readme.md' $CT.TreeItem } 'Right on an open item to move the focus to its first child' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{LEFT}')
+        Wait-For { & $focusIs 'docs' $CT.TreeItem } 'Left to move the focus to the parent' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{LEFT}')
+        Wait-Gone { Find-Named $win 'readme.md' $CT.TreeItem | Select-Object -First 1 } 'Left on an open item to close docs' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{UP}')
+        Wait-For { & $focusIs 'src' $CT.TreeItem } 'Up to move the focus back to src' | Out-Null
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Components page, scrolled to the navigation section' {
+            $header = Find-One $win 'Advanced options' $CT.Button
+            $item = Require-Pattern $header ([System.Windows.Automation.ScrollItemPatternIdentifiers]::Pattern) 'ScrollItem'
+            $item.ScrollIntoView()
+            Wait-For { if ($header.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom) { $true } else { $null } } 'the navigation section to be in view' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-navigation'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
     }
 
     if ($axe) {

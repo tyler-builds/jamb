@@ -388,6 +388,70 @@ number field is a spin box that holds its text field, as Microsoft's Spinner
 control type describes
 ([Spinner control type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).
 
+### Navigation and layout
+
+Tabs, collapsible sections, an accordion and a tree view. Each is bound to
+signals or to a node key, as the form controls are, and follows high contrast,
+the Text size and reduced motion.
+
+```go
+ui.Tabs(section,                                  // *ui.Signal[T], for any comparable T
+	ui.Tab[string]{Value: "general", Label: "General", Icon: icons.Settings,
+		Panel: func() ui.Element { return generalPanel() }},   // built only while selected
+	ui.Tab[string]{Value: "usage", Label: "Usage", Disabled: true, Panel: usagePanel},
+).Key("settings-tabs").Label("Settings sections").OnChange(func(v string) { ... })
+
+ui.Collapsible("Advanced options", open, content).Key("advanced") // *ui.Signal[bool]
+ui.Accordion(sectionA, sectionB, sectionC).SingleOpen()          // one section open at a time
+
+ui.TreeView(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[string]: the selected node's key
+	Style(ui.Style{MaxHeight: ui.Px(320)}).OnSelect(func(key string) { ... })
+// ui.TreeNode{Key: "src", Label: "src", Icon: icons.Folder,
+//	Children: func() []ui.TreeNode { return loadSrc() }}   // nil Children: a leaf
+```
+
+- **Tabs.** The tab list is one Tab stop, at the selected tab, as Microsoft's
+  TabView guidance describes: Tab enters the strip at the selected tab and Tab
+  again goes to the panel. Left and Right select the previous and next enabled
+  tab at once (automatic activation, as the design chose; WinUI's TabView moves
+  focus on the arrows and selects with Space or Enter). They do not wrap. Home
+  and End go to the first and last enabled tab. Space and Enter select the
+  focused tab. A disabled tab is shown but skipped, and it is GrayText under
+  high contrast. Ctrl+Tab and Ctrl+Shift+Tab select the next and previous
+  enabled tab and wrap around, as TabView does
+  ([Tab view keyboard navigation](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/tab-view)).
+  They work from the tab list and from the panel. Inside a tab group, Ctrl+Tab
+  is therefore bound, and focus moves to the selected tab. Only the selected
+  panel is built. Its state is not kept when another tab is selected: keep the
+  data in signals, as the demo does.
+  The selected tab is bold and has a line under it, in Accent (Highlight under
+  high contrast), so the selection is not carried by color alone. Tabs take the
+  height their parent gives them, so a panel can fill a window.
+- **Collapsible.** The header is a button with the Expanded state. Space and
+  Enter open and close it, as a click does, and its chevron points right when closed
+  and down when open. The content is not built while the section is closed.
+  Assistive technology reads the header as expandable and expanded, and the
+  content as a group named by the header.
+- **Accordion.** Sections open and close on their own. `SingleOpen` makes
+  opening one section close the others, as the Expander guidance describes for a
+  group ([Expander](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/expander)).
+  A section's `OnChange` runs when it is closed by the accordion too.
+- **Tree view.** Only the rows in view are built, so a tree of tens of thousands
+  of nodes costs what its visible part costs. A node's children are asked for only
+  while it is open. Size the tree with `Style`: a tree with no bounded height
+  shows every row. The tree is one focusable element. Its keys act on the
+  selected node, which follows the keyboard (single selection). Down and Up move
+  to the next and previous visible node, without wrapping. Home and End go to the
+  first and last visible node. Right opens a closed node, and on an open node
+  moves to its first child. Left closes an open node, and otherwise moves to the
+  parent. Enter and Space open and close a node with children. `*` opens the
+  closed siblings of the selected node, and typing letters selects the next node
+  whose label starts with them. These follow the WAI-ARIA tree view pattern
+  ([Tree View Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/treeview/)). A click
+  selects a node, and a click on its chevron opens or closes it without selecting.
+  A double-click opens or closes it. Keys are kept by node key, so focus and the
+  selection stay with their node as the rows scroll.
+
 ### Rich text
 
 `ui.Rich` joins segments into one text element. It wraps, truncates and
@@ -714,7 +778,8 @@ rt.AddBindings(ui.BindIn("Editor", "ctrl+backspace", ui.DeleteBack))  // replace
 Behavior changes from earlier versions: a key the defaults don't list (Ctrl+Up,
 Alt+Left, Shift+Delete, Shift+Enter in a single-line field, Ctrl+Shift+Backspace)
 is no longer handled by a field, so it bubbles on. Shift+Tab and Ctrl+Tab are
-unbound in fields, so they move focus as before.
+unbound in fields, so they move focus as before. A `Tabs` group binds Ctrl+Tab and
+Ctrl+Shift+Tab to its tabs (see Navigation and layout).
 
 **Palettes.** A command palette's search field is an `Editor` inside a
 `KeyContext("Palette")`. Its keys therefore belong to `"Palette > Editor"`:
@@ -1164,6 +1229,13 @@ The controls, with no app code, once their roles and states are set:
   toggle button with its state.
 - A `DropdownMenu` trigger, a menu item with a submenu, and a menu bar label
   expand and collapse. A menu of radio items is a selection group.
+- A `Tabs` group is a Tab control: its tabs are tab items with SelectionItem, and
+  its panel is a pane named by its tab. Tabs have no Invoke pattern, since they are
+  selected. A `Collapsible` header is a button that expands and collapses, and its
+  content is a group named by the header. A `TreeView` is a tree whose items expand
+  and collapse, with their level and position in their set. Every tree item has
+  ExpandCollapse, and a leaf reports that it has no children. Only the rows in view
+  are in the tree.
 - A `TextInput` or `TextArea` has its text as its value, which assistive
   technology can read and set. It also has the UI Automation Text pattern: a
   screen reader reads and moves by character, word, line and paragraph, reads
@@ -1375,19 +1447,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\a11y-check.ps1
 ```
 
 The script builds both examples into a temporary folder and starts them. The
-notes app runs with a temporary notes file, never your own. It runs 27 checks:
-names and roles, Invoke, Toggle, ExpandCollapse, Selection, Value, Scroll, focus
-with its event, and the Text pattern on the word "small". The demo's form controls
-are checked too: a check box's Toggle, including its indeterminate state; a radio
-button's SelectionItem; a select's ExpandCollapse and Value, and its open list; a
-slider's and a number field's RangeValue with SetValue. Axe scans cover the
-Settings page, the Components page scrolled to the form controls, and the same
-page with a select open. Each check prints PASS or FAIL, and the script exits 1
-if any fails. Options: `-TimeoutSeconds N` (default
-30), `-SkipAxe`, `-HighContrast` (run the apps with `JAMB_HIGH_CONTRAST=1`) and
-`-TextScale N` (run them with `JAMB_TEXT_SCALE=N`, 100 to 225). The overrides are
-described under System settings in the Accessibility section. The processes and temporary files are removed on exit, after a
-failure too.
+notes app runs with a temporary notes file, never your own. It runs 32 checks:
+names and roles, Invoke, Toggle, ExpandCollapse, Selection, Value, Scroll,
+focus with its event, and the Text pattern on the word "small". The demo's form
+controls are checked too: a check box's Toggle, including its indeterminate
+state; a radio button's SelectionItem; a select's ExpandCollapse and Value, and
+its open list; a slider's and a number field's RangeValue with SetValue. The
+navigation samples are checked too: a tab list's Tab, TabItem and
+SelectionItem, and Select moves the panel; a collapsible header's
+ExpandCollapse; a tree's items expanding, with their level and position in
+their set; and Down, Right, Left and Up moving the focus through the tree by
+keys, with focus events. Axe scans cover the Settings page, the Components page
+scrolled to the navigation section, to the form controls, and the same page
+with a select open. Each check prints PASS or FAIL, and the script exits 1 if
+any fails. Options: `-TimeoutSeconds N` (default 30), `-SkipAxe`,
+`-HighContrast` (run the apps with `JAMB_HIGH_CONTRAST=1`) and `-TextScale N`
+(run them with `JAMB_TEXT_SCALE=N`, 100 to 225). The overrides are described
+under System settings in the Accessibility section. The processes and temporary
+files are removed on exit, after a failure too.
 
 When AxeWindowsCLI is installed, the script also scans each app with it, and a scan
 that finds errors is a failure. The script looks for it at
@@ -1661,8 +1738,8 @@ On the Projects page:
   or Space opens the focused page.
 - The Projects page header uses an Oklab gradient on the logo tile.
 - Clicking the "Open in window" button on a project card opens the project in
-  its own window, which has a comments panel. A card whose window is open
-  shows an "Open in window" badge until that window closes.
+  its own window, which has an Overview tab and a Comments tab. A card whose
+  window is open shows an "Open in window" badge until that window closes.
 - The Activity page has a filter field (matches are highlighted in each row),
   rows of different heights in a `ListOf`, and build rows that expand on a
   click, or on Enter or Space when focused.
@@ -1681,8 +1758,25 @@ On the Projects page:
 
 ![The open select in the Form controls section](docs/screenshots/select-open.png)
 
-- The Settings page (Ctrl+5) uses switches for its on and off settings, and a
-  slider for the UI zoom from 80% to 150%, which changes the whole interface.
+- The Components page's **Navigation and layout** section shows tabs (plain, one
+  with a disabled tab, and one with icons), a collapsible section, an accordion
+  with one section open at a time, a small project file tree and a tree of 10,000
+  generated folders. The large tree builds only the rows in view.
+
+![The Navigation and layout section of the Components page](docs/screenshots/navigation-layout.png)
+
+![The tree views in the Navigation and layout section](docs/screenshots/tree-view.png)
+
+- The project window has its details on an **Overview** tab and its thread on a
+  **Comments** tab.
+
+![The Overview tab of a project window](docs/screenshots/project-window-tabs.png)
+
+![The Comments tab of a project window](docs/screenshots/project-window-comments.png)
+
+- The Settings page (Ctrl+5) groups its settings in tabs: Appearance, with switches
+  and a slider for the UI zoom from 80% to 150% (which changes the whole interface);
+  Notifications; and Keyboard shortcuts.
 - **New Project** opens a modal form with a name and a description. Create adds
   the project, selects it and shows the Projects page. It is disabled until the
   name has text. Cancel, Escape and a press on the backdrop close the form
@@ -1789,6 +1883,14 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
 
 ## Known limitations and next steps
 
+- **Tree view.** A tree builds only its visible rows, so its accessibility tree is
+  flat: the items are siblings under the tree, with `Level` and their position in
+  their set, not nested as UI Automation's content view describes. A tree that has
+  never been drawn builds only its first row; an assistive technology that expands
+  an item out of view should scroll the tree into view first. A tree selects one
+  node, and it does not report its open state to the app. Animated expansion and a
+  sliding tab indicator are not implemented (both are optional; reduced motion
+  needs no change for them).
 - **Disabled controls.** In the normal themes a disabled control is dimmed with
   `Opacity` (0.5), as before. WCAG 1.4.3 exempts inactive components from the
   contrast ratio, so the dimmed text is not held to 4.5:1. Under high contrast a

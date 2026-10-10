@@ -59,6 +59,8 @@ const (
 	RoleComboBox                  // a field that opens a list of choices; its Value is the chosen one
 	RoleSlider                    // a value moved along a track within a range (see Node.Range)
 	RoleSpinner                   // a number within a range, with an edit field (see Node.Range)
+	RoleTree                      // a hierarchy of nodes that open and close, such as a file tree
+	RoleTreeItem                  // one node of a tree, with its Level and its position in its siblings
 )
 
 var roleNames = [...]string{
@@ -92,6 +94,8 @@ var roleNames = [...]string{
 	RoleComboBox:      "combo box",
 	RoleSlider:        "slider",
 	RoleSpinner:       "spinner",
+	RoleTree:          "tree",
+	RoleTreeItem:      "tree item",
 }
 
 // String returns the role's name, such as "check box".
@@ -108,7 +112,7 @@ func (r Role) Interactive() bool {
 	switch r {
 	case RoleButton, RoleCheckBox, RoleSwitch, RoleRadioButton, RoleTextField,
 		RoleTextArea, RoleLink, RoleMenuItem, RoleMenuItemCheck, RoleMenuItemRadio,
-		RoleTab, RoleComboBox, RoleSlider, RoleSpinner:
+		RoleTab, RoleComboBox, RoleSlider, RoleSpinner, RoleTreeItem:
 		return true
 	}
 	return false

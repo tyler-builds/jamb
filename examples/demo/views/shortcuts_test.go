@@ -61,6 +61,11 @@ func TestSettingsListsShortcuts(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageSettings)
 	rt := shortcutRig(s)
+	// The shortcuts are in their own tab, which is shown by a click on it.
+	if err := rt.ClickKey("settings-tabs/shortcuts"); err != nil {
+		t.Fatal(err)
+	}
+	rt.Frame(time.Now())
 	var b strings.Builder
 	rt.Dump(&b, 40)
 	for _, want := range []string{"Keyboard shortcuts", "Go to Projects", "Ctrl+2", "Toggle theme", "Ctrl+Shift+L"} {
