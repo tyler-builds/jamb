@@ -984,7 +984,9 @@ ctx.Window().MessageBox(dialog.MessageOptions{
 - The owner window is disabled while its dialog is open, as Windows does for
   any modal dialog, so it takes no input. Its frames, and those of the app's
   other windows, keep drawing: a timer on the owner renders them while the
-  dialog's own message loop runs.
+  dialog's own message loop runs. The same timer runs while the window's system
+  menu (F10, or Alt alone in a window without a menu bar) or a move or size is in
+  progress, so posted work still runs during those loops.
 - The callbacks are asynchronous on purpose. A blocking call would run the
   dialog's loop inside the event that opened it, while the runtime is still
   handling that event. The callback shape also matches a macOS sheet, which
@@ -1727,11 +1729,10 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   Invoke, Toggle, ExpandCollapse, SelectionItem and Selection, Value, Scroll and
   ScrollItem, Window for dialogs, focus, menu, property-changed and notification
   events, headings and label relations, the dump and the development warnings.
-  Open from phase B: the window opened and closed events were raised but not
-  seen by a .NET client, an action sent through UI Automation while a context
-  menu opened from the keyboard is open may not run, and virtualized rows that
-  are not built cannot be found or realized (see the design's phase B open
-  items). Still to come: the Text pattern for text fields (phase C); high
+  Open from phase B: a dialog's window opened event is not seen by a .NET client
+  (a dialog is announced by its focus, IsDialog and IsModal; see
+  [docs/accessibility.md](docs/accessibility.md)), and virtualized rows that are
+  not built cannot be found or realized (see the design's phase B open items). Still to come: the Text pattern for text fields (phase C); high
   contrast, text size and reduced motion (phase D). The caption
   buttons (Minimize, Maximize, Close) have their roles and names, but their
   invoke path has not been checked live. Building the tree for the demo's

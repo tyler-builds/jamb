@@ -435,7 +435,7 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 			w.onTimer()
 			return 0
 		}
-		if wp == dialogTimerID {
+		if wp == modalTimerID {
 			pumpFrames()
 			return 0
 		}
@@ -472,10 +472,21 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 
 	case win32.WM_ENTERSIZEMOVE:
 		w.inSizeMove = true
+		w.startFrames()
 		return 0
 	case win32.WM_EXITSIZEMOVE:
 		w.inSizeMove = false
+		w.stopFrames()
 		w.emit(platform.Event{Kind: platform.EventMoved})
+		return 0
+
+	case win32.WM_ENTERMENULOOP:
+		// The system menu, which F10 or a lone Alt opens in a window without a
+		// menu bar, runs its own loop, as a dialog does: frames are pumped.
+		w.startFrames()
+		return 0
+	case win32.WM_EXITMENULOOP:
+		w.stopFrames()
 		return 0
 
 	case win32.WM_DPICHANGED:

@@ -152,6 +152,7 @@ const (
 	WM_SYSKEYDOWN           = 0x0104
 	WM_SYSKEYUP             = 0x0105
 	WM_SYSCOMMAND           = 0x0112
+	WM_CANCELMODE           = 0x001F
 	WM_MOUSEMOVE            = 0x0200
 	WM_LBUTTONDOWN          = 0x0201
 	WM_LBUTTONUP            = 0x0202
@@ -165,6 +166,8 @@ const (
 	WM_MOUSEHWHEEL          = 0x020E
 	WM_ENTERSIZEMOVE        = 0x0231
 	WM_EXITSIZEMOVE         = 0x0232
+	WM_ENTERMENULOOP        = 0x0211
+	WM_EXITMENULOOP         = 0x0212
 	WM_DPICHANGED           = 0x02E0
 	WM_DROPFILES            = 0x0233
 	WM_MOUSELEAVE           = 0x02A3

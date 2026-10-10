@@ -364,21 +364,96 @@ per-client state, as Phase A concluded. The zero-allocation guard
 (`uia_alloc_test.go`) covers the new hot paths: the pattern lookup, the state
 reads, and the scroll and selection reads.
 
+### Native modal loops and posted work
+
+A UI Automation request reaches the UI thread through `ui.Runtime.Post`, which
+requests a frame and wakes the window. The runtime and the wake path were not
+the cause: a headless test that opens the context menu with Shift+F10 and posts
+an Expand from another goroutine runs the request on the next frame
+(`TestPostRunsWithKeyboardContextMenuOpen`).
+
+The cause was the window's message loop. Shift+F10 arrives as WM_SYSKEYDOWN,
+since F10 is a system key. `wndProc` handled the key and then fell through to
+`DefWindowProc` (`platform/windows/window.go`, the WM_SYSKEYDOWN case), which
+opened the window's system menu. That menu runs its own message loop, and the
+loop of `Run` does not run while it does. The wake-up message was taken by the
+menu's loop, so no frame rendered until the menu closed. A lone Alt (the window
+has no menu bar in the demo) and a title-bar drag (a move loop) stalled the same
+way. Dialogs already avoided this with a timer that renders frames while their
+loop runs (`modal` in `platform/windows/dialog.go`).
+
+The fix moves that timer into `startFrames` and `stopFrames`, and starts it on
+WM_ENTERMENULOOP and on WM_ENTERSIZEMOVE, as well as for dialogs. `stopFrames`
+runs the posted queue when the loop ends. The regression test,
+`TestPostRunsDuringNativeMenuLoop` (`platform/windows/modal_test.go`), opens the
+system menu on the UI thread and posts a function from another goroutine. It
+fails without the fix ("the posted function did not run while the menu loop was
+open") and passes with it.
+
+Live checks against the demo, with a UI Automation client, before and after the
+fix:
+
+| State | Before | After |
+| --- | --- | --- |
+| Shift+F10 on a card, then Expand Status | not expanded | Expanded, Active, Paused and Done shown |
+| Right-click on a card, then Expand Status | expanded | expanded |
+| Lone Alt, then Invoke the "Done" filter | list stayed at 6 items | list filtered to 1 |
+| Drag the title bar, Invoke "Done" while held | list stayed at 6 items | list filtered to 1, window moved |
+| No Alt, Invoke "Done" (control, unfixed build only) | list filtered to 1 | not measured |
+
+The idle, animating and minimized states are covered by the same frame path. A
+minimized window renders nothing, and a function posted while it is minimized
+runs when it is restored, since the restore sends WM_SIZE, which renders a
+frame. That state was not driven live.
+
+### Window events for dialogs
+
+Phase B raises WindowOpened on a dialog's element and WindowClosed on the
+window's root. Findings:
+
+- Microsoft describes `WindowOpenedEvent` as the event "raised when a window is
+  opened", and says it is "used by UI Automation providers" while clients use
+  the WindowPattern field
+  ([WindowPatternIdentifiers.WindowOpenedEvent](https://learn.microsoft.com/en-us/dotnet/api/system.windows.automation.windowpatternidentifiers.windowopenedevent)).
+  The page does not say that an event raised on a non-HWND fragment reaches
+  clients. The Win32 event-id reference could not be fetched (HTTP 404), so the
+  rules for fragment windows are not confirmed from primary sources.
+- A live check with a UI Automation client (a listener in C#, with
+  Automation.AddAutomationEventHandler, pumping messages) subscribed to
+  WindowOpened and WindowClosed at the window's root and at the desktop, and to
+  MenuOpened at the window's root. It opened the "New project" modal by Invoke
+  and closed it with Escape. WindowOpened arrived at neither scope. WindowClosed
+  arrived twice, at the desktop only, and its source element could no longer be
+  read. The window-scoped listener received nothing, and no menu was opened in
+  that run.
+- Dialog announcement is described in Microsoft's IsDialog documentation: a
+  screen reader speaks the dialog's title, then the focused control, which is why
+  focus is what matters
+  ([AutomationProperties.IsDialog](https://learn.microsoft.com/en-us/uwp/api/windows.ui.xaml.automation.automationproperties.isdialog?view=winrt-26100)).
+  Narrator relies on FocusChanged events, and does not announce changes that do
+  not have focus
+  ([Microsoft UIA notification guidance](https://learn.microsoft.com/tr-tr/archive/blogs/winuiautomation/can-your-desktop-app-leverage-the-new-uia-notification-event-in-order-to-have-narrator-say-exactly-what-your-customers-need)).
+  These two statements came from search summaries, not from the pages
+  themselves, so they need checking.
+
+The supported approach is therefore focus. A dialog must take keyboard focus,
+and its root must have ControlType Window, IsDialog and IsModal, as the
+`ui.Modal` root reports. The adapter's WindowOpened and WindowClosed raises are
+kept, since WindowClosed reaches a desktop listener. Whether a fragment
+WindowOpened can be delivered at all, and whether a focused modal is announced by
+Narrator and NVDA, are left for Phase E, with Narrator testing.
+
 ### Phase B: open items
 
-- **Window events are not delivered in the live check.** Window opened and closed
-  are raised, for the dialog and for the window's root, and the dialog has the
-  Window pattern. A .NET client that subscribed to them, on the window or at the
-  desktop root, received neither, while the menu events, raised on the same root,
-  were received. The cause is not isolated. Until it is, a dialog is announced by
-  its focus, its IsDialog and its IsModal properties.
-- **An action requested through UI Automation may not run while a context menu
-  opened from the keyboard is open.** The live check was: focus a project card,
-  press Shift+F10, then call Expand on the menu's Status item. The request was
-  posted to the UI thread, but no frame ran it, while key presses and dropdown
-  menus were not affected. The cause is not isolated. The likely place to look
-  is the frame request and wake path (`ui.Runtime.requestFrame` and
-  `platform/windows/window.go`), not the access tree.
+- **Window opened is not delivered to a .NET client for a dialog.** The adapter
+  raises WindowOpened on the dialog's element and WindowClosed on the window's
+  root. In the live check (see [Window events for dialogs](#window-events-for-dialogs))
+  a client listening for WindowOpened at the window and at the desktop received
+  nothing, and WindowClosed reached only the desktop listener. Menu events on the
+  same root were received. The cause is not isolated, so the event code is
+  unchanged. Until it is, a dialog is announced by its focus, its IsDialog and its
+  IsModal properties: focus moves into the dialog, and the dialog's Window pattern
+  reports IsModal.
 - ItemContainer and VirtualizedItem, as above. A client cannot find an unbuilt
   row.
 - A context menu's own items are not exposed as a dropdown: a context menu opens

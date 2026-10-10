@@ -4,6 +4,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/access/accesstest"
+	"github.com/tyler-builds/jamb/input"
 )
 
 func TestPostRunsOnNextFrame(t *testing.T) {
@@ -79,6 +83,34 @@ func testKeys(rt *Runtime) string {
 		}
 	}
 	return strings.Join(keys, " ")
+}
+
+// An accessibility request made from another goroutine while a keyboard-opened
+// context menu is open runs on the next frame, as Post does.
+func TestPostRunsWithKeyboardContextMenuOpen(t *testing.T) {
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Key("target").Size(Full, Full).Focusable().ContextMenu(func() []MenuItem {
+			return []MenuItem{{Label: "Status", Submenu: []MenuItem{
+				{Label: "Active", OnClick: func() {}}, {Label: "Done", OnClick: func() {}}}}}
+		}).Child(Text("Body"))
+	})
+	r.rt.setFocus(r.nodeByKey(t, "target").id)
+	r.frame()
+	r.rt.KeyDown(input.KeyF10, input.ModShift, false)
+	r.rt.KeyUp(input.KeyF10, input.ModShift)
+	r.frame()
+	if r.rt.ctxMenu == nil {
+		t.Fatal("Shift+F10 did not open the context menu")
+	}
+	status := accesstest.Find(t, r.tree(), access.RoleMenuItem, "Status")
+	done := make(chan struct{})
+	go func() {
+		r.bridge.Perform(status.ID, access.ActionExpand)
+		close(done)
+	}()
+	<-done
+	accesstest.Absent(t, r.bridge.Tree(), access.RoleMenuItem, "Active")
+	accesstest.Find(t, r.tree(), access.RoleMenuItem, "Active")
 }
 
 // Context.Post hands work from a goroutine that holds a component's context

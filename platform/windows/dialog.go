@@ -9,13 +9,13 @@ import (
 	"github.com/tyler-builds/jamb/internal/win32"
 )
 
-// dialogTimerID is the timer that renders frames while a native dialog runs
-// its own message loop; see modal.
-const dialogTimerID = 2
+// modalTimerID is the timer that renders frames while a native modal loop runs
+// on the UI thread: a dialog, a menu, or a move or size; see startFrames.
+const modalTimerID = 2
 
-// dialogFrameMS is the interval of that timer, in milliseconds: about 60 frames
-// a second while a dialog is open.
-const dialogFrameMS = 16
+// modalFrameMS is the interval of that timer, in milliseconds: about 60 frames
+// a second while the loop runs.
+const modalFrameMS = 16
 
 // Message box flags (MessageBoxW). The icon and button bits combine with the
 // default-button bits.
@@ -66,15 +66,27 @@ func (w *window) ShowMessageBox(o dialog.MessageOptions, done func(dialog.Button
 
 // modal runs show, which opens a native dialog that runs its own message loop
 // until the user closes it. Windows disables the owner while the dialog is
-// open, so the owner takes no input. The loop of Run does not run meanwhile,
-// so a timer on the owner renders each window that wants a frame and whose
-// swap chain is ready, as runLoop does. Frames are drawn, and animations go on.
+// open, so the owner takes no input.
 func (w *window) modal(show func()) {
-	win32.SetTimer(w.hwnd, dialogTimerID, dialogFrameMS)
+	w.startFrames()
 	show()
-	win32.KillTimer(w.hwnd, dialogTimerID)
-	// The dialog's loop may have taken a posted function's wake-up message, so
-	// run the queue now rather than wait for the next message.
+	w.stopFrames()
+}
+
+// startFrames starts the timer that renders frames while a native modal loop
+// runs: a dialog, a menu, or a move or size of the window. The loop of Run does
+// not run meanwhile, so the timer renders each window that wants a frame and
+// whose swap chain is ready, as runLoop does. Frames are drawn, and animations
+// go on.
+func (w *window) startFrames() {
+	win32.SetTimer(w.hwnd, modalTimerID, modalFrameMS)
+}
+
+// stopFrames stops the timer that startFrames started. The loop that has ended
+// may have taken a posted function's wake-up message, so the queue runs now
+// rather than wait for the next message.
+func (w *window) stopFrames() {
+	win32.KillTimer(w.hwnd, modalTimerID)
 	runPosted()
 }
 
