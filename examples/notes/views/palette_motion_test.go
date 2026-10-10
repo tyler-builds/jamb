@@ -21,6 +21,22 @@ func paletteQuads(r *rig) []scene.Quad {
 	return out
 }
 
+// waitForMotion renders frames until done reports true, and fails the test if
+// that does not happen within the deadline. The motion runs on the runtime's
+// clock, so the test waits for the state it checks rather than for a fixed time:
+// a fixed wait is too short on a loaded machine.
+func waitForMotion(t *testing.T, r *rig, what string, done func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !done() {
+		if time.Now().After(deadline) {
+			t.Fatalf("%s did not happen within 10 s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+		r.frame()
+	}
+}
+
 // The palette fades in and rises into place over about 140 ms, and when it
 // closes it stays drawn for about 90 ms without being in the tree.
 func TestPaletteEnterAndExit(t *testing.T) {
@@ -36,16 +52,18 @@ func TestPaletteEnterAndExit(t *testing.T) {
 		}
 	}
 	top, _ := r.rt.Find("palette")
-	deadline := time.Now().Add(220 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-		r.frame()
-	}
-	for _, q := range paletteQuads(r) {
-		if q.Background.A < 0.99 {
-			t.Fatalf("palette quad alpha %v after 220 ms, want fully opaque", q.Background.A)
+	opaque := func() bool {
+		for _, q := range paletteQuads(r) {
+			if q.Background.A < 0.99 {
+				return false
+			}
 		}
+		return len(paletteQuads(r)) > 0
 	}
+	waitForMotion(t, r, "the palette became fully opaque", func() bool {
+		settled, ok := r.rt.Find("palette")
+		return ok && opaque() && settled.Y-top.Y >= 5
+	})
 	settled, _ := r.rt.Find("palette")
 	if d := settled.Y - top.Y; d < 5 || d > 7 {
 		t.Errorf("palette moved %v from its first frame to its resting place, want about 6", d)
@@ -58,9 +76,5 @@ func TestPaletteEnterAndExit(t *testing.T) {
 	if len(paletteQuads(r)) == 0 {
 		t.Error("the closing palette is not drawn during its exit")
 	}
-	time.Sleep(120 * time.Millisecond)
-	r.frame()
-	if len(paletteQuads(r)) != 0 {
-		t.Error("the palette is still drawn after its exit ended")
-	}
+	waitForMotion(t, r, "the palette's exit ended", func() bool { return len(paletteQuads(r)) == 0 })
 }

@@ -213,7 +213,13 @@ acts on the field the user was typing in, not on the palette.
 Text fields support selection with the mouse (drag, double-click a word,
 triple-click a paragraph) and with Shift+arrows, plus Ctrl+arrow word
 movement, clipboard (Ctrl+C/X/V), grouped undo/redo (Ctrl+Z/Y), Home/End,
-PageUp/PageDown and a blinking caret. Text areas keep the caret visible
+PageUp/PageDown and a blinking caret. Word keys follow the platform. On
+Windows, as in Notepad, Ctrl+Right and Ctrl+Delete go to the start of the next
+word unit, and Ctrl+Left and Ctrl+Backspace to the start of the unit before the
+caret. A unit is a word, or a run of punctuation, with the spaces after it, and a
+line break is a unit of its own (`text.WordStarts`). Elsewhere, the keys stop at
+the end of the next word and the start of the word before, as on macOS and Linux
+(`text.NextWord` and `text.PrevWord`). Text areas keep the caret visible
 inside the nearest scroll container. Text is shaped with HarfBuzz (via
 `go-text/typesetting`), so ligatures, right-to-left scripts, complex scripts
 and font fallback for other writing systems all work. Input-method windows
@@ -1070,7 +1076,13 @@ The controls, with no app code, once their roles and states are set:
 - A `DropdownMenu` trigger, a menu item with a submenu, and a menu bar label
   expand and collapse. A menu of radio items is a selection group.
 - A `TextInput` or `TextArea` has its text as its value, which assistive
-  technology can read and set.
+  technology can read and set. It also has the UI Automation Text pattern: a
+  screen reader reads and moves by character, word, line and paragraph, reads
+  the selection and the caret, selects and finds text, and gets the bounds of
+  each visual line. Text and selection changes raise events. The system caret
+  follows the insertion point, so screen magnifiers track typing. The points
+  and the word rules are described in
+  [docs/accessibility.md](docs/accessibility.md#phase-c-what-changed-from-this-design).
 - A scroll container reports its position and its visible part, and can be
   scrolled and scrolled to a percent. A row or control inside one can be
   scrolled into view.
@@ -1724,16 +1736,19 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   version has not been tested. The arm64 build is compiled but has not been run.
   The MSIX install steps are for a person to run; the SDK tools check the
   package's structure.
-- **Accessibility.** Phases A and B of [docs/accessibility.md](docs/accessibility.md)
+- **Accessibility.** Phases A, B and C of [docs/accessibility.md](docs/accessibility.md)
   are in place on Windows: the access tree, names and roles, bounds and focus,
   Invoke, Toggle, ExpandCollapse, SelectionItem and Selection, Value, Scroll and
-  ScrollItem, Window for dialogs, focus, menu, property-changed and notification
-  events, headings and label relations, the dump and the development warnings.
-  Open from phase B: a dialog's window opened event is not seen by a .NET client
-  (a dialog is announced by its focus, IsDialog and IsModal; see
-  [docs/accessibility.md](docs/accessibility.md)), and virtualized rows that are
-  not built cannot be found or realized (see the design's phase B open items). Still to come: the Text pattern for text fields (phase C); high
-  contrast, text size and reduced motion (phase D). The caption
+  ScrollItem, Text for text fields and text areas (with the system caret for
+  magnifiers), Window for dialogs, focus, menu, property-changed, text-changed
+  and notification events, headings and label relations, the dump and the
+  development warnings. Open from phase B: a dialog's window opened event is not
+  seen by a .NET client (a dialog is announced by its focus, IsDialog and
+  IsModal; see [docs/accessibility.md](docs/accessibility.md)), and virtualized
+  rows that are not built cannot be found or realized (see the design's phase B
+  open items). Open from phase C: IME composition, the Text pattern for static
+  and rich text, annotations and embedded objects (see the design's phase C open
+  items). Still to come: high contrast, text size and reduced motion (phase D). The caption
   buttons (Minimize, Maximize, Close) have their roles and names, but their
   invoke path has not been checked live. Building the tree for the demo's
   dashboard takes about 18 µs, measured with a benchmark; the cost grows with

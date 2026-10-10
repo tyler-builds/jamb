@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -120,9 +121,9 @@ func TestEditorClipboard(t *testing.T) {
 		t.Fatalf("after copy/paste: %q", v.Peek())
 	}
 	r.key(input.KeyHome, 0)
-	r.key(input.KeyRight, ctrl|shift) // select "alpha"
+	r.key(input.KeyRight, ctrl|shift) // select "alpha " with its space, as Windows does
 	r.key(input.KeyX, ctrl)
-	if v.Peek() != " beta alpha beta" {
+	if v.Peek() != "beta alpha beta" {
 		t.Errorf("after cut: %q", v.Peek())
 	}
 	// Pasting multi-line text into a single-line field flattens it.
@@ -283,5 +284,54 @@ func TestTextAreaTypingIsIncremental(t *testing.T) {
 	st := frame(r.rt)
 	if st.Rendered != 1 {
 		t.Errorf("typing re-rendered %d components, want only the text area", st.Rendered)
+	}
+}
+
+// TestEditorWordKeysUseTheWindowsConvention checks the word keys against Notepad,
+// which the Windows convention follows: Ctrl+Right stops at the start of the next
+// word unit, a unit being a word or a run of punctuation with the spaces after it,
+// Ctrl+Left at the start of the unit before the caret, and Ctrl+Delete and
+// Ctrl+Backspace delete to those places. The stops are the ones Notepad shows for
+// "A small note-taking app. Next".
+func TestEditorWordKeysUseTheWindowsConvention(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the Windows word convention is the one on Windows")
+	}
+	v := NewSignal("")
+	r := newEditorRig(t, func(ctx *Context) Element { return Div().Padding(10).Child(TextInput(v)) })
+	r.click(100, 27)
+	r.typeText("A small note-taking app. Next")
+	caret := func() int {
+		_, es := r.editor()
+		return es.caret
+	}
+	r.key(input.KeyHome, 0)
+	for _, want := range []int{2, 8, 12, 13, 20, 23, 25, 29} {
+		r.key(input.KeyRight, ctrl)
+		if got := caret(); got != want {
+			t.Fatalf("Ctrl+Right stopped at %d, want %d", got, want)
+		}
+	}
+	for _, want := range []int{25, 23, 20, 13, 12, 8, 2, 0} {
+		r.key(input.KeyLeft, ctrl)
+		if got := caret(); got != want {
+			t.Fatalf("Ctrl+Left stopped at %d, want %d", got, want)
+		}
+	}
+	r.key(input.KeyRight, ctrl|shift) // Ctrl+Shift+Right from the start selects "A "
+	if _, es := r.editor(); es != nil {
+		if a, b := es.selection(); v.Peek()[a:b] != "A " {
+			t.Errorf("Ctrl+Shift+Right selected %q, want \"A \"", v.Peek()[a:b])
+		}
+	}
+	r.key(input.KeyHome, 0)
+	r.key(input.KeyDelete, ctrl) // deletes "A " to the start of "small"
+	if v.Peek() != "small note-taking app. Next" {
+		t.Errorf("Ctrl+Delete left %q", v.Peek())
+	}
+	r.key(input.KeyEnd, 0)
+	r.key(input.KeyBackspace, ctrl) // deletes "Next" back to the start of its unit
+	if v.Peek() != "small note-taking app. " {
+		t.Errorf("Ctrl+Backspace left %q", v.Peek())
 	}
 }

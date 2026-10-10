@@ -1,8 +1,10 @@
 # Accessibility design
 
-Status: accepted. Phases A (Foundation) and B (Controls) are done, with the
-changes listed under "Phase A: what changed from this design" and "Phase B: what
-changed from this design". Phases C to E have not started. This document
+Status: accepted. Phases A (Foundation), B (Controls) and C (Text) are done, with
+the changes listed under "Phase A: what changed from this design", "Phase B: what
+changed from this design" and "Phase C: what changed from this design". The
+magnifier caret of phase D is done too; the rest of phase D and phase E have not
+started. This document
 describes how jamb exposes its UI
 to assistive technology (screen readers, magnifiers, voice control) and the
 order in which the work is done.
@@ -462,6 +464,283 @@ Narrator and NVDA, are left for Phase E, with Narrator testing.
 - The mixed (indeterminate) state is in the model and the adapter, but no public
   API sets it.
 - RangeValue is not implemented: no slider exists in the framework yet.
-- The Text pattern for text fields and text areas is Phase C. Until then, a
-  text area exposes its Value only, as a text field does.
+- The Text pattern for text fields and text areas was Phase C, and is done (see
+  below).
 - Screen reader checks (NVDA, Narrator, Accessibility Insights) are Phase E.
+
+## Phase C: what changed from this design
+
+Phase C is in place on Windows for text fields and text areas: the Text pattern
+(ITextProvider, ITextProvider2 for the caret, and ITextRangeProvider), the text
+events, and the system caret that magnifiers follow. The model is in
+`access/text.go` and `access/textrange.go`, the content is built in
+`ui/textaccess.go`, and the adapter is `platform/windows/uiatext.go`.
+
+### Design
+
+- **The snapshot carries the text.** Each text node has an `access.TextInfo` in
+  the snapshot: the content, the selection, where the layout is drawn in physical
+  pixels, the clip, and the font attributes. The content (`access.TextContent`)
+  holds the text, the grapheme points, the x of the caret at each point, the
+  visual lines (with their top, height and right edge), the paragraph starts and
+  the word runs. The ui runtime builds the content on the UI thread, once for each
+  change of the text or the layout, and keeps it on the editor's state; a
+  selection change or a scroll does not rebuild it. Nothing a UI Automation call
+  reads is shared with the runtime's mutable state.
+- **Offset model: points.** A point is a position between two grapheme clusters,
+  held as an index into `Points` (the byte offset of each cluster boundary).
+  Endpoints of a range are points, so a range never splits a grapheme cluster,
+  a surrogate pair or a combining sequence. UI Automation exposes no offsets, so
+  the point is an internal unit. UTF-16 is counted only where UI Automation
+  counts it: GetText's `maxLength` cuts at a UTF-16 code-unit count and never
+  inside a surrogate pair (`access.UTF16Prefix`). A byte offset from the editor
+  rounds down to the point of its grapheme cluster.
+- **Range lifetime.** A range is a COM object in the registry, made per call with
+  native memory from the process heap, reference counted, and freed when its last
+  reference is released (`kindTextRange`). A range keeps the `TextInfo` of the
+  snapshot it was made from, so its text and rectangles are the ones the client
+  was told about, even after the field has changed. Select acts on the current
+  text: it sends the two endpoints as byte offsets, and the runtime clamps them to
+  its text on a rune boundary. A range whose node has left the tree still answers
+  from its snapshot; Select and ScrollIntoView then report ElementNotAvailable.
+- **Events.** `access.Diff` reports the fields whose text changed
+  (`Update.TextChanged`) and whose selection or caret moved
+  (`Update.TextSelection`), once per published frame, so a burst of typing in one
+  frame is one event. The adapter raises TextChanged (`UIA_Text_TextChangedEventId`,
+  20015) and TextSelectionChanged (`UIA_Text_TextSelectionChangedEventId`, 20014)
+  only when a client listens. The Value property change is kept for text fields
+  and text areas.
+- **Caret for magnifiers.** The window's `SetTextInputRect` already receives the
+  insertion point once per frame, for the IME. `placeCaret` keeps a system caret
+  there: `CreateCaret` makes a one-pixel solid caret at the field's height,
+  `HideCaret` hides it at once so it never draws over jamb's own caret, and
+  `SetCaretPos` moves it. The caret is destroyed when no field has focus, and made
+  again at the new height when the height changes. Live, `GetGUIThreadInfo`
+  reports the caret rectangle in client coordinates, and a screenshot shows only
+  jamb's caret.
+
+### Semantics, and the documentation they follow
+
+Microsoft's rules are cited where they apply. Where the documentation is silent,
+the choice is stated.
+
+- **Move**
+  (<https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-move>).
+  A degenerate range moves its insertion point and stays degenerate. Any other
+  range moves its start back to the start of its unit, moves that by the count,
+  and ends one unit later, so the result is whole units. The count returned is the
+  number of units moved, negative for a backward move, and a move that cannot
+  happen leaves the range unchanged. The documentation says a backward count is
+  negative and is silent on the sign of MoveEndpointByUnit's return; the same sign
+  convention is used there.
+- **MoveEndpointByUnit** and **MoveEndpointByRange**
+  (<https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-moveendpointbyunit>,
+  <https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-moveendpointbyrange>).
+  The endpoint moves to the next unit boundary in its direction. If it passes the
+  other endpoint, the other moves with it, so the range stays ordered and becomes
+  degenerate.
+- **ExpandToEnclosingUnit**
+  (<https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-expandtoenclosingunit>).
+  The start moves back to the start of its unit and the end forward to the end of
+  the unit of its last grapheme; a range that is already whole units is unchanged.
+  A page is the whole text, as a document is. A degenerate range expands to the
+  unit at its position.
+- **CompareEndpoints** returns a negative value, zero or a positive value
+  (<https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-compareendpoints>).
+  The magnitude is not defined, and the adapter returns -1, 0 or 1.
+- **Compare** compares the endpoints, not the text, and a range of another
+  snapshot is not the same
+  (<https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-compare>).
+- **FindText** returns the first match, or the last with `backward`, within the
+  range, with optional case folding (simple Unicode folding). A match starts and
+  ends on a cluster boundary. No match, and an empty search, return no range
+  (<https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-findtext>).
+- **GetBoundingRectangles** returns one rectangle for each visual line the range
+  touches, in screen coordinates, clipped to the field. A degenerate range, and a
+  range that is off the visible part of the field, has none
+  (<https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-getboundingrectangles>).
+- **GetText** returns the text between the endpoints, whatever their order, cut
+  to `maxLength` UTF-16 code units when it is not -1
+  (<https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-gettext>).
+- **Select** selects the range and replaces any selection; a degenerate range moves
+  the insertion point
+  (<https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextrangeprovider-select>).
+  The field takes focus, since its selection is shown only when it has it.
+- **AddToSelection** and **RemoveFromSelection** return UIA_E_NOTSUPPORTED: the
+  field has one selection (SupportedTextSelection_Single).
+- **GetCaretRange** (ITextProvider2,
+  <https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcore/nf-uiautomationcore-itextprovider2-getcaretrange>)
+  returns a degenerate range at the caret, and isActive is true when the field has
+  keyboard focus.
+- **GetSelection** returns the selection as one range, a degenerate one at the
+  insertion point when nothing is selected
+  (<https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-implementingtextandtextrange>).
+  **Deviation:** a field that does not have focus returns no range, because its
+  selection is not shown; the documentation does not cover this case.
+- **Characters** are grapheme clusters, which is what the caret moves over. A CR
+  LF pair is one cluster.
+- **Lines** are the visual lines of the layout. A line includes its line break, a
+  soft wrap belongs to the line after it, and the end of a text after a line break
+  is an empty line of its own. The rectangles of a line run from the start of its
+  text to its right edge, which excludes trailing spaces.
+- **Word units** follow Windows and Notepad (`text.WordStarts`). A unit is a run
+  of word characters, or a run of punctuation, followed by the spaces after it,
+  so "A small note-taking app." has the units "A ", "small ", "note", "-",
+  "taking ", "app", ". ". A line break is a unit of its own, and the spaces
+  before it belong to the word before. The Text pattern and the editor use the
+  same units: a degenerate range moved by one word lands at the start of the next
+  unit, where Ctrl+Right lands, and Move(Word, -1) lands where Ctrl+Left lands.
+  ExpandToEnclosingUnit(Word) of a degenerate range gives the unit that holds the
+  position, including its trailing spaces. A non-degenerate range moves from the
+  start of its unit, and Move(Word, 1) followed by Expand(Word) gives the next
+  unit. Ctrl+Delete and Ctrl+Backspace delete to the same places as the keys.
+  The rule was checked against Notepad (below), which the Windows edit controls
+  follow; Microsoft's documentation does not state the punctuation rules, so
+  those are Notepad's observed behaviour.
+
+  Notepad (Windows 11), jamb's notes body, and the same text, "A small
+  note-taking app. Next line" with a line break and "Second line, ok.":
+
+  | Operation | Notepad | jamb |
+  | --- | --- | --- |
+  | Ctrl+Right from 0, repeated | "A ", "small ", "note", "-", "taking ", "app", ". ", "Next ", "line  ", break | the same |
+  | Ctrl+Left from the end, repeated (the start of each unit passed) | "ok", ", ", "line", "Second ", break, "line  ", "Next ", ". ", "app" | the same |
+  | Move(Word, 1) from 0, then Expand(Word) | "A " then "small ", "note", "-", "taking ", "app", ". ", "Next ", "line  ", break | the same |
+  | Move(Word, -1) from the end | the Ctrl+Left stops | the same |
+  | Ctrl+Right from inside "sm" (after Right x4) | "small " | the same |
+  | Move(Word, 3) from 0, then Expand(Word) | moves to 12 (the start of "-"), expands to "-" | the same |
+  | MoveEndpointByUnit(End, Word, 2) from 0 | "A small " | the same |
+  | Ctrl+Delete at 0 | deletes "A " | the same |
+  | Ctrl+Backspace at the end | deletes "." | the same |
+
+  The two runs were compared line for line (44 lines each, identical), and the
+  mid-word run matched as well. Intentional differences: none measured. Not
+  checked: the leading spaces of a text, and a space typed after a line break.
+- **Paragraphs** end with their line break; the last one may be empty.
+- **Document, page and format** are the whole text: a plain text has one format,
+  and a text field has one page.
+- **Attributes.** IsReadOnly is always false, since no field is read-only yet. The
+  font name, size (in points, at 96 per inch), weight and italic are reported,
+  and a colour is not, so ForegroundColor and any other attribute is
+  NotSupported. A field's attributes are the same throughout, so an attribute
+  does not depend on the range.
+- **Visible ranges** of a field are its whole text. Scrolling does not split them.
+- **Events.** The text events follow
+  <https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-implementingtextandtextrange>:
+  the text-changed event after any text change, and the selection event whenever
+  the selection or the caret moves.
+
+### Verification
+
+Unit tests cover the points and their conversions (ASCII, combining marks,
+surrogate pairs, CR LF and Arabic), the expansion, movement and endpoint rules
+against hand-worked tables, the word units against Notepad's stops and the editor's keys,
+the wrapped lines and rectangles against the layout, selection requests, the
+events from snapshots, range validity, the vtable layout, the refcounts, and the
+zero-allocation hot paths (`uia_alloc_test.go`).
+
+Live checks were made against the notes body (a text area with two lines), the
+demo's search field, and a UI Automation client. Two client harnesses were used:
+PowerShell's .NET UI Automation client, and a compiled C# handler for the events,
+since PowerShell script blocks called from the event thread did not run.
+
+| Operation | Notes body | Demo search field |
+| --- | --- | --- |
+| DocumentRange, GetText | the two-line text | empty |
+| GetSelection at the caret | degenerate | degenerate |
+| Move by Character, 3 | moved 3 | none (empty text) |
+| Move by Word, 1, then Expand to Word | "Hello" before the Windows word units; under them the expected result is moved 1, "notes " (not re-run on this text) | none |
+| Expand to Line at the caret | "Hello notes body" with its break | none |
+| Move by Line, 1 | moved 1 | none |
+| GetBoundingRectangles | two rectangles, one per line: x 759, y 411 (113 by 24) and y 435 (528 by 24), screen pixels | none |
+| FindText "second" | found | none |
+| FindText "LINE", backward, ignoring case | "line" | none |
+| Select the found word, then GetSelection | "second" | none |
+| RangeFromPoint on line 1, then Expand to Line | "Hello notes body" | none |
+| Typing, Ctrl+Left and Shift+Left (script) | the text and the selection follow | "Beta" typed, caret moves 27 px |
+
+Events, counted with the C# handler: typing three characters in one frame gave one
+TextChanged; typing, Ctrl+Left, Shift+Left and Select gave four
+TextSelectionChanged; the Value property changed once.
+
+System caret, from GetGUIThreadInfo (client coordinates): the body's first line
+(348,244) when the body has focus; (395,268) with "second" selected (the caret at
+its end); (373,268) after "XYZ" replaces it; (348,268) after Ctrl+Left; (461,244)
+after Shift+Left selects the line break. Focus on the title moved it to (348,110),
+focus on a button destroyed it (no caret), and focus on the body restored it. A
+magnified screenshot shows jamb's single caret and no second caret.
+
+Phase A and B were re-checked on the notes app: a raw tree walk reached 23
+elements, the Pin note toggle went from Off to On, and Invoke on New note added
+the note's fields.
+
+### Memory
+
+Each operation was run 5000 times after a warm-up of 3000, with a client-side
+collection every 500, against the notes body (about 110 characters) in jamb and a
+Notepad document of the same text. The growth below is the process's private
+memory per call, after warm-up.
+
+| Operation | jamb before | jamb after | Notepad |
+| --- | --- | --- | --- |
+| GetSelection | 0.029 | 0.100 at 5000 calls; 0.012 over 20,000 (collector pacing, see below) | -0.018 |
+| DocumentRange | 0.006 | 0.030 | -0.030 |
+| Clone | 0.051 | 0.029 | -0.018 |
+| Move (Word, 1) | 0.029 | 0.264 (one step of 1.2 MB, then flat) | -0.029 |
+| ExpandToEnclosingUnit (Line) | 0.219 | 0.014 | 0.027 |
+| GetText | 0.683 | 0.019 | -0.002 |
+| GetBoundingRectangles | 0.265 | 0.194 (one step, then flat) | 0 |
+| FindText | 0.046 | 0.022 | -0.023 |
+
+KB per call. "Before" is the adapter before the change described below, measured
+with the same protocol.
+
+The cause was the adapter's own Go garbage, not a leak. A forced collection in
+the adapter (a temporary instrument, removed afterwards) showed that the Go heap
+was constant once collected: after the fix, 22,000 DocumentRange calls left the
+heap at the same size and object count, and the registry of cores at its
+baseline. Before the fix the steady rise was garbage that the collector had not
+yet run over. Three sources made it: GetText built a `[]rune` and a `[]uint16`
+for every call, and every range object allocated its core, its views slice and a
+pointer to its range. GetText now writes the BSTR in place (`bstrOf`,
+`win32.SysAllocStringN`), the views live in the core, the range is stored under
+the registry lock rather than in a pointer, and freed cores are reused with a new
+handle (`freeCores`, `recycle`), so a steady range object makes no Go allocation.
+A view that outlived its object cannot reach a reused core, since the reused
+core has a new handle. The scaling check after the fix: a 20-character body
+gives 0.017 KB per GetText call, and a 20,000-character body 0.005 KB, both flat;
+before, 0.26 and 1.94.
+
+Warm-up matters for the figures. The collector runs when the heap reaches its
+goal, so a short run can show a rise that is only waiting for a collection; the
+forced-collection run is what separates the two. The one steps of 0.9 to 1.2 MB
+in the table are arena growth in the Go heap, after which the samples are flat.
+The `SAFEARRAY`s are owned by UI Automation once returned, and a test
+(`TestRangeArrayOwnsItsRanges`) checks that the array keeps its ranges alive and
+frees them when destroyed.
+
+### Open items
+
+- **IME composition.** GetActiveComposition and GetConversionTarget
+  (ITextEditProvider) and UiaRaiseTextEditTextChangedEvent are not implemented.
+  ITextEditProvider was skipped as not trivial; the composition text is not
+  exposed as a range.
+- **Static and rich text.** The Text pattern is only on text fields and text
+  areas. A static text node's name carries its text, and the links of rich text
+  are children of it. A Text pattern on read-only rich text is not built.
+- **Annotations and embedded objects.** RangeFromAnnotation is not supported, and
+  RangeFromChild returns no range, since a field has no child with text. The
+  framework has no embedded objects.
+- **Attributes.** Colours, per-span attributes and mixed values are NotSupported.
+  No field is read-only, so IsReadOnly is false. A password flag exists
+  (`access.StatePassword`, reported as IsPassword) and no API sets it yet.
+- **Cost.** Building the content is linear in the text, about 2.4 ms for a 22 KB
+  wrapped text, and runs on each change to the text; grapheme segmentation is most
+  of it. A large text that changes on every keystroke may need incremental
+  segmentation.
+- **Collector pacing.** The adapter's per-call Go garbage was reduced (see the
+  Memory section). Between collections the private memory still rises by the
+  garbage made since the last one, so a short run shows a slope that a long run
+  does not. Notepad makes no Go garbage per call, which is why its column is flat.
+- **Visible ranges and scrolling.** Visible ranges are the whole text, and a
+  rectangle outside the field is dropped rather than scrolled into view.

@@ -53,3 +53,39 @@ func TestHotPathsAllocateNothing(t *testing.T) {
 		}
 	}
 }
+
+// TestTextHotPathsAllocateNothing holds the text pattern's calls that run per
+// query to no Go allocation: the pattern lookup, the state of the field and of a
+// range, and the movements and comparisons of a range. Making a range object is
+// not on this list, since the object's core is a Go allocation.
+func TestTextHotPathsAllocateNothing(t *testing.T) {
+	b := textBridge("hello world")
+	const hwnd = 0x7f21
+	patternView := cachedObject(kindNode, 2, b, hwnd, iidRawElementProviderSimple)
+	defer releaseCall(patternView)
+	fieldNode := coreOf(patternView)
+	textView := cachedObject(kindText, 2, b, hwnd, iidTextProvider)
+	defer releaseCall(textView)
+	textCore := coreOf(textView)
+	info := b.Tree().Node(2).Text
+	docView := newTextRange(hwnd, b, 2, info.Whole(), iidTextRangeProvider)
+	defer releaseCall(docView)
+	docCore := coreOf(docView)
+	doc, _ := docCore.textRange()
+	cases := map[string]func(){
+		"node text pattern, cached": func() { fieldNode.pattern(patternText) },
+		"text provider state":       func() { textCore.textOf() },
+		"range state":               func() { docCore.textRange() },
+		"range move by character":   func() { doc.Move(access.UnitCharacter, 2) },
+		"range move by word":        func() { doc.Move(access.UnitWord, 1) },
+		"range expand to line":      func() { doc.Expand(access.UnitLine) },
+		"range move endpoint":       func() { doc.MoveEndpoint(true, access.UnitWord, -1) },
+		"range compare endpoints":   func() { doc.CompareEndpoints(false, doc, true) },
+		"range find":                func() { doc.Find("world", false, true) },
+	}
+	for name, fn := range cases {
+		if n := testing.AllocsPerRun(100, fn); n != 0 {
+			t.Errorf("%s allocates %.1f times per call, want 0", name, n)
+		}
+	}
+}

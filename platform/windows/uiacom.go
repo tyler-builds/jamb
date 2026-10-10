@@ -101,12 +101,14 @@ const (
 	kindScroll                     // the Scroll pattern of a scroll container
 	kindScrollItem                 // the ScrollItem pattern of a node
 	kindWindow                     // the Window pattern of a dialog
+	kindText                       // the Text pattern of a text field or text area
+	kindTextRange                  // a range of the text of a text field; made per call, not kept by its node
 )
 
 // patternKinds lists the kinds of pattern objects. Like nodes, each pattern
 // object is kept per node until the node leaves the tree.
 var patternKinds = []coreKind{kindInvoke, kindToggle, kindExpand, kindSelectItem, kindSelection,
-	kindValue, kindScroll, kindScrollItem, kindWindow}
+	kindValue, kindScroll, kindScrollItem, kindWindow, kindText}
 
 // kindIfaces lists the interfaces that each kind of object implements.
 var kindIfaces = [...][]*iface{
@@ -121,20 +123,25 @@ var kindIfaces = [...][]*iface{
 	kindScroll:     {&ifaceScroll},
 	kindScrollItem: {&ifaceScrollItem},
 	kindWindow:     {&ifaceWindow},
+	kindText:       {&ifaceText, &ifaceText2},
+	kindTextRange:  {&ifaceTextRange},
 }
 
 // core is the Go-side state of an object. Its views share it.
 type core struct {
-	refs   atomic.Int32
-	handle uintptr
-	kind   coreKind
-	id     access.ID // the node, for node and pattern objects; access.RootID for the root
-	hwnd   uintptr   // the window
-	bridge *access.Bridge
-	views  []comView
+	refs    atomic.Int32
+	handle  uintptr
+	kind    coreKind
+	id      access.ID // the node, for node and pattern objects; access.RootID for the root
+	hwnd    uintptr   // the window
+	bridge  *access.Bridge
+	views   []comView
+	viewBuf [3]comView // the backing array of views, so that a core needs no second allocation
 	// root is the window's node as of the snapshot it was made from, for the
 	// root object only (see rootNode).
 	root atomic.Pointer[rootSnap]
+	// rng is the range of a text range object (see uiatext.go).
+	rng access.TextRange // read and set under regMu
 }
 
 // rootSnap is the root node of one snapshot, with the title the window had when
@@ -168,6 +175,7 @@ func initVtbls() {
 		qi := syscall.NewCallback(uiaQueryInterface)
 		ar := syscall.NewCallback(uiaAddRef)
 		rl := syscall.NewCallback(uiaRelease)
+		initTextVtbls(qi, ar, rl)
 		simpleVtbl = [...]uintptr{qi, ar, rl,
 			syscall.NewCallback(uiaProviderOptions),
 			syscall.NewCallback(uiaGetPatternProvider),
@@ -262,7 +270,16 @@ func createLocked(kind coreKind, id access.ID, b *access.Bridge, hwnd uintptr, i
 		return 0
 	}
 	lastHandle++
-	c := &core{handle: lastHandle, kind: kind, id: id, hwnd: hwnd, bridge: b}
+	var c *core
+	if n := len(freeCores); n > 0 {
+		c = freeCores[n-1]
+		freeCores = freeCores[:n-1]
+		*c = core{}
+	} else {
+		c = new(core)
+	}
+	c.handle, c.kind, c.id, c.hwnd, c.bridge = lastHandle, kind, id, hwnd, b
+	c.views = c.viewBuf[:0]
 	c.refs.Store(1)
 	for _, i := range ifs {
 		addr := allocView(i.vtbl, c.handle)
@@ -392,6 +409,23 @@ func (c *core) provide(id access.ID, iid guid) uintptr {
 	return cachedObject(kindNode, id, c.bridge, c.hwnd, iid)
 }
 
+// freeCores holds the cores of freed objects, for createLocked to reuse, so that a
+// range object makes no Go allocation in steady state. A reused core takes a new
+// handle, so a view of the object it was before no longer finds it in cores.
+var freeCores []*core
+
+// maxFreeCores bounds freeCores.
+const maxFreeCores = 256
+
+// recycle keeps a core whose object was freed, once its views are freed.
+func recycle(c *core) {
+	regMu.Lock()
+	if len(freeCores) < maxFreeCores {
+		freeCores = append(freeCores, c)
+	}
+	regMu.Unlock()
+}
+
 // objs holds one object for each node and kind, so that a node is the same
 // object each time UI Automation asks for it. UI Automation keeps the objects it
 // has been given, so making a new object per query would grow the registry with
@@ -480,6 +514,7 @@ func dropRef(c *core) {
 	regMu.Unlock()
 	if n == 0 {
 		c.free()
+		recycle(c)
 	}
 }
 
@@ -537,6 +572,7 @@ func uiaRelease(this uintptr) uintptr {
 	regMu.Unlock()
 	if n == 0 {
 		c.free()
+		recycle(c)
 	}
 	return uintptr(n)
 }

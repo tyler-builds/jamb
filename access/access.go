@@ -128,6 +128,7 @@ const (
 	StateSelectable                           // the node is one item of a selection; StateSelected says whether it is chosen
 	StateSelectionContainer                   // the node holds selection items, such as the chips of a filter
 	StateToggle                               // the node has an on or off state; StateChecked says whether it is on
+	StatePassword                             // a password field: its text is hidden (UI Automation IsPassword); no API sets it yet
 )
 
 // Has reports whether all the flags in f are set.
@@ -153,6 +154,7 @@ var stateNames = [...]struct {
 	{StateSelectable, "selectable"},
 	{StateSelectionContainer, "selection container"},
 	{StateToggle, "toggle"},
+	{StatePassword, "password"},
 }
 
 // String lists the flags that are set, such as "focusable focused".
@@ -183,6 +185,7 @@ const (
 	ActionDecrement                      // lower a value
 	ActionScroll                         // scroll a container by a fraction of its view (see Request)
 	ActionSetScrollPercent               // scroll a container to a percent of its range (see Request)
+	ActionSetTextSelection               // select the text between Request.Anchor and Request.Caret (byte offsets)
 )
 
 var actionNames = [...]string{
@@ -198,6 +201,7 @@ var actionNames = [...]string{
 	ActionDecrement:        "decrement",
 	ActionScroll:           "scroll",
 	ActionSetScrollPercent: "set scroll percent",
+	ActionSetTextSelection: "set text selection",
 }
 
 // Request is an action with its argument, which the bridge passes to the
@@ -206,9 +210,10 @@ var actionNames = [...]string{
 // a negative value leaves that axis alone. For ActionScroll they are the
 // fraction of the view to move, positive down and right.
 type Request struct {
-	Action Action
-	Value  string
-	X, Y   float64
+	Action        Action
+	Value         string
+	X, Y          float64
+	Anchor, Caret int // the selection for ActionSetTextSelection, as byte offsets of the text
 }
 
 // Scroll describes a scroll container. A node with Container set exposes the
@@ -310,6 +315,7 @@ type Node struct {
 	SetSize     int  // the number of items in the set; 0 when not in a set
 	Level       int  // the nesting depth of a menu or tree item, 1 for the top; 0 when not set
 	Scroll      Scroll
+	Text        *TextInfo // the text of a text field or text area, for the Text pattern; nil otherwise
 }
 
 // Has reports whether the node supports action a.
@@ -335,6 +341,7 @@ func (n *Node) Equal(o *Node) bool {
 		n.Key == o.Key && n.Value == o.Value && n.States == o.States && n.Bounds == o.Bounds &&
 		n.Parent == o.Parent && n.Heading == o.Heading && n.PosInSet == o.PosInSet &&
 		n.SetSize == o.SetSize && n.Level == o.Level && n.Scroll == o.Scroll &&
+		n.Text.Equal(o.Text) &&
 		equalIDs(n.Children, o.Children) && equalIDs(n.LabelledBy, o.LabelledBy) &&
 		equalIDs(n.DescribedBy, o.DescribedBy) && equalIDs(n.Controls, o.Controls) &&
 		equalActions(n.Actions, o.Actions)

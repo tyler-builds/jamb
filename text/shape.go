@@ -567,6 +567,13 @@ func (l *Layout) Caret(pos int) (x, top float32) {
 	return l.caretX(ln, l.runeAt(pos)), ln.Top
 }
 
+// LineCaretX returns the x of the caret at byte offset pos, in layout units, on
+// line i. It is Caret for a caller that knows the line, so a whole layout can be
+// measured in one pass; pos must be a position on that line.
+func (l *Layout) LineCaretX(i, pos int) float32 {
+	return l.caretX(&l.Lines[i], l.runeAt(pos))
+}
+
 // CaretX is Caret's x and line index, kept for single-line callers.
 func (l *Layout) CaretX(pos int) (float32, int) {
 	x, _ := l.Caret(pos)
@@ -748,6 +755,11 @@ func (sys *System) graphemes(s string) []int {
 	return stops
 }
 
+// GraphemeStops returns a copy of the byte offsets of the grapheme cluster
+// boundaries in s, from 0 to len(s). Unlike the internal list it is not shared,
+// so the caller may keep it.
+func (sys *System) GraphemeStops(s string) []int { return slices.Clone(sys.graphemes(s)) }
+
 // NextGrapheme returns the byte offset after the user-perceived character at pos.
 func (sys *System) NextGrapheme(s string, pos int) int {
 	for _, b := range sys.graphemes(s) {
@@ -772,6 +784,10 @@ func (sys *System) PrevGrapheme(s string, pos int) int {
 func isWordRune(r rune) bool {
 	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || unicode.Is(unicode.Mn, r)
 }
+
+// IsWordRune reports whether r is a word character, as the editor's word
+// movement (NextWord, PrevWord) and double-click selection (WordAt) treat it.
+func IsWordRune(r rune) bool { return isWordRune(r) }
 
 // NextWord returns the end of the word at or after pos (Ctrl+Right).
 func NextWord(s string, pos int) int {

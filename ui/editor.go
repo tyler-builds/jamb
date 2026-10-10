@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/scene"
 	"github.com/tyler-builds/jamb/text"
@@ -55,6 +56,10 @@ type editState struct {
 	lastX     float32
 	lastY     float32
 	reveal    bool
+
+	// The access content of the text, and the layout it was made from (see textContent).
+	content       *access.TextContent
+	contentLayout *text.Layout
 
 	// From the last paint, for hit testing.
 	layout           *text.Layout

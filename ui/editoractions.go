@@ -2,7 +2,6 @@ package ui
 
 import (
 	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/text"
 )
 
 // The keys of a text field are actions, so key bindings can change them and
@@ -192,9 +191,9 @@ func (rt *Runtime) editorHorizontal(id uint64, dir int, word, extend bool) {
 	p := es.caret
 	switch {
 	case word && dir < 0:
-		p = text.PrevWord(v, p)
+		p = wordBackward(v, p)
 	case word:
-		p = text.NextWord(v, p)
+		p = wordForward(v, p)
 	case dir < 0:
 		p = rt.text.PrevGrapheme(v, p)
 	default:
@@ -274,11 +273,11 @@ func (rt *Runtime) editorDeleteStep(id uint64, dir int, word bool) {
 	case a != b:
 		rt.editorDelete(id, a, b)
 	case dir < 0 && word:
-		rt.editorDelete(id, text.PrevWord(v, a), a)
+		rt.editorDelete(id, wordBackward(v, a), a)
 	case dir < 0:
 		rt.editorDelete(id, rt.text.PrevGrapheme(v, a), a)
 	case word:
-		rt.editorDelete(id, a, text.NextWord(v, a))
+		rt.editorDelete(id, a, wordForward(v, a))
 	default:
 		rt.editorDelete(id, a, rt.text.NextGrapheme(v, a))
 	}

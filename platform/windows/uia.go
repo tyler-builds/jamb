@@ -284,7 +284,30 @@ func variantBSTR(s string) variant {
 // bstrOf returns a new BSTR holding s. The caller frees it with SysFreeString,
 // unless it is given to UI Automation in a VARIANT.
 func bstrOf(s string) uintptr {
-	return win32.SysAllocStringLen(utf16.Encode([]rune(s)))
+	// The BSTR is allocated by the system and filled in place, so a call makes no
+	// Go buffer. Garbage made on each query is what the Go collector had to run
+	// over, and it grew the process's private memory between collections.
+	n := 0
+	for _, r := range s {
+		n += utf16.RuneLen(r)
+	}
+	b := win32.SysAllocStringN(n)
+	if b == 0 {
+		return 0
+	}
+	units := unsafe.Slice((*uint16)(ptr(b)), n)
+	i := 0
+	for _, r := range s {
+		if r >= 0x10000 {
+			r1, r2 := utf16.EncodeRune(r)
+			units[i], units[i+1] = uint16(r1), uint16(r2)
+			i += 2
+		} else {
+			units[i] = uint16(r)
+			i++
+		}
+	}
+	return b
 }
 
 // newVariant returns a VARIANT on the heap. A pointer to a VARIANT that is given to
@@ -382,6 +405,10 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 		if isText(n.Role) {
 			return variantBSTR(n.Value)
 		}
+	case propIsPassword:
+		if isText(n.Role) {
+			return variantBool(n.States.Has(access.StatePassword))
+		}
 	case propIsReadOnly:
 		if isText(n.Role) {
 			return variantBool(n.States.Has(access.StateReadOnly))
@@ -462,6 +489,8 @@ func patternKindOf(id int32) (coreKind, bool) {
 		return kindScrollItem, true
 	case patternWindow:
 		return kindWindow, true
+	case patternText, patternText2:
+		return kindText, true
 	}
 	return 0, false
 }
@@ -488,6 +517,8 @@ func availableKind(id int32) (coreKind, bool) {
 		return kindScrollItem, true
 	case propIsWindowAvailable:
 		return kindWindow, true
+	case propIsTextPatternAvailable, propIsTextPattern2Available:
+		return kindText, true
 	}
 	return 0, false
 }
@@ -513,6 +544,8 @@ func supports(k coreKind, n *access.Node) bool {
 		return n.Scroll.Container
 	case kindScrollItem:
 		return n.Has(access.ActionScrollIntoView)
+	case kindText:
+		return isText(n.Role)
 	case kindWindow:
 		return n.Role == access.RoleDialog
 	}
@@ -1178,6 +1211,13 @@ func (w *window) onAccess(b *access.Bridge, u access.Update) {
 		if n := t.Node(pc.ID); n != nil {
 			w.raiseProperty(b, n, pc.Property, t.Focus == n.ID)
 		}
+	}
+	// The text events are raised on the field, which holds the text pattern.
+	for _, id := range u.TextSelection {
+		w.raiseOn(b, id, eventTextSelectionChanged)
+	}
+	for _, id := range u.TextChanged {
+		w.raiseOn(b, id, eventTextChanged)
 	}
 	for _, p := range u.Opened {
 		event := int32(eventMenuOpened)

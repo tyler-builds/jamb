@@ -62,4 +62,30 @@ func (w *window) SetTextInputRect(r platform.Rect) {
 	if r.H > 0 {
 		win32.SetIMEPosition(w.hwnd, int32(r.X), int32(r.Y), int32(r.H))
 	}
+	w.placeCaret(r)
+}
+
+// placeCaret keeps a hidden system caret at the text insertion point, so that
+// screen magnifiers, and other tools that follow the system caret, track the
+// typing. The caret is never shown: jamb draws its own caret, and a visible
+// system caret would be a second one. It is destroyed when no field has focus,
+// and made again at the height of the field the next time one does.
+func (w *window) placeCaret(r platform.Rect) {
+	if r.H <= 0 {
+		if w.caretH != 0 {
+			win32.DestroyCaret()
+			w.caretH = 0
+		}
+		return
+	}
+	if int32(r.H) != w.caretH {
+		win32.DestroyCaret()
+		// A one-pixel solid caret, hidden at once: a hidden caret does not draw.
+		if !win32.CreateCaret(w.hwnd, 1, int32(r.H)) {
+			return
+		}
+		win32.HideCaret(w.hwnd)
+		w.caretH = int32(r.H)
+	}
+	win32.SetCaretPos(int32(r.X), int32(r.Y))
 }

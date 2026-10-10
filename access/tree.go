@@ -145,6 +145,11 @@ type Update struct {
 	// were removed (taken from the previous snapshot).
 	Opened []Popup
 	Closed []Popup
+	// TextChanged are the text fields and text areas whose text changed, and
+	// TextSelection those whose selection or caret moved. Adapters raise the
+	// text events for them.
+	TextChanged   []ID
+	TextSelection []ID
 	// Announcements are the status messages queued since the last snapshot.
 	Announcements []Announcement
 }
@@ -184,6 +189,7 @@ func Diff(prev, next *Tree) Update {
 		}
 		if old != nil {
 			u.Properties = appendPropertyChanges(u.Properties, old, n)
+			u.TextChanged, u.TextSelection = appendTextChanges(u.TextChanged, u.TextSelection, old, n)
 		}
 		return true
 	})
@@ -202,7 +208,24 @@ func Diff(prev, next *Tree) Update {
 	slices.Sort(u.Changed)
 	slices.SortFunc(u.Opened, comparePopups)
 	slices.SortFunc(u.Closed, comparePopups)
+	slices.Sort(u.TextChanged)
+	slices.Sort(u.TextSelection)
 	return u
+}
+
+// appendTextChanges appends n to the text-changed list when its text differs from
+// old, and to the selection list when its selection or caret moved.
+func appendTextChanges(changed, selected []ID, old, n *Node) ([]ID, []ID) {
+	if old.Text == nil || n.Text == nil {
+		return changed, selected
+	}
+	if old.Text.Content.Text != n.Text.Content.Text {
+		changed = append(changed, n.ID)
+	}
+	if old.Text.Anchor != n.Text.Anchor || old.Text.Caret != n.Text.Caret {
+		selected = append(selected, n.ID)
+	}
+	return changed, selected
 }
 
 // comparePopups orders popups by ID.

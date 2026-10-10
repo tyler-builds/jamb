@@ -340,6 +340,10 @@ func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 		if n.kind == kindEditor {
 			rt.editorSet(n.id, req.Value, len(req.Value), editOther)
 		}
+	case access.ActionSetTextSelection:
+		if n.kind == kindEditor {
+			rt.editorSelect(n.id, req.Anchor, req.Caret)
+		}
 	case access.ActionScrollIntoView:
 		rt.scrollIntoView(n)
 	case access.ActionScroll:
@@ -938,15 +942,23 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 	if n.editor.multiline {
 		role = access.RoleTextArea
 	}
+	v := n.editor.value.Peek()
 	an := &access.Node{ID: id, Role: role, Name: n.editor.name, Key: n.key, Bounds: b.bounds(n),
-		Value:   n.editor.value.Peek(),
-		Actions: []access.Action{access.ActionFocus, access.ActionSetValue}}
+		Value:   v,
+		Actions: []access.Action{access.ActionFocus, access.ActionSetValue, access.ActionSetTextSelection}}
+	if n.st != nil && n.st.edit != nil {
+		n.st.edit.sync(v)
+		an.Text = b.textInfo(n, n.st.edit, v)
+	}
 	an.States = access.StateFocusable | b.offscreen(n)
 	if id == b.focus {
 		an.States |= access.StateFocused
 	}
 	if n.editor.multiline {
 		an.States |= access.StateMultiLine
+	}
+	if an.Text != nil {
+		an.Text.ReadOnly = an.States.Has(access.StateReadOnly)
 	}
 	b.relate(an, n.div.acc)
 	b.add(an, n, nil)

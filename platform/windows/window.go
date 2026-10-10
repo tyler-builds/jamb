@@ -49,6 +49,7 @@ type window struct {
 	maximized   bool // last reported state, see platform.EventWindowState
 	wakeAt      time.Time
 	imeRect     platform.Rect
+	caretH      int32 // height of the hidden system caret, or 0 when there is none (see placeCaret)
 	// caption is the title-bar button the mouse went down on; its action runs
 	// when the button is released over it.
 	caption platform.TitleArea
