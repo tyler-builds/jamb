@@ -18,27 +18,39 @@ import (
 
 // packageOptions are the flags and the directory of jamb package.
 type packageOptions struct {
-	dir       string
-	arch      string
-	cert      string
-	testCert  bool
-	timestamp string
-	noMSIX    bool
-	sdkBin    string
+	dir         string
+	arch        string
+	installer   bool
+	makensis    string
+	msix        bool
+	signCommand string
+	sdkBin      string
+}
+
+// removedFlags are the flags of earlier versions of jamb package. Each one is
+// refused with what to do instead, rather than reported as an unknown flag.
+var removedFlags = map[string]string{
+	"cert":      "jamb package no longer reads certificates or their passwords; sign the output with --sign-command (see the README, Packaging)",
+	"test-cert": "jamb package no longer creates certificates; sign the MSIX with --sign-command, using a certificate whose subject matches publisherSubject (see the README, Packaging)",
+	"timestamp": "put the timestamp server in the sign command, for example with signtool's /tr option (see the README, Packaging)",
+	"no-msix":   "the MSIX is no longer built by default; leave out --msix to build the zip only",
 }
 
 // packageCmd parses the arguments of jamb package and builds the release.
 //
 //	jamb package [flags] [package dir]
 func packageCmd(args []string) error {
+	if err := checkRemovedFlags(args); err != nil {
+		return err
+	}
 	var o packageOptions
 	fs := flag.NewFlagSet("jamb package", flag.ContinueOnError)
 	fs.StringVar(&o.arch, "arch", "amd64", "target architecture: amd64 or arm64")
-	fs.StringVar(&o.cert, "cert", "", "sign with this PFX file; its password is read from the "+passwordEnv+" environment variable")
-	fs.BoolVar(&o.testCert, "test-cert", false, "sign with a self-signed test certificate kept in dist (for install tests on this PC only)")
-	fs.StringVar(&o.timestamp, "timestamp", "", "RFC 3161 timestamp server URL for the signatures")
-	fs.BoolVar(&o.noMSIX, "no-msix", false, "build the zip only")
-	fs.StringVar(&o.sdkBin, "sdk-bin", "", "Windows SDK bin directory with makeappx.exe and signtool.exe (default: the newest SDK under Windows Kits)")
+	fs.BoolVar(&o.installer, "installer", false, "build a setup.exe installer with NSIS (makensis)")
+	fs.StringVar(&o.makensis, "makensis", "", "path of makensis.exe (default: on PATH, or in the NSIS install directory); needs --installer")
+	fs.BoolVar(&o.msix, "msix", false, "build an MSIX package; it is unsigned unless --sign-command signs it")
+	fs.StringVar(&o.signCommand, "sign-command", "", "command that signs each built file, with "+filePlaceholder+" for its path (default: the "+signCommandEnv+" environment variable)")
+	fs.StringVar(&o.sdkBin, "sdk-bin", "", "Windows SDK bin directory with makeappx.exe (default: the newest SDK under Windows Kits)")
 	if err := fs.Parse(args); err != nil {
 		return helpOrError(err)
 	}
@@ -57,11 +69,16 @@ func packageCmd(args []string) error {
 	if o.arch != "amd64" && o.arch != "arm64" {
 		return fmt.Errorf("--arch must be amd64 or arm64, not %q", o.arch)
 	}
-	if o.cert != "" && o.testCert {
-		return errors.New("--cert and --test-cert cannot be used together")
+	if o.makensis != "" && !o.installer {
+		return errors.New("--makensis needs --installer")
 	}
-	if o.timestamp != "" && o.cert == "" && !o.testCert {
-		return errors.New("--timestamp needs --cert or --test-cert")
+	if o.signCommand == "" {
+		o.signCommand = os.Getenv(signCommandEnv)
+	}
+	if o.signCommand != "" {
+		if _, err := newSigner(o.signCommand); err != nil {
+			return err
+		}
 	}
 	abs, err := filepath.Abs(o.dir)
 	if err != nil {
@@ -69,6 +86,27 @@ func packageCmd(args []string) error {
 	}
 	o.dir = abs
 	return packageApp(o)
+}
+
+// checkRemovedFlags refuses a flag that earlier versions of jamb package had and
+// this one does not, with the reason and the replacement.
+func checkRemovedFlags(args []string) error {
+	for _, a := range args {
+		if a == "--" {
+			break
+		}
+		if !strings.HasPrefix(a, "-") {
+			continue
+		}
+		name := strings.TrimLeft(a, "-")
+		if i := strings.Index(name, "="); i >= 0 {
+			name = name[:i]
+		}
+		if msg, ok := removedFlags[name]; ok {
+			return fmt.Errorf("--%s was removed: %s", name, msg)
+		}
+	}
+	return nil
 }
 
 // helpOrError treats a request for help as success, since flag has already
@@ -81,9 +119,9 @@ func helpOrError(err error) error {
 }
 
 // cleaner runs the removals of one packaging run: the staging directory, the
-// resource object in the app's directory, and the temporary signing PFX. It
+// work directory in dist, and the resource object in the app's directory. It
 // also runs them on Ctrl+C, which ends the process without running deferred
-// calls, so the decrypted signing key is not left in the temp directory.
+// calls.
 type cleaner struct {
 	mu  sync.Mutex
 	fns []func()
@@ -127,9 +165,14 @@ func (c *cleaner) watchInterrupt() (stop func()) {
 	}
 }
 
-// packageApp builds the release of the app in o.dir into o.dir/dist: a zip,
-// and, when it is signed and the Windows SDK is installed, an MSIX. Signing with
-// --cert or --test-cert covers the executable and the MSIX.
+// packageApp builds the release of the app in o.dir into o.dir/dist: a zip, and
+// when requested an installer and an MSIX. When a sign command is set, it signs
+// the executable before the zip, the installer after it is built, and the MSIX
+// after it is built.
+//
+// The artifacts are built in a work directory inside dist and moved into dist
+// only when every step has succeeded, so a failed signature leaves dist without
+// a partly signed set.
 func packageApp(o packageOptions) error {
 	var c cleaner
 	defer c.run()
@@ -150,47 +193,47 @@ func packageApp(o packageOptions) error {
 	if err != nil {
 		return err
 	}
-	// Check the tools before anything is written, so a missing SDK leaves
-	// nothing behind.
-	signing := o.cert != "" || o.testCert
-	var signtool string
-	if signing {
-		if signtool, err = findSDKTool("signtool.exe", o.sdkBin); err != nil {
-			return err
-		}
-	}
-	dist := filepath.Join(o.dir, "dist")
-	if err := os.MkdirAll(dist, 0o755); err != nil {
-		return err
-	}
-
+	// Check the sign command and the tools before anything is written, so a
+	// missing tool leaves nothing behind.
 	var sign *signer
-	if signing {
-		if sign, err = newSigner(o, cfg, dist, signtool); err != nil {
+	if o.signCommand != "" {
+		if sign, err = newSigner(o.signCommand); err != nil {
 			return err
 		}
-		c.add(sign.close)
 	}
-	// An MSIX that is not signed cannot be installed, so it is built only when
-	// a signing option is given.
+	var makensis string
+	if o.installer {
+		if makensis, err = findMakensis(o.makensis); err != nil {
+			if o.makensis != "" {
+				return err
+			}
+			pkgf("warning: no installer will be built: %v", err)
+		}
+	}
 	var makeappx string
-	switch {
-	case o.noMSIX:
-	case sign == nil:
-		pkgf("no MSIX: a package must be signed to install, so add --test-cert for a local test or --cert for a release (the MSIX also needs the Windows SDK)")
-	default:
+	if o.msix {
 		if makeappx, err = findSDKTool("makeappx.exe", o.sdkBin); err != nil {
 			pkgf("warning: no MSIX will be built: %v", err)
 		}
 	}
+
+	dist := filepath.Join(o.dir, "dist")
+	if err := os.MkdirAll(dist, 0o755); err != nil {
+		return err
+	}
+	work, err := os.MkdirTemp(dist, ".jamb-package-")
+	if err != nil {
+		return err
+	}
+	c.add(func() { os.RemoveAll(work) })
 
 	stage, err := os.MkdirTemp("", "jamb-package-")
 	if err != nil {
 		return err
 	}
 	c.add(func() { os.RemoveAll(stage) })
-	// The layout holds what goes into the package: the executable, and for
-	// the MSIX its manifest and logos.
+	// The layout holds what goes into the MSIX: the executable, and then its
+	// manifest and logos.
 	layout := filepath.Join(stage, "layout")
 	if err := os.Mkdir(layout, 0o755); err != nil {
 		return err
@@ -207,27 +250,47 @@ func packageApp(o packageOptions) error {
 	}
 
 	base := fmt.Sprintf("%s-%s-windows-%s", cfg.Name, cfg.Version, o.arch)
-	zipPath := filepath.Join(dist, base+".zip")
-	if err := writeZip(zipPath, o.dir, exe); err != nil {
+	zipName := base + ".zip"
+	if err := writeZip(filepath.Join(work, zipName), o.dir, exe); err != nil {
 		return err
 	}
-	pkgf("wrote %s", zipPath)
+	outputs := []string{zipName}
 
-	if makeappx == "" {
-		return nil
-	}
-	msixPath := filepath.Join(dist, base+".msix")
-	if err := buildMSIX(makeappx, layout, msixPath, cfg, icon, winVersion, o.arch); err != nil {
-		return err
-	}
-	if sign != nil {
-		if err := sign.sign(msixPath); err != nil {
+	if makensis != "" {
+		setupName := base + "-setup.exe"
+		setupPath := filepath.Join(work, setupName)
+		if err := buildInstaller(makensis, stage, setupPath, o.dir, exe, cfg, icon, winVersion); err != nil {
 			return err
 		}
+		if sign != nil {
+			if err := sign.sign(setupPath); err != nil {
+				return err
+			}
+		}
+		outputs = append(outputs, setupName)
 	}
-	pkgf("wrote %s", msixPath)
-	if sign != nil && sign.testCert {
-		printTestCertInstructions(sign, cfg, msixPath)
+
+	if makeappx != "" {
+		msixName := base + ".msix"
+		msixPath := filepath.Join(work, msixName)
+		if err := buildMSIX(makeappx, layout, msixPath, cfg, icon, winVersion, o.arch); err != nil {
+			return err
+		}
+		if sign != nil {
+			if err := sign.sign(msixPath); err != nil {
+				return err
+			}
+		} else {
+			pkgf("warning: %s is unsigned. Upload it to Partner Center, where the Store signs it, or sign it with --sign-command before installing it; Windows does not install unsigned packages", msixName)
+		}
+		outputs = append(outputs, msixName)
+	}
+
+	for _, name := range outputs {
+		if err := os.Rename(filepath.Join(work, name), filepath.Join(dist, name)); err != nil {
+			return err
+		}
+		pkgf("wrote %s", filepath.Join(dist, name))
 	}
 	return nil
 }
@@ -263,20 +326,30 @@ func buildExe(dir, exe string, cfg *config, icon image.Image, winVersion, arch s
 	return nil
 }
 
-// writeZip writes the release zip. It holds the executable and any LICENSE or
-// NOTICE files of the app's directory, all at the root of the archive.
-func writeZip(path, dir, exe string) (err error) {
-	files := []string{exe}
+// licenseFiles returns the LICENSE and NOTICE files of dir, by full path.
+func licenseFiles(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	var files []string
 	for _, e := range entries {
 		upper := strings.ToUpper(e.Name())
 		if !e.IsDir() && (strings.HasPrefix(upper, "LICENSE") || strings.HasPrefix(upper, "NOTICE")) {
 			files = append(files, filepath.Join(dir, e.Name()))
 		}
 	}
+	return files, nil
+}
+
+// writeZip writes the release zip. It holds the executable and any LICENSE or
+// NOTICE files of the app's directory, all at the root of the archive.
+func writeZip(path, dir, exe string) (err error) {
+	licenses, err := licenseFiles(dir)
+	if err != nil {
+		return err
+	}
+	files := append([]string{exe}, licenses...)
 
 	out, err := os.Create(path)
 	if err != nil {
@@ -320,19 +393,6 @@ func addZipFile(zw *zip.Writer, file string) error {
 	}
 	_, err = io.Copy(w, src)
 	return err
-}
-
-// printTestCertInstructions shows how to trust the test certificate for an
-// install on this PC. The steps change system state, so jamb only prints them.
-func printTestCertInstructions(s *signer, cfg *config, msix string) {
-	fmt.Fprintln(os.Stderr)
-	pkgf("The MSIX is signed with a test certificate that Windows does not trust yet.")
-	pkgf("To install it on this PC, run these in an administrator PowerShell:")
-	pkgf(`  certutil -addstore -f TrustedPeople "%s"`, s.cer)
-	pkgf(`  Add-AppxPackage -Path "%s"`, msix)
-	pkgf("To remove it again:")
-	pkgf(`  Get-AppxPackage -Name "%s" | Remove-AppxPackage`, cfg.IdentityName)
-	pkgf("  certutil -delstore TrustedPeople %s", s.thumbprint)
 }
 
 // pkgf prints a progress or warning line for jamb package.

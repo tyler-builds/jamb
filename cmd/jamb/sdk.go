@@ -16,8 +16,8 @@ import (
 // sdkVersionPattern matches the version directories under Windows Kits\10\bin.
 var sdkVersionPattern = regexp.MustCompile(`^\d+(\.\d+)+$`)
 
-// findSDKTool returns the path of a Windows SDK tool such as makeappx.exe or
-// signtool.exe. When dir is set, the tool must be in it. Otherwise the newest
+// findSDKTool returns the path of a Windows SDK tool such as makeappx.exe. When
+// dir is set, the tool must be in it. Otherwise the newest
 // installed SDK is searched, for this machine's architecture first.
 func findSDKTool(name, dir string) (string, error) {
 	if dir != "" {

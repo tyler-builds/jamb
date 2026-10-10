@@ -38,11 +38,28 @@ func makeApp(t *testing.T, dir, mainSrc string) {
 	writeSolidPNG(t, filepath.Join(dir, "icon.png"), 256, 256)
 }
 
+// distEntries returns the names in dist, or none when dist does not exist.
+func distEntries(t *testing.T, dist string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dist)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
 func TestPackageRemovesSysoAfterBuildFailure(t *testing.T) {
 	dir := t.TempDir()
 	makeApp(t, dir, "package main\n\nfunc main() { undefined() }\n")
 
-	if err := packageApp(packageOptions{dir: dir, arch: "amd64", noMSIX: true}); err == nil {
+	if err := packageApp(packageOptions{dir: dir, arch: "amd64"}); err == nil {
 		t.Fatal("packageApp succeeded on a program that does not compile")
 	}
 	if _, err := os.Stat(filepath.Join(dir, sysoName("amd64"))); !os.IsNotExist(err) {
@@ -62,7 +79,7 @@ func TestPackageKeepsAnExistingSyso(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := packageApp(packageOptions{dir: dir, arch: "amd64", noMSIX: true}); err == nil {
+	if err := packageApp(packageOptions{dir: dir, arch: "amd64"}); err == nil {
 		t.Fatal("packageApp overwrote a .syso it did not write")
 	}
 	data, err := os.ReadFile(mine)
@@ -84,15 +101,15 @@ func TestPackageZipHoldsAGUIExecutableWithResources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Unsigned, so no MSIX is written even though the SDK may be installed.
+	// No installer and no MSIX are requested, and no sign command is set.
 	if err := packageApp(packageOptions{dir: dir, arch: "amd64"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, sysoName("amd64"))); !os.IsNotExist(err) {
 		t.Errorf("the resource object is left in the app directory: %v", err)
 	}
-	if msix, _ := filepath.Glob(filepath.Join(dir, "dist", "*.msix")); len(msix) != 0 {
-		t.Errorf("an unsigned build wrote %v", msix)
+	if got := distEntries(t, filepath.Join(dir, "dist")); strings.Join(got, ",") != "jamb-demo-0.1.0-windows-amd64.zip" {
+		t.Errorf("dist holds %v; want only the zip", got)
 	}
 
 	zipPath := filepath.Join(dir, "dist", "jamb-demo-0.1.0-windows-amd64.zip")
@@ -161,7 +178,10 @@ func TestPackageZipHoldsAGUIExecutableWithResources(t *testing.T) {
 	}
 }
 
-func TestPackageMSIXWithTestCertificate(t *testing.T) {
+// TestPackageUnsignedMSIX builds the MSIX without a sign command. The package is
+// unsigned, so it has no AppxSignature.p7x, and nothing signing-related is written
+// to dist.
+func TestPackageUnsignedMSIX(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds an executable and runs the Windows SDK")
 	}
@@ -169,32 +189,113 @@ func TestPackageMSIXWithTestCertificate(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	if _, err := findSDKTool("signtool.exe", ""); err != nil {
-		t.Skip(err)
-	}
 	dir := t.TempDir()
 	makeApp(t, dir, "package main\n\nfunc main() {}\n")
 
-	if err := packageApp(packageOptions{dir: dir, arch: "amd64", testCert: true}); err != nil {
+	if err := packageApp(packageOptions{dir: dir, arch: "amd64", msix: true}); err != nil {
 		t.Fatal(err)
 	}
 	dist := filepath.Join(dir, "dist")
-	msix := filepath.Join(dist, "jamb-demo-0.1.0-windows-amd64.msix")
-	for _, p := range []string{msix, filepath.Join(dist, "jamb-demo-0.1.0-windows-amd64.zip"), filepath.Join(dist, "jamb-demo-test.pfx"), filepath.Join(dist, "jamb-demo-test.cer")} {
-		if _, err := os.Stat(p); err != nil {
-			t.Errorf("missing output: %v", err)
-		}
+	want := "jamb-demo-0.1.0-windows-amd64.msix,jamb-demo-0.1.0-windows-amd64.zip"
+	if got := strings.Join(distEntries(t, dist), ","); got != want {
+		t.Errorf("dist holds %s; want %s", got, want)
 	}
 
 	unpacked := t.TempDir()
+	msix := filepath.Join(dist, "jamb-demo-0.1.0-windows-amd64.msix")
 	if out, err := exec.Command(makeappx, "unpack", "/p", msix, "/d", unpacked, "/o").CombinedOutput(); err != nil {
 		t.Fatalf("makeappx unpack: %v\n%s", err, out)
 	}
-	for _, p := range []string{"AppxManifest.xml", "AppxSignature.p7x", "jamb-demo.exe", filepath.Join("Assets", "Square44x44Logo.scale-200.png")} {
+	for _, p := range []string{"AppxManifest.xml", "jamb-demo.exe", filepath.Join("Assets", "Square44x44Logo.scale-200.png")} {
 		if _, err := os.Stat(filepath.Join(unpacked, p)); err != nil {
 			t.Errorf("package lacks %s: %v", p, err)
 		}
 	}
+	if _, err := os.Stat(filepath.Join(unpacked, "AppxSignature.p7x")); !os.IsNotExist(err) {
+		t.Errorf("the MSIX without --sign-command is signed: %v", err)
+	}
+}
+
+// TestPackageSignsEachArtifactOnce checks the order of the signing: the executable
+// first, then the MSIX built from it. Each file is signed once.
+func TestPackageSignsEachArtifactOnce(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds an executable and runs the Windows SDK")
+	}
+	if _, err := findSDKTool("makeappx.exe", ""); err != nil {
+		t.Skip(err)
+	}
+	command, logPath := helperSignCommand(t)
+	dir := t.TempDir()
+	makeApp(t, dir, "package main\n\nfunc main() {}\n")
+
+	if err := packageApp(packageOptions{dir: dir, arch: "amd64", msix: true, signCommand: command}); err != nil {
+		t.Fatal(err)
+	}
+	got := signedFiles(t, logPath)
+	want := []string{"jamb-demo.exe", "jamb-demo-0.1.0-windows-amd64.msix"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("signed %v; want %v", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "dist", "jamb-demo-0.1.0-windows-amd64.msix")); err != nil {
+		t.Errorf("signed MSIX missing: %v", err)
+	}
+}
+
+// TestPackageSignFailureStopsAndPublishesNothing makes the signer fail on the MSIX,
+// the last artifact. The zip, which is already built, must not be published, so
+// dist never holds a partly signed set.
+func TestPackageSignFailureStopsAndPublishesNothing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds an executable and runs the Windows SDK")
+	}
+	if _, err := findSDKTool("makeappx.exe", ""); err != nil {
+		t.Skip(err)
+	}
+	command, logPath := helperSignCommand(t)
+	t.Setenv(signFailEnv, ".msix")
+	dir := t.TempDir()
+	makeApp(t, dir, "package main\n\nfunc main() {}\n")
+
+	err := packageApp(packageOptions{dir: dir, arch: "amd64", msix: true, signCommand: command})
+	if err == nil || !strings.Contains(err.Error(), "signing jamb-demo-0.1.0-windows-amd64.msix failed") {
+		t.Fatalf("err = %v; want the MSIX signing failure", err)
+	}
+	if got := signedFiles(t, logPath); len(got) != 2 {
+		t.Errorf("signed %v; want the executable and the MSIX, then a stop", got)
+	}
+	if got := distEntries(t, filepath.Join(dir, "dist")); len(got) != 0 {
+		t.Errorf("dist holds %v after a failed signature; want nothing", got)
+	}
+}
+
+// TestPackageInstallerIsSignedAfterItIsBuilt needs NSIS. It is skipped without makensis.
+func TestPackageInstallerIsSignedAfterItIsBuilt(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds an executable and compiles an installer")
+	}
+	makensis, err := findMakensis("")
+	if err != nil {
+		t.Skip(err)
+	}
+	command, logPath := helperSignCommand(t)
+	dir := t.TempDir()
+	makeApp(t, dir, "package main\n\nfunc main() {}\n")
+
+	if err := packageApp(packageOptions{dir: dir, arch: "amd64", installer: true, makensis: makensis, signCommand: command}); err != nil {
+		t.Fatal(err)
+	}
+	got := signedFiles(t, logPath)
+	want := []string{"jamb-demo.exe", "jamb-demo-0.1.0-windows-amd64-setup.exe"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("signed %v; want %v", got, want)
+	}
+	setup := filepath.Join(dir, "dist", "jamb-demo-0.1.0-windows-amd64-setup.exe")
+	f, err := pe.Open(setup)
+	if err != nil {
+		t.Fatalf("setup.exe is not a PE file: %v", err)
+	}
+	f.Close()
 }
 
 func TestPackageCmdArguments(t *testing.T) {
@@ -203,8 +304,8 @@ func TestPackageCmdArguments(t *testing.T) {
 		want string
 	}{
 		{[]string{"--arch", "386"}, "--arch must be amd64 or arm64"},
-		{[]string{"--cert", "a.pfx", "--test-cert"}, "cannot be used together"},
-		{[]string{"--timestamp", "http://t.example"}, "--timestamp needs"},
+		{[]string{"--makensis", "makensis.exe"}, "--makensis needs --installer"},
+		{[]string{"--sign-command", "signtool sign"}, "has no {file}"},
 		{[]string{t.TempDir(), "extra"}, `unexpected argument "extra"`},
 	} {
 		err := packageCmd(tc.args)
@@ -214,6 +315,38 @@ func TestPackageCmdArguments(t *testing.T) {
 	}
 	if err := packageCmd([]string{"-h"}); err != nil {
 		t.Errorf("-h = %v; want no error", err)
+	}
+}
+
+// TestPackageCmdRefusesRemovedFlags checks that the flags of earlier versions give a
+// reason and a replacement, not an unknown-flag error.
+func TestPackageCmdRefusesRemovedFlags(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--cert", "release.pfx"}, "--cert was removed: jamb package no longer reads certificates"},
+		{[]string{"--cert=release.pfx"}, "--cert was removed"},
+		{[]string{"--test-cert"}, "--test-cert was removed"},
+		{[]string{"--timestamp", "http://t.example"}, "--timestamp was removed"},
+		{[]string{"--no-msix"}, "--no-msix was removed"},
+	} {
+		err := packageCmd(tc.args)
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("packageCmd(%q) = %v; want %q", tc.args, err, tc.want)
+		}
+	}
+}
+
+// TestPackageCmdReadsSignCommandFromEnvironment checks the JAMB_SIGN_COMMAND fallback.
+// The bad command is rejected before anything is built.
+func TestPackageCmdReadsSignCommandFromEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	makeApp(t, dir, "package main\n\nfunc main() {}\n")
+	t.Setenv(signCommandEnv, "{file} sign")
+	err := packageCmd([]string{dir})
+	if err == nil || !strings.Contains(err.Error(), "not in the program name") {
+		t.Errorf("err = %v; want the environment's sign command to be read and rejected", err)
 	}
 }
 

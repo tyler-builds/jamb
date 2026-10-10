@@ -1,204 +1,150 @@
 package main
 
 import (
-	"crypto/x509"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
-	pkcs12 "software.sslmate.com/src/go-pkcs12"
 )
 
-func TestTestCertificateIsCodeSigningAndReused(t *testing.T) {
-	cfg := validConfig()
-	dist := t.TempDir()
+// The sign command in these tests is the test binary itself. TestSignHelper
+// appends the file it is given to the log named by signLogEnv. It exits 1 when
+// the file name ends with the suffix in signFailEnv.
+const (
+	signLogEnv  = "JAMB_TEST_SIGN_LOG"
+	signFailEnv = "JAMB_TEST_SIGN_FAIL"
+)
 
-	first := &signer{}
-	if err := first.useTestCertificate(dist, &cfg); err != nil {
-		t.Fatal(err)
+// TestSignHelper is not a test of its own. It runs only as the sign command of the
+// tests below, which start the test binary with -test.run=^TestSignHelper$.
+func TestSignHelper(t *testing.T) {
+	logPath := os.Getenv(signLogEnv)
+	if logPath == "" {
+		t.Skip("runs only as the sign command of the other tests")
 	}
-	second := &signer{}
-	if err := second.useTestCertificate(dist, &cfg); err != nil {
-		t.Fatal(err)
-	}
-	if first.thumbprint == "" || first.thumbprint != second.thumbprint {
-		t.Errorf("thumbprints %q and %q; want the same certificate reused", first.thumbprint, second.thumbprint)
-	}
-	if !first.testCert || first.pfx != filepath.Join(dist, "jamb-demo-test.pfx") || first.cer != filepath.Join(dist, "jamb-demo-test.cer") {
-		t.Errorf("test certificate paths: pfx %q, cer %q, testCert %v", first.pfx, first.cer, first.testCert)
-	}
-
-	cert, err := readTestCertificate(first.pfx)
+	file := os.Args[len(os.Args)-1]
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cert.Subject.CommonName != "Jamb Examples" {
-		t.Errorf("subject CN = %q", cert.Subject.CommonName)
-	}
-	if !hasCodeSigning(cert) {
-		t.Error("test certificate lacks the code-signing extended key usage")
-	}
-	roots := x509.NewCertPool()
-	roots.AddCert(cert)
-	if _, err := cert.Verify(x509.VerifyOptions{Roots: roots, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning}}); err != nil {
-		t.Errorf("test certificate does not verify as a code-signing root: %v", err)
-	}
-	der, err := os.ReadFile(first.cer)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(der) != string(cert.Raw) {
-		t.Error(".cer file does not match the PFX certificate")
+	fmt.Fprintln(f, file)
+	f.Close()
+	if fail := os.Getenv(signFailEnv); fail != "" && strings.HasSuffix(file, fail) {
+		os.Exit(1)
 	}
 }
 
-func TestTestCertificateReplacedForOtherSubject(t *testing.T) {
-	cfg := validConfig()
-	dist := t.TempDir()
-	first := &signer{}
-	if err := first.useTestCertificate(dist, &cfg); err != nil {
-		t.Fatal(err)
+// helperSignCommand returns a sign command that runs the test binary as the signer,
+// with {file} as its last argument. The log is kept in a temporary directory.
+func helperSignCommand(t *testing.T) (command, logPath string) {
+	t.Helper()
+	logPath = filepath.Join(t.TempDir(), "sign.log")
+	t.Setenv(signLogEnv, logPath)
+	return fmt.Sprintf(`"%s" -test.run=^TestSignHelper$ %s`, os.Args[0], filePlaceholder), logPath
+}
+
+// signedFiles returns the base names of the files the helper signer was given, in
+// order.
+func signedFiles(t *testing.T, logPath string) []string {
+	t.Helper()
+	data, err := os.ReadFile(logPath)
+	if os.IsNotExist(err) {
+		return nil
 	}
-	cfg.PublisherSubject = "CN=Another Publisher"
-	second := &signer{}
-	if err := second.useTestCertificate(dist, &cfg); err != nil {
-		t.Fatal(err)
-	}
-	cert, err := readTestCertificate(second.pfx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cert.Subject.CommonName != "Another Publisher" || second.thumbprint == first.thumbprint {
-		t.Errorf("certificate for the new subject was not created: CN %q", cert.Subject.CommonName)
+	var names []string
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		names = append(names, filepath.Base(line))
+	}
+	return names
+}
+
+func TestNewSignerParsesQuotedProgramAndPlaceholder(t *testing.T) {
+	s, err := newSigner(`"C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe" sign /fd SHA256  /sha1 ABC /f:{file}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.program != `C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe` {
+		t.Errorf("program = %q", s.program)
+	}
+	want := []string{"sign", "/fd", "SHA256", "/sha1", "ABC", "/f:{file}"}
+	if strings.Join(s.args, "|") != strings.Join(want, "|") {
+		t.Errorf("args = %q; want %q", s.args, want)
 	}
 }
 
-func TestTestCertificateRenewedNearExpiry(t *testing.T) {
-	cfg := validConfig()
-	dist := t.TempDir()
-	base := filepath.Join(dist, cfg.Name+"-test")
-	// A certificate with less than testCertRenewBefore left is replaced.
-	old, err := createTestCertificate("Jamb Examples", base+".pfx", base+".cer", time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := &signer{}
-	if err := s.useTestCertificate(dist, &cfg); err != nil {
-		t.Fatal(err)
-	}
-	fresh, err := readTestCertificate(s.pfx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(fresh.Raw) == string(old.Raw) || time.Until(fresh.NotAfter) < testCertRenewBefore {
-		t.Error("a certificate near expiry was not renewed")
-	}
-}
-
-func TestTestCertificateRejectsMoreThanCommonName(t *testing.T) {
-	cfg := validConfig()
-	cfg.PublisherSubject = "CN=Jamb Examples, O=Jamb, C=US"
-	s := &signer{}
-	if err := s.useTestCertificate(t.TempDir(), &cfg); err == nil || !strings.Contains(err.Error(), "only a common name") {
-		t.Errorf("err = %v; want a message that --test-cert needs a common name only", err)
-	}
-}
-
-func TestNewSignerUnlocksCertPFX(t *testing.T) {
-	const password = "p4ss-Phrase-7731"
-	dir := t.TempDir()
-	base := filepath.Join(dir, "source")
-	cert, err := createTestCertificate("Jamb Examples", base+".pfx", base+".cer", time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Re-encrypt the PFX under the password, as a commercial certificate is.
-	data, err := os.ReadFile(base + ".pfx")
-	if err != nil {
-		t.Fatal(err)
-	}
-	key, _, err := pkcs12.Decode(data, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	encrypted, err := pkcs12.Modern.Encode(key, cert, nil, password)
-	if err != nil {
-		t.Fatal(err)
-	}
-	certPath := filepath.Join(dir, "cert.pfx")
-	if err := os.WriteFile(certPath, encrypted, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv(passwordEnv, password)
-
-	cfg := validConfig()
-	s, err := newSigner(packageOptions{cert: certPath}, &cfg, t.TempDir(), "signtool.exe")
-	if err != nil {
-		t.Fatalf("newSigner: %v", err)
-	}
-	if s.testCert {
-		t.Error("--cert signer reports a test certificate")
-	}
-	unlocked, err := os.ReadFile(s.pfx)
-	if err != nil {
-		t.Fatalf("temporary PFX: %v", err)
-	}
-	_, got, err := pkcs12.Decode(unlocked, "")
-	if err != nil || string(got.Raw) != string(cert.Raw) {
-		t.Fatalf("temporary PFX without a password does not hold the certificate: %v", err)
-	}
-	tmp := filepath.Dir(s.pfx)
-	s.close()
-	if _, err := os.Stat(tmp); !os.IsNotExist(err) {
-		t.Errorf("temporary signing directory %s survives close", tmp)
-	}
-}
-
-func TestNewSignerRejectsWrongPasswordWithoutEchoingIt(t *testing.T) {
-	const password = "p4ss-Phrase-7731"
-	dir := t.TempDir()
-	certPath := filepath.Join(dir, "cert.pfx")
-	if _, err := createTestCertificate("Jamb Examples", certPath, filepath.Join(dir, "cert.cer"), time.Hour); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(certPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key, leaf, err := pkcs12.Decode(data, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	encrypted, err := pkcs12.Modern.Encode(key, leaf, nil, password)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(certPath, encrypted, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv(passwordEnv, "wrong-"+password)
-
-	cfg := validConfig()
-	_, err = newSigner(packageOptions{cert: certPath}, &cfg, t.TempDir(), "signtool.exe")
-	if err == nil {
-		t.Fatal("wrong password accepted")
-	}
-	if !strings.Contains(err.Error(), passwordEnv) {
-		t.Errorf("error %q does not name %s", err, passwordEnv)
-	}
-	if strings.Contains(err.Error(), password) {
-		t.Errorf("error %q echoes the password", err)
-	}
-}
-
-// hasCodeSigning reports whether cert allows code signing.
-func hasCodeSigning(cert *x509.Certificate) bool {
-	for _, u := range cert.ExtKeyUsage {
-		if u == x509.ExtKeyUsageCodeSigning {
-			return true
+func TestNewSignerRefusesBadCommands(t *testing.T) {
+	for _, tc := range []struct {
+		name, command, want string
+	}{
+		{"empty", "   ", "is empty"},
+		{"no placeholder", "signtool sign /fd SHA256", "has no {file}"},
+		{"placeholder in program", "{file} sign", "not in the program name"},
+		{"unmatched quote", `"C:\signtool.exe sign {file}`, "unmatched double quote"},
+		{"batch file", `C:\sign.cmd {file}`, "cmd.exe"},
+	} {
+		if _, err := newSigner(tc.command); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: err = %v; want it to contain %q", tc.name, err, tc.want)
 		}
 	}
-	return false
+}
+
+func TestSignerRunsOncePerFileWithTheFilePassedAsOneArgument(t *testing.T) {
+	command, logPath := helperSignCommand(t)
+	s, err := newSigner(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A path with spaces and an ampersand is passed as one argument, not split or
+	// interpreted by a shell.
+	dir := filepath.Join(t.TempDir(), "R&D files")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	first := filepath.Join(dir, "one.exe")
+	second := filepath.Join(dir, "two.msix")
+	if err := s.sign(first); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.sign(second); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 2 || lines[0] != first || lines[1] != second {
+		t.Errorf("signer was called with %q; want %q then %q", lines, first, second)
+	}
+}
+
+func TestSignerFailureIsReturned(t *testing.T) {
+	command, _ := helperSignCommand(t)
+	t.Setenv(signFailEnv, ".exe")
+	s, err := newSigner(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.sign(filepath.Join(t.TempDir(), "app.exe"))
+	if err == nil || !strings.Contains(err.Error(), "signing app.exe failed") {
+		t.Errorf("err = %v; want a failure naming the file", err)
+	}
+}
+
+func TestSignerErrorDoesNotShowCommand(t *testing.T) {
+	const secret = "THUMBPRINT-SECRET-123"
+	t.Setenv(signLogEnv, filepath.Join(t.TempDir(), "sign.log"))
+	t.Setenv(signFailEnv, ".exe")
+	s, err := newSigner(fmt.Sprintf(`"%s" -test.run=^TestSignHelper$ /sha1 %s {file}`, os.Args[0], secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.sign(filepath.Join(t.TempDir(), "app.exe"))
+	if err == nil || strings.Contains(err.Error(), secret) {
+		t.Errorf("err = %v; want a failure that does not repeat the command", err)
+	}
 }

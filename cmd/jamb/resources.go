@@ -19,7 +19,7 @@ func sysoName(arch string) string {
 // VERSIONINFO that Windows shows in a file's Details tab, and the application
 // manifest.
 func buildResources(cfg *config, icon image.Image, winVersion string) (*winres.ResourceSet, error) {
-	ico, err := winres.NewIconFromImages(iconImages(icon))
+	ico, err := buildIcon(icon)
 	if err != nil {
 		return nil, err
 	}
@@ -62,6 +62,29 @@ func buildResources(cfg *config, icon image.Image, winVersion string) (*winres.R
 		UseCommonControlsV6: true,
 	})
 	return rs, nil
+}
+
+// buildIcon returns the .ico image set of src, with each size of icoSizes.
+func buildIcon(src image.Image) (*winres.Icon, error) {
+	return winres.NewIconFromImages(iconImages(src))
+}
+
+// writeICO writes src as an .ico file at path, for the installer's icon.
+func writeICO(path string, src image.Image) (err error) {
+	ico, err := buildIcon(src)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	return ico.SaveICO(f)
 }
 
 // writeSyso writes rs as a COFF object for arch. The go tool links a .syso

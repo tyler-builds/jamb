@@ -9,15 +9,15 @@
 // restarts the app, keeping the window where you left it. A failed build
 // prints the compiler errors and leaves the running app alone.
 //
-// package builds a Windows release of the application into dist/: a zip, and an
-// MSIX when it is signed and the Windows SDK is installed. The app's jamb.json
-// holds its name, version, publisher and icon. The README's Packaging section
-// describes it.
+// package builds a Windows release of the application into dist/: a zip, and
+// optionally an NSIS installer (--installer) and an MSIX (--msix). A sign command
+// (--sign-command) signs the files it builds. The app's jamb.json holds its name,
+// version, publisher and icon. The README's Packaging section describes it.
 //
 // Run it from the repository root with:
 //
 //	go run ./cmd/jamb dev ./examples/demo
-//	go run ./cmd/jamb package --test-cert ./examples/demo
+//	go run ./cmd/jamb package --installer ./examples/demo
 package main
 
 import (
@@ -40,7 +40,7 @@ func usage() {
        jamb package [flags] [package dir]
 
   dev      build, run, and rebuild/restart on source changes
-  package  build the Windows zip, and a signed MSIX, of an app (see the README, Packaging)`)
+  package  build the Windows zip of an app, and optionally an installer and an MSIX (see the README, Packaging)`)
 	os.Exit(2)
 }
 

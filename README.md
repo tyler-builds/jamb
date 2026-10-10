@@ -23,7 +23,7 @@ Windows 10+ and Go 1.27+. Nothing else.
 go run ./examples/demo                         # run the demo
 go run ./examples/notes                        # run the notes app
 go run ./cmd/jamb dev ./examples/notes         # rebuild + restart on every save, window position preserved
-go run ./cmd/jamb package --test-cert ./examples/demo   # Windows zip and MSIX in examples/demo/dist (see Packaging)
+go run ./cmd/jamb package --installer ./examples/demo   # Windows zip and setup.exe in examples/demo/dist (see Packaging)
 go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/...   # headless tests (no window, no GPU)
 go build -trimpath -ldflags "-s -w -H windowsgui" -o jamb-demo.exe ./examples/demo   # ~7 MB release build
 ```
@@ -1124,24 +1124,27 @@ driven headlessly: Ctrl+N, typing, search, saving).
 
 ## Packaging
 
-`jamb package` turns an app into an ordinary Windows program: an executable with
-its icon, version information and manifest, in a zip, and an MSIX package that
-installs it. It reads the app's `jamb.json` (below).
+`jamb package` builds a Windows release of an app from its `jamb.json` (below).
+It always writes a zip. Flags add an installer and an MSIX.
 
 ```
-go run ./cmd/jamb package ./examples/demo              # zip only; an MSIX must be signed to install
-go run ./cmd/jamb package --test-cert ./examples/demo  # zip and MSIX, signed with a test certificate
-go run ./cmd/jamb package --cert release.pfx ./examples/notes   # zip, and MSIX, signed with a certificate
+go run ./cmd/jamb package ./examples/demo                 # zip
+go run ./cmd/jamb package --installer ./examples/demo     # zip and setup.exe (needs NSIS)
+go run ./cmd/jamb package --msix ./examples/demo          # zip and an unsigned MSIX (needs the Windows SDK)
 ```
 
-Outputs go to `<app>/dist/`, which git ignores:
+Outputs go to `<app>/dist/`, which git ignores. Each run builds its files in a
+temporary folder inside `dist` and moves them there only after every step has
+succeeded, so a failed signature leaves no partly signed set.
 
 - `<name>-<version>-windows-<arch>.zip`: the executable at the root, and any
   `LICENSE*` and `NOTICE*` files of the app directory beside it. Always built.
-- `<name>-<version>-windows-<arch>.msix`: a full-trust desktop package. `<arch>`
-  is `amd64` or `arm64`. Built only when a signing option is given and the
-  Windows SDK is installed, because Windows installs only signed packages.
-- With `--test-cert`: `<name>-test.pfx` and `<name>-test.cer`.
+- `<name>-<version>-windows-<arch>-setup.exe`: an installer, built with
+  `--installer`. See [Installer](#installer).
+- `<name>-<version>-windows-<arch>.msix`: an MSIX package, built with `--msix`.
+  It is unsigned unless a sign command signs it. See [Signing](#signing).
+
+`<arch>` is `amd64` or `arm64`.
 
 ### jamb.json
 
@@ -1151,14 +1154,14 @@ misspelled name stops the build, and every problem is reported in one message.
 | Field | Meaning |
 |---|---|
 | `name` | The executable's name without `.exe`: starts with a letter, then letters, digits, `-` and `_`, at most 64 characters. |
-| `displayName` | The name users see: Start, the taskbar and the package. |
-| `description` | A short description, shown in file properties and the package. |
+| `displayName` | The name users see: Start, the taskbar, the installer and the package. It also names the install folder, so it cannot contain `\ / : * ? " < > \|`. |
+| `description` | A short description, shown in file properties, the installer and the package. |
 | `version` | A semantic version, `MAJOR.MINOR.PATCH`. Each part is 0 to 65535, and Windows stores it as `MAJOR.MINOR.PATCH.0`. Pre-release and build suffixes have no Windows form and are rejected. |
-| `publisher` | The publisher's display name, shown as the company in file properties and in the package. |
-| `publisherSubject` | The subject of the signing certificate, starting with `CN=`, such as `CN=Example`. The MSIX publisher must equal the certificate's subject exactly, so for a certificate from a certificate authority copy the whole subject. `--test-cert` accepts only a `CN=` subject. |
-| `identityName` | The package identity: 3 to 50 characters of letters, digits, `.` and `-`, starting and ending with a letter or digit. Windows uses it to identify the app, so it must stay the same across versions that should upgrade one another. |
-| `copyright` | Optional. Shown as the legal copyright in file properties. |
-| `icon` | A square PNG, at least 48 px, relative to the app directory. 256 px or larger is recommended, and packaging warns below that. It becomes the executable's icon and the MSIX logos. |
+| `publisher` | The publisher's display name, shown as the company in file properties, the installer and the package. |
+| `publisherSubject` | The subject of the signing certificate, starting with `CN=`, such as `CN=Example`. The MSIX publisher must equal the certificate's subject exactly, so for a certificate from a certificate authority copy the whole subject. For the Store, use the publisher value that Partner Center shows for the app. |
+| `identityName` | The package identity: 3 to 50 characters of letters, digits, `.` and `-`, starting and ending with a letter or digit. Windows uses it to identify the app, and the installer uses it as its registry key, so it must stay the same across versions that should upgrade one another. For the Store, use the identity name that Partner Center shows for the app. |
+| `copyright` | Optional. Shown as the legal copyright in file properties and the installer. |
+| `icon` | A square PNG, at least 48 px, relative to the app directory. 256 px or larger is recommended, and packaging warns below that. It becomes the executable's icon, the installer's icon and the MSIX logos. |
 
 File associations and extra capabilities are not supported yet. The manifest
 requests only `runFullTrust`.
@@ -1171,11 +1174,14 @@ come before or after it.
 | Flag | Effect |
 |---|---|
 | `--arch amd64\|arm64` | The target architecture. Default `amd64`. |
-| `--no-msix` | Build the zip only, even when signing is requested. |
-| `--cert FILE.pfx` | Sign the executable and the MSIX with this certificate. Its password is read from the `JAMB_CERT_PASSWORD` environment variable, never from a flag. |
-| `--test-cert` | Sign with a self-signed test certificate kept in `dist` (see below). Cannot be combined with `--cert`. |
-| `--timestamp URL` | An RFC 3161 timestamp server for the signatures. Needs `--cert` or `--test-cert`. |
-| `--sdk-bin DIR` | The directory with `makeappx.exe` and `signtool.exe`. Default: the newest SDK under `C:\Program Files (x86)\Windows Kits\10\bin`. |
+| `--installer` | Build the `setup.exe` installer with NSIS. |
+| `--makensis PATH` | The `makensis` program to use. Needs `--installer`. Default: found on PATH or in the NSIS install directory. |
+| `--msix` | Build the MSIX package. It is unsigned unless `--sign-command` signs it. |
+| `--sign-command CMD` | Run this command once for each file that is built, with `{file}` replaced by the file's path. Default: the `JAMB_SIGN_COMMAND` environment variable. See [Signing](#signing). |
+| `--sdk-bin DIR` | The directory with `makeappx.exe`. Default: the newest SDK under `C:\Program Files (x86)\Windows Kits\10\bin`. |
+
+`--cert`, `--test-cert`, `--timestamp` and `--no-msix` were removed. Each one is
+refused with the replacement to use.
 
 ### What the executable contains
 
@@ -1198,76 +1204,151 @@ While it builds, `jamb package` writes a resource object,
 packaging ends, on failure and on Ctrl+C too. If a file with that name already
 exists, packaging stops rather than overwrite it.
 
+### Installer
+
+`--installer` compiles `<name>-<version>-windows-<arch>-setup.exe` with NSIS,
+from a script that jamb generates from `jamb.json`. The installer:
+
+- installs for the current user only, to `%LOCALAPPDATA%\Programs\<displayName>`.
+  It needs no administrator rights, and it writes only to `HKCU` and the user's
+  Start menu and desktop. This is the default because it works on managed PCs
+  where standard users cannot write to Program Files, and because each user can
+  update the app without elevation. A machine-wide Program Files installer is not
+  generated; that would need its own script and an administrator prompt.
+- adds a Start menu folder with the app and an uninstaller shortcut;
+- offers a desktop shortcut as an optional component, off by default;
+- registers the app in Apps & features under `identityName`, with the display
+  name, version, publisher, description, icon and estimated size;
+- uninstalls cleanly: it removes the installed files, the shortcuts and the
+  registry entry. It leaves data the app wrote elsewhere, such as under AppData,
+  in place.
+
+Close the app before installing or uninstalling it. Silent installs use `/S`, and
+`/D=PATH` (last on the command line) chooses another folder.
+
 ### Signing
 
-- **`--cert`.** signtool can read a PFX password only from its command line, so
-  jamb decrypts the PFX with the password in `JAMB_CERT_PASSWORD` and writes a copy
-  with no password to a temporary directory. The copy holds the private key
-  unencrypted while packaging runs. It is deleted when packaging ends, including
-  on Ctrl+C. Check that this is acceptable for your key-handling policy.
-- **`--test-cert`.** A self-signed code-signing certificate, RSA 2048, valid for
-  one year, with the subject from `publisherSubject`. It is stored in `dist` as
-  `<name>-test.pfx` (no password) and `<name>-test.cer`, and it is never added to a
-  certificate store. It is reused while it matches the subject and has more than
-  30 days left. Use it for install tests only.
-- Files are signed with `signtool sign /fd SHA256`, and with a timestamp when
-  `--timestamp` is set.
-- Signing policy varies by organization. Confirm the signing arrangement with
-  your security or legal contacts before you distribute a build.
+jamb never needs a signing certificate, and it never reads one or a password. It
+is a library shipped as source, so it is not signed. Each app's author chooses how
+the app's binaries are signed:
+
+- **Unsigned.** Works. Windows SmartScreen may warn people when they first run the
+  app. An unsigned MSIX cannot be installed on a PC.
+- **Microsoft Store.** Free for individual developers since September 2025. The
+  Store signs the MSIX packages it accepts, so an MSIX can be uploaded unsigned:
+  <https://blogs.windows.com/windowsdeveloper/2025/09/10/free-developer-registration-for-individual-developers-on-microsoft-store/>
+- **SignPath Foundation.** Free signing for open-source apps with OSI-licensed
+  source and automated public builds. Eligibility and setup are at
+  <https://signpath.org/>.
+- **Azure Artifact Signing, or a purchased certificate.** Paid. Azure Artifact
+  Signing is documented at
+  <https://learn.microsoft.com/en-us/azure/artifact-signing/overview>.
+
+#### The sign command
+
+Set the command with `--sign-command "<command>"`, or with the `JAMB_SIGN_COMMAND`
+environment variable. The flag wins when both are set. The environment variable is
+used rather than `jamb.json` because the certificate differs between machines and
+CI runners, and a committed file should not hold a thumbprint or a path.
+
+jamb runs the command once for each file it builds, and `{file}` is replaced by
+that file's path:
+
+1. the executable, before it goes into the zip, the installer or the MSIX;
+2. the installer, after it is compiled;
+3. the MSIX, after it is packed.
+
+Rules:
+
+- The command runs directly, with no shell. Put a program path with spaces in
+  double quotes. Pipes, `&&` and `%VAR%` expansion do not work. For those, call a
+  script: `powershell -NoProfile -ExecutionPolicy Bypass -File C:\sign\sign.ps1 {file}`.
+  Do not use a `.cmd` or `.bat` file as the program, since cmd.exe reads `&` and
+  `%` in the path.
+- If the command exits with an error, packaging stops and nothing is written to
+  `dist`. The error does not repeat the command, which may name secrets.
+- Keep passwords out of the command. Use the Windows certificate store, or a script
+  that reads a secret from the environment.
+- The command's output is shown in the console, so a signer that asks for a PIN
+  can be answered.
+
+Examples, in PowerShell. Replace the placeholders.
+
+Certificate in the Windows certificate store, found by thumbprint, with signtool
+from the Windows SDK:
+
+```
+$env:JAMB_SIGN_COMMAND = '"C:\Program Files (x86)\Windows Kits\10\bin\<sdk version>\x64\signtool.exe" sign /fd SHA256 /sha1 <THUMBPRINT> /tr http://timestamp.digicert.com /td SHA256 {file}'
+go run ./cmd/jamb package --installer --msix ./examples/demo
+```
+
+PFX file with its password in an environment variable. signtool accepts a PFX
+password only as its `/p` argument, so the password is visible to other processes
+of the same user while signtool runs. The certificate store avoids that. Where a
+PFX is required, use a script such as `C:\sign\sign.ps1`:
+
+```
+param([string]$File)
+& "C:\Program Files (x86)\Windows Kits\10\bin\<sdk version>\x64\signtool.exe" sign /fd SHA256 /f "C:\certs\release.pfx" /p $env:CERT_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $File
+exit $LASTEXITCODE
+```
+
+```
+$env:JAMB_SIGN_COMMAND = 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\sign\sign.ps1 {file}'
+```
+
+Azure Artifact Signing uses signtool with the Artifact Signing client's `dlib`
+and a metadata file. Take the timestamp URL, the DLL path and the metadata file
+from the documentation linked above:
+
+```
+$env:JAMB_SIGN_COMMAND = '"<signtool.exe>" sign /fd SHA256 /tr <timestamp URL> /td SHA256 /dlib "<Artifact Signing dlib>" /dmdf "<metadata.json>" {file}'
+```
+
+SignPath signs through its own service and build integration. Use the command its
+documentation gives, as the sign command. See <https://signpath.org/>.
+
+### Testing the MSIX on this PC
+
+An unsigned MSIX cannot be installed, and jamb does not create certificates. For a
+local install test, sign the MSIX with a self-signed certificate whose subject is
+`publisherSubject`, and trust that certificate on the PC. Microsoft's steps for
+creating and trusting a certificate for package signing are at
+<https://learn.microsoft.com/en-us/windows/msix/package/create-certificate-package-signing>.
+They use `New-SelfSignedCertificate`, and they import the certificate into the
+`LocalMachine\TrustedPeople` store from an administrator session.
+
+Trusting a certificate changes what every user of the PC will accept, so remove it
+when the test is done.
 
 ### Requirements
 
-- Windows 10 or 11 and Go 1.27 or later. The zip needs nothing else.
-- MSIX and signing need the Windows SDK, with its **Windows SDK Signing Tools for
-  Desktop Apps** feature, which provides `makeappx.exe` and `signtool.exe`. Get it
-  from <https://developer.microsoft.com/windows/downloads/windows-sdk/>. A build
-  without a signing option needs no SDK and writes the zip. A build with
-  `--cert` or `--test-cert` stops with a message when `signtool.exe` is missing,
-  and writes nothing, so it never produces an unsigned release. When only
-  `makeappx.exe` is missing, the signed zip is written and the MSIX is skipped
-  with a warning. Use `--sdk-bin` if the tools are somewhere else.
+- **Zip.** Windows 10 or 11 and Go 1.27 or later. Nothing else.
+- **`--installer`.** NSIS 3.x, which provides `makensis`. Install it with
+  `winget install NSIS.NSIS`, with `scoop install nsis`, or from
+  <https://nsis.sourceforge.io/Download>. jamb looks for `makensis` on PATH, in
+  `Program Files (x86)\NSIS` and `Program Files\NSIS`, and at the `--makensis`
+  path. If it is missing, jamb prints these instructions, skips the installer with
+  a warning, and still writes the zip.
+- **`--msix`.** The Windows SDK, with its **Windows SDK Signing Tools for Desktop
+  Apps** feature, which provides `makeappx.exe`. Get it from
+  <https://developer.microsoft.com/windows/downloads/windows-sdk/>. Use
+  `--sdk-bin` if the tool is somewhere else. If it is missing, jamb skips the MSIX
+  with a warning and still writes the zip.
+- **`--sign-command`.** Whatever the command runs.
 
-### Installing the MSIX on this PC (test certificate)
-
-Windows does not trust a self-signed certificate, so the MSIX installs only after
-its certificate is trusted on this machine. These steps change system settings, so
-`jamb package` only prints them. Replace `<repo>` with the repository's path.
-
-1. Build the package with the test certificate:
-   `go run ./cmd/jamb package --test-cert ./examples/demo`
-2. In an administrator PowerShell, trust the certificate on this machine:
-
-   ```
-   certutil -addstore -f TrustedPeople "<repo>\examples\demo\dist\jamb-demo-test.cer"
-   ```
-
-3. Install the package, from any PowerShell:
-
-   ```
-   Add-AppxPackage -Path "<repo>\examples\demo\dist\jamb-demo-0.1.0-windows-amd64.msix"
-   ```
-
-   Start "Jamb Demo" from the Start menu.
-4. Remove it when you are done:
-
-   ```
-   Get-AppxPackage -Name "JambExamples.Demo" | Remove-AppxPackage
-   certutil -delstore TrustedPeople <thumbprint>
-   ```
-
-   `jamb package` prints the thumbprint. The notes app works the same way with
-   `examples\notes` and `JambExamples.Notes`.
+NSIS also runs on Linux and macOS, so a host other than Windows can compile the
+installer. That path has not been tested.
 
 ### Packaging dependencies
 
 `cmd/jamb` is its own Go module, listed in `go.work`, so the framework's `go.mod`
 and the modules that import it gain nothing from packaging. Its dependencies are
-`github.com/tc-hib/winres` (writes the resource object; ISC-style license),
-`software.sslmate.com/src/go-pkcs12` (reads PFX files; BSD-3-Clause),
-`golang.org/x/image` (resizes the icon; BSD-3-Clause) and `golang.org/x/crypto`
-(used by go-pkcs12; BSD-3-Clause). winres depends on `github.com/nfnt/resize`
-(ISC-style license). The Windows SDK tools are external programs and are not
-redistributed.
+`github.com/tc-hib/winres` (writes the resource object and the icon; ISC-style
+license), `golang.org/x/image` (resizes the icon; BSD-3-Clause) and
+`github.com/nfnt/resize` (used by winres; ISC-style license). The Windows SDK
+tools and NSIS are external programs and are not redistributed. NSIS is under a
+zlib-style license.
 
 ## Icons
 
@@ -1539,13 +1620,14 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   their window, returned their results, and canceled correctly, and the window
   stayed disabled and kept drawing while a dialog was open. Not checked: dialogs
   in other languages, and high-contrast themes.
-- **Packaging.** Windows only (see [Packaging](#packaging)). Not done: Microsoft Store submission, signing with
-  hardware tokens or cloud key services (only PFX files), file associations and
-  capabilities beyond `runFullTrust`, localized resources, the wide and splash
-  logos and target-size logos of the MSIX, an MSI or installer UI, and automatic
-  updates. The arm64 build is compiled but has not been run. The MSIX install
-  steps are for a person to run; the package's structure and signature are
-  checked by the SDK tools.
+- **Packaging.** Windows only (see [Packaging](#packaging)). Not done: Store
+  submission (the MSIX is uploaded by hand), a machine-wide installer, file
+  associations and capabilities beyond `runFullTrust`, localized resources, the
+  wide and splash logos and target-size logos of the MSIX, and automatic updates.
+  The installer has been run only on Windows 11, and its upgrade over an older
+  version has not been tested. The arm64 build is compiled but has not been run.
+  The MSIX install steps are for a person to run; the SDK tools check the
+  package's structure.
 - **Not attempted (non-goals).** Accessibility, tray,
   CSS grid, and the optional utility-class shorthand
   (`.Class("flex col gap-2")`). The shorthand was skipped in favor of typed
