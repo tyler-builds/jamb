@@ -93,6 +93,15 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	x, y := bx+v.offX, by+v.offY
 	w, h := n.lay.W, n.lay.H
 	n.abs = scene.Rect{X: x, Y: y, W: w, H: h}
+	// The hit box is the layout box moved by the element's own offset, not by
+	// its hover, focus or press styles, transitions or motion. Those move the
+	// paint only, so a hover that lifts an element cannot move the pointer off
+	// it, end the hover, and bring the element back under the pointer.
+	own := &n.style
+	if n.div != nil {
+		own = &n.div.style
+	}
+	n.hit = scene.Rect{X: bx + own.OffsetX, Y: by + own.OffsetY, W: w, H: h}
 	n.clip = clip
 	opacity *= v.opacity
 	bg, border, fg := v.bg, v.border, v.fg

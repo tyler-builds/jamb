@@ -103,6 +103,7 @@ type node struct {
 	// element's own offset; inOpacity and inFg are what its parent passed down.
 	// They let an exiting element be painted where it was.
 	abs       scene.Rect
+	hit       scene.Rect // the box hit testing uses; see paintNode
 	clip      scene.Rect
 	baseX     float32
 	baseY     float32

@@ -41,7 +41,7 @@ func (rt *Runtime) hit(n *node, x, y float32) bool {
 			return true
 		}
 	}
-	if n.abs.Contains(x, y) {
+	if n.hit.Contains(x, y) {
 		rt.hitPath = append(rt.hitPath, n)
 		return true
 	}
