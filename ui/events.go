@@ -8,10 +8,12 @@ type MouseEvent struct {
 	// whose handler is running.
 	X, Y           float32
 	LocalX, LocalY float32
-	Button         input.MouseButton
-	Clicks         int
-	Mods           input.Modifiers
-	stopped        bool
+	// Width and Height are the size of the element whose handler is running.
+	Width, Height float32
+	Button        input.MouseButton
+	Clicks        int
+	Mods          input.Modifiers
+	stopped       bool
 }
 
 // StopPropagation prevents ancestors from receiving the event.

@@ -1,38 +1,55 @@
 package views
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
 
-// Settings shows toggles bound to signals, including the theme, and the
-// keyboard shortcuts.
+// Settings shows switches bound to signals, including the theme, the UI zoom,
+// and the keyboard shortcuts.
 func Settings(s *Store) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
-		dark := t.Dark
+		// The theme and the zoom can also change from the menus and the keys, so the
+		// local signals of the switch and the slider are brought up to date here.
+		dark := ui.Local(ctx, "dark", t.Dark)
+		if dark.Peek() != t.Dark {
+			dark.Set(t.Dark)
+		}
+		zoom := ui.Local(ctx, "zoom", float64(ctx.Zoom()))
+		if float32(zoom.Peek()) != ctx.Zoom() {
+			zoom.Set(float64(ctx.Zoom()))
+		}
 		return ui.Div().Grow(1).ScrollY().
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(760)).
 				Child(ui.Div().Gap(4).
 					Child(ui.Div().Heading(1).Child(ui.Text("Settings").Size(26).Semibold())).
-					Child(ui.Text("Preferences are plain signals; toggles re-render only this page.").Color(t.TextMuted))).
+					Child(ui.Text("Preferences are plain signals; switches and sliders re-render only this page.").Color(t.TextMuted))).
 				Child(Card(t).Gap(14).
 					Child(SectionTitle(t, "Appearance")).
 					Child(SettingRow(t, "Dark mode", "Use the dark zinc theme.",
-						Toggle(t, dark, func(on bool) {
+						ui.Switch("Dark mode", dark).OnChange(func(on bool) {
 							if on {
 								ctx.SetTheme(ui.DarkTheme)
 							} else {
 								ctx.SetTheme(ui.LightTheme)
 							}
-						}).Label("Dark mode").LabelledBy(settingLabel("Dark mode")))).
+						}))).
 					Child(ui.Divider()).
 					Child(SettingRow(t, "Compact activity", "Tighter rows on the Activity page.",
-						Toggle(t, s.Compact.Get(), s.Compact.Set).Label("Compact activity").LabelledBy(settingLabel("Compact activity"))))).
+						ui.Switch("Compact activity", s.Compact))).
+					Child(ui.Divider()).
+					Child(SettingRow(t, "UI zoom", "Scale the whole interface, from 80% to 150%.",
+						ui.Slider(zoom, 0.8, 1.5, 0.1).Label("UI zoom").Width(180).
+							Format(func(v float64) string { return fmt.Sprintf("%d%%", int(math.Round(v*100))) }).
+							OnChange(func(v float64) { ctx.SetZoom(float32(v)) })))).
 				Child(Card(t).Gap(14).
 					Child(SectionTitle(t, "Notifications")).
 					Child(SettingRow(t, "Desktop notifications", "Show a notification when a build finishes.",
-						Toggle(t, s.Notify.Get(), s.Notify.Set).Label("Desktop notifications").LabelledBy(settingLabel("Desktop notifications")))).
+						ui.Switch("Desktop notifications", s.Notify))).
 					Child(ui.Divider()).
 					Child(SettingRow(t, "Danger zone", "Remove every project from this workspace.",
 						ui.Button("Delete all").Danger().Small().Icon(icons.Trash).OnClick(func() {

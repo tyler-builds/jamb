@@ -6,6 +6,9 @@ changed from this design" and "Phase C: what changed from this design". Phase D
 (system settings) is done: high contrast, text size, reduced motion,
 the text caret, the contrast audit, and the fix for the `idle` script step (see
 "Phase D: what changed from this design").
+Phase F (form controls: check boxes with a mixed state, switches, radio groups,
+selects, sliders and number fields, and the RangeValue pattern) is done, with the
+changes listed under "Phase F: what changed from this design".
 Phase E's automated checks are done (see "Phase E: what changed from this
 design"); its manual screen reader pass is pending, and is described in
 [accessibility-testing.md](accessibility-testing.md). This document
@@ -63,9 +66,10 @@ A platform-neutral package with no dependencies. It defines:
 - **Roles**: window, group, button, check box, switch, radio button, text
   field, multi-line text field, static text, image, link, list, list item,
   menu bar, menu, menu item (plain, check, radio), separator, dialog,
-  tooltip, scroll area, heading, tab list, tab, tab panel.
+  tooltip, scroll area, heading, tab list, tab, tab panel, combo box, slider,
+  spin box (the last three from phase F).
 - **Actions**: click (invoke), focus, expand, collapse, toggle, select, set
-  value, scroll into view, increment, decrement.
+  value, scroll into view, increment, decrement, set range value (phase F).
 - **Tree updates**: the nodes that changed and the focused node. Updates are
   incremental.
 - **Announcements**: text to speak, polite or assertive, for status messages
@@ -136,6 +140,7 @@ README.
 | C. Text | UI Automation Text pattern for text fields and text areas: caret, selection, reading by character, word and line, text change events |
 | D. System settings | Windows high contrast, the Text size setting, reduced animations, a contrast audit of the built-in themes, caret tracking for magnifiers, and the text caret blink and width |
 | E. Verification | Accessibility Insights for Windows checks on the examples, a manual NVDA and Narrator script, automated tests that read the real UI Automation tree |
+| F. Form controls | Check boxes with a mixed state, switches, radio groups, selects, sliders and number fields; the RangeValue pattern; the Windows ComboBox, Slider and Spinner control types |
 
 ## Testing
 
@@ -467,8 +472,9 @@ Narrator and NVDA, are left for Phase E, with Narrator testing.
   from the keyboard or a pointer press on the element it hangs from, and that
   element has no expand state.
 - The mixed (indeterminate) state is in the model and the adapter, but no public
-  API sets it.
-- RangeValue is not implemented: no slider exists in the framework yet.
+  API sets it. Closed in phase F: `CheckboxTri` sets it (see "Phase F").
+- RangeValue is not implemented: no slider exists in the framework yet. Closed in
+  phase F: `Slider` and `NumberField` expose it (see "Phase F").
 - The Text pattern for text fields and text areas was Phase C, and is done (see
   below).
 - Screen reader checks: the Accessibility Insights rules are done in Phase E; the
@@ -1204,3 +1210,137 @@ the two Axe scans (2 and 3 errors). Those are the defects the fixes address.
   cause was a hover feedback loop, not the idle step.
 - **Scanner coverage.** The CLI reports errors only, and this phase did not run
   the Accessibility Insights assessment, which needs a person.
+
+## Phase F: what changed from this design
+
+Phase F adds the form controls to the framework and closes the two open items of
+phase B that were about them: the mixed state had no public API, and RangeValue
+was not implemented. The decisions and their sources are below.
+
+- **Roles and patterns.** A switch is a check box with the Toggle pattern: its
+  ControlType is CheckBox and its LocalizedControlType is "switch", as phase B
+  chose. A check box in the mixed state reports ToggleState Indeterminate. A select
+  is a ComboBox with ExpandCollapse and Value; the Value is the chosen label and is
+  read-only. Its list is a List whose items have SelectionItem, under a
+  SelectionContainer, and the highlighted item has accessibility focus, as a menu's
+  highlighted row does. A radio group is a Group that is a SelectionContainer, and
+  its radio buttons are RadioButton with SelectionItem. A slider is a Slider with
+  RangeValue. A number field is a Spinner that holds its Edit, with RangeValue.
+- **Control types from Microsoft.** The control type identifiers are ComboBox
+  50003, Slider 50015 and Spinner 50016
+  ([Control Type Identifiers](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-controltype-ids)).
+  The Spinner page describes a spinner as a tree of an edit (0 or 1) and two
+  buttons, with RangeValue for a numeric range
+  ([Spinner Control Type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).
+  The Slider page requires RangeValue for a numerical range
+  ([Slider Control Type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportslidercontroltype)).
+  The number field therefore follows the Spinner structure. The slider needs no
+  Thumb child; the Slider page lists thumbs and buttons as the structure of the
+  control, and jamb draws its thumb without exposing it.
+- **RangeValue.** `access.Range` (Value, Min, Max, SmallChange, LargeChange) is set
+  on the node, and Diff raises a range-value property change. ActionSetRangeValue
+  sets the value through the element, which clamps and snaps it. The Windows adapter
+  implements the provider interface IRangeValueProvider (IID
+  36dc7aef-33e6-4691-afe1-2be7274b3d33). The property IDs come from
+  UIAutomationClient.h in the Windows 10.0.26100.0 SDK: the pattern is 10003, the
+  availability property 30033, and the value, read-only, minimum, maximum, large
+  change and small change properties 30047 to 30052 in that order, with Minimum at
+  30049 and Maximum at 30050.
+- **Mixed state API.** `CheckboxTri(label, state)` takes a `*Signal[CheckState]`
+  with `CheckOff`, `CheckOn` and `CheckMixed`. `Checkbox(label, checked)` takes a
+  bool and cannot be mixed. A click on a mixed box makes it on, as Windows check
+  boxes do. A mixed box is not checked: its state is the mixed one.
+- **Keys of the controls.** Space toggles a check box and a switch, and chooses a
+  radio button. Enter does not: the runtime runs a click for Enter only on an
+  element that is not `spaceOnly`, and check boxes, switches and radio buttons
+  are, so Enter goes on to the modal's default button or the form, as on Windows.
+- **Radio group focus.** One Tab stop: the selected option, or the first enabled
+  one when none is selected. The others are reached with the arrows, which move the
+  focus and select the option they reach. Up and Left go back, and Down and Right go
+  on. The group wraps and skips disabled options. The Windows behavior was not
+  checked against a source in this phase; the choice is a design decision.
+- **Select.** It reuses the overlay of a menu: an Overlay below the field, which
+  flips when there is no room, a click outside that closes it, and AutoFocus. It
+  also reuses the menu's focus return (menuOpened and menuClosed), so focus goes
+  back to the field however the list was opened. Its keys are its own, since a list
+  does not wrap and has no submenus. Closed, Up and Down choose the neighbouring
+  option, and Home and End the ends, as the task asked for a Windows combo box.
+  Type-ahead matches the typed letters from the current option, and a pause of one
+  second starts a new search.
+- **Runtime fix.** A radio button is a selection item by its role, but the runtime
+  ran the Select action only for items with the Selected flag. A radio button set
+  with Checked could not be selected through the bridge. The check now includes the
+  radio roles, which also covers menu radio items.
+- **Slider.** A click or drag sets the value to the nearest step. The arrows move by
+  one step, Page Up and Page Down by a tenth of the range rounded up to steps, and
+  Home and End go to the ends. `MouseEvent` now carries the size of the element that
+  handles it (Width and Height), which the slider needs to map a position to a value.
+- **NumberField validation.** Chosen and documented in the README: a number outside
+  the range is clamped on commit; text that is not a number (or not a whole number
+  for an int) is not applied, and Enter shows the field as invalid with a message
+  that gives the range. Leaving the field with invalid text reverts it to the value.
+  Up and Down step the value. The editor's own Up and Down are replaced for a number
+  field only.
+- **Switch in the demo.** The Settings switches are `ui.Switch`, and the demo's
+  hand-made toggle is removed. The UI zoom slider sets the framework's zoom.
+
+### Phase F: verification
+
+- Unit tests (`ui/form_controls_test.go`, 21 tests): the states and the mixed
+  state; Space and click toggles; disabled controls; roving focus and the arrows;
+  the select's open, close, Enter, Escape, Tab, F4, Alt+Down, type-ahead, Home and
+  End, and focus return; the slider's keys, pointer and SetValue; the number field's
+  steps, clamping, invalid text, blur and buttons; the warning for an unnamed select;
+  and a high contrast and 225 percent build with no warnings and no fixed heights on
+  the fields.
+- Adapter tests in `platform/windows` for the control types, the RangeValue pattern
+  and its values, the combo box Value, and the property mapping.
+- The demo's tests check the Components page's form controls and the Settings
+  switch.
+- `scripts/a11y-check.ps1` runs 27 checks in the normal, high contrast and 225
+  percent modes, and all pass. The new checks read a check box's Toggle and its
+  indeterminate state, a radio button's SelectionItem, a select's ComboBox with
+  ExpandCollapse and Value and its open list, a slider's RangeValue with SetValue,
+  and a number field's Spinner with RangeValue and Edit. Axe scans report zero errors
+  for the Settings page, the Components page scrolled to the form controls, and the
+  same page with a select open, in all three modes.
+- The Axe scan found one defect in this phase: a disabled switch named "Unavailable
+  switch" repeated its control type in its name, which the Name rule forbids. Its
+  name is now "Unavailable sync". The rule is general: a name must not contain the
+  LocalizedControlType of its control.
+- Screenshots of the form controls (dark, light, high contrast and 225 percent), the
+  open select and the Settings page are in `docs/screenshots`.
+
+- **Follow-up fixes after review.** Under high contrast a disabled slider, check
+  box, switch, select and number field are drawn in GrayText throughout: the slider's
+  fill, thumb and readout, the check box's fill and mark, the switch's track and knob,
+  the select's text, placeholder and chevron, and the number field's frame and text.
+  A selected radio button is one Highlight ring with one solid dot. It had a second,
+  text-colored dot, which made a blob. The check box and radio button were also
+  checked at 150 percent, with the selected radio button drawn as a clean ring.
+  Enter on a check box or a switch now goes on to the modal default. Select and
+  radio group have `OnChange`, which the tests cover.
+- **Reduced motion.** A test opens and closes a select and toggles a switch: under
+  reduced motion none of the three asks for animation frames, and without it each of
+  them does.
+- **The Notes text-selection check.** It failed once in the first runs. A harness
+  that reran the check on 20 fresh Notes processes showed the cause: 19 of 20 runs
+  read the selection before the next frame published it, which is 6 to 40 ms after
+  the Select. The app is correct; the check read too early. The check now polls for
+  the selection, with a 3-second timeout, and 20 of 20 fresh runs pass.
+- **The Menus sample at 225 percent.** Its box had a fixed height of 64 px, so its
+  wrapped text overlapped the caption. The box now has a fixed width and a minimum
+  height, and grows with its text.
+
+### Phase F: open items
+
+- **Radio group and select keys on Windows** were not compared with a source either.
+  The arrow and type-ahead rules are design decisions, listed above.
+- **A select's value is read-only** to assistive technology. SetValue is ignored on
+  a combo box, which is what a read-only Value pattern expects.
+- **The spin box's buttons** do not have the ScrollAmount automation IDs that the
+  Spinner page suggests, so an automation test cannot tell them apart by ID.
+- **Narrator and NVDA** passes are pending, as for phase E, and are for a person to
+  run.
+- **Existing layout.** The Menus sample on the Components page has a fixed height,
+  so its text overlaps at 225 percent. This predates phase F and was not changed.

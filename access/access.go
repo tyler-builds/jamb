@@ -56,6 +56,9 @@ const (
 	RoleTabList                   // a row of tabs
 	RoleTab                       // one tab of a tab list
 	RoleTabPanel                  // the content of a tab
+	RoleComboBox                  // a field that opens a list of choices; its Value is the chosen one
+	RoleSlider                    // a value moved along a track within a range (see Node.Range)
+	RoleSpinner                   // a number within a range, with an edit field (see Node.Range)
 )
 
 var roleNames = [...]string{
@@ -86,6 +89,9 @@ var roleNames = [...]string{
 	RoleTabList:       "tab list",
 	RoleTab:           "tab",
 	RoleTabPanel:      "tab panel",
+	RoleComboBox:      "combo box",
+	RoleSlider:        "slider",
+	RoleSpinner:       "spinner",
 }
 
 // String returns the role's name, such as "check box".
@@ -102,7 +108,7 @@ func (r Role) Interactive() bool {
 	switch r {
 	case RoleButton, RoleCheckBox, RoleSwitch, RoleRadioButton, RoleTextField,
 		RoleTextArea, RoleLink, RoleMenuItem, RoleMenuItemCheck, RoleMenuItemRadio,
-		RoleTab:
+		RoleTab, RoleComboBox, RoleSlider, RoleSpinner:
 		return true
 	}
 	return false
@@ -186,6 +192,7 @@ const (
 	ActionScroll                         // scroll a container by a fraction of its view (see Request)
 	ActionSetScrollPercent               // scroll a container to a percent of its range (see Request)
 	ActionSetTextSelection               // select the text between Request.Anchor and Request.Caret (byte offsets)
+	ActionSetRangeValue                  // set the value of a slider or spin box to Request.X
 )
 
 var actionNames = [...]string{
@@ -202,13 +209,15 @@ var actionNames = [...]string{
 	ActionScroll:           "scroll",
 	ActionSetScrollPercent: "set scroll percent",
 	ActionSetTextSelection: "set text selection",
+	ActionSetRangeValue:    "set range value",
 }
 
 // Request is an action with its argument, which the bridge passes to the
 // runtime. Value is the new text for ActionSetValue. X and Y are the position
 // for ActionSetScrollPercent, in percent of each axis's scrollable range, where
 // a negative value leaves that axis alone. For ActionScroll they are the
-// fraction of the view to move, positive down and right.
+// fraction of the view to move, positive down and right. For ActionSetRangeValue
+// X is the new value of the range.
 type Request struct {
 	Action        Action
 	Value         string
@@ -229,12 +238,13 @@ type Scroll struct {
 type Property uint8
 
 const (
-	PropertyName     Property = iota // the name
-	PropertyValue                    // the value of a text field
-	PropertyToggle                   // the on or off state of a toggle
-	PropertyExpanded                 // whether an expandable node is open
-	PropertySelected                 // whether a selection item is chosen
-	PropertyEnabled                  // whether the node can be operated
+	PropertyName       Property = iota // the name
+	PropertyValue                      // the value of a text field
+	PropertyToggle                     // the on or off state of a toggle
+	PropertyExpanded                   // whether an expandable node is open
+	PropertySelected                   // whether a selection item is chosen
+	PropertyEnabled                    // whether the node can be operated
+	PropertyRangeValue                 // the value of a slider or spin box (Node.Range)
 )
 
 // PropertyChange records that a property of a node changed between two
@@ -291,6 +301,26 @@ type Announcement struct {
 	Politeness Politeness
 }
 
+// Range is the number a slider or spin box holds, with the bounds and the steps
+// it moves by. A node with a Range exposes the RangeValue pattern.
+type Range struct {
+	Value       float64
+	Min, Max    float64
+	SmallChange float64 // the step of an arrow key
+	LargeChange float64 // the step of Page Up and Page Down
+}
+
+// Equal reports whether two ranges are the same. Nil equals nil only.
+func (r *Range) Equal(o *Range) bool {
+	if r == o {
+		return true
+	}
+	if r == nil || o == nil {
+		return false
+	}
+	return *r == *o
+}
+
 // Node is one element of the access tree. A Tree holds its nodes; a Node is
 // not changed after the tree is published.
 type Node struct {
@@ -316,6 +346,7 @@ type Node struct {
 	Level       int  // the nesting depth of a menu or tree item, 1 for the top; 0 when not set
 	Scroll      Scroll
 	Text        *TextInfo // the text of a text field or text area, for the Text pattern; nil otherwise
+	Range       *Range    // the number of a slider or spin box, for the RangeValue pattern; nil otherwise
 }
 
 // Has reports whether the node supports action a.
@@ -341,7 +372,7 @@ func (n *Node) Equal(o *Node) bool {
 		n.Key == o.Key && n.Value == o.Value && n.States == o.States && n.Bounds == o.Bounds &&
 		n.Parent == o.Parent && n.Heading == o.Heading && n.PosInSet == o.PosInSet &&
 		n.SetSize == o.SetSize && n.Level == o.Level && n.Scroll == o.Scroll &&
-		n.Text.Equal(o.Text) &&
+		n.Text.Equal(o.Text) && n.Range.Equal(o.Range) &&
 		equalIDs(n.Children, o.Children) && equalIDs(n.LabelledBy, o.LabelledBy) &&
 		equalIDs(n.DescribedBy, o.DescribedBy) && equalIDs(n.Controls, o.Controls) &&
 		equalActions(n.Actions, o.Actions)

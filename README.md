@@ -324,6 +324,70 @@ when that changes.
   element. The move takes effect, and the element it left is not blurred a
   second time.
 
+### Form controls
+
+Checkboxes, switches, radio groups, selects, sliders and number fields are bound
+to signals, as `TextInput` is. Each reads its signal when it renders and writes
+it when the user changes it. They use the theme's colors, follow high contrast
+and the Text size, and show their state by a shape as well as a color: a check,
+a dash, a dot, or the place of the knob.
+
+```go
+ui.Checkbox("Email alerts", email)                // *ui.Signal[bool]
+ui.CheckboxTri("All alerts", all)                 // *ui.Signal[ui.CheckState]: CheckOff, CheckOn or CheckMixed
+ui.Switch("Dark mode", dark).OnChange(func(on bool) { ... })
+ui.RadioGroup(freq,                               // *ui.Signal[T], for any comparable T
+	ui.Option[string]{Value: "daily", Label: "Daily digest"},
+	ui.Option[string]{Value: "weekly", Label: "Weekly digest", Disabled: true},
+).Label("Frequency").OnChange(func(v string) { ... })
+ui.Select(channel, ui.Option[string]{Value: "email", Label: "Email"}).Label("Channel").Placeholder("Choose").Width(240).OnChange(func(v string) { ... })
+ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percent).OnChange(fn).Width(240)
+ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").Buttons().Precision(2) // int or float64
+// every control also takes .Key("id") and .Disabled(true)
+```
+
+- A check box toggles with Space, or with a click on the box or its label. A
+  tri-state box goes from mixed to on, as Windows check boxes do. Enter does not
+  toggle it: Enter goes on to the modal's default button or the form, as on Windows.
+- A switch is drawn as a track and a knob, with no text: its label is its
+  accessible name, so put the title beside it. Space toggles it; Enter does not.
+- A radio group is one Tab stop, at the selected option. Up and Left go to the
+  previous option, and Down and Right to the next. The arrows select the option
+  they reach and move the focus to it. They wrap around and skip disabled options.
+  Space chooses the focused option; Enter goes on to the modal's default button or
+  the form, as for a check box.
+  `OnChange` runs with the new value when the user selects an option, by a click,
+  Space or the arrows.
+- A select opens with a click, Enter, Space, Alt+Down or F4, and its list opens
+  below the field, or above it when there is no room. While the list is closed,
+  Up and Down choose the previous and next option, Home and End the first and
+  last, and a typed letter the first option that starts with what has been typed.
+  In the list, Up and Down move the highlight without wrapping, Home and End go
+  to the ends, and typing moves to a matching option. Enter or Space chooses the
+  highlighted option and closes the list.
+  `OnChange` runs with the new value whenever the user changes the selection, by the
+  keys or by the list. Escape and a press outside the list change nothing, so they
+  do not run it. Escape, Tab and a press outside the list
+  close it without a change. Focus returns to the field.
+- A slider moves by one `step` with the arrows, by a tenth of the range with Page
+  Up and Page Down, and to the ends with Home and End. A click or drag sets the
+  value to the nearest step. `OnChange` runs when the value changes.
+- A number field takes typed text, or steps with Up and Down (and the + and -
+  buttons with `Buttons()`). Enter, or leaving the field, checks the text. A number
+  outside the range is clamped to the nearest bound. Text that is not a number (or
+  not a whole number, for an `int`) is not applied: Enter shows the field as
+  invalid, with a message that gives the range, and keeps the text so it can be
+  corrected. Leaving the field then reverts the text to the value that is set.
+  `Precision` sets the decimals of a float; the default is the decimals of the step.
+
+Assistive technology reads a check box with a mixed state as mixed, a switch as a
+check box with the Toggle pattern (as Phase B chose), a radio group as a selection
+container named by its label, and a select as a combo box whose Value is the
+chosen label. A slider and a number field report their range (RangeValue). A
+number field is a spin box that holds its text field, as Microsoft's Spinner
+control type describes
+([Spinner control type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).
+
 ### Rich text
 
 `ui.Rich` joins segments into one text element. It wraps, truncates and
@@ -1129,6 +1193,8 @@ ui.IconButton(icons.Bell).Label("Notifications")
 ui.TextInput(query).Label("Search projects") // also TextArea
 ui.Image(avatar).Alt("Account avatar")
 ui.Announce("Saved", access.Polite) // spoken as a notification; Assertive interrupts
+ui.CheckboxTri("All", all)            // a check box in the mixed state is set by its CheckState
+ui.Slider(v, 0, 100, 5).Label("Volume") // a slider: RangeValue, with the Range of the value
 ```
 
 `Expanded` and `Selected` declare the state; the element's click handler makes
@@ -1309,10 +1375,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\a11y-check.ps1
 ```
 
 The script builds both examples into a temporary folder and starts them. The
-notes app runs with a temporary notes file, never your own. It runs 18 checks:
+notes app runs with a temporary notes file, never your own. It runs 27 checks:
 names and roles, Invoke, Toggle, ExpandCollapse, Selection, Value, Scroll, focus
-with its event, and the Text pattern on the word "small". Each prints PASS or
-FAIL, and the script exits 1 if any fails. Options: `-TimeoutSeconds N` (default
+with its event, and the Text pattern on the word "small". The demo's form controls
+are checked too: a check box's Toggle, including its indeterminate state; a radio
+button's SelectionItem; a select's ExpandCollapse and Value, and its open list; a
+slider's and a number field's RangeValue with SetValue. Axe scans cover the
+Settings page, the Components page scrolled to the form controls, and the same
+page with a select open. Each check prints PASS or FAIL, and the script exits 1
+if any fails. Options: `-TimeoutSeconds N` (default
 30), `-SkipAxe`, `-HighContrast` (run the apps with `JAMB_HIGH_CONTRAST=1`) and
 `-TextScale N` (run them with `JAMB_TEXT_SCALE=N`, 100 to 225). The overrides are
 described under System settings in the Accessibility section. The processes and temporary files are removed on exit, after a
@@ -1601,6 +1672,17 @@ On the Projects page:
   clipping, per-side borders, motion and focus styles, one section each. Its
   Menus section has a dropdown and a context menu with a submenu; their shortcuts
   come from the demo's bindings.
+- The Components page's **Form controls** section shows each form control in its
+  normal and disabled states, with a readout of its value, and a notification
+  preferences form that uses several of them together. Its "All alerts" check box
+  is the parent of the three alerts, and is mixed when only some are on.
+
+![The Form controls section of the Components page](docs/screenshots/form-controls.png)
+
+![The open select in the Form controls section](docs/screenshots/select-open.png)
+
+- The Settings page (Ctrl+5) uses switches for its on and off settings, and a
+  slider for the UI zoom from 80% to 150%, which changes the whole interface.
 - **New Project** opens a modal form with a name and a description. Create adds
   the project, selects it and shows the Projects page. It is disabled until the
   name has text. Cancel, Escape and a press on the backdrop close the form

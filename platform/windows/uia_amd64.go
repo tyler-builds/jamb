@@ -43,3 +43,20 @@ func newSetScrollPercentSlot() uintptr {
 	setScrollPercentCB = syscall.NewCallback(uiaSetScrollPercent)
 	return setScrollPercentStubAddr()
 }
+
+// setRangeValueCB is the callback that the SetValue trampoline of
+// IRangeValueProvider jumps to. The trampoline reads it.
+var setRangeValueCB uintptr
+
+// setRangeValueStub is the trampoline of IRangeValueProvider::SetValue. It is
+// written in assembly, as setScrollPercentStub is.
+func setRangeValueStub()
+
+// setRangeValueStubAddr returns the address of setRangeValueStub.
+func setRangeValueStubAddr() uintptr
+
+// newSetRangeValueSlot returns the vtable entry of IRangeValueProvider::SetValue.
+func newSetRangeValueSlot() uintptr {
+	setRangeValueCB = syscall.NewCallback(uiaSetRangeValue)
+	return setRangeValueStubAddr()
+}

@@ -114,6 +114,13 @@ $CT = @{
     Menu     = [System.Windows.Automation.ControlType]::Menu
     MenuItem = [System.Windows.Automation.ControlType]::MenuItem
     ListItem = [System.Windows.Automation.ControlType]::ListItem
+    ComboBox = [System.Windows.Automation.ControlType]::ComboBox
+    List     = [System.Windows.Automation.ControlType]::List
+    Group    = [System.Windows.Automation.ControlType]::Group
+    RadioButton = [System.Windows.Automation.ControlType]::RadioButton
+    Slider   = [System.Windows.Automation.ControlType]::Slider
+    Spinner  = [System.Windows.Automation.ControlType]::Spinner
+    Text     = [System.Windows.Automation.ControlType]::Text
 }
 $Passed = 0
 $Failed = 0
@@ -427,6 +434,97 @@ try {
         }
     }
 
+    # ---- Demo: form controls on the Components page ---------------------------
+    Invoke-Named $win 'Components' $CT.Button
+    Wait-For { $null -ne (Find-Named $win 'Email alerts' $CT.CheckBox | Select-Object -First 1) } 'the form controls on the Components page' | Out-Null
+
+    Check 'demo: a check box has Toggle, and the mixed state is indeterminate' {
+        $box = Find-One $win 'Email alerts' $CT.CheckBox
+        $t = Require-Pattern $box ([System.Windows.Automation.TogglePattern]::Pattern) 'Toggle'
+        Assert ($t.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On) "Email alerts is $($t.Current.ToggleState), want On"
+        $mixed = Find-One $win 'Some channels' $CT.CheckBox
+        $mt = Require-Pattern $mixed ([System.Windows.Automation.TogglePattern]::Pattern) 'Toggle'
+        Assert ($mt.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::Indeterminate) "Some channels is $($mt.Current.ToggleState), want Indeterminate"
+        $mt.Toggle()
+        Wait-For { if ($mt.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On) { $true } else { $null } } 'the mixed check box to turn on' | Out-Null
+        $mt.Toggle()
+        Wait-For { if ($mt.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::Off) { $true } else { $null } } 'the check box to turn off' | Out-Null
+    }
+
+    Check 'demo: the radio group is a Selection container, and its buttons are SelectionItems' {
+        $group = Find-One $win 'Frequency' $CT.Group
+        Require-Pattern $group ([System.Windows.Automation.SelectionPatternIdentifiers]::Pattern) 'Selection' | Out-Null
+        $daily = Find-One $group 'Daily digest' $CT.RadioButton
+        $ds = Require-Pattern $daily ([System.Windows.Automation.SelectionItemPatternIdentifiers]::Pattern) 'SelectionItem'
+        $immediate = Find-One $group 'As they happen' $CT.RadioButton
+        $is = Require-Pattern $immediate ([System.Windows.Automation.SelectionItemPatternIdentifiers]::Pattern) 'SelectionItem'
+        Assert ($ds.Current.IsSelected) 'Daily digest is not selected at the start'
+        $is.Select()
+        Wait-For { if ($is.Current.IsSelected -and -not $ds.Current.IsSelected) { $true } else { $null } } 'As they happen to be selected' | Out-Null
+        $ds.Select()
+        Wait-For { if ($ds.Current.IsSelected) { $true } else { $null } } 'Daily digest to be selected again' | Out-Null
+    }
+
+    Check 'demo: a select is a ComboBox with ExpandCollapse and Value, and its list has items' {
+        $combo = Find-One $win 'Channel' $CT.ComboBox
+        $ec = Require-Pattern $combo ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+        $vp = Require-Pattern $combo ([System.Windows.Automation.ValuePatternIdentifiers]::Pattern) 'Value'
+        Assert ($vp.Current.Value -eq 'Email') "the value is '$($vp.Current.Value)', want Email"
+        Assert ($vp.Current.IsReadOnly) 'the select value is not read-only'
+        $ec.Expand()
+        Wait-For { $null -ne (Find-Named $win 'Channel' $CT.List | Select-Object -First 1) } 'the list named Channel' | Out-Null
+        Find-One $win 'Text message' $CT.ListItem | Out-Null
+        $ec.Collapse()
+        Wait-Gone { Find-Named $win 'Channel' $CT.List | Select-Object -First 1 } 'the list to close' | Out-Null
+    }
+
+    Check 'demo: a slider has RangeValue, and SetValue moves it' {
+        $slider = Find-One $win 'Volume' $CT.Slider
+        $rv = Require-Pattern $slider ([System.Windows.Automation.RangeValuePatternIdentifiers]::Pattern) 'RangeValue'
+        Assert ($rv.Current.Minimum -eq 0 -and $rv.Current.Maximum -eq 100) "the range is $($rv.Current.Minimum) to $($rv.Current.Maximum)"
+        $before = $rv.Current.Value
+        $rv.SetValue(50)
+        Wait-For { if ([Math]::Abs($rv.Current.Value - 50) -lt 0.01) { $true } else { $null } } 'the slider to move to 50' | Out-Null
+        $rv.SetValue($before)
+    }
+
+    Check 'demo: a number field is a Spinner with RangeValue, and its text is an Edit' {
+        $spin = Find-One $win 'Sample quiet hours' $CT.Spinner
+        $rv = Require-Pattern $spin ([System.Windows.Automation.RangeValuePatternIdentifiers]::Pattern) 'RangeValue'
+        $edit = Find-One $spin 'Sample quiet hours' $CT.Edit
+        $vp = Require-Pattern $edit ([System.Windows.Automation.ValuePatternIdentifiers]::Pattern) 'Value'
+        $before = $rv.Current.Value
+        $rv.SetValue(10)
+        Wait-For { if ($vp.Current.Value -eq '10') { $true } else { $null } } 'the text to show 10' | Out-Null
+        $rv.SetValue($before)
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Components page, scrolled to the Form controls section' {
+            $heading = Find-One $win 'Email alerts' $CT.CheckBox
+            $item = Require-Pattern $heading ([System.Windows.Automation.ScrollItemPatternIdentifiers]::Pattern) 'ScrollItem'
+            $item.ScrollIntoView()
+            Wait-For { if ($heading.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom) { $true } else { $null } } 'the Form controls section to be in view' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-components'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+
+        Check 'demo: AxeWindowsCLI scan of the Components page with a select open' {
+            $combo = Find-One $win 'Channel' $CT.ComboBox
+            $ec = Require-Pattern $combo ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+            $ec.Expand()
+            Wait-For { $null -ne (Find-Named $win 'Channel' $CT.List | Select-Object -First 1) } 'the list to open' | Out-Null
+            try {
+                $errors = Invoke-AxeScan $demo 'demo-select-open'
+            } finally {
+                $ec.Collapse()
+            }
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+    }
+
     # ---- Notes ---------------------------------------------------------------
     $notes = Start-App $notesExe $notesFile
     $nwin = Get-Window $notes
@@ -495,7 +593,12 @@ try {
         $found = $all.FindText('small', $false, $false)
         Assert ($null -ne $found) 'FindText did not find "small"'
         $found.Select()
-        $sel = $tp.GetSelection()
+        # Select runs on the UI thread, and the next frame publishes the new selection,
+        # so a read right after it can still see the old one. Poll until it is there.
+        $sel = @(Wait-For {
+            $s = $tp.GetSelection()
+            if ($s.Length -eq 1 -and $s[0].GetText(-1) -eq 'small') { , $s }
+        } 'the selection of "small" to be published')
         Assert ($sel.Length -eq 1 -and $sel[0].GetText(-1) -eq 'small') "the selection is '$($sel[0].GetText(-1))'"
         $word = $found.Clone()
         $word.ExpandToEnclosingUnit([System.Windows.Automation.Text.TextUnit]::Word)

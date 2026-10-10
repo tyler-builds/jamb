@@ -63,15 +63,11 @@ func countNodes(t *access.Tree, role access.Role, keep func(*access.Node) bool) 
 func TestDemoControlsReportTheirStates(t *testing.T) {
 	r := newDemoRig(t)
 
-	// Settings: switches labelled by their row titles.
+	// Settings: switches named by their titles (ui.Switch takes the name itself).
 	r.s.Page.Set(PageSettings)
 	tr := r.tree()
 	dark := accesstest.Find(t, tr, access.RoleSwitch, "Dark mode")
 	accesstest.Check(t, dark, access.RoleSwitch, "Dark mode", access.StateToggle|access.StateChecked)
-	title := accesstest.Find(t, tr, access.RoleStaticText, "Dark mode")
-	if len(dark.LabelledBy) != 1 || dark.LabelledBy[0] != title.ID {
-		t.Fatalf("the Dark mode switch is labelled by %v, want the title %d", dark.LabelledBy, title.ID)
-	}
 	accesstest.Check(t, accesstest.Find(t, tr, access.RoleSwitch, "Compact activity"), access.RoleSwitch,
 		"Compact activity", access.StateToggle)
 	r.bridge.Perform(accesstest.Find(t, tr, access.RoleSwitch, "Compact activity").ID, access.ActionToggle)

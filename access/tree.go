@@ -254,6 +254,9 @@ func appendPropertyChanges(out []PropertyChange, old, n *Node) []PropertyChange 
 	if diff(StateDisabled) {
 		out = append(out, PropertyChange{n.ID, PropertyEnabled})
 	}
+	if !old.Range.Equal(n.Range) {
+		out = append(out, PropertyChange{n.ID, PropertyRangeValue})
+	}
 	return out
 }
 

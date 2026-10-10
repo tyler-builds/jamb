@@ -52,6 +52,19 @@ type accessInfo struct {
 	// menu's panel passes focus to that row, so the highlight is what a screen
 	// reader hears (see focusTarget).
 	highlighted bool
+	// mixed is set on a check box in the indeterminate state (see CheckboxTri).
+	mixed bool
+	// invalid is set on a field whose text is not a valid value (see NumberField).
+	invalid bool
+	// readOnly is set on a control whose value is shown but not typed, such as a
+	// Select.
+	readOnly bool
+	// value is the value of a combo box: the text it shows.
+	value string
+	// rng is the number of a slider or spin box, and setRange sets it, for the
+	// RangeValue pattern (ActionSetRangeValue).
+	rng      *access.Range
+	setRange func(v float64)
 }
 
 // access returns the element's accessibility settings, creating them on use.
@@ -331,7 +344,8 @@ func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 			rt.setExpandedFrom(n, req.Action == access.ActionExpand)
 		}
 	case access.ActionSelect:
-		if n.div != nil && n.div.acc != nil && n.div.acc.selectable && !isSelected(role, n.div.acc) {
+		// A radio button is a selection item by its role, though it is set with Checked.
+		if n.div != nil && n.div.acc != nil && (n.div.acc.selectable || radioRole(role)) && !isSelected(role, n.div.acc) {
 			rt.clickNode(n)
 		}
 	case access.ActionFocus:
@@ -347,6 +361,10 @@ func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 	case access.ActionSetTextSelection:
 		if n.kind == kindEditor {
 			rt.editorSelect(n.id, req.Anchor, req.Caret)
+		}
+	case access.ActionSetRangeValue:
+		if n.div != nil && n.div.acc != nil && n.div.acc.setRange != nil {
+			n.div.acc.setRange(req.X)
 		}
 	case access.ActionScrollIntoView:
 		rt.scrollIntoView(n)
@@ -602,6 +620,8 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 	if d.acc != nil {
 		an.Level = d.acc.level
 		an.Heading = d.acc.heading
+		an.Value = d.acc.value
+		an.Range = d.acc.rng
 	}
 	b.checkState(an, d.acc, role)
 	b.relate(an, d.acc)
@@ -788,6 +808,15 @@ func (b *accessBuilder) states(n *node, id access.ID, role access.Role) access.S
 	if a != nil && a.checked {
 		s |= access.StateChecked
 	}
+	if a != nil && a.mixed {
+		s |= access.StateMixed
+	}
+	if a != nil && a.invalid {
+		s |= access.StateInvalid
+	}
+	if a != nil && a.readOnly {
+		s |= access.StateReadOnly
+	}
 	if id == b.focus {
 		s |= access.StateFocused
 	}
@@ -845,6 +874,9 @@ func (b *accessBuilder) actions(n *node, role access.Role, st access.State) []ac
 	}
 	if st.Has(access.StateSelectable) {
 		out = append(out, access.ActionSelect)
+	}
+	if d.acc != nil && d.acc.setRange != nil {
+		out = append(out, access.ActionSetRangeValue)
 	}
 	if isScroll(n) {
 		out = append(out, access.ActionScroll, access.ActionSetScrollPercent)
@@ -1039,11 +1071,11 @@ func (rt *Runtime) focusChild(n *node) {
 	}
 }
 
-// highlightedRow returns the row that a menu highlights, when n is a menu: the
-// deepest highlighted row in its subtree, so that a submenu's row wins over the
-// row that opened it. It returns nil for anything else.
+// highlightedRow returns the row that a menu or a list highlights, when n is one:
+// the deepest highlighted row in its subtree, so that a submenu's row wins over
+// the row that opened it. It returns nil for anything else.
 func highlightedRow(n *node) *node {
-	if n.div == nil || n.div.acc == nil || n.div.acc.role != access.RoleMenu {
+	if n.div == nil || n.div.acc == nil || (n.div.acc.role != access.RoleMenu && n.div.acc.role != access.RoleList) {
 		return nil
 	}
 	var found *node

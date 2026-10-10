@@ -3,7 +3,6 @@ package views
 import (
 	"time"
 
-	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -66,35 +65,6 @@ func IconTile(t *ui.Theme, ic *icons.Icon, c ui.Color, size float32) *ui.DivElem
 	return ui.Div().Size(ui.Px(size), ui.Px(size)).Shrink(0).Radius(size / 4).
 		Background(tintOf(t, c, 0.15)).Center().
 		Child(ui.Icon(ic).Size(size / 2).Color(c))
-}
-
-// Toggle is an on/off switch bound to a bool signal.
-func Toggle(t *ui.Theme, on bool, onChange func(bool)) *ui.DivElement {
-	if t.HighContrast {
-		// On is a solid Highlight track with an AccentText knob. Off is an outlined
-		// empty track with a text-colored knob, so the two states differ in color
-		// and in outline, not only in the knob's place.
-		track, knob, knobX := t.Surface, t.Text, float32(3)
-		if on {
-			track, knob, knobX = t.Accent, t.AccentText, 19
-		}
-		return ui.Div().Size(ui.Px(38), ui.Px(22)).Shrink(0).Radius(11).Background(track).Border(2, t.Text).
-			Role(access.RoleSwitch).Checked(on).
-			OnClick(func() { onChange(!on) }).
-			Child(ui.Div().Absolute().Left(knobX).Top(3).Size(ui.Px(16), ui.Px(16)).Radius(8).Background(knob))
-	}
-	knobX := float32(3)
-	track := t.SurfaceActive
-	if on {
-		knobX = 19
-		track = t.Accent
-	}
-	return ui.Div().Size(ui.Px(38), ui.Px(22)).Shrink(0).Radius(11).Background(track).
-		Transition(fast).Hover(ui.Style{Background: track.Lighten(0.08)}).
-		Role(access.RoleSwitch).Checked(on).
-		OnClick(func() { onChange(!on) }).
-		Child(ui.Div().Absolute().Left(knobX).Top(3).Size(ui.Px(16), ui.Px(16)).Radius(8).
-			Background(ui.Hex("#ffffff")).Shadow(ui.ShadowSm))
 }
 
 // SettingRow is a label/description pair with a control on the right.

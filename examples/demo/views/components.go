@@ -37,6 +37,7 @@ func Components(s *Store) ui.Element {
 					sample(t, "Disabled", ui.Button("Disabled").Disabled(true)))).
 				Child(section(t, "Overlays", placements(t))).
 				Child(section(t, "Menus", dropdownSample(t), contextSample(t))).
+				Child(formControlsSection()).
 				Child(dialogsSection(ctx, t, s)).
 				Child(section(t, "Images",
 					fitSample(t, "Cover", ui.FitCover),
@@ -145,7 +146,7 @@ func contextSample(t *ui.Theme) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		layout := ui.Local(ctx, "layout", "Grid")
 		completed := ui.Local(ctx, "completed", false)
-		box := ui.Div().Key("context-menu-sample").Size(ui.Px(240), ui.Px(64)).Radius(8).Border(1, t.Border).Center().
+		box := ui.Div().Key("context-menu-sample").Width(ui.Px(240)).MinHeight(ui.Px(64)).Padding(8).Radius(8).Border(1, t.Border).Center().
 			Focusable().FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
 			Child(ui.Text("Right-click, or focus it and press Shift+F10").Size(12).Color(t.TextMuted)).
 			ContextMenu(func() []ui.MenuItem {

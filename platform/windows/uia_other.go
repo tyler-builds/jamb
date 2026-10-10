@@ -28,3 +28,14 @@ func newSetScrollPercentSlot() uintptr {
 func uiaSetScrollPercentUnsupported(this, horizontal, vertical uintptr) uintptr {
 	return hrNotImpl
 }
+
+// newSetRangeValueSlot returns the vtable entry of IRangeValueProvider::SetValue.
+// Its double cannot be read without the amd64 trampoline, so the method reports
+// E_NOTIMPL, and a client falls back to the slider's keys.
+func newSetRangeValueSlot() uintptr {
+	return syscall.NewCallback(uiaSetRangeValueUnsupported)
+}
+
+func uiaSetRangeValueUnsupported(this, val uintptr) uintptr {
+	return hrNotImpl
+}

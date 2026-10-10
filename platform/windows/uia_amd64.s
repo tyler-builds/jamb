@@ -32,3 +32,18 @@ TEXT ·setScrollPercentStubAddr(SB),NOSPLIT,$0-8
 	LEAQ	·setScrollPercentStub(SB), AX
 	MOVQ	AX, ret+0(FP)
 	RET
+
+// setRangeValueStub is the vtable entry of IRangeValueProvider::SetValue, which
+// takes one double. The double is in XMM1, so the stub moves it into DX, the
+// integer register the callback reads, and jumps to the callback that
+// setRangeValueCB holds.
+TEXT ·setRangeValueStub(SB),NOSPLIT|NOFRAME,$0-0
+	MOVQ	X1, DX
+	MOVQ	·setRangeValueCB(SB), AX
+	JMP	AX
+
+// func setRangeValueStubAddr() uintptr
+TEXT ·setRangeValueStubAddr(SB),NOSPLIT,$0-8
+	LEAQ	·setRangeValueStub(SB), AX
+	MOVQ	AX, ret+0(FP)
+	RET

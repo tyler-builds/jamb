@@ -213,7 +213,7 @@ func (rt *Runtime) setPressed(ids []uint64) {
 
 func (rt *Runtime) mouseEvent(n *node, x, y float32) *MouseEvent {
 	r := rt.nodeRect(n)
-	return &MouseEvent{X: x, Y: y, LocalX: x - r.X, LocalY: y - r.Y}
+	return &MouseEvent{X: x, Y: y, LocalX: x - r.X, LocalY: y - r.Y, Width: r.W, Height: r.H}
 }
 
 // PointerMove handles pointer motion in logical pixels.
@@ -575,7 +575,7 @@ func (rt *Runtime) keyDown(k input.Key, mods input.Modifiers, repeat bool) {
 		}
 		return
 	}
-	if !repeat && mods == 0 && (k == input.KeyEnter || k == input.KeySpace) && rt.activateFocused() {
+	if !repeat && mods == 0 && (k == input.KeyEnter || k == input.KeySpace) && rt.activateFocused(k) {
 		return
 	}
 	if !repeat && mods == 0 && k == input.KeyEnter && rt.modalDefault() {
@@ -927,12 +927,16 @@ func (rt *Runtime) revealTabFocus() {
 }
 
 // activateFocused runs the OnClick of the focused element, as Enter or Space
-// does for a focused button. It reports whether there was one to run. Text
-// fields are not elements with OnClick, so their keys are left to typing.
-func (rt *Runtime) activateFocused() bool {
+// does for a focused button, unless the element is spaceOnly and the key is
+// Enter. It reports whether it ran one. Text fields are not elements with
+// OnClick, so their keys are left to typing.
+func (rt *Runtime) activateFocused(k input.Key) bool {
 	n := rt.byID[rt.focusID]
 	if n == nil || n.kind != kindDiv || n.div == nil || n.div.h.onClick == nil {
 		return false
+	}
+	if n.div.spaceOnly && k == input.KeyEnter {
+		return false // Enter goes on to the modal default button, as Windows check boxes do
 	}
 	n.div.h.onClick()
 	return true

@@ -42,6 +42,7 @@ var (
 	selItemVtbl    [8]uintptr  // ISelectionItemProvider
 	selectionVtbl  [6]uintptr  // ISelectionProvider
 	valueVtbl      [6]uintptr  // IValueProvider
+	rangeVtbl      [10]uintptr // IRangeValueProvider
 	scrollVtbl     [11]uintptr // IScrollProvider
 	scrollItemVtbl [4]uintptr  // IScrollItemProvider
 )
@@ -63,6 +64,7 @@ var (
 	ifaceSelectItem   = iface{iidSelectionItemProvider, selItemVtbl[:]}
 	ifaceSelection    = iface{iidSelectionProvider, selectionVtbl[:]}
 	ifaceValue        = iface{iidValueProvider, valueVtbl[:]}
+	ifaceRange        = iface{iidRangeValueProvider, rangeVtbl[:]}
 	ifaceScroll       = iface{iidScrollProvider, scrollVtbl[:]}
 	ifaceScrollItem   = iface{iidScrollItemProvider, scrollItemVtbl[:]}
 )
@@ -81,6 +83,7 @@ var (
 	iidSelectionItemProvider          = guid{0x2acad808, 0xb2d4, 0x452d, [8]byte{0xa4, 0x07, 0x91, 0xff, 0x1a, 0xd1, 0x67, 0xb2}}
 	iidSelectionProvider              = guid{0xfb8b03af, 0x3bdf, 0x48d4, [8]byte{0xbd, 0x36, 0x1a, 0x65, 0x79, 0x3b, 0xe1, 0x68}}
 	iidValueProvider                  = guid{0xc7935180, 0x6fb3, 0x4201, [8]byte{0xb1, 0x74, 0x7d, 0xf7, 0x3a, 0xdb, 0xf6, 0x4a}}
+	iidRangeValueProvider             = guid{0x36dc7aef, 0x33e6, 0x4691, [8]byte{0xaf, 0xe1, 0x2b, 0xe7, 0x27, 0x4b, 0x3d, 0x33}}
 	iidScrollProvider                 = guid{0xb38b8077, 0x1fc3, 0x42a5, [8]byte{0x8c, 0xae, 0xd4, 0x0c, 0x22, 0x15, 0x05, 0x5a}}
 	iidScrollItemProvider             = guid{0x2360c714, 0x4bf1, 0x4b26, [8]byte{0xba, 0x65, 0x9b, 0x21, 0x31, 0x61, 0x27, 0xeb}}
 )
@@ -97,18 +100,19 @@ const (
 	kindExpand                     // the ExpandCollapse pattern of a node
 	kindSelectItem                 // the SelectionItem pattern of a node
 	kindSelection                  // the Selection pattern of a container
-	kindValue                      // the Value pattern of a text field
+	kindValue                      // the Value pattern of a text field or combo box
 	kindScroll                     // the Scroll pattern of a scroll container
 	kindScrollItem                 // the ScrollItem pattern of a node
 	kindWindow                     // the Window pattern of a dialog
 	kindText                       // the Text pattern of a text field or text area
+	kindRange                      // the RangeValue pattern of a slider or spin box
 	kindTextRange                  // a range of the text of a text field; made per call, not kept by its node
 )
 
 // patternKinds lists the kinds of pattern objects. Like nodes, each pattern
 // object is kept per node until the node leaves the tree.
 var patternKinds = []coreKind{kindInvoke, kindToggle, kindExpand, kindSelectItem, kindSelection,
-	kindValue, kindScroll, kindScrollItem, kindWindow, kindText}
+	kindValue, kindScroll, kindScrollItem, kindWindow, kindText, kindRange}
 
 // kindIfaces lists the interfaces that each kind of object implements.
 var kindIfaces = [...][]*iface{
@@ -120,6 +124,7 @@ var kindIfaces = [...][]*iface{
 	kindSelectItem: {&ifaceSelectItem},
 	kindSelection:  {&ifaceSelection},
 	kindValue:      {&ifaceValue},
+	kindRange:      {&ifaceRange},
 	kindScroll:     {&ifaceScroll},
 	kindScrollItem: {&ifaceScrollItem},
 	kindWindow:     {&ifaceWindow},
@@ -222,6 +227,17 @@ func initVtbls() {
 			syscall.NewCallback(uiaSetValue),
 			syscall.NewCallback(uiaValue),
 			syscall.NewCallback(uiaIsReadOnly),
+		}
+		// IRangeValueProvider's SetValue takes a double, so it goes through a
+		// trampoline (see uia_amd64.s). Its IsReadOnly is the Value pattern's.
+		rangeVtbl = [...]uintptr{qi, ar, rl,
+			newSetRangeValueSlot(),
+			syscall.NewCallback(uiaRangeValue),
+			syscall.NewCallback(uiaIsReadOnly),
+			syscall.NewCallback(uiaRangeMaximum),
+			syscall.NewCallback(uiaRangeMinimum),
+			syscall.NewCallback(uiaRangeLargeChange),
+			syscall.NewCallback(uiaRangeSmallChange),
 		}
 		// IScrollProvider's SetScrollPercent takes two doubles, so it goes through
 		// the same trampoline as ElementProviderFromPoint (see uia_amd64.s).
@@ -976,6 +992,52 @@ func uiaIsReadOnly(this, out uintptr) uintptr {
 	}
 	*(*int32)(ptr(out)) = boolOf(v)
 	return hrOK
+}
+
+// IRangeValueProvider. SetValue's double is passed in XMM1, which the trampoline
+// moves into the integer register the callback reads (see uia_amd64.s).
+
+func uiaSetRangeValue(this, val uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	return c.setRangeValue(math.Float64frombits(uint64(val)))
+}
+
+// rangeNumberOut answers one getter of IRangeValueProvider: f picks the number
+// from the range of the node that the object stands for.
+func rangeNumberOut(this, out uintptr, f func(r access.Range) float64) uintptr {
+	c, hr := enter(this, out)
+	if hr != hrOK {
+		return hr
+	}
+	r, hr := c.rangeOf()
+	if hr != hrOK {
+		return hr
+	}
+	*(*float64)(ptr(out)) = f(r)
+	return hrOK
+}
+
+func uiaRangeValue(this, out uintptr) uintptr {
+	return rangeNumberOut(this, out, func(r access.Range) float64 { return r.Value })
+}
+
+func uiaRangeMaximum(this, out uintptr) uintptr {
+	return rangeNumberOut(this, out, func(r access.Range) float64 { return r.Max })
+}
+
+func uiaRangeMinimum(this, out uintptr) uintptr {
+	return rangeNumberOut(this, out, func(r access.Range) float64 { return r.Min })
+}
+
+func uiaRangeLargeChange(this, out uintptr) uintptr {
+	return rangeNumberOut(this, out, func(r access.Range) float64 { return r.LargeChange })
+}
+
+func uiaRangeSmallChange(this, out uintptr) uintptr {
+	return rangeNumberOut(this, out, func(r access.Range) float64 { return r.SmallChange })
 }
 
 // IScrollProvider. Its amounts are ScrollAmount values, and the percents are

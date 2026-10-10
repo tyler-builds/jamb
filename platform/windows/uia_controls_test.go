@@ -63,6 +63,7 @@ func TestPatternIIDsMatchTheSDK(t *testing.T) {
 		{"ISelectionItemProvider", iidSelectionItemProvider, "2acad808-b2d4-452d-a407-91ff1ad167b2"},
 		{"ISelectionProvider", iidSelectionProvider, "fb8b03af-3bdf-48d4-bd36-1a65793be168"},
 		{"IValueProvider", iidValueProvider, "c7935180-6fb3-4201-b174-7df73adbf64a"},
+		{"IRangeValueProvider", iidRangeValueProvider, "36dc7aef-33e6-4691-afe1-2be7274b3d33"},
 		{"IScrollProvider", iidScrollProvider, "b38b8077-1fc3-42a5-8cae-d40c2215055a"},
 		{"IScrollItemProvider", iidScrollItemProvider, "2360c714-4bf1-4b26-ba65-9b21316127eb"},
 	}
@@ -329,6 +330,121 @@ func TestValuePatternSetsAndReadsTheText(t *testing.T) {
 	}
 }
 
+// TestComboBoxHasTheValuePattern checks that a combo box has the Value pattern,
+// which reports the label it has chosen, and not the Text pattern, which is for
+// text fields and text areas.
+func TestComboBoxHasTheValuePattern(t *testing.T) {
+	n := &access.Node{ID: 2, Role: access.RoleComboBox, Parent: access.RootID, Value: "Louisiana",
+		States: access.StateExpandable}
+	b := testTree(0, node(access.RootID, 0, 2), n)
+	p := patternOn(t, b, 2, patternValue)
+
+	bstr, hr := getOut(comMethod(p, 4), p)
+	if hr != hrOK || bstrString(bstr) != "Louisiana" {
+		t.Errorf("Value = %q (HRESULT 0x%08X), want Louisiana", bstrString(bstr), uint32(hr))
+	}
+	win32.SysFreeString(bstr)
+	if ro, _ := getOut(comMethod(p, 5), p); int32(ro) != 0 {
+		t.Error("IsReadOnly is true for an editable combo box")
+	}
+
+	testHwnd++
+	v := create(kindNode, 2, b, testHwnd, iidRawElementProviderSimple)
+	defer releaseCall(v)
+	if got, hr := getOut(comMethod(v, 4), v, patternText); hr != hrOK || got != 0 {
+		t.Errorf("a combo box answered the text pattern: %x, HRESULT 0x%08X", got, uint32(hr))
+	}
+}
+
+// TestRangePatternNeedsARange checks that only a node with a Range has the
+// RangeValue pattern, and that a slider with one has it.
+func TestRangePatternNeedsARange(t *testing.T) {
+	slider := &access.Node{ID: 2, Role: access.RoleSlider, Parent: access.RootID, Range: &access.Range{Max: 10}}
+	spinner := &access.Node{ID: 3, Role: access.RoleSpinner, Parent: access.RootID}
+	if !supports(kindRange, slider) {
+		t.Error("a slider with a Range does not support RangeValue")
+	}
+	if supports(kindRange, spinner) {
+		t.Error("a spin box without a Range supports RangeValue")
+	}
+	b := testTree(0, node(access.RootID, 0, 2, 3), slider, spinner)
+	patternOn(t, b, 2, patternRangeValue)
+}
+
+// TestRangeValuePatternReadsAndSetsTheValue checks the getters of the RangeValue
+// pattern, and that SetValue requests the new value. SetValue takes a double,
+// which the vtable reaches through the trampoline, so the test calls the method
+// that the trampoline jumps to with the double's bits (see uiaSetRangeValue).
+func TestRangeValuePatternReadsAndSetsTheValue(t *testing.T) {
+	n := &access.Node{ID: 2, Role: access.RoleSlider, Parent: access.RootID,
+		Range: &access.Range{Value: 30, Min: 5, Max: 100, SmallChange: 1, LargeChange: 10}}
+	b := testTree(0, node(access.RootID, 0, 2), n)
+	var got []access.Request
+	b.SetHooks(nil, func(id access.ID, r access.Request) { got = append(got, r) })
+	p := patternOn(t, b, 2, patternRangeValue)
+
+	double := func(index int) float64 {
+		out := newDouble()
+		syscall.SyscallN(comMethod(p, index), p, uintptr(unsafe.Pointer(out)))
+		runtime.KeepAlive(out)
+		return *out
+	}
+	cases := []struct {
+		name  string
+		index int
+		want  float64
+	}{
+		{"Value", 4, 30},
+		{"Maximum", 6, 100},
+		{"Minimum", 7, 5},
+		{"LargeChange", 8, 10},
+		{"SmallChange", 9, 1},
+	}
+	for _, c := range cases {
+		if v := double(c.index); v != c.want {
+			t.Errorf("%s = %v, want %v", c.name, v, c.want)
+		}
+	}
+	if ro, _ := getOut(comMethod(p, 5), p); int32(ro) != 0 {
+		t.Error("IsReadOnly is true for a slider without the read-only state")
+	}
+
+	if hr := uiaSetRangeValue(p, uintptr(math.Float64bits(42.5))); uint32(hr) != hrOK {
+		t.Fatalf("SetValue HRESULT 0x%08X", uint32(hr))
+	}
+	last := got[len(got)-1]
+	if last.Action != access.ActionSetRangeValue || last.X != 42.5 {
+		t.Errorf("SetValue requested %+v, want 42.5", last)
+	}
+}
+
+// TestRangePropertiesOfASlider checks the VARIANTs of the RangeValue properties,
+// and that a node without a Range has none of them.
+func TestRangePropertiesOfASlider(t *testing.T) {
+	n := &access.Node{ID: 2, Role: access.RoleSlider, States: access.StateReadOnly,
+		Range: &access.Range{Value: 30, Min: 5, Max: 100, SmallChange: 1, LargeChange: 10}}
+	cases := map[int32]float64{propRangeValue: 30, propRangeMinimum: 5, propRangeMaximum: 100,
+		propRangeLargeChange: 10, propRangeSmallChange: 1}
+	for id, want := range cases {
+		if v := nodeProperty(id, n, false); v.vt != vtR8 || math.Float64frombits(v.data[0]) != want {
+			t.Errorf("property %d has tag %d and value %v, want %v", id, v.vt, math.Float64frombits(v.data[0]), want)
+		}
+	}
+	if v := nodeProperty(propRangeIsReadOnly, n, false); v.vt != vtBool || variantBoolOf(v) != -1 {
+		t.Error("RangeValue IsReadOnly is not VARIANT_TRUE for a read-only slider")
+	}
+	if v := nodeProperty(propIsRangeValueAvail, n, false); variantBoolOf(v) != -1 {
+		t.Error("IsRangeValuePatternAvailable is not VARIANT_TRUE for a slider with a Range")
+	}
+	button := &access.Node{ID: 3, Role: access.RoleButton}
+	if v := nodeProperty(propRangeValue, button, false); v.vt != vtEmpty {
+		t.Errorf("RangeValue of a button has tag %d, want VT_EMPTY", v.vt)
+	}
+	if v := nodeProperty(propIsRangeValueAvail, button, false); variantBoolOf(v) != 0 {
+		t.Error("IsRangeValuePatternAvailable is true for a button")
+	}
+}
+
 func TestWideStringReadsToTheTerminator(t *testing.T) {
 	s := append(utf16.Encode([]rune("Save")), 0, 'x')
 	if got := wideString(uintptr(unsafe.Pointer(&s[0]))); got != "Save" {
@@ -538,12 +654,13 @@ func cachedObjectCount(hwnd uintptr, id access.ID) int {
 // the UI Automation property that a client watches for it.
 func TestPropertyIDsOfTheAccessProperties(t *testing.T) {
 	cases := map[access.Property]int32{
-		access.PropertyName:     propName,
-		access.PropertyValue:    propValue,
-		access.PropertyToggle:   propToggleState,
-		access.PropertyExpanded: propExpandCollapseState,
-		access.PropertySelected: propIsSelected,
-		access.PropertyEnabled:  propIsEnabled,
+		access.PropertyName:       propName,
+		access.PropertyValue:      propValue,
+		access.PropertyToggle:     propToggleState,
+		access.PropertyExpanded:   propExpandCollapseState,
+		access.PropertySelected:   propIsSelected,
+		access.PropertyEnabled:    propIsEnabled,
+		access.PropertyRangeValue: propRangeValue,
 	}
 	for prop, want := range cases {
 		if got := propertyID(prop); got != want {

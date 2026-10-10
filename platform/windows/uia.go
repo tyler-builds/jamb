@@ -20,6 +20,7 @@ const (
 	// Control types.
 	ctButton      = 50000
 	ctCheckBox    = 50002
+	ctComboBox    = 50003
 	ctEdit        = 50004
 	ctHyperlink   = 50005
 	ctImage       = 50006
@@ -29,6 +30,8 @@ const (
 	ctMenuBar     = 50010
 	ctMenuItem    = 50011
 	ctRadioButton = 50013
+	ctSlider      = 50015
+	ctSpinner     = 50016
 	ctTab         = 50018
 	ctTabItem     = 50019
 	ctText        = 50020
@@ -72,6 +75,7 @@ const (
 	patternToggle         = 10015
 	patternScrollItem     = 10017
 	patternWindow         = 10009
+	patternRangeValue     = 10003
 
 	eventStructureChanged       = 20002
 	eventPropertyChanged        = 20004
@@ -95,6 +99,13 @@ const (
 	propWindowIsModal            = 30077
 	propValue                    = 30045
 	propIsReadOnly               = 30046
+	propIsRangeValueAvail        = 30033
+	propRangeValue               = 30047
+	propRangeIsReadOnly          = 30048
+	propRangeMinimum             = 30049
+	propRangeMaximum             = 30050
+	propRangeLargeChange         = 30051
+	propRangeSmallChange         = 30052
 	propScrollHorizontalPercent  = 30053
 	propScrollHorizontalView     = 30054
 	propScrollVerticalPercent    = 30055
@@ -189,6 +200,9 @@ const (
 //	check box, switch         CheckBox          check box, switch
 //	radio button              RadioButton       radio button
 //	text field, text area     Edit              text field, text area
+//	combo box                 ComboBox          combo box
+//	slider                    Slider            slider
+//	spinner                   Spinner           spinner
 //	static text, heading      Text              static text, heading
 //	image                     Image             image
 //	link                      Hyperlink         link
@@ -218,6 +232,12 @@ func controlType(r access.Role) int32 {
 		return ctRadioButton
 	case access.RoleTextField, access.RoleTextArea:
 		return ctEdit
+	case access.RoleComboBox:
+		return ctComboBox
+	case access.RoleSlider:
+		return ctSlider
+	case access.RoleSpinner:
+		return ctSpinner
 	case access.RoleStaticText, access.RoleHeading:
 		return ctText
 	case access.RoleImage:
@@ -402,7 +422,7 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 			return variantBool(true)
 		}
 	case propValue:
-		if isText(n.Role) {
+		if hasValue(n.Role) {
 			return variantBSTR(n.Value)
 		}
 	case propIsPassword:
@@ -410,8 +430,32 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 			return variantBool(n.States.Has(access.StatePassword))
 		}
 	case propIsReadOnly:
-		if isText(n.Role) {
+		if hasValue(n.Role) {
 			return variantBool(n.States.Has(access.StateReadOnly))
+		}
+	case propRangeValue:
+		if n.Range != nil {
+			return variantDouble(n.Range.Value)
+		}
+	case propRangeIsReadOnly:
+		if n.Range != nil {
+			return variantBool(n.States.Has(access.StateReadOnly))
+		}
+	case propRangeMinimum:
+		if n.Range != nil {
+			return variantDouble(n.Range.Min)
+		}
+	case propRangeMaximum:
+		if n.Range != nil {
+			return variantDouble(n.Range.Max)
+		}
+	case propRangeLargeChange:
+		if n.Range != nil {
+			return variantDouble(n.Range.LargeChange)
+		}
+	case propRangeSmallChange:
+		if n.Range != nil {
+			return variantDouble(n.Range.SmallChange)
 		}
 	case propToggleState:
 		if n.States.Has(access.StateToggle) {
@@ -448,6 +492,10 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 // isText reports whether a role is an editable text field.
 func isText(r access.Role) bool { return r == access.RoleTextField || r == access.RoleTextArea }
 
+// hasValue reports whether a role has the Value pattern: a text field, or a combo
+// box, whose Value is the label it has chosen.
+func hasValue(r access.Role) bool { return isText(r) || r == access.RoleComboBox }
+
 // toggleStateOf returns the ToggleState of a node: on when checked, indeterminate
 // when mixed, off otherwise.
 func toggleStateOf(s access.State) int32 {
@@ -483,6 +531,8 @@ func patternKindOf(id int32) (coreKind, bool) {
 		return kindSelection, true
 	case patternValue:
 		return kindValue, true
+	case patternRangeValue:
+		return kindRange, true
 	case patternScroll:
 		return kindScroll, true
 	case patternScrollItem:
@@ -511,6 +561,8 @@ func availableKind(id int32) (coreKind, bool) {
 		return kindSelection, true
 	case propIsValueAvailable:
 		return kindValue, true
+	case propIsRangeValueAvail:
+		return kindRange, true
 	case propIsScrollAvailable:
 		return kindScroll, true
 	case propIsScrollItemAvailable:
@@ -544,7 +596,9 @@ func supports(k coreKind, n *access.Node) bool {
 	case kindSelection:
 		return n.States.Has(access.StateSelectionContainer)
 	case kindValue:
-		return isText(n.Role)
+		return hasValue(n.Role)
+	case kindRange:
+		return n.Range != nil
 	case kindScroll:
 		return n.Scroll.Container
 	case kindScrollItem:
@@ -1083,6 +1137,28 @@ func (c *core) isReadOnly() (bool, uintptr) {
 	return n.States.Has(access.StateReadOnly), hrOK
 }
 
+// setRangeValue sets the number of the slider or spin box c. The runtime sets it
+// on the UI thread, as setValue does for a text field.
+func (c *core) setRangeValue(v float64) uintptr {
+	if _, _, ok := c.current(); !ok {
+		return hrElementNotAvailable
+	}
+	c.bridge.Do(c.id, access.Request{Action: access.ActionSetRangeValue, X: v})
+	return hrOK
+}
+
+// rangeOf returns the range of c. A node without a Range has the zero range.
+func (c *core) rangeOf() (access.Range, uintptr) {
+	n, _, ok := c.current()
+	if !ok {
+		return access.Range{}, hrElementNotAvailable
+	}
+	if n.Range == nil {
+		return access.Range{}, hrOK
+	}
+	return *n.Range, hrOK
+}
+
 // scroll moves the container c by the ScrollAmount values of each axis: a small
 // amount is a tenth of the view, a large one nine tenths (see ActionScroll).
 func (c *core) scroll(horizontal, vertical int32) uintptr {
@@ -1293,6 +1369,8 @@ func propertyID(prop access.Property) int32 {
 		return propIsSelected
 	case access.PropertyEnabled:
 		return propIsEnabled
+	case access.PropertyRangeValue:
+		return propRangeValue
 	}
 	return propName
 }

@@ -58,6 +58,7 @@ type DivElement struct {
 	focusable    bool
 	tabIndex     int  // see TabIndex
 	noTabStop    bool // see TabStop
+	spaceOnly    bool // Space runs OnClick but Enter does not (check boxes, switches, radio buttons)
 	capture      bool
 	autoFocus    bool
 	handle       *FocusHandle

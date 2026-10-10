@@ -175,6 +175,8 @@ type fieldOptions struct {
 	icon        *icons.Icon
 	onSubmit    func(string)
 	onChange    func(string)
+	onBlur      func()        // set by NumberField, which checks its text on blur
+	onStep      func(dir int) // set by NumberField, for Up and Down
 	style       Style
 	key         string
 	borderless  bool
@@ -314,7 +316,7 @@ func (f *fieldOptions) expand(ctx *Context, multiline bool, minRows int) Element
 	}
 	ed := &editorElement{
 		value: f.value, placeholder: f.placeholder, name: f.name, labelledBy: f.labelledBy, describedBy: f.describedBy, multiline: multiline,
-		onSubmit: f.onSubmit, onChange: f.onChange, autoFocus: f.autoFocus, handle: h,
+		onSubmit: f.onSubmit, onChange: f.onChange, onBlur: f.onBlur, onStep: f.onStep, autoFocus: f.autoFocus, handle: h,
 		style: Style{Grow: 1},
 	}
 	if multiline && minRows > 0 {
