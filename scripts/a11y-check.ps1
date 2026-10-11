@@ -272,24 +272,36 @@ function Invoke-Named($Root, [string]$Name, $Type = $null) {
 }
 
 # Scan runs AxeWindowsCLI on the process and returns its error count. The scanner
-# exits 0 with no errors and 1 with errors; anything else is a failure to scan.
+# exits 0 with no errors and 1 with errors; anything else is a failure to scan,
+# which happens now and then when the tree changes during the scan, so such a
+# scan is tried up to three times before the check fails.
 function Invoke-AxeScan($Proc, [string]$Name) {
     $out = Join-Path $Work "axe-$Name"
     New-Item -ItemType Directory -Force -Path $out | Out-Null
-    # The scanner writes its report to stderr, which is captured here, so the
-    # native-error handling of the session must not turn those lines into errors.
-    $oldPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $log = & $axe --processid $Proc.Id --outputdirectory $out --scanid $Name --verbosity default --delayinseconds 2 2>&1 | ForEach-Object { "$_" }
-        $code = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $oldPreference
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        # The scanner writes its report to stderr, which is captured here, so the
+        # native-error handling of the session must not turn those lines into errors.
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $log = & $axe --processid $Proc.Id --outputdirectory $out --scanid $Name --verbosity default --delayinseconds 2 2>&1 | ForEach-Object { "$_" }
+            $code = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+        $text = $log -join "`n"
+        if ($code -eq 0) { return 0 }
+        if ($code -eq 1 -and $text -match '(\d+) errors? (were|was) found') {
+            # Show what the scanner found, since its report folder is removed on exit.
+            Write-Host -Separator "`n" ($log | Where-Object { $_ -ne '' } | ForEach-Object { "  axe: $_" })
+            return [int]$matches[1]
+        }
+        if ($attempt -lt 3) {
+            Write-Host "  (AxeWindowsCLI exited $code without a count; scanning again)"
+            Start-Sleep -Seconds 2
+        }
     }
-    $text = $log -join "`n"
-    if ($code -eq 0) { return 0 }
-    if ($code -eq 1 -and $text -match '(\d+) errors? (were|was) found') { return [int]$matches[1] }
-    throw "AxeWindowsCLI exited $code without a count: $text"
+    throw "AxeWindowsCLI exited $code without a count, three times: $text"
 }
 
 try {
@@ -558,6 +570,28 @@ try {
         Find-One $win 'Gamma' $CT.Pane | Out-Null
         $ai.Select()
         Wait-For { if ($ai.Current.IsSelected) { $true } else { $null } } 'Alpha to be selected again' | Out-Null
+    }
+
+    Check 'demo: a kept tab panel keeps its field text, and the hidden field is not in the tree' {
+        $list = Find-One $win 'Plain sections' $CT.Tab
+        $alpha = Find-One $list 'Alpha' $CT.TabItem
+        $gamma = Find-One $list 'Gamma' $CT.TabItem
+        $ai = Require-Pattern $alpha ([System.Windows.Automation.SelectionItemPatternIdentifiers]::Pattern) 'SelectionItem'
+        $gi = Require-Pattern $gamma ([System.Windows.Automation.SelectionItemPatternIdentifiers]::Pattern) 'SelectionItem'
+        $ai.Select()
+        Wait-For { if ($ai.Current.IsSelected) { $true } else { $null } } 'Alpha to be selected' | Out-Null
+        $field = Find-One $win 'Note' $CT.Edit
+        $vp = Require-Pattern $field ([System.Windows.Automation.ValuePatternIdentifiers]::Pattern) 'Value'
+        $vp.SetValue('kept text')
+        Wait-For { if ($vp.Current.Value -eq 'kept text') { $true } else { $null } } 'the field to hold the text' | Out-Null
+        $gi.Select()
+        Wait-For { if ($gi.Current.IsSelected) { $true } else { $null } } 'Gamma to be selected' | Out-Null
+        Wait-Gone { Find-Named $win 'Note' $CT.Edit | Select-Object -First 1 } 'the hidden Note field to leave the tree' | Out-Null
+        $ai.Select()
+        $field = Wait-For { Find-Named $win 'Note' $CT.Edit | Select-Object -First 1 } 'the Note field to be shown again'
+        $vp = Require-Pattern $field ([System.Windows.Automation.ValuePatternIdentifiers]::Pattern) 'Value'
+        Assert ($vp.Current.Value -eq 'kept text') "the field holds '$($vp.Current.Value)' after switching back, want 'kept text'"
+        $vp.SetValue('')
     }
 
     Check 'demo: a collapsible header is a Button with ExpandCollapse, and its content opens and closes' {
