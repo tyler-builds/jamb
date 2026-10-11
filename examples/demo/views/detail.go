@@ -93,7 +93,7 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 				ui.Tab[string]{Value: "comments", Label: "Comments", Panel: func() ui.Element {
 					return Comments(s, id, thread)
 				}},
-			).Key("detail-tabs").Label("Project sections"))
+			).Key("detail-tabs").Label("Project sections").KeepPanels())
 		return ui.Div().Size(ui.Full, ui.Full).Background(t.Background).TextColor(t.Text).
 			Child(titleBar(t, focused, p.Name)).
 			Child(content)

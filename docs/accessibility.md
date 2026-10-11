@@ -101,6 +101,9 @@ Small and explicit, on the elements that already exist, for example:
 - `Div().Role(access.RoleCheckBox).Label("Notifications").Checked(on)`
 - `Div().Description("…")`, `Div().Hidden()` (leave out of the tree),
   `Div().Heading(2)`
+- `Div().Display(false)` (not shown, not drawn, not focusable and out of the tree,
+  with its state kept). It is not `Hidden()`, which only leaves the element out of
+  the tree and keeps it drawn and reachable by mouse and keyboard.
 - `Image(src).Alt("…")`, `IconButton(icon).Label("…")`
 - `ui.Announce(text, access.Polite)`
 
@@ -1360,7 +1363,8 @@ decisions, and are marked as such.
   Tab lists and tabs were already mapped to Tab (50018) and TabItem (50019).
 - **Tabs.** `ui.Tabs(selected, tabs...)` takes `Tab[T]` values, each with a value, a
   label, an optional icon, a disabled flag and a `Panel` func. Only the selected
-  panel is built. The tab list is one Tab stop, at the selected tab. This follows
+  panel is built, unless the tabs call `KeepPanels()` (see Panel state). The tab
+  list is one Tab stop, at the selected tab. This follows
   [Microsoft's TabView guidance](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/tab-view),
   which says that when focus moves into the tab strip, "the selected TabViewItem
   gains focus".
@@ -1384,16 +1388,19 @@ decisions, and are marked as such.
   that this phase fixed: a TabItem supported Invoke, a tab list did not report
   IsSelectionRequired, and a tab list's name repeated its control type word (so the
   demo's labels avoid "tab").
-- **Panel state (gap).** Panels are keyed by their tab's value, so a panel is rebuilt
-  when its tab is selected again, and its state is not kept. The app keeps its data
-  in signals. Keeping every panel's state would build every panel, which the lazy
-  panels exist to avoid.
+- **Panel state (opt-in).** By default a panel is rebuilt when its tab is selected
+  again, and its state is not kept. `KeepPanels()` keeps each panel once its tab has
+  been selected. A kept panel is hidden with `Display(false)` while other tabs are
+  selected, so it is not in the tree, is not focusable and is not in the Tab order.
+  Its panel keys are per tab (`<tabs key>/panel:<value>`), so they stay unique. The
+  selected panel is named and labelled as before.
 - **Collapsible.** The header is a button with the Expanded state, and a click toggles
   it. Enter and Space run the click, as they do for a focusable element with OnClick,
   so both open and close the section. This matches the Phase B semantics, where an
   expandable row's click toggles it. The content is a group named by its title, and
   LabelledBy names it by the header. The content is not built while the section is
-  closed.
+  closed, unless the section calls `KeepContent()`. Then it is built on the first
+  opening and hidden while the section is closed, and it is not in the tree then.
 - **Expander UIA type (decided).** Microsoft's Expander page says the header is the
   part a user activates, and that the content area is the region it shows
   ([Expander](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/expander)).

@@ -275,3 +275,45 @@ func TestWrapJustifiesEachLine(t *testing.T) {
 	expect(t, items[0], 10, 0, 40, 10) // line 1: 80 wide, centered in 100
 	expect(t, items[2], 30, 10, 40, 10)
 }
+
+func TestHiddenChildTakesNoSpace(t *testing.T) {
+	a := box(Style{Width: Px(100)})
+	b := box(Style{Width: Px(70), Hidden: true})
+	c := box(Style{Width: Px(50)})
+	root := box(Style{Direction: Row, Gap: 10}, a, b, c)
+	var e Engine
+	e.Compute(root, 400, 100)
+	expect(t, a, 0, 0, 100, 100)
+	expect(t, b, 0, 0, 0, 0)
+	expect(t, c, 110, 0, 50, 100)
+}
+
+func TestHiddenChildIsLeftOutOfTheContentExtentAndInk(t *testing.T) {
+	huge := box(Style{Height: Px(500), Hidden: true}, box(Style{Height: Px(500)}))
+	abs := box(Style{Position: Absolute, Top: Px(0), Left: Px(0), Width: Px(300), Height: Px(300), Hidden: true})
+	shown := box(Style{Height: Px(20)})
+	root := box(Style{}, huge, abs, shown)
+	var e Engine
+	e.Compute(root, 200, 100)
+	if root.ContentH != 100 {
+		t.Errorf("content height %v, want 100: a hidden child adds nothing to the extent", root.ContentH)
+	}
+	if root.InkY1 != 100 || root.InkX1 != 200 {
+		t.Errorf("ink reaches (%v, %v), want (200, 100): hidden children draw nothing", root.InkX1, root.InkY1)
+	}
+	expect(t, shown, 0, 0, 200, 20)
+}
+
+func TestHiddenChildLaysOutWhenShown(t *testing.T) {
+	a := box(Style{Height: Px(30)})
+	c := box(Style{Height: Px(20), Hidden: true})
+	root := box(Style{Gap: 5}, a, c)
+	var e Engine
+	e.Compute(root, 100, 100)
+	expect(t, c, 0, 0, 0, 0)
+	c.Style.Hidden = false
+	c.Invalidate()
+	root.Invalidate()
+	e.Compute(root, 100, 100)
+	expect(t, c, 0, 35, 100, 20)
+}

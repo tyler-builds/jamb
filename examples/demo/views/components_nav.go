@@ -22,13 +22,21 @@ func navigationSection() ui.Element {
 		email, sms, push := ui.Local(ctx, "nav.email", true), ui.Local(ctx, "nav.sms", false), ui.Local(ctx, "nav.push", false)
 		node := ui.Local(ctx, "nav.node", "src")
 		big := ui.Local(ctx, "nav.big", "folder-0000")
+		note := ui.Local(ctx, "nav.note", "")
 
 		samples := []ui.Element{
-			sample(t, "Tabs", ui.Div().Width(ui.Px(420)).Child(ui.Tabs(plain,
-				ui.Tab[string]{Value: "alpha", Label: "Alpha", Panel: func() ui.Element { return panelText(t, "Alpha panel") }},
+			sample(t, "Tabs, panels kept", ui.Div().Width(ui.Px(420)).Child(ui.Tabs(plain,
+				ui.Tab[string]{Value: "alpha", Label: "Alpha", Panel: func() ui.Element {
+					// KeepPanels keeps this panel, so the text in the field stays when another tab is selected.
+					return ui.Div().Column().Gap(8).Children(
+						panelText(t, "Alpha panel"),
+						ui.TextInput(note).Label("Note").Placeholder("Type a note"),
+						ui.Text("Text typed here is kept when another tab is selected.").Size(11).Color(t.TextSubtle),
+					)
+				}},
 				ui.Tab[string]{Value: "beta", Label: "Beta", Panel: func() ui.Element { return panelText(t, "Beta panel") }},
 				ui.Tab[string]{Value: "gamma", Label: "Gamma", Panel: func() ui.Element { return panelText(t, "Gamma panel") }},
-			).Key("nav.plainSections").Label("Plain sections"))),
+			).Key("nav.plainSections").Label("Plain sections").KeepPanels())),
 			sample(t, "Tabs, one disabled", ui.Div().Width(ui.Px(420)).Child(ui.Tabs(disabled,
 				ui.Tab[string]{Value: "overview", Label: "Overview", Panel: func() ui.Element { return panelText(t, "Overview panel") }},
 				ui.Tab[string]{Value: "usage", Label: "Usage", Disabled: true, Panel: func() ui.Element { return panelText(t, "Usage panel") }},

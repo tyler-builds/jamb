@@ -169,7 +169,7 @@ func (rt *Runtime) clickOutside(path []*node) {
 		return false
 	}
 	for _, o := range append([]*node(nil), rt.outside...) {
-		if in(o.id) || (o.div.overlay != 0 && o.parent != nil && in(o.parent.id)) {
+		if in(o.id) || (o.div.overlay != 0 && o.parent != nil && in(o.parent.id)) || rt.undisplayed(o) {
 			continue
 		}
 		if fn := o.div.h.onClickOutside; fn != nil {
@@ -807,6 +807,9 @@ func (rt *Runtime) setFocus(id uint64) {
 	if id == rt.focusID {
 		return
 	}
+	if rt.undisplayed(rt.byID[id]) {
+		return // a hidden element (see Display) cannot take focus
+	}
 	rt.markAccess()
 	oldID := rt.focusID
 	if old := rt.byID[oldID]; old != nil && old.div != nil && old.div.h.onBlur != nil && rt.blurring != oldID {
@@ -858,6 +861,9 @@ func (rt *Runtime) tabOrder() []uint64 {
 	var rest []uint64
 	var walk func(n *node)
 	walk = func(n *node) {
+		if n.flags&flagNoDisplay != 0 {
+			return // a hidden element and its subtree are not in the order (see Display)
+		}
 		if d := n.div; d != nil && d.focusable && !d.noTabStop && d.tabIndex >= 0 {
 			if d.tabIndex > 0 {
 				first = append(first, indexed{d.tabIndex, n.id})

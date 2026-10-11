@@ -21,6 +21,7 @@ type CollapsibleElement struct {
 	content  Element
 	key      string
 	disabled bool
+	keep     bool // see KeepContent
 	onChange func(bool)
 	// group is set by an Accordion, and runs after a change made by the header.
 	group func(open bool)
@@ -41,6 +42,13 @@ func (c *CollapsibleElement) Key(k string) *CollapsibleElement { c.key = k; retu
 
 // Disabled shows the section but does not let it open or close.
 func (c *CollapsibleElement) Disabled(d bool) *CollapsibleElement { c.disabled = d; return c }
+
+// KeepContent keeps the content once the section has been opened. The content is
+// built the first time the section opens, as it is by default, and then stays in
+// the tree while the section is closed, hidden with Display. Its state survives
+// closing and opening the section. Without KeepContent the content is discarded
+// when the section closes.
+func (c *CollapsibleElement) KeepContent() *CollapsibleElement { c.keep = true; return c }
 
 // OnChange runs fn with the new state after the user opens or closes the section.
 // The signal is set first.
@@ -99,8 +107,18 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 	if c.key != "" {
 		col.Key(c.key)
 	}
-	if on && c.content != nil {
-		col.Child(Div().Column().Role(access.RoleGroup).Label(c.title).LabelledBy(c.headerKey()).
+	// With KeepContent the content is built once the section has opened, and is
+	// then kept hidden while the section is closed.
+	kept := false
+	if c.keep {
+		opened := Local(ctx, "opened", false)
+		if on && !opened.Peek() {
+			opened.Set(true)
+		}
+		kept = opened.Peek()
+	}
+	if (on || kept) && c.content != nil {
+		col.Child(Div().Column().Display(on).Role(access.RoleGroup).Label(c.title).LabelledBy(c.headerKey()).
 			PaddingEdges(Edges{Top: 4, Right: 12, Bottom: 12, Left: 12}).Child(c.content))
 	}
 	return col

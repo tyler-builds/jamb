@@ -250,6 +250,10 @@ func (e *Engine) arrange(n *Node) {
 	// Scrollable extent: farthest child edge plus trailing padding.
 	cw, ch := n.W, n.H
 	for _, c := range n.Children {
+		if c.Style.Hidden {
+			c.X, c.Y, c.W, c.H = 0, 0, 0, 0
+			continue
+		}
 		if c.Style.Position == Floating {
 			continue
 		}
@@ -263,7 +267,7 @@ func (e *Engine) arrange(n *Node) {
 	clipX, clipY := n.Style.OverflowX != OverflowVisible, n.Style.OverflowY != OverflowVisible
 	x0, y0, x1, y1 := float32(0), float32(0), n.W, n.H
 	for _, c := range n.Children {
-		if c.Style.Position == Floating {
+		if c.Style.Hidden || c.Style.Position == Floating {
 			continue
 		}
 		if !clipX {
@@ -328,7 +332,7 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 	// 1. Flex basis and hypothetical main size of each item.
 	for _, c := range n.Children {
 		cs := &c.Style
-		if cs.Position != Relative {
+		if cs.Position != Relative || cs.Hidden {
 			continue
 		}
 		it := item{n: c, grow: cs.Grow, shrink: cs.Shrink, forcedCross: nan}
@@ -669,6 +673,9 @@ func (e *Engine) arrangeAbsolute(n *Node) {
 	pbH := n.H - s.Border.Top - s.Border.Bottom
 	for _, c := range n.Children {
 		cs := &c.Style
+		if cs.Hidden {
+			continue
+		}
 		if cs.Position == Floating {
 			w, h := e.measure(c, e.viewW, e.viewH, e.viewW, nan, nan)
 			c.X, c.Y, c.W, c.H = 0, 0, w, h

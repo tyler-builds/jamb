@@ -11,8 +11,8 @@ import (
 
 // Tab is one tab of a Tabs: the value it selects, its label, an optional icon
 // and the panel it shows. Panel is called only while the tab is selected, so the
-// panels of the other tabs are not built. A disabled tab is shown but cannot be
-// selected.
+// panels of the other tabs are not built, unless the Tabs keeps its panels (see
+// KeepPanels). A disabled tab is shown but cannot be selected.
 type Tab[T comparable] struct {
 	Value    T
 	Label    string
@@ -42,6 +42,7 @@ type TabsElement[T comparable] struct {
 	name     string // the accessible name of the tab list, see Label
 	key      string
 	onChange func(T)
+	keep     bool // see KeepPanels
 }
 
 // Tabs creates a tab list over tabs, showing the panel of the tab that selected
@@ -65,6 +66,17 @@ func (t *TabsElement[T]) Label(name string) *TabsElement[T] { t.name = name; ret
 // by the keys or by Ctrl+Tab. The signal is set first.
 func (t *TabsElement[T]) OnChange(fn func(T)) *TabsElement[T] { t.onChange = fn; return t }
 
+// KeepPanels keeps each panel once it has been built. A panel is built the first
+// time its tab is selected, as it is by default, and then stays in the tree while
+// other tabs are selected, hidden with Display. Its component instances, Local
+// state, text, selection, scroll positions and lists survive switching tabs.
+// Tabs that were never selected are not built. Without KeepPanels only the
+// selected panel exists, and the state of the others is discarded.
+//
+// A kept panel renders again when the code that makes the tabs runs again, and
+// when its own state changes. Switching tabs does not render it.
+func (t *TabsElement[T]) KeepPanels() *TabsElement[T] { t.keep = true; return t }
+
 // scope is the prefix of the keys of this tab list.
 func (t *TabsElement[T]) scope() string {
 	if t.key != "" {
@@ -77,6 +89,9 @@ func (t *TabsElement[T]) scope() string {
 func (t *TabsElement[T]) tabKey(v T) string { return t.scope() + "/" + fmt.Sprint(v) }
 
 func (t *TabsElement[T]) expand(ctx *Context) Element {
+	// panels holds the component of each kept panel, made by this render of the
+	// tab list. Switching tabs reuses them, so the panels are not rendered again.
+	panels := map[T]*ComponentElement{}
 	return Component(func(ctx *Context) Element {
 		th := ctx.Theme()
 		cur := t.selected.Get()
@@ -166,7 +181,9 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				choose(nextEnabled(opts, sel, dir, false))
 			}).
 			Child(strip)
-		if sel >= 0 && t.tabs[sel].Panel != nil {
+		if t.keep {
+			group.Children(t.keptPanels(ctx, sel, panels)...)
+		} else if sel >= 0 && t.tabs[sel].Panel != nil {
 			if p := t.tabs[sel].Panel(); p != nil {
 				// The panel is named by its tab: the label is its name, and LabelledBy
 				// links it to the tab for the relation.
@@ -177,6 +194,34 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		}
 		return group
 	})
+}
+
+// keptPanels returns the panel of each tab that has been selected, with the
+// selected one shown and the others hidden (see KeepPanels). The first time a
+// tab is selected its panel is recorded in the Local set; its component is made
+// once per render of the tab list, so a tab switch reuses it.
+func (t *TabsElement[T]) keptPanels(ctx *Context, sel int, panels map[T]*ComponentElement) []Element {
+	built := Local(ctx, "built", map[T]bool{}).Peek()
+	if sel >= 0 && t.tabs[sel].Panel != nil {
+		built[t.tabs[sel].Value] = true
+	}
+	var out []Element
+	for i, tb := range t.tabs {
+		if !built[tb.Value] {
+			continue
+		}
+		pc := panels[tb.Value]
+		if pc == nil {
+			panel := tb.Panel
+			pc = Component(func(*Context) Element { return panel() })
+			panels[tb.Value] = pc
+		}
+		// Each panel has its own key, and is named by its tab as the panel is by default.
+		out = append(out, Div().Key(t.scope()+"/panel:"+fmt.Sprint(tb.Value)).Column().Grow(1).MinHeight(Px(0)).
+			Role(access.RoleTabPanel).Label(tb.Label).Display(i == sel).
+			LabelledBy(t.tabKey(tb.Value)).Child(pc))
+	}
+	return out
 }
 
 // tabView is the drawn tab: its icon and label above a line that marks the selected

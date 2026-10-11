@@ -58,6 +58,7 @@ type DivElement struct {
 	focusable    bool
 	tabIndex     int  // see TabIndex
 	noTabStop    bool // see TabStop
+	noDisplay    bool // see Display
 	spaceOnly    bool // Space runs OnClick but Enter does not (check boxes, switches, radio buttons)
 	capture      bool
 	autoFocus    bool
@@ -336,6 +337,21 @@ func (d *DivElement) ScrollX() *DivElement {
 	return d
 }
 
+// Display shows the element when on is true. Display(false) hides it as CSS
+// display: none does, but keeps it in the tree: its component instances, Local
+// state, signals, text and selection, scroll positions and list state survive,
+// so Display(true) shows it again as it was. While hidden, the element and its
+// subtree take no space in layout, are not painted, are not hit, are skipped by
+// Tab and cannot take focus, are absent from the accessibility tree, and run no
+// repeating animation or frame. A focused element that becomes hidden hands
+// focus to its nearest focusable ancestor, or to nothing when there is none.
+//
+// Hidden is a different thing: it only leaves the element out of the
+// accessibility tree, and the element is still drawn, laid out and reachable.
+// Use Display for content that should not be seen or reached, and Hidden for
+// content that is seen but not announced.
+func (d *DivElement) Display(on bool) *DivElement { d.noDisplay = !on; return d }
+
 // ---- visuals ----
 
 // Background sets the fill color.
@@ -567,9 +583,9 @@ func (h *FocusHandle) Focused() bool { return h.rt != nil && h.id != 0 && h.rt.f
 
 // FocusNow focuses the element at once, or clears focus for a "nothing
 // focused" handle, and reports whether it did. If the element is no longer in
-// the tree it does nothing and reports false: a restore must not wait and
-// later take focus from wherever the user has moved on to. To focus an
-// element that is about to appear, use Focus.
+// the tree, or is hidden by Display, it does nothing and reports false: a
+// restore must not wait and later take focus from wherever the user has moved
+// on to. To focus an element that is about to appear, use Focus.
 func (h *FocusHandle) FocusNow() bool {
 	if h.rt == nil {
 		return false
@@ -578,7 +594,7 @@ func (h *FocusHandle) FocusNow() bool {
 		h.rt.setFocus(0)
 		return true
 	}
-	if h.id != 0 && h.rt.byID[h.id] != nil {
+	if n := h.rt.byID[h.id]; n != nil && !h.rt.undisplayed(n) {
 		h.rt.setFocus(h.id)
 		return true
 	}

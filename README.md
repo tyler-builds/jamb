@@ -155,6 +155,7 @@ ui.Div()                       // flex container; children stack vertically by d
   .Grow(1).Shrink(0).Basis(ui.Px(0))          // Basis(0)+Grow(1) = equal columns
   .Align(ui.Center).Justify(ui.SpaceBetween).Center().AlignSelf(ui.End)
   .Absolute().Top(8).Right(8)  /  .Inset(0)   // positioned relative to the parent
+  .Display(false)              // hidden, state kept: no space, not drawn, not focusable (see below)
   .ZIndex(1).ClipContent().ScrollY().ScrollX()  // overflowing containers get scrollbars:
                                // drag the thumb, click the track to page by 90%;
                                // horizontal bars too; presses never click content below
@@ -206,6 +207,19 @@ saved.FocusNow()              // focuses it at once; does nothing and returns fa
 ui.Div().FocusWithin(ui.Style{BorderColor: c})  // style while focus is inside
 ui.Div().CapturePointer()                       // keep getting moves while dragging
 ```
+
+`Display(false)` hides an element as CSS `display: none` does, but keeps it in the
+tree. Its component instances, Local state, signals, text and selection, scroll
+positions and lists survive, and `Display(true)` shows it again as it was, without
+a rebuild unless its inputs changed. While it is hidden, the element and its subtree
+take no space in layout, are not painted or hit, are skipped by Tab and cannot take
+focus, are absent from the accessibility tree, and run no repeating animation or
+frame. A focused element that becomes hidden hands focus to its nearest focusable
+ancestor, or to nothing when there is none. `Hidden()` is a different thing: it
+only leaves the element out of the accessibility tree. The element is still drawn,
+laid out and reachable with the mouse and keyboard. Use `Display` for content that
+should not be seen or reached, and `Hidden` for content that is seen but not
+announced.
 
 The command palette restores focus this way. It takes `ctx.FocusedHandle()`
 when it opens and calls `FocusNow()` when it closes, so a command it runs
@@ -397,9 +411,9 @@ the Text size and reduced motion.
 ```go
 ui.Tabs(section,                                  // *ui.Signal[T], for any comparable T
 	ui.Tab[string]{Value: "general", Label: "General", Icon: icons.Settings,
-		Panel: func() ui.Element { return generalPanel() }},   // built only while selected
+		Panel: func() ui.Element { return generalPanel() }},   // built only while selected (or kept: KeepPanels)
 	ui.Tab[string]{Value: "usage", Label: "Usage", Disabled: true, Panel: usagePanel},
-).Key("settings-tabs").Label("Settings sections").OnChange(func(v string) { ... })
+).Key("settings-tabs").Label("Settings sections").KeepPanels().OnChange(func(v string) { ... })
 
 ui.Collapsible("Advanced options", open, content).Key("advanced") // *ui.Signal[bool]
 ui.Accordion(sectionA, sectionB, sectionC).SingleOpen()          // one section open at a time
@@ -422,14 +436,24 @@ ui.TreeView(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[
   ([Tab view keyboard navigation](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/tab-view)).
   They work from the tab list and from the panel. Inside a tab group, Ctrl+Tab
   is therefore bound, and focus moves to the selected tab. Only the selected
-  panel is built. Its state is not kept when another tab is selected: keep the
-  data in signals, as the demo does.
+  panel is built, so the state of the other panels is discarded when the
+  selection moves. `KeepPanels()` keeps them: each panel is built the first time
+  its tab is selected, and then stays in the tree, hidden with `Display` while
+  other tabs are selected. Its component instances, Local state, text, selection
+  and scroll positions survive switching tabs, and switching does not render it.
+  It renders again when the code that makes the tabs runs again, and when its own
+  state changes. A hidden panel is not in the tree, the Tab order or the hit test.
+  The project window keeps its Overview and Comments tabs this way, so a draft
+  comment and the scroll position survive. Without `KeepPanels()`, keep the data in
+  signals, as the other demo samples do.
   The selected tab is bold and has a line under it, in Accent (Highlight under
   high contrast), so the selection is not carried by color alone. Tabs take the
   height their parent gives them, so a panel can fill a window.
 - **Collapsible.** The header is a button with the Expanded state. Space and
   Enter open and close it, as a click does, and its chevron points right when closed
-  and down when open. The content is not built while the section is closed.
+  and down when open. The content is not built while the section is closed. With
+  `KeepContent()` it is built on the first opening and then kept hidden while the
+  section is closed, so its state survives closing and opening.
   Assistive technology reads the header as expandable and expanded, and the
   content as a group named by the header.
 - **Accordion.** Sections open and close on their own. `SingleOpen` makes
@@ -1339,6 +1363,7 @@ ui.TextInput(name).Label("Name").LabelledBy("name-label").DescribedBy("name-help
 ui.ListOf(items, key, row).SelectionContainer() // also UniformList
 ui.Div().Description("Saves the file to disk")
 ui.Div().Hidden() // leaves the element and its children out of the tree
+ui.Div().Display(false) // hidden: not drawn, not focusable, out of the tree, state kept (see the API guide)
 ui.IconButton(icons.Bell).Label("Notifications")
 ui.TextInput(query).Label("Search projects") // also TextArea
 ui.Image(avatar).Alt("Account avatar")

@@ -550,7 +550,7 @@ func (b *accessBuilder) focusTarget() access.ID {
 		return 0
 	}
 	for ; n != nil; n = n.parent {
-		if n.div != nil && n.div.acc != nil && n.div.acc.hidden {
+		if n.flags&flagNoDisplay != 0 || (n.div != nil && n.div.acc != nil && n.div.acc.hidden) {
 			return 0
 		}
 		if n.kind == kindEditor || exposed(n) {
@@ -585,7 +585,7 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 		return b.emitField(n)
 	}
 	d := n.div
-	if d == nil || (d.acc != nil && d.acc.hidden) {
+	if d == nil || d.noDisplay || (d.acc != nil && d.acc.hidden) {
 		return nil
 	}
 	if d.acc != nil && d.acc.inert {
@@ -801,7 +801,7 @@ func collectText(n *node, parts *[]string) {
 			}
 			continue
 		}
-		if c.div != nil && c.div.acc != nil && c.div.acc.hidden {
+		if c.flags&flagNoDisplay != 0 || (c.div != nil && c.div.acc != nil && c.div.acc.hidden) {
 			continue
 		}
 		collectText(c, parts)
@@ -1080,7 +1080,7 @@ func inSelectionContainer(t *access.Tree, n *access.Node) bool {
 // element that takes focus for its child (see accessInfo.focusInside).
 func (rt *Runtime) focusChild(n *node) {
 	for _, c := range n.children {
-		if c.div != nil && c.div.focusable {
+		if c.flags&flagNoDisplay == 0 && c.div != nil && c.div.focusable {
 			rt.setFocus(c.id)
 			return
 		}

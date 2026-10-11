@@ -76,7 +76,10 @@ func (a *AnimateElement) expand(ctx *Context) Element {
 			p = 0
 		}
 	}
-	if running {
+	if running && rt.undisplayed(ctx.inst.parentNode) {
+		// Hidden by Display: the animation asks for no frame (see holdAnim).
+		rt.holdAnim(ctx.inst)
+	} else if running {
 		if looping {
 			rt.looping = true
 		} else {

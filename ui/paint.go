@@ -20,7 +20,9 @@ func (rt *Runtime) paint(dt float32) {
 	for n := rt.byID[rt.focusID]; n != nil; n = n.parent {
 		n.keepGen = rt.paintGen
 	}
-	rt.paintNode(rt.tree, 0, 0, view, 1, rt.theme.Text, dt)
+	if rt.tree.flags&flagNoDisplay == 0 {
+		rt.paintNode(rt.tree, 0, 0, view, 1, rt.theme.Text, dt)
+	}
 	rt.paintGhosts(dt)
 	rt.paintOverlays(view, dt)
 	rt.paintDrag(view, dt)
@@ -233,6 +235,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		sx, sy = rt.scrollStep(n, dt)
 	}
 	for _, c := range n.order {
+		if c.flags&flagNoDisplay != 0 {
+			continue // nothing of an element hidden by Display is drawn, or hit
+		}
 		if c.flags&flagOverlay != 0 {
 			// Painted later, on top of everything and unclipped. n.abs and
 			// clip are the anchor's.

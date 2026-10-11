@@ -140,6 +140,11 @@ type Style struct {
 	Position                 Position
 	Top, Right, Bottom, Left Length
 
+	// Hidden takes the node out of layout: it takes no space, its subtree is
+	// not laid out, and it adds nothing to its parent's content extent or ink.
+	// Its own W and H are zero while it is hidden.
+	Hidden bool
+
 	OverflowX, OverflowY Overflow
 }
 

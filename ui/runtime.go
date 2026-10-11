@@ -31,13 +31,14 @@ const (
 type nodeFlags uint8
 
 const (
-	flagOverlay nodeFlags = 1 << iota // Overlay: painted and hit-tested from the overlay list
-	flagOutside                       // has OnClickOutside
-	flagList                          // a UniformList's or ListOf's scroll container
-	flagExit                          // has Exit: paint records what a ghost of it needs
-	flagDrag                          // has OnDrag: a press on it can start a drag
-	flagDrop                          // has OnDrop: a drag can end over it
-	flagRich                          // rich text with a clickable or hoverable segment
+	flagOverlay   nodeFlags = 1 << iota // Overlay: painted and hit-tested from the overlay list
+	flagOutside                         // has OnClickOutside
+	flagList                            // a UniformList's or ListOf's scroll container
+	flagExit                            // has Exit: paint records what a ghost of it needs
+	flagDrag                            // has OnDrag: a press on it can start a drag
+	flagDrop                            // has OnDrop: a drag can end over it
+	flagRich                            // rich text with a clickable or hoverable segment
+	flagNoDisplay                       // Display(false): the node and its subtree are not laid out, painted or focusable
 )
 
 // nodeState is per-element state that survives rebuilds, keyed by element ID.
@@ -248,6 +249,7 @@ type Runtime struct {
 	animating             bool                 // something animates: the next frame must come
 	looping               bool                 // a repeating Animate runs: the next frame must come, but it never ends
 	animInsts             []*componentInstance // Animate instances that were running; re-rendered by the next Frame
+	hiddenAnims           []*componentInstance // Animate instances held back while hidden by Display (see revealAnims)
 	listStale             bool                 // a UniformList must rebuild its rows before the frame ends
 	toasts                []*toastEntry        // the stack of toasts, oldest first (see Context.Toast)
 	toastNext             uint64               // the ID of the last toast made
@@ -831,6 +833,7 @@ func (rt *Runtime) rebuildDirty() {
 	if rt.focusID != 0 && rt.byID[rt.focusID] == nil {
 		rt.focusID = 0
 	}
+	rt.moveFocusOutOfHidden()
 	if id := rt.pendingFocus; id != 0 {
 		rt.pendingFocus = 0
 		if rt.byID[id] != nil {
@@ -845,6 +848,7 @@ func (rt *Runtime) rebuildDirty() {
 			}
 		}
 	}
+	rt.revealAnims()
 }
 
 func (rt *Runtime) rootTextStyle() textStyle {
@@ -1086,12 +1090,16 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		if len(e.drops) > 0 {
 			n.flags |= flagDrop
 		}
+		if e.noDisplay {
+			n.flags |= flagNoDisplay
+		}
 		rt.attachFocus(n)
 		n.style = rt.resolveStyle(n)
 		n.lay.Style = n.style.layoutStyle(1)
 		if e.overlay != 0 {
 			n.lay.Style.Position = layout.Floating
 		}
+		n.lay.Style.Hidden = e.noDisplay
 		n.ts = inh.inherit(&n.style)
 		if e.hover != nil || e.pressed != nil || e.focused != nil || e.focusWithin != nil || n.style.Transition > 0 ||
 			n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil {
@@ -1347,6 +1355,7 @@ func (rt *Runtime) restyle(id uint64) {
 	if d.overlay != 0 {
 		ls.Position = layout.Floating
 	}
+	ls.Hidden = d.noDisplay
 	if ls != n.lay.Style {
 		n.lay.Style = ls
 		rt.invalidateLayout(n)
