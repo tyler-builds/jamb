@@ -427,7 +427,8 @@ func enter(this, out uintptr) (*core, uintptr) {
 func putPtr(out, v uintptr) { *(*uintptr)(ptr(out)) = v }
 
 // provide returns a new reference to the provider of node id for iid. The root
-// is the window's root object.
+// is the window's root object. It returns 0 when the node is not in the
+// snapshot (see cachedObject).
 func (c *core) provide(id access.ID, iid guid) uintptr {
 	if id == access.RootID {
 		return rootView(c.hwnd, c.bridge, iid)
@@ -469,7 +470,11 @@ type objKey struct {
 }
 
 // cachedObject returns a view of the object of kind for node id, with a new
-// reference. The first call makes the object.
+// reference. The first call makes the object. A node that is not in the
+// snapshot has no object: none is made, so that no removal could miss one. The
+// check and the making run under regMu, and the runtime publishes a snapshot
+// before it drops the objects of the nodes it removed (under regMu too), so an
+// object is either made before that drop or never made.
 func cachedObject(kind coreKind, id access.ID, b *access.Bridge, hwnd uintptr, iid guid) uintptr {
 	regMu.Lock()
 	defer regMu.Unlock()
@@ -483,6 +488,9 @@ func cachedObject(kind coreKind, id access.ID, b *access.Bridge, hwnd uintptr, i
 			return v
 		}
 	}
+	if id != access.RootID && b.Tree().Node(id) == nil {
+		return 0
+	}
 	v := createLocked(kind, id, b, hwnd, iid)
 	if v != 0 {
 		c := cores[lastHandle] // the object createLocked just made
@@ -491,6 +499,10 @@ func cachedObject(kind coreKind, id access.ID, b *access.Bridge, hwnd uintptr, i
 	}
 	return v
 }
+
+// disconnectProvider is UiaDisconnectProvider. A variable, so that a test can
+// record the providers that a removal disconnects.
+var disconnectProvider = win32.UiaDisconnectProvider
 
 // dropObjects releases the registry's references to the objects of node id. It
 // runs when the node has left the tree.
@@ -505,6 +517,7 @@ func dropObjects(hwnd uintptr, id access.ID) {
 		}
 		regMu.Unlock()
 		if c != nil {
+			disconnect(c)
 			dropRef(c)
 		}
 	}
@@ -526,7 +539,25 @@ func dropAllObjects(hwnd uintptr) {
 	}
 	regMu.Unlock()
 	for _, c := range list {
+		disconnect(c)
 		dropRef(c)
+	}
+}
+
+// disconnect disconnects the provider of a node object that left the tree, as
+// the provider documentation asks for a destroyed element: UI Automation then
+// answers a client's calls on it with UIA_E_ELEMENTNOTAVAILABLE, without calling
+// the adapter. It is called outside regMu, since UI Automation may release
+// references into the adapter while it runs. The result is ignored: the adapter
+// answers the same way from the snapshot, so a call that UI Automation refuses
+// (RPC_E_CANTCALLOUT_ININPUTSYNCCALL inside a SendMessage) costs only the
+// disconnect. Pattern objects are not disconnected, since they are not elements.
+func disconnect(c *core) {
+	if c.kind != kindNode {
+		return
+	}
+	if p := c.viewFor(iidRawElementProviderSimple); p != 0 {
+		disconnectProvider(p)
 	}
 }
 
@@ -750,8 +781,12 @@ func uiaBoundingRectangle(this, out uintptr) uintptr {
 }
 
 func uiaEmbeddedFragmentRoots(this, out uintptr) uintptr {
-	if _, hr := enter(this, out); hr != hrOK {
+	c, hr := enter(this, out)
+	if hr != hrOK {
 		return hr
+	}
+	if _, _, ok := c.current(); !ok {
+		return hrElementNotAvailable
 	}
 	putPtr(out, 0)
 	return hrOK
@@ -771,6 +806,9 @@ func uiaFragmentRoot(this, out uintptr) uintptr {
 	c, hr := enter(this, out)
 	if hr != hrOK {
 		return hr
+	}
+	if _, _, ok := c.current(); !ok {
+		return hrElementNotAvailable
 	}
 	putPtr(out, c.provide(access.RootID, iidRawElementProviderFragmentRoot))
 	return hrOK
@@ -927,6 +965,9 @@ func uiaRemoveFromSelection(this uintptr) uintptr {
 	c := coreOf(this)
 	if c == nil {
 		return hrFail
+	}
+	if _, _, ok := c.current(); !ok {
+		return hrElementNotAvailable
 	}
 	if !inMultiSelection(c) {
 		return hrInvalidOperation

@@ -928,14 +928,20 @@ func (c *core) rootNode(t *access.Tree) *access.Node {
 // navigate returns a new reference to the fragment that dir reaches from c, or
 // 0 for none.
 func (c *core) navigate(dir int32) (uintptr, uintptr) {
-	if _, _, ok := c.current(); !ok {
+	_, t, ok := c.current()
+	if !ok {
 		return 0, hrElementNotAvailable
 	}
-	id := navigateTarget(c.bridge.Tree(), c.id, dir)
+	// The target is found in the same snapshot that showed c, so the two agree.
+	id := navigateTarget(t, c.id, dir)
 	if id == 0 {
 		return 0, hrOK
 	}
-	return c.provide(id, iidRawElementProviderFragment), hrOK
+	p := c.provide(id, iidRawElementProviderFragment)
+	if p == 0 {
+		return 0, hrElementNotAvailable // the target left the tree since t was published
+	}
+	return p, hrOK
 }
 
 // runtimeID returns a new SAFEARRAY that the caller owns. The root has no
@@ -1039,7 +1045,11 @@ func (c *core) pattern(id int32) (uintptr, uintptr) {
 	if !supports(k, n) {
 		return 0, hrOK
 	}
-	return cachedObject(k, c.id, c.bridge, c.hwnd, kindIfaces[k][0].iid), hrOK
+	p := cachedObject(k, c.id, c.bridge, c.hwnd, kindIfaces[k][0].iid)
+	if p == 0 {
+		return 0, hrElementNotAvailable // the node left the tree since n was read
+	}
+	return p, hrOK
 }
 
 // perform asks the runtime to run action a on c, from any thread. It returns
@@ -1106,7 +1116,11 @@ func (c *core) selectionContainer() (uintptr, uintptr) {
 			break
 		}
 		if p.States.Has(access.StateSelectionContainer) {
-			return c.provide(p.ID, iidRawElementProviderSimple), hrOK
+			v := c.provide(p.ID, iidRawElementProviderSimple)
+			if v == 0 {
+				return 0, hrElementNotAvailable
+			}
+			return v, hrOK
 		}
 		id = p.Parent
 	}

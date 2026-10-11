@@ -558,13 +558,18 @@ func uiaRangeBoundingRectangles(this, out uintptr) uintptr {
 	return hrOK
 }
 
-// uiaRangeEnclosingElement returns the element that holds the text: the field.
+// uiaRangeEnclosingElement returns the element that holds the text: the field. A
+// field that has left the tree has no element to return.
 func uiaRangeEnclosingElement(this, out uintptr) uintptr {
 	c, _, hr := rangeEnter(this, out)
 	if hr != hrOK {
 		return hr
 	}
-	putPtr(out, c.provide(c.id, iidRawElementProviderSimple))
+	p := c.provide(c.id, iidRawElementProviderSimple)
+	if p == 0 {
+		return hrElementNotAvailable
+	}
+	putPtr(out, p)
 	return hrOK
 }
 

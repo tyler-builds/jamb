@@ -159,7 +159,11 @@ func uiaGridGetItem(this, row, col, out uintptr) uintptr {
 		putPtr(out, 0)
 		return hrOK
 	}
-	putPtr(out, c.provide(cell.ID, iidRawElementProviderSimple))
+	p := c.provide(cell.ID, iidRawElementProviderSimple)
+	if p == 0 {
+		return hrElementNotAvailable // the cell left the tree since t was published
+	}
+	putPtr(out, p)
 	return hrOK
 }
 
@@ -234,7 +238,11 @@ func uiaGridItemContainingGrid(this, out uintptr) uintptr {
 		putPtr(out, 0)
 		return hrOK
 	}
-	putPtr(out, c.provide(g.ID, iidRawElementProviderSimple))
+	p := c.provide(g.ID, iidRawElementProviderSimple)
+	if p == 0 {
+		return hrElementNotAvailable // the grid left the tree since t was published
+	}
+	putPtr(out, p)
 	return hrOK
 }
 

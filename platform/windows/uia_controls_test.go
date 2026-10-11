@@ -618,7 +618,7 @@ func TestNotificationProcessingForPoliteness(t *testing.T) {
 // nothing is raised, and the objects of the removed nodes are dropped.
 func TestEventsWithoutAClientDropObjects(t *testing.T) {
 	const hwnd = 0x7104
-	b := testTree(0, node(access.RootID, 0, 2), node(2, access.RootID))
+	b := testTree(0, node(access.RootID, 0, 2, 9), node(2, access.RootID), node(9, access.RootID))
 	w := &window{hwnd: hwnd, uiaRoot: rootView(hwnd, b, iidRawElementProviderSimple)}
 	defer releaseCall(w.uiaRoot)
 	releaseCall(cachedObject(kindNode, 9, b, hwnd, iidRawElementProviderSimple))
