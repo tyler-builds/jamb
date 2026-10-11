@@ -21,6 +21,7 @@ func main() {
 		// Closing the main window quits, even with project windows open.
 		QuitWhenClosed: true,
 		Root:           views.App(store),
+		Theme:          views.DemoDarkTheme,
 		// Keyboard shortcuts for the main window (see views.Bindings).
 		Bindings: views.Bindings(),
 	})

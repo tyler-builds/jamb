@@ -12,6 +12,104 @@ import (
 // travels from sliderThumb/2 to the track's width less sliderThumb/2.
 const sliderThumb = 16
 
+// SliderStyle is the look of each part of a slider. A part's style merges over
+// the built-in defaults, then over the theme's Slider, then over the Styles of
+// the instance; see docs/styling.md.
+//
+// Track is the control itself: it takes focus and the pointer, and the rail and
+// thumb are drawn over it. Rail is the line the value is drawn on, Fill is the
+// part of the rail up to the value (its width comes from the value, so Grow is
+// not set by the style), and Thumb is the knob, always sliderThumb pixels wide
+// so that the ends of the track stay where the value puts them. The thumb's
+// states are ThumbHover, while the pointer is over an enabled slider's thumb,
+// and ThumbPressed, while it is dragged.
+type SliderStyle struct {
+	Track             Style // the control: it takes focus and the pointer
+	TrackFocusVisible Style // the control while it has keyboard focus
+	Rail              Style // the line the value is drawn on
+	Fill              Style // the part of the rail up to the value
+	Thumb             Style // the knob at the value
+	ThumbHover        Style // the knob while the pointer is over it
+	ThumbPressed      Style // the knob while it is dragged
+	ValueText         Style // the readout beside the track
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s SliderStyle) merge(o SliderStyle) SliderStyle {
+	return SliderStyle{
+		Track:             s.Track.Merge(o.Track),
+		TrackFocusVisible: s.TrackFocusVisible.Merge(o.TrackFocusVisible),
+		Rail:              s.Rail.Merge(o.Rail),
+		Fill:              s.Fill.Merge(o.Fill),
+		Thumb:             s.Thumb.Merge(o.Thumb),
+		ThumbHover:        s.ThumbHover.Merge(o.ThumbHover),
+		ThumbPressed:      s.ThumbPressed.Merge(o.ThumbPressed),
+		ValueText:         s.ValueText.Merge(o.ValueText),
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s SliderStyle) plain() SliderStyle {
+	return SliderStyle{
+		Track:             plainStyle(s.Track),
+		TrackFocusVisible: plainStyle(s.TrackFocusVisible),
+		Rail:              plainStyle(s.Rail),
+		Fill:              plainStyle(s.Fill),
+		Thumb:             plainStyle(s.Thumb),
+		ThumbHover:        plainStyle(s.ThumbHover),
+		ThumbPressed:      plainStyle(s.ThumbPressed),
+		ValueText:         plainStyle(s.ValueText),
+	}
+}
+
+// sliderDefaults returns the built-in look of a slider, from the colors of t.
+// Under high contrast the parts are outlined and filled with the text color, or
+// with Highlight for the fill; a disabled slider is all GrayText, with no dimming.
+func sliderDefaults(t *Theme, disabled bool) SliderStyle {
+	ring := Shadow{Spread: 2, Color: t.FocusRing}
+	fill, edge, readout := t.Accent, t.Text, t.TextMuted
+	thumbFill, thumbEdge := t.Accent, t.Surface
+	if t.HighContrast {
+		thumbFill, thumbEdge = t.Text, t.Background
+	}
+	if disabled && t.HighContrast {
+		fill, edge, readout, thumbFill = t.Disabled, t.Disabled, t.Disabled, t.Disabled
+	}
+	d := SliderStyle{
+		Track:             Style{Height: Px(22), Radius: 11},
+		TrackFocusVisible: Style{Shadows: []Shadow{ring}},
+		Rail:              Style{Height: Px(4), Radius: 2, OverflowX: OverflowHidden, OverflowY: OverflowHidden, Background: t.SurfaceActive},
+		Fill:              Style{Background: fill},
+		Thumb: Style{Radius: sliderThumb / 2, NoShrink: true, Background: thumbFill,
+			BorderWidth: 2, BorderColor: thumbEdge, Shadows: []Shadow{ShadowSm}},
+		ThumbHover:   Style{Background: t.AccentHover},
+		ThumbPressed: Style{Background: t.AccentActive},
+		ValueText:    Style{TextColor: readout, FontSize: 13, FontWeight: FontMedium},
+	}
+	if t.HighContrast {
+		// The rail is outlined rather than tinted, and nothing casts a shadow.
+		d.Rail = Style{Height: Px(4), Radius: 2, OverflowX: OverflowHidden, OverflowY: OverflowHidden,
+			Background: t.Surface, BorderWidth: 1, BorderColor: edge}
+		d.Thumb.Shadows = nil
+		d.ThumbHover, d.ThumbPressed = Style{}, Style{}
+	}
+	return d
+}
+
+// resolveSlider returns the look of a slider: the defaults, merged with the
+// theme's Slider and then the instance's Styles. Under high contrast the two
+// overrides are plain (see plainStyle).
+func resolveSlider(t *Theme, disabled bool, inst SliderStyle) SliderStyle {
+	st := sliderDefaults(t, disabled)
+	for _, o := range []SliderStyle{t.Slider, inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
 // SliderElement moves a value along a track from lo to hi, in steps of step. The
 // mouse sets the value by a click or a drag. Keys: the arrows move it by one
 // step, Page Up and Page Down by a tenth of the range, and Home and End go to
@@ -26,6 +124,7 @@ type SliderElement struct {
 	width        float32
 	format       func(float64) string
 	onChange     func(float64)
+	styles       SliderStyle
 }
 
 // Slider creates a slider that reads and writes value, from lo to hi in steps of
@@ -62,6 +161,14 @@ func (s *SliderElement) Format(fn func(float64) string) *SliderElement { s.forma
 // OnChange runs fn with the new value when the user moves the slider to a value
 // that differs from the current one. The signal is set first.
 func (s *SliderElement) OnChange(fn func(float64)) *SliderElement { s.onChange = fn; return s }
+
+// Styles sets the look of the parts of the slider, for this instance only. Set
+// fields win over the theme's Slider and the defaults; see SliderStyle and
+// docs/styling.md. Calling Styles again merges with the earlier values.
+func (s *SliderElement) Styles(st SliderStyle) *SliderElement {
+	s.styles = s.styles.merge(st)
+	return s
+}
 
 // steps returns the arrow step and the Page step. The Page step is a tenth of
 // the range, rounded up to a whole number of arrow steps.
@@ -103,6 +210,7 @@ func (s *SliderElement) at(e *MouseEvent) float64 {
 func (s *SliderElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
+		st := resolveSlider(t, s.disabled, s.styles)
 		v := s.value.Get()
 		dragging := Local(ctx, "dragging", false)
 		small, large := s.steps()
@@ -118,40 +226,32 @@ func (s *SliderElement) expand(ctx *Context) Element {
 		}
 		f := float32(s.fraction(v))
 
-		// The track is one focusable element. Its bar and thumb are drawn over it
+		// The track is one focusable element. Its rail and thumb are drawn over it
 		// and are not part of the access tree.
-		// The colors of the parts. Under high contrast the parts are outlined and filled
-		// with the text color, or with Highlight for the fill; a disabled slider is all
-		// GrayText, with no dimming. Its readout is GrayText too.
-		fill, edge, readoutColor := t.Accent, t.Text, t.TextMuted
-		thumbFill, thumbEdge := t.Accent, t.Surface
-		if t.HighContrast {
-			fill, thumbFill, thumbEdge = t.Accent, t.Text, t.Background
-		}
-		if s.disabled && t.HighContrast {
-			fill, edge, readoutColor, thumbFill = t.Disabled, t.Disabled, t.Disabled, t.Disabled
-		}
-		bar := Div().Row().Height(Px(4)).Grow(1).Radius(2).ClipContent().Background(t.SurfaceActive).
-			Child(Div().Height(Full).Grow(f).Background(fill)).
+		fill := Div().asPart("Slider.Fill").Height(Full).Style(st.Fill).Grow(f)
+		rail := Div().asPart("Slider.Rail").Row().Style(st.Rail).Grow(1).
+			Child(fill).
 			Child(Div().Height(Full).Grow(1 - f))
-		if t.HighContrast {
-			bar.Border(1, edge).Background(t.Surface)
-		}
-		thumb := Div().Size(Px(sliderThumb), Px(sliderThumb)).Radius(sliderThumb/2).Shrink(0).
-			Background(thumbFill).Border(2, thumbEdge).Shadow(ShadowSm)
-		if !s.disabled && !t.HighContrast {
-			thumb.Hover(Style{Background: t.AccentHover})
+		// While the thumb is dragged the pointer is over it, so its hover style is
+		// left off and ThumbPressed shows instead.
+		thumb := Div().asPart("Slider.Thumb").Style(st.Thumb).Size(Px(sliderThumb), Px(sliderThumb)).Shrink(0)
+		if dragging.Get() {
+			thumb.Style(st.ThumbPressed)
+		} else if !s.disabled {
+			thumb.Hover(st.ThumbHover)
 		}
 		overlay := Div().Absolute().Inset(0).Row().Align(Center).
 			Child(Div().Grow(f)).Child(thumb).Child(Div().Grow(1 - f))
-		track := Div().Height(Px(22)).Grow(1).Shrink(1).Radius(11).
-			Child(Div().Row().Height(Px(22)).Align(Center).PaddingX(sliderThumb / 2).Child(bar)).
+		track := Div().asPart("Slider.Track").Height(Px(22)).Grow(1).Shrink(1).Style(st.Track).
+			Child(Div().Row().Height(Px(22)).Align(Center).PaddingX(sliderThumb / 2).Child(rail)).
 			Child(overlay)
 
 		readout := fmtValue(s, v)
+		value := Div().asPart("Slider.ValueText").Hidden().MinWidth(Px(44)).Align(End).Style(st.ValueText).
+			Child(Text(readout))
 		root := Div().Row().Align(Center).Gap(12).Width(Px(s.width)).
 			Child(track).
-			Child(Div().Hidden().MinWidth(Px(44)).Align(End).Child(Text(readout).Size(13).Medium().Color(readoutColor)))
+			Child(value)
 
 		a := track.access()
 		track.Role(access.RoleSlider)
@@ -173,7 +273,7 @@ func (s *SliderElement) expand(ctx *Context) Element {
 			track.Cursor(CursorNotAllowed)
 			return root
 		}
-		track.Cursor(CursorPointer).Focusable().FocusVisible(Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}).
+		track.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
 			OnMouseDown(func(e *MouseEvent) {
 				if e.Button == input.ButtonLeft {
 					dragging.Set(true)

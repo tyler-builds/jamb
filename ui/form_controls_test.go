@@ -444,7 +444,7 @@ func TestSliderDisabledIsNotFocusable(t *testing.T) {
 // numberRig builds a NumberField on the int or float signal, named "Quiet hours from".
 func intRig(t *testing.T, value *Signal[int]) *accessRig {
 	return newAccessRig(func(ctx *Context) Element {
-		return Div().Column().Child(NumberField(value, 0, 23, 1).Label("Quiet hours from").Buttons().Key("quiet"))
+		return Div().Column().Child(NumberField(value, 0, 23, 1).Label("Quiet hours from").SpinButtons(SpinInline).Key("quiet"))
 	})
 }
 
@@ -507,7 +507,7 @@ func TestNumberFieldClampsAndRejectsText(t *testing.T) {
 func TestNumberFieldButtonsAndFloats(t *testing.T) {
 	value := NewSignal(0.5)
 	r := newAccessRig(func(ctx *Context) Element {
-		return Div().Column().Child(NumberField(value, 0.0, 2.0, 0.5).Label("Gain").Buttons().Key("gain"))
+		return Div().Column().Child(NumberField(value, 0.0, 2.0, 0.5).Label("Gain").SpinButtons(SpinInline).Key("gain"))
 	})
 	if got := accesstest.Find(t, r.tree(), access.RoleTextField, "Gain").Value; got != "0.5" {
 		t.Fatalf("the text is %q, want 0.5 (one decimal, from the step)", got)
@@ -551,7 +551,7 @@ func TestFormControlsInHighContrastAndAtLargeText(t *testing.T) {
 				Child(RadioGroup(choice, Option[string]{Value: "a", Label: "Alpha"}, Option[string]{Value: "b", Label: "Beta"}).Label("Group")).
 				Child(Select(pick, Option[string]{Value: "red", Label: "Red"}).Label("Pick").Placeholder("Choose")).
 				Child(Slider(level, 0, 100, 5).Label("Level")).
-				Child(NumberField(count, 0, 9, 1).Label("Count").Buttons())
+				Child(NumberField(count, 0, 9, 1).Label("Count").SpinButtons(SpinInline))
 		})
 		r.rt.SetSystemSettings(sys)
 		tr := r.tree()

@@ -15,7 +15,7 @@ import (
 // warning.
 func TestDemoAccessibility(t *testing.T) {
 	s := NewStore()
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	var warnings []string
 	rt.SetWarnFunc(func(msg string) { warnings = append(warnings, msg) })
 	rt.SetAccessWarnings(true)

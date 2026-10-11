@@ -21,11 +21,11 @@ type chatRig struct {
 func newChatRig(t *testing.T, s *Store, id int) *chatRig {
 	t.Helper()
 	c := &chatRig{t: t, s: s, id: id, now: time.Unix(1_000_000, 0)}
-	c.rt = ui.NewRuntime(ProjectDetail(s, id), ui.DarkTheme, nil)
+	c.rt = ui.NewRuntime(ProjectDetail(s, id), DemoDarkTheme, nil)
 	c.rt.SetViewport(680, 640, 1)
 	c.frame()
 	// The thread is in the Comments tab, which the window opens on Overview.
-	if err := c.rt.ClickKey("detail-tabs/comments"); err != nil {
+	if err := c.rt.ClickKey("detail-tabs/tab:comments"); err != nil {
 		t.Fatal(err)
 	}
 	c.frame()

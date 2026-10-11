@@ -12,7 +12,7 @@ import (
 
 // shortcutRig is the main window with its key bindings, drawn once.
 func shortcutRig(s *Store) *ui.Runtime {
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.AddBindings(Bindings()...)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
@@ -37,11 +37,11 @@ func TestShortcutTogglesTheme(t *testing.T) {
 	s := NewStore()
 	rt := shortcutRig(s)
 	rt.Press(input.KeyL, input.ModCtrl|input.ModShift)
-	if rt.Theme() != ui.LightTheme {
+	if rt.Theme() != DemoLightTheme {
 		t.Error("Ctrl+Shift+L did not switch to the light theme")
 	}
 	rt.Press(input.KeyL, input.ModCtrl|input.ModShift)
-	if rt.Theme() != ui.DarkTheme {
+	if rt.Theme() != DemoDarkTheme {
 		t.Error("a second Ctrl+Shift+L did not switch back to the dark theme")
 	}
 }
@@ -62,7 +62,7 @@ func TestSettingsListsShortcuts(t *testing.T) {
 	s.Page.Set(PageSettings)
 	rt := shortcutRig(s)
 	// The shortcuts are in their own tab, which is shown by a click on it.
-	if err := rt.ClickKey("settings-tabs/shortcuts"); err != nil {
+	if err := rt.ClickKey("settings-tabs/tab:shortcuts"); err != nil {
 		t.Fatal(err)
 	}
 	rt.Frame(time.Now())

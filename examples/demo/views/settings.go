@@ -36,9 +36,9 @@ func Settings(s *Store) ui.Element {
 							Child(SettingRow(t, "Dark mode", "Use the dark zinc theme.",
 								ui.Switch("Dark mode", dark).OnChange(func(on bool) {
 									if on {
-										ctx.SetTheme(ui.DarkTheme)
+										ctx.SetTheme(DemoDarkTheme)
 									} else {
-										ctx.SetTheme(ui.LightTheme)
+										ctx.SetTheme(DemoLightTheme)
 									}
 								}))).
 							Child(ui.Divider()).

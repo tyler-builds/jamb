@@ -57,7 +57,7 @@ func formControlsSection() ui.Element {
 			formSample(t, "Select, disabled", selectSample(picked, true), channelName(picked.Get())),
 			formSample(t, "Slider", ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percentOf).Width(200), percentOf(volume.Get())),
 			formSample(t, "Slider, disabled", ui.Slider(volume, 0, 100, 5).Label("Volume, disabled").Format(percentOf).Width(200).Disabled(true), percentOf(volume.Get())),
-			formSample(t, "Number field", ui.NumberField(quiet, 0, 23, 1).Label("Sample quiet hours").Buttons(), fmt.Sprintf("%02d:00", quiet.Get())),
+			formSample(t, "Number field", ui.NumberField(quiet, 0, 23, 1).Label("Sample quiet hours").SpinButtons(ui.SpinInline), fmt.Sprintf("%02d:00", quiet.Get())),
 			formSample(t, "Number field, disabled", ui.NumberField(quiet, 0, 23, 1).Label("Sample quiet hours, disabled").Disabled(true), fmt.Sprintf("%02d:00", quiet.Get())),
 		}
 		row := ui.Div().Row().Wrap().Align(ui.Start).Gap(22)
@@ -99,9 +99,9 @@ func formControlsSection() ui.Element {
 				Child(ui.Div().Gap(10).
 					Child(ui.Text("Quiet hours").Size(13).Medium().Color(t.TextMuted)).
 					Child(ui.Div().Row().Align(ui.Center).Gap(10).
-						Child(ui.NumberField(fromHour, 0, 23, 1).Label("Quiet hours from").Buttons()).
+						Child(ui.NumberField(fromHour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinInline)).
 						Child(ui.Text("to").Color(t.TextMuted)).
-						Child(ui.NumberField(toHour, 0, 23, 1).Label("Quiet hours to").Buttons()))).
+						Child(ui.NumberField(toHour, 0, 23, 1).Label("Quiet hours to").SpinButtons(ui.SpinInline)))).
 				Child(ui.Div().Gap(4).Width(ui.Px(240)).
 					Child(ui.Textf("Sends by %s, %s, at volume %s.",
 						channelsOf(email.Get(), text.Get(), push.Get()), prefFreq.Get(), percentOf(prefVolume.Get())).Size(13)).

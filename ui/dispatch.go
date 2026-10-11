@@ -119,12 +119,12 @@ func (rt *Runtime) updateHover() {
 	// Restyle only the elements whose hover state flipped.
 	for _, id := range old {
 		if !contains(newIDs, id) {
-			rt.restyle(id)
+			rt.stateFlipped(id)
 		}
 	}
 	for _, id := range newIDs {
 		if !contains(old, id) {
-			rt.restyle(id)
+			rt.stateFlipped(id)
 		}
 	}
 	rt.updateCursor(path)
@@ -201,13 +201,22 @@ func (rt *Runtime) setPressed(ids []uint64) {
 	rt.pressIDs = append(rt.pressIDs[:0], ids...)
 	for _, id := range old {
 		if !contains(rt.pressIDs, id) {
-			rt.restyle(id)
+			rt.stateFlipped(id)
 		}
 	}
 	for _, id := range rt.pressIDs {
 		if !contains(old, id) {
-			rt.restyle(id)
+			rt.stateFlipped(id)
 		}
+	}
+}
+
+// stateFlipped restyles an element whose hover or press state changed, and
+// re-renders the component that asked for that state (see Context.hovered).
+func (rt *Runtime) stateFlipped(id uint64) {
+	rt.restyle(id)
+	if n := rt.byID[id]; n != nil && n.owner != nil && n.owner.watchesPointer {
+		n.owner.invalidate()
 	}
 }
 

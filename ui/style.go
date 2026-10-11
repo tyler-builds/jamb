@@ -178,10 +178,65 @@ type Style struct {
 	// Transition eases colors, opacity, offset and scale (hover, press, theme,
 	// and changes made by a new render) over this duration.
 	Transition time.Duration
+
+	// Clear removes the fields it names from the style it is merged into, before
+	// the set fields of this style are applied, so a style can turn a default off:
+	// the zero value of a field means unset and cannot replace a default by itself.
+	// The clears are kept when styles are merged, so a style merged in later, such
+	// as an instance's Styles, still clears the defaults it names. See ClearSet.
+	Clear ClearSet
 }
 
-// Merge returns s with every set field of o applied on top.
+// ClearSet names the fields that a style removes with its Clear field. Each
+// constant clears the fields listed beside it, before the rest of the style is
+// applied, so a clear and a value for the same field give the value.
+type ClearSet uint16
+
+const (
+	ClearBackground ClearSet = 1 << iota // Background and Gradient: no fill
+	ClearTextColor                       // TextColor: text and icons inherit the color above
+	ClearBorder                          // BorderWidth, BorderEdges and BorderColor: no border
+	ClearRadius                          // Radius and Corners: square corners
+	ClearShadows                         // Shadows: no shadow, and no focus ring of this style
+	ClearPadding                         // Padding: no padding
+	ClearMargin                          // Margin: no margin
+	ClearGap                             // Gap: no space between children
+)
+
+// cleared returns s without the fields that c names.
+func (s Style) cleared(c ClearSet) Style {
+	if c&ClearBackground != 0 {
+		s.Background, s.Gradient = Color{}, Gradient{}
+	}
+	if c&ClearTextColor != 0 {
+		s.TextColor = Color{}
+	}
+	if c&ClearBorder != 0 {
+		s.BorderWidth, s.BorderEdges, s.BorderColor = 0, Edges{}, Color{}
+	}
+	if c&ClearRadius != 0 {
+		s.Radius, s.Corners = 0, Corners{}
+	}
+	if c&ClearShadows != 0 {
+		s.Shadows = nil
+	}
+	if c&ClearPadding != 0 {
+		s.Padding = Edges{}
+	}
+	if c&ClearMargin != 0 {
+		s.Margin = Edges{}
+	}
+	if c&ClearGap != 0 {
+		s.Gap = 0
+	}
+	return s
+}
+
+// Merge returns s with every set field of o applied on top. The fields that o
+// clears (see Style.Clear) are removed first.
 func (s Style) Merge(o Style) Style {
+	s = s.cleared(o.Clear)
+	s.Clear |= o.Clear
 	if o.Direction != Column {
 		s.Direction = o.Direction
 	}

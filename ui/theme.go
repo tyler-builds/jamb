@@ -42,6 +42,16 @@ type Theme struct {
 
 	Radius   float32
 	FontSize float32
+
+	// The parts of the built-in widgets, for every widget of that kind in the
+	// app. They merge over the built-in defaults, which are made from the colors
+	// above, and an instance's Styles merge over them. Under high contrast only
+	// their sizes, spacing, fonts, radius and border widths apply (see
+	// docs/styling.md).
+	Tabs        TabsStyle
+	Select      SelectStyle
+	Slider      SliderStyle
+	NumberField NumberFieldStyle
 }
 
 // DarkTheme is a neutral zinc palette with an indigo accent.
@@ -103,4 +113,13 @@ var LightTheme = &Theme{
 	Scrim:         Hex("#18181b59"),
 	Radius:        8,
 	FontSize:      14,
+}
+
+// Clone returns a copy of the theme, to change for an app without changing the
+// built-in theme it was copied from. The copy shares the Shadows slices of its
+// part styles, so change a part by assigning a new style to its field, and do
+// not append to or change those slices in place.
+func (t *Theme) Clone() *Theme {
+	c := *t
+	return &c
 }

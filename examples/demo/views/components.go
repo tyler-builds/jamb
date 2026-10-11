@@ -39,6 +39,7 @@ func Components(s *Store) ui.Element {
 				Child(section(t, "Menus", dropdownSample(t), contextSample(t))).
 				Child(navigationSection()).
 				Child(formControlsSection()).
+				Child(customizingSection()).
 				Child(dialogsSection(ctx, t, s)).
 				Child(section(t, "Images",
 					fitSample(t, "Cover", ui.FitCover),

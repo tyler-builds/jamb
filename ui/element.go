@@ -66,6 +66,7 @@ type DivElement struct {
 	overlay      Placement
 	overlayGap   float32
 	tooltip      string
+	part         string          // the widget part this element draws, see asPart
 	keyContext   string          // the KeyContext spec, as given
 	keyCtx       keyCtx          // its parsed entries, for BindIn bindings
 	actions      []actionHandler // see OnAction

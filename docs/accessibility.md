@@ -839,6 +839,13 @@ surface instead of a tint (`tintOf`, `barFill` in `examples/demo/views/kit.go`).
 The selected navigation item uses `AccentText` for its label, and the theme switch
 selects the app's theme (`ctx.AppTheme()`).
 
+The parts of the built-in widgets (`Tabs`, `Select`, `Slider`, `NumberField`) follow
+the same rules. The theme's and an instance's part styles lose their colors,
+gradients, shadows and opacity under high contrast, and keep their sizes, spacing,
+fonts, radius and border widths, so the built-in system colors and focus ring stay.
+A render slot's content is hidden from assistive technology, so it cannot change
+what the widget announces. See [styling.md](styling.md).
+
 Custom graphics that show a state were checked under high contrast, since a color
 that carries a state has to be replaced by something that does not depend on color.
 Fixed: the progress bar (an outlined empty track, a solid Highlight fill, the

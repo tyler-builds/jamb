@@ -59,6 +59,9 @@ type componentInstance struct {
 	// watchesFocus is set when the last render asked whether its element is
 	// focused; a focus change then re-renders it.
 	watchesFocus bool
+	// watchesPointer is set when the last render asked whether its element is
+	// hovered or pressed; a change then re-renders it (see hovered).
+	watchesPointer bool
 
 	// locals holds signals created by Local, by name.
 	locals map[string]any
@@ -93,6 +96,7 @@ func (inst *componentInstance) render() {
 	inst.unsubscribe()
 	inst.dirty.Store(false)
 	inst.watchesFocus = false
+	inst.watchesPointer = false
 	ctx := &Context{rt: inst.rt, inst: inst, id: inst.id}
 	prev := tracking.Swap(inst)
 	defer tracking.Store(prev)
@@ -221,6 +225,25 @@ func (c *Context) isFocused() bool {
 // Custom elements draw their focus ring with it. The component re-renders
 // when it changes.
 func (c *Context) KeyboardFocus() bool { return c.isFocused() && c.rt.keyboardModality }
+
+// hovered reports whether the pointer is over the element produced by this
+// render. The component re-renders when that changes. Widgets use it for
+// render slots, whose content is built by the slot's function (see PartState).
+func (c *Context) hovered() bool {
+	if c.inst != nil {
+		c.inst.watchesPointer = true
+	}
+	return c.rt.isHovered(expandedID(c.id))
+}
+
+// pressed reports whether the element produced by this render is being
+// pressed. The component re-renders when that changes; see hovered.
+func (c *Context) pressed() bool {
+	if c.inst != nil {
+		c.inst.watchesPointer = true
+	}
+	return c.rt.isPressed(expandedID(c.id))
+}
 
 // AppTheme returns the theme the app set with SetTheme, which under high
 // contrast is not the active theme (see Theme).

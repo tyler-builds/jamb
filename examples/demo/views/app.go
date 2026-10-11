@@ -27,9 +27,9 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			OnAction(FocusSearch, s.Search.Focus).
 			OnAction(ToggleTheme, func() {
 				if ctx.Theme().Dark {
-					ctx.SetTheme(ui.LightTheme)
+					ctx.SetTheme(DemoLightTheme)
 				} else {
-					ctx.SetTheme(ui.DarkTheme)
+					ctx.SetTheme(DemoDarkTheme)
 				}
 			}).
 			Child(Sidebar(s)).
@@ -131,8 +131,8 @@ func themeSwitch(ctx *ui.Context) ui.Element {
 	}
 	return ui.Div().Row().Padding(3).Gap(3).Radius(9).Background(t.SurfaceActive.Alpha(0.6)).MarginBottom(10).
 		SelectionContainer().Label("Theme").
-		Child(option(icons.Moon, "Dark", ui.DarkTheme)).
-		Child(option(icons.Sun, "Light", ui.LightTheme))
+		Child(option(icons.Moon, "Dark", DemoDarkTheme)).
+		Child(option(icons.Sun, "Light", DemoLightTheme))
 }
 
 // userCard is the account row at the bottom of the sidebar; clicking it

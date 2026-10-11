@@ -13,7 +13,7 @@ import (
 func TestActivityProjectLinkOpensProjectSelected(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageActivity)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	now := time.Unix(1_000_000, 0)
 	rt.Frame(now)

@@ -14,7 +14,7 @@ import (
 // Motion bars) are not waited for, as the idle step expects.
 func TestComponentsPageSettlesAfterScrollUnderHover(t *testing.T) {
 	s := NewStore()
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	now := time.Unix(1_000_000, 0)
 	frame := func() {

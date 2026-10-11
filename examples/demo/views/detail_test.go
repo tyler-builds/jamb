@@ -18,7 +18,7 @@ func TestStarInProjectWindowUpdatesProjectsPage(t *testing.T) {
 		t.Fatal("the test needs a project that starts unstarred")
 	}
 
-	page := ui.NewRuntime(func(ctx *ui.Context) ui.Element { return Projects(s) }, ui.DarkTheme, nil)
+	page := ui.NewRuntime(func(ctx *ui.Context) ui.Element { return Projects(s) }, DemoDarkTheme, nil)
 	page.SetViewport(1200, 900, 1)
 	page.Frame(time.Now())
 
@@ -26,7 +26,7 @@ func TestStarInProjectWindowUpdatesProjectsPage(t *testing.T) {
 	detail := ui.NewRuntime(func(ctx *ui.Context) ui.Element {
 		detailRuns++
 		return ProjectDetail(s, id)(ctx)
-	}, ui.DarkTheme, nil)
+	}, DemoDarkTheme, nil)
 	detail.SetViewport(640, 420, 1)
 	detail.Frame(time.Now())
 
@@ -48,7 +48,7 @@ func TestStarInProjectWindowUpdatesProjectsPage(t *testing.T) {
 // A project that is gone shows a message instead of crashing its window.
 func TestProjectDetailWithoutProject(t *testing.T) {
 	s := NewStore()
-	rt := ui.NewRuntime(ProjectDetail(s, -1), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(ProjectDetail(s, -1), DemoDarkTheme, nil)
 	rt.SetViewport(640, 420, 1)
 	rt.Frame(time.Now())
 }
@@ -58,7 +58,7 @@ func TestProjectDetailWithoutProject(t *testing.T) {
 func TestOpenWindowBadgeFollowsTheWindow(t *testing.T) {
 	s := NewStore()
 	id := s.Projects.Peek()[0].ID
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
 	dump := func() string {

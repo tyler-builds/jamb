@@ -24,7 +24,7 @@ type demoRig struct {
 func newDemoRig(t *testing.T) *demoRig {
 	t.Helper()
 	r := &demoRig{s: NewStore(), now: time.Unix(1_000_000, 0)}
-	r.rt = ui.NewRuntime(App(r.s), ui.DarkTheme, nil)
+	r.rt = ui.NewRuntime(App(r.s), DemoDarkTheme, nil)
 	r.rt.SetWarnFunc(func(msg string) { r.warnings = append(r.warnings, msg) })
 	r.rt.SetAccessWarnings(true)
 	r.rt.SetViewport(1200, 760, 1)
@@ -79,25 +79,22 @@ func TestDemoControlsReportTheirStates(t *testing.T) {
 		t.Fatalf("%d headings on Settings, want the page title and the section titles", n)
 	}
 
-	// Projects: the status filter is a selection group, and the list a selection container.
+	// Projects: the status filter is a segmented tab list, and the list a selection container.
 	r.s.Page.Set(PageProjects)
 	tr = r.tree()
-	group := accesstest.Find(t, tr, access.RoleGroup, "Status filter")
-	if !group.States.Has(access.StateSelectionContainer) {
-		t.Fatalf("the status filter is not a selection container: [%s]", group.States)
-	}
-	all := accesstest.Find(t, tr, access.RoleButton, "All")
-	accesstest.Check(t, all, access.RoleButton, "All", access.StateSelectable|access.StateSelected)
-	done := accesstest.Find(t, tr, access.RoleButton, "Done")
+	accesstest.Find(t, tr, access.RoleTabList, "Status filter")
+	all := accesstest.Find(t, tr, access.RoleTab, "All")
+	accesstest.Check(t, all, access.RoleTab, "All", access.StateSelectable|access.StateSelected)
+	done := accesstest.Find(t, tr, access.RoleTab, "Done")
 	if !done.States.Has(access.StateSelectable) || done.States.Has(access.StateSelected) {
-		t.Fatalf("the unchosen Done chip has states [%s]", done.States)
+		t.Fatalf("the unchosen Done tab has states [%s]", done.States)
 	}
 	r.bridge.Perform(done.ID, access.ActionSelect)
 	r.frame()
 	if r.s.Filter.Get() != int(StatusDone) {
-		t.Fatalf("selecting the Done chip set the filter to %d", r.s.Filter.Get())
+		t.Fatalf("selecting the Done tab set the filter to %d", r.s.Filter.Get())
 	}
-	accesstest.Check(t, accesstest.Find(t, r.tree(), access.RoleButton, "Done"), access.RoleButton, "Done", access.StateSelected)
+	accesstest.Check(t, accesstest.Find(t, r.tree(), access.RoleTab, "Done"), access.RoleTab, "Done", access.StateSelected)
 
 	// Each project card is a list item, and the selected one is selected.
 	selected := 0

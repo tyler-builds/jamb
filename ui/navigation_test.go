@@ -38,7 +38,7 @@ func TestTabsBuildOnlyTheSelectedPanel(t *testing.T) {
 	if got := strings.Join(built, ","); got != "a" {
 		t.Fatalf("built panels %q at first, want only the selected one (a)", got)
 	}
-	r.clickKey(t, "settings/c")
+	r.clickKey(t, "settings/tab:c")
 	if sel.Peek() != "c" {
 		t.Fatalf("a click did not select the tab: %q", sel.Peek())
 	}
@@ -54,12 +54,12 @@ func TestTabsArrowKeysSelectAndSkipDisabled(t *testing.T) {
 	sel := NewSignal("a")
 	var built []string
 	r := newAccessRig(func(ctx *Context) Element { return tabsDemo(sel, &built) })
-	r.focusKey(t, "settings/a")
+	r.focusKey(t, "settings/tab:a")
 	r.press(input.KeyRight, 0) // Beta is disabled, so Gamma is next
 	if sel.Peek() != "c" {
 		t.Fatalf("Right selected %q, want c", sel.Peek())
 	}
-	if got := r.focusedKey(); got != "settings/c" {
+	if got := r.focusedKey(); got != "settings/tab:c" {
 		t.Fatalf("focus is on %q after Right, want the selected tab", got)
 	}
 	r.press(input.KeyRight, 0) // the last tab does not wrap
@@ -97,10 +97,10 @@ func TestTabsOneTabStopAtTheSelectedTab(t *testing.T) {
 		}
 		return false
 	}
-	if !inOrder("settings/c") {
+	if !inOrder("settings/tab:c") {
 		t.Fatalf("the selected tab is not in the Tab order")
 	}
-	if inOrder("settings/a") {
+	if inOrder("settings/tab:a") {
 		t.Fatalf("an unselected tab is in the Tab order")
 	}
 }
@@ -109,7 +109,7 @@ func TestTabsCtrlTabLoopsFromTheTabListAndThePanel(t *testing.T) {
 	sel := NewSignal("a")
 	var built []string
 	r := newAccessRig(func(ctx *Context) Element { return tabsDemo(sel, &built) })
-	r.focusKey(t, "settings/a")
+	r.focusKey(t, "settings/tab:a")
 	r.press(input.KeyTab, input.ModCtrl) // Beta is disabled, so Gamma
 	if sel.Peek() != "c" {
 		t.Fatalf("Ctrl+Tab selected %q, want c", sel.Peek())
@@ -131,7 +131,7 @@ func TestTabsCtrlTabLoopsFromTheTabListAndThePanel(t *testing.T) {
 	if sel.Peek() != "c" {
 		t.Fatalf("Ctrl+Tab from the panel selected %q, want c", sel.Peek())
 	}
-	if got := r.focusedKey(); got != "settings/c" {
+	if got := r.focusedKey(); got != "settings/tab:c" {
 		t.Fatalf("focus is on %q after Ctrl+Tab from the panel, want the selected tab", got)
 	}
 	if len(r.warnings) != 0 {
@@ -214,8 +214,10 @@ func TestTabsHighContrastTextScaleAndReducedMotion(t *testing.T) {
 			for _, n := range r.rt.byID {
 				if n.kind == kindText && n.textEl != nil && n.textEl.text == "Beta" {
 					found = true
-					if n.textEl.style.TextColor != r.rt.theme.Disabled {
-						t.Fatalf("high contrast: the disabled tab's label is %v, want GrayText %v", n.textEl.style.TextColor, r.rt.theme.Disabled)
+					// The label inherits its color from its tab, so the color it is
+					// painted with is the one its parent passed down.
+					if c := effectiveTextColor(n); c != r.rt.theme.Disabled {
+						t.Fatalf("high contrast: the disabled tab's label is %v, want GrayText %v", c, r.rt.theme.Disabled)
 					}
 				}
 			}
@@ -234,7 +236,7 @@ func TestTabsHighContrastTextScaleAndReducedMotion(t *testing.T) {
 		r := newAccessRig(func(ctx *Context) Element { return tabsDemo(sel, &built) })
 		r.rt.SetSystemSettings(SystemSettings{ReducedMotion: reduced})
 		r.frame()
-		r.focusKey(t, "settings/a")
+		r.focusKey(t, "settings/tab:a")
 		r.press(input.KeyRight, 0) // the indicator and the label ease over 120 ms
 		eased := r.rt.NeedsFrame()
 		if reduced && eased {

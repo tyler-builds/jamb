@@ -13,7 +13,7 @@ import (
 func TestActivityBuildsOnlyVisibleRows(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageActivity)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
 	if n := rt.Stats().Nodes; n >= 2000 {
@@ -28,7 +28,7 @@ func TestActivityBuildsOnlyVisibleRows(t *testing.T) {
 func TestActivityScrollsToLastEvent(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageActivity)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	now := time.Unix(1_000_000, 0)
 	rt.Frame(now)
@@ -61,7 +61,7 @@ func TestActivityScrollsToLastEvent(t *testing.T) {
 func TestActivityJumpButtons(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageActivity)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	now := time.Unix(1_000_000, 0)
 	rt.Frame(now)
@@ -91,7 +91,7 @@ func TestActivityJumpButtons(t *testing.T) {
 func TestActivityCompactRowsRemeasure(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageActivity)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
 	height := func() float32 {
@@ -111,7 +111,7 @@ func TestActivityCompactRowsRemeasure(t *testing.T) {
 func TestActivityRowsVaryInHeight(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageActivity)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
 	status, _ := rt.Find("event-1")
@@ -129,7 +129,7 @@ func TestActivityRowsVaryInHeight(t *testing.T) {
 func TestActivityExpandIsKeyedByID(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageActivity)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
 	if _, ok := rt.Find("details-4"); ok {
@@ -166,7 +166,7 @@ func TestActivityExpandIsKeyedByID(t *testing.T) {
 func TestActivityFilterHighlightsAndCounts(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageActivity)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
 	soft := scene.Color(matchHighlight(ui.DarkTheme).Background)

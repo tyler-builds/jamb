@@ -12,7 +12,7 @@ import (
 func appRig(t *testing.T) (*Store, *ui.Runtime) {
 	t.Helper()
 	s := NewStore()
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 900, 1)
 	rt.Frame(time.Now())
 	return s, rt

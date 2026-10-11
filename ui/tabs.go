@@ -21,6 +21,106 @@ type Tab[T comparable] struct {
 	Panel    func() Element
 }
 
+// TabsVariant selects the look of a tab list.
+type TabsVariant uint8
+
+const (
+	// TabsUnderline draws a line under the selected tab. It is the default.
+	TabsUnderline TabsVariant = iota
+	// TabsSegmented draws the tabs as one row of segments, the selected one
+	// filled with Accent. It is the look of a segmented control.
+	TabsSegmented
+)
+
+// TabsStyle is the look of each part of a tab list. A part's style merges over
+// the built-in defaults of its variant, then over the theme's Tabs, then over
+// the Styles of the instance. The states are parts of their own: TabSelected
+// applies to the selected tab, TabDisabled to a disabled one, TabHover while
+// the pointer is over an enabled tab that is not selected, and TabFocusVisible
+// while the tab has keyboard focus. See docs/styling.md.
+type TabsStyle struct {
+	List            Style // the strip that holds the tabs
+	Tab             Style // each tab
+	TabHover        Style // a tab the pointer is over, if it is enabled and not selected
+	TabSelected     Style // the selected tab
+	TabDisabled     Style // a disabled tab
+	TabFocusVisible Style // a tab that has keyboard focus
+	Indicator       Style // the line under a tab in TabsUnderline; only the selected one shows it
+	Panel           Style // the panel of the selected tab
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s TabsStyle) merge(o TabsStyle) TabsStyle {
+	return TabsStyle{
+		List:            s.List.Merge(o.List),
+		Tab:             s.Tab.Merge(o.Tab),
+		TabHover:        s.TabHover.Merge(o.TabHover),
+		TabSelected:     s.TabSelected.Merge(o.TabSelected),
+		TabDisabled:     s.TabDisabled.Merge(o.TabDisabled),
+		TabFocusVisible: s.TabFocusVisible.Merge(o.TabFocusVisible),
+		Indicator:       s.Indicator.Merge(o.Indicator),
+		Panel:           s.Panel.Merge(o.Panel),
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s TabsStyle) plain() TabsStyle {
+	return TabsStyle{
+		List:            plainStyle(s.List),
+		Tab:             plainStyle(s.Tab),
+		TabHover:        plainStyle(s.TabHover),
+		TabSelected:     plainStyle(s.TabSelected),
+		TabDisabled:     plainStyle(s.TabDisabled),
+		TabFocusVisible: plainStyle(s.TabFocusVisible),
+		Indicator:       plainStyle(s.Indicator),
+		Panel:           plainStyle(s.Panel),
+	}
+}
+
+// tabsDefaults returns the built-in look of a tab list of variant v, from the
+// colors of th.
+func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
+	ring := Shadow{Spread: 2, Color: th.FocusRing}
+	d := TabsStyle{
+		List: Style{Direction: Row, Gap: 4, BorderEdges: Edges{Bottom: 1}, BorderColor: th.Border},
+		Tab: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(36), Padding: XY(12, 0),
+			NoShrink: true, Radius: th.Radius / 2, TextColor: th.TextMuted, Transition: 110 * time.Millisecond},
+		TabHover:        Style{Background: th.SurfaceHover},
+		TabSelected:     Style{TextColor: th.Text, FontWeight: FontSemibold},
+		TabFocusVisible: Style{Shadows: []Shadow{ring}},
+		Indicator:       Style{Height: Px(2), Background: th.Accent, Transition: 120 * time.Millisecond},
+	}
+	if th.HighContrast {
+		// Under high contrast a disabled tab is GrayText, not dimmed.
+		d.TabDisabled = Style{TextColor: th.Disabled}
+	} else {
+		d.TabDisabled = Style{Opacity: 0.5}
+	}
+	if v == TabsSegmented {
+		d.List = Style{Direction: Row, Gap: 2, Padding: All(3), Radius: th.Radius,
+			Background: th.Sidebar, BorderWidth: 1, BorderColor: th.Border}
+		d.Tab.MinHeight = Px(30)
+		d.Tab.Radius = max(th.Radius-3, 0)
+		d.TabSelected = Style{Background: th.Accent, TextColor: th.AccentText, FontWeight: FontSemibold}
+		d.Indicator = Style{}
+	}
+	return d
+}
+
+// resolveTabs returns the look of a tab list: the defaults of v, merged with
+// the theme's Tabs and then the instance's Styles. Under high contrast the two
+// overrides are plain (see plainStyle).
+func resolveTabs(th *Theme, v TabsVariant, inst TabsStyle) TabsStyle {
+	st := tabsDefaults(th, v)
+	for _, o := range []TabsStyle{th.Tabs, inst} {
+		if th.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
 // TabsElement is a tab list and the panel of the selected tab. The selected tab
 // is the one whose value equals the signal's.
 //
@@ -37,12 +137,15 @@ type Tab[T comparable] struct {
 // The tabs take the space their parent gives them, as a column does, so the panel
 // can fill a window: a list in a panel grows to the height left under the tabs.
 type TabsElement[T comparable] struct {
-	selected *Signal[T]
-	tabs     []Tab[T]
-	name     string // the accessible name of the tab list, see Label
-	key      string
-	onChange func(T)
-	keep     bool // see KeepPanels
+	selected  *Signal[T]
+	tabs      []Tab[T]
+	name      string // the accessible name of the tab list, see Label
+	key       string
+	onChange  func(T)
+	keep      bool // see KeepPanels
+	variant   TabsVariant
+	styles    TabsStyle
+	renderTab func(Tab[T], PartState) Element
 }
 
 // Tabs creates a tab list over tabs, showing the panel of the tab that selected
@@ -77,6 +180,36 @@ func (t *TabsElement[T]) OnChange(fn func(T)) *TabsElement[T] { t.onChange = fn;
 // when its own state changes. Switching tabs does not render it.
 func (t *TabsElement[T]) KeepPanels() *TabsElement[T] { t.keep = true; return t }
 
+// Variant sets the look of the tab list: TabsUnderline (the default) or
+// TabsSegmented. The behavior is the same in both.
+func (t *TabsElement[T]) Variant(v TabsVariant) *TabsElement[T] { t.variant = v; return t }
+
+// Styles sets the look of the parts of the tab list, for this instance only.
+// Set fields win over the theme's Tabs and the defaults; see TabsStyle and
+// docs/styling.md. Calling Styles again merges with the earlier values.
+//
+//	ui.Tabs(view, tabs...).Styles(ui.TabsStyle{
+//		Indicator: ui.Style{Height: ui.Px(3)},
+//	})
+func (t *TabsElement[T]) Styles(s TabsStyle) *TabsElement[T] { t.styles = t.styles.merge(s); return t }
+
+// RenderTab replaces the content of each tab (its icon and label) with what fn
+// returns. The tab keeps its behavior, its focus, selection and state styles,
+// and its accessible name is still its Label, so put in the label anything a
+// user must hear, such as a count. The content is hidden from assistive
+// technology. fn is called again when the tab's state changes, with the state
+// in the PartState.
+//
+//	ui.Tabs(view, tabs...).RenderTab(func(tab ui.Tab[string], s ui.PartState) ui.Element {
+//		return ui.Div().Row().Align(ui.Center).Gap(6).
+//			Child(ui.Text(names[tab.Value])).
+//			Child(ui.Badge(counts[tab.Value]))
+//	})
+func (t *TabsElement[T]) RenderTab(fn func(tab Tab[T], state PartState) Element) *TabsElement[T] {
+	t.renderTab = fn
+	return t
+}
+
 // scope is the prefix of the keys of this tab list.
 func (t *TabsElement[T]) scope() string {
 	if t.key != "" {
@@ -85,8 +218,10 @@ func (t *TabsElement[T]) scope() string {
 	return fmt.Sprintf("tabs:%p", t.selected)
 }
 
-// tabKey is the key of the tab with value v. A panel names itself by it.
-func (t *TabsElement[T]) tabKey(v T) string { return t.scope() + "/" + fmt.Sprint(v) }
+// tabKey is the key of the tab with value v. The tab and panel keys are
+// disjoint: a tab's key has the "tab:" prefix and a panel's has "panel", so
+// a value that formats as "panel" cannot collide with the default panel.
+func (t *TabsElement[T]) tabKey(v T) string { return t.scope() + "/tab:" + fmt.Sprint(v) }
 
 func (t *TabsElement[T]) expand(ctx *Context) Element {
 	// panels holds the component of each kept panel, made by this render of the
@@ -94,6 +229,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 	panels := map[T]*ComponentElement{}
 	return Component(func(ctx *Context) Element {
 		th := ctx.Theme()
+		st := resolveTabs(th, t.variant, t.styles)
 		cur := t.selected.Get()
 		opts := make([]Option[T], len(t.tabs))
 		for i, tb := range t.tabs {
@@ -112,35 +248,58 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			t.choose(opts[i].Value)
 			focus.Focus()
 		}
-
-		strip := Div().Row().Gap(4).BorderEdges(Edges{Bottom: 1}, th.Border).Role(access.RoleTabList)
-		if t.name != "" {
-			strip.Label(t.name)
-		}
-		ring := Shadow{Spread: 2, Color: th.FocusRing}
-		for i, tb := range t.tabs {
+		// drawTab returns the tab at index i, in the state ps describes.
+		drawTab := func(i int, ps PartState) *DivElement {
+			tb := t.tabs[i]
 			on := i == sel
-			tab := t.tabView(th, tb, on, tb.Disabled)
-			tab.Key(t.tabKey(tb.Value))
-			tab.Role(access.RoleTab).Label(tb.Label).Selected(on)
-			if on && !tb.Disabled {
+			style := st.Tab
+			if on {
+				style = style.Merge(st.TabSelected)
+			}
+			if tb.Disabled {
+				style = style.Merge(st.TabDisabled)
+			}
+			if on && style.FontWeight < FontSemibold {
+				// The selected tab keeps at least semibold text, which no style can lighten:
+				// with its indicator or fill cleared, the weight still shows the selection.
+				style.FontWeight = FontSemibold
+			}
+			tab := Div().asPart("Tabs.Tab").Key(t.tabKey(tb.Value)).Style(style).
+				Role(access.RoleTab).Label(tb.Label).Selected(on)
+			if t.renderTab != nil {
+				tab.Child(Div().Hidden().Child(t.renderTab(tb, ps)))
+			} else {
+				if tb.Icon != nil {
+					tab.Child(Icon(tb.Icon).Size(16))
+				}
+				tab.Child(Text(tb.Label).NoWrap())
+			}
+			if t.variant == TabsUnderline {
+				// The line is drawn under the selected tab only. The others have a
+				// transparent one, so that it eases in when the tab is selected.
+				ind := Div().asPart("Tabs.Indicator").Absolute().Left(0).Right(0).Bottom(0).Style(st.Indicator)
+				if !on {
+					ind.Background(Transparent)
+				} else if tb.Disabled && th.HighContrast {
+					ind.Background(th.Disabled) // a disabled tab's line is GrayText under high contrast
+				}
+				tab.Child(ind)
+			}
+			if tb.Disabled {
+				tab.access().disabled = true
+				tab.Cursor(CursorNotAllowed)
+				return tab
+			}
+			if on {
 				tab.FocusHandle(focus) // a handle makes the tab focusable, so a disabled one has none
 			}
 			if i != stop {
 				tab.TabStop(false) // reached with the arrow keys, not Tab
 			}
-			if tb.Disabled {
-				tab.access().disabled = true
-				tab.Cursor(CursorNotAllowed)
-				if !th.HighContrast {
-					tab.Opacity(0.5) // under high contrast the label is drawn in GrayText instead
-				}
-				strip.Child(tab)
-				continue
+			if !on {
+				tab.Hover(st.TabHover)
 			}
-			i := i
-			tab.Cursor(CursorPointer).Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
-				Hover(Style{Background: th.SurfaceHover}).
+			tab.Cursor(CursorPointer).Focusable().FocusVisible(st.TabFocusVisible).
 				OnClick(func() { choose(i) }).
 				OnKeyDown(func(e *KeyEvent) {
 					if e.Mods != 0 || e.Repeat {
@@ -162,7 +321,25 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 					e.StopPropagation()
 					choose(j)
 				})
-			strip.Child(tab)
+			return tab
+		}
+
+		strip := Div().asPart("Tabs.List").Role(access.RoleTabList).Style(st.List)
+		if t.name != "" {
+			strip.Label(t.name)
+		}
+		for i, tb := range t.tabs {
+			if t.renderTab == nil {
+				strip.Child(drawTab(i, PartState{Selected: i == sel, Disabled: tb.Disabled, HighContrast: th.HighContrast}))
+				continue
+			}
+			// With a render slot the tab is its own component, so that it re-renders
+			// when its pointer or focus state changes, and the slot gets the new state.
+			i := i
+			strip.Child(Component(func(ctx *Context) Element {
+				return drawTab(i, PartState{Hovered: ctx.hovered(), Pressed: ctx.pressed(), Focused: ctx.isFocused(),
+					Selected: i == sel, Disabled: t.tabs[i].Disabled, HighContrast: th.HighContrast})
+			}).Key(t.tabKey(tb.Value)))
 		}
 
 		group := Div().Column().Gap(12).Grow(1).MinHeight(Px(0)).Key(t.scope()).
@@ -182,13 +359,13 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			}).
 			Child(strip)
 		if t.keep {
-			group.Children(t.keptPanels(ctx, sel, panels)...)
+			group.Children(t.keptPanels(ctx, sel, panels, st.Panel)...)
 		} else if sel >= 0 && t.tabs[sel].Panel != nil {
 			if p := t.tabs[sel].Panel(); p != nil {
 				// The panel is named by its tab: the label is its name, and LabelledBy
 				// links it to the tab for the relation.
-				group.Child(Div().Key(t.scope() + "/panel").Column().Grow(1).MinHeight(Px(0)).
-					Role(access.RoleTabPanel).Label(t.tabs[sel].Label).
+				group.Child(Div().asPart("Tabs.Panel").Key(t.scope() + "/panel").Column().Grow(1).MinHeight(Px(0)).
+					Role(access.RoleTabPanel).Label(t.tabs[sel].Label).Style(st.Panel).
 					LabelledBy(t.tabKey(t.tabs[sel].Value)).Child(p))
 			}
 		}
@@ -200,7 +377,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 // selected one shown and the others hidden (see KeepPanels). The first time a
 // tab is selected its panel is recorded in the Local set; its component is made
 // once per render of the tab list, so a tab switch reuses it.
-func (t *TabsElement[T]) keptPanels(ctx *Context, sel int, panels map[T]*ComponentElement) []Element {
+func (t *TabsElement[T]) keptPanels(ctx *Context, sel int, panels map[T]*ComponentElement, panel Style) []Element {
 	built := Local(ctx, "built", map[T]bool{}).Peek()
 	if sel >= 0 && t.tabs[sel].Panel != nil {
 		built[t.tabs[sel].Value] = true
@@ -212,47 +389,16 @@ func (t *TabsElement[T]) keptPanels(ctx *Context, sel int, panels map[T]*Compone
 		}
 		pc := panels[tb.Value]
 		if pc == nil {
-			panel := tb.Panel
-			pc = Component(func(*Context) Element { return panel() })
+			fn := tb.Panel
+			pc = Component(func(*Context) Element { return fn() })
 			panels[tb.Value] = pc
 		}
 		// Each panel has its own key, and is named by its tab as the panel is by default.
-		out = append(out, Div().Key(t.scope()+"/panel:"+fmt.Sprint(tb.Value)).Column().Grow(1).MinHeight(Px(0)).
-			Role(access.RoleTabPanel).Label(tb.Label).Display(i == sel).
+		out = append(out, Div().asPart("Tabs.Panel").Key(t.scope()+"/panel:"+fmt.Sprint(tb.Value)).Column().Grow(1).MinHeight(Px(0)).
+			Role(access.RoleTabPanel).Label(tb.Label).Display(i == sel).Style(panel).
 			LabelledBy(t.tabKey(tb.Value)).Child(pc))
 	}
 	return out
-}
-
-// tabView is the drawn tab: its icon and label above a line that marks the selected
-// tab. The selected tab is also bold and the line is solid Accent, so the selection
-// is not carried by color alone.
-func (t *TabsElement[T]) tabView(th *Theme, tb Tab[T], on, disabled bool) *DivElement {
-	// A disabled tab under high contrast is GrayText throughout, label, icon and line.
-	// Elsewhere it is dimmed as a whole, by the opacity its caller sets.
-	c := th.TextMuted
-	if on {
-		c = th.Text
-	}
-	line := Transparent
-	if on {
-		line = th.Accent
-	}
-	if disabled && th.HighContrast {
-		c, line = th.Disabled, th.Disabled
-	}
-	text := Text(tb.Label).NoWrap().Color(c)
-	if on {
-		text.Semibold()
-	}
-	label := Div().Row().Align(Center).Gap(6).MinHeight(Px(36)).PaddingX(12).Shrink(0)
-	if tb.Icon != nil {
-		label.Child(Icon(tb.Icon).Size(16).Color(c))
-	}
-	label.Child(text)
-	// The line eases in and out of its color, which is instant under reduced motion.
-	bar := Div().Height(Px(2)).Background(line).Transition(120 * time.Millisecond)
-	return Div().Column().Shrink(0).Radius(th.Radius / 2).Child(label).Child(bar)
 }
 
 // choose sets the selected value to v and runs OnChange.

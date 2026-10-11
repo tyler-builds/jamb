@@ -338,6 +338,33 @@ when that changes.
   element. The move takes effect, and the element it left is not blurred a
   second time.
 
+### Styling
+
+The complex built-in widgets have named parts: a tab list's strip, tabs and
+indicator; a select's trigger, options and popup; a slider's track, rail and
+thumb; a number field's frame and spin buttons. Each part is a typed `ui.Style`
+that you can set for every widget of that kind in the theme (`ui.DarkTheme.Tabs`,
+`Theme.Select`, `Theme.Slider`, `Theme.NumberField`), or for one widget with
+`.Styles(...)`. The instance wins over the theme, and the theme over the built-in
+defaults, which follow the theme's colors. States are parts too (`TabSelected`,
+`OptionHighlighted`, `SpinButtonHover`). Tabs and number fields have variants
+(`Variant(ui.TabsSegmented)`, `SpinButtons(ui.SpinStacked)`), and render slots
+(`Tabs.RenderTab`, `Select.RenderValue`, `Select.RenderOption`) draw one part with
+your own content while the widget keeps its keyboard, focus, selection and
+accessible names. Under high contrast the parts use the system colors, and text
+scale and reduced motion still apply.
+
+```go
+ui.Tabs(view, tabs...).Variant(ui.TabsSegmented).Styles(ui.TabsStyle{
+	TabSelected: ui.Style{Background: t.Success},
+})
+```
+
+To turn a default off (no fill, no border, square corners, no padding, no
+shadow), set the part's `Clear` field, for example `ui.Style{Clear: ui.ClearBorder}`.
+The parts, the precedence, the states, the guardrails, and how to add styling to a
+new widget are in [docs/styling.md](docs/styling.md).
+
 ### Form controls
 
 Checkboxes, switches, radio groups, selects, sliders and number fields are bound
@@ -356,8 +383,9 @@ ui.RadioGroup(freq,                               // *ui.Signal[T], for any comp
 ).Label("Frequency").OnChange(func(v string) { ... })
 ui.Select(channel, ui.Option[string]{Value: "email", Label: "Email"}).Label("Channel").Placeholder("Choose").Width(240).OnChange(func(v string) { ... })
 ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percent).OnChange(fn).Width(240)
-ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").Buttons().Precision(2) // int or float64
-// every control also takes .Key("id") and .Disabled(true)
+ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStacked).Precision(2) // int or float64
+// every control also takes .Key("id") and .Disabled(true); select, slider and number field take .Styles(...)
+// and select takes RenderOption and RenderValue. See the Styling section.
 ```
 
 - A check box toggles with Space, or with a click on the box or its label. A
@@ -386,8 +414,10 @@ ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").Buttons().Precision(2) 
 - A slider moves by one `step` with the arrows, by a tenth of the range with Page
   Up and Page Down, and to the ends with Home and End. A click or drag sets the
   value to the nearest step. `OnChange` runs when the value changes.
-- A number field takes typed text, or steps with Up and Down (and the + and -
-  buttons with `Buttons()`). Enter, or leaving the field, checks the text. A number
+- A number field takes typed text, or steps with Up and Down (and its spin buttons,
+  added with `SpinButtons(ui.SpinInline)`, the + and - buttons after the field, or
+  `SpinButtons(ui.SpinStacked)`, an up arrow above a down arrow at its right). Enter, or
+  leaving the field, checks the text. A number
   outside the range is clamped to the nearest bound. Text that is not a number (or
   not a whole number, for an `int`) is not applied: Enter shows the field as
   invalid, with a message that gives the range, and keeps the text so it can be
@@ -414,6 +444,9 @@ ui.Tabs(section,                                  // *ui.Signal[T], for any comp
 		Panel: func() ui.Element { return generalPanel() }},   // built only while selected (or kept: KeepPanels)
 	ui.Tab[string]{Value: "usage", Label: "Usage", Disabled: true, Panel: usagePanel},
 ).Key("settings-tabs").Label("Settings sections").KeepPanels().OnChange(func(v string) { ... })
+ui.Tabs(filter, tabs...).Variant(ui.TabsSegmented)   // one row of segments, the selected one filled
+ui.Tabs(view, tabs...).Styles(ui.TabsStyle{Indicator: ui.Style{Height: ui.Px(3)}}) // parts: see Styling
+ui.Tabs(count, tabs...).RenderTab(func(tab ui.Tab[int], s ui.PartState) ui.Element { ... }) // your content in each tab
 
 ui.Collapsible("Advanced options", open, content).Key("advanced") // *ui.Signal[bool]
 ui.Accordion(sectionA, sectionB, sectionC).SingleOpen()          // one section open at a time
@@ -449,6 +482,13 @@ ui.TreeView(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[
   The selected tab is bold and has a line under it, in Accent (Highlight under
   high contrast), so the selection is not carried by color alone. Tabs take the
   height their parent gives them, so a panel can fill a window.
+  `Variant(ui.TabsSegmented)` draws the tabs as one row of segments instead, with
+  the selected segment filled in Accent (Highlight under high contrast). Both
+  variants keep the same keys, keyboard behavior and accessible names. The parts
+  of a tab list (`List`, `Tab`, `TabSelected`, `TabHover`, `TabDisabled`,
+  `TabFocusVisible`, `Indicator`, `Panel`) are set with `Styles` or the theme, and
+  `RenderTab` draws each tab's content yourself. A tab's accessible name stays its
+  `Label`, so a count the user must hear belongs in the label.
 - **Collapsible.** The header is a button with the Expanded state. Space and
   Enter open and close it, as a click does, and its chevron points right when closed
   and down when open. The content is not built while the section is closed. With
@@ -1836,8 +1876,11 @@ On the Projects page:
 - Drag a project card to reorder projects. Drop it on the upper or lower half
   of another card to place it before or after that card; a 2 px line shows
   where. The order is kept even while a status filter hides some projects.
-- Drop a project on Active, Paused or Done in the filter bar to set its
-  status.
+- The status filter on the Projects page is a segmented tab list (All, Active,
+  Paused, Done). Drop a project on Active, Paused or Done to set its status; the
+  drop target is the tab's content, drawn by `RenderTab`.
+
+![The Projects page with its segmented status filter](docs/screenshots/projects.png)
 - On the Activity page, the project name in each row is a link: clicking it
   opens the Projects page with that project selected.
 - Tab walks the sidebar navigation (each item shows a focus ring), and Enter
@@ -1890,6 +1933,19 @@ On the Projects page:
 ![The Overview tab of a project window](docs/screenshots/project-window-tabs.png)
 
 ![The Comments tab of a project window](docs/screenshots/project-window-comments.png)
+
+- The Components page's **Customizing** section shows how a built-in widget is
+  styled without rebuilding it: the demo's theme is a copy of the built-in theme, with a
+  3 px line under every underline tab, one tab list has an instance override in
+  Success, and the segmented and stacked variants and two render slots (a count
+  in a tab, and a color swatch in a select) are next to them. See
+  [docs/styling.md](docs/styling.md).
+
+![The Customizing section of the Components page](docs/screenshots/customizing.png)
+
+![The Customizing section in the light theme](docs/screenshots/customizing-light.png)
+
+![The Customizing section under high contrast](docs/screenshots/customizing-hc.png)
 
 - The Settings page (Ctrl+5) groups its settings in tabs: Appearance, with switches
   and a slider for the UI zoom from 80% to 150% (which changes the whole interface);

@@ -183,6 +183,8 @@ type fieldOptions struct {
 	small       bool
 	autoFocus   bool
 	handle      *FocusHandle
+	partName    string  // the part of the widget this frame is, see asPart
+	trailing    Element // drawn inside the frame's right edge, after the text (NumberField's stacked spin buttons)
 }
 
 // TextInputElement is a single-line text field bound to a string signal.
@@ -327,14 +329,14 @@ func (f *fieldOptions) expand(ctx *Context, multiline bool, minRows int) Element
 		ed.style.MinHeight = Px(float32(minRows) * size * float32(ctx.TextScale()) / 100 * 1.4)
 	}
 	if f.borderless {
-		box := Div().Row().Align(Start).Gap(8).Cursor(CursorText).
+		box := Div().asPart(f.partName).Row().Align(Start).Gap(8).Cursor(CursorText).
 			OnMouseDown(func(*MouseEvent) { h.Focus() })
 		if f.icon != nil {
 			box.Child(Icon(f.icon).Size(16).Color(t.TextSubtle))
 		}
 		return box.Child(ed).Style(f.style)
 	}
-	box := Div().Row().Gap(8).PaddingX(10).
+	box := Div().asPart(f.partName).Row().Gap(8).PaddingX(10).
 		Radius(t.Radius).Background(t.Surface).Border(1, t.BorderStrong).
 		Cursor(CursorText).Transition(110 * time.Millisecond).
 		Hover(Style{BorderColor: t.TextMuted}).
@@ -351,6 +353,12 @@ func (f *fieldOptions) expand(ctx *Context, multiline bool, minRows int) Element
 	}
 	if f.icon != nil {
 		box.Child(Icon(f.icon).Size(16).Color(t.TextSubtle))
+	}
+	if f.trailing != nil {
+		// The text takes the room the trailing element leaves. The frame keeps its
+		// height at the text size, so the trailing element can be half of it.
+		box.Gap(0).PaddingEdges(Edges{Left: 10}).MinHeight(Px(34 * float32(ctx.TextScale()) / 100))
+		return box.Child(ed).Child(f.trailing).Style(f.style)
 	}
 	return box.Child(ed).Style(f.style)
 }

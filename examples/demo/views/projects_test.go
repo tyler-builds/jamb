@@ -13,7 +13,7 @@ import (
 func projectRig(t *testing.T) (*Store, *ui.Runtime) {
 	t.Helper()
 	s := NewStore()
-	rt := ui.NewRuntime(func(ctx *ui.Context) ui.Element { return Projects(s) }, ui.DarkTheme, nil)
+	rt := ui.NewRuntime(func(ctx *ui.Context) ui.Element { return Projects(s) }, DemoDarkTheme, nil)
 	rt.SetViewport(1200, 900, 1)
 	rt.Frame(time.Now())
 	return s, rt

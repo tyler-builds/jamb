@@ -38,39 +38,31 @@ func Projects(s *Store) ui.Element {
 					Child(ui.Div().Gap(4).
 						Child(ui.Div().Heading(1).Child(ui.Text("Projects").Size(26).Semibold())).
 						Child(ui.Textf("%d projects · %d active", len(all), active).Color(t.TextMuted))).
-					Child(filters(t, s))).
+					Child(ui.Div().Width(ui.Px(320)).Child(filters(t, s)))).
 				Child(list))
 	})
 }
 
-// filters are the status chips. A project dragged onto Active, Paused or Done
-// takes that status.
+// filters is the status filter: a segmented tab list. A project dragged onto the
+// Active, Paused or Done tab takes that status. The drop target is the content
+// of the tab, drawn by the tab's render slot (RenderTab), so the tab keeps its
+// selection, keys and keyboard behavior, and the content is what takes the drop.
 func filters(t *ui.Theme, s *Store) ui.Element {
-	current := s.Filter.Get()
-	chip := func(label string, value int) ui.Element {
-		on := current == value
-		return ui.Div().Key("filter-"+label).Selected(on).Row().PaddingX(12).Height(ui.Px(30)).Radius(8).Center().
-			TextColor(t.TextMuted).FontSize(13).FontWeight(ui.FontMedium).Transition(fast).
-			Hover(ui.Style{TextColor: t.Text}).
-			When(on, func(d *ui.DivElement) {
-				d.Background(t.Surface).TextColor(t.Text).Shadow(ui.ShadowSm)
-				if t.HighContrast {
-					d.Border(1, t.Text) // no shadow there: the outline marks the selected filter
-				}
-			}).
-			OnClick(func() { s.Filter.Set(value) }).
-			When(value >= 0, func(d *ui.DivElement) {
-				d.OnDrop(ui.Drop(func(id int, e *ui.DropEvent) { s.SetProjectStatus(id, Status(value)) }).
+	return ui.Tabs(s.Filter,
+		ui.Tab[int]{Value: -1, Label: "All"},
+		ui.Tab[int]{Value: int(StatusActive), Label: "Active"},
+		ui.Tab[int]{Value: int(StatusPaused), Label: "Paused"},
+		ui.Tab[int]{Value: int(StatusDone), Label: "Done"},
+	).Key("projects-filter").Label("Status filter").Variant(ui.TabsSegmented).
+		RenderTab(func(tab ui.Tab[int], _ ui.PartState) ui.Element {
+			content := ui.Div().Key("filter-" + tab.Label).Row().Align(ui.Center).Child(ui.Text(tab.Label).NoWrap())
+			if tab.Value >= 0 {
+				value := tab.Value
+				content.OnDrop(ui.Drop(func(id int, e *ui.DropEvent) { s.SetProjectStatus(id, Status(value)) }).
 					Over(ui.Style{Background: t.AccentSoft, TextColor: t.Accent}))
-			}).
-			Child(ui.Text(label))
-	}
-	return ui.Div().Row().Padding(3).Gap(2).Radius(10).Background(t.SurfaceActive.Alpha(0.6)).
-		SelectionContainer().Label("Status filter").
-		Child(chip("All", -1)).
-		Child(chip("Active", int(StatusActive))).
-		Child(chip("Paused", int(StatusPaused))).
-		Child(chip("Done", int(StatusDone)))
+			}
+			return content
+		})
 }
 
 // projectCard is one project. Matches of the search query are highlighted in

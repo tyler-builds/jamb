@@ -373,17 +373,17 @@ try {
         Wait-For { if ($ec.Current.ExpandCollapseState -eq 'Collapsed') { $true } else { $null } } 'the row to collapse' | Out-Null
     }
 
-    Check 'demo: the Done filter is selected in its group' {
+    Check 'demo: the Done tab is selected in the status filter' {
         Invoke-Named $win 'Projects, 6 items' $CT.Button
-        Wait-For { $null -ne (Find-Named $win 'Status filter' | Select-Object -First 1) } 'the filter group' | Out-Null
-        $done = Find-One $win 'Done' $CT.Button
+        Wait-For { $null -ne (Find-Named $win 'Status filter' $CT.Tab | Select-Object -First 1) } 'the status filter' | Out-Null
+        $done = Find-One $win 'Done' $CT.TabItem
         $item = Require-Pattern $done ([System.Windows.Automation.SelectionItemPattern]::Pattern) 'SelectionItem'
         $item.Select()
         Wait-For { if ($item.Current.IsSelected) { $true } else { $null } } 'Done to be selected' | Out-Null
-        $group = Find-One $win 'Status filter'
+        $group = Find-One $win 'Status filter' $CT.Tab
         $sel = (Require-Pattern $group ([System.Windows.Automation.SelectionPattern]::Pattern) 'Selection').Current.GetSelection()
-        Assert ($sel.Count -eq 1 -and $sel[0].Current.Name -eq 'Done') 'the group does not report Done as its one selection'
-        (Require-Pattern (Find-One $win 'All' $CT.Button) ([System.Windows.Automation.SelectionItemPattern]::Pattern) 'SelectionItem').Select()
+        Assert ($sel.Count -eq 1 -and $sel[0].Current.Name -eq 'Done') 'the status filter does not report Done as its one selection'
+        (Require-Pattern (Find-One $win 'All' $CT.TabItem) ([System.Windows.Automation.SelectionItemPattern]::Pattern) 'SelectionItem').Select()
     }
 
     Check 'demo: the search field takes a value through SetValue' {
@@ -684,6 +684,26 @@ try {
             } finally {
                 $ec.Collapse()
             }
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+
+        Check 'demo: AxeWindowsCLI scan of the Components page, scrolled to the Customizing section' {
+            $spin = Find-One $win 'Hour, stacked' $CT.Spinner
+            $item = Require-Pattern $spin ([System.Windows.Automation.ScrollItemPatternIdentifiers]::Pattern) 'ScrollItem'
+            $item.ScrollIntoView()
+            Wait-For { if ($spin.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom) { $true } else { $null } } 'the Customizing section to be in view' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-customizing'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Projects page with its status filter' {
+            Invoke-Named $win 'Projects, 6 items' $CT.Button
+            Wait-For { $null -ne (Find-Named $win 'Status filter' $CT.Tab | Select-Object -First 1) } 'the status filter' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-projects'
             Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
             "$errors errors"
         }

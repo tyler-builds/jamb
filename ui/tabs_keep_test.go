@@ -62,9 +62,9 @@ func TestTabsKeepPanelsBuildEachPanelOnceAndKeepIt(t *testing.T) {
 	if got := strings.Join(built, ","); got != "a" {
 		t.Fatalf("built panels %q at first, want only the selected one (a)", got)
 	}
-	r.clickKey(t, "settings/c")
-	r.clickKey(t, "settings/a")
-	r.clickKey(t, "settings/c")
+	r.clickKey(t, "settings/tab:c")
+	r.clickKey(t, "settings/tab:a")
+	r.clickKey(t, "settings/tab:c")
 	if got := strings.Join(built, ","); got != "a,c" {
 		t.Fatalf("built panels %q after switching back and forth, want a,c: each is built once", got)
 	}
@@ -83,7 +83,7 @@ func TestTabsKeepPanelsStateSurvivesSwitching(t *testing.T) {
 	if got := text.Peek(); got != "hi" {
 		t.Fatalf("typing into the field gave %q, want hi", got)
 	}
-	r.clickKey(t, "settings/c")
+	r.clickKey(t, "settings/tab:c")
 	r.clickKey(t, "add-c")
 	r.clickKey(t, "add-c")
 	if namedInTree(r, "Alpha note") {
@@ -92,7 +92,7 @@ func TestTabsKeepPanelsStateSurvivesSwitching(t *testing.T) {
 	if !namedInTree(r, "Count 2") {
 		t.Fatalf("the Gamma panel does not show its count")
 	}
-	r.clickKey(t, "settings/a")
+	r.clickKey(t, "settings/tab:a")
 	if got := text.Peek(); got != "hi" {
 		t.Fatalf("text is %q after switching back, want hi", got)
 	}
@@ -102,7 +102,7 @@ func TestTabsKeepPanelsStateSurvivesSwitching(t *testing.T) {
 	if namedInTree(r, "Count 2") {
 		t.Fatalf("the hidden Gamma panel is in the accessibility tree")
 	}
-	r.clickKey(t, "settings/c")
+	r.clickKey(t, "settings/tab:c")
 	if !namedInTree(r, "Count 2") {
 		t.Fatalf("the count was lost after switching back to Gamma")
 	}
@@ -116,8 +116,8 @@ func TestTabsDefaultDiscardsPanelsWhenSwitching(t *testing.T) {
 	var built []string
 	text := NewSignal("")
 	r := newAccessRig(func(ctx *Context) Element { return keptDemo(sel, &built, text, false) })
-	r.clickKey(t, "settings/c")
-	r.clickKey(t, "settings/a")
+	r.clickKey(t, "settings/tab:c")
+	r.clickKey(t, "settings/tab:a")
 	if got := strings.Join(built, ","); got != "a,c,a" {
 		t.Fatalf("built panels %q, want a,c,a: without KeepPanels a panel is built again", got)
 	}
@@ -134,8 +134,8 @@ func TestTabsKeepPanelsKeyboardAndTabOrder(t *testing.T) {
 	var built []string
 	text := NewSignal("")
 	r := newAccessRig(func(ctx *Context) Element { return keptDemo(sel, &built, text, true) })
-	r.clickKey(t, "settings/c")
-	r.clickKey(t, "settings/a")
+	r.clickKey(t, "settings/tab:c")
+	r.clickKey(t, "settings/tab:a")
 	inOrder := func(key string) bool {
 		id := r.nodeByKey(t, key).id
 		for _, x := range r.rt.tabOrder() {
@@ -145,10 +145,10 @@ func TestTabsKeepPanelsKeyboardAndTabOrder(t *testing.T) {
 		}
 		return false
 	}
-	if inOrder("settings/c") || inOrder("add-c") {
+	if inOrder("settings/tab:c") || inOrder("add-c") {
 		t.Fatalf("a hidden tab or the hidden Gamma panel is in the Tab order")
 	}
-	if !inOrder("settings/a") || !inOrder("inside-a") {
+	if !inOrder("settings/tab:a") || !inOrder("inside-a") {
 		// inside-a is a button in the selected panel, so it is in the order.
 		t.Fatalf("the selected tab or its panel is missing from the Tab order")
 	}
@@ -157,7 +157,7 @@ func TestTabsKeepPanelsKeyboardAndTabOrder(t *testing.T) {
 	if sel.Peek() != "c" {
 		t.Fatalf("Ctrl+Tab from the kept panel selected %q, want c", sel.Peek())
 	}
-	if got := r.focusedKey(); got != "settings/c" {
+	if got := r.focusedKey(); got != "settings/tab:c" {
 		t.Fatalf("focus is on %q after Ctrl+Tab, want the selected tab", got)
 	}
 	r.press(input.KeyTab, input.ModCtrl) // wraps to Alpha, past the hidden Beta
@@ -182,7 +182,7 @@ func TestTabsKeepPanelsAccessTreeShowsOnlySelectedPanel(t *testing.T) {
 	var built []string
 	text := NewSignal("")
 	r := newAccessRig(func(ctx *Context) Element { return keptDemo(sel, &built, text, true) })
-	r.clickKey(t, "settings/c")
+	r.clickKey(t, "settings/tab:c")
 	panels := tabPanels(r)
 	if len(panels) != 1 {
 		t.Fatalf("the tree has %d tab panels, want the one selected", len(panels))

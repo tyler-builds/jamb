@@ -11,7 +11,7 @@ import (
 func TestUserMenu(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageDashboard)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
 
@@ -50,7 +50,7 @@ func TestUserMenu(t *testing.T) {
 func TestUserMenuClosesOnEscape(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageDashboard)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
 
@@ -70,7 +70,7 @@ func TestUserMenuClosesOnEscape(t *testing.T) {
 func TestComponentsPopoverClosesOnEscape(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageComponents)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
 

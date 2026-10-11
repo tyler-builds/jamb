@@ -91,7 +91,7 @@ func TestProjectCardMenuStarsAndSetsStatus(t *testing.T) {
 func TestComponentsMenusShowBindingShortcuts(t *testing.T) {
 	s := NewStore()
 	s.Page.Set(PageComponents)
-	rt := ui.NewRuntime(App(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.AddBindings(Bindings()...)
 	rt.SetViewport(1200, 3000, 1) // the whole page, so every sample is on screen
 	rt.Frame(time.Now())

@@ -94,7 +94,7 @@ func TestComponentsLargeTreeBuildsOnlyVisibleRows(t *testing.T) {
 // overview first, and that the comments are in their own tab.
 func TestProjectWindowOpensOnTheOverview(t *testing.T) {
 	s := NewStore()
-	rt := ui.NewRuntime(ProjectDetail(s, s.Projects.Peek()[0].ID), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(ProjectDetail(s, s.Projects.Peek()[0].ID), DemoDarkTheme, nil)
 	rt.SetViewport(680, 640, 1)
 	rt.Frame(time.Now())
 	tr := rt.AccessTree()

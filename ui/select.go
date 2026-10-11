@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"time"
 	"unicode"
@@ -14,6 +15,111 @@ import (
 // selectTypeahead is the pause after which typing starts a new search.
 const selectTypeahead = time.Second
 
+// SelectStyle is the look of each part of a select. A part's style merges over
+// the built-in defaults, then over the theme's Select, then over the Styles of
+// the instance; see docs/styling.md. The states are parts of their own:
+// TriggerHover while the pointer is over the field, TriggerFocusVisible while
+// it has keyboard focus, TriggerDisabled when it is disabled, OptionHighlighted
+// for the option that has keyboard focus in the open list, OptionSelected for
+// the chosen option and OptionDisabled for an option that cannot be chosen.
+type SelectStyle struct {
+	Trigger             Style // the field that shows the chosen option
+	TriggerHover        Style // the field while the pointer is over it
+	TriggerFocusVisible Style // the field while it has keyboard focus
+	TriggerDisabled     Style // the field when it is disabled
+	Value               Style // the label of the chosen option in the field
+	Placeholder         Style // the placeholder, while no option is chosen
+	Chevron             Style // the arrow at the right of the field
+	Popup               Style // the open list of options
+	Option              Style // each option in the list
+	OptionHighlighted   Style // the option that has keyboard focus in the list
+	OptionSelected      Style // the chosen option
+	OptionDisabled      Style // an option that cannot be chosen
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s SelectStyle) merge(o SelectStyle) SelectStyle {
+	return SelectStyle{
+		Trigger:             s.Trigger.Merge(o.Trigger),
+		TriggerHover:        s.TriggerHover.Merge(o.TriggerHover),
+		TriggerFocusVisible: s.TriggerFocusVisible.Merge(o.TriggerFocusVisible),
+		TriggerDisabled:     s.TriggerDisabled.Merge(o.TriggerDisabled),
+		Value:               s.Value.Merge(o.Value),
+		Placeholder:         s.Placeholder.Merge(o.Placeholder),
+		Chevron:             s.Chevron.Merge(o.Chevron),
+		Popup:               s.Popup.Merge(o.Popup),
+		Option:              s.Option.Merge(o.Option),
+		OptionHighlighted:   s.OptionHighlighted.Merge(o.OptionHighlighted),
+		OptionSelected:      s.OptionSelected.Merge(o.OptionSelected),
+		OptionDisabled:      s.OptionDisabled.Merge(o.OptionDisabled),
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s SelectStyle) plain() SelectStyle {
+	return SelectStyle{
+		Trigger:             plainStyle(s.Trigger),
+		TriggerHover:        plainStyle(s.TriggerHover),
+		TriggerFocusVisible: plainStyle(s.TriggerFocusVisible),
+		TriggerDisabled:     plainStyle(s.TriggerDisabled),
+		Value:               plainStyle(s.Value),
+		Placeholder:         plainStyle(s.Placeholder),
+		Chevron:             plainStyle(s.Chevron),
+		Popup:               plainStyle(s.Popup),
+		Option:              plainStyle(s.Option),
+		OptionHighlighted:   plainStyle(s.OptionHighlighted),
+		OptionSelected:      plainStyle(s.OptionSelected),
+		OptionDisabled:      plainStyle(s.OptionDisabled),
+	}
+}
+
+// selectDefaults returns the built-in look of a select of the given width, from
+// the colors of t. Under high contrast a disabled select is all GrayText.
+func selectDefaults(t *Theme, width float32, disabled bool) SelectStyle {
+	ring := Shadow{Spread: 2, Color: t.FocusRing}
+	placeholder, chevron := t.TextSubtle, t.TextMuted
+	if disabled && t.HighContrast {
+		placeholder, chevron = t.Disabled, t.Disabled
+	}
+	d := SelectStyle{
+		Trigger: Style{Direction: Row, Align: Center, Gap: 8, Width: Px(width), MinHeight: Px(34),
+			Padding: XY(10, 0), Radius: t.Radius, Background: t.Surface, BorderWidth: 1, BorderColor: t.BorderStrong,
+			Transition: 110 * time.Millisecond, TextColor: t.Text},
+		TriggerHover:        Style{BorderColor: t.TextMuted},
+		TriggerFocusVisible: Style{Shadows: []Shadow{ring}},
+		Placeholder:         Style{TextColor: placeholder},
+		Chevron:             Style{TextColor: chevron},
+		Popup: Style{Padding: All(4), MinWidth: Px(width), Background: t.Surface, BorderWidth: 1,
+			BorderColor: t.Border, Radius: t.Radius, Shadows: []Shadow{ShadowMd}},
+		Option: Style{Direction: Row, Align: Center, Gap: 8, MinHeight: Px(28), Padding: XY(8, 0),
+			Radius: 4, NoShrink: true, FontSize: 13, TextColor: t.Text},
+		OptionDisabled: Style{TextColor: t.Disabled},
+	}
+	if t.HighContrast {
+		// The highlighted option is the Highlight color, as a selected item is.
+		d.TriggerDisabled = Style{TextColor: t.Disabled, BorderColor: t.Disabled}
+		d.OptionHighlighted = Style{Background: t.Accent, TextColor: t.AccentText}
+	} else {
+		d.TriggerDisabled = Style{Opacity: 0.5}
+		d.OptionHighlighted = Style{Background: t.AccentSoft}
+	}
+	return d
+}
+
+// resolveSelect returns the look of a select: the defaults, merged with the
+// theme's Select and then the instance's Styles. Under high contrast the two
+// overrides are plain (see plainStyle).
+func resolveSelect(t *Theme, width float32, disabled bool, inst SelectStyle) SelectStyle {
+	st := selectDefaults(t, width, disabled)
+	for _, o := range []SelectStyle{t.Select, inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
 // SelectElement is a drop-down list: a field that shows the chosen option, and
 // opens a list of the options below it (above it when there is no room).
 //
@@ -26,15 +132,18 @@ const selectTypeahead = time.Second
 // list close it without a change. Focus returns to the field when the list
 // closes, as it does for a menu.
 type SelectElement[T comparable] struct {
-	value       *Signal[T]
-	options     []Option[T]
-	placeholder string
-	name        string // the accessible name, see Label
-	labelledBy  []string
-	key         string
-	disabled    bool
-	width       float32
-	onChange    func(T)
+	value        *Signal[T]
+	options      []Option[T]
+	placeholder  string
+	name         string // the accessible name, see Label
+	labelledBy   []string
+	key          string
+	disabled     bool
+	width        float32
+	onChange     func(T)
+	styles       SelectStyle
+	renderValue  func(Option[T], PartState) Element
+	renderOption func(Option[T], PartState) Element
 }
 
 // Select creates a drop-down list that reads and writes value. The options are
@@ -74,6 +183,37 @@ func (s *SelectElement[T]) OnChange(fn func(T)) *SelectElement[T] { s.onChange =
 // Width sets the width of the field, in logical pixels. The list is at least as wide.
 func (s *SelectElement[T]) Width(px float32) *SelectElement[T] { s.width = px; return s }
 
+// Styles sets the look of the parts of the select, for this instance only. Set
+// fields win over the theme's Select and the defaults; see SelectStyle and
+// docs/styling.md. Calling Styles again merges with the earlier values.
+func (s *SelectElement[T]) Styles(st SelectStyle) *SelectElement[T] {
+	s.styles = s.styles.merge(st)
+	return s
+}
+
+// RenderValue replaces the label of the chosen option in the field with what fn
+// returns, for example a swatch and the label. fn is called only while an option
+// is chosen; the placeholder is shown otherwise. The field keeps its behavior,
+// and its accessible name and value stay the option's label. The content is
+// hidden from assistive technology.
+func (s *SelectElement[T]) RenderValue(fn func(opt Option[T], state PartState) Element) *SelectElement[T] {
+	s.renderValue = fn
+	return s
+}
+
+// RenderOption replaces the label of each option in the open list with what fn
+// returns. The option keeps its check mark, role, selection and highlight, and
+// its accessible name stays its label. The content is hidden from assistive
+// technology. The state's Focused means the option is highlighted.
+//
+//	ui.Select(color, options...).RenderOption(func(o ui.Option[string], s ui.PartState) ui.Element {
+//		return ui.Div().Size(ui.Px(12), ui.Px(12)).Radius(6).Background(swatch[o.Value])
+//	})
+func (s *SelectElement[T]) RenderOption(fn func(opt Option[T], state PartState) Element) *SelectElement[T] {
+	s.renderOption = fn
+	return s
+}
+
 // selectType is the type-ahead search: the letters typed so far and when the last
 // letter was typed.
 type selectType struct {
@@ -85,6 +225,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
+		st := resolveSelect(t, s.width, s.disabled, s.styles)
 		cur := s.value.Get()
 		sel := indexOf(s.options, cur)
 		open := Local(ctx, "open", false)
@@ -93,7 +234,6 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		// back is the field's focus handle. Focus returns to the field when the list
 		// closes, whichever way it was opened.
 		back := Local(ctx, "back", NewFocusHandle())
-		ring := Shadow{Spread: 2, Color: t.FocusRing}
 
 		// shut closes the list. Focus returns to the field when restore is set.
 		shut := func(restore bool) {
@@ -163,19 +303,28 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		if open.Get() {
 			chevron = icons.ChevronUp
 		}
-		// Under high contrast a disabled select is all GrayText, with no dimming.
-		placeholderColor, chevronColor := t.TextSubtle, t.TextMuted
-		if s.disabled && t.HighContrast {
-			placeholderColor, chevronColor = t.Disabled, t.Disabled
+		// The state of the field, for a render slot. A slot's content follows the
+		// field's pointer and focus state, so the field re-renders when they change.
+		var ps PartState
+		if s.renderValue != nil {
+			ps = PartState{Hovered: ctx.hovered(), Pressed: ctx.pressed(), Focused: ctx.isFocused(),
+				Disabled: s.disabled, HighContrast: t.HighContrast}
 		}
-		shown := Text(label).NoWrap()
-		if sel < 0 {
-			shown = Text(s.placeholder).NoWrap().Color(placeholderColor)
+		var shown Element
+		switch {
+		case sel >= 0 && s.renderValue != nil:
+			ps.Selected = true
+			shown = Div().asPart("Select.Value").Grow(1).Hidden().Style(st.Value).
+				Child(s.renderValue(s.options[sel], ps))
+		case sel >= 0:
+			shown = Div().asPart("Select.Value").Grow(1).Hidden().Style(st.Value).Child(Text(label).NoWrap())
+		default:
+			shown = Div().asPart("Select.Placeholder").Grow(1).Hidden().Style(st.Placeholder).
+				Child(Text(s.placeholder).NoWrap())
 		}
-		field := Div().Row().Align(Center).Gap(8).Width(Px(s.width)).MinHeight(Px(34)).PaddingX(10).
-			Radius(t.Radius).Background(t.Surface).Border(1, t.BorderStrong).Transition(110 * time.Millisecond).
-			Child(Div().Grow(1).Hidden().Child(shown)).
-			Child(Icon(chevron).Size(16).Color(chevronColor))
+		field := Div().asPart("Select.Trigger").Style(st.Trigger).
+			Child(shown).
+			Child(Div().asPart("Select.Chevron").Shrink(0).Style(st.Chevron).Child(Icon(chevron).Size(16)))
 		a := field.access()
 		field.Role(access.RoleComboBox).Expanded(open.Get())
 		a.value, a.readOnly = label, true
@@ -189,15 +338,11 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		if s.disabled {
 			field.Cursor(CursorNotAllowed)
 			a.disabled = true
-			if t.HighContrast {
-				field.TextColor(t.Disabled).Border(1, t.Disabled)
-			} else {
-				field.Opacity(0.5)
-			}
+			field.Style(st.TriggerDisabled)
 			return field
 		}
-		field.Cursor(CursorPointer).Hover(Style{BorderColor: t.TextMuted}).
-			FocusVisible(Style{Shadows: []Shadow{ring}}).
+		field.Cursor(CursorPointer).Hover(st.TriggerHover).
+			FocusVisible(st.TriggerFocusVisible).
 			OnClick(func() {
 				if open.Peek() {
 					shut(true)
@@ -238,7 +383,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 			})
 
 		if open.Get() {
-			field.Child(s.list(t, sel, hl.Get(), shut, choose, func(r rune) int {
+			field.Child(s.list(st, t, sel, hl.Get(), shut, choose, func(r rune) int {
 				return search(r, hl.Peek())
 			}, func(i int) { hl.Set(i) }))
 		}
@@ -249,7 +394,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 // list is the open list of the field: an overlay below it, which takes focus.
 // Its rows are list items, the chosen one is selected, and the highlighted one
 // is the row that has focus.
-func (s *SelectElement[T]) list(t *Theme, sel, hl int, shut func(bool), choose func(int),
+func (s *SelectElement[T]) list(st SelectStyle, t *Theme, sel, hl int, shut func(bool), choose func(int),
 	search func(rune) int, highlight func(int)) Element {
 	name := s.name
 	if name == "" {
@@ -285,8 +430,7 @@ func (s *SelectElement[T]) list(t *Theme, sel, hl int, shut func(bool), choose f
 		}
 		e.StopPropagation()
 	}
-	panel := Div().Key("jamb.listbox").Column().Padding(4).MinWidth(Px(s.width)).
-		Background(t.Surface).Border(1, t.Border).Radius(t.Radius).Shadow(ShadowMd).
+	panel := Div().asPart("Select.Popup").Key("jamb.listbox").Column().Style(st.Popup).
 		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
 		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
 		Overlay(BelowStart).OverlayGap(4).
@@ -301,28 +445,54 @@ func (s *SelectElement[T]) list(t *Theme, sel, hl int, shut func(bool), choose f
 		OnClickOutside(func() { shut(false) }).
 		OnClick(func() {}) // a press on the list's padding must not reach the field
 	for i, o := range s.options {
+		i := i
 		on := i == sel
 		hi := i == hl && !o.Disabled
-		mark := Div().Size(Px(16), Px(16)).Center().Shrink(0)
-		if on {
-			mark.Child(Icon(icons.Check).Size(14).Color(t.Text))
+		draw := func(ps PartState) *DivElement {
+			style := st.Option
+			if hi {
+				style = style.Merge(st.OptionHighlighted)
+			}
+			if on {
+				style = style.Merge(st.OptionSelected)
+			}
+			if o.Disabled {
+				style = style.Merge(st.OptionDisabled)
+			}
+			if hi && style.FontWeight < FontSemibold {
+				// The highlighted option keeps at least semibold text, so the keyboard
+				// position still shows with its highlight cleared.
+				style.FontWeight = FontSemibold
+			}
+			mark := Div().Size(Px(16), Px(16)).Center().Shrink(0)
+			if on {
+				mark.Child(Icon(icons.Check).Size(14))
+			}
+			row := Div().asPart("Select.Option").Style(style).
+				Role(access.RoleListItem).Selected(on).Label(o.Label).Child(mark)
+			if s.renderOption != nil {
+				row.Child(Div().Hidden().Child(s.renderOption(o, ps)))
+			} else {
+				row.Child(Text(o.Label).NoWrap())
+			}
+			row.access().highlighted = hi
+			if o.Disabled {
+				row.access().disabled = true
+			} else {
+				row.OnMouseEnter(func() { highlight(i) }).OnClick(func() { choose(i) })
+			}
+			return row
 		}
-		row := Div().Row().Align(Center).Gap(8).MinHeight(Px(28)).PaddingX(8).Radius(4).Shrink(0).
-			FontSize(13).TextColor(t.Text).
-			Role(access.RoleListItem).Selected(on).Label(o.Label).
-			Child(mark).Child(Text(o.Label).NoWrap())
-		row.access().highlighted = hi
-		if hi {
-			row.Background(t.AccentSoft)
+		if s.renderOption == nil {
+			panel.Child(draw(PartState{}))
+			continue
 		}
-		if o.Disabled {
-			row.TextColor(t.Disabled)
-			row.access().disabled = true
-		} else {
-			i := i
-			row.OnMouseEnter(func() { highlight(i) }).OnClick(func() { choose(i) })
-		}
-		panel.Child(row)
+		// With a render slot the row is its own component, so that it re-renders
+		// when its pointer state changes, and the slot gets the new state.
+		panel.Child(Component(func(ctx *Context) Element {
+			return draw(PartState{Hovered: ctx.hovered(), Pressed: ctx.pressed(), Focused: hi,
+				Selected: on, Disabled: o.Disabled, HighContrast: t.HighContrast})
+		}).Key(fmt.Sprintf("jamb.listbox/%d", i)))
 	}
 	return panel
 }
