@@ -918,10 +918,14 @@ try {
         }
 
         Check 'demo: AxeWindowsCLI scan of the notifications list open from the bell' {
-            # The warning toast of the check above leaves after 8 seconds. A scan that runs as it
-            # leaves can read its elements after they are gone, and reports them as on-screen with
-            # no bounds. The list is scanned once the toast has gone.
-            Wait-Gone { Find-Named $win 'Disk nearly full' | Select-Object -First 1 } 'the warning toast to leave' | Out-Null
+            # Scan a settled screen: close every toast first, so none is leaving
+            # (an auto-dismiss) while the scanner reads the tree. A scanner that
+            # reads an element before and after its removal reports it as an
+            # on-screen element without bounds.
+            foreach ($close in @(Find-Named $win 'Dismiss notification' $CT.Button)) {
+                try { (Require-Pattern $close ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke').Invoke() } catch { }
+            }
+            Wait-For { @(Find-Named $win 'Dismiss notification' $CT.Button).Count -eq 0 } 'every toast to close' | Out-Null
             $bellCond = New-Object System.Windows.Automation.PropertyCondition -ArgumentList ([System.Windows.Automation.AutomationElement]::ControlTypeProperty), $CT.Button
             $bell = @($win.FindAll($Descendants, $bellCond) | Where-Object { $_.Current.Name -match '^Notifications(, \d+ unread)?$' })[0]
             (Require-Pattern $bell ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke').Invoke()
