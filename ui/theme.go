@@ -70,6 +70,8 @@ type Theme struct {
 	Collapsible CollapsibleStyle
 	// TreeView is the look of every tree.
 	TreeView TreeStyle
+	// DataGrid is the look of every data grid.
+	DataGrid DataGridStyle
 	// Menu is the look of every menu: dropdown, context and the menus of a MenuBar.
 	Menu MenuStyle
 	// MenuBar is the look of every menu bar.

@@ -24,6 +24,10 @@ func Projects(s *Store) ui.Element {
 			}
 		}
 
+		view := ui.Local(ctx, "view", 0) // 0 for the cards, 1 for the table
+		picked := ui.Local(ctx, "picked", []string(nil))
+		order := ui.Local(ctx, "order", ui.SortState{})
+
 		list := ui.Div().Gap(10).Role(access.RoleList).SelectionContainer()
 		for _, p := range visible {
 			list.Child(projectCard(t, s, p, p.ID == selected, open[p.ID]))
@@ -32,14 +36,21 @@ func Projects(s *Store) ui.Element {
 			list.Child(emptyState(t, s))
 		}
 
+		var body ui.Element = list
+		if view.Get() == 1 {
+			body = ui.Div().Gap(10).Child(projectsTableBar(t, s, picked)).Child(projectsTable(t, s, visible, picked, order))
+		}
+
 		return ui.Div().Grow(1).ScrollY().
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(1100)).
 				Child(ui.Div().Row().Align(ui.End).Justify(ui.SpaceBetween).Gap(16).
 					Child(ui.Div().Gap(4).
 						Child(ui.Div().Heading(1).Child(ui.Text("Projects").Size(26).Semibold())).
 						Child(ui.Textf("%d projects · %d active", len(all), active).Color(t.TextMuted))).
-					Child(ui.Div().Width(ui.Px(320)).Child(filters(t, s)))).
-				Child(list))
+					Child(ui.Div().Row().Align(ui.Center).Gap(12).
+						Child(projectsViewTabs(view)).
+						Child(ui.Div().Width(ui.Px(320)).Child(filters(t, s))))).
+				Child(body))
 	})
 }
 

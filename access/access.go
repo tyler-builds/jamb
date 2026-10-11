@@ -62,6 +62,9 @@ const (
 	RoleTree                      // a hierarchy of nodes that open and close, such as a file tree
 	RoleTreeItem                  // one node of a tree, with its Level and its position in its siblings
 	RoleProgressBar               // progress: a read-only Range when determinate, no range when busy (see Node.Range)
+	RoleDataGrid                  // a grid of rows and columns, such as a DataGrid (see Node.GridRows)
+	RoleDataItem                  // a cell of a data grid (see Node.GridRow and Node.GridColumn)
+	RoleHeaderItem                // a column header of a data grid, with its sort state in its name
 )
 
 var roleNames = [...]string{
@@ -98,6 +101,9 @@ var roleNames = [...]string{
 	RoleTree:          "tree",
 	RoleTreeItem:      "tree item",
 	RoleProgressBar:   "progress bar",
+	RoleDataGrid:      "data grid",
+	RoleDataItem:      "data item",
+	RoleHeaderItem:    "header item",
 }
 
 // String returns the role's name, such as "check box".
@@ -141,6 +147,7 @@ const (
 	StateSelectionContainer                   // the node holds selection items, such as the chips of a filter
 	StateToggle                               // the node has an on or off state; StateChecked says whether it is on
 	StatePassword                             // a password field: its text is hidden (UI Automation IsPassword); no API sets it yet
+	StateMultiSelectable                      // the selection container takes more than one item (see StateSelectionContainer)
 )
 
 // Has reports whether all the flags in f are set.
@@ -167,6 +174,7 @@ var stateNames = [...]struct {
 	{StateSelectionContainer, "selection container"},
 	{StateToggle, "toggle"},
 	{StatePassword, "password"},
+	{StateMultiSelectable, "multi-selectable"},
 }
 
 // String lists the flags that are set, such as "focusable focused".
@@ -185,37 +193,41 @@ func (s State) String() string {
 type Action uint8
 
 const (
-	ActionClick            Action = iota // invoke: press the control
-	ActionFocus                          // move keyboard focus to the node
-	ActionExpand                         // open the node
-	ActionCollapse                       // close the node
-	ActionToggle                         // change a check box or switch
-	ActionSelect                         // select a list item, tab or radio button
-	ActionSetValue                       // replace a text field's value
-	ActionScrollIntoView                 // scroll the node into view
-	ActionIncrement                      // raise a value (a slider or spin box)
-	ActionDecrement                      // lower a value
-	ActionScroll                         // scroll a container by a fraction of its view (see Request)
-	ActionSetScrollPercent               // scroll a container to a percent of its range (see Request)
-	ActionSetTextSelection               // select the text between Request.Anchor and Request.Caret (byte offsets)
-	ActionSetRangeValue                  // set the value of a slider or spin box to Request.X
+	ActionClick               Action = iota // invoke: press the control
+	ActionFocus                             // move keyboard focus to the node
+	ActionExpand                            // open the node
+	ActionCollapse                          // close the node
+	ActionToggle                            // change a check box or switch
+	ActionSelect                            // select a list item, tab or radio button
+	ActionSetValue                          // replace a text field's value
+	ActionScrollIntoView                    // scroll the node into view
+	ActionIncrement                         // raise a value (a slider or spin box)
+	ActionDecrement                         // lower a value
+	ActionScroll                            // scroll a container by a fraction of its view (see Request)
+	ActionSetScrollPercent                  // scroll a container to a percent of its range (see Request)
+	ActionSetTextSelection                  // select the text between Request.Anchor and Request.Caret (byte offsets)
+	ActionSetRangeValue                     // set the value of a slider or spin box to Request.X
+	ActionAddToSelection                    // add the item to a multiple selection, keeping the others (Ctrl+click)
+	ActionRemoveFromSelection               // remove the item from a multiple selection (Ctrl+click on a chosen item)
 )
 
 var actionNames = [...]string{
-	ActionClick:            "click",
-	ActionFocus:            "focus",
-	ActionExpand:           "expand",
-	ActionCollapse:         "collapse",
-	ActionToggle:           "toggle",
-	ActionSelect:           "select",
-	ActionSetValue:         "set value",
-	ActionScrollIntoView:   "scroll into view",
-	ActionIncrement:        "increment",
-	ActionDecrement:        "decrement",
-	ActionScroll:           "scroll",
-	ActionSetScrollPercent: "set scroll percent",
-	ActionSetTextSelection: "set text selection",
-	ActionSetRangeValue:    "set range value",
+	ActionClick:               "click",
+	ActionFocus:               "focus",
+	ActionExpand:              "expand",
+	ActionCollapse:            "collapse",
+	ActionToggle:              "toggle",
+	ActionSelect:              "select",
+	ActionSetValue:            "set value",
+	ActionScrollIntoView:      "scroll into view",
+	ActionIncrement:           "increment",
+	ActionDecrement:           "decrement",
+	ActionScroll:              "scroll",
+	ActionSetScrollPercent:    "set scroll percent",
+	ActionSetTextSelection:    "set text selection",
+	ActionSetRangeValue:       "set range value",
+	ActionAddToSelection:      "add to selection",
+	ActionRemoveFromSelection: "remove from selection",
 }
 
 // Request is an action with its argument, which the bridge passes to the
@@ -353,6 +365,15 @@ type Node struct {
 	Scroll      Scroll
 	Text        *TextInfo // the text of a text field or text area, for the Text pattern; nil otherwise
 	Range       *Range    // the number of a slider or spin box, for the RangeValue pattern; nil otherwise
+	// GridRows and GridColumns are the number of rows and columns of a RoleDataGrid, for
+	// the Grid and Table patterns. Rows counts every row of the data, built or not.
+	GridRows, GridColumns int
+	// GridRow and GridColumn are the 1-based position of a RoleDataItem among the cells of
+	// its grid; 0 when the node is not a cell.
+	GridRow, GridColumn int
+	// ItemStatus is the status of an item, such as "sorted ascending" for a header item
+	// (UI Automation ItemStatus); empty when there is none.
+	ItemStatus string
 }
 
 // Has reports whether the node supports action a.
@@ -378,6 +399,8 @@ func (n *Node) Equal(o *Node) bool {
 		n.Key == o.Key && n.Value == o.Value && n.States == o.States && n.Bounds == o.Bounds &&
 		n.Parent == o.Parent && n.Heading == o.Heading && n.PosInSet == o.PosInSet &&
 		n.SetSize == o.SetSize && n.Level == o.Level && n.Scroll == o.Scroll &&
+		n.GridRows == o.GridRows && n.GridColumns == o.GridColumns && n.GridRow == o.GridRow &&
+		n.GridColumn == o.GridColumn && n.ItemStatus == o.ItemStatus &&
 		n.Text.Equal(o.Text) && n.Range.Equal(o.Range) &&
 		equalIDs(n.Children, o.Children) && equalIDs(n.LabelledBy, o.LabelledBy) &&
 		equalIDs(n.DescribedBy, o.DescribedBy) && equalIDs(n.Controls, o.Controls) &&

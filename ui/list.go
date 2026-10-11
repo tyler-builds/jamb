@@ -23,6 +23,14 @@ type UniformListElement struct {
 	// ownPos leaves the positions of the rows to the rows. A tree item's position
 	// is among its siblings, not among the visible rows.
 	ownPos bool
+	// header is drawn over the top of the rows. It keeps the top of the viewport
+	// as the list scrolls, so it stays in view (see DataGrid).
+	header *DivElement
+	// rowWidth is the width of the rows' content, which is the width of the list
+	// or more, so that the list scrolls horizontally as well (see DataGrid).
+	rowWidth float32
+	// before, when set, runs at paint before the offset of the list is stepped.
+	before func(n *node)
 }
 
 // UniformList creates a list of count rows. row(i) is called only for rows
@@ -150,6 +158,8 @@ type listState struct {
 	count    int
 	handle   *ListHandle
 	inst     *componentInstance
+	sticky   bool // the header is kept at the top of the viewport
+	before   func(n *node)
 }
 
 // listOverscan is the number of rows built beyond the viewport on each side.
@@ -162,6 +172,7 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 	}
 	ls := st.list
 	ls.count, ls.inst, ls.handle = l.count, ctx.inst, l.handle
+	ls.sticky, ls.before = l.header != nil, l.before
 	if l.handle != nil {
 		l.handle.rt, l.handle.id = ctx.rt, expandedID(ctx.id)
 	}
@@ -172,6 +183,9 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 		to = max(min(ls.to, l.count), from)
 	}
 	spacer := Div().Key("jamb.list.spacer").Shrink(0).Height(Px(float32(l.count) * ls.rowH))
+	if l.rowWidth > 0 {
+		spacer.Width(Px(l.rowWidth))
+	}
 	for i := from; i < to; i++ {
 		r := l.row(i)
 		key := fmt.Sprintf("jamb.row#%d", i)
@@ -190,7 +204,11 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 	if l.decorate != nil {
 		l.decorate(container)
 	}
-	return container.Child(spacer)
+	container.Child(spacer)
+	if l.header != nil {
+		container.Child(l.header)
+	}
+	return container
 }
 
 // markList schedules a rebuild of the list's rows before the current Frame
@@ -232,7 +250,14 @@ func (rt *Runtime) checkList(n *node, sy float32) {
 			ls.rowH = h
 			if old > 0 {
 				// Keep the same row at the top of the viewport.
-				rescale := func(y float32) float32 { return max(spacer.lay.Y+(y-spacer.lay.Y)*h/old, 0) }
+				// An offset above the rows (in the padding, such as a DataGrid's header) is
+				// not scaled: the rows start at the padding, not at the top of the list.
+				rescale := func(y float32) float32 {
+					if y <= spacer.lay.Y {
+						return max(y, 0)
+					}
+					return spacer.lay.Y + (y-spacer.lay.Y)*h/old
+				}
 				st.scrollY, st.targetY = rescale(st.scrollY), rescale(st.targetY)
 				sy = st.scrollY
 			}

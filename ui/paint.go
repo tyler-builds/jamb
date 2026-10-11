@@ -232,7 +232,15 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	}
 	var sx, sy float32
 	if n.st != nil && (s.OverflowX == OverflowScroll || s.OverflowY == OverflowScroll) {
+		if n.div != nil && n.div.vlist != nil && n.div.vlist.before != nil && !rt.inGhost {
+			n.div.vlist.before(n)
+		}
 		sx, sy = rt.scrollStep(n, dt)
+		if n.div != nil && n.div.vlist != nil && n.div.vlist.sticky && len(n.children) > 1 {
+			// The header is the child after the rows. It is moved to the top of
+			// the viewport before the children are painted.
+			n.children[1].style.OffsetY = sy
+		}
 	}
 	for _, c := range n.order {
 		if c.flags&flagNoDisplay != 0 {

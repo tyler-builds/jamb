@@ -107,12 +107,17 @@ const (
 	kindText                       // the Text pattern of a text field or text area
 	kindRange                      // the RangeValue pattern of a slider or spin box
 	kindTextRange                  // a range of the text of a text field; made per call, not kept by its node
+	kindGrid                       // the Grid pattern of a data grid
+	kindTable                      // the Table pattern of a data grid
+	kindGridItem                   // the GridItem pattern of a data grid cell
+	kindTableItem                  // the TableItem pattern of a data grid cell
 )
 
 // patternKinds lists the kinds of pattern objects. Like nodes, each pattern
 // object is kept per node until the node leaves the tree.
 var patternKinds = []coreKind{kindInvoke, kindToggle, kindExpand, kindSelectItem, kindSelection,
-	kindValue, kindScroll, kindScrollItem, kindWindow, kindText, kindRange}
+	kindValue, kindScroll, kindScrollItem, kindWindow, kindText, kindRange,
+	kindGrid, kindTable, kindGridItem, kindTableItem}
 
 // kindIfaces lists the interfaces that each kind of object implements.
 var kindIfaces = [...][]*iface{
@@ -130,6 +135,10 @@ var kindIfaces = [...][]*iface{
 	kindWindow:     {&ifaceWindow},
 	kindText:       {&ifaceText, &ifaceText2},
 	kindTextRange:  {&ifaceTextRange},
+	kindGrid:       {&ifaceGrid},
+	kindTable:      {&ifaceTable},
+	kindGridItem:   {&ifaceGridItem},
+	kindTableItem:  {&ifaceTableItem},
 }
 
 // core is the Go-side state of an object. Its views share it.
@@ -181,6 +190,7 @@ func initVtbls() {
 		ar := syscall.NewCallback(uiaAddRef)
 		rl := syscall.NewCallback(uiaRelease)
 		initTextVtbls(qi, ar, rl)
+		initGridVtbls(qi, ar, rl)
 		simpleVtbl = [...]uintptr{qi, ar, rl,
 			syscall.NewCallback(uiaProviderOptions),
 			syscall.NewCallback(uiaGetPatternProvider),
@@ -888,15 +898,40 @@ func uiaSelect(this uintptr) uintptr {
 }
 
 // uiaAddToSelection selects the item: a container holds one selection.
-func uiaAddToSelection(this uintptr) uintptr { return uiaSelect(this) }
+// uiaAddToSelection adds the item to a multiple selection (a data grid's rows), and
+// otherwise selects it, as Select does.
+func uiaAddToSelection(this uintptr) uintptr {
+	c := coreOf(this)
+	if c == nil {
+		return hrFail
+	}
+	if !inMultiSelection(c) {
+		return uiaSelect(this)
+	}
+	return c.perform(access.ActionAddToSelection)
+}
+
+// inMultiSelection reports whether the item of c is in a container that takes many items.
+func inMultiSelection(c *core) bool {
+	n, t, ok := c.current()
+	if !ok {
+		return false
+	}
+	p := t.Node(n.Parent)
+	return p != nil && p.States.Has(access.StateMultiSelectable)
+}
 
 // uiaRemoveFromSelection is refused: a selection is always one item, which
 // another item replaces.
 func uiaRemoveFromSelection(this uintptr) uintptr {
-	if coreOf(this) == nil {
+	c := coreOf(this)
+	if c == nil {
 		return hrFail
 	}
-	return hrInvalidOperation
+	if !inMultiSelection(c) {
+		return hrInvalidOperation
+	}
+	return c.perform(access.ActionRemoveFromSelection)
 }
 
 func uiaIsSelected(this, out uintptr) uintptr {
@@ -942,10 +977,15 @@ func uiaGetSelection(this, out uintptr) uintptr {
 
 // uiaCanSelectMultiple reports that a container holds one selection.
 func uiaCanSelectMultiple(this, out uintptr) uintptr {
-	if _, hr := enter(this, out); hr != hrOK {
+	c, hr := enter(this, out)
+	if hr != hrOK {
 		return hr
 	}
-	*(*int32)(ptr(out)) = 0
+	n, _, ok := c.current()
+	if !ok {
+		return hrElementNotAvailable
+	}
+	*(*int32)(ptr(out)) = boolOf(n.States.Has(access.StateMultiSelectable))
 	return hrOK
 }
 

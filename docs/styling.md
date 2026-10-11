@@ -44,7 +44,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Theme.Tabs`, `Theme.Select`, `Theme.Slider`, `Theme.Field` (the frame of every
    `TextInput`, `TextArea` and `NumberField`), `Theme.NumberField`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
-   `Theme.Switch`, `Theme.Collapsible`, `Theme.TreeView`, `Theme.Menu`,
+   `Theme.Switch`, `Theme.Collapsible`, `Theme.TreeView`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
    (per kind), and `Theme.Tooltip`. Each is a field of `ui.Theme`, and the
@@ -197,6 +197,10 @@ the same in every variant.
   the toast's own `Styles`. `Toaster.Placement` picks the stack's position:
   `ToastBottomRight` (the default), `ToastTopRight` or `ToastBottomCenter`.
 
+- `DataGrid.Density(ui.DataGridCompact)` sets the rows and the header to 26 logical pixels high, and
+  `DataGridComfortable` (the default) to 36, both at the Text size setting. `DataGrid.Striped()` draws every
+  other row in `RowAlternate`.
+
 A part's style applies in every variant that draws the part. A variant's own defaults
 come first, so `TabSelected` in the segmented variant is the filled segment, and an
 override of `TabSelected` changes that segment as well.
@@ -257,6 +261,8 @@ accessible role and name.
 | `Collapsible.RenderHeader(fn)` | the title in the header; the chevron stays | the title and a `PartState` (`Selected` is open) |
 | `TreeView.RenderRow(fn)` | the icon and label of each row; the chevron stays | the `TreeNode` and a `PartState` |
 | `TreeView.RenderLabel(fn)` | the text of each row; the icon stays (not used with `RenderRow`) | the `TreeNode` and a `PartState` |
+| `DataColumn.Cell` (in `DataGrid`) | the content of each cell of the column; the cell keeps its text, focus and selection | the row's data and nothing else (the content is hidden from assistive technology) |
+| `DataColumn.RenderHeader` (in `DataGrid`) | the text of the column's header; the sort arrow stays | the header label and a `PartState` (`Selected` is the sorted column) |
 
 ```go
 ui.Tabs(inbox,
@@ -407,6 +413,7 @@ parts that the code applies.
 | `RadioGroup` | `Group`, `Radio`, `RadioFocusVisible`, `RadioDisabled`, `Ring`, `RingChecked`, `RingDisabled`, `Dot`, `DotDisabled`, `Label`, `LabelDisabled` | none | none | done |
 | `Collapsible`, `Accordion` | `Section`, `Header`, `HeaderHover`, `HeaderOpen`, `HeaderFocusVisible`, `HeaderDisabled`, `Chevron`, `Content` | none | `RenderHeader` | done |
 | `TreeView` | `Row`, `RowHover`, `RowSelected`, `Chevron`, `Icon`, `Label`, `TreeFocusVisible` | none | `RenderRow`, `RenderLabel` | done |
+| `DataGrid` | `Grid`, `GridFocusVisible`, `Header`, `HeaderCell`, `HeaderCellHover`, `HeaderCellSorted`, `SortIndicator`, `ResizeHandle`, `Row`, `RowHover`, `RowSelected`, `RowAlternate`, `Cell`, `CellFocused`, `Empty` | `DataGridComfortable`, `DataGridCompact`, `Striped()` | `DataColumn.Cell`, `DataColumn.RenderHeader` | done |
 | `DropdownMenu`, `ContextMenu` | `Panel`, `Item`, `ItemHighlighted`, `ItemDisabled`, `Separator`, `SectionLabel`, `Shortcut`, `Check`, `SubmenuChevron` | none | none | done |
 | `MenuBar` | `BarItem`, `BarItemHover`, `BarItemFocusVisible`, `BarItemOpen` | none | none | done |
 | `Modal` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | none | none | done |
@@ -491,6 +498,10 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
 - A Tooltip takes the theme's `Tooltip` only.
 - A toast's `Styles` applies to that toast alone; `Toaster` has no `Styles` of its
   own.
+- A DataGrid's header and rows are as tall as its density (see Variants). A `Header` or `Row` style that sets
+  another `MinHeight` does not move the padding that keeps the header above the rows, so keep the height at the density's.
+- The DataGrid's `Grid` padding is the header's height, which the grid sets. It has no frozen column and no
+  multi-column sort. The double-click fit of a column edge measures the `Text` of the rows in view, not a `Cell` slot.
 
 Where a look changed under high contrast on purpose, the change is in the guardrails
 above: the selected text of a text field and the highlighted row of a menu are the

@@ -66,6 +66,16 @@ type accessInfo struct {
 	// RangeValue pattern (ActionSetRangeValue).
 	rng      *access.Range
 	setRange func(v float64)
+	// gridRows and gridCols are the shape of a data grid; gridRow and gridCol the
+	// 1-based position of a cell (see DataGrid). status is the status of a header.
+	gridRows, gridCols int
+	gridRow, gridCol   int
+	status             string
+	// multiSelect is set on a selection container that takes many items.
+	multiSelect bool
+	// selectWith chooses the item with the modifier Ctrl (true) or without it. A data
+	// grid row sets it, so that AddToSelection and RemoveFromSelection keep the others.
+	selectWith func(ctrl bool)
 }
 
 // access returns the element's accessibility settings, creating them on use.
@@ -349,6 +359,20 @@ func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 		if n.div != nil && n.div.acc != nil && (n.div.acc.selectable || radioRole(role)) && !isSelected(role, n.div.acc) {
 			rt.clickNode(n)
 		}
+	case access.ActionAddToSelection, access.ActionRemoveFromSelection:
+		if n.div == nil || n.div.acc == nil {
+			break
+		}
+		a := n.div.acc
+		selected := isSelected(role, a)
+		switch {
+		case a.selectWith != nil:
+			if selected == (req.Action == access.ActionRemoveFromSelection) {
+				a.selectWith(true)
+			}
+		case req.Action == access.ActionAddToSelection && a.selectable && !selected:
+			rt.clickNode(n)
+		}
 	case access.ActionFocus:
 		if n.div == nil || n.div.focusable || n.kind == kindEditor {
 			rt.setFocus(n.id)
@@ -623,6 +647,9 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 		an.Heading = d.acc.heading
 		an.Value = d.acc.value
 		an.Range = d.acc.rng
+		an.GridRows, an.GridColumns = d.acc.gridRows, d.acc.gridCols
+		an.GridRow, an.GridColumn = d.acc.gridRow, d.acc.gridCol
+		an.ItemStatus = d.acc.status
 	}
 	b.checkState(an, d.acc, role)
 	b.relate(an, d.acc)
@@ -752,7 +779,8 @@ func absorbsText(r access.Role) bool {
 	switch r {
 	case access.RoleButton, access.RoleCheckBox, access.RoleSwitch, access.RoleRadioButton,
 		access.RoleLink, access.RoleMenuItem, access.RoleMenuItemCheck, access.RoleMenuItemRadio,
-		access.RoleListItem, access.RoleTab, access.RoleTreeItem, access.RoleTooltip, access.RoleHeading:
+		access.RoleListItem, access.RoleTab, access.RoleTreeItem, access.RoleTooltip, access.RoleHeading,
+		access.RoleDataItem, access.RoleHeaderItem:
 		return true
 	}
 	return false
@@ -852,6 +880,9 @@ func (b *accessBuilder) states(n *node, id access.ID, role access.Role) access.S
 	}
 	if role == access.RoleTabList || (a != nil && a.container) {
 		s |= access.StateSelectionContainer
+	}
+	if a != nil && a.multiSelect {
+		s |= access.StateMultiSelectable
 	}
 	return s
 }
@@ -1095,7 +1126,7 @@ func highlightedRow(n *node) *node {
 		return nil
 	}
 	switch n.div.acc.role {
-	case access.RoleMenu, access.RoleList, access.RoleTree:
+	case access.RoleMenu, access.RoleList, access.RoleTree, access.RoleDataGrid:
 	default:
 		return nil
 	}

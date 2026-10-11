@@ -277,6 +277,12 @@ func controlType(r access.Role) int32 {
 		return ctTreeItem
 	case access.RoleProgressBar:
 		return ctProgressBar
+	case access.RoleDataGrid:
+		return ctDataGrid
+	case access.RoleDataItem:
+		return ctDataItem
+	case access.RoleHeaderItem:
+		return ctHeaderItem
 	}
 	return ctPane
 }
@@ -482,6 +488,10 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 		if n.States.Has(access.StateSelectable) {
 			return variantBool(n.States.Has(access.StateSelected))
 		}
+	case propItemStatus:
+		if n.ItemStatus != "" {
+			return variantBSTR(n.ItemStatus)
+		}
 	case propWindowIsModal:
 		if n.Role == access.RoleDialog {
 			return variantBool(true)
@@ -557,6 +567,14 @@ func patternKindOf(id int32) (coreKind, bool) {
 		return kindScrollItem, true
 	case patternWindow:
 		return kindWindow, true
+	case patternGrid:
+		return kindGrid, true
+	case patternTable:
+		return kindTable, true
+	case patternGridItem:
+		return kindGridItem, true
+	case patternTableItem:
+		return kindTableItem, true
 	case patternText, patternText2:
 		return kindText, true
 	}
@@ -587,6 +605,14 @@ func availableKind(id int32) (coreKind, bool) {
 		return kindScrollItem, true
 	case propIsWindowAvailable:
 		return kindWindow, true
+	case propIsGridPatternAvail:
+		return kindGrid, true
+	case propIsTablePatternAvail:
+		return kindTable, true
+	case propIsGridItemPatternAvail:
+		return kindGridItem, true
+	case propIsTableItemPatternAvail:
+		return kindTableItem, true
 	case propIsTextPatternAvailable, propIsTextPattern2Available:
 		return kindText, true
 	}
@@ -621,6 +647,10 @@ func supports(k coreKind, n *access.Node) bool {
 		return n.Scroll.Container
 	case kindScrollItem:
 		return n.Has(access.ActionScrollIntoView)
+	case kindGrid, kindTable:
+		return n.Role == access.RoleDataGrid
+	case kindGridItem, kindTableItem:
+		return n.Role == access.RoleDataItem && n.GridRow > 0
 	case kindText:
 		return isText(n.Role)
 	case kindWindow:

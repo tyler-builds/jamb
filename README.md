@@ -1186,6 +1186,86 @@ Errors explain what failed and how to fix it. For example, `ui.Hex("#12")`
 panics with `ui.Hex("#12"): expected #rgb, #rrggbb or #rrggbbaa`, and a
 missing Root says to set `app.Window.Root`.
 
+### Data grids
+
+`ui.DataGrid` shows rows and columns of business data. Like `UniformList`, it builds only the rows in view, so a grid of 100,000 rows costs what its visible rows cost. Its header stays at the top as the rows scroll, and the header scrolls with the rows when the columns are wider than the grid.
+
+```go
+type run struct {
+	ID, Service, Status string
+	Cost                float32
+}
+
+picked := ui.NewSignal([]string(nil)) // the keys of the selected rows
+order := ui.NewSignal(ui.SortState{}) // the column and direction of the sort
+
+ui.DataGrid(runs, func(r run) string { return r.ID },
+	ui.DataColumn[run]{Header: "Run", Text: func(r run) string { return r.ID },
+		Compare: func(a, b run) int { return strings.Compare(a.ID, b.ID) }, Width: 130, Resizable: true},
+	ui.DataColumn[run]{Header: "Service", Text: func(r run) string { return r.Service },
+		Compare: func(a, b run) int { return strings.Compare(a.Service, b.Service) }, Grow: 1, Resizable: true},
+	ui.DataColumn[run]{Header: "Cost", Text: func(r run) string { return fmt.Sprintf("$%.2f", r.Cost) },
+		Compare: func(a, b run) int { return cmp.Compare(a.Cost, b.Cost) }, Align: ui.End, Width: 100, Resizable: true},
+).Label("Deploy runs").
+	Selection(ui.SelectionMultiple, picked).
+	Sort(order).
+	Density(ui.DataGridCompact).Striped().
+	OnActivate(func(r run) { openRun(r.ID) }).
+	Style(ui.Style{Height: ui.Px(420)})
+```
+
+`ui.DataColumn[T]` is the column type. The name is `DataColumn` because `ui.Column` is the layout direction (`Div().Column()`).
+
+| Field | Meaning |
+| --- | --- |
+| `Header` | The header text, and the column's name for assistive technology |
+| `Key` | Identifies the column in a `SortState` and in the widths the user sets. `Header` when empty |
+| `Text` | The text of each cell, and the cell's accessible name |
+| `Cell` | A render slot: replaces the text of each cell (hidden from assistive technology, so set `Text` too) |
+| `RenderHeader` | A render slot: replaces the header text. `PartState.Selected` is set while the column is sorted |
+| `Compare` | Orders two rows for sorting, as `strings.Compare` does. Nil means the column cannot be sorted. A sort is stable |
+| `Width`, `MinWidth`, `MaxWidth` | The width at the 100 percent Text size (120 when zero), and the limits for resizing (40 and no limit when zero). Columns grow with the Text size, as the rows do |
+| `Grow` | The share of the grid's spare width the column takes when the columns are narrower than the grid |
+| `Resizable` | Lets the user resize the column (see the keyboard and mouse below) |
+| `Align` | `ui.Start` (the zero value), `ui.Center` or `ui.End` for the cells and the header |
+
+The grid's methods:
+
+- `Selection(mode, keys)`: `ui.SelectionNone`, `ui.SelectionSingle` or `ui.SelectionMultiple`. The keys of the selected rows are kept in `keys`, so the app reads the selection and can set it. A nil `keys` keeps the selection in the grid.
+- `Sort(s)`: the `ui.SortState` (`Key` and `Desc`) in `s`. A click on a header cycles the column through ascending, descending and not sorted. A nil `s` keeps the sort in the grid.
+- `OnActivate(fn)`: runs `fn` with the row, on Enter or a double-click.
+- `Density(d)`: `ui.DataGridComfortable` (36 logical pixels a row, the default) or `ui.DataGridCompact` (26). `Striped()` draws every other row in `RowAlternate`.
+- `Loading(on)`: shows a progress ring over the rows. The rows, the focus and the selection stay.
+- `Empty(el)`: what the grid shows with no rows. The default is "No rows".
+- `Label(name)`, `Key(k)`, `Style(s)` and `Styles(st)`: as for the other widgets. `Styles` takes a `ui.DataGridStyle`; see [docs/styling.md](docs/styling.md).
+
+Rows are identified by their keys, which must be unique and stable. The focus, the selection and the sort follow the key, so a sort, a scroll or new rows keep the focused cell and the selected rows on the same data.
+
+**Keyboard.** The grid is one Tab stop. Its keys act on the focused cell, and they follow the WAI-ARIA grid pattern (https://www.w3.org/WAI/ARIA/apg/patterns/grid/) and the Windows keyboard conventions for selection (https://learn.microsoft.com/en-us/windows/apps/develop/input/keyboard-interactions):
+
+| Key | Action |
+| --- | --- |
+| Left, Right | Previous and next column |
+| Home, End | First and last column of the row |
+| Ctrl+Home, Ctrl+End | First and last cell of the grid |
+| Down, Up | Next and previous row. Up from the first row moves to the header; Down from the header moves to the first row |
+| PageDown, PageUp | By a viewport of rows |
+| Space | Toggles the row (multiple), or selects it (single). On a header cell, sorts by the column |
+| Shift+Space | Selects the rows from the anchor row to the focused row (multiple) |
+| Shift+Down, Up, PageDown, PageUp | Extends the selection from the anchor (multiple). A single selection follows the move |
+| Ctrl+Down, Up and the others | Moves the focus without selecting (multiple). The anchor stays |
+| Ctrl+A | Selects every row (multiple) |
+| Enter | Activates the row (`OnActivate`). On a header cell, sorts by the column |
+| Ctrl+Left, Ctrl+Right | On a resizable header cell, narrows or widens the column by 8 logical pixels |
+
+Alt is not used by the grid, so the host keeps its menu and navigation keys.
+
+**Mouse.** A click selects a row: Ctrl toggles it and Shift extends the selection from the anchor. A double-click activates the row. A click on a header cell sorts. Dragging the edge of a resizable header cell resizes its column, and the cursor is the east-west resize cursor over the edge. A double-click on the edge fits the column to the text of the rows in view.
+
+**Sorting.** A sort of 100,000 rows takes about 8 ms in the benchmark (`BenchmarkDataGridSort100k`), which is under the 50 ms at which a sort would move to a worker thread, so the sort runs on the UI thread. Only one column sorts at a time: Shift+click does not add a second sort (see `docs/accessibility.md`, Phase I).
+
+**Accessibility.** The grid is a `DataGrid` control with the Grid and Table patterns. Its `RowCount` is every row of the data, built or not, and its `ColumnCount` is the number of columns. Each cell is a `DataItem` with the GridItem and TableItem patterns, and each row is a `ListItem` with the SelectionItem pattern. Each header cell is a `HeaderItem` that Invoke sorts, with its sort state in its name ("Duration, sorted descending") and in its ItemStatus. Selection uses the Selection pattern, which says whether it takes many items. See `docs/accessibility.md`, Phase I.
+
 ### Windows
 
 `app.Run` opens the first window and runs until the app quits. More windows

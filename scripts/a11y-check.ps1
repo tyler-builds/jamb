@@ -151,6 +151,9 @@ $CT = @{
     Tree     = [System.Windows.Automation.ControlType]::Tree
     TreeItem = [System.Windows.Automation.ControlType]::TreeItem
     Pane     = [System.Windows.Automation.ControlType]::Pane
+    DataGrid = [System.Windows.Automation.ControlType]::DataGrid
+    DataItem = [System.Windows.Automation.ControlType]::DataItem
+    HeaderItem = [System.Windows.Automation.ControlType]::HeaderItem
 }
 $Passed = 0
 $Failed = 0
@@ -284,7 +287,7 @@ function Invoke-AxeScan($Proc, [string]$Name) {
         $oldPreference = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
         try {
-            $log = & $axe --processid $Proc.Id --outputdirectory $out --scanid $Name --verbosity default --delayinseconds 2 2>&1 | ForEach-Object { "$_" }
+            $log = & $axe --processid $Proc.Id --outputdirectory $out --scanid $Name --verbosity verbose --delayinseconds 2 2>&1 | ForEach-Object { "$_" }
             $code = $LASTEXITCODE
         } finally {
             $ErrorActionPreference = $oldPreference
@@ -709,6 +712,135 @@ try {
         }
     }
 
+    # ---- Demo: data grids (the Projects table and the Components data grid) ----
+
+    $gridNamed = {
+        param([string]$Name)
+        Find-Named $win $Name $CT.DataGrid | Select-Object -First 1
+    }
+    # The view tabs are selection items, so a tab is chosen with Select.
+    $selectTab = {
+        param([string]$Name)
+        $tab = Find-One $win $Name $CT.TabItem
+        (Require-Pattern $tab ([System.Windows.Automation.SelectionItemPattern]::Pattern) 'SelectionItem').Select()
+    }
+    $cellAtFocus = {
+        $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+        if ($null -eq $f -or $f.Current.ControlType -ne $CT.DataItem) { return $null }
+        $gi = $f.GetCurrentPattern([System.Windows.Automation.GridItemPattern]::Pattern)
+        return ,@([int]$gi.Current.Row, [int]$gi.Current.Column)
+    }
+
+    Check 'demo: the Projects table is a DataGrid with the Grid and Table patterns' {
+        Invoke-Named $win 'Projects, 6 items' $CT.Button
+        Wait-For { $null -ne (Find-Named $win 'Table' $CT.TabItem | Select-Object -First 1) } 'the Projects view tabs' | Out-Null
+        & $selectTab 'Table'
+        $grid = Wait-For { & $gridNamed 'Projects' } 'the Projects table'
+        $g = Require-Pattern $grid ([System.Windows.Automation.GridPattern]::Pattern) 'Grid'
+        $t = Require-Pattern $grid ([System.Windows.Automation.TablePattern]::Pattern) 'Table'
+        Assert ($g.Current.RowCount -eq 6) "RowCount is $($g.Current.RowCount), want the 6 projects"
+        Assert ($g.Current.ColumnCount -eq 5) "ColumnCount is $($g.Current.ColumnCount), want 5"
+        Assert (@($t.Current.GetColumnHeaders()).Count -eq 5) 'GetColumnHeaders does not give the 5 header items'
+        $cell = $g.GetItem(0, 0)
+        Assert ($null -ne $cell) 'GetItem(0, 0) is null for a visible cell'
+        $gi = Require-Pattern $cell ([System.Windows.Automation.GridItemPattern]::Pattern) 'GridItem'
+        Assert ($gi.Current.Row -eq 0 -and $gi.Current.Column -eq 0) 'the first cell is not at row 0, column 0'
+        Require-Pattern $cell ([System.Windows.Automation.TableItemPattern]::Pattern) 'TableItem' | Out-Null
+        "RowCount 6, ColumnCount 5"
+    }
+
+    Check 'demo: a Projects header sorts with Invoke, and its name and ItemStatus say so' {
+        $grid = & $gridNamed 'Projects'
+        $g = Require-Pattern $grid ([System.Windows.Automation.GridPattern]::Pattern) 'Grid'
+        $hdr = Find-One $win 'Name' $CT.HeaderItem
+        $inv = Require-Pattern $hdr ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke'
+        $inv.Invoke()
+        $sorted = Wait-For { Find-Named $win 'Name, sorted ascending' $CT.HeaderItem | Select-Object -First 1 } 'the Name header to say it is sorted ascending'
+        Assert ((Get-Prop $sorted 30026) -eq 'sorted ascending') 'ItemStatus of the sorted header is not "sorted ascending"'
+        $first = Wait-For { $n = $g.GetItem(0, 0).Current.Name; if ($n -eq 'Dev Runner') { $n } else { $null } } 'the first row to be Dev Runner after a sort by name'
+        Assert ($first -eq 'Dev Runner') "the first row after a sort by name is '$first', want 'Dev Runner'"
+    }
+
+    Check 'demo: rows of the Projects table select with SelectionItem, and the table takes many' {
+        $grid = & $gridNamed 'Projects'
+        $sel = Require-Pattern $grid ([System.Windows.Automation.SelectionPattern]::Pattern) 'Selection'
+        Assert $sel.Current.CanSelectMultiple 'the Projects table does not take many selections'
+        $rows = @($grid.FindAll($Children, [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { $_.Current.ControlType -eq $CT.ListItem })
+        Assert ($rows.Count -ge 2) "the table has $($rows.Count) rows, want two"
+        $a = Require-Pattern $rows[0] ([System.Windows.Automation.SelectionItemPattern]::Pattern) 'SelectionItem'
+        $b = Require-Pattern $rows[1] ([System.Windows.Automation.SelectionItemPattern]::Pattern) 'SelectionItem'
+        $a.Select()
+        Wait-For { if (@($sel.Current.GetSelection()).Count -eq 1) { $true } else { $null } } 'one row selected' | Out-Null
+        $b.AddToSelection()
+        Wait-For { if (@($sel.Current.GetSelection()).Count -eq 2) { $true } else { $null } } 'two rows selected' | Out-Null
+        $a.RemoveFromSelection()
+        $b.RemoveFromSelection()
+    }
+
+    Check 'demo: Down and Right move the focused cell of the Projects table, with focus events' {
+        $grid = & $gridNamed 'Projects'
+        $grid.SetFocus()
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        Start-Sleep -Milliseconds 300
+        $before = [FocusCounter]::Count
+        [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+        Wait-For { $p = & $cellAtFocus; if ($p -and $p[0] -eq 0 -and $p[1] -eq 0) { $true } else { $null } } 'the first cell to take focus' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+        Wait-For { $p = & $cellAtFocus; if ($p -and $p[0] -eq 1 -and $p[1] -eq 0) { $true } else { $null } } 'Down to move the focus to row 1' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}')
+        Wait-For { $p = & $cellAtFocus; if ($p -and $p[0] -eq 1 -and $p[1] -eq 1) { $true } else { $null } } 'Right to move the focus to column 1' | Out-Null
+        Assert ([FocusCounter]::Count -gt $before) 'the focus moves fired no focus events'
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Projects table' {
+            $errors = Invoke-AxeScan $demo 'demo-projects-table'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+    }
+    & $selectTab 'Cards'
+
+    Check 'demo: the Components data grid has 100,000 rows, and sorts and selects with UI Automation' {
+        Invoke-Named $win 'Components' $CT.Button
+        $grid = Wait-For { & $gridNamed 'Deploy runs' } 'the data grid on the Components page'
+        $g = Require-Pattern $grid ([System.Windows.Automation.GridPattern]::Pattern) 'Grid'
+        Assert ($g.Current.RowCount -eq 100000) "RowCount is $($g.Current.RowCount), want 100,000"
+        # The grid is far down the page, and a grid that is not drawn builds only its first row.
+        # The grid is scrolled into view through its own ScrollItem, and waited for in the window.
+        $gsi = Require-Pattern $grid ([System.Windows.Automation.ScrollItemPattern]::Pattern) 'ScrollItem'
+        $gsi.ScrollIntoView()
+        Wait-For { if ($grid.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom -and $grid.Current.BoundingRectangle.Bottom -gt $win.Current.BoundingRectangle.Top) { $true } else { $null } } 'the data grid to be in the window' | Out-Null
+        Assert ($g.Current.ColumnCount -eq 6) "ColumnCount is $($g.Current.ColumnCount), want 6"
+        $hdr = Wait-For { Find-Named $win 'Duration' $CT.HeaderItem | Select-Object -First 1 } 'the Duration header'
+        $hsi = Get-Pattern $hdr ([System.Windows.Automation.ScrollItemPattern]::Pattern)
+        if ($hsi) { $hsi.ScrollIntoView() }
+        $inv = Require-Pattern $hdr ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke'
+        $inv.Invoke()
+        $sorted = Wait-For { Find-Named $win 'Duration, sorted ascending' $CT.HeaderItem | Select-Object -First 1 } 'the Duration header to be sorted ascending'
+        Assert ((Get-Prop $sorted 30026) -eq 'sorted ascending') 'ItemStatus of the sorted header is not "sorted ascending"'
+        $sel = Require-Pattern $grid ([System.Windows.Automation.SelectionPattern]::Pattern) 'Selection'
+        Assert $sel.Current.CanSelectMultiple 'the data grid does not take many selections'
+        Wait-For { if (@($grid.FindAll($Children, [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { $_.Current.ControlType -eq $CT.ListItem }).Count -ge 2) { $true } else { $null } } 'two rows of the data grid in view' | Out-Null
+        $rows = @($grid.FindAll($Children, [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { $_.Current.ControlType -eq $CT.ListItem })
+        Assert ($rows.Count -ge 2) "the data grid has $($rows.Count) rows in view, want two"
+        $a = Require-Pattern $rows[0] ([System.Windows.Automation.SelectionItemPattern]::Pattern) 'SelectionItem'
+        $b = Require-Pattern $rows[1] ([System.Windows.Automation.SelectionItemPattern]::Pattern) 'SelectionItem'
+        $a.Select()
+        $b.AddToSelection()
+        Wait-For { if (@($sel.Current.GetSelection()).Count -eq 2) { $true } else { $null } } 'two runs selected' | Out-Null
+        $a.RemoveFromSelection()
+        $b.RemoveFromSelection()
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Components data grid' {
+            $errors = Invoke-AxeScan $demo 'demo-data-grid'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+    }
+
     # ---- Demo: feedback (progress, busy rings, toasts, badges) ---------------
     # The Feedback section is the last section of the Components page. Each
     # check scrolls the Info button into view, which is in the section.
@@ -786,6 +918,10 @@ try {
         }
 
         Check 'demo: AxeWindowsCLI scan of the notifications list open from the bell' {
+            # The warning toast of the check above leaves after 8 seconds. A scan that runs as it
+            # leaves can read its elements after they are gone, and reports them as on-screen with
+            # no bounds. The list is scanned once the toast has gone.
+            Wait-Gone { Find-Named $win 'Disk nearly full' | Select-Object -First 1 } 'the warning toast to leave' | Out-Null
             $bellCond = New-Object System.Windows.Automation.PropertyCondition -ArgumentList ([System.Windows.Automation.AutomationElement]::ControlTypeProperty), $CT.Button
             $bell = @($win.FindAll($Descendants, $bellCond) | Where-Object { $_.Current.Name -match '^Notifications(, \d+ unread)?$' })[0]
             (Require-Pattern $bell ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke').Invoke()
@@ -920,10 +1056,13 @@ try {
     foreach ($p in $Procs) {
         if ($p) { $p.WaitForExit(5000) | Out-Null }
     }
-    if (Test-Path $Work) { Remove-Item -Recurse -Force $Work -ErrorAction SilentlyContinue }
+    # The work folder holds the AxeWindowsCLI results. It is kept when a check fails, so
+    # that the findings can be read; otherwise it is removed.
+    if ($Failed -eq 0 -and (Test-Path $Work)) { Remove-Item -Recurse -Force $Work -ErrorAction SilentlyContinue }
 }
 
 Write-Output ''
+if ($Failed -gt 0 -and (Test-Path $Work)) { Write-Output "Results kept in $Work" }
 Write-Output "Summary: $Passed passed, $Failed failed"
 if ($Failed -gt 0) { exit 1 }
 exit 0
