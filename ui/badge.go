@@ -26,6 +26,86 @@ const (
 	badgeDot
 )
 
+// BadgeStyle is the look of each part of a badge. A part's style merges over the
+// built-in defaults of its variant, then over the theme's Badge, then over the
+// theme's Badges for that variant, then over the Styles of the instance; see
+// docs/styling.md. Badge is the pill, Label its text and Dot the dot: the dot
+// that a badge with Dot() shows before its text, or a badge that is only a dot
+// (BadgeDot). A variant's colors are in its defaults, so an override of Badge or
+// Dot sets the color for the variants it applies to.
+type BadgeStyle struct {
+	Badge Style // the pill: its shape, fill and border
+	Label Style // the text of the badge
+	Dot   Style // the dot, before the text or alone
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s BadgeStyle) merge(o BadgeStyle) BadgeStyle {
+	return BadgeStyle{Badge: s.Badge.Merge(o.Badge), Label: s.Label.Merge(o.Label), Dot: s.Dot.Merge(o.Dot)}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s BadgeStyle) plain() BadgeStyle {
+	return BadgeStyle{Badge: plainStyle(s.Badge), Label: plainStyle(s.Label), Dot: plainStyle(s.Dot)}
+}
+
+// BadgeVariants holds the style of each variant of a badge, for the theme's
+// Badges. It merges over Theme.Badge, which applies to every variant.
+type BadgeVariants struct {
+	Neutral, Accent, Success, Warning, Danger BadgeStyle
+}
+
+// of returns the style of variant v.
+func (bv BadgeVariants) of(v BadgeVariant) BadgeStyle {
+	switch v {
+	case BadgeAccent:
+		return bv.Accent
+	case BadgeSuccess:
+		return bv.Success
+	case BadgeWarning:
+		return bv.Warning
+	case BadgeDanger:
+		return bv.Danger
+	}
+	return bv.Neutral
+}
+
+// badgeDefaults returns the built-in look of a badge of variant v: a pill, or,
+// with dot, a dot on its own. The colors come from badgeColors.
+func badgeDefaults(t *Theme, v BadgeVariant, dot bool) BadgeStyle {
+	fill, ink := badgeColors(t, v)
+	if dot {
+		if t.HighContrast {
+			fill = ink
+		}
+		return BadgeStyle{Dot: Style{Width: Px(8), Height: Px(8), NoShrink: true, Radius: 4, Background: fill}}
+	}
+	d := BadgeStyle{
+		Badge: Style{Direction: Row, Align: Center, NoShrink: true, Radius: 9, Padding: XY(7, 1),
+			MinWidth: Px(18), Background: fill},
+		Label: Style{FontSize: 11, FontWeight: FontSemibold, TextColor: ink},
+		Dot:   Style{Width: Px(6), Height: Px(6), NoShrink: true, Radius: 3, Background: ink},
+	}
+	if t.HighContrast {
+		d.Badge.BorderWidth, d.Badge.BorderColor = 1, t.Text
+	}
+	return d
+}
+
+// resolveBadge returns the look of a badge of variant v: the defaults, merged
+// with the theme's Badge, the theme's Badges for the variant, and the instance's
+// Styles. Under high contrast the overrides are plain (see plainStyle).
+func resolveBadge(t *Theme, v BadgeVariant, dot bool, inst BadgeStyle) BadgeStyle {
+	st := badgeDefaults(t, v, dot)
+	for _, o := range []BadgeStyle{t.Badge, t.Badges.of(v), inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
 // BadgeElement is a small label: a count, a word such as "New", or a dot. A
 // badge is drawn as a pill in its variant's color. High contrast draws it
 // outlined, so the variant is also told by the text.
@@ -39,6 +119,7 @@ type BadgeElement struct {
 	key      string
 	attached bool // set by DivElement.Badged: the owner names the badge
 	leadDot  bool // a dot before the text (see Dot)
+	styles   BadgeStyle
 }
 
 // Badge creates a badge showing count. A count above the maximum (99 by
@@ -76,6 +157,14 @@ func (b *BadgeElement) Noun(s string) *BadgeElement { b.noun = s; return b }
 // Dot puts a dot in front of the text, in the text color, as a status chip does.
 // The dot is hidden from assistive technology: the text is what is read.
 func (b *BadgeElement) Dot() *BadgeElement { b.leadDot = true; return b }
+
+// Styles sets the look of the parts of the badge, for this instance only. Set
+// fields win over the theme's Badge and Badges and the defaults; see BadgeStyle
+// and docs/styling.md. Calling Styles again merges with the earlier values.
+func (b *BadgeElement) Styles(st BadgeStyle) *BadgeElement {
+	b.styles = b.styles.merge(st)
+	return b
+}
 
 // label is the text drawn in the badge. A dot draws none.
 func (b *BadgeElement) label() string {
@@ -120,22 +209,21 @@ func (b *BadgeElement) expand(ctx *Context) Element {
 		return nil
 	}
 	t := ctx.Theme()
-	fill, ink := badgeColors(t, b.variant)
 	if b.kind == badgeDot {
-		d := Div().Size(Px(8), Px(8)).Shrink(0).Radius(4).Background(fill)
-		if t.HighContrast {
-			d.Background(ink)
-		}
+		st := resolveBadge(t, b.variant, true, b.styles)
+		d := Div().asPart("Badge.Dot").Style(st.Dot)
 		b.decorate(d)
 		return d
 	}
-	pill := Div().Row().Align(Center).Shrink(0).Radius(9).PaddingX(7).PaddingY(1).MinWidth(Px(18)).Background(fill)
-	if t.HighContrast {
-		pill.Border(1, t.Text)
-	}
-	label := Text(b.label()).Size(11).Semibold().Color(ink).NoWrap()
+	st := resolveBadge(t, b.variant, false, b.styles)
+	pill := Div().asPart("Badge.Badge")
 	if b.leadDot {
-		pill.Gap(4).Child(Div().Hidden().Size(Px(6), Px(6)).Shrink(0).Radius(3).Background(ink))
+		pill.Style(Style{Gap: 4})
+	}
+	pill.Style(st.Badge)
+	label := Div().asPart("Badge.Label").Style(st.Label).Child(Text(b.label()).NoWrap())
+	if b.leadDot {
+		pill.Child(Div().asPart("Badge.Dot").Hidden().Style(st.Dot))
 	}
 	pill.Child(label)
 	b.decorate(pill)

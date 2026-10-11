@@ -16,6 +16,7 @@ func customizingSection() ui.Element {
 		inbox := ui.Local(ctx, "cust.inbox", "open")
 		swatch := ui.Local(ctx, "cust.swatch", "accent")
 		inline, stacked := ui.Local(ctx, "cust.inline", 8), ui.Local(ctx, "cust.stacked", 8)
+		notify, sync := ui.Local(ctx, "cust.notify", true), ui.Local(ctx, "cust.sync", false)
 
 		overview := ui.Tab[string]{Value: "overview", Label: "Overview", Panel: func() ui.Element { return panelText(t, "Overview panel") }}
 		usage := ui.Tab[string]{Value: "usage", Label: "Usage", Panel: func() ui.Element { return panelText(t, "Usage panel") }}
@@ -69,6 +70,17 @@ func customizingSection() ui.Element {
 						Child(ui.Text(names[tab.Value]).NoWrap()).
 						Child(ui.Badge(counts[tab.Value]))
 				})),
+			sample(t, "Theme: button radius", ui.Button("Save").Primary().OnClick(func() {
+				ctx.Toast(ui.ToastSuccess, "Saved")
+			})),
+			sample(t, "Instance: Checkbox Styles", ui.Checkbox("Notify me", notify).
+				Styles(ui.CheckboxStyle{BoxChecked: ui.Style{Background: t.Success, BorderColor: t.Success}})),
+			sample(t, "Render slot: collapsible header", ui.Collapsible("Sync, 3 items", sync, ui.Text("Last sync 10:42")).
+				Key("cust.syncSection").RenderHeader(func(_ string, _ ui.PartState) ui.Element {
+				return ui.Div().Row().Align(ui.Center).Gap(6).
+					Child(ui.Text("Sync").NoWrap()).
+					Child(ui.Badge(3))
+			})),
 			sample(t, "Spin buttons: Inline", ui.NumberField(inline, 0, 23, 1).Label("Hour, inline").SpinButtons(ui.SpinInline)),
 			sample(t, "Spin buttons: Stacked", ui.NumberField(stacked, 0, 23, 1).Label("Hour, stacked").SpinButtons(ui.SpinStacked)),
 			sample(t, "Render slot: swatch in a select", ui.Select(swatch, swatchOptions...).Label("Swatch").Width(200).

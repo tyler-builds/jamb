@@ -7,9 +7,10 @@ package ui
 // https://learn.microsoft.com/en-us/windows/apps/design/accessibility/high-contrast-themes).
 // Text is WindowText, and selection and the primary action are Highlight with
 // HighlightText. Status colors are WindowText too, so a status is shown by its
-// text and icon, not by its color. Radius, FontSize and the widget parts (Tabs,
-// Select, Slider, NumberField) are taken from base; the parts keep only their
-// sizes and spacing under high contrast (see plainStyle).
+// text and icon, not by its color. Radius, FontSize and the widget parts (the
+// Theme fields for each widget kind, such as Tabs, Button and Toast) are taken
+// from base; the parts keep only their sizes and spacing under high contrast (see
+// plainStyle).
 func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 	if c.isZero() {
 		c = HighContrastBlack()
@@ -46,7 +47,25 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Tabs:          base.Tabs,
 		Select:        base.Select,
 		Slider:        base.Slider,
+		Field:         base.Field,
 		NumberField:   base.NumberField,
+		Button:        base.Button,
+		Buttons:       base.Buttons,
+		Checkbox:      base.Checkbox,
+		RadioGroup:    base.RadioGroup,
+		Switch:        base.Switch,
+		Collapsible:   base.Collapsible,
+		TreeView:      base.TreeView,
+		Menu:          base.Menu,
+		MenuBar:       base.MenuBar,
+		Modal:         base.Modal,
+		ProgressBar:   base.ProgressBar,
+		ProgressRing:  base.ProgressRing,
+		Badge:         base.Badge,
+		Badges:        base.Badges,
+		Toast:         base.Toast,
+		Toasts:        base.Toasts,
+		Tooltip:       base.Tooltip,
 	}
 	return t
 }

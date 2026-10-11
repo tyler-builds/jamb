@@ -72,10 +72,30 @@ func partNode(t *testing.T, rt *Runtime, part, key string) *node {
 	return found[0]
 }
 
+// editorNode returns the one text editor drawn in the rig, which holds the Text,
+// Placeholder and Selection parts of a text field.
+func editorNode(t *testing.T, rt *Runtime) *node {
+	t.Helper()
+	var found []*node
+	for _, n := range rt.byID {
+		if n.kind == kindEditor {
+			found = append(found, n)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("%d text editors, want 1", len(found))
+	}
+	return found[0]
+}
+
 // drawnBy returns the part whose element draws the state part: a state has no
 // element of its own, so its style is found on the element of the part it is a
 // state of.
 func drawnBy(part string) string {
+	// The frame's states are drawn by the frame of their widget.
+	if w, state, ok := strings.Cut(part, ".Frame"); ok && state != "" {
+		return w + ".Frame"
+	}
 	switch part {
 	case "Tabs.TabSelected", "Tabs.TabDisabled", "Tabs.TabHover", "Tabs.TabFocusVisible":
 		return "Tabs.Tab"
@@ -85,8 +105,8 @@ func drawnBy(part string) string {
 		return "Slider.Track"
 	case "Slider.ThumbHover", "Slider.ThumbPressed":
 		return "Slider.Thumb"
-	case "NumberField.FieldInvalid", "NumberField.FieldDisabled":
-		return "NumberField.Field"
+	case "Button.RootHover", "Button.RootPressed", "Button.RootDisabled", "Button.RootFocusVisible":
+		return "Button.Root"
 	case "NumberField.SpinButtonHover", "NumberField.SpinButtonPressed",
 		"NumberField.SpinButtonFocusVisible", "NumberField.SpinButtonDisabled":
 		return "NumberField.SpinButton"
@@ -157,8 +177,23 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Tabs segmented", func(t *testing.T) { testTabsParts(t, TabsSegmented, applied) })
 	t.Run("Select", func(t *testing.T) { testSelectParts(t, applied) })
 	t.Run("Slider", func(t *testing.T) { testSliderParts(t, applied) })
+	t.Run("TextInput", func(t *testing.T) { testFieldParts(t, "TextInput", applied) })
+	t.Run("TextArea", func(t *testing.T) { testFieldParts(t, "TextArea", applied) })
 	t.Run("NumberField inline", func(t *testing.T) { testNumberFieldParts(t, SpinInline, applied) })
 	t.Run("NumberField stacked", func(t *testing.T) { testNumberFieldParts(t, SpinStacked, applied) })
+	t.Run("Button", func(t *testing.T) { testButtonParts(t, applied) })
+	t.Run("Checkbox", func(t *testing.T) { testCheckboxParts(t, applied) })
+	t.Run("RadioGroup", func(t *testing.T) { testRadioGroupParts(t, applied) })
+	t.Run("Switch", func(t *testing.T) { testSwitchParts(t, applied) })
+	t.Run("Collapsible", func(t *testing.T) { testCollapsibleParts(t, applied) })
+	t.Run("TreeView", func(t *testing.T) { testTreeParts(t, applied) })
+	t.Run("Menu", func(t *testing.T) { testMenuParts(t, applied) })
+	t.Run("MenuBar", func(t *testing.T) { testMenuBarParts(t, applied) })
+	t.Run("Modal", func(t *testing.T) { testModalParts(t, applied) })
+	t.Run("Progress", func(t *testing.T) { testProgressParts(t, applied) })
+	t.Run("Badge", func(t *testing.T) { testBadgeParts(t, applied) })
+	t.Run("Toast", func(t *testing.T) { testToastParts(t, applied) })
+	t.Run("Tooltip", func(t *testing.T) { testTooltipParts(t, applied) })
 
 	// The table and docs/styling.md list the same parts, in both directions.
 	documented := documentedParts(t)
@@ -174,40 +209,89 @@ func TestEveryPartIsApplied(t *testing.T) {
 	}
 }
 
-// documentedParts returns the parts that docs/styling.md lists for the phase 1
-// widgets, as "Widget.Part". It reads the widget tables of that document: a row
-// whose first column is the widget's name, and whose parts column names the
-// parts in code spans.
+// documentedParts returns the parts that docs/styling.md lists, as "Widget.Part".
+// It reads the widget table of that document: a row whose first column names
+// one or more widgets (separated by commas), whose second column names the
+// parts in code spans, and whose last column is the status. A row marked
+// "planned" is not yet implemented and is skipped; see
+// TestDocumentedWidgetsAreDone for the rows that must not be planned.
 func documentedParts(t *testing.T) []string {
 	t.Helper()
-	data, err := os.ReadFile("../docs/styling.md")
-	if err != nil {
-		t.Fatalf("reading the styling document: %v", err)
-	}
-	phase1 := map[string]bool{"Tabs": true, "Select": true, "Slider": true, "NumberField": true}
 	var out []string
-	for _, line := range strings.Split(string(data), "\n") {
-		cols := strings.Split(line, "|")
-		if len(cols) < 3 {
-			continue
-		}
-		widget := strings.Trim(strings.TrimSpace(cols[1]), "`")
-		if !phase1[widget] {
+	for _, row := range styleTableRows(t) {
+		if strings.HasPrefix(row.status, "planned") {
 			continue
 		}
 		// The names in code spans are the odd fields of the column split by backticks.
-		for i, name := range strings.Split(cols[2], "`") {
+		for i, name := range strings.Split(row.parts, "`") {
 			if i%2 == 1 {
-				if part := widget + "." + name; !slices.Contains(out, part) {
-					out = append(out, part)
+				for _, widget := range row.widgets {
+					if part := widget + "." + name; !slices.Contains(out, part) {
+						out = append(out, part)
+					}
 				}
 			}
 		}
 	}
 	if len(out) == 0 {
-		t.Fatalf("no phase 1 parts found in docs/styling.md")
+		t.Fatalf("no parts found in docs/styling.md")
 	}
 	return out
+}
+
+// styleRow is a row of the widget table of docs/styling.md.
+type styleRow struct {
+	widgets []string // the widget names of the first column
+	parts   string   // the parts column
+	status  string   // the status column, the last one
+}
+
+// styleTableRows returns the rows of the widget table of docs/styling.md, the
+// table under "## Widgets and their parts": the rows that start with a
+// code-span widget name and end with a status.
+func styleTableRows(t *testing.T) []styleRow {
+	t.Helper()
+	data, err := os.ReadFile("../docs/styling.md")
+	if err != nil {
+		t.Fatalf("reading the styling document: %v", err)
+	}
+	doc := string(data)
+	start := strings.Index(doc, "\n## Widgets and their parts\n")
+	end := strings.Index(doc, "\n## Examples\n")
+	if start < 0 || end < start {
+		t.Fatalf("docs/styling.md has no widget table between its sections")
+	}
+	var rows []styleRow
+	for _, line := range strings.Split(doc[start:end], "\n") {
+		cols := strings.Split(line, "|")
+		if len(cols) < 4 || !strings.HasPrefix(strings.TrimSpace(cols[1]), "`") {
+			continue
+		}
+		var widgets []string
+		for _, w := range strings.Split(cols[1], ",") {
+			widgets = append(widgets, strings.Trim(strings.TrimSpace(w), "`"))
+		}
+		rows = append(rows, styleRow{widgets: widgets, parts: cols[2], status: strings.TrimSpace(cols[len(cols)-2])})
+	}
+	return rows
+}
+
+// TestDocumentedWidgetsAreDone checks that docs/styling.md has every widget
+// filled in: each widget row lists its parts and none is marked planned. It
+// fails while a widget row is still planned.
+func TestDocumentedWidgetsAreDone(t *testing.T) {
+	rows := styleTableRows(t)
+	if len(rows) == 0 {
+		t.Fatalf("no widget rows in docs/styling.md")
+	}
+	for _, row := range rows {
+		if strings.HasPrefix(row.status, "planned") {
+			t.Errorf("%s is marked planned in docs/styling.md", strings.Join(row.widgets, ", "))
+		}
+		if !strings.Contains(row.parts, "`") {
+			t.Errorf("%s lists no parts in docs/styling.md", strings.Join(row.widgets, ", "))
+		}
+	}
 }
 
 // partTabs is a tab list of three tabs, the middle one disabled, with variant v
@@ -399,15 +483,22 @@ func testNumberFieldParts(t *testing.T, p SpinPlacement, applied map[string]bool
 		disabled bool
 		act      func(*testing.T, *accessRig)
 	}
+	invalid := func(t *testing.T, r *accessRig) {
+		focusNode(r, r.keyed(t, "nf"))
+		r.typeText("x")
+		r.press(input.KeyEnter, 0)
+	}
 	cases := []numberCase{
-		{part: "NumberField.Field", set: func(s *NumberFieldStyle, m Style) { s.Field = m }, value: 8},
-		{part: "NumberField.FieldInvalid", set: func(s *NumberFieldStyle, m Style) { s.FieldInvalid = m }, value: 8,
-			act: func(t *testing.T, r *accessRig) {
-				focusNode(r, r.keyed(t, "nf"))
-				r.typeText("x")
-				r.press(input.KeyEnter, 0)
-			}},
-		{part: "NumberField.FieldDisabled", set: func(s *NumberFieldStyle, m Style) { s.FieldDisabled = m }, value: 8, disabled: true},
+		{part: "NumberField.Frame", set: func(s *NumberFieldStyle, m Style) { s.Frame = m }, value: 8},
+		{part: "NumberField.FrameHover", set: func(s *NumberFieldStyle, m Style) { s.FrameHover = m }, value: 8,
+			act: func(t *testing.T, r *accessRig) { hoverNode(r, partNode(t, r.rt, "NumberField.Frame", "")) }},
+		{part: "NumberField.FrameFocusWithin", set: func(s *NumberFieldStyle, m Style) { s.FrameFocusWithin = m }, value: 8,
+			act: func(t *testing.T, r *accessRig) { focusNode(r, editorNode(t, r.rt)) }},
+		{part: "NumberField.FrameInvalid", set: func(s *NumberFieldStyle, m Style) { s.FrameInvalid = m }, value: 8, act: invalid},
+		{part: "NumberField.FrameDisabled", set: func(s *NumberFieldStyle, m Style) { s.FrameDisabled = m }, value: 8, disabled: true},
+		{part: "NumberField.Text", set: func(s *NumberFieldStyle, m Style) { s.Text = m }, value: 8},
+		{part: "NumberField.Selection", set: func(s *NumberFieldStyle, m Style) { s.Selection = m }, value: 8},
+		{part: "NumberField.Message", set: func(s *NumberFieldStyle, m Style) { s.Message = m }, value: 8, act: invalid},
 		{part: "NumberField.SpinButtons", set: func(s *NumberFieldStyle, m Style) { s.SpinButtons = m }, value: 8},
 		{part: "NumberField.SpinButton", set: func(s *NumberFieldStyle, m Style) { s.SpinButton = m }, value: 8},
 		{part: "NumberField.SpinButtonHover", set: func(s *NumberFieldStyle, m Style) { s.SpinButtonHover = m }, value: 8,
@@ -423,7 +514,7 @@ func testNumberFieldParts(t *testing.T, p SpinPlacement, applied map[string]bool
 		applied[c.part] = true
 		t.Run(c.part, func(t *testing.T) {
 			var st NumberFieldStyle
-			c.set(&st, Style{Background: markBG})
+			c.set(&st, Style{Background: markBG, TextColor: markFG})
 			v := NewSignal(c.value)
 			r := newAccessRig(func(ctx *Context) Element { return partNumberField(v, st, p, c.disabled) })
 			if c.act != nil {
@@ -443,10 +534,16 @@ func testNumberFieldParts(t *testing.T, p SpinPlacement, applied map[string]bool
 				if found == 0 {
 					t.Errorf("%s: no spin button is drawn in the part's color", c.part)
 				}
-			case "NumberField.SpinButtons":
-				wantBackground(t, partNode(t, r.rt, drawnBy(c.part), ""), c.part, markBG)
+			case "NumberField.SpinButtons", "NumberField.Message":
+				wantBackground(t, partNode(t, r.rt, c.part, ""), c.part, markBG)
+			case "NumberField.Text":
+				wantTextColor(t, editorNode(t, r.rt), c.part, markFG)
+			case "NumberField.Selection":
+				if got := editorNode(t, r.rt).editor.selection; got != markBG {
+					t.Errorf("%s: selection color %v, want %v", c.part, got, markBG)
+				}
 			default:
-				wantBackground(t, partNode(t, r.rt, "NumberField.Field", ""), c.part, markBG)
+				wantBackground(t, partNode(t, r.rt, drawnBy(c.part), ""), c.part, markBG)
 			}
 		})
 	}
@@ -496,15 +593,24 @@ func TestPartStylePrecedence(t *testing.T) {
 				return partSlider(NewSignal(50.0), st)
 			},
 			setTheme: func(th *Theme, c Color) { th.Slider.Thumb.Background = c }},
-		{name: "NumberField", part: "NumberField.Field", def: DarkTheme.Surface,
+		{name: "NumberField", part: "NumberField.Frame", def: DarkTheme.Surface,
 			build: func(th *Theme, inst bool) Element {
 				var st NumberFieldStyle
 				if inst {
-					st.Field = Style{Background: instBG}
+					st.Frame = Style{Background: instBG}
 				}
 				return partNumberField(NewSignal(8), st, SpinInline, false)
 			},
-			setTheme: func(th *Theme, c Color) { th.NumberField.Field.Background = c }},
+			setTheme: func(th *Theme, c Color) { th.NumberField.Frame.Background = c }},
+		{name: "TextInput", part: "TextInput.Frame", def: DarkTheme.Surface,
+			build: func(th *Theme, inst bool) Element {
+				var st FieldStyle
+				if inst {
+					st.Frame = Style{Background: instBG}
+				}
+				return partTextInput(NewSignal(""), st)
+			},
+			setTheme: func(th *Theme, c Color) { th.Field.Frame.Background = c }},
 	}
 	for _, p := range probes {
 		t.Run(p.name, func(t *testing.T) {

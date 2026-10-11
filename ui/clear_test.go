@@ -206,7 +206,7 @@ func TestStackedSpinButtonsSitInsideTheField(t *testing.T) {
 			r.rt.SetSystemSettings(SystemSettings{TextScale: scale})
 			r.frame()
 		}
-		frame := rectOf(r, partNode(t, r.rt, "NumberField.Field", ""))
+		frame := rectOf(r, partNode(t, r.rt, "NumberField.Frame", ""))
 		group := rectOf(r, partNode(t, r.rt, "NumberField.SpinButtons", ""))
 		up := rectOf(r, buttonNode(t, r, "Increase"))
 		down := rectOf(r, buttonNode(t, r, "Decrease"))
@@ -231,6 +231,39 @@ func TestStackedSpinButtonsSitInsideTheField(t *testing.T) {
 		if up.Y > down.Y {
 			t.Errorf("%d%%: the increase button is below the decrease button", scale)
 		}
+	}
+}
+
+// TestFieldPartClears checks the clear through the text frame's parts: a text
+// field with no border and no fill, a placeholder that is not given a color, a
+// selection with no color, and a number field's frame with no border.
+func TestFieldPartClears(t *testing.T) {
+	st := FieldStyle{
+		Frame:       Style{Clear: ClearBorder | ClearBackground},
+		Placeholder: Style{Clear: ClearTextColor},
+		Selection:   Style{Clear: ClearBackground},
+	}
+	r := newAccessRig(func(ctx *Context) Element { return partTextInput(NewSignal(""), st) })
+	frame := partNode(t, r.rt, "TextInput.Frame", "")
+	if frame.style.BorderWidth != 0 || !frame.style.BorderColor.IsZero() {
+		t.Errorf("the text field kept its border: width %v color %v", frame.style.BorderWidth, frame.style.BorderColor)
+	}
+	if !frame.style.Background.IsZero() {
+		t.Errorf("the text field kept its fill: %v", frame.style.Background)
+	}
+	ed := editorNode(t, r.rt)
+	if !ed.editor.placeholderColor.IsZero() {
+		t.Errorf("the placeholder kept its color: %v", ed.editor.placeholderColor)
+	}
+	if !ed.editor.selection.IsZero() {
+		t.Errorf("the selection kept its color: %v", ed.editor.selection)
+	}
+
+	r = newAccessRig(func(ctx *Context) Element {
+		return partNumberField(NewSignal(8), NumberFieldStyle{FieldStyle: FieldStyle{Frame: Style{Clear: ClearBorder}}}, SpinInline, false)
+	})
+	if n := partNode(t, r.rt, "NumberField.Frame", ""); n.style.BorderWidth != 0 {
+		t.Errorf("the number field kept its frame border: %v", n.style.BorderWidth)
 	}
 }
 

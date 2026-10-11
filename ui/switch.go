@@ -6,6 +6,111 @@ import (
 	"github.com/tyler-builds/jamb/access"
 )
 
+// SwitchStyle is the look of each part of a switch. A part's style merges over
+// the built-in defaults, then over the theme's Switch, then over the Styles of
+// the instance; see docs/styling.md. Track is the pill, and Knob the circle that
+// moves along it. The position of the knob follows the state and is not a style:
+// a Knob style sets its color, border, shadow and size. The states are parts of
+// their own: TrackChecked when the switch is on, TrackHover while the pointer is
+// over an enabled switch, TrackFocusVisible while it has keyboard focus,
+// TrackDisabled and KnobDisabled when it cannot change, and KnobChecked for the
+// knob of an on switch.
+type SwitchStyle struct {
+	Track             Style // the track: its size, shape, fill and border
+	TrackChecked      Style // the track when the switch is on
+	TrackHover        Style // the track while the pointer is over an enabled switch
+	TrackFocusVisible Style // the track while it has keyboard focus
+	TrackDisabled     Style // the track when the switch is disabled
+	Knob              Style // the knob: its size, color and shadow
+	KnobChecked       Style // the knob when the switch is on
+	KnobDisabled      Style // the knob when the switch is disabled
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s SwitchStyle) merge(o SwitchStyle) SwitchStyle {
+	return SwitchStyle{
+		Track:             s.Track.Merge(o.Track),
+		TrackChecked:      s.TrackChecked.Merge(o.TrackChecked),
+		TrackHover:        s.TrackHover.Merge(o.TrackHover),
+		TrackFocusVisible: s.TrackFocusVisible.Merge(o.TrackFocusVisible),
+		TrackDisabled:     s.TrackDisabled.Merge(o.TrackDisabled),
+		Knob:              s.Knob.Merge(o.Knob),
+		KnobChecked:       s.KnobChecked.Merge(o.KnobChecked),
+		KnobDisabled:      s.KnobDisabled.Merge(o.KnobDisabled),
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s SwitchStyle) plain() SwitchStyle {
+	return SwitchStyle{
+		Track:             plainStyle(s.Track),
+		TrackChecked:      plainStyle(s.TrackChecked),
+		TrackHover:        plainStyle(s.TrackHover),
+		TrackFocusVisible: plainStyle(s.TrackFocusVisible),
+		TrackDisabled:     plainStyle(s.TrackDisabled),
+		Knob:              plainStyle(s.Knob),
+		KnobChecked:       plainStyle(s.KnobChecked),
+		KnobDisabled:      plainStyle(s.KnobDisabled),
+	}
+}
+
+// switchDefaults returns the built-in look of a switch that is on or off and
+// disabled or not, from the colors of t. Under high contrast the track is an
+// outlined empty track, or a solid Highlight track when on, with the knob in the
+// text color (AccentText when on); a disabled switch is GrayText and not dimmed.
+func switchDefaults(t *Theme, on, disabled bool) SwitchStyle {
+	ring := Shadow{Spread: 2, Color: t.FocusRing}
+	d := SwitchStyle{
+		Track: Style{Width: Px(38), Height: Px(22), NoShrink: true, Radius: 11,
+			Background: t.SurfaceActive},
+		TrackChecked:      Style{Background: t.Accent},
+		TrackFocusVisible: Style{Shadows: []Shadow{ring}},
+		Knob: Style{Absolute: true, Width: Px(16), Height: Px(16), NoShrink: true, Radius: 8,
+			Background: Hex("#ffffff")},
+	}
+	if t.HighContrast {
+		d.Track.Background, d.Track.BorderWidth, d.Track.BorderColor = t.Surface, 2, t.Text
+		d.TrackChecked = Style{Background: t.Accent}
+		d.Knob.Background = t.Text
+		d.KnobChecked = Style{Background: t.AccentText}
+	} else {
+		d.Track.Transition = 120 * time.Millisecond
+		d.Knob.Shadows = []Shadow{ShadowSm}
+		hover := t.SurfaceActive
+		if on {
+			hover = t.Accent
+		}
+		d.TrackHover = Style{Background: hover.Lighten(0.08)}
+	}
+	if disabled {
+		if t.HighContrast {
+			d.TrackDisabled = Style{BorderColor: t.Disabled}
+			d.KnobDisabled = Style{Background: t.Disabled}
+			if on {
+				d.TrackDisabled.Background = t.Disabled
+				d.KnobDisabled.Background = t.Surface
+			}
+		} else {
+			d.TrackDisabled = Style{Opacity: 0.5}
+		}
+	}
+	return d
+}
+
+// resolveSwitch returns the look of a switch: the defaults for its state, merged
+// with the theme's Switch and then the instance's Styles. Under high contrast the
+// two overrides are plain (see plainStyle).
+func resolveSwitch(t *Theme, on, disabled bool, inst SwitchStyle) SwitchStyle {
+	st := switchDefaults(t, on, disabled)
+	for _, o := range []SwitchStyle{t.Switch, inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
 // SwitchElement is an on/off switch bound to a bool signal. It is drawn as a
 // track and a knob, without text: its label is what assistive technology reads,
 // and the text beside it is drawn by the app.
@@ -15,6 +120,7 @@ type SwitchElement struct {
 	key      string
 	disabled bool
 	onChange func(bool)
+	styles   SwitchStyle
 }
 
 // Switch creates a switch that is on while on is true. label names the switch
@@ -35,55 +141,43 @@ func (s *SwitchElement) Disabled(d bool) *SwitchElement { s.disabled = d; return
 // signal is set first.
 func (s *SwitchElement) OnChange(fn func(bool)) *SwitchElement { s.onChange = fn; return s }
 
+// Styles sets the look of the parts of the switch, for this instance only. Set
+// fields win over the theme's Switch and the defaults; see SwitchStyle and
+// docs/styling.md. Calling Styles again merges with the earlier values.
+func (s *SwitchElement) Styles(st SwitchStyle) *SwitchElement {
+	s.styles = s.styles.merge(st)
+	return s
+}
+
 func (s *SwitchElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	on := s.on.Get()
-	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	track, knob, knobX := t.SurfaceActive, Hex("#ffffff"), float32(3)
+	st := resolveSwitch(t, on, s.disabled, s.styles)
+	knobX := float32(3)
 	if on {
-		track, knobX = t.Accent, 19
+		knobX = 19
 	}
-	d := Div().Size(Px(38), Px(22)).Shrink(0).Radius(11).Background(track).
+	d := Div().asPart("Switch.Track").Style(st.Track).
 		Role(access.RoleSwitch).Label(s.label).Checked(on)
 	d.spaceOnly = true // Enter goes on to the modal default button, as on Windows
-	k := Div().Absolute().Left(knobX).Top(3).Size(Px(16), Px(16)).Radius(8).Background(knob)
-	if t.HighContrast {
-		// On is a solid Highlight track with an AccentText knob. Off is an outlined
-		// empty track with a text-colored knob, so the two states differ in color
-		// and in outline, not only in the knob's place. A disabled switch is drawn in
-		// GrayText, not dimmed: its outline and its knob are GrayText, and an on
-		// track is filled with GrayText.
-		track, knob, edge := t.Surface, t.Text, t.Text
-		if on {
-			track, knob = t.Accent, t.AccentText
-		}
-		if s.disabled {
-			edge, knob = t.Disabled, t.Disabled
-			if on {
-				track, knob = t.Disabled, t.Surface
-			} else {
-				track = t.Surface
-			}
-		}
-		d.Background(track).Border(2, edge)
-		k.Background(knob)
-	} else {
-		d.Transition(120 * time.Millisecond)
-		k.Shadow(ShadowSm)
+	if on {
+		d.Style(st.TrackChecked)
+	}
+	k := Div().asPart("Switch.Knob").Style(st.Knob).Absolute().Left(knobX).Top(3)
+	if on {
+		k.Style(st.KnobChecked)
+	}
+	if s.disabled {
+		k.Style(st.KnobDisabled)
 	}
 	d.Child(k)
 	if s.disabled {
-		d.Cursor(CursorNotAllowed)
+		d.Style(st.TrackDisabled).Cursor(CursorNotAllowed)
 		d.access().disabled = true
-		if !t.HighContrast {
-			d.Opacity(0.5)
-		}
 		return d
 	}
-	if !t.HighContrast {
-		d.Hover(Style{Background: track.Lighten(0.08)})
-	}
-	return d.Cursor(CursorPointer).Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
+	d.Hover(st.TrackHover)
+	return d.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
 		OnClick(func() {
 			s.on.Set(!on)
 			if s.onChange != nil {

@@ -33,6 +33,76 @@ type ModalElement struct {
 	initial  *FocusHandle
 	onClose  func()
 	backdrop bool
+	styles   ModalStyle
+}
+
+// ModalStyle is the look of each part of a modal. A part's style merges over the
+// built-in defaults, then over the theme's Modal, then over the Styles of the
+// instance; see docs/styling.md. Scrim is the dimmed backdrop, Panel the dialog
+// on it, Title its title, Body the area of the body and Footer the row of
+// buttons. The panel's width is its Width, 420 px by default.
+type ModalStyle struct {
+	Scrim  Style // the dimmed backdrop behind the dialog
+	Panel  Style // the dialog
+	Title  Style // the title, at the top of the dialog
+	Body   Style // the body, under the title
+	Footer Style // the row of buttons, at the bottom
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s ModalStyle) merge(o ModalStyle) ModalStyle {
+	return ModalStyle{
+		Scrim:  s.Scrim.Merge(o.Scrim),
+		Panel:  s.Panel.Merge(o.Panel),
+		Title:  s.Title.Merge(o.Title),
+		Body:   s.Body.Merge(o.Body),
+		Footer: s.Footer.Merge(o.Footer),
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s ModalStyle) plain() ModalStyle {
+	return ModalStyle{
+		Scrim:  plainStyle(s.Scrim),
+		Panel:  plainStyle(s.Panel),
+		Title:  plainStyle(s.Title),
+		Body:   plainStyle(s.Body),
+		Footer: plainStyle(s.Footer),
+	}
+}
+
+// modalDefaults returns the built-in look of a modal, from the colors of t.
+func modalDefaults(t *Theme) ModalStyle {
+	return ModalStyle{
+		Scrim: Style{Background: t.Scrim},
+		Panel: Style{Width: Px(modalWidth), Background: t.Surface, BorderWidth: 1, BorderColor: t.Border,
+			Radius: 10, Shadows: []Shadow{ShadowLg}, Padding: All(20), Gap: 16},
+		Title:  Style{FontSize: 16, FontWeight: FontSemibold},
+		Body:   Style{Direction: Column, Gap: 12},
+		Footer: Style{Direction: Row, Justify: End, Gap: 8},
+	}
+}
+
+// resolveModal returns the look of a modal: the defaults, merged with the
+// theme's Modal and then the instance's Styles. Under high contrast the two
+// overrides are plain (see plainStyle).
+func resolveModal(t *Theme, inst ModalStyle) ModalStyle {
+	st := modalDefaults(t)
+	for _, o := range []ModalStyle{t.Modal, inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
+// Styles sets the look of the parts of the modal, for this instance only. Set
+// fields win over the theme's Modal and the defaults; see ModalStyle and
+// docs/styling.md. Calling Styles again merges with the earlier values.
+func (m *ModalElement) Styles(st ModalStyle) *ModalElement {
+	m.styles = m.styles.merge(st)
+	return m
 }
 
 // modalSpec is what the runtime keeps from a built Modal, on its backdrop
@@ -98,6 +168,7 @@ func (*ModalElement) isElement() {}
 
 func (m *ModalElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
+	st := resolveModal(t, m.styles)
 	closeFn := func() {
 		if m.onClose != nil {
 			m.onClose()
@@ -105,10 +176,9 @@ func (m *ModalElement) expand(ctx *Context) Element {
 	}
 	spec := &modalSpec{def: m.def, initial: m.initial}
 
-	footer := Div().Row().Justify(End).Gap(8).Children(m.footer...)
+	footer := Div().asPart("Modal.Footer").Style(st.Footer).Children(m.footer...)
 	footer.modalFooter = true
-	panel := Div().Overlay(OverCenter).Width(Px(modalWidth)).
-		Background(t.Surface).Border(1, t.Border).Radius(10).Shadow(ShadowLg).Padding(20).Gap(16).
+	panel := Div().asPart("Modal.Panel").Overlay(OverCenter).Style(st.Panel).
 		// The panel and the backdrop take focus by click, so a click on either
 		// does not leave the modal without focus. Neither is in the Tab order.
 		Focusable().TabStop(false).
@@ -121,12 +191,12 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		// the backdrop, which the panel counts as its parent, so it does not
 		// reach this.
 		OnClickOutside(closeFn).
-		Child(Text(m.title).Size(16).Semibold()).
-		Child(Div().Column().Gap(12).Child(m.body)).
+		Child(Div().asPart("Modal.Title").Style(st.Title).Child(Text(m.title))).
+		Child(Div().asPart("Modal.Body").Style(st.Body).Child(m.body)).
 		Child(footer).
 		Role(access.RoleDialog).Label(m.title)
 
-	backdrop := Div().Absolute().Inset(0).Background(t.Scrim).
+	backdrop := Div().asPart("Modal.Scrim").Absolute().Inset(0).Style(st.Scrim).
 		Focusable().TabStop(false).
 		Enter(Fade(), Animation{Duration: 140 * time.Millisecond}).
 		Exit(Fade(), Animation{Duration: 90 * time.Millisecond}).

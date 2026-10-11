@@ -113,15 +113,49 @@ func (rt *Runtime) paintOverlays(view scene.Rect, dt float32) {
 	}
 }
 
+// TooltipStyle is the look of each part of a tooltip. A part's style merges over
+// the built-in defaults, then over the theme's Tooltip; a tooltip has no
+// instance. Panel is the box that shows the text, and Text the text in it. See
+// docs/styling.md.
+type TooltipStyle struct {
+	Panel Style // the box of the tooltip
+	Text  Style // the text in it
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s TooltipStyle) merge(o TooltipStyle) TooltipStyle {
+	return TooltipStyle{Panel: s.Panel.Merge(o.Panel), Text: s.Text.Merge(o.Text)}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s TooltipStyle) plain() TooltipStyle {
+	return TooltipStyle{Panel: plainStyle(s.Panel), Text: plainStyle(s.Text)}
+}
+
+// tooltipDefaults returns the built-in look of a tooltip, from the colors of t.
+func tooltipDefaults(t *Theme) TooltipStyle {
+	return TooltipStyle{Panel: Style{Padding: XY(8, 4), Radius: 6, Background: t.Surface, BorderWidth: 1,
+		BorderColor: t.Border, Shadows: []Shadow{ShadowMd}, TextColor: t.Text, FontSize: 12}}
+}
+
+// resolveTooltip returns the look of a tooltip: the defaults, merged with the
+// theme's Tooltip. Under high contrast the override is plain (see plainStyle).
+func resolveTooltip(t *Theme) TooltipStyle {
+	st := tooltipDefaults(t)
+	o := t.Tooltip
+	if t.HighContrast {
+		o = o.plain()
+	}
+	return st.merge(o)
+}
+
 // tooltipElement builds the label shown for a tooltip. It fades in and out.
 func (rt *Runtime) tooltipElement(s string) Element {
-	return Div().Key("jamb.tooltip").Overlay(BelowCenter).OverlayGap(6).
-		PaddingX(8).PaddingY(4).Radius(6).
-		Background(rt.theme.Surface).Border(1, rt.theme.Border).Shadow(ShadowMd).
-		TextColor(rt.theme.Text).FontSize(12).
+	st := resolveTooltip(rt.theme)
+	return Div().asPart("Tooltip.Panel").Key("jamb.tooltip").Overlay(BelowCenter).OverlayGap(6).Style(st.Panel).
 		Enter(Fade(), Animation{Duration: 120 * time.Millisecond}).
 		Exit(Fade(), Animation{Duration: 80 * time.Millisecond}).
-		Child(Text(s).NoWrap()).Role(access.RoleTooltip)
+		Child(Div().asPart("Tooltip.Text").Style(st.Text).Child(Text(s).NoWrap())).Role(access.RoleTooltip)
 }
 
 // showTip makes id the element whose tooltip is displayed (0 hides it),

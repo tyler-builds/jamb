@@ -25,78 +25,83 @@ const (
 )
 
 // NumberFieldStyle is the look of each part of a number field. A part's style
-// merges over the built-in defaults, then over the theme's NumberField, then over
-// the Styles of the instance; see docs/styling.md. Field is the text frame, and
-// FieldInvalid and FieldDisabled are its states. The spin buttons are
+// merges over the built-in defaults, then over the theme's Field and NumberField,
+// then over the Styles of the instance; see docs/styling.md.
+//
+// The text frame is FieldStyle: Frame, with its states FrameHover,
+// FrameFocusWithin, FrameDisabled and FrameInvalid, and the Text and Selection
+// parts. Placeholder, Leading and Trailing are in FieldStyle too, but a number
+// field has no placeholder, icon or element, so they do not apply to it. Message
+// is the row that says why the text is invalid: its icon is drawn in the
+// message's TextColor when it sets one, and in Danger (the text color under high
+// contrast) otherwise, and its text takes the same color. The spin buttons are
 // SpinButtons (the group), SpinButton (each button), and its states
 // SpinButtonHover, SpinButtonPressed, SpinButtonFocusVisible and
 // SpinButtonDisabled.
 type NumberFieldStyle struct {
-	Field                  Style // the text frame
-	FieldInvalid           Style // the frame while the text is not a valid number
-	FieldDisabled          Style // the frame of a disabled field
+	FieldStyle
 	SpinButtons            Style // the group of spin buttons
 	SpinButton             Style // each spin button
 	SpinButtonHover        Style // a spin button the pointer is over, if enabled
 	SpinButtonPressed      Style // a spin button being pressed
 	SpinButtonFocusVisible Style // a spin button that has keyboard focus
 	SpinButtonDisabled     Style // a spin button that cannot step the value any further
+	Message                Style // the row with the icon and the message, while the text is invalid
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
 func (s NumberFieldStyle) merge(o NumberFieldStyle) NumberFieldStyle {
 	return NumberFieldStyle{
-		Field:                  s.Field.Merge(o.Field),
-		FieldInvalid:           s.FieldInvalid.Merge(o.FieldInvalid),
-		FieldDisabled:          s.FieldDisabled.Merge(o.FieldDisabled),
+		FieldStyle:             s.FieldStyle.merge(o.FieldStyle),
 		SpinButtons:            s.SpinButtons.Merge(o.SpinButtons),
 		SpinButton:             s.SpinButton.Merge(o.SpinButton),
 		SpinButtonHover:        s.SpinButtonHover.Merge(o.SpinButtonHover),
 		SpinButtonPressed:      s.SpinButtonPressed.Merge(o.SpinButtonPressed),
 		SpinButtonFocusVisible: s.SpinButtonFocusVisible.Merge(o.SpinButtonFocusVisible),
 		SpinButtonDisabled:     s.SpinButtonDisabled.Merge(o.SpinButtonDisabled),
+		Message:                s.Message.Merge(o.Message),
 	}
 }
 
 // plain returns s as high contrast allows it (see plainStyle).
 func (s NumberFieldStyle) plain() NumberFieldStyle {
 	return NumberFieldStyle{
-		Field:                  plainStyle(s.Field),
-		FieldInvalid:           plainStyle(s.FieldInvalid),
-		FieldDisabled:          plainStyle(s.FieldDisabled),
+		FieldStyle:             s.FieldStyle.plain(),
 		SpinButtons:            plainStyle(s.SpinButtons),
 		SpinButton:             plainStyle(s.SpinButton),
 		SpinButtonHover:        plainStyle(s.SpinButtonHover),
 		SpinButtonPressed:      plainStyle(s.SpinButtonPressed),
 		SpinButtonFocusVisible: plainStyle(s.SpinButtonFocusVisible),
 		SpinButtonDisabled:     plainStyle(s.SpinButtonDisabled),
+		Message:                plainStyle(s.Message),
 	}
 }
 
 // numberFieldDefaults returns the built-in look of a number field of the given
-// width, with spin buttons of placement, from the colors of t.
-func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale float32) NumberFieldStyle {
+// width, with spin buttons of placement, from the colors of t. A disabled field
+// has the disabled frame (see fieldDefaults).
+func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale float32, disabled bool) NumberFieldStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	d := NumberFieldStyle{
-		Field:                  Style{Width: Px(width)},
-		FieldInvalid:           Style{BorderWidth: 2, BorderColor: t.Danger},
+		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled}),
 		SpinButton:             Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond},
 		SpinButtonHover:        Style{Background: t.SurfaceHover, TextColor: t.Text},
 		SpinButtonPressed:      Style{Background: t.SurfaceActive},
 		SpinButtonFocusVisible: Style{Shadows: []Shadow{ring}},
+		Message:                Style{Direction: Row, Align: Center, Gap: 6, FontSize: 12},
 	}
+	d.Frame.Width = Px(width)
 	if t.HighContrast {
-		// The invalid frame is drawn in the text color, and disabled controls are GrayText.
-		d.FieldInvalid.BorderColor = t.Text
-		d.FieldDisabled = Style{BorderColor: t.Disabled, TextColor: t.Disabled}
+		// Disabled controls are GrayText.
 		d.SpinButtonDisabled = Style{TextColor: t.Disabled}
 	} else {
-		d.FieldDisabled = Style{Opacity: 0.5}
 		d.SpinButtonDisabled = Style{Opacity: 0.5}
 	}
 	if placement == SpinStacked {
 		// The column sits at the field's right edge, inside the frame, at the field's
 		// height: its two buttons share that height. It scales with the Text size.
+		// The frame has no gap and no right padding, so the column is at its edge.
+		d.Frame.Gap, d.Frame.Padding, d.Frame.MinHeight = 0, Edges{Left: 10}, Px(34*scale)
 		d.SpinButtons = Style{Direction: Column, Width: Px(18 * scale), Height: Px(34 * scale), NoShrink: true}
 		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Full, Height: Px(17 * scale)}
 		// A ring would be drawn outside the buttons, into the frame's clipped edge,
@@ -111,11 +116,11 @@ func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale
 }
 
 // resolveNumberField returns the look of a number field: the defaults, merged
-// with the theme's NumberField and then the instance's Styles. Under high
-// contrast the two overrides are plain (see plainStyle).
-func resolveNumberField(t *Theme, width float32, placement SpinPlacement, scale float32, inst NumberFieldStyle) NumberFieldStyle {
-	st := numberFieldDefaults(t, width, placement, scale)
-	for _, o := range []NumberFieldStyle{t.NumberField, inst} {
+// with the theme's Field, then the theme's NumberField, then the instance's
+// Styles. Under high contrast the overrides are plain (see plainStyle).
+func resolveNumberField(t *Theme, width float32, placement SpinPlacement, scale float32, disabled bool, inst NumberFieldStyle) NumberFieldStyle {
+	st := numberFieldDefaults(t, width, placement, scale, disabled)
+	for _, o := range []NumberFieldStyle{{FieldStyle: t.Field}, t.NumberField, inst} {
 		if t.HighContrast {
 			o = o.plain()
 		}
@@ -206,7 +211,7 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		scale := float32(ctx.TextScale()) / 100
-		st := resolveNumberField(t, n.width, n.placement, scale, n.styles)
+		st := resolveNumberField(t, n.width, n.placement, scale, n.disabled, n.styles)
 		v := n.value.Get()
 		// The field keeps its own text while the user types. draft is that text,
 		// and seen is the value it was last made from, so that a value set from
@@ -272,31 +277,30 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 		row := Div().Row().Align(Center).Gap(6)
 		if n.disabled {
 			a.disabled = true
-			// The disabled number is drawn as text in a frame. Under high contrast the
-			// frame and the text are GrayText, with no dimming.
-			frame := Div().asPart("NumberField.Field").Row().Align(Center).MinHeight(Px(34)).PaddingX(10).
-				Radius(t.Radius).Background(t.Surface).Border(1, t.Border).
-				Style(st.Field).Style(st.FieldDisabled)
-			root.Child(row.Child(frame.Child(Text(draft.Get()))))
+			// The disabled number is drawn as text in a frame, with the disabled frame
+			// and text parts. Under high contrast both are GrayText, with no dimming.
+			frame := Div().asPart("NumberField.Frame").Style(st.Frame).Style(st.FrameDisabled)
+			content := Div().asPart("NumberField.Text").Style(st.Text).Child(Text(draft.Get()))
+			root.Child(row.Child(frame.Child(content)))
 			return root
 		}
 
 		fo := fieldOptions{value: draft, name: n.name, labelledBy: n.labelledBy,
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, onStep: step,
-			partName: "NumberField.Field"}
-		fo.style = st.Field
+			widget: "NumberField"}
+		fst := st.FieldStyle
 		if isInvalid {
 			fo.describedBy = []string{errKey}
 			// The invalid frame is drawn thicker and in the danger color (the text
 			// color under high contrast), and the message says what is wrong.
-			fo.style = fo.style.Merge(st.FieldInvalid)
+			fst.Frame = fst.Frame.Merge(st.FrameInvalid)
 		}
 		// Stacked buttons are the frame's trailing element, inside its right edge.
 		// Inline buttons follow the frame.
 		if n.spin && n.placement == SpinStacked {
 			fo.trailing = n.spinButtons(st, v, step, scale)
 		}
-		row.Child(fo.expand(ctx, false, 0))
+		row.Child(fo.expand(ctx, fst, false, 0))
 		if n.spin && n.placement != SpinStacked {
 			row.Child(n.spinButtons(st, v, step, scale))
 		}
@@ -307,9 +311,12 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 			if t.HighContrast {
 				iconColor = t.Text
 			}
-			root.Child(Div().Row().Align(Center).Gap(6).
+			if !st.Message.TextColor.IsZero() {
+				iconColor = st.Message.TextColor
+			}
+			root.Child(Div().asPart("NumberField.Message").Style(st.Message).
 				Child(Icon(icons.Alert).Size(14).Color(iconColor)).
-				Child(Text(msg).Size(12).Key(errKey)))
+				Child(Text(msg).Key(errKey)))
 		}
 		return root
 	})

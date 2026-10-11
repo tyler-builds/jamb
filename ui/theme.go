@@ -48,10 +48,48 @@ type Theme struct {
 	// above, and an instance's Styles merge over them. Under high contrast only
 	// their sizes, spacing, fonts, radius and border widths apply (see
 	// docs/styling.md).
-	Tabs        TabsStyle
-	Select      SelectStyle
-	Slider      SliderStyle
+	Tabs   TabsStyle
+	Select SelectStyle
+	Slider SliderStyle
+	// Field is the text frame of every TextInput and TextArea, and of every
+	// NumberField's frame, before the NumberField parts below.
+	Field       FieldStyle
 	NumberField NumberFieldStyle
+	// Button is the look of every button, whatever its variant. Buttons is the
+	// look of each variant, and merges over Button.
+	Button  ButtonStyle
+	Buttons ButtonVariants
+	// Checkbox is the look of every check box, including CheckboxTri.
+	Checkbox CheckboxStyle
+	// RadioGroup is the look of every radio group.
+	RadioGroup RadioGroupStyle
+	// Switch is the look of every switch.
+	Switch SwitchStyle
+	// Collapsible is the look of every collapsible section, including the
+	// sections of an Accordion.
+	Collapsible CollapsibleStyle
+	// TreeView is the look of every tree.
+	TreeView TreeStyle
+	// Menu is the look of every menu: dropdown, context and the menus of a MenuBar.
+	Menu MenuStyle
+	// MenuBar is the look of every menu bar.
+	MenuBar MenuBarStyle
+	// Modal is the look of every modal dialog.
+	Modal ModalStyle
+	// ProgressBar is the look of every progress bar, determinate or not.
+	ProgressBar ProgressBarStyle
+	// ProgressRing is the look of every progress ring.
+	ProgressRing ProgressRingStyle
+	// Badge is the look of every badge, whatever its variant. Badges is the look
+	// of each variant, and merges over Badge.
+	Badge  BadgeStyle
+	Badges BadgeVariants
+	// Toast is the look of every toast, whatever its kind. Toasts is the look of
+	// each kind, and merges over Toast.
+	Toast  ToastStyle
+	Toasts ToastVariants
+	// Tooltip is the look of every tooltip.
+	Tooltip TooltipStyle
 }
 
 // DarkTheme is a neutral zinc palette with an indigo accent.

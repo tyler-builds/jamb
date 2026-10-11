@@ -196,6 +196,9 @@ ui.TextArea(signal).Placeholder("Start writing…").MinRows(10)    // multi-line
   // TextInput also: .Small() (28 px, like Button.Small)
   // Style on a field sizes and decorates its frame (Width, Height, Padding,
   // Radius, Background, Border...); font fields style the text inside.
+  // Styles(ui.FieldStyle{...}) sets the frame's parts (Frame, FrameFocusWithin,
+  // Text, Placeholder, Selection, Leading, Trailing), and Leading(el) and
+  // Trailing(el) put an element inside the frame; see the text frame in Styling.
 ui.Divider(), ui.Spacer(), ui.If(cond, el), ui.Map(items, fn)
 
 // Focus from code (shortcuts, focusing a field you just created):
@@ -340,19 +343,27 @@ when that changes.
 
 ### Styling
 
-The complex built-in widgets have named parts: a tab list's strip, tabs and
-indicator; a select's trigger, options and popup; a slider's track, rail and
-thumb; a number field's frame and spin buttons. Each part is a typed `ui.Style`
-that you can set for every widget of that kind in the theme (`ui.DarkTheme.Tabs`,
-`Theme.Select`, `Theme.Slider`, `Theme.NumberField`), or for one widget with
-`.Styles(...)`. The instance wins over the theme, and the theme over the built-in
-defaults, which follow the theme's colors. States are parts too (`TabSelected`,
-`OptionHighlighted`, `SpinButtonHover`). Tabs and number fields have variants
-(`Variant(ui.TabsSegmented)`, `SpinButtons(ui.SpinStacked)`), and render slots
-(`Tabs.RenderTab`, `Select.RenderValue`, `Select.RenderOption`) draw one part with
-your own content while the widget keeps its keyboard, focus, selection and
-accessible names. Under high contrast the parts use the system colors, and text
-scale and reduced motion still apply.
+Every built-in widget with a look of its own has named parts. Each part is a typed
+`ui.Style`, grouped in a style struct for its widget: `ui.TabsStyle`,
+`ui.SelectStyle`, `ui.SliderStyle`, `ui.FieldStyle` (shared by `TextInput`,
+`TextArea` and a number field), `ui.NumberFieldStyle`, `ui.ButtonStyle`,
+`ui.CheckboxStyle`, `ui.RadioGroupStyle`, `ui.SwitchStyle`, `ui.CollapsibleStyle`,
+`ui.TreeStyle`, `ui.MenuStyle`, `ui.MenuBarStyle`, `ui.ModalStyle`,
+`ui.ProgressBarStyle`, `ui.ProgressRingStyle`, `ui.BadgeStyle`, `ui.ToastStyle` and
+`ui.TooltipStyle`. Set a part for every widget of its kind in the theme (for
+example `ui.DarkTheme.Tabs`, `Theme.Button`, `Theme.Buttons.Danger` for one variant,
+`Theme.Toast`, `Theme.Tooltip`), or for one widget with `.Styles(...)`. The instance
+wins over the theme, and the theme over the built-in defaults, which follow the
+theme's colors. States are parts too (`TabSelected`, `OptionHighlighted`,
+`RootHover`; each struct's doc comment lists its parts). Some widgets have
+variants (`Tabs.Variant(ui.TabsSegmented)`, `NumberField.SpinButtons(ui.SpinStacked)`,
+`Button.Variant(ui.Danger)`, `Badge.Variant(ui.BadgeSuccess)`, `Toaster.Placement`),
+and render slots (`Tabs.RenderTab`, `Select.RenderValue`, `Select.RenderOption`,
+`Collapsible.RenderHeader`, `TreeView.RenderRow`, `TreeView.RenderLabel`,
+`TextInput.Leading`, `TextInput.Trailing`) draw one part with your own content while
+the widget keeps its keyboard, focus, selection and accessible names. Under high
+contrast the parts use the system colors, and text scale and reduced motion still
+apply.
 
 ```go
 ui.Tabs(view, tabs...).Variant(ui.TabsSegmented).Styles(ui.TabsStyle{
@@ -371,7 +382,9 @@ Checkboxes, switches, radio groups, selects, sliders and number fields are bound
 to signals, as `TextInput` is. Each reads its signal when it renders and writes
 it when the user changes it. They use the theme's colors, follow high contrast
 and the Text size, and show their state by a shape as well as a color: a check,
-a dash, a dot, or the place of the knob.
+a dash, a dot, or the place of the knob. Their looks are `ui.CheckboxStyle`,
+`ui.RadioGroupStyle` and `ui.SwitchStyle`, set with `Theme.Checkbox`, `Theme.RadioGroup`,
+`Theme.Switch` or `.Styles(...)`, and a button's look is `ui.ButtonStyle` (see Styling).
 
 ```go
 ui.Checkbox("Email alerts", email)                // *ui.Signal[bool]
@@ -384,8 +397,9 @@ ui.RadioGroup(freq,                               // *ui.Signal[T], for any comp
 ui.Select(channel, ui.Option[string]{Value: "email", Label: "Email"}).Label("Channel").Placeholder("Choose").Width(240).OnChange(func(v string) { ... })
 ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percent).OnChange(fn).Width(240)
 ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStacked).Precision(2) // int or float64
-// every control also takes .Key("id") and .Disabled(true); select, slider and number field take .Styles(...)
-// and select takes RenderOption and RenderValue. See the Styling section.
+// every control also takes .Key("id") and .Disabled(true); select, slider, number field, text input and text area
+// take .Styles(...); a number field's frame takes a FieldStyle, and its spin buttons and message their own parts.
+// Select takes RenderOption and RenderValue. See the Styling section.
 ```
 
 - A check box toggles with Space, or with a click on the box or its label. A
@@ -436,7 +450,9 @@ control type describes
 
 Tabs, collapsible sections, an accordion and a tree view. Each is bound to
 signals or to a node key, as the form controls are, and follows high contrast,
-the Text size and reduced motion.
+the Text size and reduced motion. Their looks are `ui.CollapsibleStyle` (with an
+`Accordion`'s sections) and `ui.TreeStyle`, and a section's header or a tree row can
+be drawn with `RenderHeader`, `RenderRow` or `RenderLabel`.
 
 ```go
 ui.Tabs(section,                                  // *ui.Signal[T], for any comparable T
@@ -520,7 +536,9 @@ ui.TreeView(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[
 
 Progress bars, busy rings, toasts and badges. They use the theme's colors, follow
 high contrast, the Text size and reduced motion, and show their state by a shape or
-a word as well as by a color.
+a word as well as by a color. Their looks are `ui.ProgressBarStyle`, `ui.ProgressRingStyle`,
+`ui.BadgeStyle` (per variant in `Theme.Badges`), `ui.ToastStyle` (per kind in
+`Theme.Toasts`, and per toast with `Toast.Styles`) and `ui.TooltipStyle`.
 
 ```go
 ui.ProgressBar(0.45).Label("Upload").Color(accent)    // determinate: 0 to 1, or .Range(lo, hi); Color is the fill
@@ -967,7 +985,9 @@ one and `Set` it. Changing it in place notifies nobody.
 ### Menus
 
 jamb draws its own menus, so they match the theme, work with a custom title
-bar, and need no platform code. A menu is a list of `ui.MenuItem`s:
+bar, and need no platform code. A menu's look is `ui.MenuStyle` (`Theme.Menu`, or
+`.Styles(...)` on a `DropdownMenu`), and a menu bar's labels are `ui.MenuBarStyle`
+(`Theme.MenuBar`, or `.Styles(...)` on the bar). A menu is a list of `ui.MenuItem`s:
 
 ```go
 ui.MenuItem{Label: "Open in window", Icon: icons.ArrowUpRight, OnClick: openWindow}
@@ -1302,7 +1322,8 @@ ctx.Window().MessageBox(dialog.MessageOptions{
 ### Modal dialogs
 
 `ui.Modal` is a dialog in the app's own look: a dimmed backdrop, and a panel
-centered on it with a title, a body and footer buttons. Build it only while it
+centered on it with a title, a body and footer buttons. Its look is `ui.ModalStyle`
+(`Theme.Modal` or `.Styles(...)`). Build it only while it
 is open, and place it last in the window's root element, which must fill the
 window:
 

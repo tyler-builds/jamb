@@ -13,6 +13,101 @@ type Option[T comparable] struct {
 	Disabled bool
 }
 
+// RadioGroupStyle is the look of each part of a radio group. A part's style
+// merges over the built-in defaults, then over the theme's RadioGroup, then over
+// the Styles of the instance; see docs/styling.md. Group is the column of
+// options. Each option is a Radio row, with a Ring (the circle) and a Dot in the
+// ring when the option is selected, and a Label. The states are parts of their
+// own: RingChecked for the selected option's ring, RingDisabled and
+// RadioDisabled for an option that cannot be chosen, RadioFocusVisible while
+// the option has keyboard focus, and LabelDisabled for its text.
+type RadioGroupStyle struct {
+	Group             Style // the column of options
+	Radio             Style // each option: its ring and its label
+	RadioFocusVisible Style // an option that has keyboard focus
+	RadioDisabled     Style // an option that cannot be chosen
+	Ring              Style // the circle of each option
+	RingChecked       Style // the circle of the selected option
+	RingDisabled      Style // the circle of an option that cannot be chosen
+	Dot               Style // the dot in the circle of the selected option
+	DotDisabled       Style // the dot of a selected option that cannot be chosen
+	Label             Style // the text of each option
+	LabelDisabled     Style // the text of an option that cannot be chosen
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s RadioGroupStyle) merge(o RadioGroupStyle) RadioGroupStyle {
+	return RadioGroupStyle{
+		Group:             s.Group.Merge(o.Group),
+		Radio:             s.Radio.Merge(o.Radio),
+		RadioFocusVisible: s.RadioFocusVisible.Merge(o.RadioFocusVisible),
+		RadioDisabled:     s.RadioDisabled.Merge(o.RadioDisabled),
+		Ring:              s.Ring.Merge(o.Ring),
+		RingChecked:       s.RingChecked.Merge(o.RingChecked),
+		RingDisabled:      s.RingDisabled.Merge(o.RingDisabled),
+		Dot:               s.Dot.Merge(o.Dot),
+		DotDisabled:       s.DotDisabled.Merge(o.DotDisabled),
+		Label:             s.Label.Merge(o.Label),
+		LabelDisabled:     s.LabelDisabled.Merge(o.LabelDisabled),
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s RadioGroupStyle) plain() RadioGroupStyle {
+	return RadioGroupStyle{
+		Group:             plainStyle(s.Group),
+		Radio:             plainStyle(s.Radio),
+		RadioFocusVisible: plainStyle(s.RadioFocusVisible),
+		RadioDisabled:     plainStyle(s.RadioDisabled),
+		Ring:              plainStyle(s.Ring),
+		RingChecked:       plainStyle(s.RingChecked),
+		RingDisabled:      plainStyle(s.RingDisabled),
+		Dot:               plainStyle(s.Dot),
+		DotDisabled:       plainStyle(s.DotDisabled),
+		Label:             plainStyle(s.Label),
+		LabelDisabled:     plainStyle(s.LabelDisabled),
+	}
+}
+
+// radioGroupDefaults returns the built-in look of a radio group, from the colors
+// of t. Under high contrast the ring is a solid 2 px line in the text color, or
+// in Highlight when selected, and a disabled option is GrayText and not dimmed.
+func radioGroupDefaults(t *Theme) RadioGroupStyle {
+	ring := Shadow{Spread: 2, Color: t.FocusRing}
+	d := RadioGroupStyle{
+		Group:             Style{Direction: Column, Gap: 8},
+		Radio:             Style{Direction: Row, Align: Center, Gap: 10, Radius: 4, NoShrink: true},
+		RadioFocusVisible: Style{Shadows: []Shadow{ring}},
+		RadioDisabled:     Style{Opacity: 0.5},
+		Ring: Style{Width: Px(18), Height: Px(18), NoShrink: true, Radius: 9,
+			Direction: Row, Align: Center, Justify: Center, BorderWidth: 1, BorderColor: t.BorderStrong, Background: t.Surface},
+		RingChecked: Style{BorderColor: t.Accent},
+		Dot:         Style{Width: Px(8), Height: Px(8), NoShrink: true, Radius: 4, Background: t.Accent},
+	}
+	if t.HighContrast {
+		d.Ring.BorderWidth, d.Ring.BorderColor = 2, t.Text
+		d.RadioDisabled = Style{Opacity: 1, TextColor: t.Disabled}
+		d.RingDisabled = Style{BorderColor: t.Disabled}
+		d.DotDisabled = Style{Background: t.Disabled}
+		d.LabelDisabled = Style{TextColor: t.Disabled}
+	}
+	return d
+}
+
+// resolveRadioGroup returns the look of a radio group: the defaults, merged with
+// the theme's RadioGroup and then the instance's Styles. Under high contrast the
+// two overrides are plain (see plainStyle).
+func resolveRadioGroup(t *Theme, inst RadioGroupStyle) RadioGroupStyle {
+	st := radioGroupDefaults(t)
+	for _, o := range []RadioGroupStyle{t.RadioGroup, inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
 // RadioGroupElement is a set of radio buttons, one per option, bound to a value.
 // The selected option is the one whose value equals the signal's. The group is
 // one Tab stop: Tab enters it at the selected option, and the arrow keys move
@@ -26,6 +121,7 @@ type RadioGroupElement[T comparable] struct {
 	key        string
 	disabled   bool
 	onChange   func(T)
+	styles     RadioGroupStyle
 }
 
 // RadioGroup creates a group of radio buttons that reads and writes value.
@@ -56,6 +152,15 @@ func (r *RadioGroupElement[T]) OnChange(fn func(T)) *RadioGroupElement[T] { r.on
 // Disabled shows every option but lets none of them be chosen.
 func (r *RadioGroupElement[T]) Disabled(d bool) *RadioGroupElement[T] { r.disabled = d; return r }
 
+// Styles sets the look of the parts of the radio group, for this instance only.
+// Set fields win over the theme's RadioGroup and the defaults; see
+// RadioGroupStyle and docs/styling.md. Calling Styles again merges with the
+// earlier values.
+func (r *RadioGroupElement[T]) Styles(st RadioGroupStyle) *RadioGroupElement[T] {
+	r.styles = r.styles.merge(st)
+	return r
+}
+
 func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
@@ -64,9 +169,9 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 		// move focus to the next option.
 		handles := Local(ctx, "handles", newHandles(len(r.options))).Peek()
 		stop := tabStop(r.options, cur, r.disabled)
-		ring := Shadow{Spread: 2, Color: t.FocusRing}
+		st := resolveRadioGroup(t, r.styles)
 
-		g := Div().Column().Gap(8).Role(access.RoleGroup).SelectionContainer()
+		g := Div().asPart("RadioGroup.Group").Style(st.Group).Role(access.RoleGroup).SelectionContainer()
 		if r.name != "" {
 			g.Label(r.name)
 		}
@@ -78,38 +183,35 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 			dis := r.disabled || o.Disabled
 			// The circle shows the selected option as a dot, so the state is not
 			// carried by color alone.
-			// Under high contrast the ring is a solid 2 px line in the text color, or in
-			// Highlight when selected, and the dot is Highlight in the same way, so the
-			// selected option is one crisp ring with one solid dot.
-			edge, width, dot := t.BorderStrong, float32(1), t.Accent
-			if t.HighContrast {
-				edge, width, dot = t.Text, 2, t.Accent
+			ring := Div().asPart("RadioGroup.Ring").Style(st.Ring)
+			if on {
+				ring.Style(st.RingChecked)
+			}
+			if dis {
+				ring.Style(st.RingDisabled)
 			}
 			if on {
-				edge = t.Accent
+				dot := Div().asPart("RadioGroup.Dot").Style(st.Dot)
+				if dis {
+					dot.Style(st.DotDisabled)
+				}
+				ring.Child(dot)
 			}
-			if dis && t.HighContrast {
-				edge, dot = t.Disabled, t.Disabled
+			label := Div().asPart("RadioGroup.Label").Style(st.Label)
+			if dis {
+				label.Style(st.LabelDisabled)
 			}
-			circle := Div().Size(Px(18), Px(18)).Shrink(0).Radius(9).Center().
-				Border(width, edge).Background(t.Surface)
-			if on {
-				circle.Child(Div().Size(Px(8), Px(8)).Radius(4).Background(dot))
-			}
-			item := Div().Row().Align(Center).Gap(10).Radius(4).Shrink(0).
-				Child(circle).Child(Text(o.Label))
+			label.Child(Text(o.Label))
+			item := Div().asPart("RadioGroup.Radio").Style(st.Radio).Child(ring).Child(label)
 			if r.key != "" {
 				item.Keyf("%s/%v", r.key, o.Value)
 			}
 			item.Role(access.RoleRadioButton).Checked(on)
 			if dis {
 				item.access().disabled = true
-				item.Cursor(CursorNotAllowed).Opacity(0.5)
-				if t.HighContrast {
-					item.Opacity(1).TextColor(t.Disabled)
-				}
+				item.Cursor(CursorNotAllowed).Style(st.RadioDisabled)
 			} else {
-				item.Cursor(CursorPointer).Focusable().FocusHandle(handles[i]).FocusVisible(Style{Shadows: []Shadow{ring}}).
+				item.Cursor(CursorPointer).Focusable().FocusHandle(handles[i]).FocusVisible(st.RadioFocusVisible).
 					OnClick(func() { r.choose(r.options[i].Value) }).
 					OnKeyDown(func(e *KeyEvent) {
 						if e.Mods != 0 {

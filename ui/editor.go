@@ -109,6 +109,13 @@ type editorElement struct {
 	style       Style
 	autoFocus   bool
 	handle      *FocusHandle
+	part        string // the Text part of the field, see asPart
+	selection   Color  // the background of the selected text (FieldStyle.Selection)
+	// selectionText is the color of the selected text, drawn over the selection;
+	// unset, the selected text keeps its color.
+	selectionText Color
+	// placeholderColor is the color of the placeholder; unset, it is the text color.
+	placeholderColor Color
 }
 
 func (*editorElement) isElement() {}
@@ -149,6 +156,7 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	}
 	id := n.id
 	d := &DivElement{style: s, focusable: true, capture: true, autoFocus: e.autoFocus, handle: e.handle}
+	d.asPart(e.part)
 	if e.multiline {
 		d.KeyContext("Editor mode=full")
 	} else {
@@ -430,25 +438,41 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	if clip {
 		rt.scene.PushClip(rt.px(scene.Rect{X: cx - 1, Y: y, W: cw + 2, H: n.lay.H}))
 	}
-	if focused && es.hasSelection() {
+	selected := focused && es.hasSelection() && (!e.selection.IsZero() || !e.selectionText.IsZero())
+	if selected {
 		a, b := es.selection()
-		sel := rt.theme.Accent.Alpha(0.32 * opacity)
+		sel := e.selection.Alpha(opacity)
 		rt.selRects = l.SelectionRects(a, b, rt.selRects[:0])
 		for _, r := range rt.selRects {
-			rt.scene.AddQuad(scene.Quad{
-				Bounds:     rt.px(scene.Rect{X: tx + r.X, Y: cy + r.Y, W: r.W, H: r.H}),
-				Background: sel.scene(),
-				Radii:      scene.Uniform(2 * rt.scale),
-			})
+			if !e.selection.IsZero() {
+				rt.scene.AddQuad(scene.Quad{
+					Bounds:     rt.px(scene.Rect{X: tx + r.X, Y: cy + r.Y, W: r.W, H: r.H}),
+					Background: sel.scene(),
+					Radii:      scene.Uniform(2 * rt.scale),
+				})
+			}
 		}
 	}
 	if v == "" {
 		if e.placeholder != "" {
+			pc := fg
+			if !e.placeholderColor.IsZero() {
+				pc = e.placeholderColor
+			}
 			pl := rt.text.Layout(e.placeholder, st, wrap)
-			rt.text.Draw(&rt.scene, pl, tx, cy, cw, rt.scale, 0, rt.theme.TextSubtle.Alpha(opacity).scene())
+			rt.text.Draw(&rt.scene, pl, tx, cy, cw, rt.scale, 0, pc.Alpha(opacity).scene())
 		}
 	} else {
 		rt.text.Draw(&rt.scene, l, tx, cy, cw, rt.scale, 0, fg.Alpha(opacity).scene())
+		if selected && !e.selectionText.IsZero() {
+			// The selected text is drawn again over its background, clipped to the
+			// selection, in the selection's text color (HighlightText under high contrast).
+			for _, r := range rt.selRects {
+				rt.scene.PushClip(rt.px(scene.Rect{X: tx + r.X, Y: cy + r.Y, W: r.W, H: r.H}))
+				rt.text.Draw(&rt.scene, l, tx, cy, cw, rt.scale, 0, e.selectionText.Alpha(opacity).scene())
+				rt.scene.PopClip()
+			}
+		}
 	}
 
 	if focused {

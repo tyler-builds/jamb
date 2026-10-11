@@ -18,6 +18,136 @@ const (
 	Danger
 )
 
+// ButtonStyle is the look of each part of a button. A part's style merges over
+// the built-in defaults of its variant, then over the theme's Button, then over
+// the theme's Buttons for that variant, then over the Styles of the instance;
+// see docs/styling.md. The states are parts of their own: RootHover while the
+// pointer is over an enabled button, RootPressed while it is pressed,
+// RootDisabled when it is disabled, and RootFocusVisible while it has keyboard
+// focus (its focus ring is added to the shadows of Root).
+type ButtonStyle struct {
+	Root             Style // the button: its size, shape, fill, border, font and text color
+	RootHover        Style // the button while the pointer is over it, if enabled
+	RootPressed      Style // the button while it is pressed
+	RootDisabled     Style // the button when it is disabled
+	RootFocusVisible Style // the button while it has keyboard focus
+	Label            Style // the text of the label
+	Icon             Style // the icon
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s ButtonStyle) merge(o ButtonStyle) ButtonStyle {
+	return ButtonStyle{
+		Root:             s.Root.Merge(o.Root),
+		RootHover:        s.RootHover.Merge(o.RootHover),
+		RootPressed:      s.RootPressed.Merge(o.RootPressed),
+		RootDisabled:     s.RootDisabled.Merge(o.RootDisabled),
+		RootFocusVisible: s.RootFocusVisible.Merge(o.RootFocusVisible),
+		Label:            s.Label.Merge(o.Label),
+		Icon:             s.Icon.Merge(o.Icon),
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s ButtonStyle) plain() ButtonStyle {
+	return ButtonStyle{
+		Root:             plainStyle(s.Root),
+		RootHover:        plainStyle(s.RootHover),
+		RootPressed:      plainStyle(s.RootPressed),
+		RootDisabled:     plainStyle(s.RootDisabled),
+		RootFocusVisible: plainStyle(s.RootFocusVisible),
+		Label:            plainStyle(s.Label),
+		Icon:             plainStyle(s.Icon),
+	}
+}
+
+// ButtonVariants holds the style of each variant of a button, for the theme's
+// Buttons. It merges over Theme.Button, which applies to every variant.
+type ButtonVariants struct {
+	Primary   ButtonStyle
+	Secondary ButtonStyle
+	Ghost     ButtonStyle
+	Danger    ButtonStyle
+}
+
+// of returns the style of variant v.
+func (bv ButtonVariants) of(v ButtonVariant) ButtonStyle {
+	switch v {
+	case Secondary:
+		return bv.Secondary
+	case Ghost:
+		return bv.Ghost
+	case Danger:
+		return bv.Danger
+	}
+	return bv.Primary
+}
+
+// buttonDefaults returns the built-in look of a button of variant v, from the
+// colors of t. small is the compact size, iconOnly a button with no label, and
+// disabled the state the disabled style is chosen for. Under high contrast a
+// disabled button is GrayText and not dimmed.
+func buttonDefaults(t *Theme, v ButtonVariant, small, iconOnly bool) ButtonStyle {
+	h, px, fs := float32(34), float32(14), float32(14)
+	if small {
+		h, px, fs = 28, 10, 13
+	}
+	if iconOnly {
+		px = (h - 16) / 2
+		if small {
+			px = (h - 14) / 2
+		}
+	}
+	d := ButtonStyle{
+		Root: Style{Direction: Row, Align: Center, Justify: Center, Gap: 7, MinHeight: Px(h),
+			Padding: XY(px, 0), Radius: t.Radius, FontSize: fs, FontWeight: FontMedium,
+			Transition: 110 * time.Millisecond, NoShrink: true},
+		RootDisabled: Style{Opacity: 0.5},
+	}
+	switch v {
+	case Primary:
+		d.Root.Background, d.Root.TextColor, d.Root.Shadows = t.Accent, t.AccentText, []Shadow{ShadowSm}
+		d.RootHover = Style{Background: t.AccentHover}
+		d.RootPressed = Style{Background: t.AccentActive}
+	case Secondary:
+		d.Root.Background, d.Root.BorderWidth, d.Root.BorderColor = t.Surface, 1, t.BorderStrong
+		d.Root.TextColor, d.Root.Shadows = t.Text, []Shadow{ShadowSm}
+		d.RootHover = Style{Background: t.SurfaceHover, BorderColor: t.TextMuted}
+		d.RootPressed = Style{Background: t.SurfaceActive}
+	case Ghost:
+		d.Root.TextColor = t.TextMuted
+		d.RootHover = Style{Background: t.SurfaceHover, TextColor: t.Text}
+		d.RootPressed = Style{Background: t.SurfaceActive}
+	case Danger:
+		label := Hex("#ffffff")
+		if t.HighContrast {
+			label = t.Background // the Danger fill is the window's text color there
+		}
+		d.Root.Background, d.Root.TextColor, d.Root.Shadows = t.Danger, label, []Shadow{ShadowSm}
+		d.RootHover = Style{Background: t.Danger.Lighten(0.08)}
+		d.RootPressed = Style{Background: t.Danger.Darken(0.1)}
+	}
+	if t.HighContrast {
+		// High contrast draws a disabled button in GrayText, not dimmed.
+		d.RootDisabled = Style{Background: t.Surface, TextColor: t.Disabled, BorderWidth: 1, BorderColor: t.Disabled}
+	}
+	return d
+}
+
+// resolveButton returns the look of a button: the defaults of its variant,
+// merged with the theme's Button, the theme's Buttons for the variant, and then
+// the instance's Styles. Under high contrast the overrides are plain.
+func resolveButton(t *Theme, v ButtonVariant, small, iconOnly bool, inst ButtonStyle) ButtonStyle {
+	st := buttonDefaults(t, v, small, iconOnly)
+	for _, o := range []ButtonStyle{t.Button, t.Buttons.of(v), inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
 // ButtonElement is a themed, clickable button.
 type ButtonElement struct {
 	label    string
@@ -27,7 +157,7 @@ type ButtonElement struct {
 	disabled bool
 	onClick  func()
 	tooltip  string
-	style    Style
+	styles   ButtonStyle
 	key      string
 	name     string // the accessible name, see Label
 	toggle   bool   // a toggle button, see Checked
@@ -81,57 +211,36 @@ func (b *ButtonElement) Checked(on bool) *ButtonElement { b.toggle, b.checked = 
 
 // Tooltip shows s below the button after the pointer rests on it.
 func (b *ButtonElement) Tooltip(s string) *ButtonElement { b.tooltip = s; return b }
-func (b *ButtonElement) Style(s Style) *ButtonElement    { b.style = b.style.Merge(s); return b }
+
+// Style sets the look of the button's Root part, for this instance only. It is
+// the same as Styles(ButtonStyle{Root: s}); calling it again merges.
+func (b *ButtonElement) Style(s Style) *ButtonElement {
+	b.styles.Root = b.styles.Root.Merge(s)
+	return b
+}
+
+// Styles sets the look of the parts of the button, for this instance only. Set
+// fields win over the theme's Button and Buttons and the defaults of the
+// variant; see ButtonStyle and docs/styling.md. Calling Styles again merges with
+// the earlier values.
+func (b *ButtonElement) Styles(st ButtonStyle) *ButtonElement {
+	b.styles = b.styles.merge(st)
+	return b
+}
 
 func (b *ButtonElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
-	h, px, fs, iconSize := float32(34), float32(14), float32(14), float32(16)
+	iconSize := float32(16)
 	if b.small {
-		h, px, fs, iconSize = 28, 10, 13, 14
+		iconSize = 14
 	}
-	if b.label == "" {
-		px = (h - iconSize) / 2
-	}
-	d := Div().Row().Align(Center).Justify(Center).Gap(7).
-		MinHeight(Px(h)).PaddingX(px).Radius(t.Radius).
-		FontSize(fs).FontWeight(FontMedium).
-		Transition(110 * time.Millisecond).Shrink(0)
-	switch b.variant {
-	case Primary:
-		d.Background(t.Accent).TextColor(t.AccentText).Shadow(ShadowSm).
-			Hover(Style{Background: t.AccentHover}).Pressed(Style{Background: t.AccentActive})
-	case Secondary:
-		d.Background(t.Surface).Border(1, t.BorderStrong).TextColor(t.Text).Shadow(ShadowSm).
-			Hover(Style{Background: t.SurfaceHover, BorderColor: t.TextMuted}).
-			Pressed(Style{Background: t.SurfaceActive})
-	case Ghost:
-		d.TextColor(t.TextMuted).
-			Hover(Style{Background: t.SurfaceHover, TextColor: t.Text}).
-			Pressed(Style{Background: t.SurfaceActive})
-	case Danger:
-		label := Hex("#ffffff")
-		if t.HighContrast {
-			label = t.Background // the Danger fill is the window's text color there
-		}
-		d.Background(t.Danger).TextColor(label).Shadow(ShadowSm).
-			Hover(Style{Background: t.Danger.Lighten(0.08)}).Pressed(Style{Background: t.Danger.Darken(0.1)})
-	}
-	if b.icon != nil {
-		d.Child(Icon(b.icon).Size(iconSize))
-	}
-	if b.label != "" {
-		d.Child(Text(b.label).NoWrap())
-	}
+	st := resolveButton(t, b.variant, b.small, b.label == "", b.styles)
+	d := Div().asPart("Button.Root").Style(st.Root)
 	if b.disabled {
-		d.Cursor(CursorNotAllowed)
-		if t.HighContrast {
-			// High contrast draws disabled controls in GrayText, not dimmed.
-			d.Background(t.Surface).TextColor(t.Disabled).Border(1, t.Disabled)
-		} else {
-			d.Opacity(0.5)
-		}
+		d.Style(st.RootDisabled).Cursor(CursorNotAllowed)
 		d.hover, d.pressed = nil, nil
 	} else {
+		d.Hover(st.RootHover).Pressed(st.RootPressed)
 		// Enabled buttons take part in Tab navigation and respond to Enter and
 		// Space. The focus ring is a spread shadow, so it adds no layout shift.
 		d.Focusable()
@@ -142,15 +251,24 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 			d.OnClick(b.onClick)
 		}
 	}
-	d.Style(b.style).Tooltip(b.tooltip)
+	if b.icon != nil {
+		d.Child(Div().asPart("Button.Icon").Style(st.Icon).Child(Icon(b.icon).Size(iconSize)))
+	}
+	if b.label != "" {
+		d.Child(Div().asPart("Button.Label").Style(st.Label).Child(Text(b.label).NoWrap()))
+	}
+	d.Tooltip(b.tooltip)
 	a := d.access()
 	a.role, a.name, a.disabled, a.inert = access.RoleButton, b.name, b.disabled, b.inert
 	if b.toggle {
 		a.toggle, a.checked, a.checkedSet = true, b.checked, true
 	}
 	if !b.disabled {
+		// The focus ring is added to the shadows of the button, so it is drawn
+		// with the button's own shadow. RootFocusVisible can replace it.
 		ring := Shadow{Spread: 2, Color: t.FocusRing}
-		d.FocusVisible(Style{Shadows: append(slices.Clone(d.style.Shadows), ring)})
+		focus := Style{Shadows: append(slices.Clone(st.Root.Shadows), ring)}.Merge(st.RootFocusVisible)
+		d.FocusVisible(focus)
 	}
 	return d
 }
@@ -165,7 +283,130 @@ func (dividerElement) expand(ctx *Context) Element {
 	return Div().Height(Px(1)).Shrink(0).Background(ctx.Theme().Border)
 }
 
-// fieldOptions are shared by TextInput and TextArea.
+// FieldStyle is the look of the text frame of a text field: TextInput, TextArea
+// and NumberField. A part's style merges over the built-in defaults, then over
+// the theme's Field, then over the Styles of the instance. A NumberField also
+// takes its theme's and instance's NumberField parts; see docs/styling.md.
+//
+// Frame is the box around the text. Its states are FrameHover, while the pointer
+// is over an enabled field, and FrameFocusWithin, while the focus is inside it.
+// FrameDisabled and FrameInvalid are the frame of a disabled number field and of
+// a number field whose text is not a valid number; only NumberField draws them.
+// Text is the text inside the frame, with its TextColor and font, and Selection
+// is the background of the selected text. Placeholder is the text shown while a
+// TextInput or TextArea is empty. Leading and Trailing are the containers of the
+// content before and after the text: the icon (see Icon) and the element of
+// Leading, and the element of Trailing. A number field has no placeholder, icon
+// or element, so Placeholder, Leading and Trailing do not apply to it. The caret
+// is drawn in the text color, and its width and blink follow the system settings.
+type FieldStyle struct {
+	Frame            Style // the box around the text; not drawn when a field is Borderless
+	FrameHover       Style // the frame while the pointer is over it, if the field is enabled (paint only)
+	FrameFocusWithin Style // the frame while the focus is inside it (paint only)
+	FrameDisabled    Style // the frame of a disabled number field
+	FrameInvalid     Style // the frame of a number field whose text is not a valid number
+	Text             Style // the text inside the frame: TextColor and font
+	Placeholder      Style // the placeholder, while the field is empty
+	Selection        Style // the background of the selected text
+	Leading          Style // the container of the icon and the Leading element, before the text
+	Trailing         Style // the container of the Trailing element, after the text
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s FieldStyle) merge(o FieldStyle) FieldStyle {
+	return FieldStyle{
+		Frame:            s.Frame.Merge(o.Frame),
+		FrameHover:       s.FrameHover.Merge(o.FrameHover),
+		FrameFocusWithin: s.FrameFocusWithin.Merge(o.FrameFocusWithin),
+		FrameDisabled:    s.FrameDisabled.Merge(o.FrameDisabled),
+		FrameInvalid:     s.FrameInvalid.Merge(o.FrameInvalid),
+		Text:             s.Text.Merge(o.Text),
+		Placeholder:      s.Placeholder.Merge(o.Placeholder),
+		Selection:        s.Selection.Merge(o.Selection),
+		Leading:          s.Leading.Merge(o.Leading),
+		Trailing:         s.Trailing.Merge(o.Trailing),
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s FieldStyle) plain() FieldStyle {
+	return FieldStyle{
+		Frame:            plainStyle(s.Frame),
+		FrameHover:       plainStyle(s.FrameHover),
+		FrameFocusWithin: plainStyle(s.FrameFocusWithin),
+		FrameDisabled:    plainStyle(s.FrameDisabled),
+		FrameInvalid:     plainStyle(s.FrameInvalid),
+		Text:             plainStyle(s.Text),
+		Placeholder:      plainStyle(s.Placeholder),
+		Selection:        plainStyle(s.Selection),
+		Leading:          plainStyle(s.Leading),
+		Trailing:         plainStyle(s.Trailing),
+	}
+}
+
+// fieldLayout is the layout a text frame is built for: a multi-line editor, a
+// compact one (Small), or a disabled number field.
+type fieldLayout struct {
+	multiline, small, disabled bool
+}
+
+// fieldDefaults returns the built-in look of a text frame with layout lay, from
+// the colors of t. Under high contrast a disabled frame is GrayText and not
+// dimmed, and an invalid frame is drawn in the text color.
+func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
+	d := FieldStyle{
+		Frame: Style{Direction: Row, Align: Center, Gap: 8, Padding: XY(10, 0), MinHeight: Px(34),
+			Radius: t.Radius, Background: t.Surface, BorderWidth: 1, BorderColor: t.BorderStrong,
+			Transition: 110 * time.Millisecond},
+		FrameHover:       Style{BorderColor: t.TextMuted},
+		FrameFocusWithin: Style{BorderColor: t.Accent},
+		FrameInvalid:     Style{BorderWidth: 2, BorderColor: t.Danger},
+		Text:             Style{TextColor: t.Text},
+		Placeholder:      Style{TextColor: t.TextSubtle},
+		Selection:        Style{Background: t.Accent.Alpha(0.32)},
+		Leading:          Style{Direction: Row, Align: Center, NoShrink: true, TextColor: t.TextSubtle},
+		Trailing:         Style{Direction: Row, Align: Center, NoShrink: true},
+	}
+	if t.HighContrast {
+		// The selection is the Highlight color with HighlightText on it, as Windows draws it.
+		d.Selection = Style{Background: t.Accent, TextColor: t.AccentText}
+	}
+	if !lay.disabled {
+		d.Frame.Cursor = CursorText
+	}
+	switch {
+	case lay.multiline:
+		d.Frame.Align, d.Frame.MinHeight, d.Frame.Padding = Start, Auto, XY(10, 8)
+	case lay.small:
+		d.Frame.MinHeight, d.Frame.Padding, d.Frame.FontSize = Px(28), XY(8, 0), 13
+	}
+	if t.HighContrast {
+		d.FrameInvalid.BorderColor = t.Text
+		d.FrameDisabled = Style{BorderColor: t.Disabled, TextColor: t.Disabled}
+		if lay.disabled {
+			d.Text.TextColor = t.Disabled
+		}
+	} else {
+		d.FrameDisabled = Style{Opacity: 0.5, BorderColor: t.Border}
+	}
+	return d
+}
+
+// resolveField returns the look of a text frame with layout lay: the defaults,
+// merged with the theme's Field and then the instance's Styles. Under high
+// contrast the two overrides are plain (see plainStyle).
+func resolveField(t *Theme, lay fieldLayout, inst FieldStyle) FieldStyle {
+	st := fieldDefaults(t, lay)
+	for _, o := range []FieldStyle{t.Field, inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
+// fieldOptions are shared by TextInput, TextArea and NumberField.
 type fieldOptions struct {
 	value       *Signal[string]
 	placeholder string
@@ -173,17 +414,19 @@ type fieldOptions struct {
 	labelledBy  []string
 	describedBy []string
 	icon        *icons.Icon
+	leadingEl   Element // drawn in the Leading part, after the icon (see Leading)
+	trailingEl  Element // drawn in the Trailing part, after the text (see Trailing)
 	onSubmit    func(string)
 	onChange    func(string)
 	onBlur      func()        // set by NumberField, which checks its text on blur
 	onStep      func(dir int) // set by NumberField, for Up and Down
-	style       Style
+	styles      FieldStyle    // the instance's parts: from Styles, and the frame's Style
 	key         string
 	borderless  bool
 	small       bool
 	autoFocus   bool
 	handle      *FocusHandle
-	partName    string  // the part of the widget this frame is, see asPart
+	widget      string  // the widget this field is, for the part names (see asPart)
 	trailing    Element // drawn inside the frame's right edge, after the text (NumberField's stacked spin buttons)
 }
 
@@ -194,7 +437,7 @@ type TextInputElement struct{ fieldOptions }
 
 // TextInput creates a text field that reads and writes value.
 func TextInput(value *Signal[string]) *TextInputElement {
-	return &TextInputElement{fieldOptions{value: value}}
+	return &TextInputElement{fieldOptions{value: value, widget: "TextInput"}}
 }
 
 func (*TextInputElement) isElement()            {}
@@ -223,18 +466,41 @@ func (ti *TextInputElement) Icon(ic *icons.Icon) *TextInputElement      { ti.ico
 func (ti *TextInputElement) OnSubmit(fn func(string)) *TextInputElement { ti.onSubmit = fn; return ti }
 func (ti *TextInputElement) OnChange(fn func(string)) *TextInputElement { ti.onChange = fn; return ti }
 
-// Style is merged into the field's frame: size (Width, Height, Min/Max),
-// Padding, Margin, Radius, Background, BorderColor/BorderWidth and Grow
-// apply to the frame; FontSize, FontWeight, FontFamily and TextColor are
-// inherited by the text inside.
-func (ti *TextInputElement) Style(s Style) *TextInputElement { ti.style = ti.style.Merge(s); return ti }
+// Style is merged into the Frame part of the field, over the Styles of the
+// instance: size (Width, Height, Min/Max), Padding, Margin, Radius, Background,
+// BorderColor/BorderWidth and Grow apply to the frame; FontSize, FontWeight,
+// FontFamily and TextColor are inherited by the text inside. It is the same as
+// Styles(FieldStyle{Frame: s}).
+func (ti *TextInputElement) Style(s Style) *TextInputElement {
+	ti.styles.Frame = ti.styles.Frame.Merge(s)
+	return ti
+}
+
+// Styles sets the look of the parts of the field, for this instance only. Set
+// fields win over the theme's Field and the defaults; see FieldStyle and
+// docs/styling.md. Calling Styles again merges with the earlier values.
+func (ti *TextInputElement) Styles(s FieldStyle) *TextInputElement {
+	ti.styles = ti.styles.merge(s)
+	return ti
+}
+
+// Leading puts el inside the frame before the text, after the icon (see Icon).
+// It is drawn in the Leading part.
+func (ti *TextInputElement) Leading(el Element) *TextInputElement { ti.leadingEl = el; return ti }
+
+// Trailing puts el inside the frame after the text, such as a button. It is
+// drawn in the Trailing part.
+func (ti *TextInputElement) Trailing(el Element) *TextInputElement { ti.trailingEl = el; return ti }
 
 // Small makes a compact field (28px tall, 13px text), matching Button.Small.
-func (ti *TextInputElement) Small() *TextInputElement         { ti.small = true; return ti }
-func (ti *TextInputElement) Width(l Length) *TextInputElement { ti.style.Width = l; return ti }
+func (ti *TextInputElement) Small() *TextInputElement { ti.small = true; return ti }
+
+// Width sets the width of the field's frame.
+func (ti *TextInputElement) Width(l Length) *TextInputElement { ti.styles.Frame.Width = l; return ti }
 
 // Borderless drops the field's frame and padding, for inputs that should
-// look like plain text until clicked (titles, inline renames).
+// look like plain text until clicked (titles, inline renames). The Frame part
+// is not drawn, so its styles do not apply.
 func (ti *TextInputElement) Borderless() *TextInputElement { ti.borderless = true; return ti }
 
 // AutoFocus focuses the field when it first appears.
@@ -244,7 +510,8 @@ func (ti *TextInputElement) AutoFocus() *TextInputElement { ti.autoFocus = true;
 func (ti *TextInputElement) FocusHandle(h *FocusHandle) *TextInputElement { ti.handle = h; return ti }
 
 func (ti *TextInputElement) expand(ctx *Context) Element {
-	return ti.fieldOptions.expand(ctx, false, 0)
+	st := resolveField(ctx.Theme(), fieldLayout{small: ti.small}, ti.styles)
+	return ti.fieldOptions.expand(ctx, st, false, 0)
 }
 
 // TextAreaElement is a multi-line text editor bound to a string signal. It
@@ -257,7 +524,7 @@ type TextAreaElement struct {
 
 // TextArea creates a multi-line editor that reads and writes value.
 func TextArea(value *Signal[string]) *TextAreaElement {
-	return &TextAreaElement{fieldOptions: fieldOptions{value: value}, minRows: 3}
+	return &TextAreaElement{fieldOptions: fieldOptions{value: value, widget: "TextArea"}, minRows: 3}
 }
 
 func (*TextAreaElement) isElement()            {}
@@ -283,15 +550,36 @@ func (ta *TextAreaElement) DescribedBy(keys ...string) *TextAreaElement {
 }
 func (ta *TextAreaElement) OnChange(fn func(string)) *TextAreaElement { ta.onChange = fn; return ta }
 
-// Style is merged into the editor's frame, as for TextInputElement.Style.
-func (ta *TextAreaElement) Style(s Style) *TextAreaElement  { ta.style = ta.style.Merge(s); return ta }
-func (ta *TextAreaElement) Width(l Length) *TextAreaElement { ta.style.Width = l; return ta }
+// Style is merged into the Frame part of the editor, as for TextInputElement.Style.
+func (ta *TextAreaElement) Style(s Style) *TextAreaElement {
+	ta.styles.Frame = ta.styles.Frame.Merge(s)
+	return ta
+}
+
+// Width sets the width of the editor's frame.
+func (ta *TextAreaElement) Width(l Length) *TextAreaElement { ta.styles.Frame.Width = l; return ta }
 
 // MinRows sets the minimum height in lines (default 3).
 func (ta *TextAreaElement) MinRows(n int) *TextAreaElement { ta.minRows = n; return ta }
 
-// Borderless drops the frame and padding, for full-pane editors.
+// Borderless drops the frame and padding, for full-pane editors. The Frame part
+// is not drawn, so its styles do not apply.
 func (ta *TextAreaElement) Borderless() *TextAreaElement { ta.borderless = true; return ta }
+
+// Styles sets the look of the parts of the editor, for this instance only; see
+// TextInputElement.Styles.
+func (ta *TextAreaElement) Styles(s FieldStyle) *TextAreaElement {
+	ta.styles = ta.styles.merge(s)
+	return ta
+}
+
+// Leading puts el inside the frame before the text. It is drawn in the Leading
+// part; see TextInputElement.Leading.
+func (ta *TextAreaElement) Leading(el Element) *TextAreaElement { ta.leadingEl = el; return ta }
+
+// Trailing puts el inside the frame after the text. It is drawn in the Trailing
+// part; see TextInputElement.Trailing.
+func (ta *TextAreaElement) Trailing(el Element) *TextAreaElement { ta.trailingEl = el; return ta }
 
 // AutoFocus focuses the editor when it first appears.
 func (ta *TextAreaElement) AutoFocus() *TextAreaElement { ta.autoFocus = true; return ta }
@@ -300,65 +588,69 @@ func (ta *TextAreaElement) AutoFocus() *TextAreaElement { ta.autoFocus = true; r
 func (ta *TextAreaElement) FocusHandle(h *FocusHandle) *TextAreaElement { ta.handle = h; return ta }
 
 func (ta *TextAreaElement) expand(ctx *Context) Element {
-	return ta.fieldOptions.expand(ctx, true, ta.minRows)
+	st := resolveField(ctx.Theme(), fieldLayout{multiline: true}, ta.styles)
+	return ta.fieldOptions.expand(ctx, st, true, ta.minRows)
 }
 
-func (f *fieldOptions) expand(ctx *Context, multiline bool, minRows int) Element {
+// expand returns the field's frame with its editor, in the look st. The frame
+// is the Frame part, and the content before and after the text is in the
+// Leading and Trailing parts. A borderless field draws no Frame part.
+func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRows int) Element {
 	t := ctx.Theme()
 	// Reading the value subscribes this field, so it re-renders (and
 	// re-measures) when the text changes.
 	f.value.Get()
-	st := ctx.state()
+	ctxState := ctx.state()
 	h := f.handle
 	if h == nil {
-		if st.focus == nil {
-			st.focus = NewFocusHandle()
+		if ctxState.focus == nil {
+			ctxState.focus = NewFocusHandle()
 		}
-		h = st.focus
+		h = ctxState.focus
 	}
 	ed := &editorElement{
 		value: f.value, placeholder: f.placeholder, name: f.name, labelledBy: f.labelledBy, describedBy: f.describedBy, multiline: multiline,
 		onSubmit: f.onSubmit, onChange: f.onChange, onBlur: f.onBlur, onStep: f.onStep, autoFocus: f.autoFocus, handle: h,
-		style: Style{Grow: 1},
+		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
+		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
 	}
 	if multiline && minRows > 0 {
 		size := t.FontSize
-		if f.style.FontSize > 0 {
-			size = f.style.FontSize
+		if st.Frame.FontSize > 0 {
+			size = st.Frame.FontSize
+		}
+		if st.Text.FontSize > 0 {
+			size = st.Text.FontSize
 		}
 		ed.style.MinHeight = Px(float32(minRows) * size * float32(ctx.TextScale()) / 100 * 1.4)
 	}
+	var box *DivElement
 	if f.borderless {
-		box := Div().asPart(f.partName).Row().Align(Start).Gap(8).Cursor(CursorText).
+		box = Div().Row().Align(Start).Gap(8).Cursor(CursorText).
 			OnMouseDown(func(*MouseEvent) { h.Focus() })
-		if f.icon != nil {
-			box.Child(Icon(f.icon).Size(16).Color(t.TextSubtle))
-		}
-		return box.Child(ed).Style(f.style)
-	}
-	box := Div().asPart(f.partName).Row().Gap(8).PaddingX(10).
-		Radius(t.Radius).Background(t.Surface).Border(1, t.BorderStrong).
-		Cursor(CursorText).Transition(110 * time.Millisecond).
-		Hover(Style{BorderColor: t.TextMuted}).
-		FocusWithin(Style{BorderColor: t.Accent}).
+	} else {
 		// Clicks on the frame (padding, icon) still focus the text.
-		OnMouseDown(func(*MouseEvent) { h.Focus() })
-	switch {
-	case multiline:
-		box.Align(Start).PaddingY(8)
-	case f.small:
-		box.Align(Center).MinHeight(Px(28)).PaddingX(8).FontSize(13)
-	default:
-		box.Align(Center).MinHeight(Px(34))
+		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).
+			Hover(st.FrameHover).FocusWithin(st.FrameFocusWithin).
+			OnMouseDown(func(*MouseEvent) { h.Focus() })
 	}
-	if f.icon != nil {
-		box.Child(Icon(f.icon).Size(16).Color(t.TextSubtle))
+	if f.icon != nil || f.leadingEl != nil {
+		lead := Div().asPart(f.widget + ".Leading").Style(st.Leading)
+		if f.icon != nil {
+			// The icon takes the Leading part's text color, as text does.
+			lead.Child(Icon(f.icon).Size(16))
+		}
+		if f.leadingEl != nil {
+			lead.Child(f.leadingEl)
+		}
+		box.Child(lead)
+	}
+	box.Child(ed)
+	if f.trailingEl != nil {
+		box.Child(Div().asPart(f.widget + ".Trailing").Style(st.Trailing).Child(f.trailingEl))
 	}
 	if f.trailing != nil {
-		// The text takes the room the trailing element leaves. The frame keeps its
-		// height at the text size, so the trailing element can be half of it.
-		box.Gap(0).PaddingEdges(Edges{Left: 10}).MinHeight(Px(34 * float32(ctx.TextScale()) / 100))
-		return box.Child(ed).Child(f.trailing).Style(f.style)
+		box.Child(f.trailing)
 	}
-	return box.Child(ed).Style(f.style)
+	return box
 }

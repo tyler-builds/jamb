@@ -37,6 +37,104 @@ func toastDefaultTime(v ToastVariant) time.Duration {
 	return 5 * time.Second
 }
 
+// ToastStyle is the look of each part of a toast. A part's style merges over the
+// built-in defaults of its variant, then over the theme's Toast, then over the
+// theme's Toasts for that variant, then over the Styles of the toast; see
+// docs/styling.md. Container is the box of a toast, Icon the icon of its variant
+// (its TextColor is the icon's color), Text the message, and Action and Close
+// the wrappers of the action button and the dismiss button.
+type ToastStyle struct {
+	Container Style // the box of the toast
+	Icon      Style // the icon, in the color of its variant
+	Text      Style // the message
+	Action    Style // the wrapper of the action button
+	Close     Style // the wrapper of the dismiss button
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s ToastStyle) merge(o ToastStyle) ToastStyle {
+	return ToastStyle{
+		Container: s.Container.Merge(o.Container),
+		Icon:      s.Icon.Merge(o.Icon),
+		Text:      s.Text.Merge(o.Text),
+		Action:    s.Action.Merge(o.Action),
+		Close:     s.Close.Merge(o.Close),
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle).
+func (s ToastStyle) plain() ToastStyle {
+	return ToastStyle{
+		Container: plainStyle(s.Container),
+		Icon:      plainStyle(s.Icon),
+		Text:      plainStyle(s.Text),
+		Action:    plainStyle(s.Action),
+		Close:     plainStyle(s.Close),
+	}
+}
+
+// ToastVariants holds the style of each kind of toast, for the theme's Toasts.
+// It merges over Theme.Toast, which applies to every kind.
+type ToastVariants struct {
+	Info, Success, Warning, Error ToastStyle
+}
+
+// of returns the style of variant v.
+func (tv ToastVariants) of(v ToastVariant) ToastStyle {
+	switch v {
+	case ToastSuccess:
+		return tv.Success
+	case ToastWarning:
+		return tv.Warning
+	case ToastError:
+		return tv.Error
+	}
+	return tv.Info
+}
+
+// toastDefaults returns the built-in look of a toast of variant v, from the
+// colors of t. Under high contrast every icon is the text color, and the border
+// is drawn in the text color, so the shape tells the variant.
+func toastDefaults(t *Theme, v ToastVariant) ToastStyle {
+	edge, width := t.Border, float32(1)
+	if t.HighContrast {
+		edge, width = t.Text, 2
+	}
+	_, c := toastIcon(t, v)
+	return ToastStyle{
+		Container: Style{Direction: Row, Align: Center, Gap: 10, MinWidth: Px(280), MaxWidth: Px(420),
+			Padding: XY(14, 10), Radius: t.Radius, Background: t.Surface, BorderWidth: width, BorderColor: edge,
+			Shadows: []Shadow{ShadowMd}},
+		Icon: Style{Width: Px(18), Height: Px(18), NoShrink: true, TextColor: c},
+	}
+}
+
+// resolveToast returns the look of a toast of variant v: the defaults, merged
+// with the theme's Toast, the theme's Toasts for the variant, and the toast's own
+// Styles. Under high contrast the overrides are plain (see plainStyle).
+func resolveToast(t *Theme, v ToastVariant, inst ToastStyle) ToastStyle {
+	st := toastDefaults(t, v)
+	for _, o := range []ToastStyle{t.Toast, t.Toasts.of(v), inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
+// ToastPlacement is where a Toaster shows its stack of toasts.
+type ToastPlacement uint8
+
+const (
+	// ToastBottomRight stacks the toasts in the bottom-right corner. It is the default.
+	ToastBottomRight ToastPlacement = iota
+	// ToastTopRight stacks them in the top-right corner.
+	ToastTopRight
+	// ToastBottomCenter stacks them along the bottom, centered.
+	ToastBottomCenter
+)
+
 // Toast is a notification in the Toaster. Context.Toast makes one; the methods
 // below set its action, its time and its dismissal.
 type Toast struct {
@@ -55,6 +153,7 @@ type toastEntry struct {
 	left     time.Duration // time before the toast is dismissed, not counted while paused
 	sticky   bool          // no timeout: the toast stays until it is dismissed
 	hovered  bool          // the pointer is over the toast
+	styles   ToastStyle    // the look of this toast alone (see Styles)
 }
 
 // Toast shows a notification with text in the window's Toaster. It is announced
@@ -86,6 +185,14 @@ func (t *Toast) Sticky() *Toast {
 
 // Dismiss removes the toast now.
 func (t *Toast) Dismiss() { t.rt.dismissToast(t.e) }
+
+// Styles sets the look of the parts of this toast alone. Set fields win over the
+// theme's Toast and Toasts and the defaults of its kind; see ToastStyle and
+// docs/styling.md. Calling Styles again merges with the earlier values.
+func (t *Toast) Styles(st ToastStyle) *Toast {
+	t.e.styles = t.e.styles.merge(st)
+	return t
+}
 
 // toast adds a toast to the stack and announces it. When the stack is over its
 // maximum, the oldest toast that is not hovered or focused goes.
@@ -245,8 +352,9 @@ func toastKey(id uint64) string { return fmt.Sprintf("jamb.toast:%d", id) }
 // that it is laid out over the content. Only one is needed; it shows every
 // toast made with Context.Toast.
 type ToasterElement struct {
-	key string
-	max int
+	key       string
+	max       int
+	placement ToastPlacement
 }
 
 // Toaster creates the stack of toasts. Its region is focusable with F6, as
@@ -262,6 +370,10 @@ func (tv *ToasterElement) Key(k string) *ToasterElement { tv.key = k; return tv 
 // room for a new one. The default is 3.
 func (tv *ToasterElement) Max(n int) *ToasterElement { tv.max = n; return tv }
 
+// Placement sets the corner or edge the stack is shown at: ToastBottomRight (the
+// default), ToastTopRight or ToastBottomCenter.
+func (tv *ToasterElement) Placement(p ToastPlacement) *ToasterElement { tv.placement = p; return tv }
+
 func (tv *ToasterElement) expand(ctx *Context) Element {
 	rt := ctx.rt
 	rt.toastVer.Get() // re-render when the stack changes
@@ -275,7 +387,7 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	rt.toastRegion = expandedID(ctx.id)
-	region := Div().Key("jamb.toasts").Absolute().Right(16).Bottom(16).Column().Gap(8).Align(End).
+	region := Div().Key("jamb.toasts").Absolute().Column().Gap(8).
 		Role(access.RoleGroup).Label("Notifications").
 		Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
 		OnKeyDown(func(e *KeyEvent) {
@@ -284,6 +396,14 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 				rt.leaveToastRegion()
 			}
 		})
+	switch tv.placement {
+	case ToastTopRight:
+		region.Top(16).Right(16).Align(End)
+	case ToastBottomCenter:
+		region.Left(0).Right(0).Bottom(16).Align(Center)
+	default:
+		region.Right(16).Bottom(16).Align(End)
+	}
 	for _, e := range rt.toasts {
 		region.Child(rt.toastView(t, e))
 	}
@@ -293,14 +413,9 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 // toastView is one toast in the stack: an icon, the text, an optional action
 // and a close button. It is a group named by its text.
 func (rt *Runtime) toastView(t *Theme, e *toastEntry) *DivElement {
-	ic, c := toastIcon(t, e.variant)
-	edge, width := t.Border, float32(1)
-	if t.HighContrast {
-		edge, width = t.Text, 2
-	}
-	box := Div().Key(toastKey(e.id)).Row().Align(Center).Gap(10).
-		MinWidth(Px(280)).MaxWidth(Px(420)).PaddingX(14).PaddingY(10).
-		Radius(t.Radius).Background(t.Surface).Border(width, edge).Shadow(ShadowMd).
+	st := resolveToast(t, e.variant, e.styles)
+	ic, _ := toastIcon(t, e.variant)
+	box := Div().asPart("Toast.Container").Key(toastKey(e.id)).Style(st.Container).
 		Enter(Fade().Slide(0, 8), Animation{Duration: 160 * time.Millisecond}).
 		Exit(Fade(), Animation{Duration: 120 * time.Millisecond}).
 		Role(access.RoleGroup).Label(e.text).
@@ -312,17 +427,18 @@ func (rt *Runtime) toastView(t *Theme, e *toastEntry) *DivElement {
 				rt.closeToast(e)
 			}
 		})
-	box.Child(Div().Size(Px(18), Px(18)).Shrink(0).Child(Icon(ic).Size(18).Color(c)))
-	box.Child(Text(e.text).Grow(1))
+	box.Child(Div().asPart("Toast.Icon").Style(st.Icon).Child(Icon(ic).Size(18)))
+	box.Child(Div().asPart("Toast.Text").Style(st.Text).Grow(1).Child(Text(e.text)))
 	if e.action != "" {
-		box.Child(Button(e.action).Small().Ghost().OnClick(func() {
+		box.Child(Div().asPart("Toast.Action").Style(st.Action).Child(Button(e.action).Small().Ghost().OnClick(func() {
 			if e.onAction != nil {
 				e.onAction()
 			}
 			rt.dismissToast(e)
-		}))
+		})))
 	}
-	box.Child(IconButton(icons.X).Label("Dismiss notification").Ghost().OnClick(func() { rt.closeToast(e) }))
+	box.Child(Div().asPart("Toast.Close").Style(st.Close).Child(
+		IconButton(icons.X).Label("Dismiss notification").Ghost().OnClick(func() { rt.closeToast(e) })))
 	return box
 }
 

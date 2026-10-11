@@ -22,6 +22,95 @@ type TreeNode struct {
 	Children func() []TreeNode
 }
 
+// TreeStyle is the look of each part of a tree. A part's style merges over the
+// built-in defaults, then over the theme's TreeView, then over the Styles of the
+// instance; see docs/styling.md. Row is each visible row, indented by its level
+// by Indent pixels per level (a row's own left padding, when its Row style sets
+// one, replaces the indent). Chevron is the click target that opens and closes a
+// node, Icon the node's icon and Label its text. The states are parts of their
+// own: RowHover while the pointer is over a row that is not selected,
+// RowSelected for the selected row, and TreeFocusVisible for the tree while it
+// has keyboard focus (the ring is drawn on the tree, as the rows are not focused
+// themselves).
+type TreeStyle struct {
+	Row              Style   // each visible row
+	RowHover         Style   // a row the pointer is over, if it is not selected
+	RowSelected      Style   // the selected row
+	Chevron          Style   // the click target of a node's chevron
+	Icon             Style   // the icon of a node
+	Label            Style   // the text of a node
+	TreeFocusVisible Style   // the tree while it has keyboard focus
+	Indent           float32 // the indent of each level below the top, in logical pixels
+}
+
+// merge returns s with the set fields of o applied on top, part by part.
+func (s TreeStyle) merge(o TreeStyle) TreeStyle {
+	indent := s.Indent
+	if o.Indent != 0 {
+		indent = o.Indent
+	}
+	return TreeStyle{
+		Row:              s.Row.Merge(o.Row),
+		RowHover:         s.RowHover.Merge(o.RowHover),
+		RowSelected:      s.RowSelected.Merge(o.RowSelected),
+		Chevron:          s.Chevron.Merge(o.Chevron),
+		Icon:             s.Icon.Merge(o.Icon),
+		Label:            s.Label.Merge(o.Label),
+		TreeFocusVisible: s.TreeFocusVisible.Merge(o.TreeFocusVisible),
+		Indent:           indent,
+	}
+}
+
+// plain returns s as high contrast allows it (see plainStyle). The indent is a
+// size, so it is kept.
+func (s TreeStyle) plain() TreeStyle {
+	return TreeStyle{
+		Row:              plainStyle(s.Row),
+		RowHover:         plainStyle(s.RowHover),
+		RowSelected:      plainStyle(s.RowSelected),
+		Chevron:          plainStyle(s.Chevron),
+		Icon:             plainStyle(s.Icon),
+		Label:            plainStyle(s.Label),
+		TreeFocusVisible: plainStyle(s.TreeFocusVisible),
+		Indent:           s.Indent,
+	}
+}
+
+// treeDefaults returns the built-in look of a tree, from the colors of t. Under
+// high contrast the selected row is the Highlight color with HighlightText on it.
+func treeDefaults(t *Theme) TreeStyle {
+	ring := Shadow{Spread: 2, Color: t.FocusRing}
+	d := TreeStyle{
+		Row: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(26), NoShrink: true,
+			Radius: t.Radius / 2, Padding: Edges{Top: 2, Right: 8, Bottom: 2}, TextColor: t.Text},
+		RowHover:    Style{Background: t.SurfaceHover},
+		RowSelected: Style{Background: t.AccentSoft},
+		Chevron: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(16), Height: Px(16),
+			NoShrink: true, TextColor: t.TextMuted},
+		Icon:             Style{TextColor: t.TextMuted},
+		TreeFocusVisible: Style{Shadows: []Shadow{ring}},
+		Indent:           18,
+	}
+	if t.HighContrast {
+		d.RowSelected = Style{Background: t.Accent, TextColor: t.AccentText}
+	}
+	return d
+}
+
+// resolveTree returns the look of a tree: the defaults, merged with the theme's
+// TreeView and then the instance's Styles. Under high contrast the two overrides
+// are plain (see plainStyle).
+func resolveTree(t *Theme, inst TreeStyle) TreeStyle {
+	st := treeDefaults(t)
+	for _, o := range []TreeStyle{t.TreeView, inst} {
+		if t.HighContrast {
+			o = o.plain()
+		}
+		st = st.merge(o)
+	}
+	return st
+}
+
 // TreeElement is a hierarchy of nodes that open and close, shown as a list of the
 // rows that are visible. Only the rows near the viewport are built, so a tree of
 // tens of thousands of nodes costs what its visible part costs. Size it with Style
@@ -46,12 +135,15 @@ type TreeNode struct {
 // selecting it. A double-click opens or closes it, as it does on Windows.
 // Selection is single.
 type TreeElement struct {
-	nodes    []TreeNode
-	selected *Signal[string]
-	name     string // the accessible name, see Label
-	key      string
-	style    Style
-	onSelect func(key string)
+	nodes       []TreeNode
+	selected    *Signal[string]
+	name        string // the accessible name, see Label
+	key         string
+	style       Style
+	onSelect    func(key string)
+	styles      TreeStyle
+	renderRow   func(node TreeNode, state PartState) Element
+	renderLabel func(node TreeNode, state PartState) Element
 }
 
 // TreeView creates a tree of nodes, with the node whose key equals selected's
@@ -73,9 +165,33 @@ func (tv *TreeElement) Label(name string) *TreeElement { tv.name = name; return 
 // Style is merged into the scroll container: size it with Height, Grow or MaxHeight.
 func (tv *TreeElement) Style(s Style) *TreeElement { tv.style = tv.style.Merge(s); return tv }
 
+// Styles sets the look of the parts of the tree, for this instance only. Set
+// fields win over the theme's TreeView and the defaults; see TreeStyle and
+// docs/styling.md. Calling Styles again merges with the earlier values.
+func (tv *TreeElement) Styles(st TreeStyle) *TreeElement { tv.styles = tv.styles.merge(st); return tv }
+
 // OnSelect runs fn with the key of the node after the selection changes, by a
 // click, the keys or a typed letter. The signal is set first.
 func (tv *TreeElement) OnSelect(fn func(key string)) *TreeElement { tv.onSelect = fn; return tv }
+
+// RenderRow replaces the icon and the label of each row with what fn returns. The
+// row keeps its chevron, its level, key, selection, keys and accessible name, which
+// is still the node's label. fn is called again when the row's pointer state
+// changes, with the state in the PartState (Selected for the selected row). The
+// content is hidden from assistive technology.
+func (tv *TreeElement) RenderRow(fn func(node TreeNode, state PartState) Element) *TreeElement {
+	tv.renderRow = fn
+	return tv
+}
+
+// RenderLabel replaces the text of each row with what fn returns, keeping the
+// row's icon, level, key, selection and accessible name. It is not called when
+// RenderRow is set, which replaces the label too. The content is hidden from
+// assistive technology.
+func (tv *TreeElement) RenderLabel(fn func(node TreeNode, state PartState) Element) *TreeElement {
+	tv.renderLabel = fn
+	return tv
+}
 
 // treeRow is one visible row of a tree: a node, its place in the tree and its state.
 type treeRow struct {
@@ -145,13 +261,13 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
+		st := resolveTree(t, tv.styles)
 		sel := tv.selected.Get()
 		open := Local(ctx, "open", map[string]bool{})
 		handle := Local(ctx, "handle", NewListHandle()).Peek()
 		typed := Local(ctx, "typed", selectType{})
 		rows := flattenTree(tv.nodes, open.Get())
 		cur := rowOf(rows, sel)
-		ring := Shadow{Spread: 2, Color: t.FocusRing}
 
 		// setOpen opens or closes the node with key, keeping the other nodes' state.
 		setOpen := func(key string, v bool) {
@@ -271,12 +387,14 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 		}
 
 		list := UniformList(len(rows), func(i int) Element {
-			return tv.row(t, rows[i], i, sel, setOpen, choose)
+			return tv.row(st, t, rows[i], i, sel, setOpen, choose)
 		})
 		list.Key(tv.key).SelectionContainer().Style(Style{Grow: 1}).Handle(handle)
 		list.ownPos = true
 		list.decorate = func(c *DivElement) {
-			c.Role(access.RoleTree).Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
+			// The ring is the tree's own, drawn on the list while it has focus.
+			focus := Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}.Merge(st.TreeFocusVisible)
+			c.asPart("TreeView.Tree").Role(access.RoleTree).Focusable().FocusVisible(focus).
 				OnKeyDown(keys).OnTextInput(typeahead)
 			if tv.name != "" {
 				c.Label(tv.name)
@@ -291,61 +409,81 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 // row is the element of one visible row. Its position is among its siblings, and
 // its level is its depth. The row that is selected is the highlighted one, so it
 // is the row that has accessibility focus while the tree has keyboard focus.
-func (tv *TreeElement) row(t *Theme, r treeRow, i int, sel string,
+func (tv *TreeElement) row(st TreeStyle, t *Theme, r treeRow, i int, sel string,
 	setOpen func(string, bool), choose func(int)) Element {
 	on := r.key == sel
-	text := Text(r.label).NoWrap().Color(t.Text)
-	if on {
-		text.Semibold()
-	}
-	row := Div().Key(r.key).Row().Align(Center).Gap(6).MinHeight(Px(26)).Shrink(0).Radius(t.Radius / 2).
-		PaddingEdges(Edges{Top: 2, Right: 8, Bottom: 2, Left: 4 + float32(r.level-1)*18})
-	if on {
-		if t.HighContrast {
-			row.Background(t.Accent)
-			text.Color(t.AccentText)
+	node := TreeNode{Key: r.key, Label: r.label, Icon: r.icon}
+	// draw returns the row in the state ps describes. The level sets the left
+	// padding, which the Row style replaces when it sets one.
+	draw := func(ps PartState) *DivElement {
+		row := Div().asPart("TreeView.Row").Key(r.key).
+			Style(Style{Padding: Edges{Left: 4 + float32(r.level-1)*st.Indent}}).Style(st.Row)
+		if on {
+			row.Style(st.RowSelected)
 		} else {
-			row.Background(t.AccentSoft)
+			row.Hover(st.RowHover)
 		}
-	} else {
-		row.Hover(Style{Background: t.SurfaceHover})
-	}
 
-	// The chevron is a click target of its own: a click on it opens or closes the
-	// node and does not select it, as the Windows glyph does.
-	chev := Div().Size(Px(16), Px(16)).Center().Shrink(0)
-	chev.access().inert = true // the row is the item; assistive technology uses its Expand action
-	if r.expandable {
-		glyph := icons.ChevronRight
-		if r.open {
-			glyph = icons.ChevronDown
-		}
-		key := r.key
-		open := r.open
-		chev.Child(Icon(glyph).Size(12).Color(t.TextMuted)).Cursor(CursorPointer).
-			OnClick(func() { setOpen(key, !open) })
-	}
-	row.Child(chev)
-	if r.icon != nil {
-		row.Child(Icon(r.icon).Size(16).Color(t.TextMuted))
-	}
-	row.Child(text)
-
-	a := row.access()
-	row.Role(access.RoleTreeItem).Label(r.label).Selected(on)
-	a.setPos, a.setSize, a.level = r.pos, r.size, r.level
-	a.highlighted = on
-	if r.expandable {
-		row.Expanded(r.open)
-		key := r.key
-		a.setExpanded = func(v bool) { setOpen(key, v) }
-	}
-	key, open := r.key, r.open
-	row.Cursor(CursorPointer).OnClick(func() { choose(i) }).
-		OnDoubleClick(func() {
-			if r.expandable {
-				setOpen(key, !open)
+		// The chevron is a click target of its own: a click on it opens or closes the
+		// node and does not select it, as the Windows glyph does.
+		chev := Div().asPart("TreeView.Chevron").Style(st.Chevron)
+		chev.access().inert = true // the row is the item; assistive technology uses its Expand action
+		if r.expandable {
+			glyph := icons.ChevronRight
+			if r.open {
+				glyph = icons.ChevronDown
 			}
-		})
-	return row
+			key := r.key
+			open := r.open
+			chev.Child(Icon(glyph).Size(12)).Cursor(CursorPointer).
+				OnClick(func() { setOpen(key, !open) })
+		}
+		row.Child(chev)
+		if tv.renderRow != nil {
+			row.Child(Div().Hidden().Child(tv.renderRow(node, ps)))
+		} else {
+			if r.icon != nil {
+				row.Child(Div().asPart("TreeView.Icon").Style(st.Icon).Child(Icon(r.icon).Size(16)))
+			}
+			label := Div().asPart("TreeView.Label").Style(st.Label)
+			if on && label.style.FontWeight < FontSemibold {
+				// The selected row keeps at least semibold text, so the selection still
+				// shows with its highlight cleared.
+				label.Style(Style{FontWeight: FontSemibold})
+			}
+			if tv.renderLabel != nil {
+				label.Child(Div().Hidden().Child(tv.renderLabel(node, ps)))
+			} else {
+				label.Child(Text(r.label).NoWrap())
+			}
+			row.Child(label)
+		}
+
+		a := row.access()
+		row.Role(access.RoleTreeItem).Label(r.label).Selected(on)
+		a.setPos, a.setSize, a.level = r.pos, r.size, r.level
+		a.highlighted = on
+		if r.expandable {
+			row.Expanded(r.open)
+			key := r.key
+			a.setExpanded = func(v bool) { setOpen(key, v) }
+		}
+		key, open := r.key, r.open
+		row.Cursor(CursorPointer).OnClick(func() { choose(i) }).
+			OnDoubleClick(func() {
+				if r.expandable {
+					setOpen(key, !open)
+				}
+			})
+		return row
+	}
+	if tv.renderRow == nil && tv.renderLabel == nil {
+		return draw(PartState{Selected: on, HighContrast: t.HighContrast})
+	}
+	// With a render slot the row is its own component, so that it re-renders when
+	// its pointer state changes, and the slot gets the new state.
+	return Component(func(ctx *Context) Element {
+		return draw(PartState{Hovered: ctx.hovered(), Pressed: ctx.pressed(), Focused: on,
+			Selected: on, HighContrast: t.HighContrast})
+	}).Key(r.key)
 }
