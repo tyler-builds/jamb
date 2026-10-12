@@ -394,12 +394,15 @@ ui.RadioGroup(freq,                               // *ui.Signal[T], for any comp
 	ui.Option[string]{Value: "daily", Label: "Daily digest"},
 	ui.Option[string]{Value: "weekly", Label: "Weekly digest", Disabled: true},
 ).Label("Frequency").OnChange(func(v string) { ... })
-ui.Select(channel, ui.Option[string]{Value: "email", Label: "Email"}).Label("Channel").Placeholder("Choose").Width(240).OnChange(func(v string) { ... })
-ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percent).OnChange(fn).Width(240)
+ui.Select(channel, ui.Option[string]{Value: "email", Label: "Email"}).Label("Channel").Placeholder("Choose").Width(ui.Px(240)).OnChange(func(v string) { ... })
+ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percent).OnChange(fn).Width(ui.Full)
 ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStacked).Precision(2) // int or float64
 // every control also takes .Key("id") and .Disabled(true); select, slider, number field, text input and text area
 // take .Styles(...); a number field's frame takes a FieldStyle, and its spin buttons and message their own parts.
 // Select takes RenderOption and RenderValue. See the Styling section.
+// The controls take the sizing methods (Width, MinWidth, MaxWidth and Grow, and Height where it
+// applies) with a ui.Length; a progress ring keeps Size, and a form field (`Field`) takes them on its outer box. The defaults and the precedence are in
+// the Sizing section of docs/styling.md.
 ```
 
 - A check box toggles with Space, or with a click on the box or its label. A
@@ -473,13 +476,19 @@ follows CSS Flexbox's automatic minimum size of flex items
   clips its overflow (`ScrollX`, `ScrollY`, `ClipContent`) has no automatic minimum.
 - **A fixed `Width` is the item's floor**, as it was before this rule: the item does
   not shrink below it. CSS takes the smaller of the width and the content instead, and
-  jamb does not.
+  jamb does not. The exception is a text field (`TextInput`, `TextArea` and the frame of
+  a `NumberField`): its fixed width is a ceiling, and in a shrinking row it keeps the
+  room for six digits and no more, so it does not collapse to a letter's width. A
+  `MinWidth` replaces that minimum.
+- **Bars and sliders** (`ProgressBar`, `IndeterminateProgressBar`, `Slider`) keep a
+  default minimum of 160 px, so they stay visible in a container that has no width of
+  its own. `MinWidth` replaces it.
 - **A word longer than its container breaks inside the word**, so a URL stays within
   its row or column. A word that fits its container does not break, even when a fixed
   item beside it takes the room. The row then overflows, as in CSS, so give such items room.
-- The minimums grow with the Text size (`JAMB_TEXT_SCALE`). A control whose label is
-  wider than a fixed `Width` should use `MinWidth` instead, so the control grows with its
-  label; the demo's Projects page and Components page do this.
+- The minimums of text grow with the Text size (`JAMB_TEXT_SCALE`). A control whose label
+  is wider than a fixed `Width` should use `MinWidth` instead, so the control grows with
+  its label.
 
 ### Navigation and layout
 

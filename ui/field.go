@@ -157,6 +157,7 @@ type FieldElement struct {
 	form     *Form
 	key      string // the key of the field in its form, see Form.Field
 	styles   FormFieldStyle
+	size     sizing // the field's box sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // Field creates a field with the label and the control. Add help text with
@@ -194,6 +195,15 @@ func (f *FieldElement) Check(fn func() error) *FieldElement { f.check = fn; retu
 // for a field whose control is a group that the field does not wire (see Check). For
 // a control, the control takes focus, and Focus is not needed.
 func (f *FieldElement) Focus(h *FocusHandle) *FieldElement { f.focus = h; return f }
+
+// The sizing methods give the field's outer box a size, so a form can size a labeled
+// field as a unit. A field fills its container by default, as a column does. Its
+// control keeps its own width: a control whose width is Auto or Full fills the field,
+// and a fixed one keeps its size. See Sizing in docs/styling.md.
+func (f *FieldElement) Width(l Length) *FieldElement    { f.size.setWidth(l); return f }
+func (f *FieldElement) MinWidth(l Length) *FieldElement { f.size.setMinWidth(l); return f }
+func (f *FieldElement) MaxWidth(l Length) *FieldElement { f.size.setMaxWidth(l); return f }
+func (f *FieldElement) Grow(g float32) *FieldElement    { f.size.setGrow(g); return f }
 
 // Styles sets the look of the parts of the field, for this instance only. Set fields
 // win over the theme's FormField and the defaults; see FormFieldStyle and
@@ -340,7 +350,7 @@ func (f *FieldElement) expand(ctx *Context) Element {
 				root.Description(desc)
 			}
 		}
-		return root
+		return f.size.apply(root)
 	})
 }
 

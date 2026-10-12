@@ -145,6 +145,20 @@ type Style struct {
 	// Its own W and H are zero while it is hidden.
 	Hidden bool
 
+	// FitWidth keeps an item with an automatic width at its content's width in a
+	// column, instead of stretching it to the column's width. In a row it has no
+	// effect, since its width is along the main axis.
+	FitWidth bool
+	// ContentMin makes an item's fixed width a ceiling for its automatic minimum
+	// instead of a floor: in a shrinking row the item may shrink to its content's
+	// min-content width, as CSS's min(specified width, content) allows. The default
+	// keeps a fixed width as the floor.
+	ContentMin bool
+	// MatchParentWidth makes a Floating child at least as wide as its parent's
+	// border box, so a popup can be as wide as the control it opens from. Its
+	// content is laid out at that width.
+	MatchParentWidth bool
+
 	OverflowX, OverflowY Overflow
 }
 

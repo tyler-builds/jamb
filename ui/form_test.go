@@ -403,7 +403,7 @@ func TestEveryControlReportsItsRequiredState(t *testing.T) {
 }
 
 func TestMessagesLookAlikeInANumberFieldAndAField(t *testing.T) {
-	if !reflect.DeepEqual(messageStyle(DarkTheme), numberFieldDefaults(DarkTheme, 120, SpinInline, 1, false, false).Message) {
+	if !reflect.DeepEqual(messageStyle(DarkTheme), numberFieldDefaults(DarkTheme, SpinInline, 1, false, false).Message) {
 		t.Fatal("a number field's message and a field's error have different looks")
 	}
 	if !reflect.DeepEqual(messageStyle(DarkTheme), formFieldDefaults(DarkTheme).Error) {

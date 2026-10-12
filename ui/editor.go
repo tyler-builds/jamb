@@ -131,6 +131,11 @@ func (e *editorElement) textStyle(n *node) text.Style {
 	return st
 }
 
+// fieldMinChars is the text whose width is the automatic minimum of a text field
+// in a shrinking row (its min-content width): about six digits, as a short value
+// needs. The minimum grows with the text size, and MinWidth replaces it.
+const fieldMinChars = "000000"
+
 // measureEditor sizes the editor to its content: one line at least.
 func (n *node) measureEditor(maxWidth float32) (float32, float32) {
 	e := n.editor
@@ -150,7 +155,7 @@ func (n *node) measureEditor(maxWidth float32) (float32, float32) {
 // div so focus, key and pointer routing work exactly as for any element.
 func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	n.editor = e
-	s := Style{MinWidth: Px(0), Cursor: CursorText}.Merge(e.style)
+	s := Style{Cursor: CursorText}.Merge(e.style)
 	n.style = s
 	n.ts = inh.inherit(&s)
 	n.lay.Style = s.layoutStyle(1)

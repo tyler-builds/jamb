@@ -92,7 +92,7 @@ func TestNumberFieldAlignStartAndEnd(t *testing.T) {
 // not focused.
 func TestNumberFieldOverflowingValueIsNotAligned(t *testing.T) {
 	r := numberRig(123456, 100, func(n *NumberFieldElement[int]) *NumberFieldElement[int] {
-		return n.Width(40).Align(End)
+		return n.Width(Px(40)).Align(End)
 	})
 	box, left, width := valueText(t, r)
 	if width <= box.W {

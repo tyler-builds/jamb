@@ -46,7 +46,7 @@ func Settings(s *Store) ui.Element {
 								ui.Switch("Compact activity", s.Compact))).
 							Child(ui.Divider()).
 							Child(SettingRow(t, "UI zoom", "Scale the whole interface, from 80% to 150%.",
-								ui.Slider(zoom, 0.8, 1.5, 0.1).Label("UI zoom").Width(180).
+								ui.Slider(zoom, 0.8, 1.5, 0.1).Label("UI zoom").Width(ui.Px(180)).
 									Format(func(v float64) string { return fmt.Sprintf("%d%%", int(math.Round(v*100))) }).
 									OnChange(func(v float64) { ctx.SetZoom(float32(v)) })))
 					}},

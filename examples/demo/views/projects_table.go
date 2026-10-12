@@ -28,8 +28,8 @@ func projectsTable(t *ui.Theme, s *Store, visible []Project, picked *ui.Signal[[
 		{Header: "Progress", Key: "progress", Text: func(p Project) string { return fmt.Sprintf("%d%%", int(p.Progress*100+0.5)) },
 			Compare: ui.SortBy(func(p Project) float32 { return p.Progress }),
 			Cell: func(p Project) ui.Element {
-				// The bar has a fixed width, so the readout beside it stays in the column.
-				return ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").Width(96)
+				// The bar is at most 160 px, so its readout stays in view in a wide column too.
+				return ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").MaxWidth(ui.Px(160))
 			},
 			Width: 200, Resizable: true},
 		{Header: "Open tasks", Key: "tasks", Text: func(p Project) string { return strconv.Itoa(p.Tasks) },

@@ -1409,7 +1409,14 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		case cl.Cell != nil && cl.Interactive:
 			cell.Child(cl.Cell(v))
 		case cl.Cell != nil:
-			cell.Child(Div().Hidden().Child(cl.Cell(v)))
+			// A cell aligned to the start fills its width, so the content can take a
+			// percentage of it (as a progress bar does). Other cells keep the content's
+			// width, so their Justify places it.
+			wrap := Div().Hidden()
+			if alignOf(cl.Align) == Start {
+				wrap.Grow(1)
+			}
+			cell.Child(wrap.Child(cl.Cell(v)))
 		default:
 			cell.Child(Text(s).Truncate())
 		}

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"slices"
 	"sort"
@@ -178,9 +179,13 @@ func (n *node) Measure(maxWidth float32) (float32, float32) {
 	return 0, 0
 }
 
-// MinContentWidth implements layout.MinContenter. Only text wraps among the
-// leaves, so other kinds report that they do not.
+// MinContentWidth implements layout.MinContenter. Text wraps, and so does a text
+// field: its min-content width is the room for fieldMinChars characters, so a field
+// does not shrink to a letter in a shrinking row. The other kinds do not wrap.
 func (n *node) MinContentWidth() (float32, bool) {
+	if n.kind == kindEditor {
+		return n.rt.text.Layout(fieldMinChars, n.editor.textStyle(n), float32(math.Inf(1))).Width + 2, true
+	}
 	if n.kind != kindText {
 		return 0, false
 	}
@@ -598,7 +603,7 @@ func (rt *Runtime) Stats() FrameStats { return rt.stats }
 
 // NeedsFrame reports whether something changed since the last Frame.
 func (rt *Runtime) NeedsFrame() bool {
-	return rt.looping || !rt.Settled() || len(rt.toasts) > 0 // toasts run their time one frame at a time
+	return rt.looping || !rt.Settled() || rt.toastsTimed()
 }
 
 // Settled reports whether the UI has come to rest: nothing changed since the
@@ -1112,6 +1117,7 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		if e.overlay != 0 {
 			n.lay.Style.Position = layout.Floating
 		}
+		n.lay.Style.MatchParentWidth = e.matchAnchor
 		n.lay.Style.Hidden = e.noDisplay
 		n.ts = inh.inherit(&n.style)
 		if e.hover != nil || e.pressed != nil || e.focused != nil || e.focusWithin != nil || n.style.Transition > 0 ||
@@ -1368,6 +1374,7 @@ func (rt *Runtime) restyle(id uint64) {
 	if d.overlay != 0 {
 		ls.Position = layout.Floating
 	}
+	ls.MatchParentWidth = d.matchAnchor
 	ls.Hidden = d.noDisplay
 	if ls != n.lay.Style {
 		n.lay.Style = ls

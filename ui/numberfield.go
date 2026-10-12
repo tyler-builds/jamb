@@ -77,6 +77,10 @@ func (s NumberFieldStyle) plain() NumberFieldStyle {
 	}
 }
 
+// numberFieldWidth is the default width of a number field at the Text size of 100
+// percent, in logical pixels. It scales with the Text size.
+const numberFieldWidth = 120
+
 // spinInlineWidth is the width of an inline spin button at the Text size setting of
 // 100 percent, in logical pixels. It is the button's hit target, so it is wider than
 // the glyph.
@@ -91,7 +95,7 @@ const spinGap = 2
 // numberFieldDefaults returns the built-in look of a number field of the given
 // width, with spin buttons of placement when spin is set, from the colors of t. A
 // disabled field has the disabled frame (see fieldDefaults).
-func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale float32, disabled, spin bool) NumberFieldStyle {
+func numberFieldDefaults(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool) NumberFieldStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	d := NumberFieldStyle{
 		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled}),
@@ -101,7 +105,7 @@ func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale
 		SpinButtonFocusVisible: Style{Shadows: []Shadow{ring}},
 		Message:                messageStyle(t),
 	}
-	d.Frame.Width = Px(width)
+	d.Frame.Width = Full // the frame fills the field, whose width is its outer box's (see expand)
 	if t.HighContrast {
 		// Disabled controls are GrayText.
 		d.SpinButtonDisabled = Style{TextColor: t.Disabled}
@@ -129,7 +133,6 @@ func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale
 		// increase at the right, so the frame is padded by their width and the text
 		// keeps the middle. Both scale with the Text size, and so does the field's width.
 		w := spinInlineWidth * scale
-		d.Frame.Width = Px(width * scale)
 		d.Frame.Padding = Edges{Left: w + 4, Right: w + 4}
 		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Px(w)}
 		// As in the stacked column, the focus is an inner outline, inside the border.
@@ -141,8 +144,8 @@ func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale
 // resolveNumberField returns the look of a number field: the defaults, merged
 // with the theme's Field, then the theme's NumberField, then the instance's
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveNumberField(t *Theme, width float32, placement SpinPlacement, scale float32, disabled, spin bool, inst NumberFieldStyle) NumberFieldStyle {
-	st := numberFieldDefaults(t, width, placement, scale, disabled, spin)
+func resolveNumberField(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool, inst NumberFieldStyle) NumberFieldStyle {
+	st := numberFieldDefaults(t, placement, scale, disabled, spin)
 	for _, o := range []NumberFieldStyle{{FieldStyle: t.Field}, t.NumberField, inst} {
 		if t.HighContrast {
 			o = o.plain()
@@ -176,7 +179,7 @@ type NumberFieldElement[T int | float64] struct {
 	placement  SpinPlacement
 	align      Alignment // where the text sits in the field (see Align)
 	precision  int       // the decimals of a float, or -1 for the decimals of the step
-	width      float32
+	size       sizing    // the frame's sizes, from the sizing methods (see Sizing in docs/styling.md)
 	styles     NumberFieldStyle
 	rules      []Validator[T] // the validators of the value (see Validate)
 	wire       fieldWire      // what a Field gives the field (see Field)
@@ -201,10 +204,10 @@ func (n *NumberFieldElement[T]) formWire(w fieldWire) Element {
 }
 
 // NumberField creates a number field that reads and writes value, from lo to hi
-// in steps of step. Its default width is 120 px, it shows the decimals of step,
-// and its value is centered in the field.
+// in steps of step. Its default width is 120 px at the Text size of 100 percent (see
+// Width), it shows the decimals of step, and its value is centered in the field.
 func NumberField[T int | float64](value *Signal[T], lo, hi, step T) *NumberFieldElement[T] {
-	return &NumberFieldElement[T]{value: value, lo: lo, hi: hi, step: step, precision: -1, width: 120, align: Center}
+	return &NumberFieldElement[T]{value: value, lo: lo, hi: hi, step: step, precision: -1, align: Center}
 }
 
 func (*NumberFieldElement[T]) isElement()           {}
@@ -244,9 +247,23 @@ func (n *NumberFieldElement[T]) Align(a Alignment) *NumberFieldElement[T] { n.al
 // The default is the number of decimals of the step.
 func (n *NumberFieldElement[T]) Precision(d int) *NumberFieldElement[T] { n.precision = d; return n }
 
-// Width sets the width of the field, in logical pixels. It is the built-in width;
-// the theme's NumberField and the instance's Styles can change it.
-func (n *NumberFieldElement[T]) Width(px float32) *NumberFieldElement[T] { n.width = px; return n }
+// The sizing methods give the field's frame a size. The default is numberFieldWidth
+// wide at the Text size of 100 percent; Width(Full) fills the container, and the
+// spin buttons stay at the frame's edges. See Sizing in docs/styling.md.
+func (n *NumberFieldElement[T]) Width(l Length) *NumberFieldElement[T] { n.size.setWidth(l); return n }
+func (n *NumberFieldElement[T]) Height(l Length) *NumberFieldElement[T] {
+	n.size.setHeight(l)
+	return n
+}
+func (n *NumberFieldElement[T]) MinWidth(l Length) *NumberFieldElement[T] {
+	n.size.setMinWidth(l)
+	return n
+}
+func (n *NumberFieldElement[T]) MaxWidth(l Length) *NumberFieldElement[T] {
+	n.size.setMaxWidth(l)
+	return n
+}
+func (n *NumberFieldElement[T]) Grow(f float32) *NumberFieldElement[T] { n.size.setGrow(f); return n }
 
 // Styles sets the look of the parts of the number field, for this instance only.
 // Set fields win over the theme's NumberField and the defaults; see
@@ -261,7 +278,7 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		scale := float32(ctx.TextScale()) / 100
-		st := resolveNumberField(t, n.width, n.placement, scale, n.disabled, n.spin && !n.disabled, n.styles)
+		st := resolveNumberField(t, n.placement, scale, n.disabled, n.spin && !n.disabled, n.styles)
 		v := n.value.Get()
 		// The field keeps its own text while the user types. draft is that text,
 		// and seen is the value it was last made from, so that a value set from
@@ -326,7 +343,9 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 		if w.label != "" {
 			name, labelledBy = w.label, w.labelledBy
 		}
-		root := Div().Column().Gap(6).Role(access.RoleSpinner)
+		// The field is its column: the frame and the message row, at the field's width. Its default
+		// width is numberFieldWidth at the Text size, and the sizing methods replace it.
+		root := Div().Column().Gap(6).Role(access.RoleSpinner).Style(Style{Width: Px(numberFieldWidth * scale)})
 		a := root.access()
 		if name != "" {
 			root.Label(name)
@@ -348,7 +367,7 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 			frame := Div().asPart("NumberField.Frame").Style(st.Frame).Style(st.FrameDisabled)
 			content := Div().asPart("NumberField.Text").Style(st.Text).Row().Grow(1).Justify(n.align).Child(Text(draft.Get()))
 			root.Child(row.Child(frame.Child(content)))
-			return root
+			return n.size.apply(root)
 		}
 
 		fo := fieldOptions{value: draft, name: name, labelledBy: labelledBy,
@@ -381,7 +400,7 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 		root.Child(Div().asPart("NumberField.Message").Style(st.Message).Display(isInvalid).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
 			Child(Text(msg).Key(errKey)))
-		return root
+		return n.size.apply(root)
 	})
 }
 

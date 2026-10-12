@@ -101,7 +101,7 @@ func buttonDefaults(t *Theme, v ButtonVariant, small, iconOnly bool) ButtonStyle
 	d := ButtonStyle{
 		Root: Style{Direction: Row, Align: Center, Justify: Center, Gap: 7, MinHeight: Px(h),
 			Padding: XY(px, 0), Radius: t.Radius, FontSize: fs, FontWeight: FontMedium,
-			Transition: 110 * time.Millisecond, NoShrink: true},
+			Transition: 110 * time.Millisecond, NoShrink: true, fitWidth: true},
 		RootDisabled: Style{Opacity: 0.5},
 	}
 	switch v {
@@ -164,6 +164,7 @@ type ButtonElement struct {
 	checked  bool
 	inert    bool         // set by DropdownMenu: the wrapper is exposed instead (see accessRole)
 	handle   *FocusHandle // set by Modal.Default, so the modal can focus the button
+	size     sizing
 }
 
 // Button creates a button with a text label. The default variant is Primary.
@@ -187,6 +188,17 @@ func (b *ButtonElement) Ghost() *ButtonElement                  { return b.Varia
 func (b *ButtonElement) Danger() *ButtonElement                 { return b.Variant(Danger) }
 func (b *ButtonElement) Small() *ButtonElement                  { b.small = true; return b }
 func (b *ButtonElement) Disabled(d bool) *ButtonElement         { b.disabled = d; return b }
+
+// The sizing methods give the button's outer box a size. A button is as wide as
+// its label by default, and Width(Full) fills its container (see Sizing in
+// docs/styling.md).
+func (b *ButtonElement) Width(l Length) *ButtonElement     { b.size.setWidth(l); return b }
+func (b *ButtonElement) Height(l Length) *ButtonElement    { b.size.setHeight(l); return b }
+func (b *ButtonElement) MinWidth(l Length) *ButtonElement  { b.size.setMinWidth(l); return b }
+func (b *ButtonElement) MinHeight(l Length) *ButtonElement { b.size.setMinHeight(l); return b }
+func (b *ButtonElement) MaxWidth(l Length) *ButtonElement  { b.size.setMaxWidth(l); return b }
+func (b *ButtonElement) MaxHeight(l Length) *ButtonElement { b.size.setMaxHeight(l); return b }
+func (b *ButtonElement) Grow(f float32) *ButtonElement     { b.size.setGrow(f); return b }
 
 // Label names the button for assistive technology. A button with text needs
 // no label, since its text is its name; an icon-only button does.
@@ -270,7 +282,7 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		focus := Style{Shadows: append(slices.Clone(st.Root.Shadows), ring)}.Merge(st.RootFocusVisible)
 		d.FocusVisible(focus)
 	}
-	return d
+	return b.size.apply(d)
 }
 
 // Divider is a 1px horizontal rule in the theme's border color.
@@ -348,7 +360,14 @@ func (s FieldStyle) plain() FieldStyle {
 // compact one (Small), or a disabled number field.
 type fieldLayout struct {
 	multiline, small, disabled bool
+	width                      Length // the frame's width by default (see textFieldWidth)
 }
+
+// textFieldWidth is the default width of a text field at the Text size of 100
+// percent, like a text input's default size in CSS. A field is fixed at this width
+// by default, so it does not stretch; Width(Full) stretches it. It scales with the
+// Text size, as the number field's width does.
+const textFieldWidth = 240
 
 // fieldDefaults returns the built-in look of a text frame with layout lay, from
 // the colors of t. Under high contrast a disabled frame is GrayText and not
@@ -356,7 +375,7 @@ type fieldLayout struct {
 func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
 	d := FieldStyle{
 		Frame: Style{Direction: Row, Align: Center, Gap: 8, Padding: XY(10, 0), MinHeight: Px(34),
-			Radius: t.Radius, Background: t.Surface, BorderWidth: 1, BorderColor: t.BorderStrong,
+			Width: lay.width, contentMin: true, Radius: t.Radius, Background: t.Surface, BorderWidth: 1, BorderColor: t.BorderStrong,
 			Transition: 110 * time.Millisecond},
 		FrameHover:       Style{BorderColor: t.TextMuted},
 		FrameFocusWithin: Style{BorderColor: t.Accent},
@@ -434,6 +453,7 @@ type fieldOptions struct {
 	overlays    []Element           // laid over the frame's edges, after the text, out of its flow (NumberField's inline spin buttons)
 	rules       []Validator[string] // the validators of the value (see Validate)
 	wire        fieldWire           // what a Field gives the control (see Field)
+	size        sizing              // the frame's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // formCheck and formWire make a text field a formControl (see Field).
@@ -488,9 +508,10 @@ func (ti *TextInputElement) OnSubmit(fn func(string)) *TextInputElement { ti.onS
 func (ti *TextInputElement) OnChange(fn func(string)) *TextInputElement { ti.onChange = fn; return ti }
 
 // Style is merged into the Frame part of the field, over the Styles of the
-// instance: size (Width, Height, Min/Max), Padding, Margin, Radius, Background,
-// BorderColor/BorderWidth and Grow apply to the frame; FontSize, FontWeight,
-// FontFamily and TextColor are inherited by the text inside. It is the same as
+// instance: Padding, Margin, Radius, Background and BorderColor/BorderWidth apply
+// to the frame, and FontSize, FontWeight, FontFamily and TextColor are inherited
+// by the text inside. A size set here is overridden by the sizing methods (Width
+// and the others); see Sizing in docs/styling.md. It is the same as
 // Styles(FieldStyle{Frame: s}).
 func (ti *TextInputElement) Style(s Style) *TextInputElement {
 	ti.styles.Frame = ti.styles.Frame.Merge(s)
@@ -516,8 +537,16 @@ func (ti *TextInputElement) Trailing(el Element) *TextInputElement { ti.trailing
 // Small makes a compact field (28px tall, 13px text), matching Button.Small.
 func (ti *TextInputElement) Small() *TextInputElement { ti.small = true; return ti }
 
-// Width sets the width of the field's frame.
-func (ti *TextInputElement) Width(l Length) *TextInputElement { ti.styles.Frame.Width = l; return ti }
+// The sizing methods give the field's frame a size. A field is textFieldWidth wide
+// by default, so Width(Full) fills its container, and the frame never shrinks below
+// the room for a few characters (see MinWidth). See Sizing in docs/styling.md.
+func (ti *TextInputElement) Width(l Length) *TextInputElement     { ti.size.setWidth(l); return ti }
+func (ti *TextInputElement) Height(l Length) *TextInputElement    { ti.size.setHeight(l); return ti }
+func (ti *TextInputElement) MinWidth(l Length) *TextInputElement  { ti.size.setMinWidth(l); return ti }
+func (ti *TextInputElement) MinHeight(l Length) *TextInputElement { ti.size.setMinHeight(l); return ti }
+func (ti *TextInputElement) MaxWidth(l Length) *TextInputElement  { ti.size.setMaxWidth(l); return ti }
+func (ti *TextInputElement) MaxHeight(l Length) *TextInputElement { ti.size.setMaxHeight(l); return ti }
+func (ti *TextInputElement) Grow(f float32) *TextInputElement     { ti.size.setGrow(f); return ti }
 
 // Borderless drops the field's frame and padding, for inputs that should
 // look like plain text until clicked (titles, inline renames). The Frame part
@@ -540,7 +569,8 @@ func (ti *TextInputElement) Validate(rules ...Validator[string]) *TextInputEleme
 }
 
 func (ti *TextInputElement) expand(ctx *Context) Element {
-	st := resolveField(ctx.Theme(), fieldLayout{small: ti.small}, ti.styles)
+	lay := fieldLayout{small: ti.small, width: Px(textFieldWidth * textScale(ctx))}
+	st := resolveField(ctx.Theme(), lay, ti.styles)
 	return ti.fieldOptions.expand(ctx, st, false, 0)
 }
 
@@ -586,8 +616,15 @@ func (ta *TextAreaElement) Style(s Style) *TextAreaElement {
 	return ta
 }
 
-// Width sets the width of the editor's frame.
-func (ta *TextAreaElement) Width(l Length) *TextAreaElement { ta.styles.Frame.Width = l; return ta }
+// The sizing methods give the editor's frame a size, as for TextInput. A text area
+// is textFieldWidth wide by default.
+func (ta *TextAreaElement) Width(l Length) *TextAreaElement     { ta.size.setWidth(l); return ta }
+func (ta *TextAreaElement) Height(l Length) *TextAreaElement    { ta.size.setHeight(l); return ta }
+func (ta *TextAreaElement) MinWidth(l Length) *TextAreaElement  { ta.size.setMinWidth(l); return ta }
+func (ta *TextAreaElement) MinHeight(l Length) *TextAreaElement { ta.size.setMinHeight(l); return ta }
+func (ta *TextAreaElement) MaxWidth(l Length) *TextAreaElement  { ta.size.setMaxWidth(l); return ta }
+func (ta *TextAreaElement) MaxHeight(l Length) *TextAreaElement { ta.size.setMaxHeight(l); return ta }
+func (ta *TextAreaElement) Grow(f float32) *TextAreaElement     { ta.size.setGrow(f); return ta }
 
 // MinRows sets the minimum height in lines (default 3).
 func (ta *TextAreaElement) MinRows(n int) *TextAreaElement { ta.minRows = n; return ta }
@@ -624,14 +661,15 @@ func (ta *TextAreaElement) Validate(rules ...Validator[string]) *TextAreaElement
 }
 
 func (ta *TextAreaElement) expand(ctx *Context) Element {
-	st := resolveField(ctx.Theme(), fieldLayout{multiline: true}, ta.styles)
+	lay := fieldLayout{multiline: true, width: Px(textFieldWidth * textScale(ctx))}
+	st := resolveField(ctx.Theme(), lay, ta.styles)
 	return ta.fieldOptions.expand(ctx, st, true, ta.minRows)
 }
 
 // expand returns the field's frame with its editor, in the look st. The frame
 // is the Frame part, and the content before and after the text is in the
 // Leading and Trailing parts. A borderless field draws no Frame part.
-func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRows int) Element {
+func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRows int) *DivElement {
 	t := ctx.Theme()
 	// What a Field gives the field replaces or adds to what the field was given. An
 	// invalid frame also stays while the field has focus, so the danger color is not
@@ -739,5 +777,5 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 	for _, o := range f.overlays {
 		box.Child(o)
 	}
-	return box
+	return f.size.apply(box)
 }

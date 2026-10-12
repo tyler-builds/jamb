@@ -406,7 +406,7 @@ func TestSliderKeysSteps(t *testing.T) {
 func TestSliderPointerAndRangeValueSet(t *testing.T) {
 	v := NewSignal(0.0)
 	r := newAccessRig(func(ctx *Context) Element {
-		return Div().Column().Child(Slider(v, 0, 100, 5).Label("Volume").Key("vol").Width(300))
+		return Div().Column().Child(Slider(v, 0, 100, 5).Label("Volume").Key("vol").Width(Px(300)))
 	})
 	rc := r.rt.nodeRect(r.keyed(t, "vol"))
 	// A press a quarter of the way along the thumb travel sets a quarter of the range.

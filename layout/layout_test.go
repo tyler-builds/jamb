@@ -123,6 +123,70 @@ func TestFloating(t *testing.T) {
 	}
 }
 
+func TestFitWidthInColumn(t *testing.T) {
+	fit := box(Style{FitWidth: true, Height: Px(10)}, box(Style{Width: Px(30), Height: Px(10)}))
+	stretch := box(Style{Height: Px(10)})
+	col := box(Style{Width: Px(100)}, fit, stretch)
+	var e Engine
+	e.Compute(col, 100, 100)
+	if fit.W != 30 {
+		t.Errorf("fit width %v, want its content's 30", fit.W)
+	}
+	if stretch.W != 100 {
+		t.Errorf("stretched width %v, want 100", stretch.W)
+	}
+}
+
+func TestFitWidthInRowIsIgnored(t *testing.T) {
+	fit := box(Style{FitWidth: true, Width: Px(10)})
+	row := box(Style{Direction: Row, Height: Px(40)}, fit)
+	root := box(Style{AlignItems: AlignStart}, row)
+	var e Engine
+	e.Compute(root, 100, 100)
+	if fit.H != 40 {
+		t.Errorf("height %v in a row, want the stretched 40", fit.H)
+	}
+}
+
+func TestContentMinLetsFixedWidthShrink(t *testing.T) {
+	for _, contentMin := range []bool{false, true} {
+		child := box(Style{Width: Px(30), Height: Px(10)})
+		field := box(Style{Direction: Row, Width: Px(240), Shrink: 1, ContentMin: contentMin}, child)
+		root := box(Style{Direction: Row, Width: Px(100), Height: Px(20)}, field)
+		var e Engine
+		e.Compute(root, 100, 100)
+		want := float32(240)
+		if contentMin {
+			want = 100 // shrinks to the 100 px row, which is wider than its 30 px content
+		}
+		if field.W != want {
+			t.Errorf("ContentMin %v: field width %v, want %v", contentMin, field.W, want)
+		}
+	}
+}
+
+func TestFloatingMatchParentWidth(t *testing.T) {
+	pop := box(Style{Position: Floating, MatchParentWidth: true}, box(Style{Height: Px(30)}))
+	parent := box(Style{Width: Px(100), Height: Px(20)}, pop)
+	root := box(Style{AlignItems: AlignStart}, parent)
+	var e Engine
+	e.Compute(root, 300, 100)
+	if pop.W != 100 {
+		t.Errorf("popup width %v, want its parent's 100", pop.W)
+	}
+	if pop.Children[0].W != 100 {
+		t.Errorf("popup content width %v, want 100", pop.Children[0].W)
+	}
+	wide := box(Style{Position: Floating, MatchParentWidth: true, Width: Px(150)})
+	parent = box(Style{Width: Px(100), Height: Px(20)}, wide)
+	root = box(Style{AlignItems: AlignStart}, parent)
+	e = Engine{}
+	e.Compute(root, 300, 100)
+	if wide.W != 150 {
+		t.Errorf("wider popup width %v, want its own 150", wide.W)
+	}
+}
+
 func TestPercentAndMinMax(t *testing.T) {
 	a := box(Style{Width: Percent(50), MaxWidth: Px(80), Height: Px(10)})
 	b := box(Style{Width: Percent(10), MinWidth: Px(30), Height: Px(10)})

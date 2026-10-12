@@ -66,8 +66,8 @@ func formControlsSection() ui.Element {
 			formSample(t, "Radio group", radioSample(freq), freq.Get()),
 			formSample(t, "Select", selectSample(channel, false), channelName(channel.Get())),
 			formSample(t, "Select, disabled", selectSample(picked, true), channelName(picked.Get())),
-			formSample(t, "Slider", ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percentOf).Width(200), percentOf(volume.Get())),
-			formSample(t, "Slider, disabled", ui.Slider(volume, 0, 100, 5).Label("Volume, disabled").Format(percentOf).Width(200).Disabled(true), percentOf(volume.Get())),
+			formSample(t, "Slider", ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percentOf).Width(ui.Px(200)), percentOf(volume.Get())),
+			formSample(t, "Slider, disabled", ui.Slider(volume, 0, 100, 5).Label("Volume, disabled").Format(percentOf).Width(ui.Px(200)).Disabled(true), percentOf(volume.Get())),
 			formSample(t, "Number field", ui.NumberField(quiet, 0, 23, 1).Label("Sample quiet hours").SpinButtons(ui.SpinInline), fmt.Sprintf("%02d:00", quiet.Get())),
 			formSample(t, "Number field, disabled", ui.NumberField(quiet, 0, 23, 1).Label("Sample quiet hours, disabled").Disabled(true), fmt.Sprintf("%02d:00", quiet.Get())),
 		}
@@ -111,9 +111,9 @@ func formControlsSection() ui.Element {
 						ui.Option[string]{Value: "email", Label: "Email"},
 						ui.Option[string]{Value: "sms", Label: "Text message"},
 						ui.Option[string]{Value: "phone", Label: "Phone call"},
-					).Label("Preferred channel").Width(240)).
+					).Label("Preferred channel").Width(ui.Px(240))).
 					Child(ui.Text("Alert volume").Size(13).Medium().Color(t.TextMuted)).
-					Child(ui.Slider(prefVolume, 0, 100, 5).Label("Alert volume").Format(percentOf).Width(240))).
+					Child(ui.Slider(prefVolume, 0, 100, 5).Label("Alert volume").Format(percentOf).Width(ui.Px(240)))).
 				Child(ui.Div().Gap(10).
 					Child(ui.Div().Row().Align(ui.Start).Gap(10).
 						Child(prefs.Field("from", "Quiet hours from", ui.NumberField(fromHour, 0, 23, 1).SpinButtons(ui.SpinInline))).
@@ -174,7 +174,7 @@ func selectSample(value *ui.Signal[string], disabled bool) ui.Element {
 		ui.Option[string]{Value: "sms", Label: "Text message"},
 		ui.Option[string]{Value: "phone", Label: "Phone call", Disabled: true},
 		ui.Option[string]{Value: "red", Label: "Red"},
-	).Label(channelLabel(disabled)).Placeholder("Choose a channel").Width(240).Disabled(disabled)
+	).Label(channelLabel(disabled)).Placeholder("Choose a channel").Width(ui.Px(240)).Disabled(disabled)
 }
 
 // channelName is the text of a channel's value, such as "Text message".

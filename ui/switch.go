@@ -121,6 +121,7 @@ type SwitchElement struct {
 	disabled bool
 	onChange func(bool)
 	styles   SwitchStyle
+	size     sizing // the track's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // Switch creates a switch that is on while on is true. label names the switch
@@ -141,6 +142,13 @@ func (s *SwitchElement) Disabled(d bool) *SwitchElement { s.disabled = d; return
 // signal is set first.
 func (s *SwitchElement) OnChange(fn func(bool)) *SwitchElement { s.onChange = fn; return s }
 
+// The sizing methods give the track a width. The track is 38 px wide by default, and
+// the knob stays 3 px from the end it is at. See Sizing in docs/styling.md.
+func (s *SwitchElement) Width(l Length) *SwitchElement    { s.size.setWidth(l); return s }
+func (s *SwitchElement) MinWidth(l Length) *SwitchElement { s.size.setMinWidth(l); return s }
+func (s *SwitchElement) MaxWidth(l Length) *SwitchElement { s.size.setMaxWidth(l); return s }
+func (s *SwitchElement) Grow(f float32) *SwitchElement    { s.size.setGrow(f); return s }
+
 // Styles sets the look of the parts of the switch, for this instance only. Set
 // fields win over the theme's Switch and the defaults; see SwitchStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
@@ -153,19 +161,18 @@ func (s *SwitchElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	on := s.on.Get()
 	st := resolveSwitch(t, on, s.disabled, s.styles)
-	knobX := float32(3)
-	if on {
-		knobX = 19
-	}
 	d := Div().asPart("Switch.Track").Style(st.Track).
 		Role(access.RoleSwitch).Label(s.label).Checked(on)
 	d.spaceOnly = true // Enter goes on to the modal default button, as on Windows
 	if on {
 		d.Style(st.TrackChecked)
 	}
-	k := Div().asPart("Switch.Knob").Style(st.Knob).Absolute().Left(knobX).Top(3)
+	// The knob sits 3 px in from the end it is at, so the track can be any width.
+	k := Div().asPart("Switch.Knob").Style(st.Knob).Absolute().Top(3)
 	if on {
-		k.Style(st.KnobChecked)
+		k.Right(3).Style(st.KnobChecked)
+	} else {
+		k.Left(3)
 	}
 	if s.disabled {
 		k.Style(st.KnobDisabled)
@@ -174,14 +181,14 @@ func (s *SwitchElement) expand(ctx *Context) Element {
 	if s.disabled {
 		d.Style(st.TrackDisabled).Cursor(CursorNotAllowed)
 		d.access().disabled = true
-		return d
+		return s.size.apply(d)
 	}
 	d.Hover(st.TrackHover)
-	return d.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
+	return s.size.apply(d.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
 		OnClick(func() {
 			s.on.Set(!on)
 			if s.onChange != nil {
 				s.onChange(!on)
 			}
-		})
+		}))
 }

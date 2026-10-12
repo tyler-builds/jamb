@@ -254,7 +254,7 @@ func (e *Engine) minContentSize(n *Node, cbW float32) (float32, bool) {
 		}
 		return clamp(cw+n.padH(), minW, maxW), true
 	}
-	if w := s.Width.resolve(cbW); !isNaN(w) {
+	if w := s.Width.resolve(cbW); !isNaN(w) && !s.ContentMin {
 		return clamp(w, minW, maxW), true
 	}
 	row := s.Direction == Row
@@ -419,7 +419,7 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 			crossLen, mainLen = cs.Height, cs.Width
 			minL, maxL = cs.MinWidth, cs.MaxWidth
 		}
-		if it.align == AlignStretch && crossLen.IsAuto() {
+		if it.align == AlignStretch && crossLen.IsAuto() && !(cs.FitWidth && !row) {
 			// Wrapped items stretch to their line, which is only known later.
 			if !isNaN(crossSize) && !s.Wrap {
 				it.forcedCross = max(crossSize-it.marginCross, 0)
@@ -747,6 +747,9 @@ func (e *Engine) arrangeAbsolute(n *Node) {
 		}
 		if cs.Position == Floating {
 			w, h := e.measure(c, e.viewW, e.viewH, e.viewW, nan, nan)
+			if cs.MatchParentWidth && w < n.W {
+				w, h = e.measure(c, e.viewW, e.viewH, e.viewW, n.W, nan)
+			}
 			c.X, c.Y, c.W, c.H = 0, 0, w, h
 			e.arrange(c)
 			continue

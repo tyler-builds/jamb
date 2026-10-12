@@ -136,10 +136,16 @@ type Style struct {
 	// Basis is the starting main size before growing/shrinking (Auto = content).
 	Basis Length
 	// NoShrink stops the element from shrinking below its size (Shrink 0).
-	NoShrink  bool
-	Align     Alignment // children on the cross axis
-	AlignSelf Alignment
-	Justify   Alignment // children on the main axis
+	NoShrink bool
+	// fitWidth keeps an automatic width at the content's width in a column, where
+	// the element would otherwise stretch to the column's width (see layout.Style).
+	fitWidth bool
+	// contentMin lets the element shrink below its fixed width to its content's
+	// min-content width (see layout.Style.ContentMin); text fields use it.
+	contentMin bool
+	Align      Alignment // children on the cross axis
+	AlignSelf  Alignment
+	Justify    Alignment // children on the main axis
 	// Absolute removes the element from the flow; position it with Inset.
 	Absolute  bool
 	Inset     Edges
@@ -254,6 +260,8 @@ func (s Style) Merge(o Style) Style {
 	mergeF(&s.Shrink, o.Shrink)
 	mergeLen(&s.Basis, o.Basis)
 	s.NoShrink = s.NoShrink || o.NoShrink
+	s.fitWidth = s.fitWidth || o.fitWidth
+	s.contentMin = s.contentMin || o.contentMin
 	mergeA(&s.Align, o.Align)
 	mergeA(&s.AlignSelf, o.AlignSelf)
 	mergeA(&s.Justify, o.Justify)
@@ -392,6 +400,8 @@ func (s *Style) layoutStyle(shrinkDefault float32) layout.Style {
 	}
 	ls.AlignItems = align(s.Align)
 	ls.AlignSelf = align(s.AlignSelf)
+	ls.FitWidth = s.fitWidth
+	ls.ContentMin = s.contentMin
 	if s.Absolute {
 		ls.Position = layout.Absolute
 		in := [4]*Length{&ls.Top, &ls.Right, &ls.Bottom, &ls.Left}

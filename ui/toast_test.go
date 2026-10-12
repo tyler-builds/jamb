@@ -291,3 +291,29 @@ func TestToastOverflowKeepsFocusedAndHoveredToasts(t *testing.T) {
 		t.Errorf("%d toasts, want %d", len(r.rt.toasts), toastMaxDefault)
 	}
 }
+
+// A sticky toast, such as an error, has no time to run, so it asks for no frames:
+// it stays until it is dismissed, and the app is idle while it is up.
+func TestStickyToastAsksNoFrames(t *testing.T) {
+	r := toastRig(t)
+	r.rt.toast(ToastError, "Failed")
+	advance(r, 500*time.Millisecond) // its enter motion ends first
+	if r.rt.NeedsFrame() {
+		t.Error("an error toast asks for frames, though it has no time to run")
+	}
+}
+
+// The time of a timed toast starts when it is shown. While only a sticky toast was
+// up no frames ran, and that idle time is not the timed toast's.
+func TestTimedToastClockStartsWhenShown(t *testing.T) {
+	r := toastRig(t)
+	r.rt.toast(ToastError, "Failed")
+	r.frame()
+	r.now = r.now.Add(60 * time.Second) // idle: no frame runs while only the error is up
+	id := r.rt.toast(ToastInfo, "Saved").e.id
+	r.frame()
+	advance(r, 4900*time.Millisecond)
+	if !present(r, id) {
+		t.Error("the info toast went at once: the idle time was counted against it")
+	}
+}

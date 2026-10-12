@@ -78,7 +78,7 @@ func (s RadioGroupStyle) plain() RadioGroupStyle {
 func radioGroupDefaults(t *Theme) RadioGroupStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	d := RadioGroupStyle{
-		Group:             Style{Direction: Column, Gap: 8},
+		Group:             Style{Direction: Column, Gap: 8, fitWidth: true},
 		Radio:             Style{Direction: Row, Align: Center, Gap: 10, Radius: 4, NoShrink: true},
 		RadioFocusVisible: Style{Shadows: []Shadow{ring}},
 		RadioDisabled:     Style{Opacity: 0.5},
@@ -128,6 +128,7 @@ type RadioGroupElement[T comparable] struct {
 	styles     RadioGroupStyle
 	rules      []Validator[T] // the validators of the value (see Validate)
 	wire       fieldWire      // what a Field gives the group (see Field)
+	size       sizing         // the group's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // RadioGroup creates a group of radio buttons that reads and writes value.
@@ -173,6 +174,20 @@ func (r *RadioGroupElement[T]) OnChange(fn func(T)) *RadioGroupElement[T] { r.on
 
 // Disabled shows every option but lets none of them be chosen.
 func (r *RadioGroupElement[T]) Disabled(d bool) *RadioGroupElement[T] { r.disabled = d; return r }
+
+// The sizing methods give the group's outer box a size. A group is as wide as its
+// widest option by default; see Sizing in docs/styling.md.
+func (r *RadioGroupElement[T]) Width(l Length) *RadioGroupElement[T]  { r.size.setWidth(l); return r }
+func (r *RadioGroupElement[T]) Height(l Length) *RadioGroupElement[T] { r.size.setHeight(l); return r }
+func (r *RadioGroupElement[T]) MinWidth(l Length) *RadioGroupElement[T] {
+	r.size.setMinWidth(l)
+	return r
+}
+func (r *RadioGroupElement[T]) MaxWidth(l Length) *RadioGroupElement[T] {
+	r.size.setMaxWidth(l)
+	return r
+}
+func (r *RadioGroupElement[T]) Grow(f float32) *RadioGroupElement[T] { r.size.setGrow(f); return r }
 
 // Styles sets the look of the parts of the radio group, for this instance only.
 // Set fields win over the theme's RadioGroup and the defaults; see
@@ -284,7 +299,7 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 			}
 			g.Child(item)
 		}
-		return g
+		return r.size.apply(g)
 	})
 }
 

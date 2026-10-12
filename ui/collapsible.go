@@ -110,6 +110,7 @@ type CollapsibleElement struct {
 	renderHeader func(title string, state PartState) Element
 	// group is set by an Accordion, and runs after a change made by the header.
 	group func(open bool)
+	size  sizing // the section's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // Collapsible creates a section titled title, whose content shows while open is
@@ -141,6 +142,13 @@ func (c *CollapsibleElement) OnChange(fn func(open bool)) *CollapsibleElement {
 	c.onChange = fn
 	return c
 }
+
+// The sizing methods give the section's outer box a width. A section fills its
+// container by default; see Sizing in docs/styling.md.
+func (c *CollapsibleElement) Width(l Length) *CollapsibleElement    { c.size.setWidth(l); return c }
+func (c *CollapsibleElement) MinWidth(l Length) *CollapsibleElement { c.size.setMinWidth(l); return c }
+func (c *CollapsibleElement) MaxWidth(l Length) *CollapsibleElement { c.size.setMaxWidth(l); return c }
+func (c *CollapsibleElement) Grow(f float32) *CollapsibleElement    { c.size.setGrow(f); return c }
 
 // Styles sets the look of the parts of the section, for this instance only. Set
 // fields win over the theme's Collapsible and the defaults; see CollapsibleStyle
@@ -256,7 +264,7 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 		col.Child(Div().asPart("Collapsible.Content").Column().Display(on).Role(access.RoleGroup).Label(c.title).LabelledBy(c.headerKey()).
 			Style(st.Content).Child(c.content))
 	}
-	return col
+	return c.size.apply(col)
 }
 
 // AccordionElement is a group of collapsible sections. By default each section
@@ -271,6 +279,7 @@ type AccordionElement struct {
 	sections []*CollapsibleElement
 	key      string
 	single   bool
+	size     sizing // the group's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // Accordion creates a group of sections, shown in order.
@@ -283,6 +292,12 @@ func (a *AccordionElement) elementKey() string { return a.key }
 
 // Key gives the group a stable identity among its siblings.
 func (a *AccordionElement) Key(k string) *AccordionElement { a.key = k; return a }
+
+// The sizing methods give the group's outer box a width, as for a Collapsible.
+func (a *AccordionElement) Width(l Length) *AccordionElement    { a.size.setWidth(l); return a }
+func (a *AccordionElement) MinWidth(l Length) *AccordionElement { a.size.setMinWidth(l); return a }
+func (a *AccordionElement) MaxWidth(l Length) *AccordionElement { a.size.setMaxWidth(l); return a }
+func (a *AccordionElement) Grow(f float32) *AccordionElement    { a.size.setGrow(f); return a }
 
 // SingleOpen makes opening a section close the others. A section that is closed
 // stays closed, so the group can be closed entirely.
@@ -310,5 +325,5 @@ func (a *AccordionElement) expand(ctx *Context) Element {
 		}
 		col.Child(s)
 	}
-	return col
+	return a.size.apply(col)
 }

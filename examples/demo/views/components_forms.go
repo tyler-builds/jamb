@@ -39,10 +39,10 @@ func formsSection(t *ui.Theme) ui.Element {
 		})
 		body := ui.Div().Column().Gap(12).Width(ui.Px(420)).
 			Child(form.Summary()).
-			Child(form.Field("name", "Name", ui.TextInput(name).Key("forms-name").Placeholder("A name for the item").
+			Child(form.Field("name", "Name", ui.TextInput(name).Key("forms-name").Placeholder("A name for the item").Width(ui.Full).
 				Validate(ui.Required[string](), ui.MaxLength(40))).
 				Description("Must be unique. Enter “taken” to see a refusal from the server.").Required()).
-			Child(form.Field("email", "Email", ui.TextInput(email).Placeholder("name@example.com").
+			Child(form.Field("email", "Email", ui.TextInput(email).Placeholder("name@example.com").Width(ui.Full).
 				Validate(ui.Pattern(emailPattern, "Enter an email address like name@example.com."))).Inline())
 		actions := ui.Div().Row().Align(ui.Center).Gap(10).
 			Child(ui.Button("Save").Key("forms-save").Primary().Disabled(form.Submitting()).OnClick(form.Submit))

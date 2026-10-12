@@ -124,7 +124,7 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 			Child(titles).
 			Child(ui.Text(p.Description).Size(13).Color(t.TextMuted).Truncate().HighlightMatches(q, matchHighlight(t))).
 			Child(ui.Div().Row().Align(ui.Center).Gap(12).Wrap().MarginTop(4).
-				Child(ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").Width(336)).
+				Child(ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").MaxWidth(ui.Px(336))).
 				Child(ui.Div().Row().Align(ui.Center).Gap(5).TextColor(t.TextSubtle).
 					Child(ui.Icon(icons.Check).Size(13)).
 					Child(ui.Textf("%d open tasks", p.Tasks).Size(12))))).

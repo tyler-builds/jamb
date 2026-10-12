@@ -110,6 +110,10 @@ func resolveSlider(t *Theme, disabled bool, inst SliderStyle) SliderStyle {
 	return st
 }
 
+// sliderMinWidth is the narrowest a slider is by default, in logical pixels.
+// Like the minimum of a progress bar, it does not scale with the text.
+const sliderMinWidth = 160
+
 // SliderElement moves a value along a track from lo to hi, in steps of step. The
 // mouse sets the value by a click or a drag. Keys: the arrows move it by one
 // step, Page Up and Page Down by a tenth of the range, and Home and End go to
@@ -121,16 +125,16 @@ type SliderElement struct {
 	labelledBy   []string
 	key          string
 	disabled     bool
-	width        float32
+	size         sizing
 	format       func(float64) string
 	onChange     func(float64)
 	styles       SliderStyle
 }
 
 // Slider creates a slider that reads and writes value, from lo to hi in steps of
-// step. The default width is 240 px.
+// step. It fills the width of its container by default (see Width).
 func Slider(value *Signal[float64], lo, hi, step float64) *SliderElement {
-	return &SliderElement{value: value, lo: lo, hi: hi, step: step, width: 240}
+	return &SliderElement{value: value, lo: lo, hi: hi, step: step}
 }
 
 func (*SliderElement) isElement()           {}
@@ -151,8 +155,13 @@ func (s *SliderElement) LabelledBy(keys ...string) *SliderElement {
 // Disabled shows the slider but does not let it change.
 func (s *SliderElement) Disabled(d bool) *SliderElement { s.disabled = d; return s }
 
-// Width sets the width of the slider, in logical pixels, including its readout.
-func (s *SliderElement) Width(px float32) *SliderElement { s.width = px; return s }
+// The sizing methods give the slider's outer box a size, including its readout. A
+// slider fills its container by default, so Width(Px(240)) fixes it and
+// MinWidth keeps its track usable. See Sizing in docs/styling.md.
+func (s *SliderElement) Width(l Length) *SliderElement    { s.size.setWidth(l); return s }
+func (s *SliderElement) MinWidth(l Length) *SliderElement { s.size.setMinWidth(l); return s }
+func (s *SliderElement) MaxWidth(l Length) *SliderElement { s.size.setMaxWidth(l); return s }
+func (s *SliderElement) Grow(f float32) *SliderElement    { s.size.setGrow(f); return s }
 
 // Format sets how the value is shown beside the track. The default shows the
 // value with as many decimals as the step has.
@@ -249,9 +258,12 @@ func (s *SliderElement) expand(ctx *Context) Element {
 		readout := fmtValue(s, v)
 		value := Div().asPart("Slider.ValueText").Hidden().MinWidth(Px(44)).Align(End).Style(st.ValueText).
 			Child(Text(readout))
-		root := Div().Row().Align(Center).Gap(12).Width(Px(s.width)).
+		// The default minimum keeps the track usable in a container with no width of its
+		// own, where a percentage has nothing to take.
+		root := Div().Row().Align(Center).Gap(12).Width(Full).Style(Style{MinWidth: Px(sliderMinWidth)}).
 			Child(track).
 			Child(value)
+		s.size.apply(root)
 
 		a := track.access()
 		track.Role(access.RoleSlider)

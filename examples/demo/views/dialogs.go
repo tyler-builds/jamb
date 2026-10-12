@@ -26,10 +26,10 @@ func newProjectModal(s *Store) ui.Element {
 		cancel := ui.Button("Cancel").Key("project-cancel").Secondary().OnClick(s.CloseNewProject)
 		body := ui.Div().Column().Gap(12).
 			Child(form.Summary()).
-			Child(form.Field("name", "Name", ui.TextInput(s.NewName).Placeholder("Project name").
+			Child(form.Field("name", "Name", ui.TextInput(s.NewName).Placeholder("Project name").Width(ui.Full).
 				Validate(ui.Required[string](), ui.MaxLength(80))).Required()).
 			Child(form.Field("description", "Description", ui.TextArea(s.NewDesc).Placeholder("What the project is for").
-				MinRows(3)).Description("Optional. Shown on the project's page."))
+				MinRows(3).Width(ui.Full)).Description("Optional. Shown on the project's page."))
 		return ui.Modal("New project", body).Footer(cancel, create).Default(create).
 			OnClose(s.CloseNewProject).CloseOnBackdrop()
 	})
@@ -49,7 +49,7 @@ func sampleModal(s *Store) ui.Element {
 				s.SampleOpen.Set(false)
 			})
 		cancel := ui.Button("Cancel").Secondary().OnClick(func() { s.SampleOpen.Set(false) })
-		body := labeledField(t, "Name", ui.TextInput(s.SampleName).Label("Name").LabelledBy(fieldLabel("Name")).Placeholder("A name for the sample"))
+		body := labeledField(t, "Name", ui.TextInput(s.SampleName).Label("Name").LabelledBy(fieldLabel("Name")).Placeholder("A name for the sample").Width(ui.Full))
 		return ui.Modal("Form in a modal", body).Footer(cancel, save).Default(save).
 			OnClose(func() { s.SampleOpen.Set(false) }).CloseOnBackdrop()
 	})

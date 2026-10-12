@@ -38,6 +38,7 @@ type ModalElement struct {
 	onClose  func()
 	backdrop bool
 	styles   ModalStyle
+	size     sizing // the panel's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // ModalStyle is the look of each part of a modal. A part's style merges over the
@@ -108,6 +109,13 @@ func (m *ModalElement) Styles(st ModalStyle) *ModalElement {
 	m.styles = m.styles.merge(st)
 	return m
 }
+
+// The sizing methods give the panel a width. The panel is 420 px wide by default. A
+// percentage is of the window's width, so Width(Percent(90)) leaves a margin on each
+// side. See Sizing in docs/styling.md.
+func (m *ModalElement) Width(l Length) *ModalElement    { m.size.setWidth(l); return m }
+func (m *ModalElement) MinWidth(l Length) *ModalElement { m.size.setMinWidth(l); return m }
+func (m *ModalElement) MaxWidth(l Length) *ModalElement { m.size.setMaxWidth(l); return m }
 
 // modalSpec is what the runtime keeps from a built Modal, on its backdrop
 // element (DivElement.modal).
@@ -204,6 +212,7 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		Child(footer).
 		Role(access.RoleDialog).Label(m.title)
 
+	m.size.apply(panel)
 	// The backdrop's padding is the margin around the panel, so a panel of 100% is the
 	// window less the margin.
 	backdrop := Div().asPart("Modal.Scrim").Absolute().Inset(0).Style(st.Scrim).Padding(modalMargin).

@@ -30,7 +30,7 @@ func navigationSection() ui.Element {
 					// KeepPanels keeps this panel, so the text in the field stays when another tab is selected.
 					return ui.Div().Column().Gap(8).Children(
 						panelText(t, "Alpha panel"),
-						ui.TextInput(note).Label("Note").Placeholder("Type a note"),
+						ui.TextInput(note).Label("Note").Placeholder("Type a note").Width(ui.Full),
 						ui.Text("Text typed here is kept when another tab is selected.").Size(11).Color(t.TextSubtle),
 					)
 				}},

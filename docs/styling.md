@@ -62,9 +62,9 @@ ui.Tabs(view, tabs...).Styles(ui.TabsStyle{Indicator: ui.Style{Background: ui.He
 
 A zero field means unset, so a layer cannot turn a default off by setting it to
 zero. To remove a default, such as a fill, a border or a radius, use the `Clear`
-field (see "Turning a default off" below). The `Width` methods, such as
-`Select.Width`, set the built-in size of the widget: the theme and `Styles` can
-change it.
+field (see "Turning a default off" below). The sizing methods, such as `Width`,
+set the outer size of a widget and win over the theme and `Styles`; the theme and
+`Styles` set the size of the parts. See "Sizing" below.
 
 ### The app's theme
 
@@ -275,6 +275,70 @@ ui.TextInput(query).Icon(icons.Search).Trailing(clearButton).Styles(ui.FieldStyl
 - Under high contrast the frame's colors and its focus follow the system: the focus is
   the Highlight color, and an invalid frame is in the text color. A border width and
   the padding of the frame still apply.
+
+## Sizing
+
+Every built-in widget that has a box of its own takes the same sizing methods:
+`Width`, `Height` (where a height means something), `MinWidth`, `MinHeight`,
+`MaxWidth`, `MaxHeight` and `Grow`. The lengths are `ui.Px`, `ui.Percent`, `ui.Full`
+(100 percent) and `ui.Auto`. `Grow` takes a share of the free space of a row or a
+column, as a `Div` does. The methods size the widget's outer box: the frame of a text
+field or a number field, the trigger of a select, the track of a slider and the bar
+of a progress bar (its readout included), the control of a check box, the group of
+radio buttons, the tab list of `Tabs`, the section of a collapsible, the panel of a
+modal, and the track of a switch.
+
+```go
+ui.TextInput(query).Width(ui.Full)          // fills its container
+ui.Select(channel, opts...).Width(ui.Px(240))
+ui.ProgressBar(0.4).MaxWidth(ui.Px(336))    // at most 336 px, and a default minimum
+ui.Button("Save").Width(ui.Full)            // stretches to the container
+```
+
+The defaults follow WinUI's, and CSS form controls where WinUI has no equivalent. At
+the Text size of 100 percent:
+
+| Widget | Default width |
+| --- | --- |
+| `Button`, `IconButton` | as wide as its label; `Width(ui.Full)` fills the container |
+| `Checkbox`, `CheckboxTri`, `RadioGroup`, `Badge` | as wide as their content, also in a column |
+| `Switch` | 38 px track (the knob stays 3 px from its end) |
+| `TextInput`, `TextArea` | 240 px, a fixed size like a CSS input's; `Full` stretches it |
+| `NumberField` | 120 px, a fixed size for its column (the frame and the message row); `Full` stretches it, and `Grow` and the limits apply to the column |
+| `Field` | fills its container, as a column does; its control keeps its own width (see below) |
+| `Select` | 220 px, a fixed size; `Full` stretches it, and the list is at least as wide as the field |
+| `Slider`, `ProgressBar`, `IndeterminateProgressBar` | fills the container, and at least 160 px, so it is visible where its container has no width |
+| `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |
+| `Collapsible`, `Accordion` | fills the container |
+| `Modal` | a 420 px panel; a percentage is of the window's width |
+| `Text` | automatic, as a `Div`: fills a column, as wide as its words in a row |
+
+A form field (`Field`) takes the same methods on its outer box, so a labeled field is sized as a unit. Its control keeps its own width: a control whose width is `Auto` or `Full` fills the field, and a fixed one keeps its size. A content-sized control, such as a button, stays as wide as its content.
+
+The fixed defaults of the text fields, the number field and the select scale with the
+Text size, so their proportions hold at 225 percent. Content-sized widgets are not
+stretched by their container, unlike a `Div`, which is why a button in a column is as
+wide as its label.
+
+Precedence, from the lowest:
+
+1. **The built-in default** in the table above.
+2. **The theme.** A size set in a part of the theme, such as `Theme.Field.Frame.Width`,
+   replaces the default.
+3. **The instance's `Styles` or `Style`.** A size set there replaces the theme's.
+4. **The sizing method.** A method sets its field on the widget's outer box and wins
+   over the default, the theme and `Styles`, whatever the order of the calls. A field
+   the method does not set keeps the value from the layers below.
+
+So `Width(ui.Px(120))` and `Styles(ButtonStyle{Root: Style{Width: ui.Px(250)}})` on
+one button give 120 px, and `Styles` sets the fields that the method does not. Use the
+method for the size of a widget, and the theme for the size of every widget of a kind.
+
+Text fields may shrink in a row to room for six digits, and no further: a fixed width
+is their ceiling, not their floor, so a field in a narrow row does not collapse to a
+letter's width. A `MinWidth` replaces that minimum, as the README's "Shrinking and
+minimum sizes" describes. A progress bar or slider in a container with no width of its
+own is at least its default minimum, and `MinWidth` replaces that too.
 
 ## Render slots
 
@@ -522,15 +586,16 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
   SpinButton style that sets its padding, margin or size changes the fill and the hit
   target with it, so keep those as the variant sets them.
 - The stacked column is beside the text, so a centered value is centered in the room
-  left of the column, not in the whole field. The stacked field's width does not
-  scale with the Text size, as the inline field's does, so that room narrows at 225
-  percent. Set a wider field with `NumberField.Width` when the value needs it.
+  left of the column, not in the whole field. The field's default width scales with
+  the Text size, as the inline field's does. Set another width with `NumberField.Width`
+  when the value needs it.
 - The caret of a text field is not a part (see "The text frame"). Its width and blink
   follow the system settings.
 - The Slider has no render slot for the thumb (see above).
 - The Tabs have no render slot for the panel: the panel is the app's own content.
-- `Select.Width` sets the field's width and the list's minimum width together. The
-  `Trigger` and `Popup` parts can override either.
+- The list of a select is at least as wide as the field, whatever the field's width.
+  Its `Popup` part can set a larger minimum width, and the `Trigger` part can set the
+  field's width (the sizing method wins; see "Sizing").
 - The Tree has no `RowFocused` part. The keyboard focus ring is drawn on the tree
   itself (`TreeFocusVisible`), because a row cannot see whether the tree has focus.
 - The Tree's `Indent` (pixels per level) is a size on `TreeStyle`, not a part.
@@ -540,8 +605,8 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
   variant: its dots are the only drawing.
 - The menus have no render slot for their items. `DropdownMenu` takes `Styles`; a
   `ContextMenu` takes the theme's `Menu` only, as it has no instance to style.
-- A Modal has no size variants: its panel is 420 px wide, and its `Panel` part
-  (`Width`) sets another width.
+- A Modal has no size variants: its panel is 420 px wide by default, and `Width`,
+  `MinWidth` or `MaxWidth` on the modal sets another size (see "Sizing").
 - A Tooltip takes the theme's `Tooltip` only.
 - A toast's `Styles` applies to that toast alone; `Toaster` has no `Styles` of its
   own.

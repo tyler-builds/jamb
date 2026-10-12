@@ -72,7 +72,7 @@ func runColumns(ctx *ui.Context, runs *ui.Signal[[]runRow]) []ui.DataColumn[runR
 				return nil
 			},
 			Editor: func(r runRow, value string, change func(string), commit, cancel func()) ui.Element {
-				return ui.Select(ui.NewSignal(value), runStatusOptions...).Label("Status").Width(118).
+				return ui.Select(ui.NewSignal(value), runStatusOptions...).Label("Status").Width(ui.Px(118)).
 					OnChange(func(s string) { change(s); commit() })
 			},
 			Width: 130, Resizable: true},

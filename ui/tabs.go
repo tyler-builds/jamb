@@ -101,7 +101,7 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 	}
 	if v == TabsSegmented {
 		d.List = Style{Direction: Row, Gap: 2, Padding: All(3), Radius: th.Radius,
-			Background: th.Sidebar, BorderWidth: 1, BorderColor: th.Border}
+			Background: th.Sidebar, BorderWidth: 1, BorderColor: th.Border, fitWidth: true}
 		d.Tab.MinHeight = Px(30)
 		d.Tab.Radius = max(th.Radius-3, 0)
 		d.TabSelected = Style{Background: th.Accent, TextColor: th.AccentText}
@@ -149,6 +149,7 @@ type TabsElement[T comparable] struct {
 	variant   TabsVariant
 	styles    TabsStyle
 	renderTab func(Tab[T], PartState) Element
+	size      sizing // the tab list's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // Tabs creates a tab list over tabs, showing the panel of the tab that selected
@@ -195,6 +196,14 @@ func (t *TabsElement[T]) Variant(v TabsVariant) *TabsElement[T] { t.variant = v;
 //		Indicator: ui.Style{Height: ui.Px(3)},
 //	})
 func (t *TabsElement[T]) Styles(s TabsStyle) *TabsElement[T] { t.styles = t.styles.merge(s); return t }
+
+// The sizing methods give the tab list a width; the panel always fills the width of
+// the Tabs. The segmented tab list is as wide as its tabs by default, and the
+// underline tab list fills its container, as WinUI's TabView does. See Sizing in
+// docs/styling.md.
+func (t *TabsElement[T]) Width(l Length) *TabsElement[T]    { t.size.setWidth(l); return t }
+func (t *TabsElement[T]) MinWidth(l Length) *TabsElement[T] { t.size.setMinWidth(l); return t }
+func (t *TabsElement[T]) MaxWidth(l Length) *TabsElement[T] { t.size.setMaxWidth(l); return t }
 
 // RenderTab replaces the content of each tab (its icon and label) with what fn
 // returns. The tab keeps its behavior, its focus, selection and state styles,
@@ -322,7 +331,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			return tab
 		}
 
-		strip := Div().asPart("Tabs.List").Role(access.RoleTabList).Style(st.List)
+		strip := t.size.apply(Div().asPart("Tabs.List").Role(access.RoleTabList).Style(st.List))
 		if t.name != "" {
 			strip.Label(t.name)
 		}

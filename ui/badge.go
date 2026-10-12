@@ -82,7 +82,7 @@ func badgeDefaults(t *Theme, v BadgeVariant, dot bool) BadgeStyle {
 	}
 	d := BadgeStyle{
 		Badge: Style{Direction: Row, Align: Center, NoShrink: true, Radius: 9, Padding: XY(7, 1),
-			MinWidth: Px(18), Background: fill},
+			MinWidth: Px(18), Background: fill, fitWidth: true},
 		Label: Style{FontSize: 11, FontWeight: FontSemibold, TextColor: ink},
 		Dot:   Style{Width: Px(6), Height: Px(6), NoShrink: true, Radius: 3, Background: ink},
 	}
@@ -120,6 +120,7 @@ type BadgeElement struct {
 	attached bool // set by DivElement.Badged: the owner names the badge
 	leadDot  bool // a dot before the text (see Dot)
 	styles   BadgeStyle
+	size     sizing // the badge's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // Badge creates a badge showing count. A count above the maximum (99 by
@@ -157,6 +158,13 @@ func (b *BadgeElement) Noun(s string) *BadgeElement { b.noun = s; return b }
 // Dot puts a dot in front of the text, in the text color, as a status chip does.
 // The dot is hidden from assistive technology: the text is what is read.
 func (b *BadgeElement) Dot() *BadgeElement { b.leadDot = true; return b }
+
+// The sizing methods give the badge's outer box a size. A badge is as wide as its
+// text by default; see Sizing in docs/styling.md.
+func (b *BadgeElement) Width(l Length) *BadgeElement    { b.size.setWidth(l); return b }
+func (b *BadgeElement) MinWidth(l Length) *BadgeElement { b.size.setMinWidth(l); return b }
+func (b *BadgeElement) MaxWidth(l Length) *BadgeElement { b.size.setMaxWidth(l); return b }
+func (b *BadgeElement) Grow(f float32) *BadgeElement    { b.size.setGrow(f); return b }
 
 // Styles sets the look of the parts of the badge, for this instance only. Set
 // fields win over the theme's Badge and Badges and the defaults; see BadgeStyle
@@ -213,7 +221,7 @@ func (b *BadgeElement) expand(ctx *Context) Element {
 		st := resolveBadge(t, b.variant, true, b.styles)
 		d := Div().asPart("Badge.Dot").Style(st.Dot)
 		b.decorate(d)
-		return d
+		return b.size.apply(d)
 	}
 	st := resolveBadge(t, b.variant, false, b.styles)
 	pill := Div().asPart("Badge.Badge")
@@ -227,7 +235,7 @@ func (b *BadgeElement) expand(ctx *Context) Element {
 	}
 	pill.Child(label)
 	b.decorate(pill)
-	return pill
+	return b.size.apply(pill)
 }
 
 // decorate sets the access settings of a badge. A badge that belongs to an

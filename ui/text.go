@@ -150,8 +150,16 @@ func (t *TextElement) NoWrap() *TextElement { t.noWrap = true; return t }
 // Grow lets the text take free space on its parent's main axis.
 func (t *TextElement) Grow(f float32) *TextElement { t.style.Grow = f; return t }
 
-// Width sets a fixed width.
+// Width sets a fixed width, or a Percent or Full width of the parent. Text has no
+// defaults of its own, so a size set here is the one the text has (see Style).
 func (t *TextElement) Width(l Length) *TextElement { t.style.Width = l; return t }
+
+// MinWidth sets the narrowest the text may shrink to in a shrinking row. The
+// automatic minimum is the widest word (see Shrinking and minimum sizes).
+func (t *TextElement) MinWidth(l Length) *TextElement { t.style.MinWidth = l; return t }
+
+// MaxWidth sets the widest the text may grow to.
+func (t *TextElement) MaxWidth(l Length) *TextElement { t.style.MaxWidth = l; return t }
 
 // Style merges layout and text fields of s.
 func (t *TextElement) Style(s Style) *TextElement { t.style = t.style.Merge(s); return t }

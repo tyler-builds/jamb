@@ -85,7 +85,7 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 					return ui.Div().Column().Gap(18).
 						Child(ui.Text(p.Description).Color(t.TextMuted)).
 						Child(ui.Div().Row().Align(ui.Center).Gap(12).
-							Child(ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").Width(376))).
+							Child(ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").MaxWidth(ui.Px(376)))).
 						Child(ui.Div().Row().Align(ui.Center).Gap(16).
 							Child(ui.Text(fmt.Sprintf("%d open tasks", p.Tasks)).Size(13).Color(t.TextMuted)).
 							Child(star))

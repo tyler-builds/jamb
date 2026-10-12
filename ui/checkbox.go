@@ -95,7 +95,7 @@ func (s CheckboxStyle) plain() CheckboxStyle {
 func checkboxDefaults(t *Theme, s CheckState, disabled bool) CheckboxStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	d := CheckboxStyle{
-		Control:             Style{Direction: Row, Align: Center, Gap: 8, Radius: 4, NoShrink: true},
+		Control:             Style{Direction: Row, Align: Center, Gap: 8, Radius: 4, NoShrink: true, fitWidth: true},
 		ControlFocusVisible: Style{Shadows: []Shadow{ring}},
 		Box: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(18), Height: Px(18), NoShrink: true,
 			Radius: 4, BorderWidth: 1, BorderColor: t.BorderStrong, Background: t.Surface},
@@ -154,6 +154,7 @@ type CheckboxElement struct {
 	rules    []Validator[bool] // the validators of the value (see Validate)
 	wire     fieldWire         // what a Field gives the check box (see Field)
 	handle   *FocusHandle      // lets code focus the check box (see FocusHandle)
+	size     sizing            // the control's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // FocusHandle lets code focus the check box (see NewFocusHandle). A Field that
@@ -213,6 +214,16 @@ func (c *CheckboxElement) Key(k string) *CheckboxElement { c.key = k; return c }
 // Disabled shows the box but does not let it change.
 func (c *CheckboxElement) Disabled(d bool) *CheckboxElement { c.disabled = d; return c }
 
+// The sizing methods give the check box's control, its box and label, a size. It
+// is as wide as its label by default; see Sizing in docs/styling.md.
+func (c *CheckboxElement) Width(l Length) *CheckboxElement     { c.size.setWidth(l); return c }
+func (c *CheckboxElement) Height(l Length) *CheckboxElement    { c.size.setHeight(l); return c }
+func (c *CheckboxElement) MinWidth(l Length) *CheckboxElement  { c.size.setMinWidth(l); return c }
+func (c *CheckboxElement) MinHeight(l Length) *CheckboxElement { c.size.setMinHeight(l); return c }
+func (c *CheckboxElement) MaxWidth(l Length) *CheckboxElement  { c.size.setMaxWidth(l); return c }
+func (c *CheckboxElement) MaxHeight(l Length) *CheckboxElement { c.size.setMaxHeight(l); return c }
+func (c *CheckboxElement) Grow(f float32) *CheckboxElement     { c.size.setGrow(f); return c }
+
 // Styles sets the look of the parts of the check box, for this instance only.
 // Set fields win over the theme's Checkbox and the defaults; see CheckboxStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
@@ -259,7 +270,7 @@ func (c *CheckboxElement) expand(ctx *Context) Element {
 	if c.disabled {
 		row.Style(st.ControlDisabled).Cursor(CursorNotAllowed)
 		a.disabled = true
-		return row
+		return c.size.apply(row)
 	}
 	// The row takes focus and keys. The box shows the pointer's hover state.
 	box.Hover(st.BoxHover)
@@ -280,5 +291,5 @@ func (c *CheckboxElement) expand(ctx *Context) Element {
 	if w.onBlur != nil {
 		row.OnBlur(w.onBlur)
 	}
-	return row
+	return c.size.apply(row)
 }

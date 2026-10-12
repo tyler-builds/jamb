@@ -300,6 +300,6 @@ func focusWithinSample(t *ui.Theme) ui.Element {
 		draft := ui.Local(ctx, "draft", "")
 		return ui.Div().Width(ui.Px(220)).Padding(8).Radius(8).Border(1, t.Border).
 			FocusWithin(ui.Style{BorderColor: t.Accent}).
-			Child(ui.TextInput(draft).Label("Draft").Placeholder("Click inside the frame"))
+			Child(ui.TextInput(draft).Label("Draft").Placeholder("Click inside the frame").Width(ui.Full))
 	})
 }

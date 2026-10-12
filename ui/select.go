@@ -76,6 +76,10 @@ func (s SelectStyle) plain() SelectStyle {
 	}
 }
 
+// selectWidth is the default width of a select at the Text size of 100 percent, in
+// logical pixels. It scales with the Text size.
+const selectWidth = 220
+
 // selectDefaults returns the built-in look of a select of the given width, from
 // the colors of t. Under high contrast a disabled select is all GrayText.
 func selectDefaults(t *Theme, width float32, disabled bool) SelectStyle {
@@ -95,7 +99,7 @@ func selectDefaults(t *Theme, width float32, disabled bool) SelectStyle {
 		TriggerInvalid: Style{BorderWidth: 2, BorderColor: messageIconColor(t, Style{})},
 		Placeholder:    Style{TextColor: placeholder},
 		Chevron:        Style{TextColor: chevron},
-		Popup: Style{Padding: All(4), MinWidth: Px(width), Background: t.Surface, BorderWidth: 1,
+		Popup: Style{Padding: All(4), Background: t.Surface, BorderWidth: 1,
 			BorderColor: t.Border, Radius: t.Radius, Shadows: []Shadow{ShadowMd}},
 		Option: Style{Direction: Row, Align: Center, Gap: 8, MinHeight: Px(28), Padding: XY(8, 0),
 			Radius: 4, NoShrink: true, FontSize: 13, TextColor: t.Text},
@@ -145,7 +149,7 @@ type SelectElement[T comparable] struct {
 	labelledBy   []string
 	key          string
 	disabled     bool
-	width        float32
+	size         sizing
 	onChange     func(T)
 	styles       SelectStyle
 	renderValue  func(Option[T], PartState) Element
@@ -155,9 +159,9 @@ type SelectElement[T comparable] struct {
 }
 
 // Select creates a drop-down list that reads and writes value. The options are
-// shown in order. The default width is 220 px.
+// shown in order. The default width is 220 px at the Text size of 100 percent.
 func Select[T comparable](value *Signal[T], options ...Option[T]) *SelectElement[T] {
-	return &SelectElement[T]{value: value, options: options, width: 220}
+	return &SelectElement[T]{value: value, options: options}
 }
 
 // Validate sets the validators of the chosen value. The zero value is the
@@ -204,8 +208,16 @@ func (s *SelectElement[T]) Disabled(d bool) *SelectElement[T] { s.disabled = d; 
 // list or by the keys. The signal is set first.
 func (s *SelectElement[T]) OnChange(fn func(T)) *SelectElement[T] { s.onChange = fn; return s }
 
-// Width sets the width of the field, in logical pixels. The list is at least as wide.
-func (s *SelectElement[T]) Width(px float32) *SelectElement[T] { s.width = px; return s }
+// The sizing methods give the field a size. The field is 220 px wide at the Text
+// size of 100 percent by default; Width(Full) fills its container. The list is at
+// least as wide as the field. See Sizing in docs/styling.md.
+func (s *SelectElement[T]) Width(l Length) *SelectElement[T]     { s.size.setWidth(l); return s }
+func (s *SelectElement[T]) Height(l Length) *SelectElement[T]    { s.size.setHeight(l); return s }
+func (s *SelectElement[T]) MinWidth(l Length) *SelectElement[T]  { s.size.setMinWidth(l); return s }
+func (s *SelectElement[T]) MinHeight(l Length) *SelectElement[T] { s.size.setMinHeight(l); return s }
+func (s *SelectElement[T]) MaxWidth(l Length) *SelectElement[T]  { s.size.setMaxWidth(l); return s }
+func (s *SelectElement[T]) MaxHeight(l Length) *SelectElement[T] { s.size.setMaxHeight(l); return s }
+func (s *SelectElement[T]) Grow(f float32) *SelectElement[T]     { s.size.setGrow(f); return s }
 
 // Styles sets the look of the parts of the select, for this instance only. Set
 // fields win over the theme's Select and the defaults; see SelectStyle and
@@ -249,7 +261,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
-		st := resolveSelect(t, s.width, s.disabled, s.styles)
+		st := resolveSelect(t, selectWidth*textScale(ctx), s.disabled, s.styles)
 		cur := s.value.Get()
 		sel := indexOf(s.options, cur)
 		open := Local(ctx, "open", false)
@@ -385,7 +397,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 			field.Cursor(CursorNotAllowed)
 			a.disabled = true
 			field.Style(st.TriggerDisabled)
-			return field
+			return s.size.apply(field)
 		}
 		field.Cursor(CursorPointer).Hover(hover).
 			FocusVisible(st.TriggerFocusVisible).
@@ -433,7 +445,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 				return search(r, hl.Peek())
 			}, func(i int) { hl.Set(i) }))
 		}
-		return field
+		return s.size.apply(field)
 	})
 }
 
@@ -490,6 +502,7 @@ func (s *SelectElement[T]) list(st SelectStyle, t *Theme, sel, hl int, shut func
 		}).
 		OnClickOutside(func() { shut(false) }).
 		OnClick(func() {}) // a press on the list's padding must not reach the field
+	panel.matchAnchor = true // the list is at least as wide as the field, whatever its width
 	for i, o := range s.options {
 		i := i
 		on := i == sel

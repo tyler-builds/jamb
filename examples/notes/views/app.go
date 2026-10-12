@@ -247,7 +247,7 @@ func (a *App) sidebar() ui.Element {
 		}
 
 		search := ui.TextInput(a.s.Query).Label("Search notes").Placeholder("Search notes").Icon(icons.Search).
-			FocusHandle(a.search).
+			Width(ui.Full).FocusHandle(a.search).
 			OnSubmit(func(string) { // Enter opens the first match
 				for _, n := range a.s.Notes.Peek() {
 					if store.Visible(n, a.s.Query.Peek(), a.s.TagFilter.Peek()) {

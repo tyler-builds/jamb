@@ -19,6 +19,10 @@ const (
 // progressSegment is the share of a bar's width that an indeterminate bar fills.
 const progressSegment = 0.3
 
+// progressBarMinWidth is the narrowest a progress bar is by default, in logical
+// pixels. Like the minimum of a CSS progress element, it does not scale with the text.
+const progressBarMinWidth = 160
+
 // ProgressBarStyle is the look of each part of a progress bar, determinate or
 // indeterminate. A part's style merges over the built-in defaults, then over the
 // theme's ProgressBar, then over the Styles of the instance; see docs/styling.md.
@@ -127,22 +131,23 @@ type ProgressBarElement struct {
 	indeterminate bool
 	name          string
 	key           string
-	width         float32
+	size          sizing
 	format        func(float64) string
 	color         Color // the fill, when set (see Color); zero is the theme accent
 	styles        ProgressBarStyle
 }
 
 // ProgressBar creates a determinate bar showing value. The range is 0 to 1 by
-// default; see Range. The default width is 240 px.
+// default; see Range. The bar fills the width of its container by default (see
+// Width).
 func ProgressBar(value float64) *ProgressBarElement {
-	return &ProgressBarElement{value: value, lo: 0, hi: 1, width: 240}
+	return &ProgressBarElement{value: value, lo: 0, hi: 1}
 }
 
 // IndeterminateProgressBar creates a bar for work of unknown length. It slides
 // while the work runs, and is drawn in the middle when reduced motion is on.
 func IndeterminateProgressBar() *ProgressBarElement {
-	return &ProgressBarElement{indeterminate: true, lo: 0, hi: 1, width: 240}
+	return &ProgressBarElement{indeterminate: true, lo: 0, hi: 1}
 }
 
 func (*ProgressBarElement) isElement()           {}
@@ -160,8 +165,13 @@ func (p *ProgressBarElement) Range(lo, hi float64) *ProgressBarElement {
 	return p
 }
 
-// Width sets the width of the bar, in logical pixels, including its readout.
-func (p *ProgressBarElement) Width(px float32) *ProgressBarElement { p.width = px; return p }
+// The sizing methods give the bar's outer box a size, including its readout. A bar
+// fills its container by default; Width(Px(240)) fixes it, and the track keeps the
+// room that is left for the readout. See Sizing in docs/styling.md.
+func (p *ProgressBarElement) Width(l Length) *ProgressBarElement    { p.size.setWidth(l); return p }
+func (p *ProgressBarElement) MinWidth(l Length) *ProgressBarElement { p.size.setMinWidth(l); return p }
+func (p *ProgressBarElement) MaxWidth(l Length) *ProgressBarElement { p.size.setMaxWidth(l); return p }
+func (p *ProgressBarElement) Grow(f float32) *ProgressBarElement    { p.size.setGrow(f); return p }
 
 // Color sets the color of the fill, for an app that has a color of its own, such as
 // a project's. The default is the theme accent. The app is responsible for the
@@ -236,14 +246,16 @@ func (p *ProgressBarElement) expand(ctx *Context) Element {
 	}
 	track.Label(name)
 
-	root := Div().Row().Align(Center).Gap(12).Width(Px(p.width)).Child(track)
+	// The bar's default minimum keeps it visible in a container with no width of its
+	// own, where a percentage has nothing to take.
+	root := Div().Row().Align(Center).Gap(12).Width(Full).Style(Style{MinWidth: Px(progressBarMinWidth)}).Child(track)
 	if !p.indeterminate {
 		// The value is what assistive technology reads through the range, so the
 		// readout is hidden from it.
 		root.Child(Div().asPart("ProgressBar.Label").Hidden().MinWidth(Px(44)).Align(End).Style(st.Label).
 			Child(Text(p.readout())))
 	}
-	return root
+	return p.size.apply(root)
 }
 
 // fill is the filled part of a determinate bar.

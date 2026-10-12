@@ -150,7 +150,7 @@ func Comments(s *Store, id int, h *ui.ListHandle) ui.Element {
 				Child(ui.Text(teammate + " is typing…").Size(12).Color(t.TextMuted)))
 		}
 		return column.Child(ui.TextInput(draft).Label("Comment").Placeholder("Write a comment and press Enter").
-			OnSubmit(send).Key("composer"))
+			Width(ui.Full).OnSubmit(send).Key("composer"))
 	})
 }
 

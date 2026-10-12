@@ -197,8 +197,8 @@ func (t *Toast) Styles(st ToastStyle) *Toast {
 // toast adds a toast to the stack and announces it. When the stack is over its
 // maximum, the oldest toast that is not hovered or focused goes.
 func (rt *Runtime) toast(v ToastVariant, text string) *Toast {
-	if len(rt.toasts) == 0 {
-		rt.toastAt = rt.now() // the first toast's time starts now, not at the last frame
+	if !rt.toastsTimed() {
+		rt.toastAt = rt.now() // the first timed toast's time starts now, not at the last frame
 	}
 	rt.toastNext++
 	e := &toastEntry{id: rt.toastNext, variant: v, text: text, left: toastDefaultTime(v), sticky: v == ToastError}
@@ -251,10 +251,24 @@ func (rt *Runtime) dismissToast(e *toastEntry) {
 	rt.bumpToasts()
 }
 
+// toastsTimed reports whether a toast with a timeout is shown. Its time runs one
+// frame at a time, so the runtime asks for frames while it is. A sticky toast,
+// such as an error, has no time to run, so it asks for none.
+func (rt *Runtime) toastsTimed() bool {
+	for _, e := range rt.toasts {
+		if !e.sticky {
+			return true
+		}
+	}
+	return false
+}
+
 // tickToasts runs the time of each toast that is not paused, and dismisses the
 // ones that run out. It runs at the start of each frame.
 func (rt *Runtime) tickToasts(now time.Time) {
-	if len(rt.toasts) == 0 {
+	if !rt.toastsTimed() {
+		// No toast is running its time, so the clock starts again when one is shown:
+		// the frames in between were not asked for, and their time is not the toast's.
 		rt.toastAt = now
 		return
 	}
