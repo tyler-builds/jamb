@@ -157,9 +157,10 @@ func TestDataGridHighContrast(t *testing.T) {
 	}
 }
 
-// TestDataGridSelectedRowKeepsItsWeight checks that the text of a selected row is
-// at least semibold, so the selection shows with its highlight cleared.
-func TestDataGridSelectedRowKeepsItsWeight(t *testing.T) {
+// TestDataGridSelectedRowIsNotBold checks that the text of a selected row keeps its
+// weight: the selection is the row's fill, and the text is not made heavier. The
+// sorted header keeps its weight too, and shows the sort by its arrow.
+func TestDataGridSelectedRowIsNotBold(t *testing.T) {
 	sel := NewSignal([]string{"i1"})
 	r := newAccessRig(partDataGrid(6, DataGridStyle{RowSelected: Style{Clear: ClearBackground}}, sel, NewSignal(SortState{})))
 	found := false
@@ -172,13 +173,16 @@ func TestDataGridSelectedRowKeepsItsWeight(t *testing.T) {
 			if len(c.children) == 0 {
 				continue
 			}
-			if txt := c.children[0]; txt.textEl != nil && txt.style.FontWeight < FontSemibold {
-				t.Errorf("selected row text has weight %v, want at least semibold", txt.style.FontWeight)
+			if txt := c.children[0]; txt.textEl != nil && txt.style.FontWeight != 0 {
+				t.Errorf("selected row text has weight %v, want the default", txt.style.FontWeight)
 			}
 		}
 	}
 	if !found {
 		t.Fatal("the selected row is not built")
+	}
+	if w := dataGridDefaults(DarkTheme, DataGridComfortable, 1).HeaderCellSorted.FontWeight; w != 0 {
+		t.Errorf("the sorted header has weight %v, want the default", w)
 	}
 }
 

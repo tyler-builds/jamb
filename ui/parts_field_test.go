@@ -124,7 +124,7 @@ func TestFieldOverridesUnderHighContrast(t *testing.T) {
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastBlack()})
 	r.frame()
 	th = r.rt.theme
-	if got := resolveNumberField(th, 120, SpinInline, 1, false, NumberFieldStyle{}).FrameInvalid.BorderColor; got != th.Text {
+	if got := resolveNumberField(th, 120, SpinInline, 1, false, false, NumberFieldStyle{}).FrameInvalid.BorderColor; got != th.Text {
 		t.Errorf("high contrast: the invalid frame is drawn in %v, want the text color %v", got, th.Text)
 	}
 	focusNode(r, r.keyed(t, "nf"))

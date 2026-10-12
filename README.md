@@ -429,14 +429,19 @@ ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStac
   Up and Page Down, and to the ends with Home and End. A click or drag sets the
   value to the nearest step. `OnChange` runs when the value changes.
 - A number field takes typed text, or steps with Up and Down (and its spin buttons,
-  added with `SpinButtons(ui.SpinInline)`, the + and - buttons after the field, or
-  `SpinButtons(ui.SpinStacked)`, an up arrow above a down arrow at its right). Enter, or
+  added with `SpinButtons(ui.SpinInline)`, a - button at its left edge and a + button at
+  its right, inside the frame, or `SpinButtons(ui.SpinStacked)`, an up arrow above a down
+  arrow at its right). Enter, or
   leaving the field, checks the text. A number
   outside the range is clamped to the nearest bound. Text that is not a number (or
   not a whole number, for an `int`) is not applied: Enter shows the field as
   invalid, with a message that gives the range, and keeps the text so it can be
   corrected. Leaving the field then reverts the text to the value that is set.
   `Precision` sets the decimals of a float; the default is the decimals of the step.
+
+![Inline spin buttons inside the field, with the pointer over the plus button](docs/screenshots/spin-buttons-inline.png)
+
+![Stacked spin buttons, with the pointer over the up button](docs/screenshots/spin-buttons-stacked.png)
 
 Assistive technology reads a check box with a mixed state as mixed, a switch as a
 check box with the Toggle pattern (as Phase B chose), a radio group as a selection
@@ -521,9 +526,9 @@ ui.TreeView(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[
   The project window keeps its Overview and Comments tabs this way, so a draft
   comment and the scroll position survive. Without `KeepPanels()`, keep the data in
   signals, as the other demo samples do.
-  The selected tab is bold and has a line under it, in Accent (Highlight under
-  high contrast), so the selection is not carried by color alone. Tabs take the
-  height their parent gives them, so a panel can fill a window.
+  The selected tab has a line under it, in Accent (Highlight under high contrast),
+  so the selection is not carried by color alone. No state makes the text bold.
+  Tabs take the height their parent gives them, so a panel can fill a window.
   `Variant(ui.TabsSegmented)` draws the tabs as one row of segments instead, with
   the selected segment filled in Accent (Highlight under high contrast). Both
   variants keep the same keys, keyboard behavior and accessible names. The parts
@@ -1266,6 +1271,7 @@ The grid's methods:
 - `Selection(mode, keys)`: `ui.SelectionNone`, `ui.SelectionSingle` or `ui.SelectionMultiple`. The keys of the selected rows are kept in `keys`, so the app reads the selection and can set it. A nil `keys` keeps the selection in the grid.
 - `Sort(s)`: the `ui.SortState` (`Key` and `Desc`) in `s`. A click on a header cycles the column through ascending, descending and not sorted. A nil `s` keeps the sort in the grid.
 - `OnActivate(fn)`: runs `fn` with the row, on Enter or a double-click.
+- The look of the states is a fill or a line, not a change of weight: a selected row has the `RowSelected` fill, a sorted column has its arrow (`SortIndicator`), and the text keeps its weight.
 - `Density(d)`: `ui.DataGridComfortable` (36 logical pixels a row, the default) or `ui.DataGridCompact` (26). `Striped()` draws every other row in `RowAlternate`.
 - `Loading(on)`: shows a progress ring over the rows. The rows, the focus and the selection stay.
 - `Empty(el)`: what the grid shows with no rows. The default is "No rows".
@@ -1295,6 +1301,8 @@ Rows are identified by their keys, which must be unique and stable. The focus, t
 | Ctrl+Left, Ctrl+Right | On a resizable header cell, narrows or widens the column by 8 logical pixels |
 
 **Interactive and editable cells.** A cell that holds controls, or an editor, is still the grid's one Tab stop: the controls and the editor are not in the Tab order, and the grid's keys reach them through the focus. The model follows the WAI-ARIA grid pattern (https://www.w3.org/WAI/ARIA/apg/patterns/grid/), which describes two states without naming them: grid navigation, in which the grid holds focus, and the cell's own widgets, which Enter or F2 move focus into. In the second state Tab and Shift+Tab move to the next and previous widget, which the pattern lets wrap inside the cell or leave the grid; this grid wraps inside the cell. Escape (the pattern's "restores grid navigation") or F2 returns to grid navigation on the same cell. The keys a control uses (the arrows of a text field, Enter on a button) belong to the control. An edit saves on Enter and on Tab, and when focus leaves its editor (a click elsewhere in the grid), as a spreadsheet does. Escape is the only cancel. This blur save is a choice of this grid, not a rule of the pattern.
+
+![The Status header under the pointer, which fills its whole header cell, and a clicked cell in a selected row, whose text is not bold](docs/screenshots/data-grid.png)
 
 ![An editable cell with its editor open](docs/screenshots/data-grid-editing.png)
 
@@ -1477,6 +1485,8 @@ ui.If(open.Get(), ui.Modal("New project", form).
 ```
 
 ![A modal form over the Projects page](docs/screenshots/modal-new-project.png)
+
+![The New project dialog after a failed submit, with a character typed in the Name field: the error clears and the field keeps focus](docs/screenshots/modal-new-project-typing.png)
 
 - Focus moves into the modal when it opens: to the first field of the body that
   Tab reaches, else to the default button. Tab and Shift+Tab cycle through the
@@ -2197,7 +2207,7 @@ On the Projects page:
   status as a badge. A teammate's reply in a project's comments shows a "typing"
   busy ring until it arrives.
 
-![The Form controls section of the Components page](docs/screenshots/form-controls.png)
+![The Form controls section of the Components page, with its number fields and the Notification preferences below it](docs/screenshots/form-controls.png)
 
 ![The open select in the Form controls section](docs/screenshots/select-open.png)
 
@@ -2224,11 +2234,11 @@ On the Projects page:
   in a tab, and a color swatch in a select) are next to them. See
   [docs/styling.md](docs/styling.md).
 
-![The Customizing section of the Components page](docs/screenshots/customizing.png)
+![The Customizing section of the Components page, with the stacked spin buttons under the pointer](docs/screenshots/customizing.png)
 
-![The Customizing section in the light theme](docs/screenshots/customizing-light.png)
+![The Customizing section in the light theme, with the stacked spin buttons under the pointer](docs/screenshots/customizing-light.png)
 
-![The Customizing section under high contrast](docs/screenshots/customizing-hc.png)
+![The Customizing section under high contrast, with the stacked spin buttons under the pointer](docs/screenshots/customizing-hc.png)
 
 - The Settings page (Ctrl+5) groups its settings in tabs: Appearance, with switches
   and a slider for the UI zoom from 80% to 150% (which changes the whole interface);

@@ -152,14 +152,15 @@ func TestHighContrastKeepsSystemColorsAndBorders(t *testing.T) {
 	}
 }
 
-// TestSelectedTabStaysPerceivable checks the guardrail for a state that carries
-// meaning: when an app removes the selected tab's indicator and its fill, the
-// selected tab still has semibold text, so the selection shows.
-func TestSelectedTabStaysPerceivable(t *testing.T) {
+// TestSelectedTabIsNotBold checks that the selected tab keeps its weight: the
+// selection is the indicator's line, and the text is not made heavier. Under high
+// contrast an app cannot remove the indicator's color or its height, so the line
+// still shows the selection when the app clears the rest.
+func TestSelectedTabIsNotBold(t *testing.T) {
 	for _, hc := range []bool{false, true} {
 		st := TabsStyle{
 			Indicator:   Style{Clear: ClearBackground, Height: Px(0)},
-			TabSelected: Style{Clear: ClearBackground | ClearTextColor, FontWeight: FontLight},
+			TabSelected: Style{Clear: ClearBackground | ClearTextColor},
 		}
 		sel := NewSignal("a")
 		r := newAccessRig(func(ctx *Context) Element { return partTabs(sel, TabsUnderline, st) })
@@ -168,25 +169,29 @@ func TestSelectedTabStaysPerceivable(t *testing.T) {
 			r.frame()
 		}
 		box := keyNode(t, r.rt, "settings/tab:a")
-		if box.style.FontWeight < FontSemibold {
-			t.Errorf("high contrast=%v: the selected tab's weight is %v, want at least semibold", hc, box.style.FontWeight)
+		if box.style.FontWeight != 0 {
+			t.Errorf("high contrast=%v: the selected tab's weight is %v, want the default", hc, box.style.FontWeight)
 		}
-		if got := len(partNodes(r.rt, "Tabs.Indicator")); got != 3 {
-			t.Errorf("high contrast=%v: %d indicator nodes, want one per tab", hc, got)
+		ind := partNodes(r.rt, "Tabs.Indicator")
+		if got := len(ind); got != 3 {
+			t.Fatalf("high contrast=%v: %d indicator nodes, want one per tab", hc, got)
+		}
+		if hc && ind[0].style.Height != Px(2) {
+			t.Errorf("high contrast: the app set the indicator's height to %v, want the system's 2 px", ind[0].style.Height)
 		}
 	}
 }
 
-// TestHighlightedOptionStaysPerceivable checks that a highlighted option keeps
-// semibold text with its highlight cleared.
-func TestHighlightedOptionStaysPerceivable(t *testing.T) {
+// TestHighlightedOptionIsNotBold checks that a highlighted option keeps its weight:
+// its highlight is the fill, and the text is not made heavier.
+func TestHighlightedOptionIsNotBold(t *testing.T) {
 	r := newAccessRig(func(ctx *Context) Element {
 		return partSelect(NewSignal(""), SelectStyle{OptionHighlighted: Style{Clear: ClearBackground}}, false)
 	})
 	r.clickKey(t, "chan")
 	row := accessNode(t, r, access.RoleListItem, "Alpha")
-	if row.style.FontWeight < FontSemibold {
-		t.Errorf("the highlighted option's weight is %v, want at least semibold", row.style.FontWeight)
+	if row.style.FontWeight != 0 {
+		t.Errorf("the highlighted option's weight is %v, want the default", row.style.FontWeight)
 	}
 	if !row.style.Background.IsZero() {
 		t.Errorf("the highlight was not cleared: %v", row.style.Background)

@@ -63,8 +63,11 @@ func (s TabsStyle) merge(o TabsStyle) TabsStyle {
 	}
 }
 
-// plain returns s as high contrast allows it (see plainStyle).
+// plain returns s as high contrast allows it (see plainStyle). The indicator's height
+// is the system's too, so a size cannot hide the selection either.
 func (s TabsStyle) plain() TabsStyle {
+	ind := plainStyle(s.Indicator)
+	ind.Height = Auto
 	return TabsStyle{
 		List:            plainStyle(s.List),
 		Tab:             plainStyle(s.Tab),
@@ -72,7 +75,7 @@ func (s TabsStyle) plain() TabsStyle {
 		TabSelected:     plainStyle(s.TabSelected),
 		TabDisabled:     plainStyle(s.TabDisabled),
 		TabFocusVisible: plainStyle(s.TabFocusVisible),
-		Indicator:       plainStyle(s.Indicator),
+		Indicator:       ind,
 		Panel:           plainStyle(s.Panel),
 	}
 }
@@ -86,7 +89,7 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 		Tab: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(36), Padding: XY(12, 0),
 			NoShrink: true, Radius: th.Radius / 2, TextColor: th.TextMuted, Transition: 110 * time.Millisecond},
 		TabHover:        Style{Background: th.SurfaceHover},
-		TabSelected:     Style{TextColor: th.Text, FontWeight: FontSemibold},
+		TabSelected:     Style{TextColor: th.Text},
 		TabFocusVisible: Style{Shadows: []Shadow{ring}},
 		Indicator:       Style{Height: Px(2), Background: th.Accent, Transition: 120 * time.Millisecond},
 	}
@@ -101,7 +104,7 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 			Background: th.Sidebar, BorderWidth: 1, BorderColor: th.Border}
 		d.Tab.MinHeight = Px(30)
 		d.Tab.Radius = max(th.Radius-3, 0)
-		d.TabSelected = Style{Background: th.Accent, TextColor: th.AccentText, FontWeight: FontSemibold}
+		d.TabSelected = Style{Background: th.Accent, TextColor: th.AccentText}
 		d.Indicator = Style{}
 	}
 	return d
@@ -258,11 +261,6 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			}
 			if tb.Disabled {
 				style = style.Merge(st.TabDisabled)
-			}
-			if on && style.FontWeight < FontSemibold {
-				// The selected tab keeps at least semibold text, which no style can lighten:
-				// with its indicator or fill cleared, the weight still shows the selection.
-				style.FontWeight = FontSemibold
 			}
 			tab := Div().asPart("Tabs.Tab").Key(t.tabKey(tb.Value)).Style(style).
 				Role(access.RoleTab).Label(tb.Label).Selected(on)

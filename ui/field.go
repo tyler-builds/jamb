@@ -299,38 +299,27 @@ func (f *FieldElement) expand(ctx *Context) Element {
 		if f.required {
 			label.Child(Div().asPart("FormField.Required").Hidden().Style(st.Required).Child(Text("*")))
 		}
-		var help, errRow Element
-		if f.help != "" {
-			help = Div().asPart("FormField.Description").Style(st.Description).Child(Text(f.help).Key(helpKey))
-		}
-		if shown != "" {
-			errRow = Div().asPart("FormField.Error").Style(st.Error).
-				Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Error))).
-				Child(Text(shown).Key(errKey))
-		}
+		// The help text and the error are always in the tree, in the same places, and are
+		// not displayed when they have nothing to say. A child's identity is its position
+		// among its siblings, so a message that came and went would move the control and
+		// rebuild it, and the control would lose its focus.
+		help := Div().asPart("FormField.Description").Style(st.Description).Display(f.help != "").
+			Child(Text(f.help).Key(helpKey))
+		errRow := Div().asPart("FormField.Error").Style(st.Error).Display(shown != "").
+			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Error))).
+			Child(Text(shown).Key(errKey))
 		// The error is drawn above the control, under the help text, so the user reads
 		// what is wrong before the field they must correct.
 		var root *DivElement
 		if f.inline {
 			// The label takes the left column, and the help, the error and the control
 			// the right one.
-			body := Div().Column().Gap(6).Grow(1)
-			for _, p := range []Element{help, errRow} {
-				if p != nil {
-					body.Child(p)
-				}
-			}
-			body.Child(control)
+			body := Div().Column().Gap(6).Grow(1).Child(help).Child(errRow).Child(control)
 			root = Div().asPart("FormField.Root").Row().Align(Start).Gap(16).Style(st.Root).
 				Child(label).Child(body)
 		} else {
-			root = Div().asPart("FormField.Root").Column().Gap(6).Style(st.Root).Child(label)
-			for _, p := range []Element{help, errRow} {
-				if p != nil {
-					root.Child(p)
-				}
-			}
-			root.Child(control)
+			root = Div().asPart("FormField.Root").Column().Gap(6).Style(st.Root).
+				Child(label).Child(help).Child(errRow).Child(control)
 		}
 		if fc == nil {
 			// A group of controls, such as check boxes, has no control of its own to wire.

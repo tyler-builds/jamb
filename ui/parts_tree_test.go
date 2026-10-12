@@ -80,9 +80,9 @@ func testTreeParts(t *testing.T, applied map[string]bool) {
 	}
 }
 
-// TestTreeIndentAndSelectedWeight checks that the Indent size sets the indent of
-// each level, and that the selected row's label keeps semibold text.
-func TestTreeIndentAndSelectedWeight(t *testing.T) {
+// TestTreeIndentAndSelectedRowIsNotBold checks that the Indent size sets the indent of
+// each level, and that the selected row's label keeps the default weight.
+func TestTreeIndentAndSelectedRowIsNotBold(t *testing.T) {
 	sel := NewSignal("docs")
 	r := newAccessRig(func(ctx *Context) Element { return partTree(sel, TreeStyle{Indent: 30}, nil, nil) })
 	r.focusKey(t, "files")
@@ -92,8 +92,8 @@ func TestTreeIndentAndSelectedWeight(t *testing.T) {
 		t.Errorf("level 2 indent: left padding %v, want %v", got, want)
 	}
 	for _, n := range partNodes(r.rt, "TreeView.Label") {
-		if n.parent != nil && n.parent.key == "docs" && n.style.FontWeight < FontSemibold {
-			t.Errorf("the selected row's label has weight %v, want at least semibold", n.style.FontWeight)
+		if n.parent != nil && n.parent.key == "docs" && n.style.FontWeight != 0 {
+			t.Errorf("the selected row's label has weight %v, want the default", n.style.FontWeight)
 		}
 	}
 }

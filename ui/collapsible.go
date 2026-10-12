@@ -60,7 +60,7 @@ func collapsibleDefaults(t *Theme) CollapsibleStyle {
 	d := CollapsibleStyle{
 		Section: Style{Direction: Column, BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius},
 		Header: Style{Direction: Row, Align: Center, Gap: 8, MinHeight: Px(40), Padding: XY(12, 0),
-			NoShrink: true, Radius: t.Radius, TextColor: t.Text, FontWeight: FontMedium},
+			NoShrink: true, TextColor: t.Text, FontWeight: FontMedium},
 		HeaderHover:        Style{Background: t.SurfaceHover},
 		HeaderFocusVisible: Style{Shadows: []Shadow{ring}},
 		Chevron:            Style{TextColor: t.TextMuted},
@@ -192,11 +192,20 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 	if on {
 		chevron = icons.ChevronDown
 	}
+	// The header is the top of the section, inside its border, so its corners are the
+	// section's inner corners: its hover fill then does not cover the border at a rounded
+	// corner. The bottom corners are square while the section is open, since the content
+	// follows the header.
+	corners := innerCorners(st.Section.radii(), st.Section.borderEdges())
+	if on {
+		corners.BottomLeft, corners.BottomRight = 0, 0
+	}
 
 	// draw returns the header in the state ps describes. The chevron is always
 	// drawn; the title is the slot's content when RenderHeader is set.
 	draw := func(ps PartState) *DivElement {
 		header := Div().asPart("Collapsible.Header").Key(c.headerKey()).Style(st.Header).
+			Style(Style{Corners: corners}).
 			Role(access.RoleButton).Label(c.title).Expanded(on).
 			Child(Div().asPart("Collapsible.Chevron").Style(st.Chevron).Child(Icon(chevron).Size(14)))
 		if on {

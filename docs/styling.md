@@ -179,13 +179,24 @@ the same in every variant.
 - `Tabs.Variant(ui.TabsSegmented)` draws one row of segments. The selected segment is
   filled with `Accent` (`TabSelected`), and there is no `Indicator`.
 - `NumberField.SpinButtons(ui.SpinInline)` (the default when buttons are shown) draws
-  a decrease and an increase button after the field, with a minus and a plus sign.
+  a minus button at the field's left edge and a plus button at its right edge, inside
+  the frame and its border, with the text between them. Each button is the full height
+  of the frame's inside and 24 px wide at the Text size setting of 100 percent, and both
+  the buttons and the field's width scale with the setting, so the text keeps its room.
+  The buttons are `SpinButton` (there is no `SpinButtons` group for them), and the Tab
+  order is the text, then the minus and the plus button.
 - `NumberField.SpinButtons(ui.SpinStacked)` draws an up arrow above a down arrow inside
-  the field's right edge, as the up-down control of Windows does. Each button is half
-  the field's height and at least 16 px wide, the arrows scale with the Text size, and
-  the text takes the rest of the field, so it never runs under the buttons. The focus
-  of a stacked button is an inner outline, since a ring would fall outside the field's
-  clipped edge.
+  the field's right edge, as the up-down control of Windows does. The two buttons are
+  the `SpinButtons` group, each half the field's height and at least 16 px wide, the
+  arrows scale with the Text size, and the text takes the rest of the field, so it
+  never runs under the buttons. The focus of a spin button is an inner outline, since a
+  ring would fall outside the field's clipped edge.
+- A spin button's corners follow the frame: on the stacked column the up button takes
+  the frame's inner top-right corner and the down button its inner bottom-right corner,
+  and inline the minus button takes the left corners and the plus button the right
+  ones. The inner corners are the frame's radius less its border, so a hover or press
+  fill follows the rounded border and never covers it, including the invalid frame's
+  wider border. A `SpinButton` radius is replaced by these corners.
 
 - `Button.Variant(ui.Primary | ui.Secondary | ui.Ghost | ui.Danger)` picks the look of
   a button. Its style is the theme's `Button` (every variant), then the variant's own
@@ -304,8 +315,9 @@ type PartState struct {
 - `Selected`, `Disabled` and `HighContrast` are set when the widget is built.
 
 A slot that ignores the state still works. A slot that uses `Selected` or `Focused`
-must still leave a non-color cue for sighted users, such as the weight or the line of
-the built-in look.
+must still leave a non-color cue for sighted users, such as the line, the fill or the
+mark of the built-in look. The text's weight is not one of them: no built-in state
+changes it.
 
 `Select.RenderValue` is called only while an option is chosen. With no choice the
 placeholder is drawn, as it is by default.
@@ -332,16 +344,18 @@ Customization cannot break these, and this is why.
   under high contrast, because the ring is part of the defaults and an override's
   shadow is dropped there.
 - **State is not carried by color alone.** The built-in looks of the states also use a
-  weight, a line or a mark: a selected tab is semibold with a line, a selected option
-  has a check mark, and an invalid number field has a thicker frame and a message.
-  These are defaults, so an override can change them. Keep one non-color cue in your
-  styles.
-- **A selected tab and a highlighted option keep their weight.** The selected tab's
-  text is at least semibold, and so is a highlighted option's, whatever the styles
-  say. With the indicator, the fill or the highlight cleared, the weight still shows
-  the selection or the keyboard position. A chosen option keeps its check mark, and
-  an invalid number field keeps its message: those are not parts, so no style removes
-  them.
+  line, a fill or a mark: a selected tab has a line, a selected option has a check mark,
+  a selected row has a fill, and an invalid number field has a thicker frame and a
+  message. These are defaults, so an override can change them. Keep one non-color cue
+  in your styles.
+- **No state changes the weight of the text.** Hover, press, focus, selection, the
+  highlighted option and the sorted column keep the text's weight, so the built-in
+  looks never make text bold on their own. Set a weight yourself in a part's style
+  (`FontWeight`) if you want one. Under high contrast the cue is the system's: a
+  selected tab keeps its indicator line, and an app cannot clear the line's color or
+  change its height. A highlighted option and a selected row keep their Highlight fill,
+  and a chosen option keeps its check mark. An invalid number field keeps its message.
+  Those are not parts, so no style removes them.
 - **Text scale applies.** The runtime scales text with the Text size setting (100 to
   225 percent). That includes text that a part styles, so a part's font size grows
   with the setting, as all text does.
@@ -487,6 +501,9 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
 - The stacked spin buttons take the field's minimum height at the Text size setting.
   A Frame style that sets a different minimum height does not change their halves,
   so keep the field's height at its default when you use SpinStacked.
+- The inline spin buttons are laid over the frame's left and right padding. The
+  variant sets that padding to the width of a button, so a Frame style that sets a
+  smaller left or right padding puts the text under a button.
 - The caret of a text field is not a part (see "The text frame"). Its width and blink
   follow the system settings.
 - The Slider has no render slot for the thumb (see above).

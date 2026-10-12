@@ -505,11 +505,6 @@ func (s *SelectElement[T]) list(st SelectStyle, t *Theme, sel, hl int, shut func
 			if o.Disabled {
 				style = style.Merge(st.OptionDisabled)
 			}
-			if hi && style.FontWeight < FontSemibold {
-				// The highlighted option keeps at least semibold text, so the keyboard
-				// position still shows with its highlight cleared.
-				style.FontWeight = FontSemibold
-			}
 			mark := Div().Size(Px(16), Px(16)).Center().Shrink(0)
 			if on {
 				mark.Child(Icon(icons.Check).Size(14))

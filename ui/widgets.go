@@ -430,6 +430,7 @@ type fieldOptions struct {
 	handle      *FocusHandle
 	widget      string              // the widget this field is, for the part names (see asPart)
 	trailing    Element             // drawn inside the frame's right edge, after the text (NumberField's stacked spin buttons)
+	overlays    []Element           // laid over the frame's edges, after the text, out of its flow (NumberField's inline spin buttons)
 	rules       []Validator[string] // the validators of the value (see Validate)
 	wire        fieldWire           // what a Field gives the control (see Field)
 }
@@ -733,6 +734,9 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 	}
 	if f.trailing != nil {
 		box.Child(f.trailing)
+	}
+	for _, o := range f.overlays {
+		box.Child(o)
 	}
 	return box
 }

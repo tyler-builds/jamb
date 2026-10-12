@@ -521,6 +521,11 @@ func testNumberFieldParts(t *testing.T, p SpinPlacement, applied map[string]bool
 	for _, c := range cases {
 		applied[c.part] = true
 		t.Run(c.part, func(t *testing.T) {
+			if c.part == "NumberField.SpinButtons" && p != SpinStacked {
+				// The inline buttons are laid over the frame's edges, with no group (see
+				// NumberFieldStyle); the group is the stacked column's part.
+				t.Skip("the inline buttons have no group")
+			}
 			var st NumberFieldStyle
 			c.set(&st, Style{Background: markBG, TextColor: markFG})
 			v := NewSignal(c.value)
@@ -720,22 +725,30 @@ func TestTabsUnderlineDrawsOneLinePerTab(t *testing.T) {
 	}
 }
 
-func TestNumberFieldStackedSpinButtons(t *testing.T) {
-	for _, tc := range []struct {
-		p      SpinPlacement
-		dir    Direction
-		height Length
-	}{{SpinInline, Row, Px(28)}, {SpinStacked, Column, Px(17)}} {
-		r := newAccessRig(func(ctx *Context) Element { return partNumberField(NewSignal(8), NumberFieldStyle{}, tc.p, false) })
-		group := partNode(t, r.rt, "NumberField.SpinButtons", "")
-		if group.style.Direction != tc.dir {
-			t.Errorf("placement %d: group direction %v, want %v", tc.p, group.style.Direction, tc.dir)
+func TestNumberFieldSpinButtonsByPlacement(t *testing.T) {
+	// The stacked buttons are a column in the frame's flow, with half the field's
+	// height each.
+	r := newAccessRig(func(ctx *Context) Element {
+		return partNumberField(NewSignal(8), NumberFieldStyle{}, SpinStacked, false)
+	})
+	group := partNode(t, r.rt, "NumberField.SpinButtons", "")
+	if group.style.Direction != Column {
+		t.Errorf("stacked: group direction %v, want Column", group.style.Direction)
+	}
+	if h := buttonNode(t, r, "Increase").style.Height; h != Px(17) {
+		t.Errorf("stacked: Increase height %v, want 17", h)
+	}
+	// The inline buttons have no group: each is laid over an edge of the frame.
+	r = newAccessRig(func(ctx *Context) Element {
+		return partNumberField(NewSignal(8), NumberFieldStyle{}, SpinInline, false)
+	})
+	if n := len(partNodes(r.rt, "NumberField.SpinButtons")); n != 0 {
+		t.Errorf("inline: %d spin button groups, want none", n)
+	}
+	for _, name := range []string{"Decrease", "Increase"} {
+		if b := buttonNode(t, r, name); !b.style.Absolute {
+			t.Errorf("inline: %s is not laid over its frame's edge", name)
 		}
-		if h := buttonNode(t, r, "Increase").style.Height; h != tc.height {
-			t.Errorf("placement %d: Increase height %v, want %v", tc.p, h, tc.height)
-		}
-		// Both buttons are buttons with their names, whatever their placement.
-		buttonNode(t, r, "Decrease")
 	}
 }
 

@@ -258,9 +258,11 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 		GridFocusVisible: Style{Shadows: []Shadow{ring}},
 		Header: Style{Direction: Row, Align: Center, MinHeight: Px(h), Background: t.Sidebar,
 			BorderEdges: line, BorderColor: t.Border, TextColor: t.TextMuted, FontWeight: FontSemibold},
-		HeaderCell:       Style{Direction: Row, Align: Center, Gap: 4, Padding: Edges{Left: 8, Right: 8}, NoShrink: true},
+		// A header cell takes the height of the header row, as a row's cells take the height
+		// of their row, so its hover and sorted fills cover the whole cell.
+		HeaderCell:       Style{Direction: Row, Align: Center, AlignSelf: Stretch, Gap: 4, Padding: Edges{Left: 8, Right: 8}, NoShrink: true},
 		HeaderCellHover:  Style{Background: t.SurfaceHover},
-		HeaderCellSorted: Style{TextColor: t.Text, FontWeight: FontBold},
+		HeaderCellSorted: Style{TextColor: t.Text},
 		SortIndicator:    Style{TextColor: t.Text},
 		ResizeHandle:     Style{Width: Px(6), Cursor: input.CursorResizeEW},
 		Row: Style{Direction: Row, Align: Center, MinHeight: Px(h), NoShrink: true,
@@ -486,6 +488,7 @@ type dgRowCtx[T any] struct {
 	onHeader, hasFocus   bool
 	ed                   dgEdit
 	click                func(q, cl int, mods input.Modifiers)
+	colAt                func(q int, x float32) int
 	activate             func(q int)
 	ops                  dgOps
 }
@@ -1181,9 +1184,26 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		cancel: func() { endEdit(true) },
 		blur:   blurEdit,
 	}
+	// colAt returns the column of the cell of row q under the window's x. The cells are
+	// sized by their flex layout, where a Grow column takes the spare width, so the
+	// column is found in the laid-out cells and not from the widths. A point right of
+	// the last cell is in the last column.
+	colAt := func(q int, x float32) int {
+		body := rt.byID[sh.focus.id]
+		for c := range nc - 1 {
+			cell := dgCellNode(body, q+1, c+1)
+			if cell == nil {
+				continue
+			}
+			if r := rt.nodeRect(cell); x < r.X+r.W {
+				return c
+			}
+		}
+		return max(nc-1, 0)
+	}
 	rc := dgRowCtx[T]{t: t, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed,
-		click: click, activate: activate, ops: ops}
+		click: click, colAt: colAt, activate: activate, ops: ops}
 	list := UniformList(n, func(q int) Element {
 		if sh.builtHi == 0 {
 			sh.builtLo = q
@@ -1278,12 +1298,12 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 }
 
 // row builds the row at displayed position q: a list item whose cells are the
-// cells of the columns. A selected row is drawn in RowSelected, and its text is at
-// least semibold, so the selection still shows with its highlight cleared.
+// cells of the columns. A selected row is drawn in RowSelected: its fill (the Highlight
+// color under high contrast) is the selection, and its text keeps its weight.
 func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 	st, sh, rows, cols, xs, selected := rc.st, rc.sh, rc.rows, rc.cols, rc.xs, rc.selected
 	cursorPos, cursorCol, onHeader, hasFocus := rc.cursorPos, rc.cursorCol, rc.onHeader, rc.hasFocus
-	click, activate, ed, ops := rc.click, rc.activate, rc.ed, rc.ops
+	click, colAt, activate, ed, ops := rc.click, rc.colAt, rc.activate, rc.ed, rc.ops
 	i := sh.order[q]
 	k := sh.keys[i]
 	v := rows[i]
@@ -1304,11 +1324,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 	r.OnMouseDown(func(e *MouseEvent) {
 		if e.Button == input.ButtonLeft {
 			sh.pressed, sh.ctl = true, false
-			c := 0
-			for c+1 < len(cols) && e.LocalX >= xs[c+1] {
-				c++
-			}
-			click(q, c, e.Mods)
+			click(q, colAt(q, e.X), e.Mods)
 		}
 	})
 	r.OnClick(func() {
@@ -1395,11 +1411,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		case cl.Cell != nil:
 			cell.Child(Div().Hidden().Child(cl.Cell(v)))
 		default:
-			tx := Text(s).Truncate()
-			if on && tx.style.FontWeight < FontSemibold {
-				tx.Semibold()
-			}
-			cell.Child(tx)
+			cell.Child(Text(s).Truncate())
 		}
 		if editing && ed.err != "" {
 			// The message of a failed save hangs under the editing cell as an overlay: it is

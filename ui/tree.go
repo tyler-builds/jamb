@@ -446,11 +446,6 @@ func (tv *TreeElement) row(st TreeStyle, t *Theme, r treeRow, i int, sel string,
 				row.Child(Div().asPart("TreeView.Icon").Style(st.Icon).Child(Icon(r.icon).Size(16)))
 			}
 			label := Div().asPart("TreeView.Label").Style(st.Label)
-			if on && label.style.FontWeight < FontSemibold {
-				// The selected row keeps at least semibold text, so the selection still
-				// shows with its highlight cleared.
-				label.Style(Style{FontWeight: FontSemibold})
-			}
 			if tv.renderLabel != nil {
 				label.Child(Div().Hidden().Child(tv.renderLabel(node, ps)))
 			} else {

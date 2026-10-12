@@ -77,10 +77,15 @@ func (s NumberFieldStyle) plain() NumberFieldStyle {
 	}
 }
 
+// spinInlineWidth is the width of an inline spin button at the Text size setting of
+// 100 percent, in logical pixels. It is the button's hit target, so it is wider than
+// the glyph.
+const spinInlineWidth = 24
+
 // numberFieldDefaults returns the built-in look of a number field of the given
-// width, with spin buttons of placement, from the colors of t. A disabled field
-// has the disabled frame (see fieldDefaults).
-func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale float32, disabled bool) NumberFieldStyle {
+// width, with spin buttons of placement when spin is set, from the colors of t. A
+// disabled field has the disabled frame (see fieldDefaults).
+func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale float32, disabled, spin bool) NumberFieldStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	d := NumberFieldStyle{
 		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled}),
@@ -97,7 +102,8 @@ func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale
 	} else {
 		d.SpinButtonDisabled = Style{Opacity: 0.5}
 	}
-	if placement == SpinStacked {
+	switch {
+	case spin && placement == SpinStacked:
 		// The column sits at the field's right edge, inside the frame, at the field's
 		// height: its two buttons share that height. It scales with the Text size.
 		// The frame has no gap and no right padding, so the column is at its edge.
@@ -107,10 +113,16 @@ func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale
 		// A ring would be drawn outside the buttons, into the frame's clipped edge,
 		// so the focus is an inner outline.
 		d.SpinButtonFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
-	} else {
-		d.SpinButtons = Style{Direction: Row, Align: Center, Gap: 6}
-		d.SpinButton.Width, d.SpinButton.Height = Px(28), Px(28)
-		d.SpinButton.Radius = t.Radius
+	case spin:
+		// The buttons are laid over the frame's edges, the decrease at the left and the
+		// increase at the right, so the frame is padded by their width and the text
+		// keeps the middle. Both scale with the Text size, and so does the field's width.
+		w := spinInlineWidth * scale
+		d.Frame.Width = Px(width * scale)
+		d.Frame.Padding = Edges{Left: w + 4, Right: w + 4}
+		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Px(w)}
+		// As in the stacked column, the focus is an inner outline, inside the border.
+		d.SpinButtonFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
 	}
 	return d
 }
@@ -118,8 +130,8 @@ func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale
 // resolveNumberField returns the look of a number field: the defaults, merged
 // with the theme's Field, then the theme's NumberField, then the instance's
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveNumberField(t *Theme, width float32, placement SpinPlacement, scale float32, disabled bool, inst NumberFieldStyle) NumberFieldStyle {
-	st := numberFieldDefaults(t, width, placement, scale, disabled)
+func resolveNumberField(t *Theme, width float32, placement SpinPlacement, scale float32, disabled, spin bool, inst NumberFieldStyle) NumberFieldStyle {
+	st := numberFieldDefaults(t, width, placement, scale, disabled, spin)
 	for _, o := range []NumberFieldStyle{{FieldStyle: t.Field}, t.NumberField, inst} {
 		if t.HighContrast {
 			o = o.plain()
@@ -231,7 +243,7 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		scale := float32(ctx.TextScale()) / 100
-		st := resolveNumberField(t, n.width, n.placement, scale, n.disabled, n.styles)
+		st := resolveNumberField(t, n.width, n.placement, scale, n.disabled, n.spin && !n.disabled, n.styles)
 		v := n.value.Get()
 		// The field keeps its own text while the user types. draft is that text,
 		// and seen is the value it was last made from, so that a value set from
@@ -330,54 +342,70 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 		if isInvalid {
 			fo.describedBy = []string{errKey}
 		}
-		// Stacked buttons are the frame's trailing element, inside its right edge.
-		// Inline buttons follow the frame.
+		// The frame as it is drawn: an invalid frame has its own border, and the buttons
+		// take their corners from it.
+		frame := st.Frame
+		if fo.wire.invalid {
+			frame = frame.Merge(st.FrameInvalid)
+		}
+		// Stacked buttons are the frame's trailing element, inside its right edge. Inline
+		// buttons are laid over the frame's edges, after the text (see spinButtons).
 		if n.spin && n.placement == SpinStacked {
-			fo.trailing = n.spinButtons(st, v, step, scale)
+			fo.trailing = n.stackedSpin(st, frame, v, step, scale)
+		} else if n.spin {
+			fo.overlays = n.inlineSpin(st, frame, v, step, scale)
 		}
 		row.Child(fo.expand(ctx, st.FieldStyle, false, 0))
-		if n.spin && n.placement != SpinStacked {
-			row.Child(n.spinButtons(st, v, step, scale))
-		}
 		root.Child(row)
-		if isInvalid {
-			msg := fmt.Sprintf("Enter a number from %s to %s.", n.format(n.lo), n.format(n.hi))
-			root.Child(Div().asPart("NumberField.Message").Style(st.Message).
-				Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
-				Child(Text(msg).Key(errKey)))
-		}
+		// The message is always in the tree, after the row, and shown while the text is
+		// invalid, so that the field keeps its place among its siblings.
+		msg := fmt.Sprintf("Enter a number from %s to %s.", n.format(n.lo), n.format(n.hi))
+		root.Child(Div().asPart("NumberField.Message").Style(st.Message).Display(isInvalid).
+			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
+			Child(Text(msg).Key(errKey)))
 		return root
 	})
 }
 
-// spinButtons returns the group of spin buttons, in the placement set by
-// SpinButtons. Each button is a button for assistive technology, is in the Tab
-// order while enabled, and steps the value by one step when it is clicked. A
-// button is disabled at the end of the range it would step past.
-func (n *NumberFieldElement[T]) spinButtons(st NumberFieldStyle, v T, step func(int), scale float32) *DivElement {
-	stacked := n.placement == SpinStacked
-	iconSize := float32(14)
-	decrease, increase := icons.Minus, icons.Plus
-	if stacked {
-		iconSize = 12 * scale
-		decrease, increase = icons.ChevronDown, icons.ChevronUp
-	}
-	down := n.spinButton(st, -1, "Decrease", decrease, iconSize, v <= n.lo, step)
-	up := n.spinButton(st, 1, "Increase", increase, iconSize, v >= n.hi, step)
-	group := Div().asPart("NumberField.SpinButtons").Style(st.SpinButtons)
-	if stacked {
-		return group.Child(up).Child(down)
-	}
-	return group.Child(down).Child(up)
+// stackedSpin returns the group of the stacked spin buttons: the increase button
+// above the decrease button, inside the frame's right edge. Each button is a button
+// for assistive technology, is in the Tab order while enabled, and steps the value
+// by one step when it is clicked. A button is disabled at the end of the range it
+// would step past.
+func (n *NumberFieldElement[T]) stackedSpin(st NumberFieldStyle, frame Style, v T, step func(int), scale float32) *DivElement {
+	down := n.spinButton(st, frame, -1, "Decrease", icons.ChevronDown, 12*scale, v <= n.lo, step)
+	up := n.spinButton(st, frame, 1, "Increase", icons.ChevronUp, 12*scale, v >= n.hi, step)
+	return Div().asPart("NumberField.SpinButtons").Style(st.SpinButtons).Child(up).Child(down)
+}
+
+// inlineSpin returns the inline spin buttons: the decrease button at the frame's left
+// edge and the increase button at its right, each laid over the edge, inside the
+// border. They come after the text in the tree, so the Tab order is the text, then
+// the decrease and the increase button.
+func (n *NumberFieldElement[T]) inlineSpin(st NumberFieldStyle, frame Style, v T, step func(int), scale float32) []Element {
+	down := n.spinButton(st, frame, -1, "Decrease", icons.Minus, 14*scale, v <= n.lo, step)
+	up := n.spinButton(st, frame, 1, "Increase", icons.Plus, 14*scale, v >= n.hi, step)
+	return []Element{down, up}
 }
 
 // spinButton returns one spin button, which steps the value by dir steps, or is
-// disabled.
-func (n *NumberFieldElement[T]) spinButton(st NumberFieldStyle, dir int, label string, ic *icons.Icon,
+// disabled. A button takes the inner corners of the frame on its edge (see
+// spinCorners), so its fill follows the frame's rounded border and does not cover it.
+func (n *NumberFieldElement[T]) spinButton(st NumberFieldStyle, frame Style, dir int, label string, ic *icons.Icon,
 	iconSize float32, disabled bool, step func(int)) *DivElement {
+	inline := n.placement != SpinStacked
 	b := Div().asPart("NumberField.SpinButton").Row().Align(Center).Justify(Center).
 		Style(st.SpinButton).Child(Icon(ic).Size(iconSize)).
-		Role(access.RoleButton).Label(label)
+		Role(access.RoleButton).Label(label).
+		Style(Style{Corners: spinCorners(frame, inline, dir)})
+	if inline {
+		b.Absolute().Top(0).Bottom(0)
+		if dir < 0 {
+			b.Left(0)
+		} else {
+			b.Right(0)
+		}
+	}
 	if disabled {
 		b.access().disabled = true
 		b.Style(st.SpinButtonDisabled).Cursor(CursorNotAllowed)
@@ -387,6 +415,25 @@ func (n *NumberFieldElement[T]) spinButton(st NumberFieldStyle, dir int, label s
 		FocusVisible(st.SpinButtonFocusVisible).
 		OnClick(func() { step(dir) })
 	return b
+}
+
+// spinCorners returns the corners of a spin button on an edge of the frame: the inner
+// corners of the frame's border on that side, which are the corners of the frame's
+// inner edge. The button sits inside the border, so its own corners must match those,
+// or its fill would cover the border at the rounded corner. A stacked button is on the
+// right, the increase button above and the decrease button below. An inline button is
+// on the left (the decrease) or the right (the increase).
+func spinCorners(frame Style, inline bool, dir int) Corners {
+	ic := innerCorners(frame.radii(), frame.borderEdges())
+	switch {
+	case inline && dir < 0:
+		return Corners{TopLeft: ic.TopLeft, BottomLeft: ic.BottomLeft}
+	case inline:
+		return Corners{TopRight: ic.TopRight, BottomRight: ic.BottomRight}
+	case dir < 0:
+		return Corners{BottomRight: ic.BottomRight}
+	}
+	return Corners{TopRight: ic.TopRight}
 }
 
 // clamp returns x within the range.

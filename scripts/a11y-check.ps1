@@ -490,7 +490,18 @@ try {
             $errors = Invoke-AxeScan $demo 'demo-new-project-errors'
             Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
         }
-        (Require-Pattern $name ([System.Windows.Automation.ValuePatternIdentifiers]::Pattern) 'Value').SetValue('Lab project')
+        # The first character clears the required error. The field keeps focus, so the
+        # rest of the text goes into it.
+        [System.Windows.Forms.SendKeys]::SendWait('L')
+        Wait-For {
+            $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($f -and $f.Current.Name -eq 'Name' -and $f.Current.ControlType -eq $CT.Edit) { $true } else { $null }
+        } 'focus on the Name field after its error cleared' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('ab')
+        $typed = Find-Named $win 'Name' $CT.Edit | Select-Object -First 1
+        $typedValue = (Require-Pattern $typed ([System.Windows.Automation.ValuePatternIdentifiers]::Pattern) 'Value').Current.Value
+        Assert ($typedValue -eq 'Lab') "the Name field holds '$typedValue' after typing Lab, want Lab"
+        (Require-Pattern $typed ([System.Windows.Automation.ValuePatternIdentifiers]::Pattern) 'Value').SetValue('Lab project')
         Invoke-Named $win 'Create project' $CT.Button
         Wait-Gone { Find-Named $win 'New project' | Select-Object -First 1 } 'the dialog to close after Create' | Out-Null
         # Create shows the project with an Undo action; Undo keeps the projects the later checks count.
