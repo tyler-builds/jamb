@@ -982,6 +982,13 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	// editor, rather than on the grid. Tab moves through the controls of the cell
 	// or saves the edit and moves to the next editable cell. Escape and F2 return
 	// to the grid. Every other key belongs to the control, or to the editor.
+	// cursorNow returns the cell the cursor is on now. A key handler can run before the
+	// grid is built again, and the render's copy of the cursor would then be old: two arrow
+	// keys before the next frame must move two cells, so the handlers read the signal.
+	cursorNow := func() (p, col int, onHeader bool) {
+		c := cur.Peek()
+		return min(max(c.pos, 0), max(n-1, 0)), min(max(c.col, 0), max(nc-1, 0)), c.header
+	}
 	cellKeys := func(e *KeyEvent) bool {
 		switch e.Key {
 		case input.KeyTab:
@@ -1032,6 +1039,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	// typeText starts an edit of an editable cell with the character typed, which
 	// replaces its text. While an edit is starting, the text is added to its draft.
 	typeText := func(s string) {
+		p, col, onHeader := cursorNow()
 		if edit.Peek().key != "" {
 			sh.draft.Set(sh.draft.Peek() + s)
 			return
@@ -1047,6 +1055,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 
 	// keys handles a key press on the grid, and reports whether it used the key.
 	keys := func(e *KeyEvent) bool {
+		p, col, onHeader := cursorNow()
 		if e.Mods&input.ModAlt != 0 {
 			return false
 		}
