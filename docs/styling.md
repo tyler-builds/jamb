@@ -180,23 +180,30 @@ the same in every variant.
   filled with `Accent` (`TabSelected`), and there is no `Indicator`.
 - `NumberField.SpinButtons(ui.SpinInline)` (the default when buttons are shown) draws
   a minus button at the field's left edge and a plus button at its right edge, inside
-  the frame and its border, with the text between them. Each button is the full height
-  of the frame's inside and 24 px wide at the Text size setting of 100 percent, and both
-  the buttons and the field's width scale with the setting, so the text keeps its room.
-  The buttons are `SpinButton` (there is no `SpinButtons` group for them), and the Tab
-  order is the text, then the minus and the plus button.
+  the frame and its border, with the text between them. Each button is 24 px wide at
+  the Text size setting of 100 percent, and both the buttons and the field's width
+  scale with the setting, so the text keeps its room. The buttons are `SpinButton`
+  (there is no `SpinButtons` group for them), and the Tab order is the text, then the
+  minus and the plus button.
 - `NumberField.SpinButtons(ui.SpinStacked)` draws an up arrow above a down arrow inside
   the field's right edge, as the up-down control of Windows does. The two buttons are
-  the `SpinButtons` group, each half the field's height and at least 16 px wide, the
-  arrows scale with the Text size, and the text takes the rest of the field, so it
-  never runs under the buttons. The focus of a spin button is an inner outline, since a
-  ring would fall outside the field's clipped edge.
-- A spin button's corners follow the frame: on the stacked column the up button takes
-  the frame's inner top-right corner and the down button its inner bottom-right corner,
-  and inline the minus button takes the left corners and the plus button the right
-  ones. The inner corners are the frame's radius less its border, so a hover or press
-  fill follows the rounded border and never covers it, including the invalid frame's
-  wider border. A `SpinButton` radius is replaced by these corners.
+  the `SpinButtons` group: each is the field's height less the gap at the column's top
+  and bottom and twice the gap between the two, and at least 16 px wide. The arrows
+  scale with the Text size, and the text takes the rest of the field, so it never runs
+  under the buttons.
+- A spin button's fill is inset from the border by a gap, as the Windows 11 NumberBox
+  draws its compact spin buttons. The gap is 2 px at the Text size setting of 100
+  percent, and it scales with the Text size and the DPI. It is on every side that
+  meets the border, so a hover or pressed fill (`SpinButtonHover`, `SpinButtonPressed`)
+  never touches or covers the border. The fill changes only its background: the button
+  keeps its size, with no growth, shadow or change of weight. The button is the hit
+  target, so the gap is not clickable.
+- A spin button's fill has the frame's inner radius less the gap on all four corners.
+  That radius is concentric with the frame's inner curve, so the fill stays inside the
+  curve, including the invalid frame's wider border. A `SpinButton` radius is replaced
+  by these corners.
+- The focus of a spin button (`SpinButtonFocusVisible`) is an inner outline 2 px wide,
+  drawn on the button's fill, so it stays inside the gap and inside the border.
 
 - `Button.Variant(ui.Primary | ui.Secondary | ui.Ghost | ui.Danger)` picks the look of
   a button. Its style is the theme's `Button` (every variant), then the variant's own
@@ -232,6 +239,13 @@ The frame's layers are the defaults, then `Theme.Field`, then the instance. A
 `NumberField` takes `Theme.NumberField` between the theme's `Field` and its own
 `Styles`. A text field's `Style` method is its instance `Frame`, and it is plain under
 high contrast as the instance's `Styles` are.
+
+A `NumberField`'s value is centered in its text area by default. `Align` sets where
+it sits: `Align(ui.Start)`, `Align(ui.Center)` (the default) or `Align(ui.End)`, such
+as `End` for figures that line up in a column. The text area is the room between the
+spin buttons: inline, it is the middle of the frame, and stacked, it is the room left
+of the column. A value wider than the field scrolls, as before, and is not aligned.
+The caret and the selection follow the alignment.
 
 ```go
 ui.TextInput(query).Icon(icons.Search).Trailing(clearButton).Styles(ui.FieldStyle{
@@ -504,6 +518,13 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
 - The inline spin buttons are laid over the frame's left and right padding. The
   variant sets that padding to the width of a button, so a Frame style that sets a
   smaller left or right padding puts the text under a button.
+- The spin buttons' fill is the button's own box, inset by the gap. A SpinButtons or
+  SpinButton style that sets its padding, margin or size changes the fill and the hit
+  target with it, so keep those as the variant sets them.
+- The stacked column is beside the text, so a centered value is centered in the room
+  left of the column, not in the whole field. The stacked field's width does not
+  scale with the Text size, as the inline field's does, so that room narrows at 225
+  percent. Set a wider field with `NumberField.Width` when the value needs it.
 - The caret of a text field is not a part (see "The text frame"). Its width and blink
   follow the system settings.
 - The Slider has no render slot for the thumb (see above).

@@ -429,6 +429,7 @@ type fieldOptions struct {
 	autoFocus   bool
 	handle      *FocusHandle
 	widget      string              // the widget this field is, for the part names (see asPart)
+	align       Alignment           // where a single-line text sits in the field, zero for Start (NumberField's Align)
 	trailing    Element             // drawn inside the frame's right edge, after the text (NumberField's stacked spin buttons)
 	overlays    []Element           // laid over the frame's edges, after the text, out of its flow (NumberField's inline spin buttons)
 	rules       []Validator[string] // the validators of the value (see Validate)
@@ -693,7 +694,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 	ed := &editorElement{
 		value: f.value, placeholder: f.placeholder, name: name, labelledBy: labelledBy, describedBy: describedBy, multiline: multiline,
 		onSubmit: onSubmit, onChange: onChange, onBlur: onBlur, onCancel: f.onCancel, description: description,
-		onStep: f.onStep, autoFocus: f.autoFocus, handle: h, invalid: w.invalid, required: w.required,
+		onStep: f.onStep, autoFocus: f.autoFocus, handle: h, invalid: w.invalid, required: w.required, align: f.align,
 		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
 	}

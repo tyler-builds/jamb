@@ -438,6 +438,10 @@ ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStac
   invalid, with a message that gives the range, and keeps the text so it can be
   corrected. Leaving the field then reverts the text to the value that is set.
   `Precision` sets the decimals of a float; the default is the decimals of the step.
+  The value is centered in the field by default. `Align(ui.Start)` or `Align(ui.End)`
+  sets it to the left or the right, such as `End` for figures in a column. The spin
+  buttons' hover and pressed fills are inset from the border by a small gap, so they
+  never touch or cover it.
 
 ![Inline spin buttons inside the field, with the pointer over the plus button](docs/screenshots/spin-buttons-inline.png)
 

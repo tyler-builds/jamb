@@ -230,8 +230,12 @@ func TestStackedSpinButtonsSitInsideTheField(t *testing.T) {
 		if up.W < 16 || down.W < 16 {
 			t.Errorf("%d%%: the buttons are %v and %v px wide, want at least 16", scale, up.W, down.W)
 		}
-		if d := up.H - down.H; d > 1 || d < -1 || up.H+down.H > frame.H+1 || up.H < frame.H/2-2 {
-			t.Errorf("%d%%: the buttons are %v and %v px tall in a field %v px tall; each want half", scale, up.H, down.H, frame.H)
+		// The two buttons share the field's height, less the gap at its top and bottom
+		// and the twice-gap between them (see numberFieldDefaults).
+		bw := partNode(t, r.rt, "NumberField.Frame", "").style.BorderWidth
+		gap := spinGapAt(scale)
+		if want := (frame.H - 2*bw - 4*gap) / 2; !nearPx(up.H, want) || !nearPx(down.H, want) {
+			t.Errorf("%d%%: the buttons are %v and %v px tall in a field %v px tall; each want %v", scale, up.H, down.H, frame.H, want)
 		}
 		if up.Y > down.Y {
 			t.Errorf("%d%%: the increase button is below the decrease button", scale)

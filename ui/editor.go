@@ -102,6 +102,7 @@ type editorElement struct {
 	labelledBy  []string
 	describedBy []string
 	multiline   bool
+	align       Alignment // where a single-line editor's text sits in its box (see alignOffset)
 	onSubmit    func(string)
 	onChange    func(string)
 	onBlur      func()
@@ -404,6 +405,21 @@ func abs32(v float32) float32 {
 
 // ---- paint ----
 
+// alignOffset returns how far right a single line of width text is moved in a field of
+// width cw, for its alignment a. Start, and any alignment that is not Center or End,
+// moves it not at all. A text wider than the field moves not at all either, since it
+// scrolls.
+func alignOffset(a Alignment, cw, width float32) float32 {
+	room := max(cw-width, 0)
+	switch a {
+	case Center:
+		return room / 2
+	case End:
+		return room
+	}
+	return 0
+}
+
 func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float32) {
 	e := n.editor
 	es := n.st.edit
@@ -424,10 +440,16 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	focused := rt.focusID == n.id
 	caretX, caretTop := l.Caret(es.caret)
 
+	// A single-line text that fits is not scrolled: it sits at its alignment, and the
+	// alignment is left out once the text is wider than the field, which scrolls instead.
+	off := float32(0)
 	if !e.multiline {
 		// Keep the caret inside the field by scrolling the text sideways.
 		const margin = 2
-		if focused {
+		switch {
+		case l.Width <= cw:
+			es.scrollX = 0
+		case focused:
 			if caretX-es.scrollX > cw-margin {
 				es.scrollX = caretX - cw + margin
 			}
@@ -436,11 +458,12 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 			}
 		}
 		es.scrollX = min(max(es.scrollX, 0), max(l.Width-cw+margin, 0))
+		off = alignOffset(e.align, cw, l.Width)
 	} else {
 		es.scrollX = 0
 	}
-	es.originX, es.originY = cx-x-es.scrollX, cy-y
-	tx := cx - es.scrollX
+	es.originX, es.originY = cx-x-es.scrollX+off, cy-y
+	tx := cx + off - es.scrollX
 
 	clip := !e.multiline
 	if clip {

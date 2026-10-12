@@ -82,6 +82,12 @@ func (s NumberFieldStyle) plain() NumberFieldStyle {
 // the glyph.
 const spinInlineWidth = 24
 
+// spinGap is the gap between a spin button's fill and the field's border, at the Text
+// size setting of 100 percent, in logical pixels. It scales with the Text size, and
+// with the DPI through the logical pixels. The fill is inset by it on every side that
+// meets the border, as the Windows 11 NumberBox draws its buttons.
+const spinGap = 2
+
 // numberFieldDefaults returns the built-in look of a number field of the given
 // width, with spin buttons of placement when spin is set, from the colors of t. A
 // disabled field has the disabled frame (see fieldDefaults).
@@ -108,8 +114,13 @@ func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale
 		// height: its two buttons share that height. It scales with the Text size.
 		// The frame has no gap and no right padding, so the column is at its edge.
 		d.Frame.Gap, d.Frame.Padding, d.Frame.MinHeight = 0, Edges{Left: 10}, Px(34*scale)
-		d.SpinButtons = Style{Direction: Column, Width: Px(18 * scale), Height: Px(34 * scale), NoShrink: true}
-		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Full, Height: Px(17 * scale)}
+		// The column is inset by the gap from the border at its top, right and bottom, and
+		// the two buttons are twice the gap apart, so each fill is inset on every side that
+		// meets the border or the other button. The two buttons fill the rest of the column.
+		gap := spinGap * scale
+		d.SpinButtons = Style{Direction: Column, Width: Px(18 * scale), Height: Px(34 * scale), NoShrink: true,
+			Padding: Edges{Top: gap, Right: gap, Bottom: gap}, Gap: 2 * gap}
+		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Full, Height: Px(17*scale - 2*gap)}
 		// A ring would be drawn outside the buttons, into the frame's clipped edge,
 		// so the focus is an inner outline.
 		d.SpinButtonFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
@@ -163,7 +174,8 @@ type NumberFieldElement[T int | float64] struct {
 	disabled   bool
 	spin       bool // set by SpinButtons
 	placement  SpinPlacement
-	precision  int // the decimals of a float, or -1 for the decimals of the step
+	align      Alignment // where the text sits in the field (see Align)
+	precision  int       // the decimals of a float, or -1 for the decimals of the step
 	width      float32
 	styles     NumberFieldStyle
 	rules      []Validator[T] // the validators of the value (see Validate)
@@ -189,10 +201,10 @@ func (n *NumberFieldElement[T]) formWire(w fieldWire) Element {
 }
 
 // NumberField creates a number field that reads and writes value, from lo to hi
-// in steps of step. Its default width is 120 px and it shows the decimals of
-// step.
+// in steps of step. Its default width is 120 px, it shows the decimals of step,
+// and its value is centered in the field.
 func NumberField[T int | float64](value *Signal[T], lo, hi, step T) *NumberFieldElement[T] {
-	return &NumberFieldElement[T]{value: value, lo: lo, hi: hi, step: step, precision: -1, width: 120}
+	return &NumberFieldElement[T]{value: value, lo: lo, hi: hi, step: step, precision: -1, width: 120, align: Center}
 }
 
 func (*NumberFieldElement[T]) isElement()           {}
@@ -221,6 +233,12 @@ func (n *NumberFieldElement[T]) SpinButtons(p SpinPlacement) *NumberFieldElement
 	n.spin, n.placement = true, p
 	return n
 }
+
+// Align sets where the value sits in the field: Center, the default, or Start and End
+// for the left and the right, such as End for figures that line up in a column. The
+// value keeps to the room between the spin buttons, and its caret and selection
+// follow it.
+func (n *NumberFieldElement[T]) Align(a Alignment) *NumberFieldElement[T] { n.align = a; return n }
 
 // Precision sets the number of decimals a float is shown with, so 2 shows 1.50.
 // The default is the number of decimals of the step.
@@ -328,14 +346,14 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 			// The disabled number is drawn as text in a frame, with the disabled frame
 			// and text parts. Under high contrast both are GrayText, with no dimming.
 			frame := Div().asPart("NumberField.Frame").Style(st.Frame).Style(st.FrameDisabled)
-			content := Div().asPart("NumberField.Text").Style(st.Text).Child(Text(draft.Get()))
+			content := Div().asPart("NumberField.Text").Style(st.Text).Row().Grow(1).Justify(n.align).Child(Text(draft.Get()))
 			root.Child(row.Child(frame.Child(content)))
 			return root
 		}
 
 		fo := fieldOptions{value: draft, name: name, labelledBy: labelledBy,
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, onStep: step,
-			widget: "NumberField", wire: w}
+			widget: "NumberField", wire: w, align: n.align}
 		// The invalid frame is drawn thicker and in the danger color (the text color under
 		// high contrast) by fieldOptions.expand, and the message says what is wrong.
 		fo.wire.invalid = isInvalid || w.invalid
@@ -373,8 +391,9 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 // by one step when it is clicked. A button is disabled at the end of the range it
 // would step past.
 func (n *NumberFieldElement[T]) stackedSpin(st NumberFieldStyle, frame Style, v T, step func(int), scale float32) *DivElement {
-	down := n.spinButton(st, frame, -1, "Decrease", icons.ChevronDown, 12*scale, v <= n.lo, step)
-	up := n.spinButton(st, frame, 1, "Increase", icons.ChevronUp, 12*scale, v >= n.hi, step)
+	gap := spinGap * scale
+	down := n.spinButton(st, frame, -1, "Decrease", icons.ChevronDown, 12*scale, gap, v <= n.lo, step)
+	up := n.spinButton(st, frame, 1, "Increase", icons.ChevronUp, 12*scale, gap, v >= n.hi, step)
 	return Div().asPart("NumberField.SpinButtons").Style(st.SpinButtons).Child(up).Child(down)
 }
 
@@ -383,27 +402,30 @@ func (n *NumberFieldElement[T]) stackedSpin(st NumberFieldStyle, frame Style, v 
 // border. They come after the text in the tree, so the Tab order is the text, then
 // the decrease and the increase button.
 func (n *NumberFieldElement[T]) inlineSpin(st NumberFieldStyle, frame Style, v T, step func(int), scale float32) []Element {
-	down := n.spinButton(st, frame, -1, "Decrease", icons.Minus, 14*scale, v <= n.lo, step)
-	up := n.spinButton(st, frame, 1, "Increase", icons.Plus, 14*scale, v >= n.hi, step)
+	gap := spinGap * scale
+	down := n.spinButton(st, frame, -1, "Decrease", icons.Minus, 14*scale, gap, v <= n.lo, step)
+	up := n.spinButton(st, frame, 1, "Increase", icons.Plus, 14*scale, gap, v >= n.hi, step)
 	return []Element{down, up}
 }
 
 // spinButton returns one spin button, which steps the value by dir steps, or is
-// disabled. A button takes the inner corners of the frame on its edge (see
-// spinCorners), so its fill follows the frame's rounded border and does not cover it.
+// disabled. The button is the fill of its hover and pressed states, and it is inset
+// by gap from the frame's border on every side that meets it (see spinGap), so the
+// fill never touches the border. Its corners are concentric with the frame's inner
+// corners (see spinFillCorners). The button is the hit target, so the gap is not.
 func (n *NumberFieldElement[T]) spinButton(st NumberFieldStyle, frame Style, dir int, label string, ic *icons.Icon,
-	iconSize float32, disabled bool, step func(int)) *DivElement {
+	iconSize, gap float32, disabled bool, step func(int)) *DivElement {
 	inline := n.placement != SpinStacked
 	b := Div().asPart("NumberField.SpinButton").Row().Align(Center).Justify(Center).
 		Style(st.SpinButton).Child(Icon(ic).Size(iconSize)).
 		Role(access.RoleButton).Label(label).
-		Style(Style{Corners: spinCorners(frame, inline, dir)})
+		Style(Style{Corners: spinFillCorners(frame, inline, dir, gap)})
 	if inline {
-		b.Absolute().Top(0).Bottom(0)
+		b.Absolute().Top(gap).Bottom(gap)
 		if dir < 0 {
-			b.Left(0)
+			b.Left(gap)
 		} else {
-			b.Right(0)
+			b.Right(gap)
 		}
 	}
 	if disabled {
@@ -417,23 +439,29 @@ func (n *NumberFieldElement[T]) spinButton(st NumberFieldStyle, frame Style, dir
 	return b
 }
 
-// spinCorners returns the corners of a spin button on an edge of the frame: the inner
-// corners of the frame's border on that side, which are the corners of the frame's
-// inner edge. The button sits inside the border, so its own corners must match those,
-// or its fill would cover the border at the rounded corner. A stacked button is on the
-// right, the increase button above and the decrease button below. An inline button is
-// on the left (the decrease) or the right (the increase).
-func spinCorners(frame Style, inline bool, dir int) Corners {
+// spinFillCorners returns the corners of a spin button's fill. The fill is inset by gap
+// from the frame's inner edge, so its radius is the frame's inner radius on the
+// button's side less the gap. Its corners are then concentric with the frame's inner
+// corners, and never reach past the curve of the border, whatever the gap. The
+// radius is the smaller of the two inner radii on the button's side, so it is safe on
+// every corner the button meets. A stacked button is on the right, the increase
+// button above and the decrease button below. An inline button is on the left (the
+// decrease) or the right (the increase). Its other corners take the same radius.
+func spinFillCorners(frame Style, inline bool, dir int, gap float32) Corners {
 	ic := innerCorners(frame.radii(), frame.borderEdges())
+	var r float32
 	switch {
 	case inline && dir < 0:
-		return Corners{TopLeft: ic.TopLeft, BottomLeft: ic.BottomLeft}
+		r = min(ic.TopLeft, ic.BottomLeft)
 	case inline:
-		return Corners{TopRight: ic.TopRight, BottomRight: ic.BottomRight}
+		r = min(ic.TopRight, ic.BottomRight)
 	case dir < 0:
-		return Corners{BottomRight: ic.BottomRight}
+		r = ic.BottomRight
+	default:
+		r = ic.TopRight
 	}
-	return Corners{TopRight: ic.TopRight}
+	r = max(r-gap, 0)
+	return Corners{TopLeft: r, TopRight: r, BottomRight: r, BottomLeft: r}
 }
 
 // clamp returns x within the range.
