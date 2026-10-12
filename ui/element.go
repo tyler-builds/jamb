@@ -58,6 +58,7 @@ type DivElement struct {
 	focusable    bool
 	tabIndex     int  // see TabIndex
 	noTabStop    bool // see TabStop
+	tabSkip      bool // the focusable elements inside are left out of the Tab order (see DataGrid)
 	noDisplay    bool // see Display
 	spaceOnly    bool // Space runs OnClick but Enter does not (check boxes, switches, radio buttons)
 	capture      bool

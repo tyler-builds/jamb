@@ -247,7 +247,7 @@ func (rt *Runtime) modalFocus(n *node) uint64 {
 	var found uint64
 	var walk func(c *node)
 	walk = func(c *node) {
-		if found != 0 || c.flags&flagNoDisplay != 0 || (c.div != nil && c.div.modalFooter) {
+		if found != 0 || c.flags&flagNoDisplay != 0 || (c.div != nil && (c.div.modalFooter || c.div.tabSkip)) {
 			return
 		}
 		if d := c.div; d != nil && d.focusable && !d.noTabStop && d.tabIndex >= 0 {

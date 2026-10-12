@@ -1228,6 +1228,12 @@ ui.DataGrid(runs, func(r run) string { return r.ID },
 | `Grow` | The share of the grid's spare width the column takes when the columns are narrower than the grid |
 | `Resizable` | Lets the user resize the column (see the keyboard and mouse below) |
 | `Align` | `ui.Start` (the zero value), `ui.Center` or `ui.End` for the cells and the header |
+| `Interactive` | The `Cell` holds controls, such as buttons. Its content is not hidden from assistive technology (see Interactive and editable cells below) |
+| `Edit` | Makes the cells editable: `Edit(row, value) error` saves the value, or returns the error that keeps the editor open. Set Value (assistive technology) runs it too |
+| `Editor` | Replaces the text field of an edit with a custom editor, such as a `ui.Select` (see Custom editors below) |
+| `Value` | The text an edit starts with, when it differs from `Text` (a raw number for a formatted one). Nil means `Text` |
+
+The `Compare` of a column is easier to write with `ui.SortBy(key)`, which orders by any `cmp.Ordered` key, and `ui.SortByText(key)`, which orders text without regard to case. `SortState.Desc` reverses the order, so there is no descending helper.
 
 The grid's methods:
 
@@ -1255,8 +1261,36 @@ Rows are identified by their keys, which must be unique and stable. The focus, t
 | Shift+Down, Up, PageDown, PageUp | Extends the selection from the anchor (multiple). A single selection follows the move |
 | Ctrl+Down, Up and the others | Moves the focus without selecting (multiple). The anchor stays |
 | Ctrl+A | Selects every row (multiple) |
-| Enter | Activates the row (`OnActivate`). On a header cell, sorts by the column |
+| Enter | Activates the row (`OnActivate`). On a header cell, sorts by the column. On an editable cell, starts an edit. On an interactive cell, moves focus to its first control |
+| F2 | On an editable cell, starts an edit. On an interactive cell, moves focus to its first control; in a control, returns to the grid |
+| Tab, Shift+Tab | In an interactive cell, moves through its controls and wraps inside the cell. In an edit, saves and starts an edit of the next (previous) editable cell of the row; at the last one the edit ends and focus stays in the grid |
+| Escape | In a control of an interactive cell, returns to the grid. In an edit, cancels it |
+| A printable character | On an editable cell with the text field, starts an edit with the character, which replaces the text as in a spreadsheet |
 | Ctrl+Left, Ctrl+Right | On a resizable header cell, narrows or widens the column by 8 logical pixels |
+
+**Interactive and editable cells.** A cell that holds controls, or an editor, is still the grid's one Tab stop: the controls and the editor are not in the Tab order, and the grid's keys reach them through the focus. The model follows the WAI-ARIA grid pattern (https://www.w3.org/WAI/ARIA/apg/patterns/grid/), which describes two states without naming them: grid navigation, in which the grid holds focus, and the cell's own widgets, which Enter or F2 move focus into. In the second state Tab and Shift+Tab move to the next and previous widget, which the pattern lets wrap inside the cell or leave the grid; this grid wraps inside the cell. Escape (the pattern's "restores grid navigation") or F2 returns to grid navigation on the same cell. The keys a control uses (the arrows of a text field, Enter on a button) belong to the control. An edit saves on Enter and on Tab, and when focus leaves its editor (a click elsewhere in the grid), as a spreadsheet does. Escape is the only cancel. This blur save is a choice of this grid, not a rule of the pattern.
+
+![An editable cell with its editor open](docs/screenshots/data-grid-editing.png)
+
+![A save that failed: the editor keeps the invalid frame, and the message is a popover under it](docs/screenshots/data-grid-validation.png)
+
+![A status chosen in a Select editor (a custom editor)](docs/screenshots/data-grid-choice.png)
+
+![A failed save at 225 percent text: the cell clips to its column, and the popover stays on the window](docs/screenshots/data-grid-validation-225.png)
+
+![The Open button of a cell, focused from the keyboard](docs/screenshots/data-grid-actions.png)
+
+A pointer press on a control focuses it and operates it, and moves the cursor to the cell; it does not select or activate the row. A double-click on an editable cell starts an edit and does not activate the row; elsewhere a double-click activates the row, as before.
+
+An editing cell's editor is a text field named for its column, so assistive technology announces it as an edit field and reports its value. A save that fails keeps the editor open with the invalid frame of its `Editor` style. The message of the failure is a popover under the cell (`EditorMessage`, which flips above at the bottom edge of the window and is not clipped by the grid); it is the editor's description for assistive technology, and it is announced assertively.
+
+**Custom editors.** `DataColumn.Editor` replaces the text field of an edit with what it returns, such as a `ui.Select`: `Editor(row, value, change, commit, cancel) ui.Element`. `value` is the pending value (it starts as `Value`, or `Text`); `change(v)` sets it; `commit()` saves it through `Edit`; `cancel()` ends the edit. The editor needs a focusable control, which takes focus when the editor is first painted. Keys go to the editor's controls first: a control that takes Enter or Escape keeps it (an open list closes with Escape). What the controls do not take is the grid's: Enter and Tab save the pending value, Escape cancels, and a blur saves it. Typing does not start a custom editor; Enter and F2 do.
+
+**Set Value.** An editable cell has the Value pattern, whose value is the cell's text (or `Value`). Its SetValue runs `Edit` on the UI thread, without an edit: a value that `Edit` refuses is announced assertively and does not change the cell. A cell that is not editable has no Value pattern, since Microsoft's DataItem guidance requires it only for an editable primary text (https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportdataitemcontroltype). Focus stays in the editor, which takes the place of the cell's content until the edit ends. The data is the app's: `Edit` updates the app's rows, and the grid draws them again, keeping the focus and the selection on their keys.
+
+An editing row is laid out only while it is in view, as the other rows are. If its row scrolls out of view, the edit, its text and its focus are kept, and the editor is laid out again when the row comes back. While it is out of view the focus stays in the editor, so keys typed then go to that editor; a grid with an edit open should be scrolled back to its row before typing.
+
+The cell's `Text`, when it is set, is still the cell's accessible name in an interactive or editable column; the controls are listed under the cell.
 
 Alt is not used by the grid, so the host keeps its menu and navigation keys.
 

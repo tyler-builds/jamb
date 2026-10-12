@@ -718,6 +718,36 @@ try {
         param([string]$Name)
         Find-Named $win $Name $CT.DataGrid | Select-Object -First 1
     }
+    # Grid helpers, shared by the Projects and Components checks: focus the grid and
+    # send keys (each key waits a little, so the grid handles it before the next), and
+    # find the focused edit field by its name.
+    $focusGrid = {
+        param($g)
+        $g.SetFocus()
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        Start-Sleep -Milliseconds 300
+    }
+    $sendKeys = {
+        param([string]$Seq)
+        [System.Windows.Forms.SendKeys]::SendWait($Seq)
+        Start-Sleep -Milliseconds 120
+    }
+    # The built data item at the 0-based row and column of a grid, or nothing.
+    $cellAt = {
+        param($Grid, [int]$Row, [int]$Col)
+        $cond = New-Object System.Windows.Automation.PropertyCondition -ArgumentList ([System.Windows.Automation.AutomationElement]::ControlTypeProperty), $CT.DataItem
+        foreach ($el in $Grid.FindAll($Descendants, $cond)) {
+            $gi = $el.GetCurrentPattern([System.Windows.Automation.GridItemPattern]::Pattern)
+            if ([int]$gi.Current.Row -eq $Row -and [int]$gi.Current.Column -eq $Col) { return $el }
+        }
+        return $null
+    }
+    $focusedEdit = {
+        param([string]$Name)
+        $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+        if ($f -and $f.Current.ControlType -eq $CT.Edit -and $f.Current.Name -eq $Name) { return $f }
+        return $null
+    }
     # The view tabs are selection items, so a tab is chosen with Select.
     $selectTab = {
         param([string]$Name)
@@ -739,14 +769,14 @@ try {
         $g = Require-Pattern $grid ([System.Windows.Automation.GridPattern]::Pattern) 'Grid'
         $t = Require-Pattern $grid ([System.Windows.Automation.TablePattern]::Pattern) 'Table'
         Assert ($g.Current.RowCount -eq 6) "RowCount is $($g.Current.RowCount), want the 6 projects"
-        Assert ($g.Current.ColumnCount -eq 5) "ColumnCount is $($g.Current.ColumnCount), want 5"
-        Assert (@($t.Current.GetColumnHeaders()).Count -eq 5) 'GetColumnHeaders does not give the 5 header items'
+        Assert ($g.Current.ColumnCount -eq 6) "ColumnCount is $($g.Current.ColumnCount), want 6 (with the Open column)"
+        Assert (@($t.Current.GetColumnHeaders()).Count -eq 6) 'GetColumnHeaders does not give the 6 header items'
         $cell = $g.GetItem(0, 0)
         Assert ($null -ne $cell) 'GetItem(0, 0) is null for a visible cell'
         $gi = Require-Pattern $cell ([System.Windows.Automation.GridItemPattern]::Pattern) 'GridItem'
         Assert ($gi.Current.Row -eq 0 -and $gi.Current.Column -eq 0) 'the first cell is not at row 0, column 0'
         Require-Pattern $cell ([System.Windows.Automation.TableItemPattern]::Pattern) 'TableItem' | Out-Null
-        "RowCount 6, ColumnCount 5"
+        "RowCount 6, ColumnCount 6"
     }
 
     Check 'demo: a Projects header sorts with Invoke, and its name and ItemStatus say so' {
@@ -792,6 +822,28 @@ try {
         Assert ([FocusCounter]::Count -gt $before) 'the focus moves fired no focus events'
     }
 
+    Check 'demo: F2 edits Open tasks in the Projects table, and a value outside 0 to 999 keeps the editor open' {
+        $grid = & $gridNamed 'Projects'
+        & $focusGrid $grid
+        & $sendKeys '^{HOME}'
+        1..3 | ForEach-Object { & $sendKeys '{RIGHT}' }
+        & $sendKeys '{F2}'
+        Wait-For { & $focusedEdit 'Open tasks' } 'the Open tasks editor to take focus' | Out-Null
+        & $sendKeys '^a'
+        & $sendKeys '42'
+        & $sendKeys '{ENTER}'
+        Wait-For { Find-Named $win '42' $CT.DataItem | Select-Object -First 1 } 'the saved open tasks' | Out-Null
+        & $sendKeys '{F2}'
+        Wait-For { & $focusedEdit 'Open tasks' } 'the Open tasks editor to take focus again' | Out-Null
+        & $sendKeys '^a'
+        & $sendKeys '1000'
+        & $sendKeys '{ENTER}'
+        Wait-For { $e = & $focusedEdit 'Open tasks'; if ($e -and ((Get-Prop $e 30013) -like '*whole number from 0 to 999*')) { $e } else { $null } } 'the open tasks error in the editor help text' | Out-Null
+        Assert ($null -ne (& $focusedEdit 'Open tasks')) 'the editor lost focus after an invalid value'
+        & $sendKeys '{ESC}'
+        Wait-Gone { & $focusedEdit 'Open tasks' } 'the editor to close on Escape' | Out-Null
+    }
+
     if ($axe) {
         Check 'demo: AxeWindowsCLI scan of the Projects table' {
             $errors = Invoke-AxeScan $demo 'demo-projects-table'
@@ -811,7 +863,7 @@ try {
         $gsi = Require-Pattern $grid ([System.Windows.Automation.ScrollItemPattern]::Pattern) 'ScrollItem'
         $gsi.ScrollIntoView()
         Wait-For { if ($grid.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom -and $grid.Current.BoundingRectangle.Bottom -gt $win.Current.BoundingRectangle.Top) { $true } else { $null } } 'the data grid to be in the window' | Out-Null
-        Assert ($g.Current.ColumnCount -eq 6) "ColumnCount is $($g.Current.ColumnCount), want 6"
+        Assert ($g.Current.ColumnCount -eq 8) "ColumnCount is $($g.Current.ColumnCount), want 8"
         $hdr = Wait-For { Find-Named $win 'Duration' $CT.HeaderItem | Select-Object -First 1 } 'the Duration header'
         $hsi = Get-Pattern $hdr ([System.Windows.Automation.ScrollItemPattern]::Pattern)
         if ($hsi) { $hsi.ScrollIntoView() }
@@ -831,6 +883,121 @@ try {
         Wait-For { if (@($sel.Current.GetSelection()).Count -eq 2) { $true } else { $null } } 'two runs selected' | Out-Null
         $a.RemoveFromSelection()
         $b.RemoveFromSelection()
+    }
+
+    # Editing and the Actions column, from the keyboard and through UI Automation (the
+    # helpers are defined with the grid helpers above). Each step waits for the one before.
+    # RUN-000004 is the first failed run, which is the fourth row by ID. From the first
+    # cell, seven Rights reach the Actions column and three Downs reach the row.
+    $retry = 'Retry RUN-000004'
+    Check 'demo: Enter on a failed run moves focus to its Retry button' {
+        # The sort check above left the runs sorted by Duration. Sorting by Run puts the
+        # runs back in ID order, so that RUN-000004 is the fourth row again.
+        $runHdr = Wait-For { Find-Named $win 'Run' $CT.HeaderItem | Select-Object -First 1 } 'the Run header'
+        (Require-Pattern $runHdr ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke').Invoke()
+        Wait-For { Find-Named $win 'Run, sorted ascending' $CT.HeaderItem | Select-Object -First 1 } 'the runs sorted by Run' | Out-Null
+        $grid = & $gridNamed 'Deploy runs'
+        & $focusGrid $grid
+        & $sendKeys '^{HOME}'
+        1..7 | ForEach-Object { & $sendKeys '{RIGHT}' }
+        1..3 | ForEach-Object { & $sendKeys '{DOWN}' }
+        & $sendKeys '{ENTER}'
+        Wait-For {
+            $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($f -and $f.Current.ControlType -eq $CT.Button -and $f.Current.Name -eq $retry) { $true } else { $null }
+        } "focus on $retry" | Out-Null
+    }
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Components grid with the Retry button focused' {
+            $errors = Invoke-AxeScan $demo 'demo-cell-focus'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+    }
+    Check 'demo: Enter on the focused Retry queues the run, and says so' {
+        & $sendKeys '{ENTER}'
+        Wait-For { Find-Named $win 'Run RUN-000004 is queued again' | Select-Object -First 1 } 'the retry toast' | Out-Null
+    }
+    Check 'demo: F2 edits a label from the keyboard, and Enter saves it' {
+        $grid = & $gridNamed 'Deploy runs'
+        & $focusGrid $grid
+        & $sendKeys '^{HOME}'
+        1..6 | ForEach-Object { & $sendKeys '{RIGHT}' }
+        & $sendKeys '{F2}'
+        $ed = Wait-For { & $focusedEdit 'Label' } 'the Label editor to take focus'
+        & $sendKeys '^a'
+        & $sendKeys 'Nightly'
+        if ($axe) {
+            $errors = Invoke-AxeScan $demo 'demo-editor-open'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI with the editor open"
+        }
+        & $sendKeys '{ENTER}'
+        Wait-For { Find-Named $win 'Nightly' $CT.DataItem | Select-Object -First 1 } 'the saved label' | Out-Null
+        Assert ($null -eq (& $focusedEdit 'Label')) 'the editor still has focus after Enter saved the label'
+        Assert ($null -ne $ed) 'the editor was not found'
+    }
+    Check 'demo: a label edited through the UI Automation Value pattern of its editor' {
+        $grid = & $gridNamed 'Deploy runs'
+        & $focusGrid $grid
+        & $sendKeys '^{HOME}'
+        1..6 | ForEach-Object { & $sendKeys '{RIGHT}' }
+        & $sendKeys '{F2}'
+        $ed = Wait-For { & $focusedEdit 'Label' } 'the Label editor to take focus'
+        $vp = Require-Pattern $ed ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
+        $vp.SetValue('Via UIA')
+        # SetValue is applied on the UI thread, so the editor is waited for before Enter.
+        Wait-For { if ($ed.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value -eq 'Via UIA') { $true } else { $null } } 'the editor to take the value set through UI Automation' | Out-Null
+        & $sendKeys '{ENTER}'
+        Wait-For { Find-Named $win 'Via UIA' $CT.DataItem | Select-Object -First 1 } 'the label set through the Value pattern' | Out-Null
+    }
+    Check 'demo: a label over 40 characters shows its error and keeps the editor open' {
+        $grid = & $gridNamed 'Deploy runs'
+        & $focusGrid $grid
+        & $sendKeys '^{HOME}'
+        1..6 | ForEach-Object { & $sendKeys '{RIGHT}' }
+        & $sendKeys '{F2}'
+        Wait-For { & $focusedEdit 'Label' } 'the Label editor to take focus' | Out-Null
+        & $sendKeys '^a'
+        & $sendKeys ('a' * 41)
+        & $sendKeys '{ENTER}'
+        # The error is the editor's help text, which the editor reads after its name.
+        Wait-For { $e = & $focusedEdit 'Label'; if ($e -and ((Get-Prop $e 30013) -like '*at most 40 characters*')) { $e } else { $null } } 'the label error in the editor help text' | Out-Null
+        Assert ($null -ne (& $focusedEdit 'Label')) 'the editor lost focus after an invalid label'
+        if ($axe) {
+            $errors = Invoke-AxeScan $demo 'demo-editor-error'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI with the error shown"
+        }
+        & $sendKeys '{ESC}'
+        Wait-Gone { & $focusedEdit 'Label' } 'the Label editor to close on Escape' | Out-Null
+    }
+
+    Check 'demo: a label is set through its Value pattern without entering an edit' {
+        $grid = & $gridNamed 'Deploy runs'
+        & $focusGrid $grid
+        & $sendKeys '^{HOME}'
+        $cell = Wait-For { $c = & $cellAt $grid 0 6; if ($c) { $c } else { $null } } 'the label cell of the first run'
+        $vp = Require-Pattern $cell ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
+        Assert (-not $vp.Current.IsReadOnly) 'the editable label cell reports itself read-only'
+        $vp.SetValue('Set by UIA')
+        Wait-For { if (Find-Named $win 'Set by UIA' $CT.DataItem | Select-Object -First 1) { $true } else { $null } } 'the label set through its Value pattern' | Out-Null
+        $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+        Assert ($f.Current.ControlType -ne $CT.Edit) 'SetValue moved focus into an editor'
+    }
+    Check 'demo: an invalid value set through the Value pattern is refused, and the label keeps its value' {
+        $grid = & $gridNamed 'Deploy runs'
+        $cell = & $cellAt $grid 0 6
+        Assert ($null -ne $cell) 'the label cell of the first run is not built'
+        $vp = Require-Pattern $cell ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
+        $vp.SetValue(('b' * 41))
+        Start-Sleep -Milliseconds 800
+        Assert ($null -eq (Find-Named $win ('b' * 41) $CT.DataItem | Select-Object -First 1)) 'the refused value was saved'
+        Assert ($null -ne (Find-Named $win 'Set by UIA' $CT.DataItem | Select-Object -First 1)) 'the label changed on a refused value'
+    }
+    Check 'demo: a read-only name cell has no Value pattern' {
+        $grid = & $gridNamed 'Deploy runs'
+        $cell = & $cellAt $grid 0 0
+        Assert ($null -ne $cell) 'the name cell of the first run is not built'
+        Assert ($null -eq (Get-Pattern $cell ([System.Windows.Automation.ValuePattern]::Pattern))) 'a read-only cell offers the Value pattern'
     }
 
     if ($axe) {

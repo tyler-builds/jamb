@@ -1,7 +1,7 @@
 package views
 
 import (
-	"cmp"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,30 +12,45 @@ import (
 
 // projectsTable is the table view of the Projects page: the visible projects in a
 // DataGrid, sorted by a header and selected by the keyboard or the mouse. Enter or
-// a double-click opens a project in a window, as its card does, and the selected
-// projects are starred together from the bar above the table.
+// a double-click opens a project in a window, as its card does, and the Open button
+// of a row does the same. Open tasks is edited in place: a whole number from 0 to 999.
+// The selected projects are starred together from the bar above the table.
 func projectsTable(t *ui.Theme, s *Store, visible []Project, picked *ui.Signal[[]string], order *ui.Signal[ui.SortState]) ui.Element {
 	cols := []ui.DataColumn[Project]{
 		{Header: "Name", Key: "name", Text: func(p Project) string { return p.Name },
-			Compare: func(a, b Project) int { return strings.Compare(a.Name, b.Name) },
+			Compare: ui.SortByText(func(p Project) string { return p.Name }),
 			Cell:    func(p Project) ui.Element { return projectNameCell(t, p) },
 			Grow:    2, MinWidth: 160, Resizable: true},
 		{Header: "Status", Key: "status", Text: func(p Project) string { return p.Status.String() },
-			Compare: func(a, b Project) int { return cmp.Compare(a.Status, b.Status) },
+			Compare: ui.SortBy(func(p Project) Status { return p.Status }),
 			Cell:    func(p Project) ui.Element { return statusBadge(p.Status) },
 			Width:   120, Resizable: true},
 		{Header: "Progress", Key: "progress", Text: func(p Project) string { return fmt.Sprintf("%d%%", int(p.Progress*100+0.5)) },
-			Compare: func(a, b Project) int { return cmp.Compare(a.Progress, b.Progress) },
+			Compare: ui.SortBy(func(p Project) float32 { return p.Progress }),
 			Cell: func(p Project) ui.Element {
-				return ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress")
+				// The bar has a fixed width, so the readout beside it stays in the column.
+				return ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").Width(96)
 			},
 			Width: 200, Resizable: true},
 		{Header: "Open tasks", Key: "tasks", Text: func(p Project) string { return strconv.Itoa(p.Tasks) },
-			Compare: func(a, b Project) int { return cmp.Compare(a.Tasks, b.Tasks) },
-			Align:   ui.End, Width: 120, Resizable: true},
+			Compare: ui.SortBy(func(p Project) int { return p.Tasks }),
+			Edit: func(p Project, v string) error {
+				n, err := strconv.Atoi(strings.TrimSpace(v))
+				if err != nil || n < 0 || n > 999 {
+					return errors.New("Open tasks is a whole number from 0 to 999")
+				}
+				s.SetTasks(p.ID, n)
+				return nil
+			},
+			Align: ui.End, Width: 120, Resizable: true},
 		{Header: "Updated", Key: "updated", Text: func(p Project) string { return ago(p.Updated) },
 			Compare: func(a, b Project) int { return a.Updated.Compare(b.Updated) },
 			Width:   140, Resizable: true},
+		{Header: "Open", Key: "open", Interactive: true,
+			Cell: func(p Project) ui.Element {
+				return ui.Button("Open").Ghost().Small().Label("Open " + p.Name).OnClick(func() { OpenProject(s, p.ID) })
+			},
+			Width: 110, Resizable: true},
 	}
 	return ui.DataGrid(visible, func(p Project) string { return strconv.Itoa(p.ID) }, cols...).
 		Label("Projects").Selection(ui.SelectionMultiple, picked).Sort(order).Striped().
@@ -88,6 +103,19 @@ func (s *Store) StarKeys(keys []string) {
 		return out
 	})
 	ui.Announce(fmt.Sprintf("%d projects starred", n), access.Polite)
+}
+
+// SetTasks sets the number of open tasks of the project with the ID id.
+func (s *Store) SetTasks(id, tasks int) {
+	s.Projects.Update(func(ps []Project) []Project {
+		out := append([]Project(nil), ps...)
+		for i := range out {
+			if out[i].ID == id {
+				out[i].Tasks = tasks
+			}
+		}
+		return out
+	})
 }
 
 // projectsViewTabs switches the Projects page between its cards and its table.

@@ -441,7 +441,7 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 			return variantBool(true)
 		}
 	case propValue:
-		if hasValue(n.Role) {
+		if hasValueNode(n) {
 			return variantBSTR(n.Value)
 		}
 	case propIsPassword:
@@ -449,7 +449,7 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 			return variantBool(n.States.Has(access.StatePassword))
 		}
 	case propIsReadOnly:
-		if hasValue(n.Role) {
+		if hasValueNode(n) {
 			return variantBool(n.States.Has(access.StateReadOnly))
 		}
 	case propRangeValue:
@@ -518,6 +518,23 @@ func isText(r access.Role) bool { return r == access.RoleTextField || r == acces
 // hasValue reports whether a role has the Value pattern: a text field, or a combo
 // box, whose Value is the label it has chosen.
 func hasValue(r access.Role) bool { return isText(r) || r == access.RoleComboBox }
+
+// hasValueNode reports whether a node has the Value pattern: its role does (see
+// hasValue), or it takes a value through the Set Value action. An editable data
+// item does: Microsoft's DataItem guidance requires the Value pattern when the
+// item's primary text is editable (uiauto-supportdataitemcontroltype). A data item
+// that cannot be edited has no Value pattern, which that guidance does not require.
+func hasValueNode(n *access.Node) bool {
+	if hasValue(n.Role) {
+		return true
+	}
+	for _, a := range n.Actions {
+		if a == access.ActionSetValue {
+			return true
+		}
+	}
+	return false
+}
 
 // toggleStateOf returns the ToggleState of a node: on when checked, indeterminate
 // when mixed, off otherwise.
@@ -640,7 +657,7 @@ func supports(k coreKind, n *access.Node) bool {
 	case kindSelection:
 		return n.States.Has(access.StateSelectionContainer)
 	case kindValue:
-		return hasValue(n.Role)
+		return hasValueNode(n)
 	case kindRange:
 		return n.Range != nil
 	case kindScroll:

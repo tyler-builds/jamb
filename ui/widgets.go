@@ -419,6 +419,8 @@ type fieldOptions struct {
 	onSubmit    func(string)
 	onChange    func(string)
 	onBlur      func()        // set by NumberField, which checks its text on blur
+	onCancel    func()        // set by DataGrid, which ends an edit on Escape in place of Cancel
+	description string        // set by DataGrid, to say why the last save failed (a literal, not a key)
 	onStep      func(dir int) // set by NumberField, for Up and Down
 	styles      FieldStyle    // the instance's parts: from Styles, and the frame's Style
 	key         string
@@ -610,7 +612,8 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 	}
 	ed := &editorElement{
 		value: f.value, placeholder: f.placeholder, name: f.name, labelledBy: f.labelledBy, describedBy: f.describedBy, multiline: multiline,
-		onSubmit: f.onSubmit, onChange: f.onChange, onBlur: f.onBlur, onStep: f.onStep, autoFocus: f.autoFocus, handle: h,
+		onSubmit: f.onSubmit, onChange: f.onChange, onBlur: f.onBlur, onCancel: f.onCancel, description: f.description,
+		onStep: f.onStep, autoFocus: f.autoFocus, handle: h,
 		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
 	}

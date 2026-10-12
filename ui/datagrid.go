@@ -1,9 +1,12 @@
 package ui
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 	"unsafe"
 
 	"github.com/tyler-builds/jamb/access"
@@ -48,6 +51,27 @@ type DataColumn[T any] struct {
 	// Align places the text of the column's cells and header: Start (the zero
 	// value), Center or End.
 	Align Alignment
+	// Interactive lets the content of Cell hold controls, such as buttons. The
+	// content is not hidden from assistive technology. The controls are not Tab
+	// stops: Enter or F2 on the cell moves focus to its first control, Tab and
+	// Shift+Tab move through them, and Escape or F2 returns to the grid (see
+	// DataGrid).
+	Interactive bool
+	// Edit makes the cells editable. It saves value as the row's text, or returns an
+	// error that says why the value is not accepted; the editor then stays open with
+	// the error. The app keeps the data, so it updates its rows in Edit.
+	Edit func(row T, value string) error
+	// Value is the text that an edit starts with, when it differs from Text, such as
+	// the raw number of a formatted one. Nil means Text.
+	Value func(row T) string
+	// Editor replaces the text field of an edit with what it returns, such as a
+	// Select, a NumberField or a CheckBox. value is the pending value, which starts
+	// as Value (or Text); change sets the pending value; commit saves it through Edit
+	// (and an error keeps the editor open); cancel ends the edit. The grid's keys
+	// and focus work as for the text field (see DataGrid): the editor's controls get
+	// their keys first, and Enter, Tab and a blur save the pending value, Escape
+	// cancels. Give the editor a focusable control, or it cannot take focus.
+	Editor func(row T, value string, change func(string), commit, cancel func()) Element
 }
 
 // key is the column's identity in a SortState and in the widths.
@@ -85,6 +109,28 @@ type SortState struct {
 	Desc bool
 }
 
+// SortBy returns the Compare of a DataColumn that orders the rows by key, with
+// cmp.Compare. The sort is reversed by SortState.Desc, so there is no SortByDesc.
+//
+//	ui.DataColumn[Run]{Header: "Cost", Text: ..., Compare: ui.SortBy(func(r Run) float32 { return r.Cost })}
+func SortBy[T any, K cmp.Ordered](key func(T) K) func(a, b T) int {
+	return func(a, b T) int { return cmp.Compare(key(a), key(b)) }
+}
+
+// SortByText returns the Compare of a DataColumn that orders the rows by the text
+// key, without regard to case: "api" sorts with "Billing". Text with the same
+// lowercase form is ordered by its case, so the order is total. The text is
+// compared by its Unicode lowercase form, not by a locale's collation.
+func SortByText[T any](key func(T) string) func(a, b T) int {
+	return func(a, b T) int {
+		x, y := key(a), key(b)
+		if r := strings.Compare(strings.ToLower(x), strings.ToLower(y)); r != 0 {
+			return r
+		}
+		return strings.Compare(x, y)
+	}
+}
+
 // SelectionMode says how many rows the user can select at once.
 type SelectionMode uint8
 
@@ -115,6 +161,10 @@ const (
 // own: GridFocusVisible while the grid has keyboard focus, HeaderCellHover over a
 // sortable header, HeaderCellSorted for the column the rows are sorted by, and
 // SortIndicator is the arrow of that column.
+//
+// An editable cell has two more parts: CellEditing is the cell being edited, Editor
+// is its text field (a FieldStyle; FrameInvalid is its frame while the last save
+// failed), and EditorMessage is the popover under the cell that says why a save failed.
 type DataGridStyle struct {
 	Grid             Style
 	GridFocusVisible Style
@@ -131,6 +181,9 @@ type DataGridStyle struct {
 	Cell             Style
 	CellFocused      Style
 	Empty            Style
+	CellEditing      Style
+	Editor           FieldStyle
+	EditorMessage    Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -151,6 +204,9 @@ func (s DataGridStyle) merge(o DataGridStyle) DataGridStyle {
 		Cell:             s.Cell.Merge(o.Cell),
 		CellFocused:      s.CellFocused.Merge(o.CellFocused),
 		Empty:            s.Empty.Merge(o.Empty),
+		CellEditing:      s.CellEditing.Merge(o.CellEditing),
+		Editor:           s.Editor.merge(o.Editor),
+		EditorMessage:    s.EditorMessage.Merge(o.EditorMessage),
 	}
 }
 
@@ -172,6 +228,9 @@ func (s DataGridStyle) plain() DataGridStyle {
 		Cell:             plainStyle(s.Cell),
 		CellFocused:      plainStyle(s.CellFocused),
 		Empty:            plainStyle(s.Empty),
+		CellEditing:      plainStyle(s.CellEditing),
+		Editor:           s.Editor.plain(),
+		EditorMessage:    plainStyle(s.EditorMessage),
 	}
 }
 
@@ -209,12 +268,21 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 		RowHover:     Style{Background: t.SurfaceHover},
 		RowSelected:  Style{Background: t.AccentSoft},
 		RowAlternate: Style{Background: t.Sidebar},
-		Cell:         Style{Direction: Row, Align: Center, Padding: Edges{Left: 8, Right: 8}, NoShrink: true},
-		CellFocused:  Style{Shadows: []Shadow{ring}},
-		Empty:        Style{TextColor: t.TextMuted, Padding: All(16)},
+		// A cell takes the height of its row even with no content, so an empty cell
+		// (an interactive column's cell with no control) still has a bounding box.
+		// A cell clips what it draws to its column: content wider than the column is cut
+		// off at its edge, and never draws over the next column.
+		Cell: Style{Direction: Row, Align: Center, AlignSelf: Stretch, Padding: Edges{Left: 8, Right: 8}, NoShrink: true,
+			OverflowX: OverflowHidden, OverflowY: OverflowHidden},
+		CellFocused: Style{Shadows: []Shadow{ring}},
+		Empty:       Style{TextColor: t.TextMuted, Padding: All(16)},
+		CellEditing: Style{Background: t.Surface},
+		EditorMessage: Style{Direction: Row, Align: Center, Padding: XY(8, 3), Radius: t.Radius,
+			Background: t.Surface, BorderWidth: 1, BorderColor: t.Danger, TextColor: t.Danger},
 	}
 	if t.HighContrast {
 		st.RowSelected = Style{Background: t.Accent, TextColor: t.AccentText}
+		st.EditorMessage.BorderColor, st.EditorMessage.TextColor = t.Text, t.Text
 	}
 	return st
 }
@@ -258,18 +326,38 @@ func resolveDataGrid(t *Theme, d DataGridDensity, textFactor float32, inst DataG
 //     resizable header cell, Ctrl+Left and Ctrl+Right narrow and widen the column by
 //     8 logical pixels. Alt is not used by the grid, so that the host keeps its
 //     menu and navigation keys.
+//   - On an interactive cell (see DataColumn.Interactive), Enter or F2 moves focus
+//     to its first control. In the cell, Tab and Shift+Tab move through its
+//     controls and wrap at the ends, as the WAI-ARIA grid pattern allows; Escape or
+//     F2 returns focus to the cell, which is still the grid's one Tab stop. Keys
+//     that a control uses (the arrows of a text field, Enter on a button) are its own.
+//   - On an editable cell (see DataColumn.Edit), Enter or F2 starts an edit, and so
+//     does typing a printable character, which replaces the text as in a
+//     spreadsheet. Enter saves, and Escape cancels. Tab saves and starts an edit of
+//     the next editable cell of the row; at the last one the edit ends and focus
+//     stays in the grid. Leaving the editor, by a click elsewhere or by focus
+//     moving on, saves the edit, as a spreadsheet does; a save that fails keeps the
+//     editor open with its error. Only Escape cancels.
 //
 // A click selects a row (Ctrl toggles it, Shift extends the selection), and a
-// double-click activates it. A click on a header sorts by its column: ascending,
+// double-click activates it, except on an editable cell, where a double-click
+// starts an edit. A click on a control in a cell (see DataColumn.Interactive)
+// focuses and operates the control; it moves the cursor to the cell but does not
+// select or activate the row. A click on a header sorts by its column: ascending,
 // then descending, then not sorted. Dragging the edge of a resizable header
 // resizes its column, and a double-click on the edge fits the column to the rows
 // in view. A column header stays at the top of the rows as they scroll, and the
 // header scrolls with the rows when the columns are wider than the grid.
 //
 // Sorting orders the rows without changing their keys, and the focus and the
-// selection follow their rows by key, so a sort, a scroll or new rows keep them.
-// Sorting is stable, and it runs on the UI thread: a sort of 100,000 rows takes
-// about 8 ms (see docs/accessibility.md, Phase I). Keys must be unique.
+// selection follow their rows by key, so a sort, a scroll, new rows or a saved
+// edit keep them. Sorting is stable, and it runs on the UI thread: a sort of 100,000
+// rows takes about 8 ms (see docs/accessibility.md, Phase I). Keys must be unique.
+//
+// An editing row is built only while it is in view, as the other rows are, because
+// the rows of a grid are one window of the list. When the row scrolls out of view its
+// editor is not laid out, but the edit, its text and its focus are kept, and the
+// editor is laid out again when the row comes back (see docs/accessibility.md).
 type DataGridElement[T any] struct {
 	rows       []T
 	key        func(T) string
@@ -363,6 +451,45 @@ type dgCursor struct {
 	header bool
 }
 
+// dgEdit is the edit of a cell: the key of its row ("" when no cell is being
+// edited), its column, and the error of the last save, which keeps the editor open.
+type dgEdit struct {
+	key string
+	col int
+	err string
+	seq int // the number of the edit, so that a blur from an older editor is ignored
+}
+
+// dgOps are the actions that the cells of a grid call. pick moves the cursor to a
+// cell without selecting its row, and edit starts an edit of a cell. save, cancel
+// and blur are the editor's: save saves its text and returns focus to the cell,
+// cancel ends the edit and returns focus, and blur ends it when focus leaves.
+type dgOps struct {
+	pick, edit func(q, cl int)
+	save       func(text string)
+	cancel     func()
+	blur       func(seq int)
+}
+
+// dgRowCtx is what the rows of a grid are built from: the look, the data, the
+// cursor and the edit, and the actions of the cells (see dgOps).
+type dgRowCtx[T any] struct {
+	t                    *Theme
+	st                   DataGridStyle
+	sh                   *dgShared[T]
+	rows                 []T
+	cols                 []DataColumn[T]
+	xs                   []float32
+	selected             map[string]bool
+	rowH                 float32
+	cursorPos, cursorCol int
+	onHeader, hasFocus   bool
+	ed                   dgEdit
+	click                func(q, cl int, mods input.Modifiers)
+	activate             func(q int)
+	ops                  dgOps
+}
+
 // dgShared is the state of a grid that lives with it: the order of its rows, the
 // drag of a column edge, and what the paint of its list reports back.
 type dgShared[T any] struct {
@@ -375,6 +502,17 @@ type dgShared[T any] struct {
 	order          []int          // the row of the data at each displayed position
 	pos            map[string]int // displayed position by key
 	dup            string         // a key that is used twice, for the warning
+	data           []T            // the rows of the last build, for an edit to find its row
+
+	// focus is the grid's body, and editFocus the editor of an edit. draft is the
+	// text of the editor. ctl is set by a press on a control in a cell, so that the
+	// row does not select or activate on it. seq counts the edits; wantFocus is set
+	// while a custom editor waits to be painted, to take focus.
+	focus, editFocus *FocusHandle
+	draft            *Signal[string]
+	ctl              bool
+	seq              int
+	wantFocus        bool
 
 	selOK    bool
 	selIdent unsafe.Pointer
@@ -505,6 +643,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	cur := Local(ctx, "cursor", dgCursor{})
 	anchor := Local(ctx, "anchor", "")
 	focused := Local(ctx, "focused", false)
+	edit := Local(ctx, "edit", dgEdit{})
 	widths := Local(ctx, "widths", map[string]float32(nil))
 	handle := Local(ctx, "handle", NewListHandle()).Peek()
 	sel := g.sel
@@ -520,6 +659,10 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	nc := len(cols)
 	sortState := by.Get()
 	sh.update(rows, g.key, cols, sortState)
+	sh.data = rows
+	if sh.focus == nil {
+		sh.focus, sh.editFocus, sh.draft = NewFocusHandle(), NewFocusHandle(), NewSignal("")
+	}
 	if sh.dup != "" && !sh.warned && rt.warn != nil {
 		sh.warned = true
 		rt.warn(fmt.Sprintf("duplicate key %q among the rows of a DataGrid; keys must be unique. "+
@@ -540,6 +683,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	col := min(max(cursor.col, 0), max(nc-1, 0))
 	onHeader := cursor.header
 	hasFocus := focused.Get()
+	ed := edit.Get()
 	anchorPos := func() int {
 		if k := anchor.Peek(); k != "" {
 			if q, ok := sh.pos[k]; ok {
@@ -682,10 +826,240 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		place(q, cl, false)
 	}
+	// startEdit starts an edit of the cell at displayed position q and column cl,
+	// with text in the editor. The editor takes focus when it is built.
+	startEdit := func(q, cl int, text string) {
+		sh.draft.Set(text)
+		sh.seq++
+		edit.Set(dgEdit{key: keyAt(q), col: cl, seq: sh.seq})
+		if cols[cl].Editor != nil {
+			sh.wantFocus = true
+			rt.requestFrame()
+		} else {
+			sh.editFocus.Focus()
+		}
+	}
+	// editAt starts an edit of the cell at (q, cl) with the text it shows, or with
+	// its Value when it has one.
+	editAt := func(q, cl int) {
+		text := ""
+		if c := cols[cl]; c.Value != nil {
+			text = c.Value(rows[order[q]])
+		} else if c.Text != nil {
+			text = c.Text(rows[order[q]])
+		}
+		startEdit(q, cl, text)
+	}
+	// commitEdit saves the text of the editor to the row being edited. An error
+	// keeps the editor open with its message, which is announced. It reports
+	// whether the edit was saved.
+	commitEdit := func(text string) bool {
+		e := edit.Peek()
+		if e.key == "" {
+			return false
+		}
+		q, ok := sh.pos[e.key]
+		if !ok {
+			edit.Set(dgEdit{})
+			return false
+		}
+		if err := cols[e.col].Edit(sh.data[sh.order[q]], text); err != nil {
+			edit.Set(dgEdit{key: e.key, col: e.col, err: err.Error(), seq: e.seq})
+			Announce(err.Error(), access.Assertive)
+			return false
+		}
+		edit.Set(dgEdit{})
+		return true
+	}
+	// saveEdit saves the edit and returns focus to the cell, when it was saved.
+	saveEdit := func(text string) {
+		if commitEdit(text) {
+			sh.focus.FocusNow()
+		}
+	}
+	// endEdit ends the edit without saving it, and Escape returns focus to the cell.
+	endEdit := func(refocus bool) {
+		edit.Set(dgEdit{})
+		if refocus {
+			sh.focus.FocusNow()
+		}
+	}
+	// refocusEditor gives focus back to the editor of the edit that is open.
+	refocusEditor := func() {
+		if cols[edit.Peek().col].Editor != nil {
+			sh.wantFocus = true
+			rt.requestFrame()
+		} else {
+			sh.editFocus.Focus()
+		}
+	}
+	// blurEdit saves the edit numbered seq when focus leaves its editor, as a
+	// spreadsheet does. A save that fails keeps the editor open with its error, and
+	// the editor takes focus back when the window has it. An editor that is not the
+	// open edit (its edit has ended, or the next one has started) does nothing.
+	blurEdit := func(seq int) {
+		if e := edit.Peek(); e.key == "" || e.seq != seq {
+			return
+		}
+		if !commitEdit(sh.draft.Peek()) && rt.focused.Peek() {
+			refocusEditor()
+		}
+	}
+	// tabEdit saves the edit and starts one in the next editable cell of the row
+	// in direction dir. At the last editable cell the edit ends, and focus stays
+	// in the grid on that cell.
+	tabEdit := func(dir int) {
+		e := edit.Peek()
+		if !commitEdit(sh.draft.Peek()) {
+			return
+		}
+		if q, ok := sh.pos[e.key]; ok {
+			for c := e.col + dir; c >= 0 && c < nc; c += dir {
+				if cols[c].Edit != nil {
+					place(q, c, false)
+					editAt(q, c)
+					return
+				}
+			}
+		}
+		sh.focus.FocusNow()
+	}
+	// controls returns the focusable controls of the cell at (q, cl), in tree
+	// order, or nil when the cell is not built.
+	controls := func(q, cl int) []*node {
+		c := dgCellNode(rt.byID[sh.focus.id], q+1, cl+1)
+		if c == nil {
+			return nil
+		}
+		return dgControls(c, nil)
+	}
+	// cycle moves focus to the next control of the cursor cell, or to the previous
+	// one when back is set, and wraps around the cell.
+	cycle := func(back bool) {
+		ctl := controls(p, col)
+		if len(ctl) == 0 {
+			return
+		}
+		i := -1
+		for j, c := range ctl {
+			if c.id == rt.focusID {
+				i = j
+			}
+		}
+		switch {
+		case back && i <= 0:
+			i = len(ctl) - 1
+		case back:
+			i--
+		default:
+			i = (i + 1) % len(ctl)
+		}
+		rt.setFocus(ctl[i].id)
+	}
+	// enter moves focus to the first control of the cell at (q, cl). It reports
+	// whether the cell has one.
+	enter := func(q, cl int) bool {
+		ctl := controls(q, cl)
+		if len(ctl) == 0 {
+			return false
+		}
+		rt.setFocus(ctl[0].id)
+		return true
+	}
+	// cellAction is what Enter and F2 do on the cell at (q, cl): an editable cell
+	// starts an edit, and an interactive one moves focus to its first control.
+	cellAction := func(q, cl int) bool {
+		switch {
+		case cols[cl].Edit != nil:
+			editAt(q, cl)
+			return true
+		case cols[cl].Interactive:
+			return enter(q, cl)
+		}
+		return false
+	}
+	// cellKeys handles a key press while focus is on a control of a cell or on an
+	// editor, rather than on the grid. Tab moves through the controls of the cell
+	// or saves the edit and moves to the next editable cell. Escape and F2 return
+	// to the grid. Every other key belongs to the control, or to the editor.
+	cellKeys := func(e *KeyEvent) bool {
+		switch e.Key {
+		case input.KeyTab:
+			if e.Repeat {
+				return true
+			}
+			dir := 1
+			if e.Mods&input.ModShift != 0 {
+				dir = -1
+			}
+			if ed.key != "" {
+				tabEdit(dir)
+			} else {
+				cycle(dir < 0)
+			}
+			return true
+		case input.KeyEscape:
+			// A custom editor's own keys came first: an open list takes Escape to close
+			// itself. What reaches the grid cancels the edit.
+			if edit.Peek().key != "" {
+				if !e.Repeat {
+					endEdit(true)
+				}
+				return true
+			}
+			if e.Repeat {
+				return false
+			}
+			sh.focus.FocusNow()
+			return true
+		case input.KeyF2:
+			if edit.Peek().key != "" || e.Repeat {
+				return false
+			}
+			sh.focus.FocusNow()
+			return true
+		case input.KeyEnter:
+			// The text field saves on Enter by its own binding, so this is a custom
+			// editor's Enter that its controls did not take.
+			if edit.Peek().key == "" || e.Repeat {
+				return false
+			}
+			saveEdit(sh.draft.Peek())
+			return true
+		}
+		return false
+	}
+	// typeText starts an edit of an editable cell with the character typed, which
+	// replaces its text. While an edit is starting, the text is added to its draft.
+	typeText := func(s string) {
+		if edit.Peek().key != "" {
+			sh.draft.Set(sh.draft.Peek() + s)
+			return
+		}
+		r, _ := utf8.DecodeRuneInString(s)
+		// A custom editor is started by Enter or F2, not by typing: its value is not text.
+		if !sh.focus.Focused() || onHeader || n == 0 || nc == 0 || cols[col].Edit == nil || cols[col].Editor != nil ||
+			r == ' ' || !unicode.IsPrint(r) {
+			return
+		}
+		startEdit(p, col, s)
+	}
+
 	// keys handles a key press on the grid, and reports whether it used the key.
 	keys := func(e *KeyEvent) bool {
 		if e.Mods&input.ModAlt != 0 {
 			return false
+		}
+		if !sh.focus.Focused() {
+			return cellKeys(e)
+		}
+		if edit.Peek().key != "" {
+			// The editor is about to take focus, or the focus is back on the grid after a
+			// save that failed; Escape ends the edit either way.
+			if e.Key == input.KeyEscape && !e.Repeat {
+				endEdit(true)
+			}
+			return true
 		}
 		ctrl := e.Mods&input.ModCtrl != 0
 		shift := e.Mods&input.ModShift != 0
@@ -744,6 +1118,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			if n > 0 && !onHeader {
 				moveRow(max(p-step, 0), col, ctrl, shift)
 			}
+		case input.KeyF2:
+			if e.Repeat || onHeader || n == 0 {
+				return false
+			}
+			return cellAction(p, col)
 		case input.KeyEnter, input.KeySpace:
 			if e.Repeat {
 				return true
@@ -755,6 +1134,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				return true
 			}
 			if n == 0 {
+				return true
+			}
+			if e.Key == input.KeyEnter && cellAction(p, col) {
 				return true
 			}
 			k := keyAt(p)
@@ -783,12 +1165,22 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 
 	// The rows the list builds in this frame are noted for the auto-fit.
 	sh.builtLo, sh.builtHi = 0, 0
+	ops := dgOps{
+		pick:   func(q, cl int) { place(q, cl, false) },
+		edit:   editAt,
+		save:   saveEdit,
+		cancel: func() { endEdit(true) },
+		blur:   blurEdit,
+	}
+	rc := dgRowCtx[T]{t: t, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
+		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed,
+		click: click, activate: activate, ops: ops}
 	list := UniformList(n, func(q int) Element {
 		if sh.builtHi == 0 {
 			sh.builtLo = q
 		}
 		sh.builtHi = q + 1
-		return g.row(st, sh, rows, cols, xs, selected, q, p, col, onHeader, hasFocus, click, activate)
+		return g.row(rc, q)
 	}).Key(g.keyStr).Handle(handle)
 	// The scrollbar is drawn over the grid's right edge, so the rows end before it:
 	// the body keeps dataGridGutter of padding there, and the rows are as wide as
@@ -799,14 +1191,15 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		focus := Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}.Merge(st.GridFocusVisible)
 		el.asPart("DataGrid.Grid").Role(access.RoleDataGrid).ScrollX().
 			Style(st.Grid).Style(Style{Padding: Edges{Top: rowH, Right: dataGridGutter}}).
-			Focusable().FocusVisible(focus).
+			FocusHandle(sh.focus).FocusVisible(focus).
 			OnKeyDown(func(e *KeyEvent) {
 				if keys(e) {
 					e.StopPropagation()
 				}
 			}).
 			OnFocus(func() { focused.Set(true) }).
-			OnBlur(func() { focused.Set(false) })
+			OnBlur(func() { focused.Set(false) }).
+			OnTextInput(typeText)
 		if g.mode != SelectionNone {
 			el.SelectionContainer()
 		}
@@ -819,6 +1212,24 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	list.before = func(nd *node) {
 		sh.viewH = nd.lay.H
+		// A custom editor takes focus when it is painted, on its first control; until
+		// then the focus is not inside the cell, so the blur check below waits. When
+		// focus has left the editing cell, the edit is saved, as a text field's is.
+		if e := edit.Peek(); e.key != "" && cols[e.col].Editor != nil {
+			if q, ok := sh.pos[e.key]; ok {
+				if cell := dgCellNode(nd, q+1, e.col+1); cell != nil {
+					switch {
+					case sh.wantFocus:
+						sh.wantFocus = false
+						if ctl := dgControls(cell, nil); len(ctl) > 0 {
+							rt.setFocus(ctl[0].id)
+						}
+					case !rt.focusInside(cell.id):
+						blurEdit(e.seq)
+					}
+				}
+			}
+		}
 		if nd.lay.W != sh.viewW {
 			// The rows and the header are as wide as the grid or the columns, so a
 			// new width rebuilds them.
@@ -860,9 +1271,10 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 // row builds the row at displayed position q: a list item whose cells are the
 // cells of the columns. A selected row is drawn in RowSelected, and its text is at
 // least semibold, so the selection still shows with its highlight cleared.
-func (g *DataGridElement[T]) row(st DataGridStyle, sh *dgShared[T], rows []T, cols []DataColumn[T], xs []float32,
-	selected map[string]bool, q, cursorPos, cursorCol int, onHeader, hasFocus bool,
-	click func(q, cl int, mods input.Modifiers), activate func(q int)) Element {
+func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
+	st, sh, rows, cols, xs, selected := rc.st, rc.sh, rc.rows, rc.cols, rc.xs, rc.selected
+	cursorPos, cursorCol, onHeader, hasFocus := rc.cursorPos, rc.cursorCol, rc.onHeader, rc.hasFocus
+	click, activate, ed, ops := rc.click, rc.activate, rc.ed, rc.ops
 	i := sh.order[q]
 	k := sh.keys[i]
 	v := rows[i]
@@ -882,7 +1294,7 @@ func (g *DataGridElement[T]) row(st DataGridStyle, sh *dgShared[T], rows []T, co
 	}
 	r.OnMouseDown(func(e *MouseEvent) {
 		if e.Button == input.ButtonLeft {
-			sh.pressed = true
+			sh.pressed, sh.ctl = true, false
 			c := 0
 			for c+1 < len(cols) && e.LocalX >= xs[c+1] {
 				c++
@@ -898,7 +1310,11 @@ func (g *DataGridElement[T]) row(st DataGridStyle, sh *dgShared[T], rows []T, co
 		// A click from an assistive technology selects the row, in the column it had.
 		click(q, cursorCol, 0)
 	})
-	r.OnDoubleClick(func() { activate(q) })
+	r.OnDoubleClick(func() {
+		if !sh.ctl {
+			activate(q)
+		}
+	})
 	if g.mode != SelectionNone {
 		r.access().selectWith = func(ctrl bool) {
 			mods := input.Modifiers(0)
@@ -926,14 +1342,64 @@ func (g *DataGridElement[T]) row(st DataGridStyle, sh *dgShared[T], rows []T, co
 				cell.Style(st.CellFocused)
 			}
 		}
-		if cl.Cell != nil {
+		editing := ed.key == k && ed.col == c
+		if cl.Interactive || cl.Edit != nil {
+			// The controls of the cell are not Tab stops: the grid is the one stop.
+			cell.tabSkip = true
+			ci := c
+			cell.OnMouseDown(func(e *MouseEvent) {
+				// A press on a control, or in the editor, which has focus, moves the
+				// cursor to the cell and leaves the row alone.
+				if e.Button == input.ButtonLeft && !sh.focus.Focused() {
+					sh.pressed, sh.ctl = true, true
+					ops.pick(q, ci)
+					e.StopPropagation()
+				}
+			})
+		}
+		if cl.Edit != nil {
+			// The Value pattern of an editable cell sets its value through Edit, on the UI
+			// thread. A cell that cannot be edited has no Value pattern (see access.Node).
+			a.value = s
+			a.setValue = func(x string) {
+				if err := cl.Edit(v, x); err != nil {
+					Announce(err.Error(), access.Assertive)
+				}
+			}
+			ci := c
+			cell.OnDoubleClick(func() {
+				if sh.focus.Focused() {
+					ops.edit(q, ci)
+				}
+			})
+		}
+		switch {
+		case editing && cl.Editor != nil:
+			cell.Style(st.CellEditing)
+			cell.Child(cl.Editor(v, sh.draft.Get(), func(x string) { sh.draft.Set(x) },
+				func() { ops.save(sh.draft.Peek()) }, ops.cancel))
+		case editing:
+			cell.Style(st.CellEditing)
+			cell.Child(g.editor(rc, cl))
+		case cl.Cell != nil && cl.Interactive:
+			cell.Child(cl.Cell(v))
+		case cl.Cell != nil:
 			cell.Child(Div().Hidden().Child(cl.Cell(v)))
-		} else {
+		default:
 			tx := Text(s).Truncate()
 			if on && tx.style.FontWeight < FontSemibold {
 				tx.Semibold()
 			}
 			cell.Child(tx)
+		}
+		if editing && ed.err != "" {
+			// The message of a failed save hangs under the editing cell as an overlay: it is
+			// not clipped by the cell or the grid, and it flips above at the bottom edge.
+			cell.Child(Div().asPart("DataGrid.EditorMessage").Style(st.EditorMessage).
+				Overlay(BelowStart).OverlayGap(4).
+				Child(Div().Row().Align(Center).Gap(6).
+					Child(Icon(icons.Alert).Size(14).Color(st.EditorMessage.TextColor)).
+					Child(Text(ed.err).NoWrap())))
 		}
 		r.Child(cell)
 	}
@@ -941,6 +1407,68 @@ func (g *DataGridElement[T]) row(st DataGridStyle, sh *dgShared[T], rows []T, co
 		r.Label(strings.Join(names, ", "))
 	}
 	return r
+}
+
+// editor returns the content of an editing cell: its text editor. The editor takes
+// the grid's keys as described in DataGrid, and its frame is invalid while the last
+// save failed. The message of that save is drawn by row, under the cell.
+func (g *DataGridElement[T]) editor(rc dgRowCtx[T], cl DataColumn[T]) Element {
+	fe := resolveField(rc.t, fieldLayout{small: true}, rc.st.Editor)
+	if rc.ed.err != "" {
+		// The editor has focus while it is invalid, so the invalid frame also takes the
+		// place of the focus frame: the Accent border would hide the danger color.
+		fe.Frame = fe.Frame.Merge(fe.FrameInvalid)
+		fe.FrameFocusWithin = fe.FrameInvalid
+	}
+	ti := TextInput(rc.sh.draft).FocusHandle(rc.sh.editFocus).Label(cl.Header).Styles(fe).
+		OnSubmit(func(text string) { rc.ops.save(text) })
+	ti.widget = "DataGrid.Editor"
+	ti.onCancel = rc.ops.cancel
+	ti.onBlur = func() { rc.ops.blur(rc.ed.seq) }
+	// The message is the editor's description: the cell's own name hides the children
+	// of the cell, so a message in the cell is not exposed by itself.
+	ti.description = rc.ed.err
+	return ti.Style(Style{Grow: 1})
+}
+
+// dgCellNode returns the built cell at the 1-based row and column of the grid whose
+// body is body, or nil when it is not built.
+func dgCellNode(body *node, row, col int) *node {
+	if body == nil {
+		return nil
+	}
+	var found *node
+	var walk func(n *node)
+	walk = func(n *node) {
+		for _, c := range n.children {
+			if found != nil || c.flags&flagNoDisplay != 0 {
+				return
+			}
+			if d := c.div; d != nil && d.part == "DataGrid.Cell" && d.acc != nil && d.acc.gridRow == row && d.acc.gridCol == col {
+				found = c
+				return
+			}
+			walk(c)
+		}
+	}
+	walk(body)
+	return found
+}
+
+// dgControls appends to out the focusable nodes under n, in tree order: the
+// controls of a cell. An editor is one control.
+func dgControls(n *node, out []*node) []*node {
+	for _, c := range n.children {
+		if c.flags&flagNoDisplay != 0 {
+			continue
+		}
+		if c.kind == kindEditor || (c.div != nil && c.div.focusable) {
+			out = append(out, c)
+			continue
+		}
+		out = dgControls(c, out)
+	}
+	return out
 }
 
 // headerRow returns the header: a row of header cells, one for each column. The

@@ -22,8 +22,8 @@ func TestProjectsTableShowsTheVisibleProjects(t *testing.T) {
 	if want := len(r.s.Visible()); g.GridRows != want {
 		t.Fatalf("the grid has %d rows, want the %d visible projects", g.GridRows, want)
 	}
-	if g.GridColumns != 5 {
-		t.Errorf("the grid has %d columns, want 5", g.GridColumns)
+	if g.GridColumns != 6 {
+		t.Errorf("the grid has %d columns, want 6", g.GridColumns)
 	}
 	r.bridge.Perform(g.ID, access.ActionFocus)
 	r.frame()
@@ -80,8 +80,8 @@ func TestComponentsDataGridBoundsTheRows(t *testing.T) {
 	r.s.Page.Set(PageComponents)
 	tr := r.tree()
 	g := accesstest.Find(t, tr, access.RoleDataGrid, "Deploy runs")
-	if g.GridRows != 100000 || g.GridColumns != 6 {
-		t.Fatalf("the grid is %d by %d, want 100,000 rows of 6 columns", g.GridRows, g.GridColumns)
+	if g.GridRows != 100000 || g.GridColumns != 8 {
+		t.Fatalf("the grid is %d by %d, want 100,000 rows of 8 columns", g.GridRows, g.GridColumns)
 	}
 	built := countNodes(tr, access.RoleListItem, func(n *access.Node) bool { return n.GridRows == 0 && n.PosInSet > 0 })
 	if built == 0 || built > 60 {

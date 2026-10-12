@@ -93,7 +93,14 @@ var editorActions = []struct {
 	{Paste, (*Runtime).editorPaste},
 	{Undo, func(rt *Runtime, id uint64) { rt.editorUndo(id, false) }},
 	{Redo, func(rt *Runtime, id uint64) { rt.editorUndo(id, true) }},
-	{Cancel, func(rt *Runtime, id uint64) { rt.setFocus(0) }},
+	{Cancel, func(rt *Runtime, id uint64) {
+		// An editor that sets onCancel (a grid's cell editor) handles Escape itself.
+		if n := rt.byID[id]; n != nil && n.editor != nil && n.editor.onCancel != nil {
+			n.editor.onCancel()
+			return
+		}
+		rt.setFocus(0)
+	}},
 }
 
 // EditorActions lists the actions of text fields, in the order of the editor

@@ -873,6 +873,9 @@ func (rt *Runtime) tabOrder() []uint64 {
 		if n.flags&flagNoDisplay != 0 {
 			return // a hidden element and its subtree are not in the order (see Display)
 		}
+		if d := n.div; d != nil && d.tabSkip {
+			return // the controls of a grid cell are reached by the grid, not by Tab
+		}
 		if d := n.div; d != nil && d.focusable && !d.noTabStop && d.tabIndex >= 0 {
 			if d.tabIndex > 0 {
 				first = append(first, indexed{d.tabIndex, n.id})

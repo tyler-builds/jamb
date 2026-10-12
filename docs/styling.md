@@ -261,7 +261,8 @@ accessible role and name.
 | `Collapsible.RenderHeader(fn)` | the title in the header; the chevron stays | the title and a `PartState` (`Selected` is open) |
 | `TreeView.RenderRow(fn)` | the icon and label of each row; the chevron stays | the `TreeNode` and a `PartState` |
 | `TreeView.RenderLabel(fn)` | the text of each row; the icon stays (not used with `RenderRow`) | the `TreeNode` and a `PartState` |
-| `DataColumn.Cell` (in `DataGrid`) | the content of each cell of the column; the cell keeps its text, focus and selection | the row's data and nothing else (the content is hidden from assistive technology) |
+| `DataColumn.Cell` (in `DataGrid`) | the content of each cell of the column; the cell keeps its text, focus and selection | the row's data and nothing else (the content is hidden from assistive technology, unless the column is `Interactive`, when its controls are exposed) |
+| `DataColumn.Editor` (in `DataGrid`) | the text field of an edit, replaced by the editor it returns (a Select, a NumberField, a CheckBox); the cell keeps its frame and the message popover | the row's data, the pending value, and the `change`, `commit` and `cancel` functions |
 | `DataColumn.RenderHeader` (in `DataGrid`) | the text of the column's header; the sort arrow stays | the header label and a `PartState` (`Selected` is the sorted column) |
 
 ```go
@@ -413,7 +414,7 @@ parts that the code applies.
 | `RadioGroup` | `Group`, `Radio`, `RadioFocusVisible`, `RadioDisabled`, `Ring`, `RingChecked`, `RingDisabled`, `Dot`, `DotDisabled`, `Label`, `LabelDisabled` | none | none | done |
 | `Collapsible`, `Accordion` | `Section`, `Header`, `HeaderHover`, `HeaderOpen`, `HeaderFocusVisible`, `HeaderDisabled`, `Chevron`, `Content` | none | `RenderHeader` | done |
 | `TreeView` | `Row`, `RowHover`, `RowSelected`, `Chevron`, `Icon`, `Label`, `TreeFocusVisible` | none | `RenderRow`, `RenderLabel` | done |
-| `DataGrid` | `Grid`, `GridFocusVisible`, `Header`, `HeaderCell`, `HeaderCellHover`, `HeaderCellSorted`, `SortIndicator`, `ResizeHandle`, `Row`, `RowHover`, `RowSelected`, `RowAlternate`, `Cell`, `CellFocused`, `Empty` | `DataGridComfortable`, `DataGridCompact`, `Striped()` | `DataColumn.Cell`, `DataColumn.RenderHeader` | done |
+| `DataGrid` | `Grid`, `GridFocusVisible`, `Header`, `HeaderCell`, `HeaderCellHover`, `HeaderCellSorted`, `SortIndicator`, `ResizeHandle`, `Row`, `RowHover`, `RowSelected`, `RowAlternate`, `Cell`, `CellFocused`, `Empty`, `CellEditing`, `Editor`, `EditorMessage` | `DataGridComfortable`, `DataGridCompact`, `Striped()` | `DataColumn.Cell`, `DataColumn.RenderHeader` | done |
 | `DropdownMenu`, `ContextMenu` | `Panel`, `Item`, `ItemHighlighted`, `ItemDisabled`, `Separator`, `SectionLabel`, `Shortcut`, `Check`, `SubmenuChevron` | none | none | done |
 | `MenuBar` | `BarItem`, `BarItemHover`, `BarItemFocusVisible`, `BarItemOpen` | none | none | done |
 | `Modal` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | none | none | done |
@@ -502,6 +503,14 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
   another `MinHeight` does not move the padding that keeps the header above the rows, so keep the height at the density's.
 - The DataGrid's `Grid` padding is the header's height, which the grid sets. It has no frozen column and no
   multi-column sort. The double-click fit of a column edge measures the `Text` of the rows in view, not a `Cell` slot.
+- An editing cell is perceivable under high contrast without its colors: the `Editor` frame of a failed save is
+  the text color at the invalid width (`FrameInvalid`), and `EditorMessage` is drawn in the text color with a
+  text-colored border. `CellEditing` and `Editor` take the plain look of the other parts. The `EditorMessage`
+  popover is drawn above the window, so no ancestor clips it; the editor's own frame stays visible.
+- A cell clips what it draws to its column (`OverflowHidden` in the `Cell` part). A `Cell` style that sets an
+  overflow changes that, and content wider than its column is cut at the column's edge, not drawn over the next one.
+- A custom editor (`DataColumn.Editor`) is the app's to style: the grid draws the cell around it and the message
+  popover, and the `Editor` part does not apply to it.
 
 Where a look changed under high contrast on purpose, the change is in the guardrails
 above: the selected text of a text field and the highlighted row of a menu are the

@@ -76,6 +76,9 @@ type accessInfo struct {
 	// selectWith chooses the item with the modifier Ctrl (true) or without it. A data
 	// grid row sets it, so that AddToSelection and RemoveFromSelection keep the others.
 	selectWith func(ctrl bool)
+	// setValue sets the value of an element, for the Set Value action (see DataGrid's
+	// editable cells). Nil means the element takes no value from assistive technology.
+	setValue func(v string)
 }
 
 // access returns the element's accessibility settings, creating them on use.
@@ -382,6 +385,8 @@ func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 	case access.ActionSetValue:
 		if n.kind == kindEditor {
 			rt.editorSet(n.id, req.Value, len(req.Value), editOther)
+		} else if n.div != nil && n.div.acc != nil && n.div.acc.setValue != nil {
+			n.div.acc.setValue(req.Value)
 		}
 	case access.ActionSetTextSelection:
 		if n.kind == kindEditor {
@@ -913,6 +918,9 @@ func (b *accessBuilder) actions(n *node, role access.Role, st access.State) []ac
 	if st.Has(access.StateFocusable) {
 		out = append(out, access.ActionFocus)
 	}
+	if d.acc != nil && d.acc.setValue != nil {
+		out = append(out, access.ActionSetValue)
+	}
 	if st.Has(access.StateToggle) {
 		out = append(out, access.ActionToggle)
 	}
@@ -1050,6 +1058,7 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 		an.Text.ReadOnly = an.States.Has(access.StateReadOnly)
 	}
 	b.relate(an, n.div.acc)
+	an.Description = n.div.acc.descriptionOr("", an.Name)
 	b.add(an, n, nil)
 	return []access.ID{id}
 }

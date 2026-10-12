@@ -1771,3 +1771,44 @@ The SetVisualState and Close methods of IWindowProvider still answer UIA_E_NOTSU
 
 - **Scanning a settled screen.** A client that reads an element's properties across the element's removal sees an empty value for the reads after the removal, and the scanner then reports an on-screen element with no bounds. The framework cannot make a removed element report properties, since the documented answer is UIA_E_ELEMENTNOTAVAILABLE, and a screen reader that meets this re-reads the element or drops it. A rule scan, though, should run on a screen that is not changing: the check now closes every toast before it opens the notifications list and scans, instead of waiting for an auto-dismiss. With that, five consecutive normal runs passed 52 of 52. Whether AxeWindowsCLI should treat an element whose `IsOffscreen` was read before its removal as missing rather than on-screen is a question for its maintainers.
 - **Memory.** A second 60-second stress run (397 walks, 51,609 element reads) took the demo's private memory from 158.9 MB to 231.0 MB, about 1.4 KB per element read. That is inside the 1.1 to 1.5 KB per read that Phase A attributes to UI Automation's own client-side state. No control run without the change was made, so the figure is not a before-and-after comparison. The per-call guards hold, and a disconnect is one UI Automation call per removed node.
+
+## Phase J: what changed from this design
+
+Phase J adds to `ui.DataGrid` the interactive cell (`DataColumn.Interactive`), the editable cell (`DataColumn.Edit`, with `DataColumn.Value` for the text an edit starts with), and the sort helpers `ui.SortBy` and `ui.SortByText`. The keyboard and pointer model is in the README (Data grids, "Interactive and editable cells"); this section records the decisions that bind the accessibility side and the sources they follow.
+
+**Sources.**
+
+- The WAI-ARIA grid pattern (https://www.w3.org/WAI/ARIA/apg/patterns/grid/), in its "Editing and Navigating Inside a Cell" section. Enter and F2 place focus on the first widget of a cell that holds widgets. Tab and Shift+Tab move to the next and previous widget, and the pattern allows that movement to wrap inside the cell or within the grid. This grid wraps inside the cell. Escape restores grid navigation, and "may also undo edits", which this grid does by cancelling the edit. The pattern does not name the two states or define what happens at the last widget; the names used in the README are this grid's.
+- The Microsoft UI Automation DataItem control type (https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportdataitemcontroltype). A data item may host edit controls, and it must support the Value pattern when its primary text is editable. Its name identifies the item. The page gives no guidance on announcing an edit mode.
+- The Microsoft control type identifiers (https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-controltype-ids): DataItem is 50029, Edit is 50004.
+- The Microsoft keyboard guidance already cited in the README (https://learn.microsoft.com/en-us/windows/apps/develop/input/keyboard-interactions).
+
+**Mapping.**
+
+| Element | Role and name | Patterns and states |
+| --- | --- | --- |
+| Interactive cell | DataItem, named by `Text` when set, else by its children | Its controls are exposed as children; they are not Tab stops, and the grid's one stop reaches them by Enter or F2 |
+| Editable cell, not editing | DataItem, named by `Text` | Value pattern: its value is `Value` (or `Text`); `IsReadOnly` is false; SetValue runs `Edit` on the UI thread. A refused value is announced assertively and changes nothing |
+| Read-only cell | DataItem, named by `Text` | No Value pattern (not required: see the DataItem guidance below) |
+| Editor of an edit | Text field, named by the column's header | Value pattern (`SetValue`) through its text; its description is the error of the last save, while the save has failed |
+| Error of a failed save | Not an element of its own: the editor's description (help text) and an assertive announcement | The invalid frame of the `Editor` style is drawn; a popover under the cell shows the same text for sighted users |
+| Edit mode | None announced. Focus moves into the editor, which announces its name and value | The editor is the focus target; no live-region change is made for "editing" |
+
+The Value pattern follows Microsoft's DataItem guidance (uiauto-supportdataitemcontroltype, "Required Control Patterns"): IValueProvider is required when the data item's primary text is editable, and the page's table gives it as "Depends" otherwise. An editable cell therefore exposes it; a read-only cell does not, which the guidance does not require. The adapter offers the pattern on a node whose role has it (a text field, a combo box) or that offers the Set Value action (`hasValueNode` in `platform/windows/uia.go`). The editor of an edit is a text field, so it exposes the pattern too.
+
+**Layout.** A grid cell takes the height of its row, even with no content. A cell that is centred in its row with nothing in it had no height, and its bounding rectangle was null. AxeWindowsCLI reported that as "An on-screen element must not have a null BoundingRectangle property" for the empty Actions cells of a focused grid. The cell is now stretched to the row (`AlignSelf: Stretch` in the default `Cell` style).
+
+**Accessibility decisions, with the reason.**
+
+- The grid stays the one Tab stop. A cell's controls are marked `tabSkip`, which leaves them out of the Tab order and out of the modal's focus walk; the grid's own keys route Tab inside the cell.
+- The message of a failed save is the editor's description (set on the access node from the text field, which has no key to resolve). A key that matches no exposed element is recorded as an issue of the element that names it, and the message text is inside a labelled cell, so it is not exposed by itself.
+- A pointer press on a control does not select the row, so that a click on a button is not a row click. The cell records that the press was on a control, and the row's click and double-click ignore it.
+
+**Verification.** The unit tests in `ui/datagrid_cells_test.go` cover the keyboard flow (Enter, F2, Tab, Shift+Tab, Escape, arrows inside a field), the pointer, the editing flow (start by Enter, F2, double-click and typing; save; a failed save; cancel; Tab to the next editable cell; the blur save and a failed blur save, with and without window focus; the keyed selection; a row that scrolls away and back), the access tree, the Set Value action (a save, a refused value announced assertively, no action on a read-only cell), the custom editor (F2 focus, its own keys first, Enter, Escape, a blur, a refused save), the popover and the clipping of cells, the `Value` start text and the `SortBy` helpers. `testDataGridEditParts` checks the style parts against the drift test. `platform/windows/uiavalue_test.go` checks which nodes get the Value pattern. The live checks are in `scripts/a11y-check.ps1` (Components and Projects grids, including SetValue on a label cell without an edit, and an invalid SetValue that changes nothing). The Axe scans of the grids (with the editor open, with its error shown, and with focus on a Retry button) reported zero errors.
+
+**Open items.**
+
+- **An editing row that scrolls out of view.** The rows of a grid are one window of a virtual list, which is contiguous, so the row is not laid out outside the window. The edit, its text and its focus are kept, and the editor is laid out again when the row comes back (`TestEditKeepsItsTextWhenItsRowScrollsAway`). Focus therefore stays in an editor that is not on screen, and keys typed meanwhile go to it. Moving focus out of the grid when the row leaves the view would change the keyboard model, so it is not made here; the README asks the user to scroll the row back first. Whether the access tree reports the editor while it is out of view is not checked.
+- **Moving focus out of an editing row that scrolls away.** Focus stays in an editor that is not on screen (see the bullet above), so the keys typed meanwhile go to it. A grid could move focus to the cell when its editor leaves the view; that would change the keyboard model, so it is not made here.
+- **A custom editor and the Value pattern of its cell.** A custom editor (`DataColumn.Editor`, a Select, a NumberField or a CheckBox) is the app's control: its accessibility is that of the control it returns. The grid focuses the first focusable control of the editor when it opens, saves a change of focus out of the cell, and gives the failed-save message to the cell as a popover. The grid does not set the description of the custom control, since the control is not the grid's.
+- **Focus on a DataItem.** The Microsoft page describes SetFocus on a data item moving focus to its edit control. The grid's `ActionFocus` does not do that yet.

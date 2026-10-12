@@ -105,6 +105,8 @@ type editorElement struct {
 	onSubmit    func(string)
 	onChange    func(string)
 	onBlur      func()
+	onCancel    func()
+	description string // a literal description, read after the name (see fieldOptions)
 	onStep      func(dir int)
 	style       Style
 	autoFocus   bool
@@ -185,6 +187,9 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	d.h.onBlur = e.onBlur
 	if len(e.labelledBy) > 0 || len(e.describedBy) > 0 {
 		d.access().labelledBy, d.access().describedBy = e.labelledBy, e.describedBy
+	}
+	if e.description != "" {
+		d.access().description = e.description
 	}
 	n.div = d
 	rt.setOverhang(n)
