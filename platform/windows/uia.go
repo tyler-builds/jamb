@@ -63,6 +63,8 @@ const (
 	propIsPassword           = 30019
 	propIsOffscreen          = 30022
 	propOrientation          = 30023
+	propIsRequiredForForm    = 30025 // UIA_IsRequiredForFormPropertyId
+	propIsDataValidForForm   = 30103 // UIA_IsDataValidForFormPropertyId
 	propPositionInSet        = 30152
 	propSizeOfSet            = 30153
 	propLevel                = 30154
@@ -422,6 +424,15 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 		return variantBool(n.States.Has(access.StateFocusable))
 	case propIsOffscreen:
 		return variantBool(n.States.Has(access.StateOffscreen))
+	case propIsRequiredForForm:
+		return variantBool(n.States.Has(access.StateRequired))
+	case propIsDataValidForForm:
+		// A field that is required or invalid says whether its value is valid. Any other
+		// element leaves the property empty, which is the answer of an element that is
+		// not a form field.
+		if n.States.Has(access.StateRequired) || n.States.Has(access.StateInvalid) {
+			return variantBool(!n.States.Has(access.StateInvalid))
+		}
 	case propIsControlElement, propIsContentElement:
 		return variantBool(true)
 	case propPositionInSet:

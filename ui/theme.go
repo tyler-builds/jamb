@@ -78,6 +78,10 @@ type Theme struct {
 	MenuBar MenuBarStyle
 	// Modal is the look of every modal dialog.
 	Modal ModalStyle
+	// FormField is the look of every field (its label, help text and error), and Form
+	// is the look of every form's error summary.
+	FormField FormFieldStyle
+	Form      FormStyle
 	// ProgressBar is the look of every progress bar, determinate or not.
 	ProgressBar ProgressBarStyle
 	// ProgressRing is the look of every progress ring.

@@ -57,6 +57,8 @@ type accessInfo struct {
 	mixed bool
 	// invalid is set on a field whose text is not a valid value (see NumberField).
 	invalid bool
+	// required is set on a field that must be filled in (see Field).
+	required bool
 	// readOnly is set on a control whose value is shown but not typed, such as a
 	// Select.
 	readOnly bool
@@ -861,6 +863,9 @@ func (b *accessBuilder) states(n *node, id access.ID, role access.Role) access.S
 	if a != nil && a.invalid {
 		s |= access.StateInvalid
 	}
+	if a != nil && a.required {
+		s |= access.StateRequired
+	}
 	if a != nil && a.readOnly {
 		s |= access.StateReadOnly
 	}
@@ -1053,6 +1058,14 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 	}
 	if n.editor.multiline {
 		an.States |= access.StateMultiLine
+	}
+	if a := n.div.acc; a != nil {
+		if a.invalid {
+			an.States |= access.StateInvalid
+		}
+		if a.required {
+			an.States |= access.StateRequired
+		}
 	}
 	if an.Text != nil {
 		an.Text.ReadOnly = an.States.Has(access.StateReadOnly)

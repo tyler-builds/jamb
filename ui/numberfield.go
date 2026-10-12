@@ -88,7 +88,7 @@ func numberFieldDefaults(t *Theme, width float32, placement SpinPlacement, scale
 		SpinButtonHover:        Style{Background: t.SurfaceHover, TextColor: t.Text},
 		SpinButtonPressed:      Style{Background: t.SurfaceActive},
 		SpinButtonFocusVisible: Style{Shadows: []Shadow{ring}},
-		Message:                Style{Direction: Row, Align: Center, Gap: 6, FontSize: 12},
+		Message:                messageStyle(t),
 	}
 	d.Frame.Width = Px(width)
 	if t.HighContrast {
@@ -154,6 +154,26 @@ type NumberFieldElement[T int | float64] struct {
 	precision  int // the decimals of a float, or -1 for the decimals of the step
 	width      float32
 	styles     NumberFieldStyle
+	rules      []Validator[T] // the validators of the value (see Validate)
+	wire       fieldWire      // what a Field gives the field (see Field)
+}
+
+// Validate sets the validators of the value, which are checked after the value
+// is set: a Field shows the first error once the user has changed the field and left
+// it, and on submit when it is in a Form (see Field and Validator). A number field
+// does not need Required, since it always holds a number.
+func (n *NumberFieldElement[T]) Validate(rules ...Validator[T]) *NumberFieldElement[T] {
+	n.rules = rules
+	return n
+}
+
+// formCheck and formWire make a number field a formControl (see Field).
+func (n *NumberFieldElement[T]) formCheck() error { return firstError(n.value.Get(), n.rules) }
+
+func (n *NumberFieldElement[T]) formWire(w fieldWire) Element {
+	c := *n
+	c.wire = w
+	return &c
 }
 
 // NumberField creates a number field that reads and writes value, from lo to hi
@@ -232,6 +252,11 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 			seen.Set(x)
 			invalid.Set(false)
 		}
+		// A form's Enter runs once the text is applied, and not when the text is not a
+		// number. The field's own Enter is the one in the wire, so it is not run twice.
+		w := n.wire
+		enter := w.onEnter
+		w.onEnter = nil
 		submit := func(text string) {
 			x, ok := n.parse(text)
 			if !ok {
@@ -239,6 +264,9 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 				return
 			}
 			apply(x)
+			if enter != nil {
+				enter()
+			}
 		}
 		blur := func() {
 			if x, ok := n.parse(draft.Peek()); ok {
@@ -249,6 +277,9 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 			invalid.Set(false)
 		}
 		step := func(dir int) {
+			if w.onEdit != nil {
+				w.onEdit()
+			}
 			base, ok := n.parse(draft.Peek())
 			if !ok {
 				base = n.value.Peek()
@@ -261,18 +292,23 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 			errKey = n.key + "/error"
 		}
 
+		name, labelledBy := n.name, n.labelledBy
+		if w.label != "" {
+			name, labelledBy = w.label, w.labelledBy
+		}
 		root := Div().Column().Gap(6).Role(access.RoleSpinner)
 		a := root.access()
-		if n.name != "" {
-			root.Label(n.name)
+		if name != "" {
+			root.Label(name)
 		}
-		if len(n.labelledBy) > 0 {
-			root.LabelledBy(n.labelledBy...)
+		if len(labelledBy) > 0 {
+			root.LabelledBy(labelledBy...)
 		}
 		a.rng = &access.Range{Value: float64(v), Min: float64(n.lo), Max: float64(n.hi),
 			SmallChange: float64(n.step), LargeChange: 10 * float64(n.step)}
 		a.setRange = func(x float64) { apply(numberFrom[T](x)) }
-		a.invalid = isInvalid
+		a.invalid = isInvalid || w.invalid
+		a.required = w.required
 
 		row := Div().Row().Align(Center).Gap(6)
 		if n.disabled {
@@ -285,37 +321,29 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 			return root
 		}
 
-		fo := fieldOptions{value: draft, name: n.name, labelledBy: n.labelledBy,
+		fo := fieldOptions{value: draft, name: name, labelledBy: labelledBy,
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, onStep: step,
-			widget: "NumberField"}
-		fst := st.FieldStyle
+			widget: "NumberField", wire: w}
+		// The invalid frame is drawn thicker and in the danger color (the text color under
+		// high contrast) by fieldOptions.expand, and the message says what is wrong.
+		fo.wire.invalid = isInvalid || w.invalid
 		if isInvalid {
 			fo.describedBy = []string{errKey}
-			// The invalid frame is drawn thicker and in the danger color (the text
-			// color under high contrast), and the message says what is wrong.
-			fst.Frame = fst.Frame.Merge(st.FrameInvalid)
 		}
 		// Stacked buttons are the frame's trailing element, inside its right edge.
 		// Inline buttons follow the frame.
 		if n.spin && n.placement == SpinStacked {
 			fo.trailing = n.spinButtons(st, v, step, scale)
 		}
-		row.Child(fo.expand(ctx, fst, false, 0))
+		row.Child(fo.expand(ctx, st.FieldStyle, false, 0))
 		if n.spin && n.placement != SpinStacked {
 			row.Child(n.spinButtons(st, v, step, scale))
 		}
 		root.Child(row)
 		if isInvalid {
 			msg := fmt.Sprintf("Enter a number from %s to %s.", n.format(n.lo), n.format(n.hi))
-			iconColor := t.Danger
-			if t.HighContrast {
-				iconColor = t.Text
-			}
-			if !st.Message.TextColor.IsZero() {
-				iconColor = st.Message.TextColor
-			}
 			root.Child(Div().asPart("NumberField.Message").Style(st.Message).
-				Child(Icon(icons.Alert).Size(14).Color(iconColor)).
+				Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
 				Child(Text(msg).Key(errKey)))
 		}
 		return root

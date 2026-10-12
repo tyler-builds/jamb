@@ -29,6 +29,7 @@ type RadioGroupStyle struct {
 	Ring              Style // the circle of each option
 	RingChecked       Style // the circle of the selected option
 	RingDisabled      Style // the circle of an option that cannot be chosen
+	RingInvalid       Style // the circle of each option when the group's value is not valid (see Field)
 	Dot               Style // the dot in the circle of the selected option
 	DotDisabled       Style // the dot of a selected option that cannot be chosen
 	Label             Style // the text of each option
@@ -45,6 +46,7 @@ func (s RadioGroupStyle) merge(o RadioGroupStyle) RadioGroupStyle {
 		Ring:              s.Ring.Merge(o.Ring),
 		RingChecked:       s.RingChecked.Merge(o.RingChecked),
 		RingDisabled:      s.RingDisabled.Merge(o.RingDisabled),
+		RingInvalid:       s.RingInvalid.Merge(o.RingInvalid),
 		Dot:               s.Dot.Merge(o.Dot),
 		DotDisabled:       s.DotDisabled.Merge(o.DotDisabled),
 		Label:             s.Label.Merge(o.Label),
@@ -62,6 +64,7 @@ func (s RadioGroupStyle) plain() RadioGroupStyle {
 		Ring:              plainStyle(s.Ring),
 		RingChecked:       plainStyle(s.RingChecked),
 		RingDisabled:      plainStyle(s.RingDisabled),
+		RingInvalid:       plainStyle(s.RingInvalid),
 		Dot:               plainStyle(s.Dot),
 		DotDisabled:       plainStyle(s.DotDisabled),
 		Label:             plainStyle(s.Label),
@@ -82,6 +85,7 @@ func radioGroupDefaults(t *Theme) RadioGroupStyle {
 		Ring: Style{Width: Px(18), Height: Px(18), NoShrink: true, Radius: 9,
 			Direction: Row, Align: Center, Justify: Center, BorderWidth: 1, BorderColor: t.BorderStrong, Background: t.Surface},
 		RingChecked: Style{BorderColor: t.Accent},
+		RingInvalid: Style{BorderWidth: 2, BorderColor: messageIconColor(t, Style{})},
 		Dot:         Style{Width: Px(8), Height: Px(8), NoShrink: true, Radius: 4, Background: t.Accent},
 	}
 	if t.HighContrast {
@@ -122,11 +126,29 @@ type RadioGroupElement[T comparable] struct {
 	disabled   bool
 	onChange   func(T)
 	styles     RadioGroupStyle
+	rules      []Validator[T] // the validators of the value (see Validate)
+	wire       fieldWire      // what a Field gives the group (see Field)
 }
 
 // RadioGroup creates a group of radio buttons that reads and writes value.
 func RadioGroup[T comparable](value *Signal[T], options ...Option[T]) *RadioGroupElement[T] {
 	return &RadioGroupElement[T]{value: value, options: options}
+}
+
+// Validate sets the validators of the chosen value. The zero value is no choice, so
+// Required[T] rejects it (see Field).
+func (r *RadioGroupElement[T]) Validate(rules ...Validator[T]) *RadioGroupElement[T] {
+	r.rules = rules
+	return r
+}
+
+// formCheck and formWire make a radio group a formControl (see Field).
+func (r *RadioGroupElement[T]) formCheck() error { return firstError(r.value.Get(), r.rules) }
+
+func (r *RadioGroupElement[T]) formWire(w fieldWire) Element {
+	c := *r
+	c.wire = w
+	return &c
 }
 
 func (*RadioGroupElement[T]) isElement()           {}
@@ -170,14 +192,31 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 		handles := Local(ctx, "handles", newHandles(len(r.options))).Peek()
 		stop := tabStop(r.options, cur, r.disabled)
 		st := resolveRadioGroup(t, r.styles)
+		// The tab stop is the option a Field gave its handle to, when there is one, and the
+		// arrow keys reach every option by the handle it has.
+		w := r.wire
+		handleOf := func(j int) *FocusHandle {
+			if j == stop && w.handle != nil {
+				return w.handle
+			}
+			return handles[j]
+		}
 
 		g := Div().asPart("RadioGroup.Group").Style(st.Group).Role(access.RoleGroup).SelectionContainer()
-		if r.name != "" {
-			g.Label(r.name)
+		name, labelledBy := r.name, r.labelledBy
+		if w.label != "" {
+			name, labelledBy = w.label, w.labelledBy
 		}
-		if len(r.labelledBy) > 0 {
-			g.LabelledBy(r.labelledBy...)
+		if name != "" {
+			g.Label(name)
 		}
+		if len(labelledBy) > 0 {
+			g.LabelledBy(labelledBy...)
+		}
+		if w.description != "" {
+			g.Description(w.description)
+		}
+		g.access().invalid, g.access().required = w.invalid, w.required
 		for i, o := range r.options {
 			on := o.Value == cur
 			dis := r.disabled || o.Disabled
@@ -189,6 +228,9 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 			}
 			if dis {
 				ring.Style(st.RingDisabled)
+			}
+			if w.invalid {
+				ring.Style(st.RingInvalid)
 			}
 			if on {
 				dot := Div().asPart("RadioGroup.Dot").Style(st.Dot)
@@ -211,7 +253,7 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 				item.access().disabled = true
 				item.Cursor(CursorNotAllowed).Style(st.RadioDisabled)
 			} else {
-				item.Cursor(CursorPointer).Focusable().FocusHandle(handles[i]).FocusVisible(st.RadioFocusVisible).
+				item.Cursor(CursorPointer).Focusable().FocusHandle(handleOf(i)).FocusVisible(st.RadioFocusVisible).
 					OnClick(func() { r.choose(r.options[i].Value) }).
 					OnKeyDown(func(e *KeyEvent) {
 						if e.Mods != 0 {
@@ -229,9 +271,12 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 						e.StopPropagation()
 						if j := nextEnabled(r.options, i, dir, r.disabled); j >= 0 {
 							r.choose(r.options[j].Value)
-							handles[j].Focus()
+							handleOf(j).Focus()
 						}
 					})
+				if w.onBlur != nil {
+					item.OnBlur(w.onBlur)
+				}
 				item.spaceOnly = true // Enter goes on to the modal default button, as on Windows
 				if i != stop {
 					item.TabStop(false) // reached with the arrow keys, not Tab
@@ -294,6 +339,9 @@ func nextEnabled[T comparable](options []Option[T], from, dir int, disabled bool
 // choose sets the value to v and runs OnChange.
 func (r *RadioGroupElement[T]) choose(v T) {
 	r.value.Set(v)
+	if r.wire.onEdit != nil {
+		r.wire.onEdit()
+	}
 	if r.onChange != nil {
 		r.onChange(v)
 	}

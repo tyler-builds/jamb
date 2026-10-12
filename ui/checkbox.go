@@ -44,6 +44,7 @@ type CheckboxStyle struct {
 	BoxChecked          Style // the box when it is on
 	BoxMixed            Style // the box when it is mixed
 	BoxDisabled         Style // the box when it is disabled
+	BoxInvalid          Style // the box when the check's value is not valid (see Field)
 	Mark                Style // the check mark of an on box
 	Dash                Style // the line of a mixed box
 	Label               Style // the text beside the box
@@ -61,6 +62,7 @@ func (s CheckboxStyle) merge(o CheckboxStyle) CheckboxStyle {
 		BoxChecked:          s.BoxChecked.Merge(o.BoxChecked),
 		BoxMixed:            s.BoxMixed.Merge(o.BoxMixed),
 		BoxDisabled:         s.BoxDisabled.Merge(o.BoxDisabled),
+		BoxInvalid:          s.BoxInvalid.Merge(o.BoxInvalid),
 		Mark:                s.Mark.Merge(o.Mark),
 		Dash:                s.Dash.Merge(o.Dash),
 		Label:               s.Label.Merge(o.Label),
@@ -79,6 +81,7 @@ func (s CheckboxStyle) plain() CheckboxStyle {
 		BoxChecked:          plainStyle(s.BoxChecked),
 		BoxMixed:            plainStyle(s.BoxMixed),
 		BoxDisabled:         plainStyle(s.BoxDisabled),
+		BoxInvalid:          plainStyle(s.BoxInvalid),
 		Mark:                plainStyle(s.Mark),
 		Dash:                plainStyle(s.Dash),
 		Label:               plainStyle(s.Label),
@@ -101,6 +104,7 @@ func checkboxDefaults(t *Theme, s CheckState, disabled bool) CheckboxStyle {
 		Dash:       Style{TextColor: t.AccentText},
 		BoxChecked: Style{Background: t.Accent, BorderColor: t.Accent},
 		BoxMixed:   Style{Background: t.Accent, BorderColor: t.Accent},
+		BoxInvalid: Style{BorderWidth: 2, BorderColor: messageIconColor(t, Style{})},
 	}
 	if s == CheckOn {
 		d.BoxHover = Style{Background: t.AccentHover, BorderColor: t.AccentHover}
@@ -146,11 +150,45 @@ type CheckboxElement struct {
 	key      string
 	disabled bool
 	styles   CheckboxStyle
+	value    *Signal[bool]     // the checked value of a Checkbox, nil for a CheckboxTri
+	rules    []Validator[bool] // the validators of the value (see Validate)
+	wire     fieldWire         // what a Field gives the check box (see Field)
+	handle   *FocusHandle      // lets code focus the check box (see FocusHandle)
+}
+
+// FocusHandle lets code focus the check box (see NewFocusHandle). A Field that
+// wraps the check box gives it its own handle, which takes precedence.
+func (c *CheckboxElement) FocusHandle(h *FocusHandle) *CheckboxElement {
+	c.handle = h
+	return c
 }
 
 // Checkbox creates a check box that is on while checked is true.
 func Checkbox(label string, checked *Signal[bool]) *CheckboxElement {
-	return &CheckboxElement{label: label, state: checkOf(checked.Get()), set: func(s CheckState) { checked.Set(s == CheckOn) }}
+	return &CheckboxElement{label: label, state: checkOf(checked.Get()), set: func(s CheckState) { checked.Set(s == CheckOn) },
+		value: checked}
+}
+
+// Validate sets the validators of the checked value. Required[bool] makes the box
+// "must accept": it is an error while the box is off (see Field). A mixed or tri-state
+// box (CheckboxTri) has no validators.
+func (c *CheckboxElement) Validate(rules ...Validator[bool]) *CheckboxElement {
+	c.rules = rules
+	return c
+}
+
+// formValue, formCheck and formWire make a check box a formControl (see Field).
+func (c *CheckboxElement) formCheck() error {
+	if c.value == nil {
+		return nil
+	}
+	return firstError(c.value.Get(), c.rules)
+}
+
+func (c *CheckboxElement) formWire(w fieldWire) Element {
+	cp := *c
+	cp.wire = w
+	return &cp
 }
 
 // CheckboxTri creates a check box that shows state, including CheckMixed. It
@@ -188,6 +226,7 @@ func (c *CheckboxElement) expand(ctx *Context) Element {
 	s := c.state
 	on := s == CheckOn // a mixed box is not checked: its state is the mixed one
 	st := resolveCheckbox(t, s, c.disabled, c.styles)
+	w := c.wire
 
 	// The box is drawn from the state: a check for on, a dash for mixed and an
 	// empty box for off, so the state is not carried by color alone.
@@ -210,6 +249,13 @@ func (c *CheckboxElement) expand(ctx *Context) Element {
 	a := row.access()
 	row.Role(access.RoleCheckBox).Checked(on)
 	a.mixed = s == CheckMixed
+	a.invalid, a.required = w.invalid, w.required
+	if w.description != "" {
+		row.Description(w.description)
+	}
+	if w.invalid {
+		box.Style(st.BoxInvalid)
+	}
 	if c.disabled {
 		row.Style(st.ControlDisabled).Cursor(CursorNotAllowed)
 		a.disabled = true
@@ -218,6 +264,21 @@ func (c *CheckboxElement) expand(ctx *Context) Element {
 	// The row takes focus and keys. The box shows the pointer's hover state.
 	box.Hover(st.BoxHover)
 	row.Cursor(CursorPointer).Focusable().FocusVisible(st.ControlFocusVisible).
-		OnClick(func() { c.set(s.next()) })
+		OnClick(func() {
+			c.set(s.next())
+			if w.onEdit != nil {
+				w.onEdit()
+			}
+		})
+	h := c.handle
+	if w.handle != nil {
+		h = w.handle
+	}
+	if h != nil {
+		row.FocusHandle(h)
+	}
+	if w.onBlur != nil {
+		row.OnBlur(w.onBlur)
+	}
 	return row
 }

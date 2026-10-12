@@ -1,6 +1,7 @@
 package views
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -34,6 +35,16 @@ func formControlsSection() ui.Element {
 		prefFreq := ui.Local(ctx, "form.prefFreq", "daily")
 		prefChannel := ui.Local(ctx, "form.prefChannel", "email")
 		prefVolume := ui.Local(ctx, "form.prefVolume", 60.0)
+		// The preferences form checks its channels and its quiet hours when it is
+		// saved. channelFocus is the first check box of the channels, which takes focus.
+		prefs := ui.Local(ctx, "form.prefs", ui.NewForm()).Peek()
+		channelFocus := ui.Local(ctx, "form.channelFocus", ui.NewFocusHandle()).Peek()
+		saved := ui.Local(ctx, "form.saved", "")
+		prefs.OnSubmit(func() error {
+			saved.Set("Preferences saved: sends by " + channelsOf(email.Peek(), text.Peek(), push.Peek()) +
+				fmt.Sprintf(", quiet from %02d:00 to %02d:00.", fromHour.Peek(), toHour.Peek()))
+			return nil
+		})
 
 		// The "all" box is the parent of the three alerts. A click on it sets all of
 		// them; a change to one of them sets it to on, off or mixed.
@@ -72,14 +83,21 @@ func formControlsSection() ui.Element {
 			Child(row).
 			Child(ui.Divider()).
 			Child(SectionTitle(t, "Notification preferences")).
+			Child(prefs.Summary()).
 			Child(ui.Div().Row().Wrap().Align(ui.Start).Gap(28).
-				Child(ui.Div().Gap(10).Width(ui.Px(240)).
-					Child(ui.Text("Send alerts by").Size(13).Medium().Color(t.TextMuted)).
+				Child(prefs.Field("channels", "Send alerts by", ui.Div().Gap(10).Width(ui.Px(240)).
 					Child(ui.CheckboxTri("All alerts", all).Key("form-all")).
 					Child(ui.Div().Gap(8).MarginX(24).
-						Child(ui.Checkbox("Email", email)).
-						Child(ui.Checkbox("Text message", text)).
-						Child(ui.Checkbox("Push notification", push)))).
+						Child(ui.Checkbox("Email", email).Key("form-email").FocusHandle(channelFocus)).
+						Child(ui.Checkbox("Text message", text).Key("form-text")).
+						Child(ui.Checkbox("Push notification", push).Key("form-push")))).
+					Description("Choose one or more channels.").Required().Focus(channelFocus).
+					Check(func() error {
+						if email.Get() || text.Get() || push.Get() {
+							return nil
+						}
+						return errors.New("Choose at least one channel.")
+					})).
 				Child(ui.Div().Gap(10).Width(ui.Px(240)).
 					Child(ui.Text("How often").Size(13).Medium().Color(t.TextMuted)).
 					Child(ui.RadioGroup(prefFreq,
@@ -97,11 +115,19 @@ func formControlsSection() ui.Element {
 					Child(ui.Text("Alert volume").Size(13).Medium().Color(t.TextMuted)).
 					Child(ui.Slider(prefVolume, 0, 100, 5).Label("Alert volume").Format(percentOf).Width(240))).
 				Child(ui.Div().Gap(10).
-					Child(ui.Text("Quiet hours").Size(13).Medium().Color(t.TextMuted)).
-					Child(ui.Div().Row().Align(ui.Center).Gap(10).
-						Child(ui.NumberField(fromHour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinInline)).
+					Child(ui.Div().Row().Align(ui.Start).Gap(10).
+						Child(prefs.Field("from", "Quiet hours from", ui.NumberField(fromHour, 0, 23, 1).SpinButtons(ui.SpinInline))).
 						Child(ui.Text("to").Color(t.TextMuted)).
-						Child(ui.NumberField(toHour, 0, 23, 1).Label("Quiet hours to").SpinButtons(ui.SpinInline)))).
+						Child(prefs.Field("to", "Quiet hours to", ui.NumberField(toHour, 0, 23, 1).SpinButtons(ui.SpinInline)).
+							Check(func() error {
+								if fromHour.Get() == toHour.Get() {
+									return errors.New("Quiet hours must start and end at different hours.")
+								}
+								return nil
+							})))).
+				Child(ui.Div().Gap(8).Width(ui.Px(240)).
+					Child(ui.Button("Save preferences").Key("prefs-save").Primary().OnClick(prefs.Submit)).
+					Child(ui.Text(saved.Get()).Size(13).Color(t.TextMuted))).
 				Child(ui.Div().Gap(4).Width(ui.Px(240)).
 					Child(ui.Textf("Sends by %s, %s, at volume %s.",
 						channelsOf(email.Get(), text.Get(), push.Get()), prefFreq.Get(), percentOf(prefVolume.Get())).Size(13)).

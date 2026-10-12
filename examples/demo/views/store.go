@@ -89,6 +89,8 @@ type Store struct {
 	NewOpen *ui.Signal[bool]
 	NewName *ui.Signal[string]
 	NewDesc *ui.Signal[string]
+	// NewForm checks the New Project form. It is reset when the form opens and closes.
+	NewForm *ui.Form
 	// SampleOpen shows the form sample of the Components page. SampleName is its
 	// field, and SampleResult is what it last saved.
 	SampleOpen   *ui.Signal[bool]
@@ -146,6 +148,7 @@ func NewStore() *Store {
 		NewOpen:      ui.NewSignal(false),
 		NewName:      ui.NewSignal(""),
 		NewDesc:      ui.NewSignal(""),
+		NewForm:      ui.NewForm(),
 		SampleOpen:   ui.NewSignal(false),
 		SampleName:   ui.NewSignal(""),
 		SampleResult: ui.NewSignal(""),
@@ -171,11 +174,15 @@ const defaultDescription = "Freshly created. Add a description and some tasks."
 func (s *Store) OpenNewProject() {
 	s.NewName.Set("")
 	s.NewDesc.Set("")
+	s.NewForm.Reset()
 	s.NewOpen.Set(true)
 }
 
-// CloseNewProject hides the New Project form.
-func (s *Store) CloseNewProject() { s.NewOpen.Set(false) }
+// CloseNewProject hides the New Project form, and resets its checks.
+func (s *Store) CloseNewProject() {
+	s.NewOpen.Set(false)
+	s.NewForm.Reset()
+}
 
 // CreateProject adds a project with the name and description given, puts it at
 // the top of the list and selects it, and shows the Projects page with every

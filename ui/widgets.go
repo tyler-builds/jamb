@@ -428,8 +428,25 @@ type fieldOptions struct {
 	small       bool
 	autoFocus   bool
 	handle      *FocusHandle
-	widget      string  // the widget this field is, for the part names (see asPart)
-	trailing    Element // drawn inside the frame's right edge, after the text (NumberField's stacked spin buttons)
+	widget      string              // the widget this field is, for the part names (see asPart)
+	trailing    Element             // drawn inside the frame's right edge, after the text (NumberField's stacked spin buttons)
+	rules       []Validator[string] // the validators of the value (see Validate)
+	wire        fieldWire           // what a Field gives the control (see Field)
+}
+
+// formCheck and formWire make a text field a formControl (see Field).
+func (f *fieldOptions) formCheck() error { return firstError(f.value.Get(), f.rules) }
+
+func (ti *TextInputElement) formWire(w fieldWire) Element {
+	c := *ti
+	c.wire = w
+	return &c
+}
+
+func (ta *TextAreaElement) formWire(w fieldWire) Element {
+	c := *ta
+	c.wire = w
+	return &c
 }
 
 // TextInputElement is a single-line text field bound to a string signal.
@@ -511,6 +528,15 @@ func (ti *TextInputElement) AutoFocus() *TextInputElement { ti.autoFocus = true;
 // FocusHandle lets code focus the field (see NewFocusHandle).
 func (ti *TextInputElement) FocusHandle(h *FocusHandle) *TextInputElement { ti.handle = h; return ti }
 
+// Validate sets the validators of the text: the field shows the first error of
+// them once the user has changed the text and left the field, and on submit when
+// it is in a Form (see Field and Validator). An empty text passes MinLength and
+// Pattern, so pair those with Required when the field must be filled in.
+func (ti *TextInputElement) Validate(rules ...Validator[string]) *TextInputElement {
+	ti.rules = rules
+	return ti
+}
+
 func (ti *TextInputElement) expand(ctx *Context) Element {
 	st := resolveField(ctx.Theme(), fieldLayout{small: ti.small}, ti.styles)
 	return ti.fieldOptions.expand(ctx, st, false, 0)
@@ -589,6 +615,12 @@ func (ta *TextAreaElement) AutoFocus() *TextAreaElement { ta.autoFocus = true; r
 // FocusHandle lets code focus the editor (see NewFocusHandle).
 func (ta *TextAreaElement) FocusHandle(h *FocusHandle) *TextAreaElement { ta.handle = h; return ta }
 
+// Validate sets the validators of the text; see TextInputElement.Validate.
+func (ta *TextAreaElement) Validate(rules ...Validator[string]) *TextAreaElement {
+	ta.rules = rules
+	return ta
+}
+
 func (ta *TextAreaElement) expand(ctx *Context) Element {
 	st := resolveField(ctx.Theme(), fieldLayout{multiline: true}, ta.styles)
 	return ta.fieldOptions.expand(ctx, st, true, ta.minRows)
@@ -599,11 +631,58 @@ func (ta *TextAreaElement) expand(ctx *Context) Element {
 // Leading and Trailing parts. A borderless field draws no Frame part.
 func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRows int) Element {
 	t := ctx.Theme()
+	// What a Field gives the field replaces or adds to what the field was given. An
+	// invalid frame also stays while the field has focus, so the danger color is not
+	// hidden by the focus color (as in the grid's editor).
+	w := f.wire
+	if w.invalid {
+		st.Frame = st.Frame.Merge(st.FrameInvalid)
+		st.FrameFocusWithin = st.FrameInvalid
+	}
+	name, labelledBy, description := f.name, f.labelledBy, f.description
+	if w.label != "" {
+		name, labelledBy = w.label, w.labelledBy
+	}
+	if w.description != "" {
+		description = w.description
+	}
+	describedBy := slices.Concat(f.describedBy, w.describedBy)
+	onChange, onBlur, onSubmit := f.onChange, f.onBlur, f.onSubmit
+	if w.onEdit != nil {
+		change := f.onChange
+		onChange = func(s string) {
+			if change != nil {
+				change(s)
+			}
+			w.onEdit()
+		}
+	}
+	if w.onBlur != nil {
+		blur := f.onBlur
+		onBlur = func() {
+			if blur != nil {
+				blur()
+			}
+			w.onBlur()
+		}
+	}
+	if w.onEnter != nil {
+		submit := f.onSubmit
+		onSubmit = func(s string) {
+			if submit != nil {
+				submit(s)
+			}
+			w.onEnter()
+		}
+	}
 	// Reading the value subscribes this field, so it re-renders (and
 	// re-measures) when the text changes.
 	f.value.Get()
 	ctxState := ctx.state()
 	h := f.handle
+	if w.handle != nil {
+		h = w.handle
+	}
 	if h == nil {
 		if ctxState.focus == nil {
 			ctxState.focus = NewFocusHandle()
@@ -611,9 +690,9 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		h = ctxState.focus
 	}
 	ed := &editorElement{
-		value: f.value, placeholder: f.placeholder, name: f.name, labelledBy: f.labelledBy, describedBy: f.describedBy, multiline: multiline,
-		onSubmit: f.onSubmit, onChange: f.onChange, onBlur: f.onBlur, onCancel: f.onCancel, description: f.description,
-		onStep: f.onStep, autoFocus: f.autoFocus, handle: h,
+		value: f.value, placeholder: f.placeholder, name: name, labelledBy: labelledBy, describedBy: describedBy, multiline: multiline,
+		onSubmit: onSubmit, onChange: onChange, onBlur: onBlur, onCancel: f.onCancel, description: description,
+		onStep: f.onStep, autoFocus: f.autoFocus, handle: h, invalid: w.invalid, required: w.required,
 		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
 	}

@@ -39,6 +39,7 @@ func Components(s *Store) ui.Element {
 				Child(section(t, "Menus", dropdownSample(t), contextSample(t))).
 				Child(navigationSection()).
 				Child(formControlsSection()).
+				Child(formsSection(t)).
 				Child(dataGridSection(ctx, t)).
 				Child(customizingSection()).
 				Child(dialogsSection(ctx, t, s)).

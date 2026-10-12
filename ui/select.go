@@ -27,6 +27,7 @@ type SelectStyle struct {
 	TriggerHover        Style // the field while the pointer is over it
 	TriggerFocusVisible Style // the field while it has keyboard focus
 	TriggerDisabled     Style // the field when it is disabled
+	TriggerInvalid      Style // the field when its value is not valid (see Field)
 	Value               Style // the label of the chosen option in the field
 	Placeholder         Style // the placeholder, while no option is chosen
 	Chevron             Style // the arrow at the right of the field
@@ -44,6 +45,7 @@ func (s SelectStyle) merge(o SelectStyle) SelectStyle {
 		TriggerHover:        s.TriggerHover.Merge(o.TriggerHover),
 		TriggerFocusVisible: s.TriggerFocusVisible.Merge(o.TriggerFocusVisible),
 		TriggerDisabled:     s.TriggerDisabled.Merge(o.TriggerDisabled),
+		TriggerInvalid:      s.TriggerInvalid.Merge(o.TriggerInvalid),
 		Value:               s.Value.Merge(o.Value),
 		Placeholder:         s.Placeholder.Merge(o.Placeholder),
 		Chevron:             s.Chevron.Merge(o.Chevron),
@@ -62,6 +64,7 @@ func (s SelectStyle) plain() SelectStyle {
 		TriggerHover:        plainStyle(s.TriggerHover),
 		TriggerFocusVisible: plainStyle(s.TriggerFocusVisible),
 		TriggerDisabled:     plainStyle(s.TriggerDisabled),
+		TriggerInvalid:      plainStyle(s.TriggerInvalid),
 		Value:               plainStyle(s.Value),
 		Placeholder:         plainStyle(s.Placeholder),
 		Chevron:             plainStyle(s.Chevron),
@@ -87,8 +90,11 @@ func selectDefaults(t *Theme, width float32, disabled bool) SelectStyle {
 			Transition: 110 * time.Millisecond, TextColor: t.Text},
 		TriggerHover:        Style{BorderColor: t.TextMuted},
 		TriggerFocusVisible: Style{Shadows: []Shadow{ring}},
-		Placeholder:         Style{TextColor: placeholder},
-		Chevron:             Style{TextColor: chevron},
+		// The invalid trigger is drawn with a thicker border in the danger color, as an
+		// invalid text field is (the text color under high contrast).
+		TriggerInvalid: Style{BorderWidth: 2, BorderColor: messageIconColor(t, Style{})},
+		Placeholder:    Style{TextColor: placeholder},
+		Chevron:        Style{TextColor: chevron},
 		Popup: Style{Padding: All(4), MinWidth: Px(width), Background: t.Surface, BorderWidth: 1,
 			BorderColor: t.Border, Radius: t.Radius, Shadows: []Shadow{ShadowMd}},
 		Option: Style{Direction: Row, Align: Center, Gap: 8, MinHeight: Px(28), Padding: XY(8, 0),
@@ -144,12 +150,30 @@ type SelectElement[T comparable] struct {
 	styles       SelectStyle
 	renderValue  func(Option[T], PartState) Element
 	renderOption func(Option[T], PartState) Element
+	rules        []Validator[T] // the validators of the value (see Validate)
+	wire         fieldWire      // what a Field gives the field (see Field)
 }
 
 // Select creates a drop-down list that reads and writes value. The options are
 // shown in order. The default width is 220 px.
 func Select[T comparable](value *Signal[T], options ...Option[T]) *SelectElement[T] {
 	return &SelectElement[T]{value: value, options: options, width: 220}
+}
+
+// Validate sets the validators of the chosen value. The zero value is the
+// placeholder, so Required[T] rejects it: a field must show a choice (see Field).
+func (s *SelectElement[T]) Validate(rules ...Validator[T]) *SelectElement[T] {
+	s.rules = rules
+	return s
+}
+
+// formCheck and formWire make a select a formControl (see Field).
+func (s *SelectElement[T]) formCheck() error { return firstError(s.value.Get(), s.rules) }
+
+func (s *SelectElement[T]) formWire(w fieldWire) Element {
+	c := *s
+	c.wire = w
+	return &c
 }
 
 func (*SelectElement[T]) isElement()           {}
@@ -234,6 +258,12 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		// back is the field's focus handle. Focus returns to the field when the list
 		// closes, whichever way it was opened.
 		back := Local(ctx, "back", NewFocusHandle())
+		// ret is the field's handle: the one a Field gave it, else back.
+		ret := back.Peek()
+		w := s.wire
+		if w.handle != nil {
+			ret = w.handle
+		}
 
 		// shut closes the list. Focus returns to the field when restore is set.
 		shut := func(restore bool) {
@@ -250,7 +280,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 				return
 			}
 			rt.menuOpened()
-			rt.menuReturn = back.Peek()
+			rt.menuReturn = ret
 			start := sel
 			if start < 0 || s.options[start].Disabled {
 				start = nextEnabled(s.options, -1, 1, false)
@@ -328,20 +358,36 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		a := field.access()
 		field.Role(access.RoleComboBox).Expanded(open.Get())
 		a.value, a.readOnly = label, true
-		if s.name != "" {
-			field.Label(s.name)
+		name, labelledBy := s.name, s.labelledBy
+		if w.label != "" {
+			name, labelledBy = w.label, w.labelledBy
 		}
-		if len(s.labelledBy) > 0 {
-			field.LabelledBy(s.labelledBy...)
+		if name != "" {
+			field.Label(name)
 		}
-		field.FocusHandle(back.Peek())
+		if len(labelledBy) > 0 {
+			field.LabelledBy(labelledBy...)
+		}
+		if w.description != "" {
+			field.Description(w.description)
+		}
+		a.invalid, a.required = w.invalid, w.required
+		hover := st.TriggerHover
+		if w.invalid {
+			field.Style(st.TriggerInvalid)
+			hover = st.TriggerInvalid
+		}
+		if w.onBlur != nil {
+			field.OnBlur(w.onBlur)
+		}
+		field.FocusHandle(ret)
 		if s.disabled {
 			field.Cursor(CursorNotAllowed)
 			a.disabled = true
 			field.Style(st.TriggerDisabled)
 			return field
 		}
-		field.Cursor(CursorPointer).Hover(st.TriggerHover).
+		field.Cursor(CursorPointer).Hover(hover).
 			FocusVisible(st.TriggerFocusVisible).
 			OnClick(func() {
 				if open.Peek() {
@@ -564,6 +610,9 @@ func matchLabel[T comparable](options []Option[T], start int, prefix string) int
 // choose sets the value to v and runs OnChange.
 func (s *SelectElement[T]) choose(v T) {
 	s.value.Set(v)
+	if s.wire.onEdit != nil {
+		s.wire.onEdit()
+	}
 	if s.onChange != nil {
 		s.onChange(v)
 	}

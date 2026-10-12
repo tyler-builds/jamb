@@ -60,6 +60,8 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Menu:          base.Menu,
 		MenuBar:       base.MenuBar,
 		Modal:         base.Modal,
+		FormField:     base.FormField,
+		Form:          base.Form,
 		ProgressBar:   base.ProgressBar,
 		ProgressRing:  base.ProgressRing,
 		Badge:         base.Badge,

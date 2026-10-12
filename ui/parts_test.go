@@ -99,8 +99,14 @@ func drawnBy(part string) string {
 	switch part {
 	case "Tabs.TabSelected", "Tabs.TabDisabled", "Tabs.TabHover", "Tabs.TabFocusVisible":
 		return "Tabs.Tab"
-	case "Select.TriggerHover", "Select.TriggerFocusVisible", "Select.TriggerDisabled":
+	case "Select.TriggerHover", "Select.TriggerFocusVisible", "Select.TriggerDisabled", "Select.TriggerInvalid":
 		return "Select.Trigger"
+	case "Checkbox.BoxInvalid", "CheckboxTri.BoxInvalid":
+		return "Checkbox.Box"
+	case "RadioGroup.RingInvalid":
+		return "RadioGroup.Ring"
+	case "Form.SummaryItemHover", "Form.SummaryItemFocusVisible":
+		return "Form.SummaryItem"
 	case "Slider.TrackFocusVisible":
 		return "Slider.Track"
 	case "Slider.ThumbHover", "Slider.ThumbPressed":
@@ -195,6 +201,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Toast", func(t *testing.T) { testToastParts(t, applied) })
 	t.Run("Tooltip", func(t *testing.T) { testTooltipParts(t, applied) })
 	t.Run("DataGrid", func(t *testing.T) { testDataGridParts(t, applied) })
+	t.Run("Forms", func(t *testing.T) { testFormParts(t, applied) })
 
 	// The table and docs/styling.md list the same parts, in both directions.
 	documented := documentedParts(t)

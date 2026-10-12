@@ -11,6 +11,10 @@ import (
 // modalWidth is the width of a Modal's panel, in logical pixels.
 const modalWidth = 420
 
+// modalMargin is the space, in logical pixels, between a modal's panel and the edges
+// of the window when the panel is as tall as the window allows.
+const modalMargin = 24
+
 // ModalElement is a dialog drawn over the window: a dimmed backdrop, and a
 // panel centered on it with a title, a body and footer buttons. Build it only
 // while it is open, as a dropdown is built only while it is open. Place it last
@@ -79,7 +83,7 @@ func modalDefaults(t *Theme) ModalStyle {
 			Radius: 10, Shadows: []Shadow{ShadowLg}, Padding: All(20), Gap: 16},
 		Title:  Style{FontSize: 16, FontWeight: FontSemibold},
 		Body:   Style{Direction: Column, Gap: 12},
-		Footer: Style{Direction: Row, Justify: End, Gap: 8},
+		Footer: Style{Direction: Row, Justify: End, Gap: 8, Wrap: true},
 	}
 }
 
@@ -176,9 +180,13 @@ func (m *ModalElement) expand(ctx *Context) Element {
 	}
 	spec := &modalSpec{def: m.def, initial: m.initial}
 
-	footer := Div().asPart("Modal.Footer").Style(st.Footer).Children(m.footer...)
+	footer := Div().asPart("Modal.Footer").Style(st.Footer).Shrink(0).Children(m.footer...)
 	footer.modalFooter = true
-	panel := Div().asPart("Modal.Panel").Overlay(OverCenter).Style(st.Panel).
+	// The panel is at most the window's height less the margin, so its title and footer
+	// stay on screen. A body that does not fit scrolls, and the focus reveals the field
+	// in it (see FocusHandle.Focus).
+	_, winH := ctx.WindowSize()
+	panel := Div().asPart("Modal.Panel").Overlay(OverCenter).Style(st.Panel).MaxHeight(Px(winH-2*modalMargin)).
 		// The panel and the backdrop take focus by click, so a click on either
 		// does not leave the modal without focus. Neither is in the Tab order.
 		Focusable().TabStop(false).
@@ -191,12 +199,14 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		// the backdrop, which the panel counts as its parent, so it does not
 		// reach this.
 		OnClickOutside(closeFn).
-		Child(Div().asPart("Modal.Title").Style(st.Title).Child(Text(m.title))).
-		Child(Div().asPart("Modal.Body").Style(st.Body).Child(m.body)).
+		Child(Div().asPart("Modal.Title").Style(st.Title).Shrink(0).Child(Text(m.title))).
+		Child(Div().asPart("Modal.Body").Style(st.Body).Grow(1).ScrollY().Child(m.body)).
 		Child(footer).
 		Role(access.RoleDialog).Label(m.title)
 
-	backdrop := Div().asPart("Modal.Scrim").Absolute().Inset(0).Style(st.Scrim).
+	// The backdrop's padding is the margin around the panel, so a panel of 100% is the
+	// window less the margin.
+	backdrop := Div().asPart("Modal.Scrim").Absolute().Inset(0).Style(st.Scrim).Padding(modalMargin).
 		Focusable().TabStop(false).
 		Enter(Fade(), Animation{Duration: 140 * time.Millisecond}).
 		Exit(Fade(), Animation{Duration: 90 * time.Millisecond}).

@@ -118,6 +118,8 @@ type editorElement struct {
 	selectionText Color
 	// placeholderColor is the color of the placeholder; unset, it is the text color.
 	placeholderColor Color
+	// invalid and required are the states a Field gives the field (see fieldWire).
+	invalid, required bool
 }
 
 func (*editorElement) isElement() {}
@@ -191,6 +193,7 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	if e.description != "" {
 		d.access().description = e.description
 	}
+	d.access().invalid, d.access().required = e.invalid, e.required
 	n.div = d
 	rt.setOverhang(n)
 }

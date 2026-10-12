@@ -462,14 +462,39 @@ try {
         } 'the focus back on the card after Escape' | Out-Null
     }
 
-    Check 'demo: New Project opens a dialog; its disabled Create keeps Invoke; Cancel closes it' {
+    Check 'demo: New Project opens a dialog; Create is enabled and keeps Invoke, with no error shown yet; Cancel closes it' {
         Invoke-Named $win 'New Project' $CT.Button
         Wait-For { $null -ne (Find-Named $win 'New project' | Select-Object -First 1) } 'the New project dialog' | Out-Null
         $create = Find-One $win 'Create project' $CT.Button
-        Assert (-not $create.Current.IsEnabled) 'Create project is enabled with no name'
+        Assert ($create.Current.IsEnabled) 'Create project is disabled; a submit with no name should show the error'
+        Assert ($null -eq (Find-Named $win '1 field needs attention.' | Select-Object -First 1)) 'an error is shown before Create was pressed'
         Require-Pattern $create ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke' | Out-Null
         Invoke-Named $win 'Cancel' $CT.Button
         Wait-Gone { Find-Named $win 'New project' | Select-Object -First 1 } 'the dialog to close' | Out-Null
+    }
+
+    Check 'demo: New Project with an empty name flags the name, moves focus to it, and announces the error' {
+        [NotificationCounter]::Start($win)
+        $before = [NotificationCounter]::Count
+        Invoke-Named $win 'New Project' $CT.Button
+        Wait-For { $null -ne (Find-Named $win 'New project' | Select-Object -First 1) } 'the New project dialog' | Out-Null
+        Invoke-Named $win 'Create project' $CT.Button
+        $name = Wait-For { Find-Named $win 'Name' $CT.Edit | Select-Object -First 1 } 'the Name field of the dialog'
+        Wait-For { $f = [System.Windows.Automation.AutomationElement]::FocusedElement; if ($f -and $f.Current.Name -eq 'Name' -and $f.Current.ControlType -eq $CT.Edit) { $true } else { $null } } 'focus on the Name field' | Out-Null
+        Assert ((Get-Prop $name 30025) -eq $true) 'the Name field does not report IsRequiredForForm'
+        Assert ((Get-Prop $name 30103) -eq $false) 'the Name field reports IsDataValidForForm true while it has an error'
+        Assert ($name.Current.HelpText -eq 'This field is required.') "the Name field's description is '$($name.Current.HelpText)'"
+        Wait-For { if ([NotificationCounter]::Count -gt $before) { $true } else { $null } } 'the error announcement' | Out-Null
+        Wait-For { $null -ne (Find-Named $win '1 field needs attention.' | Select-Object -First 1) } 'the error summary' | Out-Null
+        if ($axe) {
+            $errors = Invoke-AxeScan $demo 'demo-new-project-errors'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+        }
+        (Require-Pattern $name ([System.Windows.Automation.ValuePatternIdentifiers]::Pattern) 'Value').SetValue('Lab project')
+        Invoke-Named $win 'Create project' $CT.Button
+        Wait-Gone { Find-Named $win 'New project' | Select-Object -First 1 } 'the dialog to close after Create' | Out-Null
+        # Create shows the project with an Undo action; Undo keeps the projects the later checks count.
+        Invoke-Named $win 'Undo' $CT.Button
     }
 
     Check 'demo: the Settings switches toggle with Toggle' {
@@ -554,6 +579,39 @@ try {
         $rv.SetValue(10)
         Wait-For { if ($vp.Current.Value -eq '10') { $true } else { $null } } 'the text to show 10' | Out-Null
         $rv.SetValue($before)
+    }
+
+    # ---- Demo: forms on the Components page ----------------------------------
+    Check 'demo: the Forms section: an empty save shows its summary, and the summary link moves focus to Name' {
+        Invoke-Named $win 'Save' $CT.Button
+        Wait-For { $null -ne (Find-Named $win '1 field needs attention.' | Select-Object -First 1) } 'the Forms summary' | Out-Null
+        $link = Find-One $win 'Name: This field is required.'
+        (Require-Pattern $link ([System.Windows.Automation.InvokePattern]::Pattern) 'Invoke').Invoke()
+        Wait-For { $f = [System.Windows.Automation.AutomationElement]::FocusedElement; if ($f -and $f.Current.Name -eq 'Name' -and $f.Current.ControlType -eq $CT.Edit) { $true } else { $null } } 'the summary link to move focus to the Name field' | Out-Null
+        $name = Find-One $win 'Name' $CT.Edit
+        Assert ((Get-Prop $name 30025) -eq $true) 'the Forms name field does not report IsRequiredForForm'
+        Assert ((Get-Prop $name 30103) -eq $false) 'the Forms name field reports IsDataValidForForm true while it has an error'
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Forms section with its summary shown' {
+            $save = Find-One $win 'Save' $CT.Button
+            $item = Require-Pattern $save ([System.Windows.Automation.ScrollItemPatternIdentifiers]::Pattern) 'ScrollItem'
+            $item.ScrollIntoView()
+            Wait-For { if ($save.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom) { $true } else { $null } } 'the Save button to be in view' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-forms-summary'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+    }
+
+    Check 'demo: the Forms save runs in the background with Save disabled, and the server refusal is shown' {
+        $name = Find-One $win 'Name' $CT.Edit
+        (Require-Pattern $name ([System.Windows.Automation.ValuePatternIdentifiers]::Pattern) 'Value').SetValue('taken')
+        Invoke-Named $win 'Save' $CT.Button
+        Wait-For { $s = @(Find-Named $win 'Save' $CT.Button)[0]; if ($s -and -not $s.Current.IsEnabled) { $true } else { $null } } 'Save to be disabled while the save runs' | Out-Null
+        Wait-For { $null -ne (Find-Named $win 'That name is already in use. Choose another.' | Select-Object -First 1) } 'the server refusal to be shown' | Out-Null
+        Wait-For { $s = @(Find-Named $win 'Save' $CT.Button)[0]; if ($s -and $s.Current.IsEnabled) { $true } else { $null } } 'Save to be enabled again' | Out-Null
     }
 
     # ---- Demo: navigation and layout on the Components page ------------------

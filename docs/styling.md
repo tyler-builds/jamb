@@ -47,7 +47,8 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Theme.Switch`, `Theme.Collapsible`, `Theme.TreeView`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
-   (per kind), and `Theme.Tooltip`. Each is a field of `ui.Theme`, and the
+   (per kind), `Theme.Tooltip`, and `Theme.FormField` (the label, help text and error
+   of every field) and `Theme.Form` (the error summary of every form). Each is a field of `ui.Theme`, and the
    high-contrast theme takes it from the base theme.
 3. **The instance.** Set on one widget with `.Styles(...)`. Calling `.Styles` again
    merges into the earlier values.
@@ -155,7 +156,7 @@ the value further.
 | `Selected` | the part is the selected one | the part's selected style |
 | `Disabled` | the part cannot be used | the part's disabled style |
 | `Highlighted` | the option is highlighted in an open list | the option's highlight style |
-| `Invalid` | the field's text is not a valid value (NumberField) | the part's invalid style |
+| `Invalid` | the field's value is not valid: a NumberField's text, or a control that a Field shows an error for (TextInput, TextArea, NumberField, Select, RadioGroup, Checkbox) | the part's invalid style |
 | `Checked` | the check box is on, or the switch is on, or the ring is the selected one | the part's checked style |
 | `Mixed` | the check box is in the mixed (indeterminate) state | the part's mixed style |
 | `Open` | the collapsible section is open | the part's open style |
@@ -239,6 +240,11 @@ ui.TextInput(query).Icon(icons.Search).Trailing(clearButton).Styles(ui.FieldStyl
   `Message` row below it. The message's icon is drawn in the `Message` part's
   `TextColor` when it sets one, and in `Danger` otherwise (the text color under high
   contrast). The message's text takes the same color.
+- A text field, text area or number field with an error from a `Field` (see the
+  README, Forms) draws `FrameInvalid` over its frame, and it keeps that frame while
+  it has focus, so the danger color is not hidden by the focus color. The error
+  itself is a field part (`FormField.Error`), which has the same look as the number
+  field's `Message`: both take `messageStyle` in the code.
 - The caret is not a part. Its width and blink follow the system settings, and it is
   drawn in the text color.
 - Under high contrast the frame's colors and its focus follow the system: the focus is
@@ -404,14 +410,16 @@ parts that the code applies.
 | Widget | Parts | Variants | Render slots | Status |
 | --- | --- | --- | --- | --- |
 | `Tabs` | `List`, `Tab`, `TabHover`, `TabSelected`, `TabDisabled`, `TabFocusVisible`, `Indicator`, `Panel` | `TabsUnderline`, `TabsSegmented` | `RenderTab` | done |
-| `Select` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `TriggerDisabled`, `Value`, `Placeholder`, `Chevron`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected`, `OptionDisabled` | none | `RenderValue`, `RenderOption` | done |
+| `FormField` | `Root`, `Label`, `InlineLabel`, `Required`, `Description`, `Error` | none | none | done |
+| `Form` | `Summary`, `SummaryTitle`, `SummaryItem`, `SummaryItemHover`, `SummaryItemFocusVisible` | none | none | done |
+| `Select` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `TriggerDisabled`, `TriggerInvalid`, `Value`, `Placeholder`, `Chevron`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected`, `OptionDisabled` | none | `RenderValue`, `RenderOption` | done |
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
 | `NumberField` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |
-| `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
-| `Checkbox`, `CheckboxTri` | `Control`, `ControlFocusVisible`, `ControlDisabled`, `Box`, `BoxHover`, `BoxChecked`, `BoxMixed`, `BoxDisabled`, `Mark`, `Dash`, `Label`, `LabelDisabled` | none | none | done |
+| `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
+| `Checkbox`, `CheckboxTri` | `Control`, `ControlFocusVisible`, `ControlDisabled`, `Box`, `BoxHover`, `BoxChecked`, `BoxMixed`, `BoxDisabled`, `BoxInvalid`, `Mark`, `Dash`, `Label`, `LabelDisabled` | none | none | done |
 | `Switch` | `Track`, `TrackChecked`, `TrackHover`, `TrackFocusVisible`, `TrackDisabled`, `Knob`, `KnobChecked`, `KnobDisabled` | none | none | done |
-| `RadioGroup` | `Group`, `Radio`, `RadioFocusVisible`, `RadioDisabled`, `Ring`, `RingChecked`, `RingDisabled`, `Dot`, `DotDisabled`, `Label`, `LabelDisabled` | none | none | done |
+| `RadioGroup` | `Group`, `Radio`, `RadioFocusVisible`, `RadioDisabled`, `Ring`, `RingChecked`, `RingDisabled`, `RingInvalid`, `Dot`, `DotDisabled`, `Label`, `LabelDisabled` | none | none | done |
 | `Collapsible`, `Accordion` | `Section`, `Header`, `HeaderHover`, `HeaderOpen`, `HeaderFocusVisible`, `HeaderDisabled`, `Chevron`, `Content` | none | `RenderHeader` | done |
 | `TreeView` | `Row`, `RowHover`, `RowSelected`, `Chevron`, `Icon`, `Label`, `TreeFocusVisible` | none | `RenderRow`, `RenderLabel` | done |
 | `DataGrid` | `Grid`, `GridFocusVisible`, `Header`, `HeaderCell`, `HeaderCellHover`, `HeaderCellSorted`, `SortIndicator`, `ResizeHandle`, `Row`, `RowHover`, `RowSelected`, `RowAlternate`, `Cell`, `CellFocused`, `Empty`, `CellEditing`, `Editor`, `EditorMessage` | `DataGridComfortable`, `DataGridCompact`, `Striped()` | `DataColumn.Cell`, `DataColumn.RenderHeader` | done |

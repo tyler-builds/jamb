@@ -568,6 +568,9 @@ func NewFocusHandle() *FocusHandle { return &FocusHandle{} }
 func (h *FocusHandle) Focus() {
 	h.pending = true
 	if h.rt != nil {
+		// A focus the code asks for scrolls the element into view, as Tab does, so a field
+		// inside a scrolling body (a modal's) is shown when it takes focus.
+		h.rt.revealFocus = true
 		h.rt.pendingHandles = append(h.rt.pendingHandles, h)
 		h.rt.requestFrame()
 	}

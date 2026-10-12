@@ -1461,6 +1461,11 @@ ui.If(open.Get(), ui.Modal("New project", form).
   button as usual, and otherwise runs the default button. A multi-line field
   takes Enter as a newline. A single-line field with no `OnSubmit` passes Enter
   on to the default button.
+- The panel is at most the window's height less 24 px, as the window is when the modal
+  opens (a window resized while a modal is open keeps its size until the modal is built
+  again). The title and the footer stay on screen, and a body that does not fit scrolls.
+  The footer's buttons wrap when they do not fit the panel's width. A focus the code asks
+  for (`FocusHandle.Focus`) scrolls the element into view, as Tab does.
 - Its placement is `ui.OverCenter`, a new overlay placement that centers the
   panel over its anchor. Colors come from `Theme.Scrim` and the surface colors,
   and the modal enters and leaves with the same motion as the command palette.
@@ -1468,6 +1473,123 @@ ui.If(open.Get(), ui.Modal("New project", form).
   handlers and typed text outside the modal don't reach anything behind it, and
   Alt doesn't activate a menu bar. Keys handled inside the modal (a field's
   editing keys, the modal's own bindings) work as usual.
+
+### Forms
+
+A form is a set of fields. `ui.Field` gives a control a label, an optional help
+text, an optional required marker and an error, and wires them to the control for
+assistive technology. `ui.NewForm` checks the fields on submit and runs the submit.
+Build the form once and keep it across renders (in a `Local`, or in the app's
+state), since it holds the submit state:
+
+```go
+f := ui.NewForm().OnSubmit(func() error { return save(name.Peek()) })
+ui.Div().Column().Gap(12).
+	Child(f.Summary()).
+	Child(f.Field("name", "Name", ui.TextInput(name).Placeholder("Project name").
+		Validate(ui.Required[string](), ui.MaxLength(80))).
+		Description("Shown in the project list.").Required()).
+	Child(f.Field("email", "Email", ui.TextInput(email).Validate(ui.Pattern(emailRE, "Enter an email address."))).Inline()).
+	Child(ui.Button("Save").Primary().OnClick(f.Submit))
+```
+
+![A form after a submit with an empty name: the summary, the required name with its error](docs/screenshots/forms-summary.png)
+
+![The New project dialog after a submit with an empty name](docs/screenshots/modal-new-project-errors.png)
+
+**Field.** `ui.Field(label, control)` puts the label above the control, or beside
+it with `Inline()`, which suits settings rows. `Description(s)` is the help text,
+`Required()` adds an asterisk after the label, `Error(msg)` shows an error the app
+found (such as one from a server), and `Check(fn)` checks a whole field, such as a
+group of check boxes, with `fn() error` (it reads its signals with `Get`). `Focus(h)`
+gives the element that takes focus for a field whose control is a group; a
+`Checkbox` takes a handle with its `FocusHandle` method for that. A field
+outside a form (`ui.Field(...)` on its own) is checked the same way, but only as the
+user works with it.
+
+- The control is named by the label (`Label` and `LabelledBy`), and it is described
+  by the help text and the error (`DescribedBy` and `HelpText`). A required control
+  reports `IsRequiredForForm`; a control with a shown error reports `StateInvalid`,
+  which the Windows adapter answers as `IsDataValidForForm` false.
+- The asterisk is drawn and hidden from assistive technology. The state is the
+  announcement, so the asterisk carries no meaning that a screen reader misses.
+- The error is drawn above the control, under the help text, with the alert icon and
+  the same look as a number field's message. The control's frame is the invalid
+  frame, and it stays invalid while the control has focus.
+
+**Validators.** A control takes validators with `Validate`: `TextInput`, `TextArea`,
+`NumberField`, `Select`, `RadioGroup` and `Checkbox` (a `Checkbox` with `Required[bool]()`
+is "must accept"). They are generic over the control's value type:
+
+- `ui.Required[T]()`: rejects the zero value (blank text after trimming, zero, `false`,
+  or the placeholder option of a `Select` or `RadioGroup`). A number field does not
+  need it, since it always holds a number.
+- `ui.MinLength(n)`, `ui.MaxLength(n)`, `ui.Pattern(re, msg)` for text, counted in runes.
+  The empty text passes `MinLength` and `Pattern`, so `Required` decides whether a field
+  must be filled in, and an optional field can use them.
+- `ui.Range(lo, hi)` for numbers, inclusive.
+- `ui.Custom(func(v T) error)` for anything else.
+
+A validator returns an error whose text is the message the field shows. The first
+failing validator of a control is its message.
+
+**When errors show.** These follow the guidance cited below: no error before the user
+has acted, errors that are found on leaving a field, and every error on submit.
+
+- A field shows nothing until the user changes its value and then leaves it, or until
+  the form is submitted. A field that the user only visits shows nothing.
+- Once an error is shown, it updates with each change, so it clears as soon as the
+  value is valid.
+- `Error(msg)` is shown at once, since the app found it.
+- On submit, every field is checked and every field's message is shown.
+
+**Submit.** `f.Submit` checks every field. When one needs attention, focus moves to the
+first such field, the form announces the number assertively ("2 fields need attention.")
+and the summary lists each error as a link that moves focus to its field. When every
+field is valid, the submit function runs. `OnSubmit(fn)` returns an error for the
+form's own message, such as a refusal from a server; the message is shown in the
+summary and announced. `OnSubmitAsync(fn)` runs work in the background: `fn` starts the
+work and returns a channel that receives the result (nil, or the error for the message).
+While it runs, `f.Submitting()` is true, `Submit` does nothing, and the button can be
+disabled, with a `ProgressRing` beside it.
+
+```go
+f := ui.NewForm().OnSubmitAsync(func() <-chan error {
+	done := make(chan error, 1)
+	go func() { done <- saveToServer(name) }()
+	return done
+})
+ui.Button("Save").Disabled(f.Submitting()).OnClick(f.Submit)
+```
+
+- Enter in a single-line field of a form submits the form. A check box, switch or
+  radio button keeps Enter for the modal's default button, as it does outside a form.
+- `f.Reset()` clears the submitted state and the form's message, and forgets its
+  fields, which are added again when they are built. Call it when the form's modal
+  closes, so the next opening starts clean.
+- `f.Summary()` is empty until a submit has an error. Place it above the fields.
+- A field's key is the key given to `f.Field` (unique in the form). Keys are the
+  window's, so two forms can use the same field keys.
+
+**Styling.** A field's parts are `ui.FormFieldStyle` (`Root`, `Label`, `InlineLabel`,
+`Required`, `Description`, `Error`), set with `Theme.FormField` or `Field.Styles`. A
+form's summary parts are `ui.FormStyle` (`Summary`, `SummaryTitle`, `SummaryItem`, with
+its hover and focus states), set with `Theme.Form` or `Summary().Styles`. The invalid
+looks of the controls are the parts `FrameInvalid`, `TriggerInvalid`, `BoxInvalid` and
+`RingInvalid`. See docs/styling.md.
+
+**Sources.** The timing and the summary follow the WCAG 2.2 success criteria for
+error identification and error suggestion
+(https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html and
+https://www.w3.org/WAI/WCAG22/Understanding/error-suggestion.html), and the W3C WAI
+forms guidance on labels, instructions and errors (https://www.w3.org/WAI/tutorials/forms/).
+The error summary with links to the fields, the error message above the input, and
+the help text under the label follow the GOV.UK Design System
+(https://design-system.service.gov.uk/components/error-summary/ and
+https://design-system.service.gov.uk/components/error-message/). The UI Automation
+properties are Microsoft's (https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-automation-element-propids):
+`IsRequiredForForm` (30025), `IsDataValidForForm` (30103), `HelpText` (30013),
+`DescribedBy` (30105) and `FullDescription` (30159, not yet answered).
 
 ### Accessibility
 

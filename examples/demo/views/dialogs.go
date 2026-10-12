@@ -8,26 +8,29 @@ import (
 )
 
 // newProjectModal is the New Project form: a name and a description. It is
-// shown while s.NewOpen is set. Create is disabled until the name has text, and
-// Enter runs it when the name field has focus.
+// shown while s.NewOpen is set. Create submits the form: a blank name, or one
+// longer than 80 characters, is reported in the summary and the field, and focus
+// moves to the name. Enter in the name field submits it too.
 func newProjectModal(s *Store) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		if !s.NewOpen.Get() {
 			return nil
 		}
-		t := ctx.Theme()
-		create := ui.Button("Create project").Key("project-create").Icon(icons.Plus).
-			Disabled(strings.TrimSpace(s.NewName.Get()) == "").
-			OnClick(func() {
-				id := s.CreateProject(strings.TrimSpace(s.NewName.Peek()), strings.TrimSpace(s.NewDesc.Peek()))
-				notify(ctx, s, ui.ToastSuccess, "Project created").Action("Undo", func() { s.DeleteProject(id) })
-				s.CloseNewProject()
-			})
+		form := s.NewForm.OnSubmit(func() error {
+			id := s.CreateProject(strings.TrimSpace(s.NewName.Peek()), strings.TrimSpace(s.NewDesc.Peek()))
+			notify(ctx, s, ui.ToastSuccess, "Project created").Action("Undo", func() { s.DeleteProject(id) })
+			s.CloseNewProject()
+			return nil
+		})
+		create := ui.Button("Create project").Key("project-create").Icon(icons.Plus).OnClick(form.Submit)
 		cancel := ui.Button("Cancel").Key("project-cancel").Secondary().OnClick(s.CloseNewProject)
-		form := ui.Div().Column().Gap(12).
-			Child(labeledField(t, "Name", ui.TextInput(s.NewName).Label("Name").LabelledBy(fieldLabel("Name")).Placeholder("Project name"))).
-			Child(labeledField(t, "Description", ui.TextArea(s.NewDesc).Label("Description").LabelledBy(fieldLabel("Description")).Placeholder("What the project is for (optional)").MinRows(3)))
-		return ui.Modal("New project", form).Footer(cancel, create).Default(create).
+		body := ui.Div().Column().Gap(12).
+			Child(form.Summary()).
+			Child(form.Field("name", "Name", ui.TextInput(s.NewName).Placeholder("Project name").
+				Validate(ui.Required[string](), ui.MaxLength(80))).Required()).
+			Child(form.Field("description", "Description", ui.TextArea(s.NewDesc).Placeholder("What the project is for").
+				MinRows(3)).Description("Optional. Shown on the project's page."))
+		return ui.Modal("New project", body).Footer(cancel, create).Default(create).
 			OnClose(s.CloseNewProject).CloseOnBackdrop()
 	})
 }

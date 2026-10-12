@@ -145,6 +145,7 @@ README.
 | E. Verification | Accessibility Insights for Windows checks on the examples, a manual NVDA and Narrator script, automated tests that read the real UI Automation tree |
 | F. Form controls | Check boxes with a mixed state, switches, radio groups, selects, sliders and number fields; the RangeValue pattern; the Windows ComboBox, Slider and Spinner control types |
 | G. Navigation and layout | Tabs with automatic activation, Ctrl+Tab, and lazily built panels; collapsible sections and an accordion; a tree view that builds only its visible rows, with Tree and TreeItem control types, levels and positions in their sets |
+| K. Forms | `ui.Field` (label, help text, required marker, error), validators on the controls, `ui.NewForm` with the submit flow, the error summary, and an async submit; IsRequiredForForm and IsDataValidForForm |
 
 ## Testing
 
@@ -1812,3 +1813,46 @@ The Value pattern follows Microsoft's DataItem guidance (uiauto-supportdataitemc
 - **Moving focus out of an editing row that scrolls away.** Focus stays in an editor that is not on screen (see the bullet above), so the keys typed meanwhile go to it. A grid could move focus to the cell when its editor leaves the view; that would change the keyboard model, so it is not made here.
 - **A custom editor and the Value pattern of its cell.** A custom editor (`DataColumn.Editor`, a Select, a NumberField or a CheckBox) is the app's control: its accessibility is that of the control it returns. The grid focuses the first focusable control of the editor when it opens, saves a change of focus out of the cell, and gives the failed-save message to the cell as a popover. The grid does not set the description of the custom control, since the control is not the grid's.
 - **Focus on a DataItem.** The Microsoft page describes SetFocus on a data item moving focus to its edit control. The grid's `ActionFocus` does not do that yet.
+
+## Phase K: what changed from this design
+
+Phase K adds forms: `ui.Field` (a label above or beside a control, with help text, a required marker and an error), validators on the controls (`Validate`), `ui.NewForm` (the submit flow, with an error summary and an async submit), and the Windows properties that report a form's state. The API and the look are in the README (Forms) and in docs/styling.md. This section records the decisions that bind the accessibility side and the sources they follow.
+
+**Sources.**
+
+- WCAG 2.2 error identification (https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html) and error suggestion (https://www.w3.org/WAI/WCAG22/Understanding/error-suggestion.html): an error is identified in text, not by color alone, and it is described to the user.
+- The W3C WAI forms tutorial (https://www.w3.org/WAI/tutorials/forms/): each control has a label, help text is associated with its control, and errors are announced.
+- The GOV.UK Design System error summary (https://design-system.service.gov.uk/components/error-summary/) and error message (https://design-system.service.gov.uk/components/error-message/): the summary sits above the form and links to each field, the message sits above its input, and the focus moves to the first field with an error.
+- Microsoft's automation element property identifiers (https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-automation-element-propids), checked against UIAutomationClient.h in the Windows SDK 10.0.26100.0: `IsRequiredForForm` is 30025 ("required to be filled out on a form"), `IsDataValidForForm` is 30103 ("valid for the form rule associated with the automation element"; its documented default is FALSE), `HelpText` is 30013, `DescribedBy` is 30105, and `FullDescription` is 30159.
+
+**Decisions.**
+
+- **Timing.** No message appears before the user has changed a field and left it, or before a submit. A field's message updates on each change once it is shown, so it clears as soon as the value is valid. On submit, every field is checked and every message is shown. An error the app sets with `Error` is shown at once.
+- **Name, relations and description.** The control's accessible name is the label (`Label`), and `LabelledBy` refers to the label's text. `DescribedBy` refers to the help text and the error, and `HelpText` carries the help text and the error together, since the screen readers that speak a description read `HelpText`. A group of controls (a `Field` with `Check` and no control of its own) is a group named by its label.
+- **Required.** The state is `StateRequired`, which the adapter answers as `IsRequiredForForm`. The asterisk is drawn and hidden from the tree, so the state is the only announcement.
+- **Invalid.** The state is `StateInvalid` while a message is shown. The adapter answers `IsDataValidForForm` false for an invalid field, true for a required valid one, and leaves it empty for an element that is neither, since that is not a form field.
+- **Focus and summary.** On a failed submit, focus moves to the first field with a message, and the form announces the count assertively ("2 fields need attention."). The summary is a group named by its title, and each item is a link that moves focus to its field.
+- **Async submit.** While the submit runs, `Submit` does nothing, and the button is disabled. The result reaches the UI thread through `Context.Post`, which requests a frame, so the result is shown without an input event.
+- **Enter.** In a single-line field of a form, Enter submits the form. A check box, switch or radio button keeps Enter for the modal's default button, as it did before.
+- **Validators on empty input.** `MinLength` and `Pattern` pass the empty text, so `Required` decides whether a field is filled in; an optional field is not reported as too short.
+
+**Verification.**
+
+- Unit tests in `ui` (`form_test.go`, `form_group_test.go`, `form_parts_test.go`): each validator and its message, the first failing validator, the field's wiring (`LabelledBy`, `DescribedBy`, `Description`, `StateRequired`, `StateInvalid`), the required marker outside the tree, the timing rules (no error before the user acts, an error after an edit and a blur, not after a visit alone, an app error at once), the submit (the first invalid field gets focus, the count is announced, the summary's links move focus), the form's message from a submit and from an async submit, the disabled state while the submit runs, Enter in a field against Enter on a check box in a modal, `Reset`, the controls' own checks (select, radio group, check box "must accept"), a group's check and its focus handle, the styles' precedence, `Clear` and high contrast, the shared message look of a number field and a field, and the drift test for every new part.
+- Platform tests in `platform/windows` (`uia_forms_test.go`): the two property IDs against the SDK header, and the answers for a required, an invalid, a required-and-invalid and an ordinary element.
+- Demo tests in `examples/demo/views` (`components_forms_test.go`): the New Project error and focus, the channels rule of the preferences, and the Forms summary and the server's refusal.
+- Live checks in `scripts/a11y-check.ps1`: New Project with an empty name (focus on Name, `IsRequiredForForm` true, `IsDataValidForForm` false, `HelpText` "This field is required.", the announcement by a Notification event, the summary's count, an Axe scan of the errors, and then a valid name submitted and undone); the Forms summary's link moving focus to Name with the same properties, an Axe scan with the summary shown, and the background save with Save disabled and the server's refusal shown. The check "New Project opens a dialog" now asserts that Create is enabled and that no error is shown before Create is pressed.
+- Results (final, after the fixes below): `-TextScale 225` passed 66 of 66 in five runs out of five; the normal mode passed 66 of 66 in two runs out of two; `-HighContrast` passed 66 of 66 once. No Axe scan reported an error in any run.
+- Earlier, before the fixes below, the 225 percent runs failed on the label editor's keyboard checks. The cause was in the grid, not the timing of the script: see "A grid key handler read a stale cursor" below.
+**Fixes made after the first live runs.**
+
+- **A grid key handler read a stale cursor.** The grid took the cursor (row, column and header) from the render, and its key handlers used that copy. Two keys delivered before the next frame, such as Ctrl+Home, Right, Right and F2 sent by a fast keyboard or by SendKeys, all acted on the cell of the last render, so the cursor moved once and F2 opened the editor of the wrong cell (or none). The handlers now read the cursor from its signal when they run (`cursorNow` in `ui/datagrid.go`). Regression tests: `TestArrowKeysBeforeAFrameEachMoveTheCursor` and `TestArrowKeysAtLargeTextScrollTheCellIntoView` (`ui/datagrid_fastkeys_test.go`), which send the keys without frames at 225% text. The failing timeouts were "Label editor to take focus", not a timing problem in the script.
+- **A modal reflowed to the window.** A modal's panel is at most the window's height less 24 px, its title and footer do not shrink, and its body scrolls (`ui/modal.go`). A focus the code asks for (`FocusHandle.Focus`, which Submit, the focus to the first invalid field and the summary links use) now scrolls the element into view, as Tab does. Tests: `ui/modal_reflow_test.go`. The 225% screenshot `docs/screenshots/modal-new-project-errors-225.png` shows the footer on screen, with Cancel and Create wrapped to fit the panel.
+
+**Open items.**
+
+- **The manual screen reader pass** (NVDA and Narrator, the script in docs/accessibility-testing.md) is pending for the forms. Check, in particular, whether the help text and the error are read once or twice: `HelpText` and `DescribedBy` both carry them, and a reader that speaks both would repeat them. The choice is kept for now, so that a reader that speaks only one of the two still gets the text.
+- **`FullDescription`** (30159) is not answered. The help text and the error are in `HelpText`.
+- **Switch and Slider.** They have no `Validate`, and a `Field` around them is a group, not a control. Their labels are not wired as names.
+- **The grid editor's popover** keeps its own look (a bordered popover), so the grid and the forms share the Danger text and the alert icon, not the same box.
+- **Quiet hours.** The check that the start and the end differ is a demo rule, not a framework rule; a range is always valid for a number field, which clamps its value.
