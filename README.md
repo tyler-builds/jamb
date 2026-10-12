@@ -458,6 +458,118 @@ number field is a spin box that holds its text field, as Microsoft's Spinner
 control type describes
 ([Spinner control type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).
 
+### Combobox
+
+A combo box is an editable text field with a list of suggestions below it: `ui.Combobox`.
+As the user types, the list opens with the suggestions for the text. The text is the
+signal the field reads and writes, as `TextInput` does. The suggestions come from a
+function of the query, or from a background function with `SuggestAsync`.
+
+```go
+// Suggestions for the text, computed on the UI thread at each change.
+ui.Combobox(city, func(q string) []ui.Option[string] { return citiesMatching(q) }).
+	Label("City").Placeholder("Type a city").
+	OnPick(func(v string) { ... }) // v is the value of the suggestion chosen
+
+// Only the suggestions can be chosen: the text reverts on blur (see AllowFree).
+ui.Combobox(fruit, fruits).Label("Fruit").AllowFree(false).Validate(ui.Required[string]())
+
+// A background search with a debounce, and the spinner while it runs.
+ui.Combobox[string](q, nil).Label("Address").
+	SuggestAsync(func(ctx context.Context, q string) ([]ui.Option[string], error) { ... }).
+	Debounce(150 * time.Millisecond).MinChars(2)
+
+// The header search of the demo: values are project IDs, and each row is a render slot.
+ui.Combobox(s.Query, searchOptions(s)).Label("Search projects").
+	RenderOption(searchOption(s, t)).OnChange(...).OnPick(func(id int) { ... })
+```
+
+The options are `ui.Option[T]`, as they are for a select: the value is what `OnPick`
+receives, the label is what the text shows and what the suggestions match. The methods:
+
+| Method | What it does |
+| --- | --- |
+| `OnPick(fn func(T))` | runs with the value of the suggestion chosen by a click or by Enter; the text is set to its label first |
+| `OnChange(fn func(string))` | runs with the text after each change the user makes (not for a chosen suggestion) |
+| `AllowFree(bool)` | free text is allowed (the default); `AllowFree(false)` chooses only from the suggestions (see below) |
+| `MinChars(n)` | the list stays closed until the text has n characters (default 0) |
+| `Debounce(d)` | waits for the user to stop typing before asking for suggestions (default: at once) |
+| `SuggestAsync(fn)` | finds the suggestions in the background; see below |
+| `MaxVisible(n)` | the list is at most n rows high (default 8) and scrolls to the rest; the highlighted row is scrolled into view |
+| `ErrorText(s)` | the text of the row shown when an async suggest function fails (default "Couldn't load suggestions") |
+| `EmptyText(s)` | the text of the empty slot (default "No results") |
+| `RenderOption(fn)` | replaces the label of each suggestion; the label stays the accessible name, and the content is hidden from assistive technology |
+| `Validate(rules...)` | the validators of the text, as TextInput has them; see Forms |
+| `Placeholder`, `Icon`, `Label`, `LabelledBy`, `Key`, `Disabled`, `FocusHandle` | as for TextInput |
+| `Width`, `Height`, `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow`, `Styles` | the sizing methods and the look of the parts (see Sizing and Styling) |
+
+The match of the query in each label is highlighted (`HighlightMatches`), so the
+label shows which part matched. Its look is the `Match` part of `ui.ComboboxStyle`.
+A suggestion that is disabled (`Disabled: true`) is shown and cannot be chosen.
+
+**Keys.** The field follows the combo box pattern of the WAI-ARIA Authoring Practices
+(https://www.w3.org/WAI/ARIA/apg/patterns/combobox/). Focus stays in the text while
+the list is open, and the highlighted suggestion is the one the keys have reached.
+
+- Typing filters the suggestions and opens the list, with nothing highlighted.
+- Down opens the list when it is closed, and moves the highlight to the next suggestion,
+  without wrapping. Up moves it back, and from the first suggestion returns to the text.
+- Enter chooses the highlighted suggestion and closes the list. With no suggestion
+  highlighted, Enter keeps the text as it is and closes the list. When the list is
+  closed, Enter is the field's own Enter (in a Form, it submits).
+- Escape closes the list. When the list is closed and the text is not empty, Escape
+  clears the text (the APG permits this as an option); when the text is empty, Escape
+  leaves the field, as it does in a text field.
+- Tab closes the list and does not choose the highlighted suggestion. The APG does not
+  define Tab while the list is open; the choice here is that Enter is the only key that
+  chooses, so a Tab through the field never changes the text.
+- Alt+Down opens the list without moving the highlight, and Alt+Up closes it.
+- Home and End move in the text.
+- A click on a suggestion chooses it and keeps focus in the text. A click in the text opens
+  the list when it is closed, and never closes it: the press places the caret.
+- Home and End are not keys of the combo box in the APG, so they edit the text. Page Up and
+  Page Down are not defined for the combo box either, and are not bound. The list scrolls
+  with the highlight, and with the mouse wheel.
+
+The keys are actions of the field (see Actions and key bindings). Up and Down are the
+field's while it is enabled, since they open the list. Enter is the field's only while
+the list is open, and Escape while the list is open or the text is not empty; otherwise
+they are the text field's own keys.
+
+**Free text and choices.** With free text (the default), the text stays as the user
+leaves it, and `OnPick` runs only for a suggestion that is chosen. With `AllowFree(false)`,
+the field chooses only from its suggestions: when the text loses focus, a text that is
+not the label of the suggestion last chosen is reverted to that label, or cleared when
+nothing was chosen. A suggestion whose label matches the text exactly (ignoring case) is
+chosen in its place. The revert happens when the field loses focus, so a Form submitted
+from another control checks the reverted text, and `Required` makes an unchosen
+restricted field an error. The change is announced politely and shown under the field, as
+"Not in the list; cleared" or "Not in the list; reverted to Apple"; the same text is the
+field's description. A text that is empty when the field is left is reverted without a message. A Form submitted by Enter in the field checks the text as it
+is at that moment.
+
+**Background suggestions.** `SuggestAsync` runs the function on its own goroutine, with
+a context that is canceled when a newer query starts. Its results are shown only when
+they are for the latest query; an older result is dropped, so a slow answer cannot
+replace a newer one. While a request runs, the list shows a `ProgressRing`. An error
+shows the error row (`ErrorText`), and the text is announced politely. The field stays
+usable: its text is still free, and editing it asks again. There is no retry button in the
+list, since the keys do not reach it. Return promptly when the context is canceled.
+
+**Accessibility.** The field is a ComboBox with ExpandCollapse, its text is an Edit with
+the Value pattern, and the suggestions are a List of ListItems with SelectionItem. Expand and
+Collapse from assistive technology run the field's own handlers, not its click. Every
+suggestion is in the list and in the accessibility tree: the rows are not virtualized, so a
+suggest function should narrow its results to a few dozen. The
+highlighted suggestion is reported as the focused element, so a screen reader announces
+it while the focus stays in the text (the active descendant of APG; see
+docs/accessibility.md, Phase L). When the suggestions change, their count is announced
+politely, after the changes settle: "5 suggestions", "1 suggestion", or "No results".
+Microsoft's AutoSuggestBox guidance (https://learn.microsoft.com/windows/apps/develop/ui/controls/auto-suggest-box)
+describes keyboard navigation through the suggestion list, with the text box updated
+from the highlighted item. It does not describe the APG's model, in which DOM focus
+stays in the combobox; the APG model is the one used here.
+
 ### Shrinking and minimum sizes
 
 When a row is narrower than its content, its items shrink in proportion to their

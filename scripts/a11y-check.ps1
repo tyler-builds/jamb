@@ -410,6 +410,69 @@ try {
         } 'the focus and its event' | Out-Null
     }
 
+    Check 'demo: the header combobox expands, highlights and picks through UI Automation' {
+        $search = Find-One $win 'Search projects' $CT.Edit
+        $box = Find-One $win 'Search projects' $CT.ComboBox
+        $ec = Require-Pattern $box ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+        $value = Require-Pattern $search ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        $search.SetFocus()
+        Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -eq 'Search projects') { $true } } 'focus on the search field' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('alp')
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded) { $true } } 'the combo box to expand' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+        # The text keeps the focus; the highlighted suggestion is the focused element.
+        Wait-For {
+            $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($f.Current.ControlType -eq $CT.ListItem -and $f.Current.Name -eq 'Project Alpha') { $true }
+        } 'Project Alpha to be the focused suggestion' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) { $true } } 'the combo box to collapse' | Out-Null
+        Wait-For { if ($value.Current.Value -eq 'Project Alpha') { $true } } 'the value Project Alpha' | Out-Null
+        $value.SetValue('')
+        Wait-For { if ($value.Current.Value -eq '') { $true } } 'the value to clear' | Out-Null
+    }
+
+    Check 'demo: Escape closes the header combobox list, and a second Escape clears its text' {
+        $search = Find-One $win 'Search projects' $CT.Edit
+        $box = Find-One $win 'Search projects' $CT.ComboBox
+        $ec = Require-Pattern $box ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+        $value = Require-Pattern $search ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        $search.SetFocus()
+        Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -eq 'Search projects') { $true } } 'focus on the search field' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('alp')
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded) { $true } } 'the combo box to expand' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) { $true } } 'the combo box to collapse on Escape' | Out-Null
+        Assert ($value.Current.Value -eq 'alp') 'the first Escape changed the text'
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-For { if ($value.Current.Value -eq '') { $true } } 'the second Escape to clear the text' | Out-Null
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the header combobox with suggestions open' {
+            $search = Find-One $win 'Search projects' $CT.Edit
+            $box = Find-One $win 'Search projects' $CT.ComboBox
+            $ec = Require-Pattern $box ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+            $value = Require-Pattern $search ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
+            [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+            $search.SetFocus()
+            Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -eq 'Search projects') { $true } } 'focus on the search field' | Out-Null
+            [System.Windows.Forms.SendKeys]::SendWait('alp')
+            Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded) { $true } } 'the combo box to expand' | Out-Null
+            try {
+                $errors = Invoke-AxeScan $demo 'demo-combobox-open'
+            } finally {
+                # Cleanup only: the list is closed and the text cleared, so the other checks see the page as it was.
+                if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded) { $ec.Collapse() }
+                $value.SetValue('')
+            }
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI with the suggestions open"
+            "$errors errors"
+        }
+    }
+
     Check 'demo: the Components page scrolls through the Scroll pattern' {
         Invoke-Named $win 'Components' $CT.Button
         Wait-For { $null -ne (Find-Named $win 'Buttons' | Select-Object -First 1) } 'the Components page' | Out-Null

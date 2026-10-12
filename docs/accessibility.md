@@ -1856,3 +1856,29 @@ Phase K adds forms: `ui.Field` (a label above or beside a control, with help tex
 - **Switch and Slider.** They have no `Validate`, and a `Field` around them is a group, not a control. Their labels are not wired as names.
 - **The grid editor's popover** keeps its own look (a bordered popover), so the grid and the forms share the Danger text and the alert icon, not the same box.
 - **Quiet hours.** The check that the start and the end differ is a demo rule, not a framework rule; a range is always valid for a number field, which clamps its value.
+
+## Phase L: what changed from this design
+
+Phase L adds `ui.Combobox`, an editable text field with a list of suggestions. Its keys, its options and its look are in the README (Combobox) and in docs/styling.md. This section records the decisions that bind the accessibility side and the sources they follow.
+
+**Focus stays in the text, and the highlight is the focused element.** The APG combobox pattern keeps DOM focus in the combobox and conveys the highlighted option through `aria-activedescendant`: "DOM focus stays on the combobox. The focused option is conveyed by setting `aria-activedescendant`" (https://www.w3.org/WAI/ARIA/apg/patterns/combobox/). The framework's equivalent is the access tree's focus target. A menu already passes focus to the row it highlights (`highlightedRow`), and a combo box extends that: when the text has focus and its list highlights a row, the focused node in the tree is that row (`comboRow` in ui/access.go). The text keeps the keyboard, and the UI Automation focus event moves to the highlighted ListItem, which a screen reader announces. This is a change to the tree only; the Windows adapter is unchanged.
+
+**The mapping of the control.** The field is a ComboBox, with ExpandCollapse from its Expanded state, a Value that is its text, and a Name from its label. Its text is an Edit with the Value pattern. The list is a List with its suggestions as ListItems, each SelectionItem, with the highlighted one marked as the focus. These are the mappings the select and the menus already use (`RoleComboBox`, `RoleList`, `RoleListItem`), so the Windows side gained no new control type.
+
+**Announcements.** When the suggestions for a query arrive, their count is announced politely, after 300 ms with no further change: "5 suggestions", "1 suggestion" or "No results" (`countText`). A search that is still running shows a `ProgressRing` labelled "Loading suggestions", which the assistive technology reads as a busy indicator. The count is not announced for a stale result (see SuggestAsync in the README).
+
+**Keys that the assistive technology uses.** Expand and Collapse run the field's own handlers through the access layer's `setExpanded` hook, so they open and close the list without a click. A click in the text opens the list and does not close it, since the press places the caret. Select on a suggestion runs its click, which chooses it.
+
+**Errors and restricted text.** A failed async request shows an error row (`ErrorText`, default "Couldn't load suggestions") and announces it politely at once; the error row replaces the empty slot, since the empty slot would say there is nothing to find. A restricted field that reverts or clears unlisted text says so in the same way, as "Not in the list; cleared" or "Not in the list; reverted to Apple". The same text is the field's description, so the change is read with the field, and the same text is shown under the field in the error's look.
+
+**Scrolling and the rows.** `MaxVisible` sets the height of the list, not the number of rows: every suggestion is a ListItem in the tree, and the keys scroll the highlighted row into view. The rows are not virtualized, as the lists of the framework that take a fixed set of rows are not, so the suggest function should narrow its results to a few dozen.
+
+**Sources.** The keys follow the APG combobox pattern for list autocomplete, with the gaps the APG leaves noted in the README (Tab while the list is open; Enter and Escape when it is hidden). Microsoft's AutoSuggestBox guidance (https://learn.microsoft.com/windows/apps/develop/ui/controls/auto-suggest-box) describes navigating the list with the keys and updating the text from the highlighted item; it does not describe the focus model used here, and this is a difference, not a conflict.
+
+**Verification.** `scripts/a11y-check.ps1` drives the header combobox through UI Automation: it expands on typing, Down reaches the Project Alpha ListItem as the focused element, Enter chooses it and the value follows, and Escape closes the list and then clears the text. An AxeWindowsCLI scan runs with the list open. The script passed 69 of 69 checks in normal mode, with `-HighContrast` and with `-TextScale 225`. In one normal run the Feedback scan reported a null BoundingRectangle on the window's "System" menu item, which belongs to the window chrome and not to the combo box; the next run passed, and the report was not reproduced.
+
+**Open items.**
+
+- **The manual screen reader pass** (NVDA and Narrator) for the combobox is not yet run. Check that the highlighted suggestion is read once as the focus moves, and that the count announcement is not repeated with the suggestion's own name.
+- **Narrator's handling** of a focus event on a row of a combo box's list has not been checked on a device.
+- **Retry** is not offered on an error. A button in the list would be reached by the mouse only, since the keys stay in the text; editing the text asks again.

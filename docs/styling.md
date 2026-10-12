@@ -41,7 +41,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Border`, `Disabled` and the others), so the defaults follow the theme's colors.
    Some defaults depend on the state of the widget, such as a disabled select.
 2. **The theme.** Set on the `ui.Theme` for every widget of that kind in the app:
-   `Theme.Tabs`, `Theme.Select`, `Theme.Slider`, `Theme.Field` (the frame of every
+   `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.Slider`, `Theme.Field` (the frame of every
    `TextInput`, `TextArea` and `NumberField`), `Theme.NumberField`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Collapsible`, `Theme.TreeView`, `Theme.DataGrid`, `Theme.Menu`,
@@ -307,6 +307,7 @@ the Text size of 100 percent:
 | `NumberField` | 120 px, a fixed size for its column (the frame and the message row); `Full` stretches it, and `Grow` and the limits apply to the column |
 | `Field` | fills its container, as a column does; its control keeps its own width (see below) |
 | `Select` | 220 px, a fixed size; `Full` stretches it, and the list is at least as wide as the field |
+| `Combobox` | 240 px at the Text size of 100 percent, like a text field; `Full` stretches it, and the list is at least as wide as the field |
 | `Slider`, `ProgressBar`, `IndeterminateProgressBar` | fills the container, and at least 160 px, so it is visible where its container has no width |
 | `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |
 | `Collapsible`, `Accordion` | fills the container |
@@ -505,6 +506,7 @@ parts that the code applies.
 | `FormField` | `Root`, `Label`, `InlineLabel`, `Required`, `Description`, `Error` | none | none | done |
 | `Form` | `Summary`, `SummaryTitle`, `SummaryItem`, `SummaryItemHover`, `SummaryItemFocusVisible` | none | none | done |
 | `Select` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `TriggerDisabled`, `TriggerInvalid`, `Value`, `Placeholder`, `Chevron`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected`, `OptionDisabled` | none | `RenderValue`, `RenderOption` | done |
+| `Combobox` | `Field`, `Popup`, `Option`, `OptionHighlighted`, `OptionDisabled`, `Match`, `Empty`, `Loading`, `Error` | none | `RenderOption` | done |
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
 | `NumberField` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |

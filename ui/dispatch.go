@@ -947,6 +947,18 @@ func (rt *Runtime) revealTabFocus() {
 	}
 }
 
+// revealRowsNow scrolls the rows that asked for it into view, once their paint has laid
+// them out (see DivElement.revealRow). A row that has gone since it was built is skipped.
+func (rt *Runtime) revealRowsNow() {
+	rows := rt.revealRows
+	rt.revealRows = nil
+	for _, n := range rows {
+		if rt.byID[n.id] == n {
+			rt.scrollIntoView(n)
+		}
+	}
+}
+
 // activateFocused runs the OnClick of the focused element, as Enter or Space
 // does for a focused button, unless the element is spaceOnly and the key is
 // Enter. It reports whether it ran one. Text fields are not elements with

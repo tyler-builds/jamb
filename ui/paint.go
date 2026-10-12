@@ -27,6 +27,7 @@ func (rt *Runtime) paint(dt float32) {
 	rt.paintOverlays(view, dt)
 	rt.paintDrag(view, dt)
 	rt.revealTabFocus()
+	rt.revealRowsNow()
 }
 
 // inkVisible reports whether a child laid out at (ox+X, oy+Y) in its parent

@@ -66,6 +66,7 @@ type DivElement struct {
 	handle       *FocusHandle
 	overlay      Placement
 	overlayGap   float32
+	revealRow    bool // a combo box's highlighted row: the next paint scrolls it into view (see revealRowsNow)
 	matchAnchor  bool // set by a Select's list: at least as wide as the field it opens from
 	tooltip      string
 	part         string          // the widget part this element draws, see asPart

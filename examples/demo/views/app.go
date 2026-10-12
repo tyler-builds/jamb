@@ -245,10 +245,14 @@ func header(ctx *ui.Context, s *Store, page Page, focused bool) ui.Element {
 		Child(ui.Div().Row().Align(ui.Center).Gap(8).Wrap().
 			// The wrapper carries the tooltip, since a text field has none.
 			Child(ui.Div().Tooltip(tip(ctx, "Search", FocusSearch)).
-				Child(ui.TextInput(s.Query).Label("Search projects").Placeholder("Search projects…").Icon(icons.Search).FocusHandle(s.Search).
-					// MinWidth lets the field shrink when the header is narrow; the controls wrap past it.
-					Style(ui.Style{Width: ui.Px(240 * layoutScale(ctx)), MinWidth: ui.Px(120)}).
-					OnChange(func(string) { s.Page.Set(PageProjects) }))).
+				// The suggestions are the projects; picking one selects it. MinWidth lets the
+				// combo box shrink when the header is narrow; the controls wrap past it.
+				Child(ui.Combobox(s.Query, searchOptions(s)).Label("Search projects").Placeholder("Search projects…").
+					Icon(icons.Search).FocusHandle(s.Search).EmptyText("No matching projects").
+					Width(ui.Px(240 * layoutScale(ctx))).MinWidth(ui.Px(120)).
+					RenderOption(searchOption(s, t)).
+					OnChange(func(string) { s.Page.Set(PageProjects) }).
+					OnPick(func(id int) { s.Selected.Set(id); s.Page.Set(PageProjects) }))).
 			Child(inboxButton(ctx, s)).
 			Child(ui.Button("New Project").Key("new-project").Icon(icons.Plus).OnClick(s.OpenNewProject)))
 }

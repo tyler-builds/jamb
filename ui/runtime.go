@@ -293,8 +293,11 @@ type Runtime struct {
 	// revealFocus asks the next paint to scroll the focused element into view
 	// (set by Tab), in its nearest vertically scrolling ancestor.
 	revealFocus bool
-	cursor      input.Cursor
-	hitPath     []*node
+	// revealRows are the rows that asked to be scrolled into view by their next paint (see
+	// DivElement.revealRow); the nodes are collected when they are built.
+	revealRows []*node
+	cursor     input.Cursor
+	hitPath    []*node
 
 	stats    FrameStats
 	restyled int // restyles since the last frame (they happen during input handling)
@@ -1089,6 +1092,9 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		}
 		n := rt.newNode(kindDiv, id, parent, owner)
 		n.div = e
+		if e.revealRow {
+			rt.revealRows = append(rt.revealRows, n)
+		}
 		if e.overlay != 0 {
 			n.flags |= flagOverlay
 		}

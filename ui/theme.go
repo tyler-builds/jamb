@@ -50,7 +50,10 @@ type Theme struct {
 	// docs/styling.md).
 	Tabs   TabsStyle
 	Select SelectStyle
-	Slider SliderStyle
+	// Combobox is the look of every combo box: its text frame (Field), its list and
+	// its rows.
+	Combobox ComboboxStyle
+	Slider   SliderStyle
 	// Field is the text frame of every TextInput and TextArea, and of every
 	// NumberField's frame, before the NumberField parts below.
 	Field       FieldStyle

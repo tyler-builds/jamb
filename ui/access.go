@@ -587,9 +587,16 @@ func (b *accessBuilder) focusTarget() access.ID {
 		if n.kind == kindEditor || exposed(n) {
 			// A menu that has focus passes it to the row it highlights, so that
 			// moving the highlight with the keys moves the focus the screen reader
-			// announces.
+			// announces. A combo box's text is different: the focus stays in the text,
+			// and the row it highlights is reported as the focused one (the active
+			// descendant of the combobox).
 			if row := highlightedRow(n); row != nil {
 				return accID(row.id)
+			}
+			if n.kind == kindEditor {
+				if row := comboRow(n); row != nil {
+					return accID(row.id)
+				}
 			}
 			return accID(n.id)
 		}
@@ -1140,15 +1147,29 @@ func (rt *Runtime) focusChild(n *node) {
 	}
 }
 
-// highlightedRow returns the row that a menu, a list or a tree highlights, when n
-// is one: the deepest highlighted row in its subtree, so that a submenu's row wins
-// over the row that opened it. It returns nil for anything else.
+// comboRow returns the row that the combo box holding the text n highlights, or nil
+// when the text is not in a combo box or the box highlights none.
+func comboRow(n *node) *node {
+	for p := n.parent; p != nil; p = p.parent {
+		if exposed(p) {
+			if p.div != nil && p.div.acc != nil && p.div.acc.role == access.RoleComboBox {
+				return highlightedRow(p)
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
+// highlightedRow returns the row that a menu, a list, a tree or a combo box
+// highlights, when n is one: the deepest highlighted row in its subtree, so that a
+// submenu's row wins over the row that opened it. It returns nil for anything else.
 func highlightedRow(n *node) *node {
 	if n.div == nil || n.div.acc == nil {
 		return nil
 	}
 	switch n.div.acc.role {
-	case access.RoleMenu, access.RoleList, access.RoleTree, access.RoleDataGrid:
+	case access.RoleMenu, access.RoleList, access.RoleTree, access.RoleDataGrid, access.RoleComboBox:
 	default:
 		return nil
 	}

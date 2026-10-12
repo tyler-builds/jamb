@@ -160,6 +160,13 @@ func DefaultBindings() []Binding {
 		BindIn("Editor && mode == full", "shift+enter", Newline),
 		BindIn("Editor && mode == full", "tab", Indent),
 		BindIn("Editor && mode == single_line", "enter", Confirm),
+		// A combo box's keys come after the editor's: at the same depth the later
+		// binding runs first, and an action runs only while its combo box has a handler
+		// for it (see combobox.go).
+		BindIn("Combobox > Editor", "down", comboboxDown),
+		BindIn("Combobox > Editor", "up", comboboxUp),
+		BindIn("Combobox > Editor", "enter", comboboxEnter),
+		BindIn("Combobox > Editor", "escape", comboboxEscape),
 	}
 }
 
