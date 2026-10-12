@@ -178,6 +178,19 @@ func (n *node) Measure(maxWidth float32) (float32, float32) {
 	return 0, 0
 }
 
+// MinContentWidth implements layout.MinContenter. Only text wraps among the
+// leaves, so other kinds report that they do not.
+func (n *node) MinContentWidth() (float32, bool) {
+	if n.kind != kindText {
+		return 0, false
+	}
+	var spans []text.Span
+	if n.rich != nil {
+		spans = n.rich.spans
+	}
+	return n.rt.text.MinContentWidth(n.textEl.text, n.textStyle(), spans)
+}
+
 // FrameStats describes the work done by the last Frame call.
 type FrameStats struct {
 	Nodes        int // live nodes in the tree

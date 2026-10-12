@@ -125,7 +125,9 @@ func formControlsSection() ui.Element {
 								}
 								return nil
 							})))).
-				Child(ui.Div().Gap(8).Width(ui.Px(240)).
+				// MinWidth, not Width: the button's label does not wrap, so the column
+				// is as wide as the label needs at a large Text size.
+				Child(ui.Div().Gap(8).MinWidth(ui.Px(240)).
 					Child(ui.Button("Save preferences").Key("prefs-save").Primary().OnClick(prefs.Submit)).
 					Child(ui.Text(saved.Get()).Size(13).Color(t.TextMuted))).
 				Child(ui.Div().Gap(4).Width(ui.Px(240)).

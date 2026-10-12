@@ -155,6 +155,17 @@ type Measurer interface {
 	Measure(maxWidth float32) (width, height float32)
 }
 
+// MinContenter is implemented by a leaf whose content wraps. MinContentWidth
+// returns the min-content width of the content: the width of its widest
+// unbreakable run, the narrowest it can be without breaking inside a word (CSS
+// min-content size). wraps is false when the content does not wrap at all, such
+// as a NoWrap text, or when the leaf has no words to break. Such a leaf is sized
+// by Measure(0) alone, as a leaf that does not implement MinContenter is, and it
+// is not held to the width of its container.
+type MinContenter interface {
+	MinContentWidth() (width float32, wraps bool)
+}
+
 var (
 	nan = float32(math.NaN())
 	inf = float32(math.Inf(1))

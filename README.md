@@ -446,6 +446,32 @@ number field is a spin box that holds its text field, as Microsoft's Spinner
 control type describes
 ([Spinner control type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).
 
+### Shrinking and minimum sizes
+
+When a row is narrower than its content, its items shrink in proportion to their
+`Basis` and `Shrink`. An item that shrinks is held to an automatic minimum, which
+follows CSS Flexbox's automatic minimum size of flex items
+([CSS Flexbox, 4.5](https://www.w3.org/TR/css-flexbox-1/#min-size-auto)):
+
+- **Text keeps its widest word.** The minimum is the min-content width of the text:
+  the width of its longest unbreakable run, which is a word, or a part of a hyphenated
+  word. A text in a shrinking row therefore wraps between words, and never between letters.
+- **Containers keep their children's min-content widths.** A column or a wrapping row
+  takes the largest of its children's, and a row takes their sum, with the gaps and the padding.
+- **Opt-outs.** `Truncate()` sets the minimum to zero, so the text stays on one line
+  and shrinks with an ellipsis. `NoWrap()` keeps the full width of the text, since it
+  is one line. Any explicit `MinWidth` replaces the automatic minimum. An item that
+  clips its overflow (`ScrollX`, `ScrollY`, `ClipContent`) has no automatic minimum.
+- **A fixed `Width` is the item's floor**, as it was before this rule: the item does
+  not shrink below it. CSS takes the smaller of the width and the content instead, and
+  jamb does not.
+- **A word longer than its container breaks inside the word**, so a URL stays within
+  its row or column. A word that fits its container does not break, even when a fixed
+  item beside it takes the room. The row then overflows, as in CSS, so give such items room.
+- The minimums grow with the Text size (`JAMB_TEXT_SCALE`). A control whose label is
+  wider than a fixed `Width` should use `MinWidth` instead, so the control grows with its
+  label; the demo's Projects page and Components page do this.
+
 ### Navigation and layout
 
 Tabs, collapsible sections, an accordion and a tree view. Each is bound to

@@ -255,7 +255,7 @@ func motionSection(t *ui.Theme) ui.Element {
 // easeRow is a ball that travels a track on the curve, repeating forever.
 func easeRow(t *ui.Theme, name string, curve func(float32) float32) ui.Element {
 	return ui.Div().Row().Align(ui.Center).Gap(12).
-		Child(ui.Text(name).Size(12).Color(t.TextMuted).Width(ui.Px(110))).
+		Child(ui.Text(name).Size(12).Color(t.TextMuted).Style(ui.Style{MinWidth: ui.Px(110)})).
 		Child(ui.Animate("ease-"+name, ui.Animation{Duration: 1600 * time.Millisecond, Easing: curve, Repeat: true},
 			func(p float32) ui.Element {
 				return ui.Div().Height(ui.Px(14)).Width(ui.Px(260)).Radius(7).Background(t.SurfaceActive).
@@ -273,7 +273,8 @@ func tile(t *ui.Theme, label string) *ui.DivElement {
 func focusSection(t *ui.Theme) ui.Element {
 	ring := ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}
 	box := func(label string) *ui.DivElement {
-		return ui.Div().Size(ui.Px(96), ui.Px(34)).Radius(8).Border(1, t.Border).Center().
+		// Minimums, not a size: the box grows with its label at a large Text size.
+		return ui.Div().MinWidth(ui.Px(96)).MinHeight(ui.Px(34)).Radius(8).Border(1, t.Border).Center().
 			FocusVisible(ring).Child(ui.Text(label).Size(12))
 	}
 	scroller := ui.Div().Row().ScrollX().Gap(10).Padding(4)

@@ -159,6 +159,33 @@ func (sys *System) LayoutSpans(s string, st Style, spans []Span, maxWidth float3
 	return sys.cached(s, st, spans, sk, maxWidth)
 }
 
+// minContent is the width that asks build for the min-content layout of a text:
+// the lines it breaks into when it may break only between words. No real width
+// is negative, so the two cannot be confused.
+const minContent float32 = -1
+
+// MinContentWidth returns the min-content width of s: the width of its widest
+// unbreakable run, which is the narrowest that s can be wrapped to without
+// breaking inside a word (CSS min-content size). A word wider than the width is
+// broken only when s is laid out narrower than the word. wraps is false for a
+// NoWrap text without MaxLines, which is one line; its width is then its full
+// width. MaxLines does not change the longest word, so it is ignored. Results
+// are cached.
+func (sys *System) MinContentWidth(s string, st Style, spans []Span) (width float32, wraps bool) {
+	if st.Size <= 0 {
+		st.Size = 14
+	}
+	if st.Weight == 0 {
+		st.Weight = Regular
+	}
+	if st.NoWrap && st.MaxLines == 0 {
+		return sys.LayoutSpans(s, st, spans, float32(math.Inf(1))).Width, false
+	}
+	// build treats NoWrap without MaxLines as one line, so NoWrap goes too.
+	st.NoWrap, st.MaxLines = false, 0
+	return sys.cached(s, st, spans, spansKey(spans), minContent).Width, true
+}
+
 // spansKey encodes spans for the layout cache key.
 func spansKey(spans []Span) string {
 	if len(spans) == 0 {

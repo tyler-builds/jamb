@@ -67,7 +67,8 @@ func welcome(t *ui.Theme, highContrast bool) ui.Element {
 
 func stat(t *ui.Theme, ic *icons.Icon, label string, value *ui.TextElement, hint string, c ui.Color) ui.Element {
 	return Card(t).Grow(1).Basis(ui.Px(0)).
-		Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).
+		// The icon moves below the label when the tile is too narrow for both.
+		Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).Wrap().
 			Child(ui.Text(label).Size(13).Medium().Color(t.TextMuted)).
 			Child(IconTile(t, ic, c, 30))).
 		Child(value.Size(28).Semibold()).

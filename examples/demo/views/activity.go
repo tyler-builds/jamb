@@ -155,7 +155,7 @@ func Activity(s *Store) ui.Element {
 					Style(ui.Style{Width: ui.Px(260), MinWidth: ui.Px(140)}).
 					OnChange(func(q string) { s.announceQuiet(eventCountText(len(s.matchingEvents(q)), q)) })).
 				Child(ui.Text(count).Size(12).Color(t.TextMuted).NoWrap())).
-			Child(ui.Div().Row().Align(ui.Center).Gap(8).
+			Child(ui.Div().Row().Align(ui.Center).Gap(8).Wrap().
 				Child(ui.Button("Jump to top").Icon(icons.ChevronUp).Secondary().Small().Key("jump-top").
 					OnClick(func() { s.activity.ScrollToItem(0) })).
 				Child(ui.Button("Jump to latest").Icon(icons.ChevronDown).Secondary().Small().Key("jump-latest").

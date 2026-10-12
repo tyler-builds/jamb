@@ -223,6 +223,68 @@ func (e *Engine) computeSize(n *Node, cbW, cbH, availW, forcedW, forcedH float32
 	return w, h
 }
 
+// minContentSize computes the min-content width of n, and whether its content
+// wraps, as CSS min-content does: the width n takes when its content breaks only
+// between words. A node with a width of its own is that wide. A container's
+// min-content is the largest contribution of its children in a column or a
+// wrapping row, and the sum of them in a row. A leaf that does not wrap is sized
+// by Measure(0), as before. It is computed when it is asked for and not stored on
+// the node, so that the minimums of a shrinking row cost no memory per node.
+// Heights are not needed by the callers.
+func (e *Engine) minContentSize(n *Node, cbW float32) (float32, bool) {
+	s := &n.Style
+	minW, maxW := orZero(s.MinWidth.resolve(cbW)), orInf(s.MaxWidth.resolve(cbW))
+	if n.Measure != nil {
+		mc, ok := n.Measure.(MinContenter)
+		var cw float32
+		wraps := false
+		if ok {
+			cw, wraps = mc.MinContentWidth()
+		}
+		if w := s.Width.resolve(cbW); !isNaN(w) {
+			return clamp(w, minW, maxW), wraps
+		}
+		if !wraps {
+			w, _ := e.computeSize(n, cbW, nan, 0, nan, nan)
+			return w, false
+		}
+		// As in computeSize, a percentage width of an indefinite size is compressible.
+		if s.Width.Unit == UnitPercent && isNaN(cbW) {
+			cw = 0
+		}
+		return clamp(cw+n.padH(), minW, maxW), true
+	}
+	if w := s.Width.resolve(cbW); !isNaN(w) {
+		return clamp(w, minW, maxW), true
+	}
+	row := s.Direction == Row
+	var cw float32
+	count := 0
+	for _, c := range n.Children {
+		cs := &c.Style
+		if cs.Position != Relative || cs.Hidden {
+			continue
+		}
+		childW, _ := e.minContentSize(c, nan)
+		// An explicit MinWidth is the child's floor in a shrinking row, so it stands
+		// in for the child's min-content width here.
+		if explicit := cs.MinWidth.resolve(nan); !isNaN(explicit) {
+			childW = explicit
+		}
+		count++
+		switch {
+		case !row, s.Wrap:
+			cw = max(cw, childW+cs.Margin.Left+cs.Margin.Right)
+		default:
+			cw += childW + cs.Margin.Left + cs.Margin.Right
+		}
+	}
+	if row && !s.Wrap {
+		cw += s.Gap * float32(max(count-1, 0))
+	}
+	return clamp(cw+n.padH(), minW, maxW), true
+}
+
 // arrange positions n's children given n's final W and H.
 func (e *Engine) arrange(n *Node) {
 	if n.arranged && n.arrW == n.W && n.arrH == n.H {
@@ -445,7 +507,7 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 			for i := range its {
 				it := &its[i]
 				if it.minMain < 0 {
-					it.minMain = e.autoMin(it.n, row, innerW, innerH, crossAvail-it.marginCross, it.forcedCross, it.basis)
+					it.minMain = e.autoMin(it.n, row, innerW, innerH, crossAvail-it.marginCross, it.forcedCross, it.basis, target)
 				}
 			}
 			e.shrink(its, -free)
@@ -572,13 +634,20 @@ func (e *Engine) mainContent(c *Node, row bool, innerW, innerH, crossAvail, forc
 	return h
 }
 
-// autoMin is the content-based minimum main size of an item.
-func (e *Engine) autoMin(c *Node, row bool, innerW, innerH, crossAvail, forcedCross, basis float32) float32 {
+// autoMin is the content-based minimum main size of an item. Along a row it is
+// the min-content width, the widest unbreakable run of its content, and an item
+// whose width is automatic and whose content wraps is held to limit, the main
+// size of its container: a word wider than the container breaks inside the word,
+// and a word that fits the container does not break, whatever its siblings take.
+// A leaf that does not wrap keeps its full width. A fixed width stays the item's
+// floor, as before.
+func (e *Engine) autoMin(c *Node, row bool, innerW, innerH, crossAvail, forcedCross, basis, limit float32) float32 {
 	if row {
-		// min-content width: the widest unbreakable piece.
-		w, _ := e.measure(c, innerW, innerH, 0, nan, forcedCross)
+		w, wraps := e.minContentSize(c, innerW)
 		if !c.Style.Width.IsAuto() {
 			w = min(w, basis)
+		} else if wraps {
+			w = min(w, limit)
 		}
 		return w
 	}

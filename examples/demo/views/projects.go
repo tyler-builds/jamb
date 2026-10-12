@@ -43,13 +43,13 @@ func Projects(s *Store) ui.Element {
 
 		return ui.Div().Grow(1).ScrollY().
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(1100)).
-				Child(ui.Div().Row().Align(ui.End).Justify(ui.SpaceBetween).Gap(16).
+				Child(ui.Div().Row().Align(ui.End).Justify(ui.SpaceBetween).Gap(16).Wrap().
 					Child(ui.Div().Gap(4).
 						Child(ui.Div().Heading(1).Child(ui.Text("Projects").Size(26).Semibold())).
 						Child(ui.Textf("%d projects · %d active", len(all), active).Color(t.TextMuted))).
-					Child(ui.Div().Row().Align(ui.Center).Gap(12).
+					Child(ui.Div().Row().Align(ui.Center).Gap(12).Wrap().
 						Child(projectsViewTabs(view)).
-						Child(ui.Div().Width(ui.Px(320)).Child(filters(t, s))))).
+						Child(filters(t, s)))).
 				Child(body))
 	})
 }
@@ -123,7 +123,7 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 		Child(ui.Div().Grow(1).Gap(6).
 			Child(titles).
 			Child(ui.Text(p.Description).Size(13).Color(t.TextMuted).Truncate().HighlightMatches(q, matchHighlight(t))).
-			Child(ui.Div().Row().Align(ui.Center).Gap(12).MarginTop(4).
+			Child(ui.Div().Row().Align(ui.Center).Gap(12).Wrap().MarginTop(4).
 				Child(ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").Width(336)).
 				Child(ui.Div().Row().Align(ui.Center).Gap(5).TextColor(t.TextSubtle).
 					Child(ui.Icon(icons.Check).Size(13)).

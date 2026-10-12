@@ -390,6 +390,12 @@ func (sys *System) wrapParagraph(l *Layout, start, end int, size fixed.Int26_6, 
 	text := l.runes[start:end]
 	outs := sys.shapePieces(text, sys.reg.Font(l.Style.Family, l.Style.Weight, l.Style.Italic), pcs, size)
 	cfg := shaping.WrapConfig{Direction: di.DirectionLTR, DisableTrailingWhitespaceTrim: true}
+	if wrapW == minContent {
+		// Lines break only between words, and a word wider than the line stays
+		// whole, so the widest line is the min-content width.
+		cfg.BreakPolicy = shaping.Never
+		wrapW = 0
+	}
 	ell := pcs[0]
 	if st := l.Style; st.MaxLines > 0 {
 		cfg.TruncateAfterLines = st.MaxLines - len(l.Lines)
