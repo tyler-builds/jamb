@@ -392,6 +392,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rh = hostOf(h.rt)
 	h.rh.SetWakeFunc(w.Wake)
 	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
+	h.rh.SetOpenURL(w.OpenURL)
 	h.rt.SetWindow(h.handle)
 	h.rt.SetAccessWarnings(h.dev.a11yWarn)
 	h.applySettings()
@@ -727,6 +728,7 @@ func (h *host) FrameWaitable() uintptr {
 type runtimeHost interface {
 	SetWakeFunc(fn func())
 	SetServices(clipboard func() (string, bool), setClipboard func(string), wakeAt func(time.Time))
+	SetOpenURL(fn func(string) error)
 	SetMaximized(on bool)
 	OnZoom(fn func(float32))
 	Invalidate()

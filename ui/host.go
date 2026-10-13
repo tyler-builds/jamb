@@ -25,6 +25,9 @@ func (h *runtimeHost) SetServices(clipboard func() (string, bool), setClipboard 
 	h.rt().hostSetServices(platformServices{Clipboard: clipboard, SetClipboard: setClipboard, WakeAt: wakeAt})
 }
 
+// SetOpenURL connects the platform's way to open a URL (see Context.OpenURL).
+func (h *runtimeHost) SetOpenURL(fn func(string) error) { h.rt().services.OpenURL = fn }
+
 // SetMaximized tells the runtime whether the window is maximized.
 func (h *runtimeHost) SetMaximized(on bool) { h.rt().hostSetMaximized(on) }
 

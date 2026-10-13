@@ -373,6 +373,13 @@ func (w *window) Fullscreen() bool { return w.fullscreen }
 
 func (w *window) SetDark(on bool) { win32.SetDarkTitleBar(w.hwnd, on) }
 
+func (w *window) OpenURL(url string) error {
+	if !win32.ShellOpen(w.hwnd, url) {
+		return fmt.Errorf("platform/windows: the system could not open %q", url)
+	}
+	return nil
+}
+
 // SetFullscreen removes the frame and covers the monitor the window is on, as
 // Windows apps conventionally do: the style and placement are saved, and
 // restored when the window leaves fullscreen.

@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+	neturl "net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -131,6 +133,21 @@ func (c *Context) HighContrast() bool { return c.rt.sys.HighContrast }
 // that the app runs itself should then jump to their end (see Animate).
 func (c *Context) ReducedMotion() bool { return c.rt.sys.ReducedMotion }
 
+// OpenURL opens url with the system: an http or https URL in the default
+// browser, a mailto URL in the mail app. Other schemes, file paths included,
+// are refused with an error, because opening them could run a program; a URL
+// built from text the app does not control stays safe. A headless runtime
+// opens nothing and returns nil.
+func (c *Context) OpenURL(url string) error {
+	if err := checkOpenURL(url); err != nil {
+		return err
+	}
+	if open := c.rt.services.OpenURL; open != nil {
+		return open(url)
+	}
+	return nil
+}
+
 // SystemDark reports whether the system's app mode is dark. A window that
 // follows the system (see app.Window) already uses its dark theme then; use it
 // for content that does not take its colors from the theme.
@@ -255,3 +272,25 @@ func (c *Context) pressed() bool {
 // AppTheme returns the theme the app set with SetTheme, which under high
 // contrast is not the active theme (see Theme).
 func (c *Context) AppTheme() *Theme { return c.rt.appTheme }
+
+// checkOpenURL accepts the URLs OpenURL opens: http, https and mailto, with
+// something after the scheme.
+func checkOpenURL(raw string) error {
+	u, err := neturl.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("ui.OpenURL: %q is not a URL: %w", raw, err)
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+		if u.Host == "" {
+			return fmt.Errorf("ui.OpenURL: %q has no host", raw)
+		}
+	case "mailto":
+		if u.Opaque == "" && u.Path == "" {
+			return fmt.Errorf("ui.OpenURL: %q has no address", raw)
+		}
+	default:
+		return fmt.Errorf("ui.OpenURL: %q is not an http, https or mailto URL", raw)
+	}
+	return nil
+}

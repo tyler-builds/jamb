@@ -261,6 +261,12 @@ which returns the text and whether there is any, and `ctx.SetClipboard(s)`.
 Text fields use the same clipboard. Only plain text is supported for now;
 images and HTML are future work.
 
+`ctx.OpenURL(url)` opens an `http`, `https` or `mailto` URL with the system, such as
+a help page in the default browser, for a `ui.Link` or a button. Other schemes and
+file paths are refused with an error, because opening them could run a program, so
+a URL built from text the app does not control stays safe. A headless runtime opens
+nothing.
+
 ### Gradients
 
 ```go

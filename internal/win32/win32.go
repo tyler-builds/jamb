@@ -16,8 +16,10 @@ var (
 	dwmapi   = syscall.NewLazyDLL("dwmapi.dll")
 	ole32    = syscall.NewLazyDLL("ole32.dll")
 	imm32    = syscall.NewLazyDLL("imm32.dll")
-	shell32  = syscall.NewLazyDLL("shell32.dll")
-	oleaut32 = syscall.NewLazyDLL("oleaut32.dll")
+
+	shell32           = syscall.NewLazyDLL("shell32.dll")
+	procShellExecuteW = shell32.NewProc("ShellExecuteW")
+	oleaut32          = syscall.NewLazyDLL("oleaut32.dll")
 
 	uiautomationcore = syscall.NewLazyDLL("UIAutomationCore.dll")
 
@@ -206,9 +208,10 @@ const (
 	// SWP_NOOWNERZORDER leaves the owner window's place in the z-order alone.
 	SWP_NOOWNERZORDER = 0x0200
 
-	SW_MINIMIZE = 6
-	SW_MAXIMIZE = 3
-	SW_RESTORE  = 9
+	SW_MINIMIZE   = 6
+	SW_MAXIMIZE   = 3
+	SW_RESTORE    = 9
+	SW_SHOWNORMAL = 1
 
 	SM_CXSIZEFRAME    = 32
 	SM_CYSIZEFRAME    = 33
@@ -1004,4 +1007,17 @@ func UiaRaiseAutomationPropertyChangedEvent(provider uintptr, id int32, oldValue
 func UiaRaiseNotificationEvent(provider uintptr, kind, processing int32, display, activity uintptr) uintptr {
 	r, _, _ := procUiaRaiseNotificationEvent.Call(provider, uintptr(kind), uintptr(processing), display, activity)
 	return r
+}
+
+// ShellOpen opens target with its default handler, as a double-click in
+// Explorer does (ShellExecuteW with the "open" verb), owned by hwnd. It
+// reports false when the shell could not open it.
+func ShellOpen(hwnd uintptr, target string) bool {
+	verb, _ := syscall.UTF16PtrFromString("open")
+	file, err := syscall.UTF16PtrFromString(target)
+	if err != nil {
+		return false
+	}
+	r, _, _ := procShellExecuteW.Call(hwnd, uintptr(unsafe.Pointer(verb)), uintptr(unsafe.Pointer(file)), 0, 0, SW_SHOWNORMAL)
+	return r > 32 // values up to 32 are errors
 }

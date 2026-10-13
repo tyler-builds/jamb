@@ -395,6 +395,8 @@ type platformServices struct {
 	SetClipboard func(string)
 	// WakeAt schedules a frame at a future time (caret blinking).
 	WakeAt func(time.Time)
+	// OpenURL opens a URL with the system (see Context.OpenURL).
+	OpenURL func(string) error
 }
 
 // hostSetServices connects platform capabilities.

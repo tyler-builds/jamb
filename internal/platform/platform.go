@@ -141,6 +141,9 @@ type Window interface {
 	// SetDark asks for the dark window decorations (the native title bar and
 	// frame), to match a dark theme.
 	SetDark(on bool)
+	// OpenURL opens url with the system's handler for its scheme, such as the
+	// default browser. The caller has checked the scheme.
+	OpenURL(url string) error
 	// Focus brings the window to the front and gives it keyboard focus.
 	Focus()
 	// Wake schedules a call to Handler.OnFrame. It is safe to call from any
