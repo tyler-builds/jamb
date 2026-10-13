@@ -16,6 +16,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"image"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -392,6 +393,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rh = hostOf(h.rt)
 	h.rh.SetWakeFunc(w.Wake)
 	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
+	h.rh.SetImageClipboard(w.ClipboardImage, w.SetClipboardImage)
 	h.rh.SetOpenURL(w.OpenURL)
 	h.rt.SetWindow(h.handle)
 	h.rt.SetAccessWarnings(h.dev.a11yWarn)
@@ -728,6 +730,7 @@ func (h *host) FrameWaitable() uintptr {
 type runtimeHost interface {
 	SetWakeFunc(fn func())
 	SetServices(clipboard func() (string, bool), setClipboard func(string), wakeAt func(time.Time))
+	SetImageClipboard(get func() (image.Image, bool), set func(image.Image))
 	SetOpenURL(fn func(string) error)
 	SetMaximized(on bool)
 	OnZoom(fn func(float32))

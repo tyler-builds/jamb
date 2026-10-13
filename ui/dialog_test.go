@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"testing"
 	"time"
 
@@ -91,5 +92,48 @@ func TestHeadlessClipboardRoundTrips(t *testing.T) {
 	ctx.SetClipboard("line one\nline two")
 	if got, ok := ctx.Clipboard(); got != "line one\nline two" || !ok {
 		t.Errorf("Clipboard() = %q, %v after SetClipboard", got, ok)
+	}
+}
+
+// A headless clipboard holds text or an image, as the system's does: copying
+// one replaces the other.
+func TestHeadlessClipboardImage(t *testing.T) {
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
+	ctx := &Context{rt: rt}
+	if _, ok := ctx.ClipboardImage(); ok {
+		t.Fatal("a new clipboard holds an image")
+	}
+	ctx.SetClipboard("text")
+	img := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	ctx.SetClipboardImage(img)
+	if got, ok := ctx.ClipboardImage(); !ok || got != image.Image(img) {
+		t.Fatalf("ClipboardImage() = %v, %v after SetClipboardImage", got, ok)
+	}
+	if _, ok := ctx.Clipboard(); ok {
+		t.Error("copying an image left the text on the clipboard")
+	}
+	ctx.SetClipboard("again")
+	if _, ok := ctx.ClipboardImage(); ok {
+		t.Error("copying text left the image on the clipboard")
+	}
+}
+
+// The image clipboard is the platform's when one is wired in, and stays wired
+// in when the other services are set after it.
+func TestContextClipboardImageUsesPlatform(t *testing.T) {
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
+	var written []image.Image
+	platformImg := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+	h := (*runtimeHost)(rt)
+	h.SetImageClipboard(func() (image.Image, bool) { return platformImg, true },
+		func(img image.Image) { written = append(written, img) })
+	h.SetServices(func() (string, bool) { return "", false }, func(string) {}, nil)
+	ctx := &Context{rt: rt}
+	if got, ok := ctx.ClipboardImage(); !ok || got != image.Image(platformImg) {
+		t.Errorf("ClipboardImage() = %v, %v; want the platform's image", got, ok)
+	}
+	ctx.SetClipboardImage(platformImg)
+	if len(written) != 1 {
+		t.Errorf("platform received %d images; want 1", len(written))
 	}
 }

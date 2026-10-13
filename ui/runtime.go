@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"image"
 	"math"
 	"os"
 	"slices"
@@ -319,7 +320,8 @@ type Runtime struct {
 	windowCtl      Window        // the app's window, see SetWindow
 	maximized      *Signal[bool] // the window's state, read by Context.Window
 	focused        *Signal[bool]
-	memClipboard   string // used when no platform clipboard is wired in
+	memClipboard   string      // used when no platform clipboard is wired in
+	memImage       image.Image // the image on that clipboard
 	clock          func() time.Time
 	captureID      uint64 // element receiving pointer moves while a button is held
 	drag           dragState
@@ -399,6 +401,10 @@ type Runtime struct {
 type platformServices struct {
 	Clipboard    func() (string, bool)
 	SetClipboard func(string)
+	// ClipboardImage and SetClipboardImage read and replace the clipboard's
+	// image (see Context.ClipboardImage).
+	ClipboardImage    func() (image.Image, bool)
+	SetClipboardImage func(image.Image)
 	// WakeAt schedules a frame at a future time (caret blinking).
 	WakeAt func(time.Time)
 	// OpenURL opens a URL with the system (see Context.OpenURL).
@@ -406,7 +412,11 @@ type platformServices struct {
 }
 
 // hostSetServices connects platform capabilities.
-func (rt *Runtime) hostSetServices(s platformServices) { rt.services = s }
+func (rt *Runtime) hostSetServices(s platformServices) {
+	s.OpenURL = rt.services.OpenURL
+	s.ClipboardImage, s.SetClipboardImage = rt.services.ClipboardImage, rt.services.SetClipboardImage
+	rt.services = s
+}
 
 func (rt *Runtime) clipboard() (string, bool) {
 	if rt.services.Clipboard != nil {
@@ -420,7 +430,22 @@ func (rt *Runtime) setClipboard(s string) {
 		rt.services.SetClipboard(s)
 		return
 	}
-	rt.memClipboard = s
+	rt.memClipboard, rt.memImage = s, nil
+}
+
+func (rt *Runtime) clipboardImage() (image.Image, bool) {
+	if rt.services.ClipboardImage != nil {
+		return rt.services.ClipboardImage()
+	}
+	return rt.memImage, rt.memImage != nil
+}
+
+func (rt *Runtime) setClipboardImage(img image.Image) {
+	if rt.services.SetClipboardImage != nil {
+		rt.services.SetClipboardImage(img)
+		return
+	}
+	rt.memClipboard, rt.memImage = "", img
 }
 
 func (rt *Runtime) wakeAt(t time.Time) {

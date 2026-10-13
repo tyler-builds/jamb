@@ -34,6 +34,8 @@ var (
 	procGlobalFree              = kernel32.NewProc("GlobalFree")
 	procGlobalLock              = kernel32.NewProc("GlobalLock")
 	procGlobalUnlock            = kernel32.NewProc("GlobalUnlock")
+	procGlobalSize              = kernel32.NewProc("GlobalSize")
+	procRegisterClipboardFormat = user32.NewProc("RegisterClipboardFormatW")
 	procImmGetContext           = imm32.NewProc("ImmGetContext")
 	procImmReleaseContext       = imm32.NewProc("ImmReleaseContext")
 	procImmSetCompositionWindow = imm32.NewProc("ImmSetCompositionWindow")
@@ -544,30 +546,38 @@ func DroppedFiles(hdrop uintptr) ([]string, POINT) {
 
 // ---- clipboard ----
 
-const cfUnicodeText = 13
+// Standard clipboard formats.
+const (
+	CF_DIB         = 8
+	cfUnicodeText  = 13
+	CF_DIBV5       = 17
+	gmemMoveable   = 0x0002
+	maxClipboardSz = 1 << 30 // larger data is refused rather than copied
+)
+
+// RegisterClipboardFormat returns the number of the clipboard format called
+// name, such as "PNG", registering it if no program has; 0 on failure.
+func RegisterClipboardFormat(name string) uint32 {
+	p, err := syscall.UTF16PtrFromString(name)
+	if err != nil {
+		return 0
+	}
+	r, _, _ := procRegisterClipboardFormat.Call(uintptr(unsafe.Pointer(p)))
+	return uint32(r)
+}
 
 // ReadClipboard returns the clipboard's text, if any.
 func ReadClipboard(hwnd uintptr) (string, bool) {
-	if r, _, _ := procOpenClipboard.Call(hwnd); r == 0 {
+	_, b, ok := ReadClipboardData(hwnd, cfUnicodeText)
+	if !ok {
 		return "", false
 	}
-	defer procCloseClipboard.Call()
-	h, _, _ := procGetClipboardData.Call(cfUnicodeText)
-	if h == 0 {
-		return "", false
-	}
-	p, _, _ := procGlobalLock.Call(h)
-	if p == 0 {
-		return "", false
-	}
-	defer procGlobalUnlock.Call(h)
-	var units []uint16
-	for i := uintptr(0); ; i += 2 {
-		u := *(*uint16)(ptrAt(p + i))
+	units := unsafe.Slice((*uint16)(unsafe.Pointer(unsafe.SliceData(b))), len(b)/2)
+	for i, u := range units {
 		if u == 0 {
+			units = units[:i]
 			break
 		}
-		units = append(units, u)
 	}
 	return string(utf16.Decode(units)), true
 }
@@ -576,29 +586,93 @@ func ReadClipboard(hwnd uintptr) (string, bool) {
 func WriteClipboard(hwnd uintptr, text string) bool {
 	units := utf16.Encode([]rune(text))
 	units = append(units, 0)
-	const gmemMoveable = 0x0002
-	h, _, _ := procGlobalAlloc.Call(gmemMoveable, uintptr(len(units)*2))
-	if h == 0 {
-		return false
-	}
-	p, _, _ := procGlobalLock.Call(h)
-	if p == 0 {
-		procGlobalFree.Call(h)
-		return false
-	}
-	copy(unsafe.Slice((*uint16)(ptrAt(p)), len(units)), units)
-	procGlobalUnlock.Call(h)
+	b := unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(units))), len(units)*2)
+	return WriteClipboardData(hwnd, ClipboardData{Format: cfUnicodeText, Data: b})
+}
+
+// ClipboardData is the clipboard's contents in one format.
+type ClipboardData struct {
+	Format uint32
+	Data   []byte
+}
+
+// ReadClipboardData returns a copy of the clipboard's contents in the first of
+// formats that it holds, and that format. The copy may be longer than the
+// data that was put there: the system rounds memory blocks up.
+func ReadClipboardData(hwnd uintptr, formats ...uint32) (uint32, []byte, bool) {
 	if r, _, _ := procOpenClipboard.Call(hwnd); r == 0 {
-		procGlobalFree.Call(h)
+		return 0, nil, false
+	}
+	defer procCloseClipboard.Call()
+	for _, f := range formats {
+		if f == 0 {
+			continue
+		}
+		h, _, _ := procGetClipboardData.Call(uintptr(f))
+		if h == 0 {
+			continue
+		}
+		n, _, _ := procGlobalSize.Call(h)
+		if n == 0 || n > maxClipboardSz {
+			continue
+		}
+		p, _, _ := procGlobalLock.Call(h)
+		if p == 0 {
+			continue
+		}
+		b := make([]byte, n)
+		copy(b, unsafe.Slice((*byte)(ptrAt(p)), n))
+		procGlobalUnlock.Call(h)
+		return f, b, true
+	}
+	return 0, nil, false
+}
+
+// WriteClipboardData replaces the clipboard's contents with data, which holds
+// the same contents in one or more formats. It reports whether the clipboard
+// took at least one of them.
+func WriteClipboardData(hwnd uintptr, data ...ClipboardData) bool {
+	handles := make([]uintptr, len(data))
+	defer func() {
+		for _, h := range handles {
+			if h != 0 {
+				procGlobalFree.Call(h) // ownership passes to the system only on success
+			}
+		}
+	}()
+	for i, d := range data {
+		if d.Format == 0 || len(d.Data) == 0 {
+			continue
+		}
+		h, _, _ := procGlobalAlloc.Call(gmemMoveable, uintptr(len(d.Data)))
+		if h == 0 {
+			continue
+		}
+		p, _, _ := procGlobalLock.Call(h)
+		if p == 0 {
+			procGlobalFree.Call(h)
+			continue
+		}
+		copy(unsafe.Slice((*byte)(ptrAt(p)), len(d.Data)), d.Data)
+		procGlobalUnlock.Call(h)
+		handles[i] = h
+	}
+	if r, _, _ := procOpenClipboard.Call(hwnd); r == 0 {
 		return false
 	}
 	defer procCloseClipboard.Call()
 	procEmptyClipboard.Call()
-	if r, _, _ := procSetClipboardData.Call(cfUnicodeText, h); r == 0 {
-		procGlobalFree.Call(h) // ownership passes to the system only on success
-		return false
+	ok := false
+	for i, h := range handles {
+		if h == 0 {
+			continue
+		}
+		if r, _, _ := procSetClipboardData.Call(uintptr(data[i].Format), h); r != 0 {
+			handles[i] = 0
+			ok = true
+		}
 	}
-	return true
+	return ok
 }
 
 // ---- file change notifications ----

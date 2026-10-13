@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"time"
 
 	"github.com/tyler-builds/jamb/input"
@@ -23,6 +24,12 @@ func (h *runtimeHost) SetWakeFunc(fn func()) { h.rt().hostSetWakeFunc(fn) }
 // SetServices connects the platform's clipboard and timed wake-ups.
 func (h *runtimeHost) SetServices(clipboard func() (string, bool), setClipboard func(string), wakeAt func(time.Time)) {
 	h.rt().hostSetServices(platformServices{Clipboard: clipboard, SetClipboard: setClipboard, WakeAt: wakeAt})
+}
+
+// SetImageClipboard connects the platform's image clipboard (see
+// Context.ClipboardImage).
+func (h *runtimeHost) SetImageClipboard(get func() (image.Image, bool), set func(image.Image)) {
+	h.rt().services.ClipboardImage, h.rt().services.SetClipboardImage = get, set
 }
 
 // SetOpenURL connects the platform's way to open a URL (see Context.OpenURL).

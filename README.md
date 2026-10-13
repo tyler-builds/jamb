@@ -260,8 +260,14 @@ open at the caret.
 
 App code reads and writes the clipboard's plain text with `ctx.Clipboard()`,
 which returns the text and whether there is any, and `ctx.SetClipboard(s)`.
-Text fields use the same clipboard. Only plain text is supported for now;
-images and HTML are future work.
+Text fields use the same clipboard. Images go through
+`ctx.ClipboardImage()`, which returns an `image.Image` (show it with
+`ui.ImageFromImage`, or save it with `image/png`), and
+`ctx.SetClipboardImage(img)`. Copying text replaces an image and the other way
+round, as on the system clipboard. On Windows an image is read as PNG when the
+program that copied it offered one (browsers, Office and the Snipping Tool do)
+and otherwise as a bitmap, and written as both, with its transparency. HTML is
+future work.
 
 `ctx.OpenURL(url)` opens an `http`, `https` or `mailto` URL with the system, such as
 a help page in the default browser, for a `ui.Link` or a button. Other schemes and
@@ -2928,8 +2934,9 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   use `MessageBoxW`, not `TaskDialog`. `TaskDialog` needs the common-controls
   version 6 manifest, which `jamb package` adds to a packaged app but a `go run`
   build does not have, so the switch (with a `MessageBoxW` fallback) is future
-  work. The clipboard is plain text only: images and
-  HTML are not supported. On Windows 11 the file, folder and message box dialogs
+  work. The clipboard holds plain text and images; HTML is not supported.
+  Image copy and paste with other programs has not been checked by hand yet.
+  On Windows 11 the file, folder and message box dialogs
   were driven through UI Automation and window messages. They opened owned by
   their window, returned their results, and canceled correctly, and the window
   stayed disabled and kept drawing while a dialog was open. Not checked: dialogs

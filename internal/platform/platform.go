@@ -16,6 +16,7 @@
 package platform
 
 import (
+	"image"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
@@ -159,6 +160,10 @@ type Window interface {
 	Clipboard() (string, bool)
 	// SetClipboard replaces the clipboard's contents.
 	SetClipboard(text string)
+	// ClipboardImage returns the clipboard's image, if it holds one.
+	ClipboardImage() (image.Image, bool)
+	// SetClipboardImage replaces the clipboard's contents with img.
+	SetClipboardImage(img image.Image)
 	// SetTextInputRect tells the OS where text is being typed (the caret,
 	// in physical client pixels) so input-method windows appear next to it.
 	// A zero rect means no text field has focus.

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"image"
 	neturl "net/url"
 	"strings"
 	"sync"
@@ -180,13 +181,24 @@ func (c *Context) Zoom() float32 { return c.rt.zoom }
 func (c *Context) SetZoom(z float32) { c.rt.SetZoom(z) }
 
 // Clipboard returns the clipboard's plain text, with LF line endings, and false
-// when it holds none. Text fields use the same clipboard. Only plain text is
-// supported; images and HTML are not yet. Headless runtimes keep a clipboard of
-// their own.
+// when it holds none. Text fields use the same clipboard. Plain text and images
+// are supported (see ClipboardImage); HTML is not yet. Headless runtimes keep a
+// clipboard of their own.
 func (c *Context) Clipboard() (string, bool) { return c.rt.clipboard() }
 
-// SetClipboard replaces the clipboard's plain text (see Clipboard).
+// SetClipboard replaces the clipboard's contents with plain text (see
+// Clipboard).
 func (c *Context) SetClipboard(s string) { c.rt.setClipboard(s) }
+
+// ClipboardImage returns the image on the clipboard, such as a screenshot or
+// an image copied from a browser, and false when it holds none. Show it with
+// ImageFromImage, or save it with image/png. Copied images keep their
+// transparency when the program that copied them kept it.
+func (c *Context) ClipboardImage() (image.Image, bool) { return c.rt.clipboardImage() }
+
+// SetClipboardImage replaces the clipboard's contents with img, which other
+// programs can paste, with its transparency where they support it.
+func (c *Context) SetClipboardImage(img image.Image) { c.rt.setClipboardImage(img) }
 
 // Invalidate re-renders the current component on the next frame.
 func (c *Context) Invalidate() {
