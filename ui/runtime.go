@@ -46,6 +46,9 @@ const (
 type nodeState struct {
 	gen uint32
 
+	// imageStart is when an animated image was first drawn (see imageTexture).
+	imageStart time.Time
+
 	scrollX, scrollY float32
 	targetX, targetY float32
 
@@ -227,6 +230,9 @@ type Runtime struct {
 	rootInst *componentInstance
 	theme    *Theme // the effective theme: the app's, or the high contrast one
 	appTheme *Theme // the theme the app set with SetTheme
+	// imageDue is when the next frame of a drawn animated image is due; a
+	// frame at or after it repaints (see imageTexture).
+	imageDue time.Time
 	// themes is the light and dark theme the runtime follows the system with
 	// (see SetThemes), or nil when the app has set one theme.
 	themes *[2]*Theme
@@ -656,6 +662,9 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 	rt.restyled = 0
 
 	rt.runPosted()
+	if !rt.imageDue.IsZero() && !now.Before(rt.imageDue) {
+		rt.needPaint = true
+	}
 	rt.expirePending(now)
 	rt.tickToasts(now)
 	rt.wakeToasts(now)
@@ -752,6 +761,7 @@ func (rt *Runtime) paintFrame(dt float32) {
 	t0 := time.Now()
 	rt.markAccess() // paint moves nodes (scrolling) and records which are drawn
 	rt.hasTextInput = false
+	rt.imageDue = time.Time{} // the animated images drawn now set it again
 	rt.paint(dt)
 	if rt.revealCaret() {
 		rt.paint(0) // the caret's scroll container moved; repaint at the new offset

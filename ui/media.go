@@ -8,6 +8,8 @@ import (
 	_ "image/jpeg" // register decoders for ImageFromBytes
 	_ "image/png"
 
+	_ "golang.org/x/image/webp"
+
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/internal/scene"
 )
@@ -43,19 +45,38 @@ func (i *IconElement) Style(s Style) *IconElement { i.style = i.style.Merge(s); 
 // ImageSource is decoded pixel data ready for the GPU. Create it once (for
 // example at package init) and reuse it.
 type ImageSource struct {
-	tex    *scene.Texture
+	tex    *scene.Texture // the image, or the first frame of an animated one
 	width  int
 	height int
+	// frames are the frames of an animated GIF, nil for a still image. loops
+	// is the GIF's loop count: 0 repeats forever, -1 plays once.
+	frames []imageFrame
+	loops  int
 }
+
+// Animated reports whether the image is an animated GIF.
+func (s *ImageSource) Animated() bool { return len(s.frames) > 1 }
 
 // Size returns the image size in pixels.
 func (s *ImageSource) Size() (int, int) { return s.width, s.height }
 
-// ImageFromBytes decodes PNG or JPEG data.
+// ImageFromBytes decodes PNG, JPEG, GIF or WebP data. An animated GIF plays,
+// with its frame timing and loop count; it pauses while it is not drawn (off
+// screen, or in a covered or minimized window), and shows its first frame when
+// the user asked for reduced motion. WebP is decoded as a still image.
 func ImageFromBytes(data []byte) (*ImageSource, error) {
+	if bytes.HasPrefix(data, []byte("GIF8")) {
+		src, err := decodeAnimatedGIF(data)
+		if err != nil {
+			return nil, fmt.Errorf("ui.ImageFromBytes: cannot decode GIF (%v)", err)
+		}
+		if src != nil {
+			return src, nil
+		}
+	}
 	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("ui.ImageFromBytes: cannot decode image (%v); supported formats are PNG and JPEG", err)
+		return nil, fmt.Errorf("ui.ImageFromBytes: cannot decode image (%v); supported formats are PNG, JPEG, GIF and WebP", err)
 	}
 	_ = format
 	return ImageFromImage(img), nil

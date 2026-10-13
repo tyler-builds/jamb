@@ -342,7 +342,7 @@ func (rt *Runtime) paintImage(n *node, opacity float32) {
 	}
 	rt.scene.AddImage(scene.ImageDraw{
 		Bounds:  rt.px(dst),
-		Texture: img.src.tex,
+		Texture: rt.imageTexture(n),
 		Src:     srcR,
 		Radii:   rt.corners(img.style.radii()),
 		Opacity: opacity,
@@ -455,4 +455,29 @@ func (rt *Runtime) approach(cur, target Color, k float32) Color {
 	}
 	rt.animating = true
 	return cur.Mix(target, k)
+}
+
+// imageTexture returns the texture an image node shows now. An animated GIF
+// shows the frame for the time since it was first drawn, and asks for a frame
+// when the next one is due. Only drawn images ask, so a GIF that is off screen,
+// or in a window that does not draw, costs nothing. Under reduced motion it
+// shows its first frame.
+func (rt *Runtime) imageTexture(n *node) *scene.Texture {
+	src := n.img.src
+	if !src.Animated() || rt.sys.ReducedMotion {
+		return src.tex
+	}
+	st := rt.state(n.id)
+	if st.imageStart.IsZero() || rt.lastFrame.Before(st.imageStart) {
+		st.imageStart = rt.lastFrame // first drawn now, or the clock stepped back
+	}
+	tex, next := src.frameAt(rt.lastFrame.Sub(st.imageStart))
+	if next > 0 {
+		due := rt.lastFrame.Add(next)
+		if rt.imageDue.IsZero() || due.Before(rt.imageDue) {
+			rt.imageDue = due
+		}
+		rt.wakeAt(due)
+	}
+	return tex
 }

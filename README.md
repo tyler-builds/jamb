@@ -199,6 +199,8 @@ ui.Text("Total").Font("Inter")                    // a family registered with ap
 ui.Icon(icons.Folder).Size(16).Color(c)          // color defaults to the inherited text color
                                                  // icons.All lists every icon; see the icon list below
 ui.Image(src).Size(ui.Px(34), ui.Px(34)).Radius(17).Fit(ui.FitCover)
+                                                 // src := ui.MustImage(data): PNG, JPEG, WebP or GIF; an animated
+                                                 // GIF plays while drawn, and stays on its first frame under reduced motion
 ui.Button("Save").Icon(icons.Check).Secondary().Small().OnClick(fn)   // Primary|Secondary|Ghost|Danger; Small|Large
 ui.IconButton(icons.Bell)
 ui.TextInput(signal).Placeholder("Search…").Icon(icons.Search).OnSubmit(fn).OnChange(fn)
