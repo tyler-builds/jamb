@@ -101,7 +101,7 @@ func Sidebar(s *Store) ui.Element {
 // bar, so it drags the window; it dims while the window is unfocused.
 func brand(t *ui.Theme, focused bool) ui.Element {
 	return ui.Div().Row().Align(ui.Center).Gap(10).PaddingX(6).Height(ui.Px(40)).MarginBottom(8).
-		WindowArea(ui.AreaDrag).Opacity(focusOpacity(focused)).
+		WindowArea(ui.WindowAreaDrag).Opacity(focusOpacity(focused)).
 		Child(ui.Div().Size(ui.Px(28), ui.Px(28)).Radius(8).Center().
 			BackgroundGradient(ui.LinearGradient(135, t.Accent, ui.Hex("#c026d3")).InOklab()).
 			Shadow(ui.Shadow{Y: 2, Blur: 8, Color: t.Accent.Alpha(0.45)}).
@@ -214,7 +214,7 @@ var pageTitles = map[Page]string{
 // the title, the strip drags the window. It dims while the window is
 // unfocused. Main and project windows both use it.
 func titleBar(t *ui.Theme, focused bool, title string) ui.Element {
-	bar := ui.Div().Row().Align(ui.Center).MinHeight(ui.Px(32)).Shrink(0).WindowArea(ui.AreaDrag)
+	bar := ui.Div().Row().Align(ui.Center).MinHeight(ui.Px(32)).Shrink(0).WindowArea(ui.WindowAreaDrag)
 	if title != "" {
 		bar.Child(ui.Div().Grow(1).MinWidth(ui.Px(0)).PaddingX(12).Opacity(focusOpacity(focused)).
 			Child(ui.Text(title).FontSize(12).Medium().TextColor(t.TextSubtle).Truncate()))
@@ -237,7 +237,7 @@ func focusOpacity(focused bool) float32 {
 func header(ctx *ui.Context, s *Store, page Page, focused bool) ui.Element {
 	t := ctx.Theme()
 	return ui.Div().Row().Wrap().MinHeight(ui.Px(60)).Shrink(0).Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(24).Gap(16).
-		WindowArea(ui.AreaDrag).
+		WindowArea(ui.WindowAreaDrag).
 		Child(ui.Div().Row().Align(ui.Center).Gap(8).MinWidth(ui.Px(0)).Opacity(focusOpacity(focused)).
 			Child(ui.Text("Workspace").TextColor(t.TextSubtle).Truncate()). // gives way first when narrow
 			Child(ui.Icon(icons.ChevronRight).Size(14).Color(t.TextSubtle)).

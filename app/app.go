@@ -520,13 +520,13 @@ func (h *host) TitleArea(w platform.Window, x, y float32) platform.TitleArea {
 	}
 	s := w.Scale()
 	switch h.rt.WindowAreaAt(x/s, y/s) {
-	case ui.AreaDrag:
+	case ui.WindowAreaDrag:
 		return platform.TitleDrag
-	case ui.AreaMinimize:
+	case ui.WindowAreaMinimize:
 		return platform.TitleMinimize
-	case ui.AreaMaximize:
+	case ui.WindowAreaMaximize:
 		return platform.TitleMaximize
-	case ui.AreaClose:
+	case ui.WindowAreaClose:
 		return platform.TitleClose
 	}
 	return platform.TitleNone

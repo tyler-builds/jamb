@@ -205,7 +205,7 @@ the same in every variant.
 - The focus of a spin button (`SpinButtonFocusVisible`) is an inner outline 2 px wide,
   drawn on the button's fill, so it stays inside the gap and inside the border.
 
-- `Button.Variant(ui.Primary | ui.Secondary | ui.Ghost | ui.Danger)` picks the look of
+- `Button.Variant(ui.ButtonPrimary | ui.ButtonSecondary | ui.ButtonGhost | ui.ButtonDanger)` picks the look of
   a button. Its style is the theme's `Button` (every variant), then the variant's own
   in `Theme.Buttons` (`Primary`, `Secondary`, `Ghost`, `Danger`), then the instance's
   `Styles`. `Small()` is a size, not a variant, so it is not styled as one.

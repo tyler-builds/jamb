@@ -193,7 +193,7 @@ func TestSplitEnterCollapsesAndRestoresTheSize(t *testing.T) {
 	pos := NewSignal(0.4)
 	collapsed := NewSignal(false)
 	r := splitRig(t, func() Element {
-		return Split(countingPane(), Div().Key("right")).Position(pos).Collapsible(FirstPane).Collapsed(collapsed)
+		return Split(countingPane(), Div().Key("right")).Position(pos).Collapsible(SplitFirst).Collapsed(collapsed)
 	})
 	r.clickKey(t, "left")
 	focusNode(r, handleNode(t, r))
@@ -227,7 +227,7 @@ func TestSplitDoubleClickCollapsesTheSecondPane(t *testing.T) {
 	pos := NewSignal(0.5)
 	collapsed := NewSignal(false)
 	r := splitRig(t, splitWith(pos, func(s *SplitElement) *SplitElement {
-		return s.Collapsible(SecondPane).Collapsed(collapsed)
+		return s.Collapsible(SplitSecond).Collapsed(collapsed)
 	}))
 	rc := r.rt.nodeRect(handleNode(t, r))
 	x, y := rc.X+rc.W/2, rc.Y+rc.H/2

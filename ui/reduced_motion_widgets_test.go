@@ -86,7 +86,7 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				pos := NewSignal(0.4)
 				collapsed := NewSignal(false)
 				return func(ctx *Context) Element {
-					return Split(Div(), Div()).Position(pos).Collapsible(FirstPane).Collapsed(collapsed)
+					return Split(Div(), Div()).Position(pos).Collapsible(SplitFirst).Collapsed(collapsed)
 				}
 			},
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) {

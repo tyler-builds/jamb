@@ -40,7 +40,7 @@ func splitSection() ui.Element {
 					MinFirst(ui.Px(120)).MinSecond(ui.Px(200)))),
 			sample(t, "Collapsible: Enter or a double-click",
 				splitBox(160, ui.Split(splitPane(t, "Files", "Collapse this pane"), splitPane(t, "Editor", "Kept while collapsed")).
-					Position(collapsedPos).Collapsed(collapsed).Collapsible(ui.FirstPane).
+					Position(collapsedPos).Collapsed(collapsed).Collapsible(ui.SplitFirst).
 					Label("Resize files").FirstLabel("Files").SecondLabel("Editor").MinSecond(ui.Px(160)))),
 			sample(t, "Pixels, from 120 to 320 px",
 				splitBox(160, ui.Split(splitPane(t, "Sidebar", "Fixed width"), splitPane(t, "Content", "Takes the rest")).

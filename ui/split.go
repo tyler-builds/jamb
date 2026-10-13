@@ -118,8 +118,8 @@ const (
 type SplitPane uint8
 
 const (
-	FirstPane  SplitPane = iota // the pane on the left, or on top
-	SecondPane                  // the pane on the right, or below
+	SplitFirst  SplitPane = iota // the pane on the left, or on top
+	SplitSecond                  // the pane on the right, or below
 )
 
 // SplitElement lays out two panes with a divider between them that the user drags,
@@ -355,8 +355,8 @@ func (s *SplitElement) values(total float64) (lo, hi float64) {
 // calls it renders again when they change.
 func (s *SplitElement) state(pos *Signal[float64], collapsed *Signal[bool], total float64) splitState {
 	var st splitState
-	st.hiddenFirst = s.collapsible && collapsed.Get() && s.collapsePane == FirstPane
-	st.hiddenSecond = s.collapsible && collapsed.Get() && s.collapsePane == SecondPane
+	st.hiddenFirst = s.collapsible && collapsed.Get() && s.collapsePane == SplitFirst
+	st.hiddenSecond = s.collapsible && collapsed.Get() && s.collapsePane == SplitSecond
 	st.small, st.large = s.steps()
 	lo, hi := s.values(total)
 	v := pos.Get()

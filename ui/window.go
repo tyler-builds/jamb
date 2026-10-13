@@ -9,33 +9,33 @@ import (
 )
 
 // WindowArea marks the part of a custom title bar an element is in. The
-// platform gives each area its native behavior: dragging AreaDrag moves the
+// platform gives each area its native behavior: dragging WindowAreaDrag moves the
 // window (double-clicking maximizes it, and Aero Snap works), and releasing a
 // button area performs its action. Windows that keep the operating system's
 // title bar ignore areas.
 type WindowArea uint8
 
 const (
-	// AreaNone is the client area: ordinary pointer events.
-	AreaNone WindowArea = iota
-	// AreaDrag moves the window when dragged.
-	AreaDrag
-	// AreaMinimize minimizes the window when released over it.
-	AreaMinimize
-	// AreaMaximize maximizes or restores the window when released over it.
-	AreaMaximize
-	// AreaClose closes the window when released over it.
-	AreaClose
+	// WindowAreaNone is the client area: ordinary pointer events.
+	WindowAreaNone WindowArea = iota
+	// WindowAreaDrag moves the window when dragged.
+	WindowAreaDrag
+	// WindowAreaMinimize minimizes the window when released over it.
+	WindowAreaMinimize
+	// WindowAreaMaximize maximizes or restores the window when released over it.
+	WindowAreaMaximize
+	// WindowAreaClose closes the window when released over it.
+	WindowAreaClose
 )
 
 // WindowArea marks d as part of the window's title bar. Elements inside an
-// AreaDrag element are dragged with the window too, unless they take input
+// WindowAreaDrag element are dragged with the window too, unless they take input
 // of their own (see WindowAreaAt): a search box or a button in the title bar
 // stays usable.
 func (d *DivElement) WindowArea(a WindowArea) *DivElement { d.area = a; return d }
 
 // WindowAreaAt returns the title-bar area under (x, y), in device-logical
-// pixels as for PointerMove, or AreaNone. A point is in an AreaDrag area
+// pixels as for PointerMove, or WindowAreaNone. A point is in an WindowAreaDrag area
 // unless an element above that area on the hit path takes input of its own:
 // one with OnClick, OnMouseDown, focus (which includes text fields) or OnDrag.
 // It uses the hit testing of the last paint, so painted elements only.
@@ -47,13 +47,13 @@ func (rt *Runtime) WindowAreaAt(x, y float32) WindowArea {
 			continue
 		}
 		if d.interactive() {
-			return AreaNone
+			return WindowAreaNone
 		}
-		if d.area != AreaNone {
+		if d.area != WindowAreaNone {
 			return d.area
 		}
 	}
-	return AreaNone
+	return WindowAreaNone
 }
 
 // interactive reports whether the element takes pointer or keyboard input of
@@ -183,27 +183,27 @@ func TitleBarButtons() Element {
 				// serves assistive technology, which invokes the button.
 				Role(access.RoleButton).Label(label).OnClick(func() {
 				switch area {
-				case AreaMinimize:
+				case WindowAreaMinimize:
 					win.Minimize()
-				case AreaMaximize:
+				case WindowAreaMaximize:
 					win.ToggleMaximize()
-				case AreaClose:
+				case WindowAreaClose:
 					win.Close()
 				}
 			})
 			// Windows shows its own Snap Layouts flyout over the maximize button, so
 			// that button gets no tooltip of ours.
-			if area != AreaMaximize {
+			if area != WindowAreaMaximize {
 				d.Tooltip(label)
 			}
 			return d
 		}
-		closeButton := button(icons.X, AreaClose, "Close").
+		closeButton := button(icons.X, WindowAreaClose, "Close").
 			Hover(Style{Background: Hex("#e81123"), TextColor: Hex("#ffffff")}).
 			Pressed(Style{Background: Hex("#f1707a"), TextColor: Hex("#ffffff")})
 		return Div().Row().Height(Px(32)).
-			Child(button(icons.Minimize, AreaMinimize, "Minimize")).
-			Child(button(maximize, AreaMaximize, maximizeLabel)).
+			Child(button(icons.Minimize, WindowAreaMinimize, "Minimize")).
+			Child(button(maximize, WindowAreaMaximize, maximizeLabel)).
 			Child(closeButton)
 	})
 }

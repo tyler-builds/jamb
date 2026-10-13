@@ -18,7 +18,7 @@ func TestPartClearRemovesBackgroundDefault(t *testing.T) {
 	}{
 		{"Button.Root", func(st Style) *accessRig {
 			return newAccessRig(func(ctx *Context) Element {
-				return partButton(Primary, ButtonStyle{Root: st}, false)
+				return partButton(ButtonPrimary, ButtonStyle{Root: st}, false)
 			})
 		}, "Button.Root", ""},
 		{"Checkbox.Box", func(st Style) *accessRig {

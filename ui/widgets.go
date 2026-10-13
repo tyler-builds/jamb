@@ -12,10 +12,10 @@ import (
 type ButtonVariant uint8
 
 const (
-	Primary ButtonVariant = iota
-	Secondary
-	Ghost
-	Danger
+	ButtonPrimary ButtonVariant = iota
+	ButtonSecondary
+	ButtonGhost
+	ButtonDanger
 )
 
 // ButtonStyle is the look of each part of a button. A part's style merges over
@@ -73,11 +73,11 @@ type ButtonVariants struct {
 // of returns the style of variant v.
 func (bv ButtonVariants) of(v ButtonVariant) ButtonStyle {
 	switch v {
-	case Secondary:
+	case ButtonSecondary:
 		return bv.Secondary
-	case Ghost:
+	case ButtonGhost:
 		return bv.Ghost
-	case Danger:
+	case ButtonDanger:
 		return bv.Danger
 	}
 	return bv.Primary
@@ -105,20 +105,20 @@ func buttonDefaults(t *Theme, v ButtonVariant, small, iconOnly bool) ButtonStyle
 		RootDisabled: Style{Opacity: 0.5},
 	}
 	switch v {
-	case Primary:
+	case ButtonPrimary:
 		d.Root.Background, d.Root.TextColor, d.Root.Shadows = t.Accent, t.AccentText, []Shadow{ShadowSm}
 		d.RootHover = Style{Background: t.AccentHover}
 		d.RootPressed = Style{Background: t.AccentActive}
-	case Secondary:
+	case ButtonSecondary:
 		d.Root.Background, d.Root.BorderWidth, d.Root.BorderColor = t.Surface, 1, t.BorderStrong
 		d.Root.TextColor, d.Root.Shadows = t.Text, []Shadow{ShadowSm}
 		d.RootHover = Style{Background: t.SurfaceHover, BorderColor: t.TextMuted}
 		d.RootPressed = Style{Background: t.SurfaceActive}
-	case Ghost:
+	case ButtonGhost:
 		d.Root.TextColor = t.TextMuted
 		d.RootHover = Style{Background: t.SurfaceHover, TextColor: t.Text}
 		d.RootPressed = Style{Background: t.SurfaceActive}
-	case Danger:
+	case ButtonDanger:
 		label := Hex("#ffffff")
 		if t.HighContrast {
 			label = t.Background // the Danger fill is the window's text color there
@@ -172,7 +172,7 @@ func Button(label string) *ButtonElement { return &ButtonElement{label: label} }
 
 // IconButton creates a square, label-less Ghost button.
 func IconButton(ic *icons.Icon) *ButtonElement {
-	return &ButtonElement{icon: ic, variant: Ghost}
+	return &ButtonElement{icon: ic, variant: ButtonGhost}
 }
 
 func (*ButtonElement) isElement()           {}
@@ -182,10 +182,10 @@ func (b *ButtonElement) Key(k string) *ButtonElement            { b.key = k; ret
 func (b *ButtonElement) OnClick(fn func()) *ButtonElement       { b.onClick = fn; return b }
 func (b *ButtonElement) Icon(ic *icons.Icon) *ButtonElement     { b.icon = ic; return b }
 func (b *ButtonElement) Variant(v ButtonVariant) *ButtonElement { b.variant = v; return b }
-func (b *ButtonElement) Primary() *ButtonElement                { return b.Variant(Primary) }
-func (b *ButtonElement) Secondary() *ButtonElement              { return b.Variant(Secondary) }
-func (b *ButtonElement) Ghost() *ButtonElement                  { return b.Variant(Ghost) }
-func (b *ButtonElement) Danger() *ButtonElement                 { return b.Variant(Danger) }
+func (b *ButtonElement) Primary() *ButtonElement                { return b.Variant(ButtonPrimary) }
+func (b *ButtonElement) Secondary() *ButtonElement              { return b.Variant(ButtonSecondary) }
+func (b *ButtonElement) Ghost() *ButtonElement                  { return b.Variant(ButtonGhost) }
+func (b *ButtonElement) Danger() *ButtonElement                 { return b.Variant(ButtonDanger) }
 func (b *ButtonElement) Small() *ButtonElement                  { b.small = true; return b }
 func (b *ButtonElement) Disabled(d bool) *ButtonElement         { b.disabled = d; return b }
 

@@ -364,7 +364,7 @@ wins over the theme, and the theme over the built-in defaults, which follow the
 theme's colors. States are parts too (`TabSelected`, `OptionHighlighted`,
 `RootHover`; each struct's doc comment lists its parts). Some widgets have
 variants (`Tabs.Variant(ui.TabsSegmented)`, `NumberInput.SpinButtons(ui.SpinStacked)`,
-`Button.Variant(ui.Danger)`, `Badge.Variant(ui.BadgeSuccess)`, `Toaster.Placement`),
+`Button.Variant(ui.ButtonDanger)`, `Badge.Variant(ui.BadgeSuccess)`, `Toaster.Placement`),
 and render slots (`Tabs.RenderTab`, `Select.RenderValue`, `Select.RenderOption`,
 `Collapsible.RenderHeader`, `Tree.RenderRow`, `Tree.RenderLabel`,
 `TextInput.Leading`, `TextInput.Trailing`) draw one part with your own content while
@@ -822,7 +822,7 @@ width := ui.NewSignal(300.0)         // the first pane's width in logical pixels
 ui.Split(sidebar, editor).PixelPosition(width).MinFirst(ui.Px(200)).MaxFirst(ui.Px(480))
 
 ui.Split(top, bottom).Orientation(ui.SplitVertical).Position(split)    // stacked
-ui.Split(files, editor).Collapsible(ui.FirstPane).Collapsed(collapsed) // Enter collapses
+ui.Split(files, editor).Collapsible(ui.SplitFirst).Collapsed(collapsed) // Enter collapses
 ```
 
 **The position is a signal the app owns**, so it can be saved and restored. The
@@ -1725,16 +1725,16 @@ geometry (content stops at the work area, above the taskbar).
 Mark the title bar's areas with `WindowArea`:
 
 ```go
-ui.Div().Row().Height(ui.Px(32)).WindowArea(ui.AreaDrag).Justify(ui.End).
+ui.Div().Row().Height(ui.Px(32)).WindowArea(ui.WindowAreaDrag).Justify(ui.End).
     Child(search).             // interactive children keep working
     Child(ui.TitleBarButtons()) // minimize, maximize or restore, and close
 ```
 
-- `ui.AreaDrag` moves the window when dragged, and double-clicking maximizes
+- `ui.WindowAreaDrag` moves the window when dragged, and double-clicking maximizes
   it. A point in a drag area is a drag unless an element on top of it takes
   input (`OnClick`, `OnMouseDown`, focus or `OnDrag`), so a search field or
-  a button inside the title bar still works. `ui.AreaMinimize`,
-  `ui.AreaMaximize` and `ui.AreaClose` act when the mouse is released over
+  a button inside the title bar still works. `ui.WindowAreaMinimize`,
+  `ui.WindowAreaMaximize` and `ui.WindowAreaClose` act when the mouse is released over
   them.
 - `ui.TitleBarButtons()` is the usual set: 46×32 buttons like Windows 11's,
   with hover and pressed styles, a red close button and the restore icon

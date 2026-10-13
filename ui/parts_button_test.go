@@ -39,7 +39,7 @@ func testButtonParts(t *testing.T, applied map[string]bool) {
 		t.Run(c.part, func(t *testing.T) {
 			var st ButtonStyle
 			c.set(&st, Style{Background: markBG, TextColor: markFG})
-			r := newAccessRig(func(ctx *Context) Element { return partButton(Primary, st, c.disabled) })
+			r := newAccessRig(func(ctx *Context) Element { return partButton(ButtonPrimary, st, c.disabled) })
 			if c.act != nil {
 				c.act(t, r)
 			}
@@ -65,16 +65,16 @@ func TestButtonVariantStyles(t *testing.T) {
 	th := *DarkTheme
 	th.Button.Root.Background = themeAll
 	th.Buttons.Danger.Root.Background = themeDanger
-	if got := bg(&th, Primary, ButtonStyle{}); got != themeAll {
+	if got := bg(&th, ButtonPrimary, ButtonStyle{}); got != themeAll {
 		t.Errorf("primary: background %v, want the theme's Button %v", got, themeAll)
 	}
-	if got := bg(&th, Danger, ButtonStyle{}); got != themeDanger {
+	if got := bg(&th, ButtonDanger, ButtonStyle{}); got != themeDanger {
 		t.Errorf("danger: background %v, want the variant's %v", got, themeDanger)
 	}
-	if got := bg(&th, Danger, ButtonStyle{Root: Style{Background: inst}}); got != inst {
+	if got := bg(&th, ButtonDanger, ButtonStyle{Root: Style{Background: inst}}); got != inst {
 		t.Errorf("danger with an instance: background %v, want %v", got, inst)
 	}
-	if got := bg(&th, Primary, ButtonStyle{}); got == themeDanger {
+	if got := bg(&th, ButtonPrimary, ButtonStyle{}); got == themeDanger {
 		t.Errorf("primary took the danger variant's style")
 	}
 }
@@ -84,7 +84,7 @@ func TestButtonVariantStyles(t *testing.T) {
 func TestButtonPartPrecedence(t *testing.T) {
 	themeBG, instBG := Hex("#111213"), Hex("#141516")
 	bgOf := func(th *Theme, st ButtonStyle) Color {
-		r := newThemedRig(th, func(ctx *Context) Element { return partButton(Primary, st, false) })
+		r := newThemedRig(th, func(ctx *Context) Element { return partButton(ButtonPrimary, st, false) })
 		return partNode(t, r.rt, "Button.Root", "").style.Background
 	}
 	plain := *DarkTheme
@@ -107,7 +107,7 @@ func TestButtonPartsUnderHighContrast(t *testing.T) {
 	theme := *DarkTheme
 	theme.Button = ButtonStyle{Root: Style{Background: markBG, TextColor: markFG, Padding: XY(9, 0)}}
 	r := newThemedRig(&theme, func(ctx *Context) Element {
-		return partButton(Primary, ButtonStyle{Root: Style{Background: markBG, Padding: XY(12, 0)}}, false)
+		return partButton(ButtonPrimary, ButtonStyle{Root: Style{Background: markBG, Padding: XY(12, 0)}}, false)
 	})
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastBlack()})
 	r.frame()
@@ -132,7 +132,7 @@ func TestButtonPartsUnderHighContrast(t *testing.T) {
 // ghost-like primary with no fill and no shadow.
 func TestButtonClearRemovesDefaults(t *testing.T) {
 	r := newAccessRig(func(ctx *Context) Element {
-		return partButton(Primary, ButtonStyle{Root: Style{Clear: ClearBackground | ClearShadows, Background: Transparent}}, false)
+		return partButton(ButtonPrimary, ButtonStyle{Root: Style{Clear: ClearBackground | ClearShadows, Background: Transparent}}, false)
 	})
 	n := partNode(t, r.rt, "Button.Root", "")
 	if n.style.Background.A != 0 {
