@@ -469,12 +469,14 @@ func (sys *System) alphaScratch(w, h int) *image.Alpha {
 	return m
 }
 
-// Warm loads the default fonts and initializes the shaper by laying out a
-// sample. Apps call it on a goroutine during startup (while the GPU device
-// is being created) so the first frame does not pay for font parsing.
-// The System must not be used concurrently with Warm.
+// Warm loads the fonts the built-in widgets use and initializes the shaper by
+// laying out a sample. Apps call it on a goroutine during startup (while the
+// GPU device is being created) so the first frame does not pay for font
+// parsing. Bold is left to load on first use: no built-in widget draws it,
+// and each parsed face costs a few megabytes. The System must not be used
+// concurrently with Warm.
 func (sys *System) Warm(size float32) {
-	for _, w := range []Weight{Regular, Semibold, Bold} {
+	for _, w := range []Weight{Regular, Medium, Semibold} {
 		sys.Layout("Warm up the shaper: Ag 0123", Style{Size: size, Weight: w}, 1e6)
 	}
 }

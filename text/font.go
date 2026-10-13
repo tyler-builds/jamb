@@ -10,7 +10,6 @@ package text
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"slices"
 	"sync"
 	"unicode"
@@ -207,7 +206,7 @@ func NewRegistry() *Registry {
 }
 
 func loadFile(path string) (*Font, error) {
-	data, err := os.ReadFile(path)
+	data, err := readFontFile(path)
 	if err != nil {
 		return nil, err
 	}

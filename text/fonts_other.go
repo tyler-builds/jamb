@@ -3,6 +3,8 @@
 package text
 
 import (
+	"os"
+
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/gobolditalic"
 	"golang.org/x/image/font/gofont/goitalic"
@@ -30,6 +32,9 @@ func embeddedFonts() []embeddedFont {
 		{FamilyMono, faceKey{Bold, true}, "Go Mono Bold Italic", gomonobolditalic.TTF},
 	}
 }
+
+// readFontFile reads a font file into memory.
+func readFontFile(path string) ([]byte, error) { return os.ReadFile(path) }
 
 // Candidate system font files for macOS and Linux. Missing files are fine:
 // the embedded Go fonts are used instead. A family without an italic file

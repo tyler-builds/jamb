@@ -5,18 +5,47 @@ package text
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 	"unicode"
+	"unsafe"
 
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/gofont/gobolditalic"
-	"golang.org/x/image/font/gofont/goitalic"
-	"golang.org/x/image/font/gofont/gomedium"
-	"golang.org/x/image/font/gofont/gomediumitalic"
-	"golang.org/x/image/font/gofont/gomono"
-	"golang.org/x/image/font/gofont/gomonobolditalic"
-	"golang.org/x/image/font/gofont/gomonoitalic"
 	"golang.org/x/image/font/gofont/goregular"
 )
+
+// readFontFile maps a font file read-only instead of copying it onto the Go
+// heap. The pages are shared with the system font cache and other processes,
+// so they do not count as this process's private memory. Fonts are never
+// unloaded, so the view stays mapped for the life of the process.
+func readFontFile(path string) ([]byte, error) {
+	name, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return nil, err
+	}
+	const share = syscall.FILE_SHARE_READ | syscall.FILE_SHARE_DELETE
+	f, err := syscall.CreateFile(name, syscall.GENERIC_READ, share, nil, syscall.OPEN_EXISTING, syscall.FILE_ATTRIBUTE_NORMAL, 0)
+	if err != nil {
+		return os.ReadFile(path) // reports a missing file; copes with a writer
+	}
+	defer syscall.CloseHandle(f)
+	var st syscall.ByHandleFileInformation
+	if err := syscall.GetFileInformationByHandle(f, &st); err != nil {
+		return nil, &os.PathError{Op: "stat", Path: path, Err: err}
+	}
+	size := int64(st.FileSizeHigh)<<32 | int64(st.FileSizeLow)
+	if size == 0 || size > 1<<30 {
+		return os.ReadFile(path) // nothing to map, or not a plausible font
+	}
+	m, err := syscall.CreateFileMapping(f, nil, syscall.PAGE_READONLY, 0, 0, nil)
+	if err != nil {
+		return os.ReadFile(path)
+	}
+	defer syscall.CloseHandle(m) // the view keeps the mapping alive
+	addr, err := syscall.MapViewOfFile(m, syscall.FILE_MAP_READ, 0, 0, 0)
+	if err != nil {
+		return os.ReadFile(path)
+	}
+	return unsafe.Slice((*byte)(*(*unsafe.Pointer)(unsafe.Pointer(&addr))), int(size)), nil
+}
 
 func winFont(name string) string {
 	dir := os.Getenv("WINDIR")
@@ -26,20 +55,11 @@ func winFont(name string) string {
 	return filepath.Join(dir, "Fonts", name)
 }
 
-// embeddedFonts are the Go fonts, used only for faces no system font
-// provides (see pick).
+// embeddedFonts is only Go Regular, the last resort the registry always has:
+// every supported Windows version ships Segoe UI and Consolas (see
+// systemFonts). The other Go faces would add about 1 MB to every binary.
 func embeddedFonts() []embeddedFont {
-	return []embeddedFont{
-		{FamilySans, faceKey{Regular, false}, "Go Regular", goregular.TTF},
-		{FamilySans, faceKey{Medium, false}, "Go Medium", gomedium.TTF},
-		{FamilySans, faceKey{Bold, false}, "Go Bold", gobold.TTF},
-		{FamilyMono, faceKey{Regular, false}, "Go Mono", gomono.TTF},
-		{FamilySans, faceKey{Regular, true}, "Go Italic", goitalic.TTF},
-		{FamilySans, faceKey{Medium, true}, "Go Medium Italic", gomediumitalic.TTF},
-		{FamilySans, faceKey{Bold, true}, "Go Bold Italic", gobolditalic.TTF},
-		{FamilyMono, faceKey{Regular, true}, "Go Mono Italic", gomonoitalic.TTF},
-		{FamilyMono, faceKey{Bold, true}, "Go Mono Bold Italic", gomonobolditalic.TTF},
-	}
+	return []embeddedFont{{FamilySans, faceKey{Regular, false}, "Go Regular", goregular.TTF}}
 }
 
 func systemFonts() map[string]map[faceKey][]string {

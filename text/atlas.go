@@ -7,7 +7,10 @@ import (
 )
 
 const (
-	atlasInitial = 1024
+	// Atlases start small and double as glyphs arrive: a typical window
+	// needs a few hundred masks, and the subpixel atlas costs 4 bytes per
+	// texel on both the CPU and the GPU.
+	atlasInitial = 256
 	atlasMax     = 4096
 	atlasPad     = 1
 )
