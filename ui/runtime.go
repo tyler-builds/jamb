@@ -567,9 +567,9 @@ func (rt *Runtime) zoomStep(dir int) {
 // Ctrl+- / Ctrl+0 keys and Ctrl+wheel zooming.
 func (rt *Runtime) SetZoomShortcuts(on bool) { rt.zoomKeys = on }
 
-// OnZoomChange registers fn to be called after the zoom changes, so an app
+// OnZoom registers fn to be called after the zoom changes, so an app
 // can remember it.
-func (rt *Runtime) OnZoomChange(fn func(float32)) { rt.onZoom = fn }
+func (rt *Runtime) OnZoom(fn func(float32)) { rt.onZoom = fn }
 
 // Invalidate forces the next Frame to repaint even if nothing changed.
 func (rt *Runtime) Invalidate() {

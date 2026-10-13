@@ -349,7 +349,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	if h.cfg.Zoom > 0 {
 		h.rt.SetZoom(h.cfg.Zoom)
 	}
-	h.rt.OnZoomChange(h.cfg.OnZoom)
+	h.rt.OnZoom(h.cfg.OnZoom)
 	h.updateViewport(w)
 	if h.primary {
 		if h.dev.stress != "" {

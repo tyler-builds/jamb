@@ -117,7 +117,7 @@ func TestZoomShortcutsAndCoordinates(t *testing.T) {
 			Child(Div().Key("btn").Size(Px(100), Px(40)).OnClick(func() { clicks++ })).
 			Child(Text("Zoomed text").Key("label"))
 	}, 600, 400, 1)
-	rt.OnZoomChange(func(z float32) { reported = z })
+	rt.OnZoom(func(z float32) { reported = z })
 
 	rt.Press(input.KeyEqual, input.ModCtrl) // 110%
 	rt.Press(input.KeyEqual, input.ModCtrl) // 125%
