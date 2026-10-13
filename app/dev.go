@@ -42,6 +42,7 @@ import (
 //	                          white scheme (ui.HighContrastWhite); 0 turns it off
 //	JAMB_TEXT_SCALE=150       the Text size setting in percent, 100 to 225
 //	JAMB_REDUCED_MOTION=1     reduced motion on; 0 turns it off
+//	JAMB_DARK=1               the dark app mode; 0 the light one
 //
 // A script is a ';'-separated list of steps run after the first frame. The
 // steps drive the target window, which is the first window until a
@@ -88,6 +89,7 @@ type devOptions struct {
 	highContrast  string
 	textScale     int
 	reducedMotion string
+	dark          string // JAMB_DARK: "1" for the dark app mode, "0" for the light one
 }
 
 func loadDevOptions() devOptions {
@@ -100,6 +102,7 @@ func loadDevOptions() devOptions {
 		geometry:      os.Getenv("JAMB_GEOMETRY_FILE"),
 		highContrast:  os.Getenv("JAMB_HIGH_CONTRAST"),
 		reducedMotion: os.Getenv("JAMB_REDUCED_MOTION"),
+		dark:          os.Getenv("JAMB_DARK"),
 	}
 	if v, err := strconv.Atoi(os.Getenv("JAMB_TEXT_SCALE")); err == nil && v > 0 {
 		d.textScale = min(max(v, 100), 225)
@@ -134,6 +137,13 @@ func (d devOptions) overrideSettings(s ui.SystemSettings) ui.SystemSettings {
 		s.ReducedMotion = false
 	default:
 		s.ReducedMotion = true
+	}
+	switch d.dark {
+	case "":
+	case "0":
+		s.Dark = false
+	default:
+		s.Dark = true
 	}
 	return s
 }

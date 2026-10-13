@@ -131,6 +131,11 @@ func (c *Context) HighContrast() bool { return c.rt.sys.HighContrast }
 // that the app runs itself should then jump to their end (see Animate).
 func (c *Context) ReducedMotion() bool { return c.rt.sys.ReducedMotion }
 
+// SystemDark reports whether the system's app mode is dark. A window that
+// follows the system (see app.Window) already uses its dark theme then; use it
+// for content that does not take its colors from the theme.
+func (c *Context) SystemDark() bool { return c.rt.sys.Dark }
+
 // TextScale returns the Text size setting in percent, from 100 to 225. Text
 // sizes are scaled by it already; use it for sizes the app computes itself.
 func (c *Context) TextScale() int { return c.rt.sys.TextScale }

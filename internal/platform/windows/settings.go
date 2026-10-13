@@ -25,6 +25,7 @@ type rawSettings struct {
 	caretBlink      uint32                // GetCaretBlinkTime in ms, or INFINITE
 	caretWidth      uint32                // SPI_GETCARETWIDTH in device pixels
 	textScale       uint32                // TextScaleFactor, or 0 when it is missing
+	appsUseLight    uint32                // AppsUseLightTheme: 0 when apps use the dark mode
 }
 
 // readRaw gathers the raw values. A read that fails leaves the value that
@@ -48,6 +49,13 @@ func readRaw() rawSettings {
 	// read here, never written.
 	if scale, ok := win32.CurrentUserDWORD(`Software\Microsoft\Accessibility`, "TextScaleFactor"); ok {
 		r.textScale = scale
+	}
+	// The app mode (light or dark) is stored there by the Settings app, and
+	// Windows broadcasts WM_SETTINGCHANGE ("ImmersiveColorSet") when it changes.
+	// Without the value, apps are light, as on a new Windows installation.
+	r.appsUseLight = 1
+	if v, ok := win32.CurrentUserDWORD(`Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`, "AppsUseLightTheme"); ok {
+		r.appsUseLight = v
 	}
 	return r
 }
@@ -92,6 +100,7 @@ func settingsFrom(raw rawSettings) platform.Settings {
 		Colors:        raw.colors,
 		ReducedMotion: raw.clientAnimation == 0,
 		CaretWidth:    1,
+		Dark:          raw.appsUseLight == 0,
 	}
 	switch {
 	case raw.textScale < 100:

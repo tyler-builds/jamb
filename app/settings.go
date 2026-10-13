@@ -17,6 +17,7 @@ func systemSettings(d devOptions) ui.SystemSettings {
 		CaretBlinkOff: p.CaretBlink == 0,
 		CaretBlink:    p.CaretBlink,
 		CaretWidth:    p.CaretWidth,
+		Dark:          p.Dark,
 	}
 	return d.overrideSettings(s)
 }

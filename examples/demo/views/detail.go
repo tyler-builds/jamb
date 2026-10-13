@@ -28,8 +28,10 @@ func OpenProject(s *Store, id int) {
 		Height:    640,
 		MinWidth:  440,
 		MinHeight: 380,
-		// The window draws its own title bar, like the main window (see titleBar).
+		// The window draws its own title bar, like the main window (see titleBar),
+		// in the demo's theme.
 		Chrome: app.ChromeCustom,
+		Theme:  DemoDarkTheme,
 		Root:   ProjectDetail(s, id),
 		// The main window marks the project as open until this window closes.
 		OnClosed: func() { s.windowClosed(id) },

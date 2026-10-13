@@ -48,8 +48,13 @@ type Window struct {
 	Height    int // logical pixels; default 720
 	MinWidth  int
 	MinHeight int
-	// Theme defaults to ui.DarkTheme().
-	Theme *ui.Theme
+	// Theme pins the window to one theme. Without it, the window follows the
+	// system's app mode (light or dark), live: it uses DarkTheme while Windows
+	// is in dark mode and LightTheme otherwise, by default ui.DarkTheme() and
+	// ui.LightTheme(). ctx.SetTheme also pins one theme.
+	Theme      *ui.Theme
+	LightTheme *ui.Theme
+	DarkTheme  *ui.Theme
 	// Root renders the whole window. It is a component: it re-runs when a
 	// signal it reads changes.
 	Root func(ctx *ui.Context) ui.Element
@@ -166,7 +171,7 @@ func (a *App) RunE(w Window) error {
 	// are being created; the first window's runtime picks the result up.
 	ready := make(chan textResult, 1)
 	application.textReady = ready
-	fonts, size := a.fonts, w.Theme.FontSize
+	fonts, size := a.fonts, w.themeFor(false).FontSize
 	go func() { ready <- loadText(fonts, size) }()
 	defer endUI() // a read that waits for the UI thread stops waiting
 	return runPlatform(func() error {
@@ -226,9 +231,26 @@ func withDefaults(w Window) Window {
 		w.Height = 720
 	}
 	if w.Theme == nil {
-		w.Theme = ui.DarkTheme()
+		if w.LightTheme == nil {
+			w.LightTheme = ui.LightTheme()
+		}
+		if w.DarkTheme == nil {
+			w.DarkTheme = ui.DarkTheme()
+		}
 	}
 	return w
+}
+
+// themeFor returns the theme the window uses when the system's app mode is dark
+// or light: its pinned Theme, or the one of its pair.
+func (w Window) themeFor(dark bool) *ui.Theme {
+	switch {
+	case w.Theme != nil:
+		return w.Theme
+	case dark:
+		return w.DarkTheme
+	}
+	return w.LightTheme
 }
 
 // openWindow creates a window for cfg and shows it. handle, when set, is the
@@ -241,7 +263,7 @@ func openWindow(cfg Window, handle *appWindow) (*host, error) {
 	application.opened++
 	opts := platform.WindowOptions{
 		Title: cfg.Title, Width: cfg.Width, Height: cfg.Height,
-		MinWidth: cfg.MinWidth, MinHeight: cfg.MinHeight, Dark: cfg.Theme.Dark,
+		MinWidth: cfg.MinWidth, MinHeight: cfg.MinHeight, Dark: cfg.themeFor(systemSettings(h.dev).Dark).Dark,
 		CustomTitleBar: cfg.Chrome == ChromeCustom,
 	}
 	if h.primary {
@@ -250,6 +272,7 @@ func openWindow(cfg Window, handle *appWindow) (*host, error) {
 	if opts.Frame.W == 0 {
 		opts.Origin = origin(cfg)
 	}
+	h.darkFrame = opts.Dark
 	if _, err := openPlatform(opts, h); err != nil {
 		return nil, err
 	}
@@ -314,11 +337,13 @@ type host struct {
 	dev      devOptions
 	openedAt time.Time
 
-	win     platform.Window
-	rt      *ui.Runtime
-	rh      runtimeHost // the host side of rt
-	r       render.Renderer
-	focused bool
+	win platform.Window
+	rt  *ui.Runtime
+	rh  runtimeHost // the host side of rt
+	// darkFrame is whether the window's decorations are dark, as last set.
+	darkFrame bool
+	r         render.Renderer
+	focused   bool
 
 	keymapFile *keymap.File
 	stopWatch  func() // stops the keymap file watcher, if one runs
@@ -359,7 +384,11 @@ func (h *host) OnCreate(w platform.Window) error {
 	if waited {
 		h.dev.tracef("fonts ready (waited %v after the renderer)", time.Since(t1))
 	}
-	h.rt = ui.NewRuntime(h.cfg.Root, h.cfg.Theme, ts)
+	h.rt = ui.NewRuntime(h.cfg.Root, h.cfg.themeFor(false), ts)
+	if h.cfg.Theme == nil {
+		// applySettings, below, picks the one the system's app mode asks for.
+		h.rt.SetThemes(h.cfg.LightTheme, h.cfg.DarkTheme)
+	}
 	h.rh = hostOf(h.rt)
 	h.rh.SetWakeFunc(w.Wake)
 	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
@@ -564,6 +593,12 @@ func (h *host) OnFrame(w platform.Window) bool {
 		return false // minimized
 	}
 	h.updateViewport(w)
+	// The native title bar follows the theme: the app may switch it, or the
+	// system's app mode may, when the window follows it.
+	if dark := h.rt.Theme().Dark; dark != h.darkFrame {
+		h.darkFrame = dark
+		w.SetDark(dark)
+	}
 	frameStart := time.Now()
 	if !h.gpuReady(frameStart) {
 		return false // the device is lost; the window is woken when it may draw

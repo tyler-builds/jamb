@@ -110,6 +110,12 @@ func HighContrastWhite() SystemColors {
 // applyTheme makes the effective theme the app's theme, or the high contrast
 // theme built from the app's theme's size and the system colors.
 func (rt *Runtime) applyTheme() {
+	if rt.themes != nil {
+		rt.appTheme = rt.themes[0]
+		if rt.sys.Dark {
+			rt.appTheme = rt.themes[1]
+		}
+	}
 	rt.theme = rt.appTheme
 	if rt.sys.HighContrast {
 		rt.theme = HighContrastTheme(rt.sys.Colors, rt.appTheme)

@@ -1555,6 +1555,18 @@ Theming: `ctx.Theme()` returns semantic colors, and `ctx.SetTheme(ui.LightTheme(
 re-renders everything. `ui.DarkTheme()` and `ui.LightTheme()` return a new copy of
 a built-in theme on each call.
 
+A window follows Windows' app mode (Settings > Personalization > Colors > Choose
+your app mode) unless it pins a theme: it uses `app.Window.DarkTheme` in dark mode
+and `app.Window.LightTheme` in light mode (the built-in themes by default), switches
+live when the setting changes, and its native title bar follows. `app.Window.Theme`
+or `ctx.SetTheme` pins one theme instead, and `ctx.SystemDark()` reports the mode:
+
+```go
+app.Window{Root: root}                                   // follows Windows
+app.Window{LightTheme: myLight, DarkTheme: myDark, ...}  // your pair, follows Windows
+app.Window{Theme: ui.DarkTheme(), ...}                   // always dark
+```
+
 High contrast is automatic. When Windows high contrast is on (Settings, Accessibility,
 Contrast themes), the runtime uses `ui.HighContrastTheme`, a theme built from the
 system colors (`GetSysColor`): window and text colors for surfaces and text,
@@ -2155,7 +2167,7 @@ The settings are read at start and again on `WM_SETTINGCHANGE` and
 `WM_SYSCOLORCHANGE`, so a change shows without a restart. jamb reads them and
 never writes them.
 
-For testing, three variables simulate the settings for one run, and change no system
+For testing, four variables simulate the settings for one run, and change no system
 setting. Real settings are used in normal use; a variable replaces its setting only
 when it is set:
 
@@ -2163,6 +2175,7 @@ when it is set:
 set JAMB_HIGH_CONTRAST=1        (or "white" for the white scheme, 0 for off)
 set JAMB_TEXT_SCALE=225         (100 to 225)
 set JAMB_REDUCED_MOTION=1       (0 for off)
+set JAMB_DARK=1                 (the dark app mode; 0 for the light one)
 go run ./examples/demo
 ```
 

@@ -12,7 +12,7 @@ import (
 
 // baseRaw is the raw state of a system with the default settings.
 func baseRaw() rawSettings {
-	return rawSettings{clientAnimation: 1, caretBlink: 530, caretWidth: 1, textScale: 100}
+	return rawSettings{clientAnimation: 1, caretBlink: 530, caretWidth: 1, textScale: 100, appsUseLight: 1}
 }
 
 func TestSettingsFromTextScale(t *testing.T) {
@@ -154,5 +154,17 @@ func TestDefaultSettings(t *testing.T) {
 	// The raw values of a system with default settings map to the same thing.
 	if got := settingsFrom(baseRaw()); got != want {
 		t.Errorf("settingsFrom(default raw) = %+v, want %+v", got, want)
+	}
+}
+
+func TestSettingsFromAppMode(t *testing.T) {
+	raw := baseRaw()
+	raw.appsUseLight = 0
+	if !settingsFrom(raw).Dark {
+		t.Error("AppsUseLightTheme 0: Dark is false")
+	}
+	raw.appsUseLight = 1
+	if settingsFrom(raw).Dark {
+		t.Error("AppsUseLightTheme 1: Dark is true")
 	}
 }

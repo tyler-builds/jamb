@@ -8,6 +8,10 @@ import "time"
 // change. The zero value is the default: 100% text, no high contrast, motion on,
 // a caret that blinks every 530 ms and is 1.5 px wide.
 type SystemSettings struct {
+	// Dark is the system's app mode: Windows' "Choose your app mode" is Dark.
+	// A runtime that follows the system (see Runtime.SetThemes) uses its dark
+	// theme then, and its light theme otherwise.
+	Dark bool
 	// HighContrast selects the high contrast theme, built from Colors. The
 	// theme is used automatically; see HighContrastTheme.
 	HighContrast bool

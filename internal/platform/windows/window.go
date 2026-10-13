@@ -371,6 +371,8 @@ func (w *window) SetPosition(x, y int) {
 
 func (w *window) Fullscreen() bool { return w.fullscreen }
 
+func (w *window) SetDark(on bool) { win32.SetDarkTitleBar(w.hwnd, on) }
+
 // SetFullscreen removes the frame and covers the monitor the window is on, as
 // Windows apps conventionally do: the style and placement are saved, and
 // restored when the window leaves fullscreen.

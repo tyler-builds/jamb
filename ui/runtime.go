@@ -227,7 +227,10 @@ type Runtime struct {
 	rootInst *componentInstance
 	theme    *Theme // the effective theme: the app's, or the high contrast one
 	appTheme *Theme // the theme the app set with SetTheme
-	sys      SystemSettings
+	// themes is the light and dark theme the runtime follows the system with
+	// (see SetThemes), or nil when the app has set one theme.
+	themes *[2]*Theme
+	sys    SystemSettings
 	// textFactor scales the font size of text (see textStyle); caretWidth is the
 	// width of the text caret in logical pixels. Both follow sys.
 	textFactor float32
@@ -587,7 +590,18 @@ func (rt *Runtime) hostInvalidateAll() {
 
 // SetTheme switches the theme and re-renders all components.
 func (rt *Runtime) SetTheme(t *Theme) {
+	rt.themes = nil
 	rt.appTheme = t
+	rt.applyTheme()
+	rt.hostInvalidateAll()
+}
+
+// SetThemes makes the runtime follow the system's app mode: it uses dark while
+// the system is in dark mode (SystemSettings.Dark), and light otherwise, and
+// switches when the setting changes. SetTheme stops following and sets one
+// theme. Under high contrast the high contrast theme is built from the one in use.
+func (rt *Runtime) SetThemes(light, dark *Theme) {
+	rt.themes = &[2]*Theme{light, dark}
 	rt.applyTheme()
 	rt.hostInvalidateAll()
 }

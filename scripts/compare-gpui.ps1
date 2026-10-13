@@ -755,6 +755,9 @@ try {
     if (-not $SkipRust) {
         $apps += [pscustomobject]@{ key = 'gpui'; exe = "$work\bin\gpui-rel.exe"; shot = 'comparison-gpui-hello.png' }
     }
+    # Both apps are dark: GPUI's hello sets its colors, and jamb's hello follows
+    # Windows' app mode, so it is pinned to the dark mode for the run.
+    $env:JAMB_DARK = '1'
     $runtime = @()
     for ($run = 1; $run -le $Runs; $run++) {
         foreach ($app in $apps) {

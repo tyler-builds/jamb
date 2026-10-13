@@ -138,6 +138,9 @@ type Window interface {
 	// puts it back where it was. Fullscreen reports which.
 	SetFullscreen(on bool)
 	Fullscreen() bool
+	// SetDark asks for the dark window decorations (the native title bar and
+	// frame), to match a dark theme.
+	SetDark(on bool)
 	// Focus brings the window to the front and gives it keyboard focus.
 	Focus()
 	// Wake schedules a call to Handler.OnFrame. It is safe to call from any
@@ -195,6 +198,7 @@ type Settings struct {
 	ReducedMotion bool          // client area animations are off (SPI_GETCLIENTAREAANIMATION false)
 	CaretBlink    time.Duration // GetCaretBlinkTime in ms; 0 means the caret does not blink (INFINITE)
 	CaretWidth    int           // SPI_GETCARETWIDTH, in device pixels (the text cursor thickness; default 1)
+	Dark          bool          // apps use the dark mode (Settings > Personalization > Colors)
 }
 
 // SystemColors are the system colors of the current theme, each as a 0x00RRGGBB
