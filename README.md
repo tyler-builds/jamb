@@ -728,9 +728,9 @@ be drawn with `RenderHeader`, `RenderRow` or `RenderLabel`.
 ```go
 ui.Tabs(section,                                  // *ui.Signal[T], for any comparable T
 	ui.Tab[string]{Value: "general", Label: "General", Icon: icons.Settings,
-		Panel: func() ui.Element { return generalPanel() }},   // built only while selected (or kept: KeepPanels)
+		Panel: func() ui.Element { return generalPanel() }},   // built only while selected (or kept: KeepMounted)
 	ui.Tab[string]{Value: "usage", Label: "Usage", Disabled: true, Panel: usagePanel},
-).Key("settings-tabs").Label("Settings sections").KeepPanels().OnChange(func(v string) { ... })
+).Key("settings-tabs").Label("Settings sections").KeepMounted().OnChange(func(v string) { ... })
 ui.Tabs(filter, tabs...).Variant(ui.TabsSegmented)   // one row of segments, the selected one filled
 ui.Tabs(view, tabs...).Styles(ui.TabsStyle{Indicator: ui.Style{Height: ui.Px(3)}}) // parts: see Styling
 ui.Tabs(count, tabs...).RenderTab(func(tab ui.Tab[int], s ui.PartState) ui.Element { ... }) // your content in each tab
@@ -757,14 +757,14 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
   They work from the tab list and from the panel. Inside a tab group, Ctrl+Tab
   is therefore bound, and focus moves to the selected tab. Only the selected
   panel is built, so the state of the other panels is discarded when the
-  selection moves. `KeepPanels()` keeps them: each panel is built the first time
+  selection moves. `KeepMounted()` keeps them: each panel is built the first time
   its tab is selected, and then stays in the tree, hidden with `Display` while
   other tabs are selected. Its component instances, Local state, text, selection
   and scroll positions survive switching tabs, and switching does not render it.
   It renders again when the code that makes the tabs runs again, and when its own
   state changes. A hidden panel is not in the tree, the Tab order or the hit test.
   The project window keeps its Overview and Comments tabs this way, so a draft
-  comment and the scroll position survive. Without `KeepPanels()`, keep the data in
+  comment and the scroll position survive. Without `KeepMounted()`, keep the data in
   signals, as the other demo samples do.
   The selected tab has a line under it, in Accent (Highlight under high contrast),
   so the selection is not carried by color alone. No state makes the text bold.
@@ -779,7 +779,7 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
 - **Collapsible.** The header is a button with the Expanded state. Space and
   Enter open and close it, as a click does, and its chevron points right when closed
   and down when open. The content is not built while the section is closed. With
-  `KeepContent()` it is built on the first opening and then kept hidden while the
+  `KeepMounted()` it is built on the first opening and then kept hidden while the
   section is closed, so its state survives closing and opening.
   Assistive technology reads the header as expandable and expanded, and the
   content as a group named by the header.

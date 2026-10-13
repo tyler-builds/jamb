@@ -1373,7 +1373,7 @@ decisions, and are marked as such.
   Tab lists and tabs were already mapped to Tab (50018) and TabItem (50019).
 - **Tabs.** `ui.Tabs(selected, tabs...)` takes `Tab[T]` values, each with a value, a
   label, an optional icon, a disabled flag and a `Panel` func. Only the selected
-  panel is built, unless the tabs call `KeepPanels()` (see Panel state). The tab
+  panel is built, unless the tabs call `KeepMounted()` (see Panel state). The tab
   list is one Tab stop, at the selected tab. This follows
   [Microsoft's TabView guidance](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/tab-view),
   which says that when focus moves into the tab strip, "the selected TabViewItem
@@ -1399,7 +1399,7 @@ decisions, and are marked as such.
   IsSelectionRequired, and a tab list's name repeated its control type word (so the
   demo's labels avoid "tab").
 - **Panel state (opt-in).** By default a panel is rebuilt when its tab is selected
-  again, and its state is not kept. `KeepPanels()` keeps each panel once its tab has
+  again, and its state is not kept. `KeepMounted()` keeps each panel once its tab has
   been selected. A kept panel is hidden with `Display(false)` while other tabs are
   selected, so it is not in the tree, is not focusable and is not in the Tab order.
   Its panel keys are per tab (`<tabs key>/panel:<value>`), so they stay unique. The
@@ -1409,7 +1409,7 @@ decisions, and are marked as such.
   so both open and close the section. This matches the Phase B semantics, where an
   expandable row's click toggles it. The content is a group named by its title, and
   LabelledBy names it by the header. The content is not built while the section is
-  closed, unless the section calls `KeepContent()`. Then it is built on the first
+  closed, unless the section calls `KeepMounted()`. Then it is built on the first
   opening and hidden while the section is closed, and it is not in the tree then.
 - **Expander UIA type (decided).** Microsoft's Expander page says the header is the
   part a user activates, and that the content area is the region it shows

@@ -9,7 +9,7 @@ import (
 	"github.com/tyler-builds/jamb/input"
 )
 
-// keptDemo is tabsDemo with KeepPanels. The first panel holds a text field bound
+// keptDemo is tabsDemo with KeepMounted. The first panel holds a text field bound
 // to text, and the third a counter in a component, so the tests can see whether
 // each panel's state survives switching tabs.
 func keptDemo(sel *Signal[string], built *[]string, text *Signal[string], keep bool) Element {
@@ -37,7 +37,7 @@ func keptDemo(sel *Signal[string], built *[]string, text *Signal[string], keep b
 		}},
 	).Key("settings").Label("Settings sections")
 	if keep {
-		tabs.KeepPanels()
+		tabs.KeepMounted()
 	}
 	return Div().Column().Child(tabs)
 }
@@ -54,7 +54,7 @@ func tabPanels(r *accessRig) []*access.Node {
 	return out
 }
 
-func TestTabsKeepPanelsBuildEachPanelOnceAndKeepIt(t *testing.T) {
+func TestTabsKeepMountedBuildEachPanelOnceAndKeepIt(t *testing.T) {
 	sel := NewSignal("a")
 	var built []string
 	text := NewSignal("")
@@ -73,7 +73,7 @@ func TestTabsKeepPanelsBuildEachPanelOnceAndKeepIt(t *testing.T) {
 	}
 }
 
-func TestTabsKeepPanelsStateSurvivesSwitching(t *testing.T) {
+func TestTabsKeepMountedStateSurvivesSwitching(t *testing.T) {
 	sel := NewSignal("a")
 	var built []string
 	text := NewSignal("")
@@ -119,17 +119,17 @@ func TestTabsDefaultDiscardsPanelsWhenSwitching(t *testing.T) {
 	r.clickKey(t, "settings/tab:c")
 	r.clickKey(t, "settings/tab:a")
 	if got := strings.Join(built, ","); got != "a,c,a" {
-		t.Fatalf("built panels %q, want a,c,a: without KeepPanels a panel is built again", got)
+		t.Fatalf("built panels %q, want a,c,a: without KeepMounted a panel is built again", got)
 	}
 	if namedInTree(r, "Gamma panel") || len(tabPanels(r)) != 1 {
-		t.Fatalf("without KeepPanels only the selected panel is in the tree")
+		t.Fatalf("without KeepMounted only the selected panel is in the tree")
 	}
 	if len(r.warnings) != 0 {
 		t.Fatalf("warnings: %v", r.warnings)
 	}
 }
 
-func TestTabsKeepPanelsKeyboardAndTabOrder(t *testing.T) {
+func TestTabsKeepMountedKeyboardAndTabOrder(t *testing.T) {
 	sel := NewSignal("a")
 	var built []string
 	text := NewSignal("")
@@ -177,7 +177,7 @@ func TestTabsKeepPanelsKeyboardAndTabOrder(t *testing.T) {
 	}
 }
 
-func TestTabsKeepPanelsAccessTreeShowsOnlySelectedPanel(t *testing.T) {
+func TestTabsKeepMountedAccessTreeShowsOnlySelectedPanel(t *testing.T) {
 	sel := NewSignal("a")
 	var built []string
 	text := NewSignal("")

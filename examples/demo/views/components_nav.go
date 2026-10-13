@@ -27,7 +27,7 @@ func navigationSection() ui.Element {
 		samples := []ui.Element{
 			sample(t, "Tabs, panels kept", ui.Div().Width(ui.Px(420)).Child(ui.Tabs(plain,
 				ui.Tab[string]{Value: "alpha", Label: "Alpha", Panel: func() ui.Element {
-					// KeepPanels keeps this panel, so the text in the field stays when another tab is selected.
+					// KeepMounted keeps this panel, so the text in the field stays when another tab is selected.
 					return ui.Div().Column().Gap(8).Children(
 						panelText(t, "Alpha panel"),
 						ui.TextInput(note).Label("Note").Placeholder("Type a note").Width(ui.Full),
@@ -36,7 +36,7 @@ func navigationSection() ui.Element {
 				}},
 				ui.Tab[string]{Value: "beta", Label: "Beta", Panel: func() ui.Element { return panelText(t, "Beta panel") }},
 				ui.Tab[string]{Value: "gamma", Label: "Gamma", Panel: func() ui.Element { return panelText(t, "Gamma panel") }},
-			).Key("nav.plainSections").Label("Plain sections").KeepPanels())),
+			).Key("nav.plainSections").Label("Plain sections").KeepMounted())),
 			sample(t, "Tabs, one disabled", ui.Div().Width(ui.Px(420)).Child(ui.Tabs(disabled,
 				ui.Tab[string]{Value: "overview", Label: "Overview", Panel: func() ui.Element { return panelText(t, "Overview panel") }},
 				ui.Tab[string]{Value: "usage", Label: "Usage", Disabled: true, Panel: func() ui.Element { return panelText(t, "Usage panel") }},

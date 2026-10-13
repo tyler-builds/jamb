@@ -12,7 +12,7 @@ import (
 // Tab is one tab of a Tabs: the value it selects, its label, an optional icon
 // and the panel it shows. Panel is called only while the tab is selected, so the
 // panels of the other tabs are not built, unless the Tabs keeps its panels (see
-// KeepPanels). A disabled tab is shown but cannot be selected.
+// KeepMounted). A disabled tab is shown but cannot be selected.
 type Tab[T comparable] struct {
 	Value    T
 	Label    string
@@ -145,7 +145,7 @@ type TabsElement[T comparable] struct {
 	name      string // the accessible name of the tab list, see Label
 	key       string
 	onChange  func(T)
-	keep      bool // see KeepPanels
+	keep      bool // see KeepMounted
 	variant   TabsVariant
 	styles    TabsStyle
 	renderTab func(Tab[T], PartState) Element
@@ -173,16 +173,16 @@ func (t *TabsElement[T]) Label(name string) *TabsElement[T] { t.name = name; ret
 // by the keys or by Ctrl+Tab. The signal is set first.
 func (t *TabsElement[T]) OnChange(fn func(T)) *TabsElement[T] { t.onChange = fn; return t }
 
-// KeepPanels keeps each panel once it has been built. A panel is built the first
+// KeepMounted keeps each panel once it has been built. A panel is built the first
 // time its tab is selected, as it is by default, and then stays in the tree while
 // other tabs are selected, hidden with Display. Its component instances, Local
 // state, text, selection, scroll positions and lists survive switching tabs.
-// Tabs that were never selected are not built. Without KeepPanels only the
+// Tabs that were never selected are not built. Without KeepMounted only the
 // selected panel exists, and the state of the others is discarded.
 //
 // A kept panel renders again when the code that makes the tabs runs again, and
 // when its own state changes. Switching tabs does not render it.
-func (t *TabsElement[T]) KeepPanels() *TabsElement[T] { t.keep = true; return t }
+func (t *TabsElement[T]) KeepMounted() *TabsElement[T] { t.keep = true; return t }
 
 // Variant sets the look of the tab list: TabsUnderline (the default) or
 // TabsSegmented. The behavior is the same in both.
@@ -381,7 +381,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 }
 
 // keptPanels returns the panel of each tab that has been selected, with the
-// selected one shown and the others hidden (see KeepPanels). The first time a
+// selected one shown and the others hidden (see KeepMounted). The first time a
 // tab is selected its panel is recorded in the Local set; its component is made
 // once per render of the tab list, so a tab switch reuses it.
 func (t *TabsElement[T]) keptPanels(ctx *Context, sel int, panels map[T]*ComponentElement, panel Style) []Element {

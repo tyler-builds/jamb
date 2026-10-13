@@ -104,7 +104,7 @@ type CollapsibleElement struct {
 	content      Element
 	key          string
 	disabled     bool
-	keep         bool // see KeepContent
+	keep         bool // see KeepMounted
 	onChange     func(bool)
 	styles       CollapsibleStyle
 	renderHeader func(title string, state PartState) Element
@@ -129,12 +129,12 @@ func (c *CollapsibleElement) Key(k string) *CollapsibleElement { c.key = k; retu
 // Disabled shows the section but does not let it open or close.
 func (c *CollapsibleElement) Disabled(d bool) *CollapsibleElement { c.disabled = d; return c }
 
-// KeepContent keeps the content once the section has been opened. The content is
+// KeepMounted keeps the content once the section has been opened. The content is
 // built the first time the section opens, as it is by default, and then stays in
 // the tree while the section is closed, hidden with Display. Its state survives
-// closing and opening the section. Without KeepContent the content is discarded
+// closing and opening the section. Without KeepMounted the content is discarded
 // when the section closes.
-func (c *CollapsibleElement) KeepContent() *CollapsibleElement { c.keep = true; return c }
+func (c *CollapsibleElement) KeepMounted() *CollapsibleElement { c.keep = true; return c }
 
 // OnChange runs fn with the new state after the user opens or closes the section.
 // The signal is set first.
@@ -250,7 +250,7 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 	if c.key != "" {
 		col.Key(c.key)
 	}
-	// With KeepContent the content is built once the section has opened, and is
+	// With KeepMounted the content is built once the section has opened, and is
 	// then kept hidden while the section is closed.
 	kept := false
 	if c.keep {

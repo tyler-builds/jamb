@@ -6,7 +6,7 @@ import (
 )
 
 // keptSection is a collapsible section named Details whose content holds a
-// counter in a component. keep sets KeepContent.
+// counter in a component. keep sets KeepMounted.
 func keptSection(open *Signal[bool], keep bool) Element {
 	c := Collapsible("Details", open, Component(func(ctx *Context) Element {
 		count := Local(ctx, "count", 0)
@@ -16,12 +16,12 @@ func keptSection(open *Signal[bool], keep bool) Element {
 		)
 	})).Key("details")
 	if keep {
-		c.KeepContent()
+		c.KeepMounted()
 	}
 	return Div().Column().Child(c)
 }
 
-func TestCollapsibleKeepContentStateSurvivesClosing(t *testing.T) {
+func TestCollapsibleKeepMountedStateSurvivesClosing(t *testing.T) {
 	open := NewSignal(false)
 	r := newAccessRig(func(ctx *Context) Element { return keptSection(open, true) })
 	if namedInTree(r, "Count 0") || namedInTree(r, "Add") {
@@ -58,7 +58,7 @@ func TestCollapsibleDefaultDiscardsContentWhenClosed(t *testing.T) {
 	r.clickKey(t, "details/header") // close
 	r.clickKey(t, "details/header") // open again
 	if !namedInTree(r, "Count 0") {
-		t.Fatalf("without KeepContent the count should start again at 0 on opening")
+		t.Fatalf("without KeepMounted the count should start again at 0 on opening")
 	}
 	if len(r.warnings) != 0 {
 		t.Fatalf("warnings: %v", r.warnings)

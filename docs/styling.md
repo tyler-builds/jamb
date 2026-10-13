@@ -492,7 +492,7 @@ A new widget that has parts follows the same pattern as `Tabs`, `Select`, `Slide
   assistive technology.
 - Keys of the built-in parts are scoped by the widget's key. Tab keys are
   `<scope>/tab:<value>` and panel keys are `<scope>/panel` (for the one panel) or
-  `<scope>/panel:<value>` (with `KeepPanels`). The `tab:` and `panel` prefixes keep a tab
+  `<scope>/panel:<value>` (with `KeepMounted`). The `tab:` and `panel` prefixes keep a tab
   and the panel disjoint, so a value that formats as "panel" cannot collide with the
   default panel.
 
