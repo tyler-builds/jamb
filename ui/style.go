@@ -5,7 +5,7 @@ import (
 
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/layout"
-	"github.com/tyler-builds/jamb/text"
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // Length is a size: Px(240), Percent(100) or Auto.

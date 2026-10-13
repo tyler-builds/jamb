@@ -2,7 +2,7 @@ package ui
 
 import (
 	"github.com/tyler-builds/jamb/access"
-	"github.com/tyler-builds/jamb/text"
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // The Text pattern of a text field or text area reads the editor's text and the

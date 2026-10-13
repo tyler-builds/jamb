@@ -6,7 +6,7 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/access/accesstest"
-	"github.com/tyler-builds/jamb/text"
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // textOf returns the Text state of the field or text area named name in the

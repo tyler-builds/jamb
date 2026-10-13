@@ -3,7 +3,7 @@
 package windows
 
 import (
-	"github.com/tyler-builds/jamb/text"
+	"github.com/tyler-builds/jamb/internal/text"
 	"syscall"
 	"testing"
 	"unicode/utf16"

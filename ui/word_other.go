@@ -2,7 +2,7 @@
 
 package ui
 
-import "github.com/tyler-builds/jamb/text"
+import "github.com/tyler-builds/jamb/internal/text"
 
 // The editor's word keys follow the convention of the platform. Outside Windows the
 // keys stop at the end of the next word and at the start of the word before the

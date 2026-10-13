@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/tyler-builds/jamb/text"
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // Highlight styles a range of text. Zero fields are unset (keep the text's own style).

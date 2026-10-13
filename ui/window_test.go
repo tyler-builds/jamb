@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/dialog"
-	"github.com/tyler-builds/jamb/text"
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // titleBarRig is a window whose top 60 px are a title bar: a drag area with a

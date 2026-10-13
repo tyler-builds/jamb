@@ -2,7 +2,7 @@
 
 package ui
 
-import "github.com/tyler-builds/jamb/text"
+import "github.com/tyler-builds/jamb/internal/text"
 
 // The editor's word keys follow the convention of the platform. On Windows, as in
 // Notepad, WordPad and the edit controls of Edge and Chrome, Ctrl+Right and

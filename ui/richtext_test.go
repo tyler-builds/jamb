@@ -9,7 +9,7 @@ import (
 
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/scene"
-	"github.com/tyler-builds/jamb/text"
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // paintNow repaints the tree and returns the scene.

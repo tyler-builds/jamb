@@ -29,10 +29,10 @@ import (
 	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/render"
 	"github.com/tyler-builds/jamb/internal/scene"
+	"github.com/tyler-builds/jamb/internal/text"
 	"github.com/tyler-builds/jamb/internal/uihost"
 	"github.com/tyler-builds/jamb/internal/watch"
 	"github.com/tyler-builds/jamb/keymap"
-	"github.com/tyler-builds/jamb/text"
 	"github.com/tyler-builds/jamb/ui"
 )
 

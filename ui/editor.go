@@ -9,7 +9,7 @@ import (
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/scene"
-	"github.com/tyler-builds/jamb/text"
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // The editor is the text-editing core behind TextInput and TextArea: one

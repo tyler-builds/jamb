@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tyler-builds/jamb/text"
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // Scaling benchmarks: trees of ~100, ~1,000 and ~10,000 nodes.

@@ -49,8 +49,6 @@ keymap/            key bindings from JSON files (Parse, Load, File); uses only u
 actions/           the text fields' actions (Undo, Copy, MoveWordLeft...), for key bindings and menus
 ease/              easing functions for animation (Linear, OutCubic, Bounce...); imports nothing
 dialog/            native dialog types (file open, save and folder; message box), shared by ui and platform
-text/              fonts and fallback, shaping and line breaking (go-text/typesetting),
-                   caret/selection geometry, glyph atlas
 icons/             built-in line icons defined in Go (no SVG)
 input/             platform-neutral keys, buttons, modifiers, cursors
 internal/          packages apps don't import, so they can change without breaking apps:
@@ -58,6 +56,8 @@ internal/          packages apps don't import, so they can change without breaki
   scene/           GPU-friendly primitives (Quad/shadow, Glyph, Image, Clip, Transform)
   render/          Renderer interface; render/d3d11 = Direct3D 11 backend
   platform/        adapter contract; platform/windows (Win32), darwin + linux placeholders
+  text/            fonts and fallback, shaping and line breaking (go-text/typesetting),
+                   caret/selection geometry, glyph atlas
 internal/win32/    minimal cgo-free Win32 bindings
 internal/watch/    directory change notifications for live keymap reload (Win32 change
                    notifications; polling elsewhere)
