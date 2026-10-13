@@ -1351,6 +1351,23 @@ ui.Component(func(ctx *ui.Context) ui.Element {
 conditions and loops. It lives as long as the component and starts fresh if
 the component is removed and added again.
 
+A value derived from signals is a `ui.Computed`. It remembers its result and
+runs its function again only when it is read after a signal it read changed;
+`Get` subscribes the rendering component, as a signal's does, and `Peek` does
+not. Create it once, like a signal, and read it on the UI thread (in a render,
+an event handler or a `Post` function):
+
+```go
+total := ui.NewComputed(func() int {           // *ui.Computed[int]
+    sum := 0
+    for _, item := range cart.Get() {
+        sum += item.Price
+    }
+    return sum
+})
+ui.Textf("Total: %d", total.Get())             // re-renders when cart changes
+```
+
 Long lists build only the rows on screen. Every row must share one height;
 the list measures the first row and positions the rest from it:
 

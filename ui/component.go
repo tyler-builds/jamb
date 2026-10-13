@@ -45,6 +45,7 @@ type componentInstance struct {
 	dirty atomic.Bool
 	depMu sync.Mutex // guards deps; signals may be read from other goroutines
 	deps  []subscribable
+	tr    tracker // records this instance's reads while it renders
 
 	// Tree bookkeeping, UI thread only.
 	gen        uint32 // frame in which the instance was last claimed by its parent
@@ -98,7 +99,8 @@ func (inst *componentInstance) render() {
 	inst.watchesFocus = false
 	inst.watchesPointer = false
 	ctx := &Context{rt: inst.rt, inst: inst, id: inst.id}
-	prev := tracking.Swap(inst)
+	inst.tr.o = inst
+	prev := tracking.Swap(&inst.tr)
 	defer tracking.Store(prev)
 	switch e := inst.el.(type) {
 	case *ComponentElement:
