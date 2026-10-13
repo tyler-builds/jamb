@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/win32"
-	"github.com/tyler-builds/jamb/platform"
 )
 
 const wakeTimerID = 1

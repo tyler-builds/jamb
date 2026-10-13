@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // focusedKey returns the key of the focused element, or "" when nothing has

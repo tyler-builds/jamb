@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/win32"
-	"github.com/tyler-builds/jamb/platform"
 )
 
 // queueHandler runs the functions queued for it in OnFrame, as the runtime runs

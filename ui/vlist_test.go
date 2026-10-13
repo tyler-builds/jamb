@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // vKey is the key of the item with the given ID.

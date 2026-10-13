@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/tyler-builds/jamb/render"
+	"github.com/tyler-builds/jamb/internal/render"
 )
 
 // ReleaseDevice and Recover create and release the real device, so the

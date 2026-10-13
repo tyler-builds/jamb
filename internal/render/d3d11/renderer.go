@@ -16,9 +16,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/tyler-builds/jamb/internal/render"
+	"github.com/tyler-builds/jamb/internal/scene"
 	"github.com/tyler-builds/jamb/internal/win32"
-	"github.com/tyler-builds/jamb/render"
-	"github.com/tyler-builds/jamb/scene"
 )
 
 var (

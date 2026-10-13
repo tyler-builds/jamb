@@ -5,7 +5,7 @@ package windows
 import (
 	"testing"
 
-	"github.com/tyler-builds/jamb/platform"
+	"github.com/tyler-builds/jamb/internal/platform"
 )
 
 // menuHandler is a Handler that reports whether its window shows a menu bar.

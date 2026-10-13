@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // gradientQuads returns the quads in the scene that carry a gradient.

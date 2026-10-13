@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/tyler-builds/jamb/scene"
+import "github.com/tyler-builds/jamb/internal/scene"
 
 // Scrollbars are drawn by the runtime for every ScrollX/ScrollY container
 // whose content overflows. The thumb can be dragged, and clicking the track

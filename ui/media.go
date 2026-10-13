@@ -9,7 +9,7 @@ import (
 	_ "image/png"
 
 	"github.com/tyler-builds/jamb/icons"
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // IconElement draws a vector icon from the icons package.

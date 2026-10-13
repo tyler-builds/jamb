@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/tyler-builds/jamb/platform"
-	"github.com/tyler-builds/jamb/render"
+	"github.com/tyler-builds/jamb/internal/platform"
+	"github.com/tyler-builds/jamb/internal/render"
 )
 
 func runPlatform(start func() error) error {

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 func linear(t float32) float32 { return t }

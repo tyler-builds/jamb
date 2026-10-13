@@ -9,7 +9,7 @@ import (
 	"github.com/tyler-builds/jamb/access/accesstest"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/layout"
+	"github.com/tyler-builds/jamb/internal/layout"
 )
 
 // tabsDemo is a tab list with three tabs, the middle one disabled. Its panels

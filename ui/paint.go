@@ -3,8 +3,8 @@ package ui
 import (
 	"math"
 
-	"github.com/tyler-builds/jamb/layout"
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/layout"
+	"github.com/tyler-builds/jamb/internal/scene"
 	"github.com/tyler-builds/jamb/text"
 )
 

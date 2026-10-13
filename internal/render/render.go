@@ -8,7 +8,7 @@ import (
 	"errors"
 	"image"
 
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // ErrDeviceLost is returned, wrapped, by BeginFrame and EndFrame when the GPU

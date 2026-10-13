@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // Dump writes the current element tree with laid-out positions (logical

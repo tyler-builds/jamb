@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // BorderEdges insets the content by each side's width, as padding does.

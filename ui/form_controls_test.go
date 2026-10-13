@@ -8,7 +8,7 @@ import (
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/access/accesstest"
 	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/layout"
+	"github.com/tyler-builds/jamb/internal/layout"
 )
 
 // press sends a key press and its release, and lets the frame run.

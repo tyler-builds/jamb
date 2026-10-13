@@ -18,8 +18,8 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/win32"
-	"github.com/tyler-builds/jamb/platform"
 )
 
 const (

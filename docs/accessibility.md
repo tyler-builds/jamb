@@ -161,7 +161,7 @@ README.
 ## Phase A: what changed from this design
 
 Phase A is in place on Windows (`access`, `ui/access.go`,
-`platform/windows/uia*.go`). These are the places where the work differed from
+`internal/platform/windows/uia*.go`). These are the places where the work differed from
 the design above, and why.
 
 - **The tree is rebuilt when something changed, not per subtree.** The runtime
@@ -393,18 +393,18 @@ an Expand from another goroutine runs the request on the next frame
 
 The cause was the window's message loop. Shift+F10 arrives as WM_SYSKEYDOWN,
 since F10 is a system key. `wndProc` handled the key and then fell through to
-`DefWindowProc` (`platform/windows/window.go`, the WM_SYSKEYDOWN case), which
+`DefWindowProc` (`internal/platform/windows/window.go`, the WM_SYSKEYDOWN case), which
 opened the window's system menu. That menu runs its own message loop, and the
 loop of `Run` does not run while it does. The wake-up message was taken by the
 menu's loop, so no frame rendered until the menu closed. A lone Alt (the window
 has no menu bar in the demo) and a title-bar drag (a move loop) stalled the same
 way. Dialogs already avoided this with a timer that renders frames while their
-loop runs (`modal` in `platform/windows/dialog.go`).
+loop runs (`modal` in `internal/platform/windows/dialog.go`).
 
 The fix moves that timer into `startFrames` and `stopFrames`, and starts it on
 WM_ENTERMENULOOP and on WM_ENTERSIZEMOVE, as well as for dialogs. `stopFrames`
 runs the posted queue when the loop ends. The regression test,
-`TestPostRunsDuringNativeMenuLoop` (`platform/windows/modal_test.go`), opens the
+`TestPostRunsDuringNativeMenuLoop` (`internal/platform/windows/modal_test.go`), opens the
 system menu on the UI thread and posts a function from another goroutine. It
 fails without the fix ("the posted function did not run while the menu loop was
 open") and passes with it.
@@ -494,7 +494,7 @@ Phase C is in place on Windows for text fields and text areas: the Text pattern
 (ITextProvider, ITextProvider2 for the caret, and ITextRangeProvider), the text
 events, and the system caret that magnifiers follow. The model is in
 `access/text.go` and `access/textrange.go`, the content is built in
-`ui/textaccess.go`, and the adapter is `platform/windows/uiatext.go`.
+`ui/textaccess.go`, and the adapter is `internal/platform/windows/uiatext.go`.
 
 ### Design
 
@@ -787,7 +787,7 @@ The settings are read at start, and again on `WM_SETTINGCHANGE` and
 `platform.EventSettingsChanged`. The app package (`app/settings.go`) converts the
 platform's values, applies the dev overrides, and gives the result to
 `ui.Runtime.SetSystemSettings`. Values are clamped: text scale to 100 to 225, caret
-width to 1 to 20. `platform/linux` and `platform/darwin` report
+width to 1 to 20. `internal/platform/linux` and `internal/platform/darwin` report
 `platform.DefaultSettings()`, since no adapter reads the settings there yet.
 
 ### API
@@ -1013,7 +1013,7 @@ a keyboard or screen reader user from moving through it, and both are fixed.
   mode, a native menu loop. That loop took the keys that followed (Down, Tab) and
   left only on Escape, so the app never saw them: after Shift+F10 the menu opened,
   but Down did nothing. Found with `GetGUIThreadInfo` (the thread's `menuOwner` was
-  the window) and the window's key messages. The fix is in `platform/windows/window.go`
+  the window) and the window's key messages. The fix is in `internal/platform/windows/window.go`
   (`ownsF10`): F10 without Alt is the application's, and the default handling is not
   run for it. Alt+F10 keeps the system's handling.
 - **The focus did not move to the menu's items.** The menu's highlight lived in the
@@ -1154,7 +1154,7 @@ Three rules produced all the errors before the fixes:
 
 Framework (the generic problems):
 
-- `platform/windows/uia.go`: a toggle has Toggle and not Invoke. A disabled button
+- `internal/platform/windows/uia.go`: a toggle has Toggle and not Invoke. A disabled button
   keeps its Invoke pattern, which the design already says a disabled element does.
   The pattern is still absent for an enabled element with no action.
 - `ui/menu.go`, `ui/menubar.go` and `ui/widgets.go`: a menu panel takes a name. A
@@ -1174,7 +1174,7 @@ Examples (app content):
 
 Regression tests: `ui/access_controls_test.go` (a request on a disabled button does
 nothing, menu panels are named, a context menu is named by its element);
-`platform/windows/uia_controls_test.go` (`TestInvokeFollowsTogglesAndDisabledButtons`).
+`internal/platform/windows/uia_controls_test.go` (`TestInvokeFollowsTogglesAndDisabledButtons`).
 Two existing tests looked up unnamed menus, and now look up "Actions", the name
 a context menu gets. A request on a disabled button already does nothing, since a
 disabled element has no request target (the rule that makes targets, in
@@ -1307,7 +1307,7 @@ was not implemented. The decisions and their sources are below.
   steps, clamping, invalid text, blur and buttons; the warning for an unnamed select;
   and a high contrast and 225 percent build with no warnings and no fixed heights on
   the fields.
-- Adapter tests in `platform/windows` for the control types, the RangeValue pattern
+- Adapter tests in `internal/platform/windows` for the control types, the RangeValue pattern
   and its values, the combo box Value, and the property mapping.
 - The demo's tests check the Components page's form controls and the Settings
   switch.
@@ -1487,7 +1487,7 @@ decisions, and are marked as such.
   Home, End, Enter, Space), `*` and type-ahead; levels and positions; the item actions;
   a 10,000-node tree that builds at most 40 items, keeps the selection, and gives focus
   to the selected row; and high contrast, 225 percent and reduced motion for the tree.
-- Adapter tests in `platform/windows/uia_tree_test.go` (3 tests): the Tree and TreeItem
+- Adapter tests in `internal/platform/windows/uia_tree_test.go` (3 tests): the Tree and TreeItem
   control types with their identifiers, the ExpandCollapse states of tree items
   including LeafNode, and that other roles have no ExpandCollapse state.
 - Demo tests in `examples/demo/views/navigation_test.go` (3 tests): the roles and states
@@ -1705,7 +1705,7 @@ Phase I adds `ui.DataGrid`, a virtualized table, with its UI Automation mapping:
 ### Verification
 
 - Unit tests in `ui` (`datagrid_test.go`, `datagrid_style_test.go`, `datagrid_select_test.go`, `datagrid_width_test.go`, `datagrid_density_test.go`, `datagrid_more_test.go`): row virtualization (no more than 40 rows built of 100,000), stable sorting with ties and the cycle through ascending, descending and none, focus and selection kept across a sort, the keyboard model including the header and resizing, Space and Shift+Space, mouse selection with Ctrl and Shift, activation by Enter and double-click, mouse and keyboard resize, the double-click fit, sticky header, horizontal scroll with the header, empty and loading states, the custom empty slot, the access tree (roles, `RowCount`, `ColumnCount`, the cell positions, header sort state and ItemStatus, selection and multi-select state, `AddToSelection` and `RemoveFromSelection`), the style drift test, precedence, `Clear`, high contrast, text size, reduced motion and the variants.
-- Platform tests in `platform/windows` (`uiagrid_test.go`): the four IIDs against the SDK strings (`TestGridIIDsMatchTheSDK`), the control types and pattern IDs, and which node has which pattern. The `CanSelectMultiple` callback is checked live, because a unit test cannot call the COM object.
+- Platform tests in `internal/platform/windows` (`uiagrid_test.go`): the four IIDs against the SDK strings (`TestGridIIDsMatchTheSDK`), the control types and pattern IDs, and which node has which pattern. The `CanSelectMultiple` callback is checked live, because a unit test cannot call the COM object.
 - Live checks in `scripts/a11y-check.ps1`: on the Projects table, the Grid and Table patterns (`RowCount` 6, `ColumnCount` 5, `GetItem(0, 0)` with GridItem and TableItem, `GetColumnHeaders` of 5), a header's Invoke that sorts (the first row becomes Dev Runner) and that gives its name and `ItemStatus`, SelectionItem `Select`, `AddToSelection` and `RemoveFromSelection` with `CanSelectMultiple`, and Ctrl+Home, Down and Right with the cell's row and column read back from the focused element and focus events counted. On the Components data grid: `RowCount` 100,000, `ColumnCount` 6, a sort by Duration with its state, and a two-row multi-selection. Both grids are scanned by AxeWindowsCLI.
 - Results (the final script, `-HighContrast`, `-TextScale 225` and normal): 52 of 52 checks pass in each mode in the final runs. The Axe scans of the Projects table and of the Components data grid report zero errors in every mode.
 - Benchmarks (`ui`, Windows, on the desktop PC described in BENCHMARKS.md): the first frame of a grid of 100,000 rows, with runtime setup, about 12 ms; a frame after one key press (a rebuild, layout and paint of the rows in view), about 0.2 ms; a sort of 100,000 rows and the frame that shows it, about 8 ms. For comparison, `ListOf` builds 100,000 rows in about 13 ms.
@@ -1730,8 +1730,8 @@ This section records a follow-up to Phase I: how the adapter answers a provider 
 
 ### Cause
 
-- **Answers that did not check the node.** Most entry points resolve their node against the snapshot first (`core.current` in `platform/windows/uia.go`) and return UIA_E_ELEMENTNOTAVAILABLE for a node that is gone. Four did not: `get_FragmentRoot` and `GetEmbeddedFragmentRoots` (`platform/windows/uiacom.go`) returned success for a removed node, and `RemoveFromSelection` returned UIA_E_INVALIDOPERATION. `RangeFromEnclosingElement` (`platform/windows/uiatext.go`, `uiaRangeEnclosingElement`) returned the provider of a removed field.
-- **A registry object for an absent node.** `cachedObject` (`platform/windows/uiacom.go`) made an object for any node ID it was given. A call that had read an older snapshot could make an object after the removal had dropped the node's objects; nothing dropped that object again, so the registry kept it until the window closed.
+- **Answers that did not check the node.** Most entry points resolve their node against the snapshot first (`core.current` in `internal/platform/windows/uia.go`) and return UIA_E_ELEMENTNOTAVAILABLE for a node that is gone. Four did not: `get_FragmentRoot` and `GetEmbeddedFragmentRoots` (`internal/platform/windows/uiacom.go`) returned success for a removed node, and `RemoveFromSelection` returned UIA_E_INVALIDOPERATION. `RangeFromEnclosingElement` (`internal/platform/windows/uiatext.go`, `uiaRangeEnclosingElement`) returned the provider of a removed field.
+- **A registry object for an absent node.** `cachedObject` (`internal/platform/windows/uiacom.go`) made an object for any node ID it was given. A call that had read an older snapshot could make an object after the removal had dropped the node's objects; nothing dropped that object again, so the registry kept it until the window closed.
 - **No disconnect.** A removed node's provider stayed connected to UI Automation, which asked it again on every call and kept the client's references to it.
 - **What a client saw.** A walk reads an element's properties one call at a time. An element can leave the tree between two reads: UI Automation reports the failed reads as empty values, not as exceptions. Here `IsOffscreen` was answered before the removal, so the element read as on-screen with no bounds. In the notifications scan the three such elements were a dismissed warning toast's group, its text and its button, and their snapshot holds no properties.
 
@@ -1765,7 +1765,7 @@ The SetVisualState and Close methods of IWindowProvider still answer UIA_E_NOTSU
 
 ### Verification
 
-- **Reproduction.** `TestRemovedNodeProvidersReturnElementNotAvailable` (`platform/windows/uia_removed_test.go`) obtains every provider of a window with one node of each pattern kind, removes all of the nodes through `Publish` and the adapter's listener, and then calls each entry point above on the providers the client holds. `TestProviderOfAnAbsentNodeIsNotMade` checks the registry rule. Before the change, the reproduction failed on five answers: `get_FragmentRoot` (S_OK), `GetEmbeddedFragmentRoots` (S_OK), `RemoveFromSelection` (UIA_E_INVALIDOPERATION), `RangeFromEnclosingElement` (S_OK), and no disconnect (0 calls for 11 removed nodes); the absent-node test made a provider. After the change both pass, and every other answer in the table was already correct.
+- **Reproduction.** `TestRemovedNodeProvidersReturnElementNotAvailable` (`internal/platform/windows/uia_removed_test.go`) obtains every provider of a window with one node of each pattern kind, removes all of the nodes through `Publish` and the adapter's listener, and then calls each entry point above on the providers the client holds. `TestProviderOfAnAbsentNodeIsNotMade` checks the registry rule. Before the change, the reproduction failed on five answers: `get_FragmentRoot` (S_OK), `GetEmbeddedFragmentRoots` (S_OK), `RemoveFromSelection` (UIA_E_INVALIDOPERATION), `RangeFromEnclosingElement` (S_OK), and no disconnect (0 calls for 11 removed nodes); the absent-node test made a provider. After the change both pass, and every other answer in the table was already correct.
 - **Unit tests.** `TestEventsWithoutAClientDropObjects` registered a node that was never in a snapshot; the node is now in the tree first, since the registry no longer makes such an object. The zero-allocation guards (`uia_alloc_test.go`) pass; the changed paths add no Go allocation, and a disconnect runs once per removed node.
 - **Live script, normal runs** (`scripts/a11y-check.ps1`, the wait removed): 52 of 52 in run 1, 51 of 52 in runs 2, 3 and 4 (the notifications scan reports three errors, "An on-screen element must not have a null BoundingRectangle property"), and 52 of 52 in run 5. The `-HighContrast` run and the `-TextScale 225` run each pass 52 of 52. The notifications scan is therefore not reliable without the wait.
 - **Stress.** A client (a temporary script outside the repository) walked the window's raw tree for 60 seconds, reading each element's `IsOffscreen` and `BoundingRectangle`, while the demo showed about 30 toasts, changed the Activity filter 20 times and switched pages 10 times. The client made 406 walks and read 53,490 elements. The app stayed alive, wrote nothing to stderr, and had no panic. No read threw anything other than UIA_E_ELEMENTNOTAVAILABLE. A second run of the same length made 397 walks and read 51,609 elements, with no errors and 37 null-bounds reads. In the first run there were 32 reads where an element answered `IsOffscreen` as on-screen, and its name and control type then read as empty. A re-read of the name also came back empty for each of them, which is what a removed element gives. The stress did not record the order of each removal against the reads, so the per-read timing is not proven here; the deterministic test above covers the answers after a removal.
@@ -1797,7 +1797,7 @@ Phase J adds to `ui.DataGrid` the interactive cell (`DataColumn.Interactive`), t
 | Error of a failed save | Not an element of its own: the editor's description (help text) and an assertive announcement | The invalid frame of the `Editor` style is drawn; a popover under the cell shows the same text for sighted users |
 | Edit mode | None announced. Focus moves into the editor, which announces its name and value | The editor is the focus target; no live-region change is made for "editing" |
 
-The Value pattern follows Microsoft's DataItem guidance (uiauto-supportdataitemcontroltype, "Required Control Patterns"): IValueProvider is required when the data item's primary text is editable, and the page's table gives it as "Depends" otherwise. An editable cell therefore exposes it; a read-only cell does not, which the guidance does not require. The adapter offers the pattern on a node whose role has it (a text field, a combo box) or that offers the Set Value action (`hasValueNode` in `platform/windows/uia.go`). The editor of an edit is a text field, so it exposes the pattern too.
+The Value pattern follows Microsoft's DataItem guidance (uiauto-supportdataitemcontroltype, "Required Control Patterns"): IValueProvider is required when the data item's primary text is editable, and the page's table gives it as "Depends" otherwise. An editable cell therefore exposes it; a read-only cell does not, which the guidance does not require. The adapter offers the pattern on a node whose role has it (a text field, a combo box) or that offers the Set Value action (`hasValueNode` in `internal/platform/windows/uia.go`). The editor of an edit is a text field, so it exposes the pattern too.
 
 **Layout.** A grid cell takes the height of its row, even with no content. A cell that is centred in its row with nothing in it had no height, and its bounding rectangle was null. AxeWindowsCLI reported that as "An on-screen element must not have a null BoundingRectangle property" for the empty Actions cells of a focused grid. The cell is now stretched to the row (`AlignSelf: Stretch` in the default `Cell` style).
 
@@ -1807,7 +1807,7 @@ The Value pattern follows Microsoft's DataItem guidance (uiauto-supportdataitemc
 - The message of a failed save is the editor's description (set on the access node from the text field, which has no key to resolve). A key that matches no exposed element is recorded as an issue of the element that names it, and the message text is inside a labelled cell, so it is not exposed by itself.
 - A pointer press on a control does not select the row, so that a click on a button is not a row click. The cell records that the press was on a control, and the row's click and double-click ignore it.
 
-**Verification.** The unit tests in `ui/datagrid_cells_test.go` cover the keyboard flow (Enter, F2, Tab, Shift+Tab, Escape, arrows inside a field), the pointer, the editing flow (start by Enter, F2, double-click and typing; save; a failed save; cancel; Tab to the next editable cell; the blur save and a failed blur save, with and without window focus; the keyed selection; a row that scrolls away and back), the access tree, the Set Value action (a save, a refused value announced assertively, no action on a read-only cell), the custom editor (F2 focus, its own keys first, Enter, Escape, a blur, a refused save), the popover and the clipping of cells, the `Value` start text and the `SortBy` helpers. `testDataGridEditParts` checks the style parts against the drift test. `platform/windows/uiavalue_test.go` checks which nodes get the Value pattern. The live checks are in `scripts/a11y-check.ps1` (Components and Projects grids, including SetValue on a label cell without an edit, and an invalid SetValue that changes nothing). The Axe scans of the grids (with the editor open, with its error shown, and with focus on a Retry button) reported zero errors.
+**Verification.** The unit tests in `ui/datagrid_cells_test.go` cover the keyboard flow (Enter, F2, Tab, Shift+Tab, Escape, arrows inside a field), the pointer, the editing flow (start by Enter, F2, double-click and typing; save; a failed save; cancel; Tab to the next editable cell; the blur save and a failed blur save, with and without window focus; the keyed selection; a row that scrolls away and back), the access tree, the Set Value action (a save, a refused value announced assertively, no action on a read-only cell), the custom editor (F2 focus, its own keys first, Enter, Escape, a blur, a refused save), the popover and the clipping of cells, the `Value` start text and the `SortBy` helpers. `testDataGridEditParts` checks the style parts against the drift test. `internal/platform/windows/uiavalue_test.go` checks which nodes get the Value pattern. The live checks are in `scripts/a11y-check.ps1` (Components and Projects grids, including SetValue on a label cell without an edit, and an invalid SetValue that changes nothing). The Axe scans of the grids (with the editor open, with its error shown, and with focus on a Retry button) reported zero errors.
 
 **Open items.**
 
@@ -1841,7 +1841,7 @@ Phase K adds forms: `ui.Field` (a label above or beside a control, with help tex
 **Verification.**
 
 - Unit tests in `ui` (`form_test.go`, `form_group_test.go`, `form_parts_test.go`): each validator and its message, the first failing validator, the field's wiring (`LabelledBy`, `DescribedBy`, `Description`, `StateRequired`, `StateInvalid`), the required marker outside the tree, the timing rules (no error before the user acts, an error after an edit and a blur, not after a visit alone, an app error at once), the submit (the first invalid field gets focus, the count is announced, the summary's links move focus), the form's message from a submit and from an async submit, the disabled state while the submit runs, Enter in a field against Enter on a check box in a modal, `Reset`, the controls' own checks (select, radio group, check box "must accept"), a group's check and its focus handle, the styles' precedence, `Clear` and high contrast, the shared message look of a number input and a field, and the drift test for every new part.
-- Platform tests in `platform/windows` (`uia_forms_test.go`): the two property IDs against the SDK header, and the answers for a required, an invalid, a required-and-invalid and an ordinary element.
+- Platform tests in `internal/platform/windows` (`uia_forms_test.go`): the two property IDs against the SDK header, and the answers for a required, an invalid, a required-and-invalid and an ordinary element.
 - Demo tests in `examples/demo/views` (`components_forms_test.go`): the New Project error and focus, the channels rule of the preferences, and the Forms summary and the server's refusal.
 - Live checks in `scripts/a11y-check.ps1`: New Project with an empty name (focus on Name, `IsRequiredForForm` true, `IsDataValidForForm` false, `HelpText` "This field is required.", the announcement by a Notification event, the summary's count, an Axe scan of the errors, and then a valid name submitted and undone); the Forms summary's link moving focus to Name with the same properties, an Axe scan with the summary shown, and the background save with Save disabled and the server's refusal shown. The check "New Project opens a dialog" now asserts that Create is enabled and that no error is shown before Create is pressed.
 - Results (final, after the fixes below): `-TextScale 225` passed 66 of 66 in five runs out of five; the normal mode passed 66 of 66 in two runs out of two; `-HighContrast` passed 66 of 66 once. No Axe scan reported an error in any run.
@@ -1901,7 +1901,7 @@ Phase M adds `ui.DatePicker` and `ui.TimePicker`, and the Calendar control type 
 
 **The list of times.** The time picker's list is a List with each time a ListItem, the highlighted time is the focus target through the combo box's highlight (as in Phase L), and the time the field holds is selected. Up and Down step the time when the list is closed, so a screen reader user can change the time without opening the list.
 
-**Verification.** The unit tests check the roles, names, the grid size (6 by 7), the selected and disabled states, the description of today, and the month announcement (`datepicker_test.go`, `timepicker_test.go`). The UI Automation mapping is tested in `platform/windows/uia_calendar_test.go`. `scripts/a11y-check.ps1` has checks for the date picker's ComboBox, its calendar taking focus on Alt+Down with Right and Enter, Escape returning focus, the time picker's list, and AxeWindowsCLI scans of the Date and time section and of the calendar open. The keyboard checks passed in none of the live runs of this session: the foreground window was another app (Windows Search), so every focus wait timed out. The Axe scan of the section passed in the normal run. The results are in the report, not here.
+**Verification.** The unit tests check the roles, names, the grid size (6 by 7), the selected and disabled states, the description of today, and the month announcement (`datepicker_test.go`, `timepicker_test.go`). The UI Automation mapping is tested in `internal/platform/windows/uia_calendar_test.go`. `scripts/a11y-check.ps1` has checks for the date picker's ComboBox, its calendar taking focus on Alt+Down with Right and Enter, Escape returning focus, the time picker's list, and AxeWindowsCLI scans of the Date and time section and of the calendar open. The keyboard checks passed in none of the live runs of this session: the foreground window was another app (Windows Search), so every focus wait timed out. The Axe scan of the section passed in the normal run. The results are in the report, not here.
 
 **Open items.**
 

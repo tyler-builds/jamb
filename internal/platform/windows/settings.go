@@ -5,8 +5,8 @@ package windows
 import (
 	"time"
 
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/win32"
-	"github.com/tyler-builds/jamb/platform"
 )
 
 // ReadSettings reads the operating system's accessibility and text settings.

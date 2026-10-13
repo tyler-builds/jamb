@@ -5,7 +5,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // Color is a straight-alpha sRGB color with components in [0,1].

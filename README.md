@@ -49,14 +49,15 @@ keymap/            key bindings from JSON files (Parse, Load, File); uses only u
 actions/           the text fields' actions (Undo, Copy, MoveWordLeft...), for key bindings and menus
 ease/              easing functions for animation (Linear, OutCubic, Bounce...); imports nothing
 dialog/            native dialog types (file open, save and folder; message box), shared by ui and platform
-layout/            flexbox-subset layout engine (no drawing, no text)
-scene/             GPU-friendly primitives (Quad/shadow, Glyph, Image, Clip, Transform)
-render/            Renderer interface; render/d3d11 = Direct3D 11 backend
 text/              fonts and fallback, shaping and line breaking (go-text/typesetting),
                    caret/selection geometry, glyph atlas
 icons/             built-in line icons defined in Go (no SVG)
 input/             platform-neutral keys, buttons, modifiers, cursors
-platform/          adapter contract; platform/windows (Win32), darwin + linux placeholders
+internal/          packages apps don't import, so they can change without breaking apps:
+  layout/          flexbox-subset layout engine (no drawing, no text)
+  scene/           GPU-friendly primitives (Quad/shadow, Glyph, Image, Clip, Transform)
+  render/          Renderer interface; render/d3d11 = Direct3D 11 backend
+  platform/        adapter contract; platform/windows (Win32), darwin + linux placeholders
 internal/win32/    minimal cgo-free Win32 bindings
 internal/watch/    directory change notifications for live keymap reload (Win32 change
                    notifications; polling elsewhere)
@@ -88,8 +89,8 @@ app code ──► ui (elements, signals, components)
              scene (retained: quads, glyphs, images, clips)
                │
                ▼
-             render.Renderer ◄── render/d3d11 (only package that knows Direct3D)
-platform.Window/Handler ◄── platform/windows (only package that knows Win32)
+             render.Renderer ◄── internal/render/d3d11 (only package that knows Direct3D)
+platform.Window/Handler ◄── internal/platform/windows (only package that knows Win32)
 ```
 
 Package rule: a concept gets its own package when it stands on its own; it
@@ -105,7 +106,7 @@ Each concern is replaceable independently:
 - `ui` only talks to `scene`. A new GPU backend implements the seven-method
   `render.Renderer` interface.
 - A new OS adapter implements `platform.Window` and drives a
-  `platform.Handler` (see `platform/darwin`). Application code never
+  `platform.Handler` (see `internal/platform/darwin`). Application code never
   branches on the OS. An adapter runs one UI thread and one event loop for all
   of an app's windows.
 - `app` is the only package that wires the concrete adapter and backend
@@ -2737,7 +2738,7 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   between two windows, closing a window while the app keeps running, and
   closing the last one. The Snap Layouts flyout was checked by hand on Windows
   11 and works, provided the top DWM frame margin stays 0 (see `applyCustomFrame`
-  in `platform/windows/chrome.go`). Not checked automatically, so check
+  in `internal/platform/windows/chrome.go`). Not checked automatically, so check
   these by hand: dragging the title bar to move the window and to snap it to an
   edge, Win+ arrows, the drop shadow and the rounded corners.
   Images and glyph textures are shared per device and stay resident after

@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/tyler-builds/jamb/platform"
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/ui"
 )
 

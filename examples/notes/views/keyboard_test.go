@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 	"github.com/tyler-builds/jamb/ui"
 )
 

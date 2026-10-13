@@ -3,10 +3,10 @@
 package app
 
 import (
-	"github.com/tyler-builds/jamb/platform"
-	"github.com/tyler-builds/jamb/platform/windows"
-	"github.com/tyler-builds/jamb/render"
-	"github.com/tyler-builds/jamb/render/d3d11"
+	"github.com/tyler-builds/jamb/internal/platform"
+	"github.com/tyler-builds/jamb/internal/platform/windows"
+	"github.com/tyler-builds/jamb/internal/render"
+	"github.com/tyler-builds/jamb/internal/render/d3d11"
 )
 
 // gpu is the Direct3D 11 device that every window renders with. The first

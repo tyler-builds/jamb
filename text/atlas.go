@@ -3,7 +3,7 @@ package text
 import (
 	"image"
 
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 const (

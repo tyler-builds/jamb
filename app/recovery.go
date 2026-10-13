@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/tyler-builds/jamb/render"
+	"github.com/tyler-builds/jamb/internal/render"
 )
 
 // The GPU device is shared by every window. When it is lost, the first window

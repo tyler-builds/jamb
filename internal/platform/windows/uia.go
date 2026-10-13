@@ -10,8 +10,8 @@ import (
 	"unsafe"
 
 	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/win32"
-	"github.com/tyler-builds/jamb/platform"
 )
 
 // The constants below are from UIAutomationClient.h and UIAutomationCoreApi.h

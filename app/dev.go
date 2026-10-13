@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/platform"
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/ui"
 )
 

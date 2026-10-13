@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/win32"
-	"github.com/tyler-builds/jamb/platform"
 )
 
 // baseRaw is the raw state of a system with the default settings.

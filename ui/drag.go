@@ -2,7 +2,7 @@ package ui
 
 import (
 	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // Drag and drop is typed: a drag carries a Go value, and a drop target

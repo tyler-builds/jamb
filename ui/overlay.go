@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // Placement says where an Overlay sits relative to its parent (the anchor).

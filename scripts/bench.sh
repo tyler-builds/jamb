@@ -41,7 +41,7 @@ edit_and_build() { # file, label
 echo "== incremental rebuilds (append a declaration, rebuild, restore)"
 for i in 1 2 3; do edit_and_build views/projects.go "edit examples/demo/views/projects.go"; done
 for i in 1 2 3; do edit_and_build ../../ui/theme.go "edit ui/theme.go"; done
-for i in 1 2 3; do edit_and_build ../../layout/layout.go "edit layout/layout.go"; done
+for i in 1 2 3; do edit_and_build ../../internal/layout/layout.go "edit internal/layout/layout.go"; done
 go build -o "$out/demo.exe" . # restore cache state
 
 echo "== binary size"

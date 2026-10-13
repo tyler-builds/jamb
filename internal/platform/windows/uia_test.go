@@ -9,8 +9,8 @@ import (
 	"unsafe"
 
 	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/win32"
-	"github.com/tyler-builds/jamb/platform"
 )
 
 // testTree publishes a snapshot of nodes on a new bridge. The nodes must include

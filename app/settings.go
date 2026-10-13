@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/tyler-builds/jamb/platform"
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/ui"
 )
 

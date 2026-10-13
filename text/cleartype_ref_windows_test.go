@@ -12,8 +12,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/tyler-builds/jamb/render/d3d11"
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/render/d3d11"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // These tests compare jamb's ClearType output with DirectWrite's own: the same

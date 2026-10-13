@@ -6,7 +6,7 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/layout"
+	"github.com/tyler-builds/jamb/internal/layout"
 )
 
 // splitHit is the width of the divider's hit area, in logical pixels. The bar is

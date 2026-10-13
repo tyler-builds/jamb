@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/image/font/sfnt"
 
-	"github.com/tyler-builds/jamb/scene"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // DirectWrite glyph rasterization. DirectWrite applies the font's hinting

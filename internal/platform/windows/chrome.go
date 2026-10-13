@@ -3,8 +3,8 @@
 package windows
 
 import (
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/win32"
-	"github.com/tyler-builds/jamb/platform"
 )
 
 // A custom title bar keeps the native window (WS_OVERLAPPEDWINDOW, so resize,
