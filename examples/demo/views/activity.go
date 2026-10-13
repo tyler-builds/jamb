@@ -165,7 +165,7 @@ func Activity(s *Store) ui.Element {
 		if len(shown) == 0 {
 			body = noEvents(t, s)
 		} else {
-			body = ui.ListOf(shown, func(e event) string { return strconv.Itoa(e.id) }, func(e event) ui.Element {
+			body = ui.ListOf(shown, func(e event) string { return strconv.Itoa(e.id) }, func(_ int, e event) ui.Element {
 				return eventRow(t, s, e, compact, expanded[e.id], query).Key(fmt.Sprintf("event-%d", e.id))
 			}).Key("events").Style(ui.Style{Grow: 1}).Handle(s.activity)
 		}

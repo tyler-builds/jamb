@@ -265,7 +265,7 @@ func (a *App) sidebar() ui.Element {
 			list = ui.Div().Grow(1).Child(ui.Div().Padding(24).Align(ui.Center).
 				Child(ui.Text(msg).TextColor(t.TextMuted)))
 		} else {
-			list = ui.ListOf(entries, sidebarKey, func(e sidebarEntry) ui.Element {
+			list = ui.ListOf(entries, sidebarKey, func(_ int, e sidebarEntry) ui.Element {
 				if e.note == nil {
 					return sectionLabel(t, e.label)
 				}

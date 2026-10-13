@@ -42,18 +42,21 @@ func (l *ListElement) Grow(f float32) *ListElement     { l.size.setGrow(f); retu
 // top of the viewport, so measurements, inserts and removals above it do not
 // make the view jump.
 //
+// row gets the item and its index in items, as Map's function does, for
+// striping or a position such as "3 of 10".
+//
 // Changes are detected by slice identity: pass a new slice to change the
 // items, as with signals. Changing a slice in place is not detected:
 //
-//	ui.ListOf(notes, func(n *store.Note) string { return n.ID }, func(n *store.Note) ui.Element {
+//	ui.ListOf(notes, func(n *store.Note) string { return n.ID }, func(_ int, n *store.Note) ui.Element {
 //		return noteRow(n)
 //	}).Style(ui.Style{Grow: 1})
-func ListOf[T any](items []T, key func(T) string, row func(T) Element) *ListElement {
+func ListOf[T any](items []T, key func(T) string, row func(i int, item T) Element) *ListElement {
 	return &ListElement{
 		ident: unsafe.Pointer(unsafe.SliceData(items)),
 		count: len(items),
 		keyAt: func(i int) string { return key(items[i]) },
-		rowAt: func(i int) Element { return row(items[i]) },
+		rowAt: func(i int) Element { return row(i, items[i]) },
 	}
 }
 

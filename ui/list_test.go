@@ -330,4 +330,4 @@ func checkListRows(t *testing.T, r *overlayRig, n int) {
 
 // listRowOf is listRow for an item of a ListOf, whose rows are keyed by the
 // ListOf's key function instead.
-func listRowOf(i int) Element { return listRow(i) }
+func listRowOf(_ int, item int) Element { return listRow(item) }

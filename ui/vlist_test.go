@@ -39,7 +39,7 @@ func newVRig(items []int, h *ListHandle) *vRig {
 	v := &vRig{items: NewSignal(items), tick: NewSignal(0), tall: map[int]float32{}}
 	v.overlayRig = newOverlayRig(func(ctx *Context) Element {
 		_ = v.tick.Get()
-		return Div().Child(ListOf(v.items.Get(), vKey, func(id int) Element {
+		return Div().Child(ListOf(v.items.Get(), vKey, func(_ int, id int) Element {
 			return Div().Key(vKey(id)).Height(Px(vHeight(id) + v.tall[id])).Child(Text(vKey(id)))
 		}).Key("list").Style(Style{Height: Px(400)}).Handle(h))
 	}, 800, 600)
@@ -277,7 +277,7 @@ func TestListOfAnchorItemRemoved(t *testing.T) {
 func bottomRig(items []int, h *ListHandle) (*overlayRig, *Signal[[]int]) {
 	s := NewSignal(items)
 	r := newOverlayRig(func(ctx *Context) Element {
-		return Div().Child(ListOf(s.Get(), vKey, func(id int) Element {
+		return Div().Child(ListOf(s.Get(), vKey, func(_ int, id int) Element {
 			return Div().Key(vKey(id)).Height(Px(vHeight(id))).Child(Text(vKey(id)))
 		}).Key("list").Style(Style{Height: Px(600)}).Bottom().Handle(h))
 	}, 800, 700)
@@ -337,7 +337,7 @@ func TestListOfKeyedStateSurvivesScrollAndReorder(t *testing.T) {
 	locals := map[int]*Signal[int]{}
 	items := NewSignal(ids(200))
 	r := newOverlayRig(func(ctx *Context) Element {
-		return Div().Child(ListOf(items.Get(), vKey, func(id int) Element {
+		return Div().Child(ListOf(items.Get(), vKey, func(_ int, id int) Element {
 			return Component(func(ctx *Context) Element {
 				n := Local(ctx, "n", id+100)
 				locals[id] = n
@@ -384,7 +384,7 @@ func TestListOfDuplicateKeysWarnOnce(t *testing.T) {
 	items := NewSignal([]int{1, 2, 2, 3})
 	r := &overlayRig{now: time.Unix(1_000_000, 0)}
 	r.rt = NewRuntime(func(ctx *Context) Element {
-		return Div().Child(ListOf(items.Get(), vKey, func(id int) Element {
+		return Div().Child(ListOf(items.Get(), vKey, func(_ int, id int) Element {
 			return Div().Key(vKey(id)).Height(Px(30)).Child(Text(vKey(id)))
 		}).Key("list").Style(Style{Height: Px(400)}))
 	}, DarkTheme(), nil)
@@ -408,7 +408,7 @@ func BenchmarkListOf(b *testing.B) {
 	newApp := func() (*Runtime, *Signal[[]int]) {
 		items := NewSignal(ids(100_000))
 		rt := NewRuntime(func(ctx *Context) Element {
-			return Div().Height(Full).Child(ListOf(items.Get(), vKey, func(id int) Element {
+			return Div().Height(Full).Child(ListOf(items.Get(), vKey, func(_ int, id int) Element {
 				return Div().Key(vKey(id)).Height(Px(vHeight(id))).Child(Text(vKey(id)))
 			}).Style(Style{Height: Px(800)}))
 		}, DarkTheme(), benchText)
@@ -458,7 +458,7 @@ func TestListOfGoesIdle(t *testing.T) {
 	h := NewListHandle()
 	items := NewSignal(ids(200))
 	r := newOverlayRig(func(ctx *Context) Element {
-		return Div().Child(ListOf(items.Get(), vKey, func(id int) Element {
+		return Div().Child(ListOf(items.Get(), vKey, func(_ int, id int) Element {
 			if id%2 == 0 {
 				return Div().Key(vKey(id)) // no height and no content
 			}
@@ -590,7 +590,7 @@ func TestListOfOnAtEndReportsChanges(t *testing.T) {
 	var seen []bool
 	items := NewSignal(ids(100))
 	r := newOverlayRig(func(ctx *Context) Element {
-		return Div().Child(ListOf(items.Get(), vKey, func(id int) Element {
+		return Div().Child(ListOf(items.Get(), vKey, func(_ int, id int) Element {
 			return Div().Key(vKey(id)).Height(Px(vHeight(id))).Child(Text(vKey(id)))
 		}).Key("list").Style(Style{Height: Px(300)}).Handle(h).
 			OnAtEnd(func(atEnd bool) { seen = append(seen, atEnd) }))
@@ -614,5 +614,21 @@ func TestListOfOnAtEndReportsChanges(t *testing.T) {
 	}
 	if len(seen) != 3 || seen[2] {
 		t.Fatalf("after scrolling up reported %v, want [false true false]", seen)
+	}
+}
+
+// A ListOf row gets its index in the items along with the item.
+func TestListOfRowGetsItsIndex(t *testing.T) {
+	items := []string{"a", "b", "c"}
+	got := map[string]int{}
+	rt := newTestRuntime(func(ctx *Context) Element {
+		return Div().Child(ListOf(items, func(s string) string { return s }, func(i int, s string) Element {
+			got[s] = i
+			return Text(s)
+		}).Height(Px(200)))
+	}, 300, 300, 1)
+	rt.Frame(time.Now())
+	if got["a"] != 0 || got["b"] != 1 || got["c"] != 2 {
+		t.Fatalf("rows saw indexes %v, want a:0 b:1 c:2", got)
 	}
 }

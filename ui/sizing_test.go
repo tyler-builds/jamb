@@ -544,5 +544,5 @@ func sizedGrid() *DataGridElement[string] {
 }
 
 func sizedListOf() *ListElement {
-	return ListOf([]string{"a", "b"}, func(s string) string { return s }, func(s string) Element { return Text(s) })
+	return ListOf([]string{"a", "b"}, func(s string) string { return s }, func(_ int, s string) Element { return Text(s) })
 }

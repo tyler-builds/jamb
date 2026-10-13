@@ -386,7 +386,7 @@ func TestAccessListRowsWithTheirOwnRoleAreTheItems(t *testing.T) {
 			items[i] = i
 		}
 		return Div().Size(Full, Px(120)).Child(ListOf(items, func(i int) string { return fmt.Sprint(i) },
-			func(i int) Element {
+			func(_ int, i int) Element {
 				return Div().Role(access.RoleListItem).AccessSelected(i == sel.Get()).OnClick(func() { sel.Set(i) }).
 					Child(Text(fmt.Sprintf("Note %d", i+1)))
 			}).SelectionContainer().Style(Style{Height: Px(120)}))

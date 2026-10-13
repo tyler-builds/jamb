@@ -125,7 +125,7 @@ func Comments(s *Store, id int, h *ui.ListHandle) ui.Element {
 			}()
 		}
 
-		list := ui.ListOf(thread, func(m Message) string { return fmt.Sprint(m.ID) }, func(m Message) ui.Element {
+		list := ui.ListOf(thread, func(m Message) string { return fmt.Sprint(m.ID) }, func(_ int, m Message) ui.Element {
 			return messageRow(t, m)
 		}).Key("thread").Style(ui.Style{Grow: 1}).Bottom().Handle(h).OnAtEnd(atEnd.Set)
 

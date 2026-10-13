@@ -1452,7 +1452,7 @@ item and a function that builds a row:
 
 ```go
 h := ui.NewListHandle()
-ui.ListOf(notes, func(n *store.Note) string { return n.ID }, func(n *store.Note) ui.Element {
+ui.ListOf(notes, func(n *store.Note) string { return n.ID }, func(_ int, n *store.Note) ui.Element {
     return noteRow(n)
 }).Style(ui.Style{Grow: 1}).Handle(h)
 h.ScrollToItem(i)  // the least scroll that shows item i completely

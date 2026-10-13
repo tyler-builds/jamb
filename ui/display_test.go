@@ -245,7 +245,7 @@ func TestDisplayFalseKeepsListScrollPosition(t *testing.T) {
 	}
 	r := newAccessRig(func(ctx *Context) Element {
 		return Div().Column().Child(Div().Key("box").Display(shown.Get()).Height(Px(200)).Child(
-			ListOf(items, func(i int) string { return fmt.Sprint("row", i) }, func(i int) Element {
+			ListOf(items, func(i int) string { return fmt.Sprint("row", i) }, func(_ int, i int) Element {
 				return Div().Height(Px(30)).Child(Text(fmt.Sprint("Row ", i)))
 			}).Key("rows"),
 		))
