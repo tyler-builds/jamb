@@ -906,6 +906,42 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
   A double-click opens or closes it. Keys are kept by node key, so focus and the
   selection stay with their node as the rows scroll.
 
+Breadcrumbs and pagination. A breadcrumb trail shows where the user is, and a
+pagination control moves through pages of results. Their looks are
+`ui.BreadcrumbsStyle` and `ui.PaginationStyle`, and both follow high contrast and
+the Text size.
+
+```go
+ui.Breadcrumbs(
+	ui.Crumb{Label: "Projects", Icon: icons.Folder, OnClick: showProjects},
+	ui.Crumb{Label: "Reports", OnClick: showReports},
+	ui.Crumb{Label: "Q3 summary"},                       // the last location is the current one
+).Key("path").Label("Folder path").MaxItems(4)          // "..." opens a menu of the hidden locations
+
+ui.Pagination(page, pageCount).Key("results").Label("Result pages"). // *ui.Signal[int], pages from 1
+	Siblings(1).OnChange(func(n int) { ... })
+ui.Pagination(page, pageCount).Compact()                 // Previous, "Page 3 of 20", Next
+```
+
+- **Breadcrumbs.** The trail is a group named by its `Label` (default "Breadcrumb").
+  A location with an `OnClick` is a link in the Tab order, and Enter and Space choose
+  it, as a click does. A location without one is plain text. The last location is the
+  current one: it is plain text, it is selected in the group, and it cannot be chosen.
+  The chevrons between locations are hidden from assistive technology. `MaxItems(n)`
+  keeps the first location and the last n-1, and puts a "..." button between them that
+  opens a menu of the hidden locations. A hidden location without an `OnClick` is
+  listed as disabled. A value below 2 counts as 2.
+- **Pagination.** Each page is a button named "Page n", in the Tab order, and Enter
+  and Space choose it. The current page is named "Page n, current page", it is
+  selected, and it is filled in Accent (Highlight under high contrast). It is not a
+  button. Previous and Next are named "Previous page" and "Next page", and they are
+  disabled at the ends. The first and the last page are always shown, with `Siblings(n)`
+  pages on each side of the current page (default 1) and a "..." where pages are
+  skipped. Up to seven pages are shown in full. The page is held between 1 and the
+  page count when it is drawn. `Compact()` shows only Previous, "Page 3 of 20" and
+  Next. The control is a group named by its `Label` (default "Pagination"). Left and
+  Right do not move between pages.
+
 ### Grid layout
 
 `Div().Grid(columns...)` lays the children out in a grid instead of a row or a

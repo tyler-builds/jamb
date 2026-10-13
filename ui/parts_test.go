@@ -214,6 +214,8 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Tag", func(t *testing.T) { testTagParts(t, applied) })
 	t.Run("Skeleton", func(t *testing.T) { testSkeletonParts(t, applied) })
 	t.Run("Sidebar", func(t *testing.T) { testSidebarParts(t, applied) })
+	t.Run("Breadcrumbs", func(t *testing.T) { testBreadcrumbsParts(t, applied) })
+	t.Run("Pagination", func(t *testing.T) { testPaginationParts(t, applied) })
 
 	// The table and docs/styling.md list the same parts, in both directions.
 	documented := documentedParts(t)

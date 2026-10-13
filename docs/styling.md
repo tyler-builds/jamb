@@ -47,7 +47,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
-   (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.SidebarNav`, and `Theme.FormField` (the label, help text and error
+   (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.SidebarNav`, `Theme.Breadcrumbs`, `Theme.Pagination`, and `Theme.FormField` (the label, help text and error
    of every field) and `Theme.Form` (the error summary of every form). Each is a field of `ui.Theme`, and the
    high-contrast theme takes it from the base theme.
 3. **The instance.** Set on one widget with `.Styles(...)`. Calling `.Styles` again
@@ -320,6 +320,7 @@ the Text size of 100 percent:
 | `TimePicker` | 140 px at the Text size of 100 percent; `Full` stretches it, and the list is at least as wide as the field |
 | `Slider`, `ProgressBar` (also when indeterminate) | fills the container, and at least 160 px, so it is visible where its container has no width |
 | `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |
+| `Breadcrumbs`, `Pagination` | as wide as their locations or pages; `Width`, `MinWidth` and `MaxWidth` set it |
 | `Collapsible`, `Accordion` | fills the container |
 | `DataGrid`, `Tree`, `ListOf`, `UniformList` | fills the container's width; give a height (`Height`, `MaxHeight`, or `Grow` in a column) so the rows scroll inside it |
 | `Split` | fills the container's width; its height is the container's, as `Full` gives (set `Height` or `Grow` in a column with other children) |
@@ -547,6 +548,8 @@ parts that the code applies.
 | `Tag` | `Tag`, `Label`, `Remove` | none | none | done |
 | `Skeleton` | `Bone` | none | none | done |
 | `Sidebar` | `Pane`, `Item`, `ItemHover`, `ItemSelected`, `ItemFocusVisible`, `ItemDisabled`, `Indicator`, `Heading`, `Toggle` | none | `Header`, `Footer` (elements) | done |
+| `Breadcrumbs` | `Bar`, `Item`, `ItemHover`, `Current`, `Separator`, `Overflow` | none | none | done |
+| `Pagination` | `Bar`, `Page`, `PageHover`, `PageCurrent`, `Nav`, `Ellipsis` | none | none | done |
 
 ## Examples
 

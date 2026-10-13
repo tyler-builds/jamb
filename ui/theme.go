@@ -116,6 +116,10 @@ type Theme struct {
 	// SidebarNav is the look of every sidebar. It is not named Sidebar, which is the
 	// background color of the theme's secondary panels.
 	SidebarNav SidebarStyle
+	// Breadcrumbs is the look of every breadcrumb trail.
+	Breadcrumbs BreadcrumbsStyle
+	// Pagination is the look of every pagination control.
+	Pagination PaginationStyle
 }
 
 // darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme
