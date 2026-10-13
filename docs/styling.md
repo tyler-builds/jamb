@@ -47,7 +47,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
-   (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, and `Theme.FormField` (the label, help text and error
+   (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.SidebarNav`, and `Theme.FormField` (the label, help text and error
    of every field) and `Theme.Form` (the error summary of every form). Each is a field of `ui.Theme`, and the
    high-contrast theme takes it from the base theme.
 3. **The instance.** Set on one widget with `.Styles(...)`. Calling `.Styles` again
@@ -546,6 +546,7 @@ parts that the code applies.
 | `Avatar` | `Avatar`, `Initials` | none | none | done |
 | `Tag` | `Tag`, `Label`, `Remove` | none | none | done |
 | `Skeleton` | `Bone` | none | none | done |
+| `Sidebar` | `Pane`, `Item`, `ItemHover`, `ItemSelected`, `ItemFocusVisible`, `ItemDisabled`, `Indicator`, `Heading`, `Toggle` | none | `Header`, `Footer` (elements) | done |
 
 ## Examples
 

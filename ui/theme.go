@@ -113,6 +113,9 @@ type Theme struct {
 	Tag TagStyle
 	// Skeleton is the look of every skeleton placeholder.
 	Skeleton SkeletonStyle
+	// SidebarNav is the look of every sidebar. It is not named Sidebar, which is the
+	// background color of the theme's secondary panels.
+	SidebarNav SidebarStyle
 }
 
 // darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme

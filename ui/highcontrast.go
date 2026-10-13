@@ -73,6 +73,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Avatar:        base.Avatar,
 		Tag:           base.Tag,
 		Skeleton:      base.Skeleton,
+		SidebarNav:    base.SidebarNav,
 	}
 	return t
 }

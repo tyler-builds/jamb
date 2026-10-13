@@ -936,6 +936,47 @@ The style fields are `GridColumns`, `GridRows`, `ColSpan` and `RowSpan`, so a th
 or a `Style` value can set them too. It is a subset of CSS grid: there are no named
 areas, explicit line placement, dense packing or subgrids.
 
+### Sidebar
+
+`ui.Sidebar(selected, items...)` is a vertical navigation pane, as the left pane of
+WinUI's NavigationView. Its look is `ui.SidebarStyle`, set on the theme as
+`Theme.SidebarNav` or with `Styles`, and it follows high contrast, the Text size and
+reduced motion.
+
+```go
+ui.Sidebar(page, // *ui.Signal[string]: the selected item's key
+	ui.SidebarHeading("Mail"),
+	ui.SidebarItem{Key: "inbox", Label: "Inbox", Icon: icons.Inbox, Badge: 4},
+	ui.SidebarItem{Key: "sent", Label: "Sent", Icon: icons.Home, Disabled: true},
+	ui.SidebarHeading("Tags"),
+	ui.SidebarItem{Key: "archive", Label: "Archive", Icon: icons.Search},
+).Key("main-nav").Label("Main navigation").
+	Collapsed(collapsed).Toggle(). // *ui.Signal[bool]: icons only, with a toggle button at the top
+	Header(header).Footer(account). // above the items, and pinned at the bottom
+	Width(ui.Px(260)).              // the expanded width; 240 px at the Text size of 100 percent by default
+	OnChange(func(key string) { ... })
+```
+
+- **Selection.** A click on an item, or Enter or Space on it, selects it and runs
+  `OnChange`. Up and Down move the focus to the previous and next enabled item,
+  without wrapping, and skip the headings and the disabled items. Home and End go
+  to the first and last enabled item. Focus follows the keys, but the selection
+  does not change until Enter, Space or a click, as NavigationView does.
+- **Tab stop.** The pane is one Tab stop, at the selected item, or at the first
+  enabled item when the selected one is not among them.
+- **Collapsed.** While the `Collapsed` signal is true, the pane is 48 px wide and
+  shows only the icons. Each item shows its label as a tooltip, and each heading is
+  a thin rule. Give every item an icon, since an item with none shows nothing. The
+  header and the footer are drawn as they are.
+- **Accessibility.** The pane is a group named by `Label` (by default
+  "Navigation"). Its items are list items that report the selected and disabled
+  states, and an item with a badge is named with its count, as in "Inbox, 4". Its
+  headings are headings. The toggle is a button named "Collapse navigation" or
+  "Expand navigation", which reports the expanded state.
+- **Layout.** The pane takes the height of its row, so put it in a row beside the
+  content. Its items scroll when they do not fit, and the header and the footer stay
+  in place.
+
 ### Split panes
 
 `ui.Split(first, second)` lays out two panes with a divider between them that the
