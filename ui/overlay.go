@@ -17,9 +17,13 @@ const (
 	AboveStart
 	AboveCenter
 	AboveEnd
-	RightStart // right of the anchor, top edges aligned
-	LeftStart  // left of the anchor, top edges aligned
-	OverCenter // over the anchor, centered in both directions (a Modal's panel)
+	RightStart  // right of the anchor, top edges aligned
+	LeftStart   // left of the anchor, top edges aligned
+	OverCenter  // over the anchor, centered in both directions (a Modal's panel)
+	RightCenter // right of the anchor, centered vertically
+	RightEnd    // right of the anchor, bottom edges aligned
+	LeftCenter  // left of the anchor, centered vertically
+	LeftEnd     // left of the anchor, bottom edges aligned
 )
 
 // overlayMargin is how far inside the window an overlay is kept.
@@ -72,7 +76,7 @@ func placeOverlay(p Placement, gap float32, a scene.Rect, w, h float32, view sce
 			x = a.X + a.W - w
 		}
 	default:
-		right := p == RightStart
+		right := p == RightStart || p == RightCenter || p == RightEnd
 		roomRight := view.X + view.W - (a.X + a.W + gap)
 		roomLeft := a.X - gap - view.X
 		if right && w > roomRight && roomLeft > roomRight {
@@ -85,7 +89,14 @@ func placeOverlay(p Placement, gap float32, a scene.Rect, w, h float32, view sce
 		} else {
 			x = a.X - gap - w
 		}
-		y = a.Y
+		switch p {
+		case RightCenter, LeftCenter:
+			y = a.Y + (a.H-h)/2
+		case RightEnd, LeftEnd:
+			y = a.Y + a.H - h
+		default:
+			y = a.Y
+		}
 	}
 	x = min(x, view.X+view.W-overlayMargin-w)
 	x = max(x, view.X+overlayMargin)

@@ -185,7 +185,8 @@ ui.Div()                       // flex container; children stack vertically by d
   .When(cond, func(d *ui.DivElement) { ... })            // conditional styling
   .OnClick(fn).OnDoubleClick(fn).OnMouseEnter(fn).OnMouseLeave(fn)
   .OnMouseDown(func(e *ui.MouseEvent){}).OnScroll(...).OnKeyDown(...).OnTextInput(...)
-  .Overlay(ui.BelowStart).OverlayGap(4)    // float next to the parent: never clipped, drawn on top,
+  .Overlay(ui.BelowStart).OverlayGap(4)    // Below|Above Start|Center|End, Right|Left Start|Center|End, OverCenter;
+                               // float next to the parent: never clipped, drawn on top,
                                // hit first; flips to the other side if it doesn't fit
   .OnClickOutside(fn)          // any button pressed outside (an Overlay's parent counts as inside);
                                // on an Overlay, Escape also runs fn (see Actions and key bindings)
