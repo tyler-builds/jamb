@@ -120,6 +120,9 @@ type Theme struct {
 	Breadcrumbs BreadcrumbsStyle
 	// Pagination is the look of every pagination control.
 	Pagination PaginationStyle
+	// DateRangePicker is the look of every date range picker and its calendar. It is not
+	// DatePicker: a range has its own parts, such as DayInRange.
+	DateRangePicker DateRangePickerStyle
 }
 
 // darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme

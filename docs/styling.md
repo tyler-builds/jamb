@@ -41,7 +41,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Border`, `Disabled` and the others), so the defaults follow the theme's colors.
    Some defaults depend on the state of the widget, such as a disabled select.
 2. **The theme.** Set on the `ui.Theme` for every widget of that kind in the app:
-   `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Field` (the frame of every
+   `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.DateRangePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Field` (the frame of every
    `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
@@ -155,7 +155,7 @@ the value further.
 | `Selected` | the part is the selected one | the part's selected style |
 | `Disabled` | the part cannot be used | the part's disabled style |
 | `Highlighted` | the option is highlighted in an open list | the option's highlight style |
-| `Invalid` | the field's value is not valid: a NumberInput's text, or a control that a Field shows an error for (TextInput, TextArea, NumberInput, DatePicker, TimePicker, Select, RadioGroup, Checkbox) | the part's invalid style |
+| `Invalid` | the field's value is not valid: a NumberInput's text, or a control that a Field shows an error for (TextInput, TextArea, NumberInput, DatePicker, DateRangePicker, TimePicker, Select, RadioGroup, Checkbox) | the part's invalid style |
 | `Checked` | the check box is on, or the switch is on, or the ring is the selected one | the part's checked style |
 | `Mixed` | the check box is in the mixed (indeterminate) state | the part's mixed style |
 | `Open` | the collapsible section is open | the part's open style |
@@ -317,6 +317,7 @@ the Text size of 100 percent:
 | `Select` | 220 px, a fixed size; `Full` stretches it, and the list is at least as wide as the field |
 | `Combobox` | 240 px at the Text size of 100 percent, like a text field; `Full` stretches it, and the list is at least as wide as the field |
 | `DatePicker` | 180 px at the Text size of 100 percent; `Full` stretches it, and the calendar is its own size |
+| `DateRangePicker` | 240 px at the Text size of 100 percent; `Full` stretches it, and the calendar is its own size |
 | `TimePicker` | 140 px at the Text size of 100 percent; `Full` stretches it, and the list is at least as wide as the field |
 | `Slider`, `ProgressBar` (also when indeterminate) | fills the container, and at least 160 px, so it is visible where its container has no width |
 | `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |
@@ -523,6 +524,7 @@ parts that the code applies.
 | `Combobox` | `Field`, `Popup`, `Option`, `OptionHighlighted`, `OptionDisabled`, `Match`, `Empty`, `Loading`, `Error` | none | `RenderOption` | done |
 | `DatePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `CalendarButton`, `Message`, `Popup`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
 | `TimePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Button`, `Message`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected` | none | none | done |
+| `DateRangePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `CalendarButton`, `Message`, `Popup`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayInRange`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
 | `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
 | `NumberInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |

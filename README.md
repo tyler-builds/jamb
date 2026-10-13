@@ -788,6 +788,39 @@ buttons are for the pointer, and the calendar closes on Tab rather than keeping 
 date picker has no time of day of its own, so a time is set with a time picker on the same
 signal. The Today description is in English. Text areas for dates and times are not provided.
 
+**Date ranges.** `ui.DateRangePicker` is a text field for a range of days, with a calendar below it. It
+reads and writes two signals, the start and the end, each a `*ui.Signal[time.Time]`; a zero time is no
+day, and a zero start is no range.
+
+```go
+var start = ui.NewSignal(time.Time{}) // the first day of the range
+var end = ui.NewSignal(time.Time{})   // the last day of the range
+
+ui.DateRangePicker(start, end).Label("Trip dates").
+	Min(today).Max(today.AddDate(0, 6, 0)). // the days that can be chosen
+	DisableDays(func(d time.Time) bool { return d.Weekday() == time.Sunday })
+```
+
+- The first day chosen is the start, and the calendar stays open; the second is the end, and it closes
+  the calendar. The days are at local midnight. If the end is before the start, the two are swapped.
+  Hovering or moving with the keys shades the range before the end is chosen.
+- The signals change only when the end is chosen. Escape, Tab and a click outside the calendar keep the
+  range that was there, and `OnChange(fn)` runs with both days only then.
+- Typed text is `date – date` or `date - date`, each date in the locale's short date format. Each date is
+  read as a date picker reads one, with the same messages, and reversed dates are swapped.
+- A day that `Min`, `Max` or `DisableDays` rules out cannot be an end, and typing it is refused. A range
+  may include such a day.
+- The ends are filled with the accent. The days between them are a band with a line above and below and
+  square corners, so the range is not shown by its fill alone; under high contrast the lines are the text
+  color.
+- The field is a combo box for assistive technology, with the range as its value. Each day is named by its
+  long date, and its description is "Start of range", "End of range" or "In range".
+- The keys are those of `DatePicker`. `Placeholder`, `Disabled`, `FirstDay`, `Key`, `Label`, `Small`,
+  `Large`, `Tooltip`, `Styles` and the sizing methods are as for a date picker; a range is 240 px wide at
+  the Text size of 100 percent. Its look is `DateRangePickerStyle`, and `Theme.DateRangePicker` sets it for
+  every range picker (see docs/styling.md).
+- The calendar shows one month at a time. A range has no `Validate`; a form reads the two signals.
+
 ### Shrinking and minimum sizes
 
 When a row is narrower than its content, its items shrink in proportion to their

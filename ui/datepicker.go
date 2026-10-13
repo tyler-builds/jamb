@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -459,47 +458,11 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		// keys are the calendar's keys, which it has while it is open. Its focus is the day
 		// the keys have reached, and the screen reader reads that day.
 		keys := func(e *KeyEvent) {
-			if e.Mods&(input.ModCtrl|input.ModAlt|input.ModSuper) != 0 {
-				return
-			}
-			f := focus.Peek()
-			shift := e.Mods&input.ModShift != 0
 			first := loc.firstDay
 			if d.firstSet {
 				first = d.firstDay
 			}
-			switch e.Key {
-			case input.KeyLeft:
-				moveTo(dayOf(f).AddDate(0, 0, -1))
-			case input.KeyRight:
-				moveTo(dayOf(f).AddDate(0, 0, 1))
-			case input.KeyUp:
-				moveTo(dayOf(f).AddDate(0, 0, -7))
-			case input.KeyDown:
-				moveTo(dayOf(f).AddDate(0, 0, 7))
-			case input.KeyHome:
-				moveTo(weekStart(f, first))
-			case input.KeyEnd:
-				moveTo(weekStart(f, first).AddDate(0, 0, 6))
-			case input.KeyPageUp:
-				moveTo(addMonths(f, -monthsStep(shift)))
-			case input.KeyPageDown:
-				moveTo(addMonths(f, monthsStep(shift)))
-			case input.KeyEnter, input.KeySpace:
-				if !e.Repeat {
-					pick(f)
-				}
-			case input.KeyEscape:
-				if !e.Repeat {
-					shut(true)
-				}
-			case input.KeyTab:
-				shut(true)
-				return // not stopped: focus moves on from the calendar
-			default:
-				return
-			}
-			e.StopPropagation()
+			calendarKeys(e, focus.Peek(), first, moveTo, pick, shut)
 		}
 
 		// The field is its own frame and the calendar, as a combo box is. Its accessibility
@@ -593,9 +556,9 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		})
 
 		if open.Get() {
-			root.Child(d.calendar(calendarView{st: st, loc: loc, scale: scale, value: v, focus: focus.Get(),
-				today: dayOf(rt.now()), name: name, move: moveTo, pick: pick, keys: keys,
-				shut: shut, enabled: d.enabled, firstSet: d.firstSet, firstDay: d.firstDay}))
+			root.Child(calendarPanel(calendarView{st: st, widget: "DatePicker", loc: loc, scale: scale, value: v,
+				focus: focus.Get(), today: dayOf(rt.now()), name: name, fallback: "Date", move: moveTo, pick: pick,
+				keys: keys, shut: shut, enabled: d.enabled, firstSet: d.firstSet, firstDay: d.firstDay}))
 		}
 		return d.size.apply(root)
 	})
@@ -608,128 +571,4 @@ func monthsStep(shift bool) int {
 		return 12
 	}
 	return 1
-}
-
-// calendarView is what the calendar of a date picker shows, and the functions it calls.
-type calendarView struct {
-	st       DatePickerStyle
-	loc      *dateLocale
-	scale    float32
-	value    time.Time // the chosen day, or zero
-	focus    time.Time // the day the keys have reached; its month is shown
-	today    time.Time
-	firstSet bool // FirstDay was called, and firstDay is the week's first day
-	firstDay time.Weekday
-	name     string
-	move     func(day time.Time)
-	pick     func(day time.Time)
-	keys     func(e *KeyEvent)
-	shut     func(restore bool)
-	enabled  func(day time.Time) bool
-}
-
-// calendar returns the open calendar: an overlay below the field (above it when there is no
-// room). It is a calendar for assistive technology, a grid of six week rows, each with seven
-// days, under a header of the weekday names (see the README, Date and time). It takes focus
-// when it opens, and the day the keys have reached is its highlighted cell, which the screen
-// reader reads. The navigation buttons are for a pointer; the keys are PageUp and PageDown
-// for a month, and Shift with them for a year.
-func (d *DatePickerElement) calendar(c calendarView) Element {
-	first := c.loc.firstDay
-	if c.firstSet {
-		first = c.firstDay
-	}
-	// The calendar is named by its field, as a combo box's list is. A name must not carry the
-	// control type, so the word "calendar" is not in it (Axe's rule for names).
-	name := c.name
-	if name == "" {
-		name = "Date"
-	}
-	st := c.st
-	panel := Div().asPart("DatePicker.Popup").Key("jamb.calendar").Style(st.Popup).
-		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
-		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
-		Overlay(BelowStart).OverlayGap(4).
-		Role(access.RoleCalendar).SelectionContainer().Label(name).
-		AutoFocus().TabStop(false).OnKeyDown(c.keys).
-		OnClickOutside(func() { c.shut(false) }).
-		OnClick(func() {}) // a press on the calendar's padding must not reach the field
-	pa := panel.access()
-	pa.gridRows, pa.gridCols = 6, 7
-	focus := c.focus
-	nav := func(label string, glyph *icons.Icon, text string, step time.Time) *DivElement {
-		b := Div().asPart("DatePicker.NavButton").Style(st.NavButton).Role(access.RoleButton).Label(label).
-			Cursor(CursorPointer).OnClick(func() { c.move(step) })
-		if glyph != nil {
-			b.Child(Icon(glyph).Size(14 * c.scale))
-		} else {
-			b.Child(Text(text).NoWrap())
-		}
-		return b
-	}
-	header := Div().Row().Align(Center).Gap(4 * c.scale).
-		Child(nav("Previous year", nil, "«", addMonths(focus, -12))).
-		Child(nav("Previous month", icons.ChevronLeft, "", addMonths(focus, -1))).
-		Child(Div().asPart("DatePicker.Header").Style(st.Header).Child(Text(c.loc.monthYear(focus)).NoWrap())).
-		Child(nav("Next month", icons.ChevronRight, "", addMonths(focus, 1))).
-		Child(nav("Next year", nil, "»", addMonths(focus, 12)))
-	panel.Child(header)
-
-	// The weekday names are header items of the grid, which the grid is given by its
-	// children, so they are not wrapped in a named element.
-	names := Div().Row().Gap(2 * c.scale)
-	for i := range 7 {
-		wd := time.Weekday((int(first) + i) % 7)
-		names.Child(Div().asPart("DatePicker.WeekdayLabel").Style(st.WeekdayLabel).
-			Role(access.RoleHeaderItem).Label(c.loc.weekdayLong(wd)).
-			Child(Text(c.loc.weekdayShort(wd)).NoWrap()))
-	}
-	panel.Child(names)
-
-	grid := monthGrid(focus, first)
-	for r := range 6 {
-		week := Div().Row().Gap(2 * c.scale).Label(c.loc.longDate(grid[r][0]))
-		week.listItem(r+1, 6)
-		for col := range 7 {
-			day := grid[r][col]
-			week.Child(d.dayCell(c, day, r+1, col+1))
-		}
-		panel.Child(week)
-	}
-	return panel
-}
-
-// dayCell returns the cell of one day of the calendar, at the grid position row and column
-// (both 1-based). It is a data item of the grid, named by the long date of the day, and it
-// is selected when the day is the chosen one. A day that cannot be chosen is disabled.
-func (d *DatePickerElement) dayCell(c calendarView, day time.Time, row, col int) *DivElement {
-	st := c.st
-	on := !c.value.IsZero() && sameDay(day, c.value)
-	ok := c.enabled(day)
-	cell := Div().asPart("DatePicker.Day").Style(st.Day).Role(access.RoleDataItem).
-		Label(c.loc.longDate(day)).Child(Text(fmt.Sprintf("%d", day.Day())).NoWrap())
-	a := cell.access()
-	a.gridRow, a.gridCol = row, col
-	cell.AccessSelected(on)
-	if day.Month() != c.focus.Month() || day.Year() != c.focus.Year() {
-		cell.Style(st.DayOutsideMonth)
-	}
-	if sameDay(day, c.today) {
-		cell.Style(st.DayToday)
-		cell.Description("Today")
-	}
-	if on {
-		cell.Style(st.DaySelected)
-	}
-	if !ok {
-		a.disabled = true
-		cell.Style(st.DayDisabled)
-	} else {
-		cell.Hover(st.DayHover).Cursor(CursorPointer).OnClick(func() { c.pick(day) })
-	}
-	if sameDay(day, c.focus) {
-		a.highlighted = true
-		cell.Style(st.DayFocusVisible)
-	}
-	return cell
 }
