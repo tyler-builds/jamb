@@ -83,12 +83,12 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 
 // TestFieldOverridesUnderHighContrast checks the guardrails of the text frame:
 // under high contrast an app's colors for the frame, the text and the invalid
-// frame of a number field are not used, while its padding and the frame's border
+// frame of a number input are not used, while its padding and the frame's border
 // are, the focus is drawn in Highlight, and a disabled number is GrayText.
 func TestFieldOverridesUnderHighContrast(t *testing.T) {
 	theme := *DarkTheme
 	theme.Field = FieldStyle{Frame: Style{Background: markBG, Padding: All(7)}, Text: Style{TextColor: markFG}}
-	theme.NumberField.FrameInvalid = Style{BorderColor: markBG, BorderWidth: 4}
+	theme.NumberInput.FrameInvalid = Style{BorderColor: markBG, BorderWidth: 4}
 
 	sig := NewSignal("x")
 	r := newThemedRig(&theme, func(ctx *Context) Element {
@@ -115,40 +115,40 @@ func TestFieldOverridesUnderHighContrast(t *testing.T) {
 		t.Errorf("high contrast: the focused frame's border is %v, want Highlight %v", got, th.Accent)
 	}
 
-	// An invalid number field keeps the border width the app gives it, and its
+	// An invalid number input keeps the border width the app gives it, and its
 	// color is the text color. The focus of the field draws its frame in
 	// Highlight, as it does without high contrast, so the color is checked on the
 	// resolved style, which the paint uses.
 	nv := NewSignal(8)
-	r = newThemedRig(&theme, func(ctx *Context) Element { return partNumberField(nv, NumberFieldStyle{}, SpinInline, false) })
+	r = newThemedRig(&theme, func(ctx *Context) Element { return partNumberInput(nv, NumberInputStyle{}, SpinInline, false) })
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastBlack()})
 	r.frame()
 	th = r.rt.theme
-	if got := resolveNumberField(th, SpinInline, 1, false, false, NumberFieldStyle{}).FrameInvalid.BorderColor; got != th.Text {
+	if got := resolveNumberInput(th, SpinInline, 1, false, false, NumberInputStyle{}).FrameInvalid.BorderColor; got != th.Text {
 		t.Errorf("high contrast: the invalid frame is drawn in %v, want the text color %v", got, th.Text)
 	}
 	focusNode(r, r.keyed(t, "nf"))
 	r.typeText("x")
 	r.press(input.KeyEnter, 0)
-	if got := partNode(t, r.rt, "NumberField.Frame", "").style.BorderWidth; got != 4 {
+	if got := partNode(t, r.rt, "NumberInput.Frame", "").style.BorderWidth; got != 4 {
 		t.Errorf("high contrast: the invalid frame is %v px wide, want the app's 4", got)
 	}
 
-	// A disabled number field is GrayText, not dimmed, and its text is too.
-	r = newThemedRig(&theme, func(ctx *Context) Element { return partNumberField(nv, NumberFieldStyle{}, SpinInline, true) })
+	// A disabled number input is GrayText, not dimmed, and its text is too.
+	r = newThemedRig(&theme, func(ctx *Context) Element { return partNumberInput(nv, NumberInputStyle{}, SpinInline, true) })
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastBlack()})
 	r.frame()
 	th = r.rt.theme
-	if got := effectiveTextColor(partNode(t, r.rt, "NumberField.Text", "")); got != th.Disabled {
+	if got := effectiveTextColor(partNode(t, r.rt, "NumberInput.Text", "")); got != th.Disabled {
 		t.Errorf("high contrast: the disabled number's text is %v, want GrayText %v", got, th.Disabled)
 	}
-	if got := partNode(t, r.rt, "NumberField.Frame", "").style.Opacity; got != 0 {
+	if got := partNode(t, r.rt, "NumberInput.Frame", "").style.Opacity; got != 0 {
 		t.Errorf("high contrast: the disabled frame is dimmed to %v, want no dimming", got)
 	}
 }
 
-// TestFieldThemeLayers checks the layers of a number field's frame: the built-in
-// defaults, then the theme's Field, then the theme's NumberField, then the
+// TestFieldThemeLayers checks the layers of a number input's frame: the built-in
+// defaults, then the theme's Field, then the theme's NumberInput, then the
 // instance's Styles. A text field takes the theme's Field, which the number
 // field takes too.
 func TestFieldThemeLayers(t *testing.T) {
@@ -156,23 +156,23 @@ func TestFieldThemeLayers(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		field Style // the theme's Field frame
-		num   Style // the theme's NumberField frame
+		num   Style // the theme's NumberInput frame
 		inst  Style // the instance's frame
 		want  Color
 	}{
 		{"the defaults", Style{}, Style{}, Style{}, DarkTheme.Surface},
 		{"the theme's Field", Style{Background: fromField}, Style{}, Style{}, fromField},
-		{"the theme's NumberField over Field", Style{Background: fromField}, Style{Background: fromNumber}, Style{}, fromNumber},
+		{"the theme's NumberInput over Field", Style{Background: fromField}, Style{Background: fromNumber}, Style{}, fromNumber},
 		{"the instance over both", Style{Background: fromField}, Style{Background: fromNumber}, Style{Background: fromInstance}, fromInstance},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			theme := *DarkTheme
 			theme.Field.Frame = tc.field
-			theme.NumberField.Frame = tc.num
+			theme.NumberInput.Frame = tc.num
 			r := newThemedRig(&theme, func(ctx *Context) Element {
-				return partNumberField(NewSignal(8), NumberFieldStyle{FieldStyle: FieldStyle{Frame: tc.inst}}, SpinInline, false)
+				return partNumberInput(NewSignal(8), NumberInputStyle{FieldStyle: FieldStyle{Frame: tc.inst}}, SpinInline, false)
 			})
-			if got := partNode(t, r.rt, "NumberField.Frame", "").style.Background; got != tc.want {
+			if got := partNode(t, r.rt, "NumberInput.Frame", "").style.Background; got != tc.want {
 				t.Errorf("the frame's background is %v, want %v", got, tc.want)
 			}
 		})

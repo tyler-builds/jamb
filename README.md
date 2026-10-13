@@ -353,7 +353,7 @@ when that changes.
 Every built-in widget with a look of its own has named parts. Each part is a typed
 `ui.Style`, grouped in a style struct for its widget: `ui.TabsStyle`,
 `ui.SelectStyle`, `ui.SliderStyle`, `ui.FieldStyle` (shared by `TextInput`,
-`TextArea` and a number field), `ui.NumberFieldStyle`, `ui.ButtonStyle`,
+`TextArea` and a number input), `ui.NumberInputStyle`, `ui.ButtonStyle`,
 `ui.CheckboxStyle`, `ui.RadioGroupStyle`, `ui.SwitchStyle`, `ui.CollapsibleStyle`, `ui.SplitStyle`,
 `ui.TreeStyle`, `ui.MenuStyle`, `ui.MenuBarStyle`, `ui.ModalStyle`,
 `ui.ProgressBarStyle`, `ui.ProgressRingStyle`, `ui.BadgeStyle`, `ui.ToastStyle` and
@@ -363,7 +363,7 @@ example `ui.DarkTheme.Tabs`, `Theme.Button`, `Theme.Buttons.Danger` for one vari
 wins over the theme, and the theme over the built-in defaults, which follow the
 theme's colors. States are parts too (`TabSelected`, `OptionHighlighted`,
 `RootHover`; each struct's doc comment lists its parts). Some widgets have
-variants (`Tabs.Variant(ui.TabsSegmented)`, `NumberField.SpinButtons(ui.SpinStacked)`,
+variants (`Tabs.Variant(ui.TabsSegmented)`, `NumberInput.SpinButtons(ui.SpinStacked)`,
 `Button.Variant(ui.Danger)`, `Badge.Variant(ui.BadgeSuccess)`, `Toaster.Placement`),
 and render slots (`Tabs.RenderTab`, `Select.RenderValue`, `Select.RenderOption`,
 `Collapsible.RenderHeader`, `Tree.RenderRow`, `Tree.RenderLabel`,
@@ -385,7 +385,7 @@ new widget are in [docs/styling.md](docs/styling.md).
 
 ### Form controls
 
-Checkboxes, switches, radio groups, selects, sliders and number fields are bound
+Checkboxes, switches, radio groups, selects, sliders and number inputs are bound
 to signals, as `TextInput` is. Each reads its signal when it renders and writes
 it when the user changes it. They use the theme's colors, follow high contrast
 and the Text size, and show their state by a shape as well as a color: a check,
@@ -403,9 +403,9 @@ ui.RadioGroup(freq,                               // *ui.Signal[T], for any comp
 ).Label("Frequency").OnChange(func(v string) { ... })
 ui.Select(channel, ui.Option[string]{Value: "email", Label: "Email"}).Label("Channel").Placeholder("Choose").Width(ui.Px(240)).OnChange(func(v string) { ... })
 ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percent).OnChange(fn).Width(ui.Full)
-ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStacked).Precision(2) // int or float64
-// every control also takes .Key("id") and .Disabled(true); select, slider, number field, text input and text area
-// take .Styles(...); a number field's frame takes a FieldStyle, and its spin buttons and message their own parts.
+ui.NumberInput(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStacked).Precision(2) // int or float64
+// every control also takes .Key("id") and .Disabled(true); select, slider, number input, text input and text area
+// take .Styles(...); a number input's frame takes a FieldStyle, and its spin buttons and message their own parts.
 // Select takes RenderOption and RenderValue. See the Styling section.
 // The controls take the sizing methods (Width, MinWidth, MaxWidth and Grow, and Height where it
 // applies) with a ui.Length; a progress ring keeps Size, and a form field (`Field`) takes them on its outer box. The defaults and the precedence are in
@@ -438,7 +438,7 @@ ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStac
 - A slider moves by one `step` with the arrows, by a tenth of the range with Page
   Up and Page Down, and to the ends with Home and End. A click or drag sets the
   value to the nearest step. `OnChange` runs when the value changes.
-- A number field takes typed text, or steps with Up and Down (and its spin buttons,
+- A number input takes typed text, or steps with Up and Down (and its spin buttons,
   added with `SpinButtons(ui.SpinInline)`, a - button at its left edge and a + button at
   its right, inside the frame, or `SpinButtons(ui.SpinStacked)`, an up arrow above a down
   arrow at its right). Enter, or
@@ -460,8 +460,8 @@ ui.NumberField(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStac
 Assistive technology reads a check box with a mixed state as mixed, a switch as a
 check box with the Toggle pattern (as Phase B chose), a radio group as a selection
 container named by its label, and a select as a combo box whose Value is the
-chosen label. A slider and a number field report their range (RangeValue). A
-number field is a spin box that holds its text field, as Microsoft's Spinner
+chosen label. A slider and a number input report their range (RangeValue). A
+number input is a spin box that holds its text field, as Microsoft's Spinner
 control type describes
 ([Spinner control type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).
 
@@ -704,7 +704,7 @@ follows CSS Flexbox's automatic minimum size of flex items
 - **A fixed `Width` is the item's floor**, as it was before this rule: the item does
   not shrink below it. CSS takes the smaller of the width and the content instead, and
   jamb does not. The exception is a text field (`TextInput`, `TextArea` and the frame of
-  a `NumberField`): its fixed width is a ceiling, and in a shrinking row it keeps the
+  a `NumberInput`): its fixed width is a ceiling, and in a shrinking row it keeps the
   room for six digits and no more, so it does not collapse to a letter's width. A
   `MinWidth` replaces that minimum.
 - **Bars and sliders** (`ProgressBar`, `IndeterminateProgressBar`, `Slider`) keep a
@@ -1879,15 +1879,15 @@ user works with it.
 - The asterisk is drawn and hidden from assistive technology. The state is the
   announcement, so the asterisk carries no meaning that a screen reader misses.
 - The error is drawn above the control, under the help text, with the alert icon and
-  the same look as a number field's message. The control's frame is the invalid
+  the same look as a number input's message. The control's frame is the invalid
   frame, and it stays invalid while the control has focus.
 
 **Validators.** A control takes validators with `Validate`: `TextInput`, `TextArea`,
-`NumberField`, `Select`, `RadioGroup` and `Checkbox` (a `Checkbox` with `Required[bool]()`
+`NumberInput`, `Select`, `RadioGroup` and `Checkbox` (a `Checkbox` with `Required[bool]()`
 is "must accept"). They are generic over the control's value type:
 
 - `ui.Required[T]()`: rejects the zero value (blank text after trimming, zero, `false`,
-  or the placeholder option of a `Select` or `RadioGroup`). A number field does not
+  or the placeholder option of a `Select` or `RadioGroup`). A number input does not
   need it, since it always holds a number.
 - `ui.MinLength(n)`, `ui.MaxLength(n)`, `ui.Pattern(re, msg)` for text, counted in runes.
   The empty text passes `MinLength` and `Pattern`, so `Required` decides whether a field
@@ -2222,7 +2222,7 @@ names and roles, Invoke, Toggle, ExpandCollapse, Selection, Value, Scroll,
 focus with its event, and the Text pattern on the word "small". The demo's form
 controls are checked too: a check box's Toggle, including its indeterminate
 state; a radio button's SelectionItem; a select's ExpandCollapse and Value, and
-its open list; a slider's and a number field's RangeValue with SetValue. The
+its open list; a slider's and a number input's RangeValue with SetValue. The
 navigation samples are checked too: a tab list's Tab, TabItem and
 SelectionItem, and Select moves the panel; a collapsible header's
 ExpandCollapse; a tree's items expanding, with their level and position in
@@ -2538,7 +2538,7 @@ On the Projects page:
   status as a badge. A teammate's reply in a project's comments shows a "typing"
   busy ring until it arrives.
 
-![The Form controls section of the Components page, with its number fields and the Notification preferences below it](docs/screenshots/form-controls.png)
+![The Form controls section of the Components page, with its number inputs and the Notification preferences below it](docs/screenshots/form-controls.png)
 
 ![The open select in the Form controls section](docs/screenshots/select-open.png)
 

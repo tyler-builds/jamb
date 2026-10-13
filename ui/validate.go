@@ -10,7 +10,7 @@ import (
 
 // Validator checks the value of a form control. It returns nil when the value is
 // valid, and an error whose text is the message the field shows. A control takes
-// its validators with Validate (TextInput, TextArea, NumberField, Select,
+// its validators with Validate (TextInput, TextArea, NumberInput, Select,
 // RadioGroup and Checkbox); a Field takes a check of its own with Check.
 //
 // The validators follow the value types of the controls:
@@ -29,7 +29,7 @@ const msgRequired = "This field is required."
 
 // Required rejects the zero value of T: the empty text, zero, false and the zero
 // option. A text value is trimmed first, so spaces alone are empty. A number does
-// not need it, since a number field always holds a number; use Range to say which
+// not need it, since a number input always holds a number; use Range to say which
 // numbers are allowed.
 func Required[T comparable]() Validator[T] {
 	return func(v T) error {

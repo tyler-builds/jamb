@@ -65,7 +65,7 @@ type DataColumn[T any] struct {
 	// the raw number of a formatted one. Nil means Text.
 	Value func(row T) string
 	// Editor replaces the text field of an edit with what it returns, such as a
-	// Select, a NumberField or a CheckBox. value is the pending value, which starts
+	// Select, a NumberInput or a CheckBox. value is the pending value, which starts
 	// as Value (or Text); change sets the pending value; commit saves it through Edit
 	// (and an error keeps the editor open); cancel ends the edit. The grid's keys
 	// and focus work as for the text field (see DataGrid): the editor's controls get

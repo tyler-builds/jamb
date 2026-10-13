@@ -205,14 +205,14 @@ func TestHighlightedOptionIsNotBold(t *testing.T) {
 func TestStackedSpinButtonsSitInsideTheField(t *testing.T) {
 	for _, scale := range []int{100, 225} {
 		r := newAccessRig(func(ctx *Context) Element {
-			return partNumberField(NewSignal(8), NumberFieldStyle{}, SpinStacked, false)
+			return partNumberInput(NewSignal(8), NumberInputStyle{}, SpinStacked, false)
 		})
 		if scale != 100 {
 			r.rt.SetSystemSettings(SystemSettings{TextScale: scale})
 			r.frame()
 		}
-		frame := rectOf(r, partNode(t, r.rt, "NumberField.Frame", ""))
-		group := rectOf(r, partNode(t, r.rt, "NumberField.SpinButtons", ""))
+		frame := rectOf(r, partNode(t, r.rt, "NumberInput.Frame", ""))
+		group := rectOf(r, partNode(t, r.rt, "NumberInput.SpinButtons", ""))
 		up := rectOf(r, buttonNode(t, r, "Increase"))
 		down := rectOf(r, buttonNode(t, r, "Decrease"))
 		var text rectT
@@ -231,8 +231,8 @@ func TestStackedSpinButtonsSitInsideTheField(t *testing.T) {
 			t.Errorf("%d%%: the buttons are %v and %v px wide, want at least 16", scale, up.W, down.W)
 		}
 		// The two buttons share the field's height, less the gap at its top and bottom
-		// and the twice-gap between them (see numberFieldDefaults).
-		bw := partNode(t, r.rt, "NumberField.Frame", "").style.BorderWidth
+		// and the twice-gap between them (see numberInputDefaults).
+		bw := partNode(t, r.rt, "NumberInput.Frame", "").style.BorderWidth
 		gap := spinGapAt(scale)
 		if want := (frame.H - 2*bw - 4*gap) / 2; !nearPx(up.H, want) || !nearPx(down.H, want) {
 			t.Errorf("%d%%: the buttons are %v and %v px tall in a field %v px tall; each want %v", scale, up.H, down.H, frame.H, want)
@@ -245,7 +245,7 @@ func TestStackedSpinButtonsSitInsideTheField(t *testing.T) {
 
 // TestFieldPartClears checks the clear through the text frame's parts: a text
 // field with no border and no fill, a placeholder that is not given a color, a
-// selection with no color, and a number field's frame with no border.
+// selection with no color, and a number input's frame with no border.
 func TestFieldPartClears(t *testing.T) {
 	st := FieldStyle{
 		Frame:       Style{Clear: ClearBorder | ClearBackground},
@@ -269,10 +269,10 @@ func TestFieldPartClears(t *testing.T) {
 	}
 
 	r = newAccessRig(func(ctx *Context) Element {
-		return partNumberField(NewSignal(8), NumberFieldStyle{FieldStyle: FieldStyle{Frame: Style{Clear: ClearBorder}}}, SpinInline, false)
+		return partNumberInput(NewSignal(8), NumberInputStyle{FieldStyle: FieldStyle{Frame: Style{Clear: ClearBorder}}}, SpinInline, false)
 	})
-	if n := partNode(t, r.rt, "NumberField.Frame", ""); n.style.BorderWidth != 0 {
-		t.Errorf("the number field kept its frame border: %v", n.style.BorderWidth)
+	if n := partNode(t, r.rt, "NumberInput.Frame", ""); n.style.BorderWidth != 0 {
+		t.Errorf("the number input kept its frame border: %v", n.style.BorderWidth)
 	}
 }
 

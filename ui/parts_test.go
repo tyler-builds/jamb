@@ -115,9 +115,9 @@ func drawnBy(part string) string {
 		return "Split.Divider"
 	case "Button.RootHover", "Button.RootPressed", "Button.RootDisabled", "Button.RootFocusVisible":
 		return "Button.Root"
-	case "NumberField.SpinButtonHover", "NumberField.SpinButtonPressed",
-		"NumberField.SpinButtonFocusVisible", "NumberField.SpinButtonDisabled":
-		return "NumberField.SpinButton"
+	case "NumberInput.SpinButtonHover", "NumberInput.SpinButtonPressed",
+		"NumberInput.SpinButtonFocusVisible", "NumberInput.SpinButtonDisabled":
+		return "NumberInput.SpinButton"
 	}
 	return part
 }
@@ -188,8 +188,8 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Split", func(t *testing.T) { testSplitParts(t, applied) })
 	t.Run("TextInput", func(t *testing.T) { testFieldParts(t, "TextInput", applied) })
 	t.Run("TextArea", func(t *testing.T) { testFieldParts(t, "TextArea", applied) })
-	t.Run("NumberField inline", func(t *testing.T) { testNumberFieldParts(t, SpinInline, applied) })
-	t.Run("NumberField stacked", func(t *testing.T) { testNumberFieldParts(t, SpinStacked, applied) })
+	t.Run("NumberInput inline", func(t *testing.T) { testNumberInputParts(t, SpinInline, applied) })
+	t.Run("NumberInput stacked", func(t *testing.T) { testNumberInputParts(t, SpinStacked, applied) })
 	t.Run("Button", func(t *testing.T) { testButtonParts(t, applied) })
 	t.Run("Checkbox", func(t *testing.T) { testCheckboxParts(t, applied) })
 	t.Run("RadioGroup", func(t *testing.T) { testRadioGroupParts(t, applied) })
@@ -523,17 +523,17 @@ func testSliderParts(t *testing.T, applied map[string]bool) {
 	}
 }
 
-// partNumberField is a number field from 0 to 23 with the instance style st and
+// partNumberInput is a number input from 0 to 23 with the instance style st and
 // spin buttons of placement p.
-func partNumberField(v *Signal[int], st NumberFieldStyle, p SpinPlacement, disabled bool) Element {
-	return Div().Column().Child(NumberField(v, 0, 23, 1).Label("Quiet hours").Key("nf").
+func partNumberInput(v *Signal[int], st NumberInputStyle, p SpinPlacement, disabled bool) Element {
+	return Div().Column().Child(NumberInput(v, 0, 23, 1).Label("Quiet hours").Key("nf").
 		SpinButtons(p).Disabled(disabled).Styles(st))
 }
 
-func testNumberFieldParts(t *testing.T, p SpinPlacement, applied map[string]bool) {
+func testNumberInputParts(t *testing.T, p SpinPlacement, applied map[string]bool) {
 	type numberCase struct {
 		part     string
-		set      func(*NumberFieldStyle, Style)
+		set      func(*NumberInputStyle, Style)
 		value    int
 		disabled bool
 		act      func(*testing.T, *accessRig)
@@ -544,49 +544,49 @@ func testNumberFieldParts(t *testing.T, p SpinPlacement, applied map[string]bool
 		r.press(input.KeyEnter, 0)
 	}
 	cases := []numberCase{
-		{part: "NumberField.Frame", set: func(s *NumberFieldStyle, m Style) { s.Frame = m }, value: 8},
-		{part: "NumberField.FrameHover", set: func(s *NumberFieldStyle, m Style) { s.FrameHover = m }, value: 8,
-			act: func(t *testing.T, r *accessRig) { hoverNode(r, partNode(t, r.rt, "NumberField.Frame", "")) }},
-		{part: "NumberField.FrameFocusWithin", set: func(s *NumberFieldStyle, m Style) { s.FrameFocusWithin = m }, value: 8,
+		{part: "NumberInput.Frame", set: func(s *NumberInputStyle, m Style) { s.Frame = m }, value: 8},
+		{part: "NumberInput.FrameHover", set: func(s *NumberInputStyle, m Style) { s.FrameHover = m }, value: 8,
+			act: func(t *testing.T, r *accessRig) { hoverNode(r, partNode(t, r.rt, "NumberInput.Frame", "")) }},
+		{part: "NumberInput.FrameFocusWithin", set: func(s *NumberInputStyle, m Style) { s.FrameFocusWithin = m }, value: 8,
 			act: func(t *testing.T, r *accessRig) { focusNode(r, editorNode(t, r.rt)) }},
-		{part: "NumberField.FrameInvalid", set: func(s *NumberFieldStyle, m Style) { s.FrameInvalid = m }, value: 8, act: invalid},
-		{part: "NumberField.FrameDisabled", set: func(s *NumberFieldStyle, m Style) { s.FrameDisabled = m }, value: 8, disabled: true},
-		{part: "NumberField.Text", set: func(s *NumberFieldStyle, m Style) { s.Text = m }, value: 8},
-		{part: "NumberField.Selection", set: func(s *NumberFieldStyle, m Style) { s.Selection = m }, value: 8},
-		{part: "NumberField.Message", set: func(s *NumberFieldStyle, m Style) { s.Message = m }, value: 8, act: invalid},
-		{part: "NumberField.SpinButtons", set: func(s *NumberFieldStyle, m Style) { s.SpinButtons = m }, value: 8},
-		{part: "NumberField.SpinButton", set: func(s *NumberFieldStyle, m Style) { s.SpinButton = m }, value: 8},
-		{part: "NumberField.SpinButtonHover", set: func(s *NumberFieldStyle, m Style) { s.SpinButtonHover = m }, value: 8,
+		{part: "NumberInput.FrameInvalid", set: func(s *NumberInputStyle, m Style) { s.FrameInvalid = m }, value: 8, act: invalid},
+		{part: "NumberInput.FrameDisabled", set: func(s *NumberInputStyle, m Style) { s.FrameDisabled = m }, value: 8, disabled: true},
+		{part: "NumberInput.Text", set: func(s *NumberInputStyle, m Style) { s.Text = m }, value: 8},
+		{part: "NumberInput.Selection", set: func(s *NumberInputStyle, m Style) { s.Selection = m }, value: 8},
+		{part: "NumberInput.Message", set: func(s *NumberInputStyle, m Style) { s.Message = m }, value: 8, act: invalid},
+		{part: "NumberInput.SpinButtons", set: func(s *NumberInputStyle, m Style) { s.SpinButtons = m }, value: 8},
+		{part: "NumberInput.SpinButton", set: func(s *NumberInputStyle, m Style) { s.SpinButton = m }, value: 8},
+		{part: "NumberInput.SpinButtonHover", set: func(s *NumberInputStyle, m Style) { s.SpinButtonHover = m }, value: 8,
 			act: func(t *testing.T, r *accessRig) { hoverNode(r, accessNode(t, r, access.RoleButton, "Increase")) }},
-		{part: "NumberField.SpinButtonPressed", set: func(s *NumberFieldStyle, m Style) { s.SpinButtonPressed = m }, value: 8,
+		{part: "NumberInput.SpinButtonPressed", set: func(s *NumberInputStyle, m Style) { s.SpinButtonPressed = m }, value: 8,
 			act: func(t *testing.T, r *accessRig) { pressNode(r, accessNode(t, r, access.RoleButton, "Increase")) }},
-		{part: "NumberField.SpinButtonFocusVisible", set: func(s *NumberFieldStyle, m Style) { s.SpinButtonFocusVisible = m }, value: 8,
+		{part: "NumberInput.SpinButtonFocusVisible", set: func(s *NumberInputStyle, m Style) { s.SpinButtonFocusVisible = m }, value: 8,
 			act: func(t *testing.T, r *accessRig) { focusNode(r, accessNode(t, r, access.RoleButton, "Increase")) }},
 		// At the top of the range the increase button cannot step any further.
-		{part: "NumberField.SpinButtonDisabled", set: func(s *NumberFieldStyle, m Style) { s.SpinButtonDisabled = m }, value: 23},
+		{part: "NumberInput.SpinButtonDisabled", set: func(s *NumberInputStyle, m Style) { s.SpinButtonDisabled = m }, value: 23},
 	}
 	for _, c := range cases {
 		applied[c.part] = true
 		t.Run(c.part, func(t *testing.T) {
-			if c.part == "NumberField.SpinButtons" && p != SpinStacked {
+			if c.part == "NumberInput.SpinButtons" && p != SpinStacked {
 				// The inline buttons are laid over the frame's edges, with no group (see
-				// NumberFieldStyle); the group is the stacked column's part.
+				// NumberInputStyle); the group is the stacked column's part.
 				t.Skip("the inline buttons have no group")
 			}
-			var st NumberFieldStyle
+			var st NumberInputStyle
 			c.set(&st, Style{Background: markBG, TextColor: markFG})
 			v := NewSignal(c.value)
-			r := newAccessRig(func(ctx *Context) Element { return partNumberField(v, st, p, c.disabled) })
+			r := newAccessRig(func(ctx *Context) Element { return partNumberInput(v, st, p, c.disabled) })
 			if c.act != nil {
 				c.act(t, r)
 			}
 			switch c.part {
-			case "NumberField.SpinButton", "NumberField.SpinButtonHover", "NumberField.SpinButtonPressed",
-				"NumberField.SpinButtonFocusVisible", "NumberField.SpinButtonDisabled":
+			case "NumberInput.SpinButton", "NumberInput.SpinButtonHover", "NumberInput.SpinButtonPressed",
+				"NumberInput.SpinButtonFocusVisible", "NumberInput.SpinButtonDisabled":
 				// Every button that the part applies to is drawn in the part's color.
 				// Hover, press and focus pick out the one under the pointer or focus.
 				found := 0
-				for _, b := range partNodes(r.rt, "NumberField.SpinButton") {
+				for _, b := range partNodes(r.rt, "NumberInput.SpinButton") {
 					if b.style.Background == markBG {
 						found++
 					}
@@ -594,11 +594,11 @@ func testNumberFieldParts(t *testing.T, p SpinPlacement, applied map[string]bool
 				if found == 0 {
 					t.Errorf("%s: no spin button is drawn in the part's color", c.part)
 				}
-			case "NumberField.SpinButtons", "NumberField.Message":
+			case "NumberInput.SpinButtons", "NumberInput.Message":
 				wantBackground(t, partNode(t, r.rt, c.part, ""), c.part, markBG)
-			case "NumberField.Text":
+			case "NumberInput.Text":
 				wantTextColor(t, editorNode(t, r.rt), c.part, markFG)
-			case "NumberField.Selection":
+			case "NumberInput.Selection":
 				if got := editorNode(t, r.rt).editor.selection; got != markBG {
 					t.Errorf("%s: selection color %v, want %v", c.part, got, markBG)
 				}
@@ -653,15 +653,15 @@ func TestPartStylePrecedence(t *testing.T) {
 				return partSlider(NewSignal(50.0), st)
 			},
 			setTheme: func(th *Theme, c Color) { th.Slider.Thumb.Background = c }},
-		{name: "NumberField", part: "NumberField.Frame", def: DarkTheme.Surface,
+		{name: "NumberInput", part: "NumberInput.Frame", def: DarkTheme.Surface,
 			build: func(th *Theme, inst bool) Element {
-				var st NumberFieldStyle
+				var st NumberInputStyle
 				if inst {
 					st.Frame = Style{Background: instBG}
 				}
-				return partNumberField(NewSignal(8), st, SpinInline, false)
+				return partNumberInput(NewSignal(8), st, SpinInline, false)
 			},
-			setTheme: func(th *Theme, c Color) { th.NumberField.Frame.Background = c }},
+			setTheme: func(th *Theme, c Color) { th.NumberInput.Frame.Background = c }},
 		{name: "TextInput", part: "TextInput.Frame", def: DarkTheme.Surface,
 			build: func(th *Theme, inst bool) Element {
 				var st FieldStyle
@@ -772,13 +772,13 @@ func TestTabsUnderlineDrawsOneLinePerTab(t *testing.T) {
 	}
 }
 
-func TestNumberFieldSpinButtonsByPlacement(t *testing.T) {
+func TestNumberInputSpinButtonsByPlacement(t *testing.T) {
 	// The stacked buttons are a column in the frame's flow, each the field's height less
 	// the gap, with the gap at the column's top and bottom and twice the gap between them.
 	r := newAccessRig(func(ctx *Context) Element {
-		return partNumberField(NewSignal(8), NumberFieldStyle{}, SpinStacked, false)
+		return partNumberInput(NewSignal(8), NumberInputStyle{}, SpinStacked, false)
 	})
-	group := partNode(t, r.rt, "NumberField.SpinButtons", "")
+	group := partNode(t, r.rt, "NumberInput.SpinButtons", "")
 	if group.style.Direction != Column {
 		t.Errorf("stacked: group direction %v, want Column", group.style.Direction)
 	}
@@ -787,9 +787,9 @@ func TestNumberFieldSpinButtonsByPlacement(t *testing.T) {
 	}
 	// The inline buttons have no group: each is laid over an edge of the frame.
 	r = newAccessRig(func(ctx *Context) Element {
-		return partNumberField(NewSignal(8), NumberFieldStyle{}, SpinInline, false)
+		return partNumberInput(NewSignal(8), NumberInputStyle{}, SpinInline, false)
 	})
-	if n := len(partNodes(r.rt, "NumberField.SpinButtons")); n != 0 {
+	if n := len(partNodes(r.rt, "NumberInput.SpinButtons")); n != 0 {
 		t.Errorf("inline: %d spin button groups, want none", n)
 	}
 	for _, name := range []string{"Decrease", "Increase"} {

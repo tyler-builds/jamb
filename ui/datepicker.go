@@ -24,7 +24,7 @@ const dayCellSize = 32
 //
 // Field is the text frame, a FieldStyle as TextInput's is, with its states. CalendarButton
 // is the button at the end of the field that opens the calendar, and Message the row that
-// says why the text is not a date that can be chosen (as NumberField's message). The
+// says why the text is not a date that can be chosen (as NumberInput's message). The
 // calendar is the popup: Popup is its panel, Header the row with the month and the year,
 // NavButton each of its navigation buttons (previous and next month, and year), and
 // WeekdayLabel the name of each day of the week. Day is each day; DayHover a day the
@@ -117,7 +117,7 @@ func datePickerDefaults(t *Theme, scale float32, disabled bool) DatePickerStyle 
 		d.DaySelected = Style{Background: t.Accent, TextColor: t.AccentText}
 		d.DayToday = Style{BorderWidth: 1, BorderColor: t.Text}
 		d.DayDisabled = Style{TextColor: t.Disabled}
-		// The focus is an inner outline, as the focus of a number field's buttons is.
+		// The focus is an inner outline, as the focus of a number input's buttons is.
 		d.DayFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
 	} else {
 		d.DayToday = Style{BorderWidth: 1, BorderColor: t.Accent}
@@ -367,7 +367,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 			}
 		}
 		// blur applies a text that changed and is valid, and otherwise shows the value again
-		// (as a number field does), so that a form never sees a text it does not hold.
+		// (as a number input does), so that a form never sees a text it does not hold.
 		blur := func() {
 			cur := formatDate(d.value.Peek(), loc)
 			if draft.Peek() == cur {

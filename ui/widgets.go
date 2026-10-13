@@ -299,27 +299,27 @@ func (dividerElement) expand(ctx *Context) Element {
 }
 
 // FieldStyle is the look of the text frame of a text field: TextInput, TextArea
-// and NumberField. A part's style merges over the built-in defaults, then over
-// the theme's Field, then over the Styles of the instance. A NumberField also
-// takes its theme's and instance's NumberField parts; see docs/styling.md.
+// and NumberInput. A part's style merges over the built-in defaults, then over
+// the theme's Field, then over the Styles of the instance. A NumberInput also
+// takes its theme's and instance's NumberInput parts; see docs/styling.md.
 //
 // Frame is the box around the text. Its states are FrameHover, while the pointer
 // is over an enabled field, and FrameFocusWithin, while the focus is inside it.
-// FrameDisabled and FrameInvalid are the frame of a disabled number field and of
-// a number field whose text is not a valid number; only NumberField draws them.
+// FrameDisabled and FrameInvalid are the frame of a disabled number input and of
+// a number input whose text is not a valid number; only NumberInput draws them.
 // Text is the text inside the frame, with its TextColor and font, and Selection
 // is the background of the selected text. Placeholder is the text shown while a
 // TextInput or TextArea is empty. Leading and Trailing are the containers of the
 // content before and after the text: the icon (see Icon) and the element of
-// Leading, and the element of Trailing. A number field has no placeholder, icon
+// Leading, and the element of Trailing. A number input has no placeholder, icon
 // or element, so Placeholder, Leading and Trailing do not apply to it. The caret
 // is drawn in the text color, and its width and blink follow the system settings.
 type FieldStyle struct {
 	Frame            Style // the box around the text; not drawn when a field is Borderless
 	FrameHover       Style // the frame while the pointer is over it, if the field is enabled (paint only)
 	FrameFocusWithin Style // the frame while the focus is inside it (paint only)
-	FrameDisabled    Style // the frame of a disabled number field
-	FrameInvalid     Style // the frame of a number field whose text is not a valid number
+	FrameDisabled    Style // the frame of a disabled number input
+	FrameInvalid     Style // the frame of a number input whose text is not a valid number
 	Text             Style // the text inside the frame: TextColor and font
 	Placeholder      Style // the placeholder, while the field is empty
 	Selection        Style // the background of the selected text
@@ -360,7 +360,7 @@ func (s FieldStyle) plain() FieldStyle {
 }
 
 // fieldLayout is the layout a text frame is built for: a multi-line editor, a
-// compact one (Small), or a disabled number field.
+// compact one (Small), or a disabled number input.
 type fieldLayout struct {
 	multiline, small, disabled bool
 	width                      Length // the frame's width by default (see textFieldWidth)
@@ -369,7 +369,7 @@ type fieldLayout struct {
 // textFieldWidth is the default width of a text field at the Text size of 100
 // percent, like a text input's default size in CSS. A field is fixed at this width
 // by default, so it does not stretch; Width(Full) stretches it. It scales with the
-// Text size, as the number field's width does.
+// Text size, as the number input's width does.
 const textFieldWidth = 240
 
 // fieldDefaults returns the built-in look of a text frame with layout lay, from
@@ -428,7 +428,7 @@ func resolveField(t *Theme, lay fieldLayout, inst FieldStyle) FieldStyle {
 	return st
 }
 
-// fieldOptions are shared by TextInput, TextArea and NumberField.
+// fieldOptions are shared by TextInput, TextArea and NumberInput.
 type fieldOptions struct {
 	value       *Signal[string]
 	placeholder string
@@ -440,10 +440,10 @@ type fieldOptions struct {
 	trailingEl  Element // drawn in the Trailing part, after the text (see Trailing)
 	onSubmit    func(string)
 	onChange    func(string)
-	onBlur      func()        // set by NumberField, which checks its text on blur
+	onBlur      func()        // set by NumberInput, which checks its text on blur
 	onCancel    func()        // set by DataGrid, which ends an edit on Escape in place of Cancel
 	description string        // set by DataGrid, to say why the last save failed (a literal, not a key)
-	onStep      func(dir int) // set by NumberField, for Up and Down
+	onStep      func(dir int) // set by NumberInput, for Up and Down
 	styles      FieldStyle    // the instance's parts: from Styles, and the frame's Style
 	key         string
 	borderless  bool
@@ -451,9 +451,9 @@ type fieldOptions struct {
 	autoFocus   bool
 	handle      *FocusHandle
 	widget      string              // the widget this field is, for the part names (see asPart)
-	align       Alignment           // where a single-line text sits in the field, zero for Start (NumberField's Align)
-	trailing    Element             // drawn inside the frame's right edge, after the text (NumberField's stacked spin buttons)
-	overlays    []Element           // laid over the frame's edges, after the text, out of its flow (NumberField's inline spin buttons)
+	align       Alignment           // where a single-line text sits in the field, zero for Start (NumberInput's Align)
+	trailing    Element             // drawn inside the frame's right edge, after the text (NumberInput's stacked spin buttons)
+	overlays    []Element           // laid over the frame's edges, after the text, out of its flow (NumberInput's inline spin buttons)
 	rules       []Validator[string] // the validators of the value (see Validate)
 	wire        fieldWire           // what a Field gives the control (see Field)
 	size        sizing              // the frame's sizes, from the sizing methods (see Sizing in docs/styling.md)

@@ -7,7 +7,7 @@ changed from this design" and "Phase C: what changed from this design". Phase D
 the text caret, the contrast audit, and the fix for the `idle` script step (see
 "Phase D: what changed from this design").
 Phase F (form controls: check boxes with a mixed state, switches, radio groups,
-selects, sliders and number fields, and the RangeValue pattern) is done, with the
+selects, sliders and number inputs, and the RangeValue pattern) is done, with the
 changes listed under "Phase F: what changed from this design".
 Phase E's automated checks are done (see "Phase E: what changed from this
 design"); its manual screen reader pass is pending, and is described in
@@ -143,7 +143,7 @@ README.
 | C. Text | UI Automation Text pattern for text fields and text areas: caret, selection, reading by character, word and line, text change events |
 | D. System settings | Windows high contrast, the Text size setting, reduced animations, a contrast audit of the built-in themes, caret tracking for magnifiers, and the text caret blink and width |
 | E. Verification | Accessibility Insights for Windows checks on the examples, a manual NVDA and Narrator script, automated tests that read the real UI Automation tree |
-| F. Form controls | Check boxes with a mixed state, switches, radio groups, selects, sliders and number fields; the RangeValue pattern; the Windows ComboBox, Slider and Spinner control types |
+| F. Form controls | Check boxes with a mixed state, switches, radio groups, selects, sliders and number inputs; the RangeValue pattern; the Windows ComboBox, Slider and Spinner control types |
 | G. Navigation and layout | Tabs with automatic activation, Ctrl+Tab, and lazily built panels; collapsible sections and an accordion; a tree view that builds only its visible rows, with Tree and TreeItem control types, levels and positions in their sets |
 | M. Date and time | `ui.DatePicker` and `ui.TimePicker`, the calendar with the Calendar control type and the Grid and Table patterns, and the keys of the WAI-ARIA date picker dialog pattern |
 | Split panes | `ui.Split`: a focusable divider with the Separator role and the RangeValue pattern, keys of the window splitter pattern, panes as named groups |
@@ -481,7 +481,7 @@ Narrator and NVDA, are left for Phase E, with Narrator testing.
 - The mixed (indeterminate) state is in the model and the adapter, but no public
   API sets it. Closed in phase F: `CheckboxTri` sets it (see "Phase F").
 - RangeValue is not implemented: no slider exists in the framework yet. Closed in
-  phase F: `Slider` and `NumberField` expose it (see "Phase F").
+  phase F: `Slider` and `NumberInput` expose it (see "Phase F").
 - The Text pattern for text fields and text areas was Phase C, and is done (see
   below).
 - Screen reader checks: the Accessibility Insights rules are done in Phase E; the
@@ -842,7 +842,7 @@ surface instead of a tint (`tintOf`, `barFill` in `examples/demo/views/kit.go`).
 The selected navigation item uses `AccentText` for its label, and the theme switch
 selects the app's theme (`ctx.AppTheme()`).
 
-The parts of the built-in widgets (`Tabs`, `Select`, `Slider`, `NumberField`) follow
+The parts of the built-in widgets (`Tabs`, `Select`, `Slider`, `NumberInput`) follow
 the same rules. The theme's and an instance's part styles lose their colors,
 gradients, shadows and opacity under high contrast, and keep their sizes, spacing,
 fonts, radius and border widths, so the built-in system colors and focus ring stay.
@@ -1239,7 +1239,7 @@ was not implemented. The decisions and their sources are below.
   SelectionContainer, and the highlighted item has accessibility focus, as a menu's
   highlighted row does. A radio group is a Group that is a SelectionContainer, and
   its radio buttons are RadioButton with SelectionItem. A slider is a Slider with
-  RangeValue. A number field is a Spinner that holds its Edit, with RangeValue.
+  RangeValue. A number input is a Spinner that holds its Edit, with RangeValue.
 - **Control types from Microsoft.** The control type identifiers are ComboBox
   50003, Slider 50015 and Spinner 50016
   ([Control Type Identifiers](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-controltype-ids)).
@@ -1248,7 +1248,7 @@ was not implemented. The decisions and their sources are below.
   ([Spinner Control Type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).
   The Slider page requires RangeValue for a numerical range
   ([Slider Control Type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportslidercontroltype)).
-  The number field therefore follows the Spinner structure. The slider needs no
+  The number input therefore follows the Spinner structure. The slider needs no
   Thumb child; the Slider page lists thumbs and buttons as the structure of the
   control, and jamb draws its thumb without exposing it.
 - **RangeValue.** `access.Range` (Value, Min, Max, SmallChange, LargeChange) is set
@@ -1289,7 +1289,7 @@ was not implemented. The decisions and their sources are below.
   one step, Page Up and Page Down by a tenth of the range rounded up to steps, and
   Home and End go to the ends. `MouseEvent` now carries the size of the element that
   handles it (Width and Height), which the slider needs to map a position to a value.
-- **NumberField validation.** Chosen and documented in the README: a number outside
+- **NumberInput validation.** Chosen and documented in the README: a number outside
   the range is clamped on commit; text that is not a number (or not a whole number
   for an int) is not applied, and Enter shows the field as invalid with a message
   that gives the range. Leaving the field with invalid text reverts it to the value.
@@ -1303,7 +1303,7 @@ was not implemented. The decisions and their sources are below.
 - Unit tests (`ui/form_controls_test.go`, 21 tests): the states and the mixed
   state; Space and click toggles; disabled controls; roving focus and the arrows;
   the select's open, close, Enter, Escape, Tab, F4, Alt+Down, type-ahead, Home and
-  End, and focus return; the slider's keys, pointer and SetValue; the number field's
+  End, and focus return; the slider's keys, pointer and SetValue; the number input's
   steps, clamping, invalid text, blur and buttons; the warning for an unnamed select;
   and a high contrast and 225 percent build with no warnings and no fixed heights on
   the fields.
@@ -1315,7 +1315,7 @@ was not implemented. The decisions and their sources are below.
   percent modes, and all pass. The new checks read a check box's Toggle and its
   indeterminate state, a radio button's SelectionItem, a select's ComboBox with
   ExpandCollapse and Value and its open list, a slider's RangeValue with SetValue,
-  and a number field's Spinner with RangeValue and Edit. Axe scans report zero errors
+  and a number input's Spinner with RangeValue and Edit. Axe scans report zero errors
   for the Settings page, the Components page scrolled to the form controls, and the
   same page with a select open, in all three modes.
 - The Axe scan found one defect in this phase: a disabled switch named "Unavailable
@@ -1326,9 +1326,9 @@ was not implemented. The decisions and their sources are below.
   open select and the Settings page are in `docs/screenshots`.
 
 - **Follow-up fixes after review.** Under high contrast a disabled slider, check
-  box, switch, select and number field are drawn in GrayText throughout: the slider's
+  box, switch, select and number input are drawn in GrayText throughout: the slider's
   fill, thumb and readout, the check box's fill and mark, the switch's track and knob,
-  the select's text, placeholder and chevron, and the number field's frame and text.
+  the select's text, placeholder and chevron, and the number input's frame and text.
   A selected radio button is one Highlight ring with one solid dot. It had a second,
   text-colored dot, which made a blob. The check box and radio button were also
   checked at 150 percent, with the selected radio button drawn as a clean ring.
@@ -1551,7 +1551,7 @@ others are design decisions and are marked as such.
   WinUI ProgressRing exposes, so that mapping is not verified against Windows' own
   control.
 - **Name of the busy indicator (decided).** The API is `ProgressRing`, not `Spinner`,
-  because `RoleSpinner` is the number field's spin box (see Phase C). A second meaning
+  because `RoleSpinner` is the number input's spin box (see Phase C). A second meaning
   of "spinner" would be ambiguous. The ring is named "Loading…" unless `Label` gives
   another name.
 - **Reduced motion (decided).** With reduced motion on, an indeterminate bar is drawn
@@ -1813,7 +1813,7 @@ The Value pattern follows Microsoft's DataItem guidance (uiauto-supportdataitemc
 
 - **An editing row that scrolls out of view.** The rows of a grid are one window of a virtual list, which is contiguous, so the row is not laid out outside the window. The edit, its text and its focus are kept, and the editor is laid out again when the row comes back (`TestEditKeepsItsTextWhenItsRowScrollsAway`). Focus therefore stays in an editor that is not on screen, and keys typed meanwhile go to it. Moving focus out of the grid when the row leaves the view would change the keyboard model, so it is not made here; the README asks the user to scroll the row back first. Whether the access tree reports the editor while it is out of view is not checked.
 - **Moving focus out of an editing row that scrolls away.** Focus stays in an editor that is not on screen (see the bullet above), so the keys typed meanwhile go to it. A grid could move focus to the cell when its editor leaves the view; that would change the keyboard model, so it is not made here.
-- **A custom editor and the Value pattern of its cell.** A custom editor (`DataColumn.Editor`, a Select, a NumberField or a CheckBox) is the app's control: its accessibility is that of the control it returns. The grid focuses the first focusable control of the editor when it opens, saves a change of focus out of the cell, and gives the failed-save message to the cell as a popover. The grid does not set the description of the custom control, since the control is not the grid's.
+- **A custom editor and the Value pattern of its cell.** A custom editor (`DataColumn.Editor`, a Select, a NumberInput or a CheckBox) is the app's control: its accessibility is that of the control it returns. The grid focuses the first focusable control of the editor when it opens, saves a change of focus out of the cell, and gives the failed-save message to the cell as a popover. The grid does not set the description of the custom control, since the control is not the grid's.
 - **Focus on a DataItem.** The Microsoft page describes SetFocus on a data item moving focus to its edit control. The grid's `ActionFocus` does not do that yet.
 
 ## Phase K: what changed from this design
@@ -1840,7 +1840,7 @@ Phase K adds forms: `ui.Field` (a label above or beside a control, with help tex
 
 **Verification.**
 
-- Unit tests in `ui` (`form_test.go`, `form_group_test.go`, `form_parts_test.go`): each validator and its message, the first failing validator, the field's wiring (`LabelledBy`, `DescribedBy`, `Description`, `StateRequired`, `StateInvalid`), the required marker outside the tree, the timing rules (no error before the user acts, an error after an edit and a blur, not after a visit alone, an app error at once), the submit (the first invalid field gets focus, the count is announced, the summary's links move focus), the form's message from a submit and from an async submit, the disabled state while the submit runs, Enter in a field against Enter on a check box in a modal, `Reset`, the controls' own checks (select, radio group, check box "must accept"), a group's check and its focus handle, the styles' precedence, `Clear` and high contrast, the shared message look of a number field and a field, and the drift test for every new part.
+- Unit tests in `ui` (`form_test.go`, `form_group_test.go`, `form_parts_test.go`): each validator and its message, the first failing validator, the field's wiring (`LabelledBy`, `DescribedBy`, `Description`, `StateRequired`, `StateInvalid`), the required marker outside the tree, the timing rules (no error before the user acts, an error after an edit and a blur, not after a visit alone, an app error at once), the submit (the first invalid field gets focus, the count is announced, the summary's links move focus), the form's message from a submit and from an async submit, the disabled state while the submit runs, Enter in a field against Enter on a check box in a modal, `Reset`, the controls' own checks (select, radio group, check box "must accept"), a group's check and its focus handle, the styles' precedence, `Clear` and high contrast, the shared message look of a number input and a field, and the drift test for every new part.
 - Platform tests in `platform/windows` (`uia_forms_test.go`): the two property IDs against the SDK header, and the answers for a required, an invalid, a required-and-invalid and an ordinary element.
 - Demo tests in `examples/demo/views` (`components_forms_test.go`): the New Project error and focus, the channels rule of the preferences, and the Forms summary and the server's refusal.
 - Live checks in `scripts/a11y-check.ps1`: New Project with an empty name (focus on Name, `IsRequiredForForm` true, `IsDataValidForForm` false, `HelpText` "This field is required.", the announcement by a Notification event, the summary's count, an Axe scan of the errors, and then a valid name submitted and undone); the Forms summary's link moving focus to Name with the same properties, an Axe scan with the summary shown, and the background save with Save disabled and the server's refusal shown. The check "New Project opens a dialog" now asserts that Create is enabled and that no error is shown before Create is pressed.
@@ -1857,7 +1857,7 @@ Phase K adds forms: `ui.Field` (a label above or beside a control, with help tex
 - **`FullDescription`** (30159) is not answered. The help text and the error are in `HelpText`.
 - **Switch and Slider.** They have no `Validate`, and a `Field` around them is a group, not a control. Their labels are not wired as names.
 - **The grid editor's popover** keeps its own look (a bordered popover), so the grid and the forms share the Danger text and the alert icon, not the same box.
-- **Quiet hours.** The check that the start and the end differ is a demo rule, not a framework rule; a range is always valid for a number field, which clamps its value.
+- **Quiet hours.** The check that the start and the end differ is a demo rule, not a framework rule; a range is always valid for a number input, which clamps its value.
 
 ## Phase L: what changed from this design
 

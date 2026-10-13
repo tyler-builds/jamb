@@ -68,8 +68,8 @@ func formControlsSection() ui.Element {
 			formSample(t, "Select, disabled", selectSample(picked, true), channelName(picked.Get())),
 			formSample(t, "Slider", ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percentOf).Width(ui.Px(200)), percentOf(volume.Get())),
 			formSample(t, "Slider, disabled", ui.Slider(volume, 0, 100, 5).Label("Volume, disabled").Format(percentOf).Width(ui.Px(200)).Disabled(true), percentOf(volume.Get())),
-			formSample(t, "Number field", ui.NumberField(quiet, 0, 23, 1).Label("Sample quiet hours").SpinButtons(ui.SpinInline), fmt.Sprintf("%02d:00", quiet.Get())),
-			formSample(t, "Number field, disabled", ui.NumberField(quiet, 0, 23, 1).Label("Sample quiet hours, disabled").Disabled(true), fmt.Sprintf("%02d:00", quiet.Get())),
+			formSample(t, "Number input", ui.NumberInput(quiet, 0, 23, 1).Label("Sample quiet hours").SpinButtons(ui.SpinInline), fmt.Sprintf("%02d:00", quiet.Get())),
+			formSample(t, "Number input, disabled", ui.NumberInput(quiet, 0, 23, 1).Label("Sample quiet hours, disabled").Disabled(true), fmt.Sprintf("%02d:00", quiet.Get())),
 		}
 		row := ui.Div().Row().Wrap().Align(ui.Start).Gap(22)
 		for _, s := range samples {
@@ -116,9 +116,9 @@ func formControlsSection() ui.Element {
 					Child(ui.Slider(prefVolume, 0, 100, 5).Label("Alert volume").Format(percentOf).Width(ui.Px(240)))).
 				Child(ui.Div().Gap(10).
 					Child(ui.Div().Row().Align(ui.Start).Gap(10).
-						Child(prefs.Field("from", "Quiet hours from", ui.NumberField(fromHour, 0, 23, 1).SpinButtons(ui.SpinInline))).
+						Child(prefs.Field("from", "Quiet hours from", ui.NumberInput(fromHour, 0, 23, 1).SpinButtons(ui.SpinInline))).
 						Child(ui.Text("to").TextColor(t.TextMuted)).
-						Child(prefs.Field("to", "Quiet hours to", ui.NumberField(toHour, 0, 23, 1).SpinButtons(ui.SpinInline)).
+						Child(prefs.Field("to", "Quiet hours to", ui.NumberInput(toHour, 0, 23, 1).SpinButtons(ui.SpinInline)).
 							Check(func() error {
 								if fromHour.Get() == toHour.Get() {
 									return errors.New("Quiet hours must start and end at different hours.")

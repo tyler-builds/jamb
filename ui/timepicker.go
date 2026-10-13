@@ -30,7 +30,7 @@ const timePickerDefaultStep = 15
 //
 // Field is the text frame, a FieldStyle as TextInput's is, with its states. Button is the
 // button at the end of the field that opens the list of times, and Message the row that
-// says why the text is not a time that can be chosen (as NumberField's message). Popup is
+// says why the text is not a time that can be chosen (as NumberInput's message). Popup is
 // the open list, Option each time in it, OptionHighlighted the time the keys have reached,
 // and OptionSelected the time that the field holds. Under high contrast the highlighted
 // time is drawn in the system Highlight colors, and the selected one has a check mark, so

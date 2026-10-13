@@ -56,14 +56,14 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				}
 			},
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) { hoverPart(t, r, "TextArea.Frame") }},
-		{name: "NumberField", animates: true,
+		{name: "NumberInput", animates: true,
 			root: func(open *Signal[bool]) func(*Context) Element {
 				count := NewSignal(3)
 				return func(ctx *Context) Element {
-					return Div().Column().Child(NumberField(count, 0, 10, 1).Label("Count"))
+					return Div().Column().Child(NumberInput(count, 0, 10, 1).Label("Count"))
 				}
 			},
-			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) { hoverPart(t, r, "NumberField.Frame") }},
+			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) { hoverPart(t, r, "NumberInput.Frame") }},
 		{name: "Checkbox",
 			root: func(open *Signal[bool]) func(*Context) Element {
 				include := NewSignal(false)

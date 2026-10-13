@@ -60,9 +60,9 @@ type Theme struct {
 	Slider     SliderStyle
 	Split      SplitStyle
 	// Field is the text frame of every TextInput and TextArea, and of every
-	// NumberField's frame, before the NumberField parts below.
+	// NumberInput's frame, before the NumberInput parts below.
 	Field       FieldStyle
-	NumberField NumberFieldStyle
+	NumberInput NumberInputStyle
 	// Button is the look of every button, whatever its variant. Buttons is the
 	// look of each variant, and merges over Button.
 	Button  ButtonStyle

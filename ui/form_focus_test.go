@@ -80,13 +80,13 @@ func TestFieldMessageComingAndGoingKeepsTheControl(t *testing.T) {
 	}
 }
 
-// TestNumberFieldMessageComingAndGoingKeepsFocus checks that a number field keeps
+// TestNumberInputMessageComingAndGoingKeepsFocus checks that a number input keeps
 // its focus when its own message appears and goes away: an invalid entry shows the
 // range, and a valid one clears it, with the field focused through both.
-func TestNumberFieldMessageComingAndGoingKeepsFocus(t *testing.T) {
+func TestNumberInputMessageComingAndGoingKeepsFocus(t *testing.T) {
 	v := NewSignal(8)
 	r := newAccessRig(func(ctx *Context) Element {
-		return Div().Column().Child(NumberField(v, 0, 23, 1).Label("Hours").Key("hours"))
+		return Div().Column().Child(NumberInput(v, 0, 23, 1).Label("Hours").Key("hours"))
 	})
 	focusNode(r, editorNode(t, r.rt))
 	r.typeText("x")

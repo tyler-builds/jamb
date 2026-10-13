@@ -402,9 +402,9 @@ func TestEveryControlReportsItsRequiredState(t *testing.T) {
 	}
 }
 
-func TestMessagesLookAlikeInANumberFieldAndAField(t *testing.T) {
-	if !reflect.DeepEqual(messageStyle(DarkTheme), numberFieldDefaults(DarkTheme, SpinInline, 1, false, false).Message) {
-		t.Fatal("a number field's message and a field's error have different looks")
+func TestMessagesLookAlikeInANumberInputAndAField(t *testing.T) {
+	if !reflect.DeepEqual(messageStyle(DarkTheme), numberInputDefaults(DarkTheme, SpinInline, 1, false, false).Message) {
+		t.Fatal("a number input's message and a field's error have different looks")
 	}
 	if !reflect.DeepEqual(messageStyle(DarkTheme), formFieldDefaults(DarkTheme).Error) {
 		t.Fatal("a field's error is not the shared message look")

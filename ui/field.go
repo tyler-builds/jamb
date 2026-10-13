@@ -16,7 +16,7 @@ import (
 // is the label, InlineLabel the label beside the control of an Inline field (merged
 // over Label), Required the asterisk after the label, Description the help text,
 // and Error the message row with the error. The error's icon and text take the
-// Error part's TextColor, as a number field's message does.
+// Error part's TextColor, as a number input's message does.
 type FormFieldStyle struct {
 	Root        Style // the field: a column, or a row when Inline
 	Label       Style // the label above the control
@@ -52,7 +52,7 @@ func (s FormFieldStyle) plain() FormFieldStyle {
 
 // messageStyle is the look of a message that says what is wrong with a control: a
 // row with an alert icon and the text, in Danger, or in the text color under high
-// contrast. A number field's message and a field's error take it, so the two look
+// contrast. A number input's message and a field's error take it, so the two look
 // the same. The message is not a color cue alone: the icon marks it too.
 func messageStyle(t *Theme) Style {
 	c := t.Danger

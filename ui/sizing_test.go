@@ -85,10 +85,10 @@ func sizeCases() []sizeCase {
 			set: func(w, minW, maxW Length, g float32) Element {
 				return TextArea(NewSignal("")).Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
 			}},
-		{name: "NumberField", box: 400, auto: autoFill,
-			def: func() Element { return NumberField(NewSignal(3), 0, 10, 1) },
+		{name: "NumberInput", box: 400, auto: autoFill,
+			def: func() Element { return NumberInput(NewSignal(3), 0, 10, 1) },
 			set: func(w, minW, maxW Length, g float32) Element {
-				return NumberField(NewSignal(3), 0, 10, 1).Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
+				return NumberInput(NewSignal(3), 0, 10, 1).Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
 			}},
 		{name: "Select", part: "Select.Trigger", box: 400, auto: autoFill,
 			def: func() Element { return Select(NewSignal("a"), opts...) },
@@ -249,7 +249,7 @@ func TestSizingDefaults(t *testing.T) {
 	want := map[string]float32{
 		"TextInput":                textFieldWidth,
 		"TextArea":                 textFieldWidth,
-		"NumberField":              numberFieldWidth,
+		"NumberInput":              numberInputWidth,
 		"Select":                   selectWidth,
 		"Slider":                   400,
 		"ProgressBar":              400,
@@ -284,7 +284,7 @@ func TestSizingDefaults(t *testing.T) {
 func TestSizingDefaultsScaleWithText(t *testing.T) {
 	for _, c := range sizeCases() {
 		switch c.name {
-		case "TextInput", "TextArea", "NumberField", "Select":
+		case "TextInput", "TextArea", "NumberInput", "Select":
 		default:
 			continue
 		}

@@ -11,7 +11,7 @@ import (
 	"github.com/tyler-builds/jamb/icons"
 )
 
-// SpinPlacement is where a number field's spin buttons are drawn. The zero
+// SpinPlacement is where a number input's spin buttons are drawn. The zero
 // value is SpinInline.
 type SpinPlacement uint8
 
@@ -24,8 +24,8 @@ const (
 	SpinStacked
 )
 
-// NumberFieldStyle is the look of each part of a number field. A part's style
-// merges over the built-in defaults, then over the theme's Field and NumberField,
+// NumberInputStyle is the look of each part of a number input. A part's style
+// merges over the built-in defaults, then over the theme's Field and NumberInput,
 // then over the Styles of the instance; see docs/styling.md.
 //
 // The text frame is FieldStyle: Frame, with its states FrameHover,
@@ -38,7 +38,7 @@ const (
 // SpinButtons (the group), SpinButton (each button), and its states
 // SpinButtonHover, SpinButtonPressed, SpinButtonFocusVisible and
 // SpinButtonDisabled.
-type NumberFieldStyle struct {
+type NumberInputStyle struct {
 	FieldStyle
 	SpinButtons            Style // the group of spin buttons
 	SpinButton             Style // each spin button
@@ -50,8 +50,8 @@ type NumberFieldStyle struct {
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
-func (s NumberFieldStyle) merge(o NumberFieldStyle) NumberFieldStyle {
-	return NumberFieldStyle{
+func (s NumberInputStyle) merge(o NumberInputStyle) NumberInputStyle {
+	return NumberInputStyle{
 		FieldStyle:             s.FieldStyle.merge(o.FieldStyle),
 		SpinButtons:            s.SpinButtons.Merge(o.SpinButtons),
 		SpinButton:             s.SpinButton.Merge(o.SpinButton),
@@ -64,8 +64,8 @@ func (s NumberFieldStyle) merge(o NumberFieldStyle) NumberFieldStyle {
 }
 
 // plain returns s as high contrast allows it (see plainStyle).
-func (s NumberFieldStyle) plain() NumberFieldStyle {
-	return NumberFieldStyle{
+func (s NumberInputStyle) plain() NumberInputStyle {
+	return NumberInputStyle{
 		FieldStyle:             s.FieldStyle.plain(),
 		SpinButtons:            plainStyle(s.SpinButtons),
 		SpinButton:             plainStyle(s.SpinButton),
@@ -77,9 +77,9 @@ func (s NumberFieldStyle) plain() NumberFieldStyle {
 	}
 }
 
-// numberFieldWidth is the default width of a number field at the Text size of 100
+// numberInputWidth is the default width of a number input at the Text size of 100
 // percent, in logical pixels. It scales with the Text size.
-const numberFieldWidth = 120
+const numberInputWidth = 120
 
 // spinInlineWidth is the width of an inline spin button at the Text size setting of
 // 100 percent, in logical pixels. It is the button's hit target, so it is wider than
@@ -92,12 +92,12 @@ const spinInlineWidth = 24
 // meets the border, as the Windows 11 NumberBox draws its buttons.
 const spinGap = 2
 
-// numberFieldDefaults returns the built-in look of a number field of the given
+// numberInputDefaults returns the built-in look of a number input of the given
 // width, with spin buttons of placement when spin is set, from the colors of t. A
 // disabled field has the disabled frame (see fieldDefaults).
-func numberFieldDefaults(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool) NumberFieldStyle {
+func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool) NumberInputStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := NumberFieldStyle{
+	d := NumberInputStyle{
 		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled}),
 		SpinButton:             Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond},
 		SpinButtonHover:        Style{Background: t.SurfaceHover, TextColor: t.Text},
@@ -141,12 +141,12 @@ func numberFieldDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 	return d
 }
 
-// resolveNumberField returns the look of a number field: the defaults, merged
-// with the theme's Field, then the theme's NumberField, then the instance's
+// resolveNumberInput returns the look of a number input: the defaults, merged
+// with the theme's Field, then the theme's NumberInput, then the instance's
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveNumberField(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool, inst NumberFieldStyle) NumberFieldStyle {
-	st := numberFieldDefaults(t, placement, scale, disabled, spin)
-	for _, o := range []NumberFieldStyle{{FieldStyle: t.Field}, t.NumberField, inst} {
+func resolveNumberInput(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool, inst NumberInputStyle) NumberInputStyle {
+	st := numberInputDefaults(t, placement, scale, disabled, spin)
+	for _, o := range []NumberInputStyle{{FieldStyle: t.Field}, t.NumberInput, inst} {
 		if t.HighContrast {
 			o = o.plain()
 		}
@@ -155,7 +155,7 @@ func resolveNumberField(t *Theme, placement SpinPlacement, scale float32, disabl
 	return st
 }
 
-// NumberFieldElement is a text field for a number, bound to an int or float64
+// NumberInputElement is a text field for a number, bound to an int or float64
 // signal, from lo to hi in steps of step. The user types a number, or steps it
 // with Up and Down (and with the optional spin buttons).
 //
@@ -167,7 +167,7 @@ func resolveNumberField(t *Theme, placement SpinPlacement, scale float32, disabl
 //     reverts the text to the value that is set.
 //
 // Assistive technology reports it as a spin box, which holds the text field.
-type NumberFieldElement[T int | float64] struct {
+type NumberInputElement[T int | float64] struct {
 	value      *Signal[T]
 	lo, hi     T
 	step       T
@@ -180,59 +180,59 @@ type NumberFieldElement[T int | float64] struct {
 	align      Alignment // where the text sits in the field (see Align)
 	precision  int       // the decimals of a float, or -1 for the decimals of the step
 	size       sizing    // the frame's sizes, from the sizing methods (see Sizing in docs/styling.md)
-	styles     NumberFieldStyle
+	styles     NumberInputStyle
 	rules      []Validator[T] // the validators of the value (see Validate)
 	wire       fieldWire      // what a Field gives the field (see Field)
 }
 
 // Validate sets the validators of the value, which are checked after the value
 // is set: a Field shows the first error once the user has changed the field and left
-// it, and on submit when it is in a Form (see Field and Validator). A number field
+// it, and on submit when it is in a Form (see Field and Validator). A number input
 // does not need Required, since it always holds a number.
-func (n *NumberFieldElement[T]) Validate(rules ...Validator[T]) *NumberFieldElement[T] {
+func (n *NumberInputElement[T]) Validate(rules ...Validator[T]) *NumberInputElement[T] {
 	n.rules = rules
 	return n
 }
 
-// formCheck and formWire make a number field a formControl (see Field).
-func (n *NumberFieldElement[T]) formCheck() error { return firstError(n.value.Get(), n.rules) }
+// formCheck and formWire make a number input a formControl (see Field).
+func (n *NumberInputElement[T]) formCheck() error { return firstError(n.value.Get(), n.rules) }
 
-func (n *NumberFieldElement[T]) formWire(w fieldWire) Element {
+func (n *NumberInputElement[T]) formWire(w fieldWire) Element {
 	c := *n
 	c.wire = w
 	return &c
 }
 
-// NumberField creates a number field that reads and writes value, from lo to hi
+// NumberInput creates a number input that reads and writes value, from lo to hi
 // in steps of step. Its default width is 120 px at the Text size of 100 percent (see
 // Width), it shows the decimals of step, and its value is centered in the field.
-func NumberField[T int | float64](value *Signal[T], lo, hi, step T) *NumberFieldElement[T] {
-	return &NumberFieldElement[T]{value: value, lo: lo, hi: hi, step: step, precision: -1, align: Center}
+func NumberInput[T int | float64](value *Signal[T], lo, hi, step T) *NumberInputElement[T] {
+	return &NumberInputElement[T]{value: value, lo: lo, hi: hi, step: step, precision: -1, align: Center}
 }
 
-func (*NumberFieldElement[T]) isElement()           {}
-func (n *NumberFieldElement[T]) elementKey() string { return n.key }
+func (*NumberInputElement[T]) isElement()           {}
+func (n *NumberInputElement[T]) elementKey() string { return n.key }
 
-func (n *NumberFieldElement[T]) Key(k string) *NumberFieldElement[T] { n.key = k; return n }
+func (n *NumberInputElement[T]) Key(k string) *NumberInputElement[T] { n.key = k; return n }
 
 // Label names the field for assistive technology, such as "Quiet hours from".
-func (n *NumberFieldElement[T]) Label(s string) *NumberFieldElement[T] { n.name = s; return n }
+func (n *NumberInputElement[T]) Label(s string) *NumberInputElement[T] { n.name = s; return n }
 
 // LabelledBy names the field by the text of the elements with the given keys;
 // see DivElement.LabelledBy.
-func (n *NumberFieldElement[T]) LabelledBy(keys ...string) *NumberFieldElement[T] {
+func (n *NumberInputElement[T]) LabelledBy(keys ...string) *NumberInputElement[T] {
 	n.labelledBy = keys
 	return n
 }
 
 // Disabled shows the number but does not let it change.
-func (n *NumberFieldElement[T]) Disabled(d bool) *NumberFieldElement[T] { n.disabled = d; return n }
+func (n *NumberInputElement[T]) Disabled(d bool) *NumberInputElement[T] { n.disabled = d; return n }
 
 // SpinButtons adds the buttons that step the value, placed as p says: SpinInline
 // draws a decrease and an increase button after the field, and SpinStacked draws
 // an up arrow above a down arrow at its right, as Windows' up-down control does.
-// Their look is in NumberFieldStyle.
-func (n *NumberFieldElement[T]) SpinButtons(p SpinPlacement) *NumberFieldElement[T] {
+// Their look is in NumberInputStyle.
+func (n *NumberInputElement[T]) SpinButtons(p SpinPlacement) *NumberInputElement[T] {
 	n.spin, n.placement = true, p
 	return n
 }
@@ -241,44 +241,44 @@ func (n *NumberFieldElement[T]) SpinButtons(p SpinPlacement) *NumberFieldElement
 // for the left and the right, such as End for figures that line up in a column. The
 // value keeps to the room between the spin buttons, and its caret and selection
 // follow it.
-func (n *NumberFieldElement[T]) Align(a Alignment) *NumberFieldElement[T] { n.align = a; return n }
+func (n *NumberInputElement[T]) Align(a Alignment) *NumberInputElement[T] { n.align = a; return n }
 
 // Precision sets the number of decimals a float is shown with, so 2 shows 1.50.
 // The default is the number of decimals of the step.
-func (n *NumberFieldElement[T]) Precision(d int) *NumberFieldElement[T] { n.precision = d; return n }
+func (n *NumberInputElement[T]) Precision(d int) *NumberInputElement[T] { n.precision = d; return n }
 
-// The sizing methods give the field's frame a size. The default is numberFieldWidth
+// The sizing methods give the field's frame a size. The default is numberInputWidth
 // wide at the Text size of 100 percent; Width(Full) fills the container, and the
 // spin buttons stay at the frame's edges. See Sizing in docs/styling.md.
-func (n *NumberFieldElement[T]) Width(l Length) *NumberFieldElement[T] { n.size.setWidth(l); return n }
-func (n *NumberFieldElement[T]) Height(l Length) *NumberFieldElement[T] {
+func (n *NumberInputElement[T]) Width(l Length) *NumberInputElement[T] { n.size.setWidth(l); return n }
+func (n *NumberInputElement[T]) Height(l Length) *NumberInputElement[T] {
 	n.size.setHeight(l)
 	return n
 }
-func (n *NumberFieldElement[T]) MinWidth(l Length) *NumberFieldElement[T] {
+func (n *NumberInputElement[T]) MinWidth(l Length) *NumberInputElement[T] {
 	n.size.setMinWidth(l)
 	return n
 }
-func (n *NumberFieldElement[T]) MaxWidth(l Length) *NumberFieldElement[T] {
+func (n *NumberInputElement[T]) MaxWidth(l Length) *NumberInputElement[T] {
 	n.size.setMaxWidth(l)
 	return n
 }
-func (n *NumberFieldElement[T]) Grow(f float32) *NumberFieldElement[T] { n.size.setGrow(f); return n }
+func (n *NumberInputElement[T]) Grow(f float32) *NumberInputElement[T] { n.size.setGrow(f); return n }
 
-// Styles sets the look of the parts of the number field, for this instance only.
-// Set fields win over the theme's NumberField and the defaults; see
-// NumberFieldStyle and docs/styling.md. Calling Styles again merges with the
+// Styles sets the look of the parts of the number input, for this instance only.
+// Set fields win over the theme's NumberInput and the defaults; see
+// NumberInputStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
-func (n *NumberFieldElement[T]) Styles(st NumberFieldStyle) *NumberFieldElement[T] {
+func (n *NumberInputElement[T]) Styles(st NumberInputStyle) *NumberInputElement[T] {
 	n.styles = n.styles.merge(st)
 	return n
 }
 
-func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
+func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		scale := float32(ctx.TextScale()) / 100
-		st := resolveNumberField(t, n.placement, scale, n.disabled, n.spin && !n.disabled, n.styles)
+		st := resolveNumberInput(t, n.placement, scale, n.disabled, n.spin && !n.disabled, n.styles)
 		v := n.value.Get()
 		// The field keeps its own text while the user types. draft is that text,
 		// and seen is the value it was last made from, so that a value set from
@@ -344,8 +344,8 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 			name, labelledBy = w.label, w.labelledBy
 		}
 		// The field is its column: the frame and the message row, at the field's width. Its default
-		// width is numberFieldWidth at the Text size, and the sizing methods replace it.
-		root := Div().Column().Gap(6).Role(access.RoleSpinner).Style(Style{Width: Px(numberFieldWidth * scale)})
+		// width is numberInputWidth at the Text size, and the sizing methods replace it.
+		root := Div().Column().Gap(6).Role(access.RoleSpinner).Style(Style{Width: Px(numberInputWidth * scale)})
 		a := root.access()
 		if name != "" {
 			root.Label(name)
@@ -364,15 +364,15 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 			a.disabled = true
 			// The disabled number is drawn as text in a frame, with the disabled frame
 			// and text parts. Under high contrast both are GrayText, with no dimming.
-			frame := Div().asPart("NumberField.Frame").Style(st.Frame).Style(st.FrameDisabled)
-			content := Div().asPart("NumberField.Text").Style(st.Text).Row().Grow(1).Justify(n.align).Child(Text(draft.Get()))
+			frame := Div().asPart("NumberInput.Frame").Style(st.Frame).Style(st.FrameDisabled)
+			content := Div().asPart("NumberInput.Text").Style(st.Text).Row().Grow(1).Justify(n.align).Child(Text(draft.Get()))
 			root.Child(row.Child(frame.Child(content)))
 			return n.size.apply(root)
 		}
 
 		fo := fieldOptions{value: draft, name: name, labelledBy: labelledBy,
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, onStep: step,
-			widget: "NumberField", wire: w, align: n.align}
+			widget: "NumberInput", wire: w, align: n.align}
 		// The invalid frame is drawn thicker and in the danger color (the text color under
 		// high contrast) by fieldOptions.expand, and the message says what is wrong.
 		fo.wire.invalid = isInvalid || w.invalid
@@ -397,7 +397,7 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 		// The message is always in the tree, after the row, and shown while the text is
 		// invalid, so that the field keeps its place among its siblings.
 		msg := fmt.Sprintf("Enter a number from %s to %s.", n.format(n.lo), n.format(n.hi))
-		root.Child(Div().asPart("NumberField.Message").Style(st.Message).Display(isInvalid).
+		root.Child(Div().asPart("NumberInput.Message").Style(st.Message).Display(isInvalid).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
 			Child(Text(msg).Key(errKey)))
 		return n.size.apply(root)
@@ -409,18 +409,18 @@ func (n *NumberFieldElement[T]) expand(ctx *Context) Element {
 // for assistive technology, is in the Tab order while enabled, and steps the value
 // by one step when it is clicked. A button is disabled at the end of the range it
 // would step past.
-func (n *NumberFieldElement[T]) stackedSpin(st NumberFieldStyle, frame Style, v T, step func(int), scale float32) *DivElement {
+func (n *NumberInputElement[T]) stackedSpin(st NumberInputStyle, frame Style, v T, step func(int), scale float32) *DivElement {
 	gap := spinGap * scale
 	down := n.spinButton(st, frame, -1, "Decrease", icons.ChevronDown, 12*scale, gap, v <= n.lo, step)
 	up := n.spinButton(st, frame, 1, "Increase", icons.ChevronUp, 12*scale, gap, v >= n.hi, step)
-	return Div().asPart("NumberField.SpinButtons").Style(st.SpinButtons).Child(up).Child(down)
+	return Div().asPart("NumberInput.SpinButtons").Style(st.SpinButtons).Child(up).Child(down)
 }
 
 // inlineSpin returns the inline spin buttons: the decrease button at the frame's left
 // edge and the increase button at its right, each laid over the edge, inside the
 // border. They come after the text in the tree, so the Tab order is the text, then
 // the decrease and the increase button.
-func (n *NumberFieldElement[T]) inlineSpin(st NumberFieldStyle, frame Style, v T, step func(int), scale float32) []Element {
+func (n *NumberInputElement[T]) inlineSpin(st NumberInputStyle, frame Style, v T, step func(int), scale float32) []Element {
 	gap := spinGap * scale
 	down := n.spinButton(st, frame, -1, "Decrease", icons.Minus, 14*scale, gap, v <= n.lo, step)
 	up := n.spinButton(st, frame, 1, "Increase", icons.Plus, 14*scale, gap, v >= n.hi, step)
@@ -432,10 +432,10 @@ func (n *NumberFieldElement[T]) inlineSpin(st NumberFieldStyle, frame Style, v T
 // by gap from the frame's border on every side that meets it (see spinGap), so the
 // fill never touches the border. Its corners are concentric with the frame's inner
 // corners (see spinFillCorners). The button is the hit target, so the gap is not.
-func (n *NumberFieldElement[T]) spinButton(st NumberFieldStyle, frame Style, dir int, label string, ic *icons.Icon,
+func (n *NumberInputElement[T]) spinButton(st NumberInputStyle, frame Style, dir int, label string, ic *icons.Icon,
 	iconSize, gap float32, disabled bool, step func(int)) *DivElement {
 	inline := n.placement != SpinStacked
-	b := Div().asPart("NumberField.SpinButton").Row().Align(Center).Justify(Center).
+	b := Div().asPart("NumberInput.SpinButton").Row().Align(Center).Justify(Center).
 		Style(st.SpinButton).Child(Icon(ic).Size(iconSize)).
 		Role(access.RoleButton).Label(label).
 		Style(Style{Corners: spinFillCorners(frame, inline, dir, gap)})
@@ -484,12 +484,12 @@ func spinFillCorners(frame Style, inline bool, dir int, gap float32) Corners {
 }
 
 // clamp returns x within the range.
-func (n *NumberFieldElement[T]) clamp(x T) T { return min(max(x, n.lo), n.hi) }
+func (n *NumberInputElement[T]) clamp(x T) T { return min(max(x, n.lo), n.hi) }
 
 // stepped returns the next grid value from x in direction dir (+1 or -1), where
 // the grid starts at lo and is spaced by step. A value between two grid values
 // moves to the nearer one in that direction, so 5.5 steps up to 6.
-func (n *NumberFieldElement[T]) stepped(x T, dir int) T {
+func (n *NumberInputElement[T]) stepped(x T, dir int) T {
 	step := float64(n.step)
 	if step <= 0 {
 		return n.clamp(x)
@@ -505,7 +505,7 @@ func (n *NumberFieldElement[T]) stepped(x T, dir int) T {
 
 // parse returns the number that text holds, and whether it is a valid value.
 // For an int the number must be a whole number.
-func (n *NumberFieldElement[T]) parse(text string) (T, bool) {
+func (n *NumberInputElement[T]) parse(text string) (T, bool) {
 	f, err := strconv.ParseFloat(strings.TrimSpace(text), 64)
 	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
 		return 0, false
@@ -518,7 +518,7 @@ func (n *NumberFieldElement[T]) parse(text string) (T, bool) {
 
 // format returns the text of x: a whole number for an int, and for a float the
 // number of decimals set by Precision, or that of the step.
-func (n *NumberFieldElement[T]) format(x T) string {
+func (n *NumberInputElement[T]) format(x T) string {
 	switch v := any(x).(type) {
 	case int:
 		return strconv.Itoa(v)

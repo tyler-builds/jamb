@@ -55,7 +55,7 @@ type accessInfo struct {
 	highlighted bool
 	// mixed is set on a check box in the indeterminate state (see CheckboxTri).
 	mixed bool
-	// invalid is set on a field whose text is not a valid value (see NumberField).
+	// invalid is set on a field whose text is not a valid value (see NumberInput).
 	invalid bool
 	// required is set on a field that must be filled in (see Field).
 	required bool

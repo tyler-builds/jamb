@@ -81,8 +81,8 @@ func customizingSection() ui.Element {
 					Child(ui.Text("Sync").NoWrap()).
 					Child(ui.Badge(3))
 			})),
-			sample(t, "Spin buttons: Inline", ui.NumberField(inline, 0, 23, 1).Label("Hour, inline").SpinButtons(ui.SpinInline)),
-			sample(t, "Spin buttons: Stacked", ui.NumberField(stacked, 0, 23, 1).Label("Hour, stacked").SpinButtons(ui.SpinStacked)),
+			sample(t, "Spin buttons: Inline", ui.NumberInput(inline, 0, 23, 1).Label("Hour, inline").SpinButtons(ui.SpinInline)),
+			sample(t, "Spin buttons: Stacked", ui.NumberInput(stacked, 0, 23, 1).Label("Hour, stacked").SpinButtons(ui.SpinStacked)),
 			sample(t, "Render slot: swatch in a select", ui.Select(swatch, swatchOptions...).Label("Swatch").Width(ui.Px(200)).
 				RenderOption(func(o ui.Option[string], _ ui.PartState) ui.Element {
 					return swatchRow(o.Value, o.Label)

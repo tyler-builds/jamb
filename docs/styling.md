@@ -42,7 +42,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    Some defaults depend on the state of the widget, such as a disabled select.
 2. **The theme.** Set on the `ui.Theme` for every widget of that kind in the app:
    `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Field` (the frame of every
-   `TextInput`, `TextArea` and `NumberField`), `Theme.NumberField`, `Theme.Button`
+   `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.ProgressBar`, `Theme.ProgressRing`,
@@ -156,7 +156,7 @@ the value further.
 | `Selected` | the part is the selected one | the part's selected style |
 | `Disabled` | the part cannot be used | the part's disabled style |
 | `Highlighted` | the option is highlighted in an open list | the option's highlight style |
-| `Invalid` | the field's value is not valid: a NumberField's text, or a control that a Field shows an error for (TextInput, TextArea, NumberField, DatePicker, TimePicker, Select, RadioGroup, Checkbox) | the part's invalid style |
+| `Invalid` | the field's value is not valid: a NumberInput's text, or a control that a Field shows an error for (TextInput, TextArea, NumberInput, DatePicker, TimePicker, Select, RadioGroup, Checkbox) | the part's invalid style |
 | `Checked` | the check box is on, or the switch is on, or the ring is the selected one | the part's checked style |
 | `Mixed` | the check box is in the mixed (indeterminate) state | the part's mixed style |
 | `Open` | the collapsible section is open | the part's open style |
@@ -178,14 +178,14 @@ the same in every variant.
   selected tab's line is drawn in `Indicator`.
 - `Tabs.Variant(ui.TabsSegmented)` draws one row of segments. The selected segment is
   filled with `Accent` (`TabSelected`), and there is no `Indicator`.
-- `NumberField.SpinButtons(ui.SpinInline)` (the default when buttons are shown) draws
+- `NumberInput.SpinButtons(ui.SpinInline)` (the default when buttons are shown) draws
   a minus button at the field's left edge and a plus button at its right edge, inside
   the frame and its border, with the text between them. Each button is 24 px wide at
   the Text size setting of 100 percent, and both the buttons and the field's width
   scale with the setting, so the text keeps its room. The buttons are `SpinButton`
   (there is no `SpinButtons` group for them), and the Tab order is the text, then the
   minus and the plus button.
-- `NumberField.SpinButtons(ui.SpinStacked)` draws an up arrow above a down arrow inside
+- `NumberInput.SpinButtons(ui.SpinStacked)` draws an up arrow above a down arrow inside
   the field's right edge, as the up-down control of Windows does. The two buttons are
   the `SpinButtons` group: each is the field's height less the gap at the column's top
   and bottom and twice the gap between the two, and at least 16 px wide. The arrows
@@ -226,21 +226,21 @@ override of `TabSelected` changes that segment as well.
 
 ## The text frame
 
-`TextInput`, `TextArea` and `NumberField` share one text frame, and its parts are a
+`TextInput`, `TextArea` and `NumberInput` share one text frame, and its parts are a
 `ui.FieldStyle`: the box around the text (`Frame`) with its states (`FrameHover`,
 `FrameFocusWithin`, `FrameDisabled` and `FrameInvalid`), the text inside (`Text`),
 the placeholder (`Placeholder`), the selected text (`Selection`), and the containers
-of the content before and after the text (`Leading` and `Trailing`). A `NumberField`
-takes the same frame, and its `NumberFieldStyle` embeds the `FieldStyle`. Its
-`Placeholder`, `Leading` and `Trailing` parts have no effect, because a number field
+of the content before and after the text (`Leading` and `Trailing`). A `NumberInput`
+takes the same frame, and its `NumberInputStyle` embeds the `FieldStyle`. Its
+`Placeholder`, `Leading` and `Trailing` parts have no effect, because a number input
 has none of that content.
 
 The frame's layers are the defaults, then `Theme.Field`, then the instance. A
-`NumberField` takes `Theme.NumberField` between the theme's `Field` and its own
+`NumberInput` takes `Theme.NumberInput` between the theme's `Field` and its own
 `Styles`. A text field's `Style` method is its instance `Frame`, and it is plain under
 high contrast as the instance's `Styles` are.
 
-A `NumberField`'s value is centered in its text area by default. `Align` sets where
+A `NumberInput`'s value is centered in its text area by default. `Align` sets where
 it sits: `Align(ui.Start)`, `Align(ui.Center)` (the default) or `Align(ui.End)`, such
 as `End` for figures that line up in a column. The text area is the room between the
 spin buttons: inline, it is the middle of the frame, and stacked, it is the room left
@@ -261,11 +261,11 @@ ui.TextInput(query).Icon(icons.Search).Trailing(clearButton).Styles(ui.FieldStyl
 - A borderless field (`Borderless()`) draws no `Frame` part, so its frame styles and
   states do not apply. Its `Text`, `Placeholder`, `Selection`, `Leading` and `Trailing`
   parts still apply.
-- An invalid number field draws its `FrameInvalid` part over the frame, and the
+- An invalid number input draws its `FrameInvalid` part over the frame, and the
   `Message` row below it. The message's icon is drawn in the `Message` part's
   `TextColor` when it sets one, and in `Danger` otherwise (the text color under high
   contrast). The message's text takes the same color.
-- A text field, text area or number field with an error from a `Field` (see the
+- A text field, text area or number input with an error from a `Field` (see the
   README, Forms) draws `FrameInvalid` over its frame, and it keeps that frame while
   it has focus, so the danger color is not hidden by the focus color. The error
   itself is a field part (`FormField.Error`), which has the same look as the number
@@ -283,7 +283,7 @@ Every built-in widget that has a box of its own takes the same sizing methods:
 `MaxWidth`, `MaxHeight` and `Grow`. The lengths are `ui.Px`, `ui.Percent`, `ui.Full`
 (100 percent) and `ui.Auto`. `Grow` takes a share of the free space of a row or a
 column, as a `Div` does. The methods size the widget's outer box: the frame of a text
-field or a number field, the trigger of a select, the track of a slider and the bar
+field or a number input, the trigger of a select, the track of a slider and the bar
 of a progress bar (its readout included), the control of a check box, the group of
 radio buttons, the tab list of `Tabs`, the section of a collapsible, the panel of a
 modal, and the track of a switch, and the split of `Split`.
@@ -304,7 +304,7 @@ the Text size of 100 percent:
 | `Checkbox`, `CheckboxTri`, `RadioGroup`, `Badge` | as wide as their content, also in a column |
 | `Switch` | 38 px track (the knob stays 3 px from its end) |
 | `TextInput`, `TextArea` | 240 px, a fixed size like a CSS input's; `Full` stretches it |
-| `NumberField` | 120 px, a fixed size for its column (the frame and the message row); `Full` stretches it, and `Grow` and the limits apply to the column |
+| `NumberInput` | 120 px, a fixed size for its column (the frame and the message row); `Full` stretches it, and `Grow` and the limits apply to the column |
 | `Field` | fills its container, as a column does; its control keeps its own width (see below) |
 | `Select` | 220 px, a fixed size; `Full` stretches it, and the list is at least as wide as the field |
 | `Combobox` | 240 px at the Text size of 100 percent, like a text field; `Full` stretches it, and the list is at least as wide as the field |
@@ -319,7 +319,7 @@ the Text size of 100 percent:
 
 A form field (`Field`) takes the same methods on its outer box, so a labeled field is sized as a unit. Its control keeps its own width: a control whose width is `Auto` or `Full` fills the field, and a fixed one keeps its size. A content-sized control, such as a button, stays as wide as its content.
 
-The fixed defaults of the text fields, the number field and the select scale with the
+The fixed defaults of the text fields, the number input and the select scale with the
 Text size, so their proportions hold at 225 percent. Content-sized widgets are not
 stretched by their container, unlike a `Div`, which is why a button in a column is as
 wide as its label.
@@ -361,7 +361,7 @@ accessible role and name.
 | `Tree.RenderRow(fn)` | the icon and label of each row; the chevron stays | the `TreeNode` and a `PartState` |
 | `Tree.RenderLabel(fn)` | the text of each row; the icon stays (not used with `RenderRow`) | the `TreeNode` and a `PartState` |
 | `DataColumn.Cell` (in `DataGrid`) | the content of each cell of the column; the cell keeps its text, focus and selection | the row's data and nothing else (the content is hidden from assistive technology, unless the column is `Interactive`, when its controls are exposed) |
-| `DataColumn.Editor` (in `DataGrid`) | the text field of an edit, replaced by the editor it returns (a Select, a NumberField, a CheckBox); the cell keeps its frame and the message popover | the row's data, the pending value, and the `change`, `commit` and `cancel` functions |
+| `DataColumn.Editor` (in `DataGrid`) | the text field of an edit, replaced by the editor it returns (a Select, a NumberInput, a CheckBox); the cell keeps its frame and the message popover | the row's data, the pending value, and the `change`, `commit` and `cancel` functions |
 | `DataColumn.RenderHeader` (in `DataGrid`) | the text of the column's header; the sort arrow stays | the header label and a `PartState` (`Selected` is the sorted column) |
 
 ```go
@@ -427,7 +427,7 @@ Customization cannot break these, and this is why.
   shadow is dropped there.
 - **State is not carried by color alone.** The built-in looks of the states also use a
   line, a fill or a mark: a selected tab has a line, a selected option has a check mark,
-  a selected row has a fill, and an invalid number field has a thicker frame and a
+  a selected row has a fill, and an invalid number input has a thicker frame and a
   message. These are defaults, so an override can change them. Keep one non-color cue
   in your styles.
 - **No state changes the weight of the text.** Hover, press, focus, selection, the
@@ -436,7 +436,7 @@ Customization cannot break these, and this is why.
   (`FontWeight`) if you want one. Under high contrast the cue is the system's: a
   selected tab keeps its indicator line, and an app cannot clear the line's color or
   change its height. A highlighted option and a selected row keep their Highlight fill,
-  and a chosen option keeps its check mark. An invalid number field keeps its message.
+  and a chosen option keeps its check mark. An invalid number input keeps its message.
   Those are not parts, so no style removes them.
 - **Text scale applies.** The runtime scales text with the Text size setting (100 to
   225 percent). That includes text that a part styles, so a part's font size grows
@@ -457,7 +457,7 @@ cannot change which keys act, what is focusable, or what assistive technology is
 ## Adding styling to a widget
 
 A new widget that has parts follows the same pattern as `Tabs`, `Select`, `Slider` and
-`NumberField`. In `ui`:
+`NumberInput`. In `ui`:
 
 1. **Name the parts.** Write `<Widget>Style` as a struct of `Style` fields, one per part,
    and one more per state (the naming rules are below). Add a `merge` method that merges
@@ -514,7 +514,7 @@ parts that the code applies.
 | `TimePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Button`, `Message`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected` | none | none | done |
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
 | `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
-| `NumberField` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
+| `NumberInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |
 | `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
 | `Checkbox`, `CheckboxTri` | `Control`, `ControlFocusVisible`, `ControlDisabled`, `Box`, `BoxHover`, `BoxChecked`, `BoxMixed`, `BoxDisabled`, `BoxInvalid`, `Mark`, `Dash`, `Label`, `LabelDisabled` | none | none | done |
@@ -550,8 +550,8 @@ ui.Tabs(section, tabs...).Styles(ui.TabsStyle{
 // A segmented tab list for a filter.
 ui.Tabs(filter, tabs...).Variant(ui.TabsSegmented)
 
-// A number field with stacked spin buttons.
-ui.NumberField(hour, 0, 23, 1).Label("Hour").SpinButtons(ui.SpinStacked)
+// A number input with stacked spin buttons.
+ui.NumberInput(hour, 0, 23, 1).Label("Hour").SpinButtons(ui.SpinStacked)
 
 // A select whose options show a color swatch.
 ui.Select(color, options...).Label("Color").
@@ -595,7 +595,7 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
   target with it, so keep those as the variant sets them.
 - The stacked column is beside the text, so a centered value is centered in the room
   left of the column, not in the whole field. The field's default width scales with
-  the Text size, as the inline field's does. Set another width with `NumberField.Width`
+  the Text size, as the inline field's does. Set another width with `NumberInput.Width`
   when the value needs it.
 - The caret of a text field is not a part (see "The text frame"). Its width and blink
   follow the system settings.

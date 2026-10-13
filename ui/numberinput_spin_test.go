@@ -11,11 +11,11 @@ import (
 // nearPx reports whether a and b differ by less than half a pixel.
 func nearPx(a, b float32) bool { return math.Abs(float64(a-b)) < 0.5 }
 
-// spinRig returns a rig of a number field with spin buttons of placement p, at the
+// spinRig returns a rig of a number input with spin buttons of placement p, at the
 // Text size setting scale.
 func spinRig(p SpinPlacement, scale int) *accessRig {
 	r := newAccessRig(func(ctx *Context) Element {
-		return partNumberField(NewSignal(8), NumberFieldStyle{}, p, false)
+		return partNumberInput(NewSignal(8), NumberInputStyle{}, p, false)
 	})
 	if scale != 100 {
 		r.rt.SetSystemSettings(SystemSettings{TextScale: scale})
@@ -31,7 +31,7 @@ func makeInvalid(t *testing.T, r *accessRig) {
 	focusNode(r, editorNode(t, r.rt))
 	r.typeText("x")
 	r.press(input.KeyEnter, 0)
-	if bw := partNode(t, r.rt, "NumberField.Frame", "").style.BorderWidth; bw != 2 {
+	if bw := partNode(t, r.rt, "NumberInput.Frame", "").style.BorderWidth; bw != 2 {
 		t.Fatalf("the invalid frame is %v px wide, want 2", bw)
 	}
 }
@@ -59,7 +59,7 @@ func TestInlineSpinButtonsSitInsideTheFrame(t *testing.T) {
 			if invalid {
 				makeInvalid(t, r)
 			}
-			in := insideBorder(r, partNode(t, r.rt, "NumberField.Frame", ""))
+			in := insideBorder(r, partNode(t, r.rt, "NumberInput.Frame", ""))
 			gap := spinGapAt(scale)
 			dec := rectOf(r, buttonNode(t, r, "Decrease"))
 			inc := rectOf(r, buttonNode(t, r, "Increase"))
@@ -103,7 +103,7 @@ func TestStackedSpinFillsAreInsetFromTheBorder(t *testing.T) {
 			if invalid {
 				makeInvalid(t, r)
 			}
-			in := insideBorder(r, partNode(t, r.rt, "NumberField.Frame", ""))
+			in := insideBorder(r, partNode(t, r.rt, "NumberInput.Frame", ""))
 			gap := spinGapAt(scale)
 			up := rectOf(r, buttonNode(t, r, "Increase"))
 			down := rectOf(r, buttonNode(t, r, "Decrease"))
@@ -132,7 +132,7 @@ func TestSpinFillGapIsAtLeastOnePhysicalPixel(t *testing.T) {
 			r := spinRig(p, 100)
 			r.rt.SetViewport(500, 400, dpi)
 			r.frame()
-			fn := partNode(t, r.rt, "NumberField.Frame", "")
+			fn := partNode(t, r.rt, "NumberInput.Frame", "")
 			fp := r.rt.px(r.rt.nodeRect(fn))
 			be := r.rt.borderSides(fn.style.borderEdges())
 			inLeft, inTop := fp.X+be.Left, fp.Y+be.Top
@@ -170,7 +170,7 @@ func TestSpinButtonCornersStayInsideTheCurve(t *testing.T) {
 				if invalid {
 					makeInvalid(t, r)
 				}
-				fn := partNode(t, r.rt, "NumberField.Frame", "")
+				fn := partNode(t, r.rt, "NumberInput.Frame", "")
 				ic := innerCorners(fn.style.radii(), fn.style.borderEdges())
 				if ic.TopRight == 0 {
 					t.Fatalf("the frame has no rounded corner to follow")
@@ -230,8 +230,8 @@ func TestSpinButtonKeepsItsSizeOnHoverAndPress(t *testing.T) {
 func TestInlineSpinFieldScalesWithTheText(t *testing.T) {
 	r100 := spinRig(SpinInline, 100)
 	r225 := spinRig(SpinInline, 225)
-	w100 := rectOf(r100, partNode(t, r100.rt, "NumberField.Frame", "")).W
-	w225 := rectOf(r225, partNode(t, r225.rt, "NumberField.Frame", "")).W
+	w100 := rectOf(r100, partNode(t, r100.rt, "NumberInput.Frame", "")).W
+	w225 := rectOf(r225, partNode(t, r225.rt, "NumberInput.Frame", "")).W
 	if !nearPx(w225, w100*2.25) {
 		t.Errorf("the field is %v px wide at 225 percent, want %v", w225, w100*2.25)
 	}
