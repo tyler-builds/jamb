@@ -256,7 +256,7 @@ func (s *SliderElement) expand(ctx *Context) Element {
 			Child(overlay)
 
 		readout := fmtValue(s, v)
-		value := Div().asPart("Slider.ValueText").Hidden().MinWidth(Px(44)).Align(End).Style(st.ValueText).
+		value := Div().asPart("Slider.ValueText").AccessHidden().MinWidth(Px(44)).Align(End).Style(st.ValueText).
 			Child(Text(readout))
 		// The default minimum keeps the track usable in a container with no width of its
 		// own, where a percentage has nothing to take.

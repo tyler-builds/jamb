@@ -263,7 +263,7 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 			if r.key != "" {
 				item.Keyf("%s/%v", r.key, o.Value)
 			}
-			item.Role(access.RoleRadioButton).Checked(on)
+			item.Role(access.RoleRadioButton).AccessChecked(on)
 			if dis {
 				item.access().disabled = true
 				item.Cursor(CursorNotAllowed).Style(st.RadioDisabled)

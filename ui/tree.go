@@ -440,14 +440,14 @@ func (tv *TreeElement) row(st TreeStyle, t *Theme, r treeRow, i int, sel string,
 		}
 		row.Child(chev)
 		if tv.renderRow != nil {
-			row.Child(Div().Hidden().Child(tv.renderRow(node, ps)))
+			row.Child(Div().AccessHidden().Child(tv.renderRow(node, ps)))
 		} else {
 			if r.icon != nil {
 				row.Child(Div().asPart("TreeView.Icon").Style(st.Icon).Child(Icon(r.icon).Size(16)))
 			}
 			label := Div().asPart("TreeView.Label").Style(st.Label)
 			if tv.renderLabel != nil {
-				label.Child(Div().Hidden().Child(tv.renderLabel(node, ps)))
+				label.Child(Div().AccessHidden().Child(tv.renderLabel(node, ps)))
 			} else {
 				label.Child(Text(r.label).NoWrap())
 			}
@@ -455,11 +455,11 @@ func (tv *TreeElement) row(st TreeStyle, t *Theme, r treeRow, i int, sel string,
 		}
 
 		a := row.access()
-		row.Role(access.RoleTreeItem).Label(r.label).Selected(on)
+		row.Role(access.RoleTreeItem).Label(r.label).AccessSelected(on)
 		a.setPos, a.setSize, a.level = r.pos, r.size, r.level
 		a.highlighted = on
 		if r.expandable {
-			row.Expanded(r.open)
+			row.AccessExpanded(r.open)
 			key := r.key
 			a.setExpanded = func(v bool) { setOpen(key, v) }
 		}

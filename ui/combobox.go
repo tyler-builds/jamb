@@ -587,7 +587,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 			root.style.Width = Px(textFieldWidth * textScale(ctx))
 		}
 		a := root.access()
-		root.Role(access.RoleComboBox).Expanded(open.Get())
+		root.Role(access.RoleComboBox).AccessExpanded(open.Get())
 		name, labelledBy := c.name, c.labelledBy
 		if w.label != "" {
 			name, labelledBy = w.label, w.labelledBy
@@ -765,11 +765,11 @@ func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], 
 				mark.Child(Icon(icons.Check).Size(14))
 			}
 			row := Div().asPart("Combobox.Option").Style(style).
-				Role(access.RoleListItem).Selected(on).Label(o.Label).Child(mark)
+				Role(access.RoleListItem).AccessSelected(on).Label(o.Label).Child(mark)
 			row.revealRow = reveals
 			reveals = false // a render slot's later renders do not scroll again
 			if c.render != nil {
-				row.Child(Div().Hidden().Child(c.render(o, ps)))
+				row.Child(Div().AccessHidden().Child(c.render(o, ps)))
 			} else {
 				row.Child(Text(o.Label).NoWrap().HighlightMatches(query, hlStyle))
 			}

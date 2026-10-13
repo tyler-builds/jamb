@@ -350,9 +350,9 @@ func (d *DivElement) ScrollX() *DivElement {
 // repeating animation or frame. A focused element that becomes hidden hands
 // focus to its nearest focusable ancestor, or to nothing when there is none.
 //
-// Hidden is a different thing: it only leaves the element out of the
+// AccessHidden is a different thing: it only leaves the element out of the
 // accessibility tree, and the element is still drawn, laid out and reachable.
-// Use Display for content that should not be seen or reached, and Hidden for
+// Use Display for content that should not be seen or reached, and AccessHidden for
 // content that is seen but not announced.
 func (d *DivElement) Display(on bool) *DivElement { d.noDisplay = !on; return d }
 

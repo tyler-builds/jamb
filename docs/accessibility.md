@@ -98,11 +98,11 @@ extra when no assistive technology is running.
 
 Small and explicit, on the elements that already exist, for example:
 
-- `Div().Role(access.RoleCheckBox).Label("Notifications").Checked(on)`
-- `Div().Description("…")`, `Div().Hidden()` (leave out of the tree),
+- `Div().Role(access.RoleCheckBox).Label("Notifications").AccessChecked(on)`
+- `Div().Description("…")`, `Div().AccessHidden()` (leave out of the tree),
   `Div().Heading(2)`
 - `Div().Display(false)` (not shown, not drawn, not focusable and out of the tree,
-  with its state kept). It is not `Hidden()`, which only leaves the element out of
+  with its state kept). It is not `AccessHidden()`, which only leaves the element out of
   the tree and keeps it drawn and reachable by mouse and keyboard.
 - `Image(src).Alt("…")`, `IconButton(icon).Label("…")`
 - `ui.Announce(text, access.Polite)`
@@ -260,7 +260,7 @@ in building it, and why.
   change its own state, as a click does. A submenu item is the exception: its
   expansion is not a click, so it opens and closes its submenu directly. Toggle
   always runs the click.
-- **Selection is declared by the app.** `Selected(on)` gives an item its state,
+- **Selection is declared by the app.** `AccessSelected(on)` gives an item its state,
   and `SelectionContainer()` marks the group. An item reports the nearest
   container above it. A tab list, and a menu with radio items, are containers
   without a call. A container reports one selection: CanSelectMultiple and

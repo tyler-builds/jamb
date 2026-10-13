@@ -450,7 +450,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 			root.Key(p.key)
 		}
 		a := root.access()
-		root.Role(access.RoleComboBox).Expanded(open.Get())
+		root.Role(access.RoleComboBox).AccessExpanded(open.Get())
 		name, labelledBy := p.name, p.labelledBy
 		if w.label != "" {
 			name, labelledBy = w.label, w.labelledBy
@@ -631,7 +631,7 @@ func (p *TimePickerElement) list(st TimePickerStyle, scale float32, times []int,
 		}
 		label := formatClock(clockAt(m), loc)
 		row := Div().asPart("TimePicker.Option").Style(style).
-			Role(access.RoleListItem).Selected(on).Label(label).Child(mark).
+			Role(access.RoleListItem).AccessSelected(on).Label(label).Child(mark).
 			Child(Text(label).NoWrap())
 		row.revealRow = reveal == i+1
 		row.access().highlighted = hi

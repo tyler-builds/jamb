@@ -258,7 +258,7 @@ func (c *CheckboxElement) expand(ctx *Context) Element {
 	row := Div().asPart("Checkbox.Control").Style(st.Control).Child(box).Child(label)
 	row.spaceOnly = true
 	a := row.access()
-	row.Role(access.RoleCheckBox).Checked(on)
+	row.Role(access.RoleCheckBox).AccessChecked(on)
 	a.mixed = s == CheckMixed
 	a.invalid, a.required = w.invalid, w.required
 	if w.description != "" {

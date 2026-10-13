@@ -203,7 +203,7 @@ func (mb *MenuBarElement) expand(ctx *Context) Element {
 						show(i, false)
 					}
 				}).
-				Child(Text(tm.Label).NoWrap()).Role(access.RoleMenuItem).Expanded(i == cur)
+				Child(Text(tm.Label).NoWrap()).Role(access.RoleMenuItem).AccessExpanded(i == cur)
 			if i == cur {
 				lbl.Style(st.BarItemOpen)
 				lbl.Child(panel.top(2))

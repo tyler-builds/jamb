@@ -307,7 +307,7 @@ func (f *FieldElement) expand(ctx *Context) Element {
 		}
 		label.Row().Align(Center).Gap(4).Child(Text(f.label).Key(labelKey))
 		if f.required {
-			label.Child(Div().asPart("FormField.Required").Hidden().Style(st.Required).Child(Text("*")))
+			label.Child(Div().asPart("FormField.Required").AccessHidden().Style(st.Required).Child(Text("*")))
 		}
 		// The help text and the error are always in the tree, in the same places, and are
 		// not displayed when they have nothing to say. A child's identity is its position

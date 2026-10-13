@@ -231,7 +231,7 @@ func (b *BadgeElement) expand(ctx *Context) Element {
 	pill.Style(st.Badge)
 	label := Div().asPart("Badge.Label").Style(st.Label).Child(Text(b.label()).NoWrap())
 	if b.leadDot {
-		pill.Child(Div().asPart("Badge.Dot").Hidden().Style(st.Dot))
+		pill.Child(Div().asPart("Badge.Dot").AccessHidden().Style(st.Dot))
 	}
 	pill.Child(label)
 	b.decorate(pill)
@@ -243,7 +243,7 @@ func (b *BadgeElement) expand(ctx *Context) Element {
 // stands alone is a group named by its text, so it is read as one thing.
 func (b *BadgeElement) decorate(d *DivElement) {
 	if b.attached {
-		d.Hidden()
+		d.AccessHidden()
 		return
 	}
 	if name := b.accName(); name != "" {

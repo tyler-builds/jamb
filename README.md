@@ -225,7 +225,7 @@ a rebuild unless its inputs changed. While it is hidden, the element and its sub
 take no space in layout, are not painted or hit, are skipped by Tab and cannot take
 focus, are absent from the accessibility tree, and run no repeating animation or
 frame. A focused element that becomes hidden hands focus to its nearest focusable
-ancestor, or to nothing when there is none. `Hidden()` is a different thing: it
+ancestor, or to nothing when there is none. `AccessHidden()` is a different thing: it
 only leaves the element out of the accessibility tree. The element is still drawn,
 laid out and reachable with the mouse and keyboard. Use `Display` for content that
 should not be seen or reached, and `Hidden` for content that is seen but not
@@ -1984,7 +1984,7 @@ What is automatic, with no app code:
 The controls, with no app code, once their roles and states are set:
 
 - A check box, switch or radio button has its check state. A `Checked` element
-  is a toggle, so Toggle works, and a `ui.IconButton(...).Checked(on)` is a
+  is a toggle, so Toggle works, and a `ui.IconButton(...).AccessChecked(on)` is a
   toggle button with its state.
 - A `DropdownMenu` trigger, a menu item with a submenu, and a menu bar label
   expand and collapse. A menu of radio items is a selection group.
@@ -2015,16 +2015,16 @@ The controls, with no app code, once their roles and states are set:
 The API, on the elements that already exist:
 
 ```go
-ui.Div().Role(access.RoleCheckBox).Label("Notifications").Checked(on)
-ui.Div().Expanded(open)                    // a row that opens and closes; its click toggles it
-ui.Div().Role(access.RoleButton).Selected(on).OnClick(choose) // one item of a selection
+ui.Div().Role(access.RoleCheckBox).Label("Notifications").AccessChecked(on)
+ui.Div().AccessExpanded(open)                    // a row that opens and closes; its click toggles it
+ui.Div().Role(access.RoleButton).AccessSelected(on).OnClick(choose) // one item of a selection
 ui.Div().Label("Status").SelectionContainer() // the group that holds the items
 ui.Div().Heading(2).Child(ui.Text("Appearance"))
 ui.Text("Name").Key("name-label")          // a label, named by key
 ui.TextInput(name).Label("Name").LabelledBy("name-label").DescribedBy("name-help")
 ui.ListOf(items, key, row).SelectionContainer() // also UniformList
 ui.Div().Description("Saves the file to disk")
-ui.Div().Hidden() // leaves the element and its children out of the tree
+ui.Div().AccessHidden() // leaves the element and its children out of the tree
 ui.Div().Display(false) // hidden: not drawn, not focusable, out of the tree, state kept (see the API guide)
 ui.IconButton(icons.Bell).Label("Notifications")
 ui.TextInput(query).Label("Search projects") // also TextArea

@@ -26,8 +26,8 @@ type accessInfo struct {
 	hidden      bool
 	disabled    bool
 	checked     bool
-	checkedSet  bool // Checked was called, so a toggle or radio button has a state
-	toggle      bool // the element is a toggle button (see ButtonElement.Checked)
+	checkedSet  bool // AccessChecked was called, so a toggle or radio button has a state
+	toggle      bool // the element is a toggle button (see ButtonElement.AccessChecked)
 	setPos      int  // 1-based position in a set, such as a row of a list
 	setSize     int  // the number of items in the set
 	level       int  // the depth of a menu, 1 at the top
@@ -103,33 +103,33 @@ func (d *DivElement) Label(s string) *DivElement { d.access().name = s; return d
 // Description adds help text, which assistive technology reads after the name.
 func (d *DivElement) Description(s string) *DivElement { d.access().description = s; return d }
 
-// Checked gives the element an on or off state: whether a check box, switch,
+// AccessChecked gives the element an on or off state: whether a check box, switch,
 // radio button, toggle button or checkable menu item is on. Assistive technology
 // reports the state after the name, and the element can be toggled. A check box,
 // switch or radio button needs a state, so the development warnings ask for this
-// call. A radio button is a choice in a group (see Selected), not a toggle.
-func (d *DivElement) Checked(on bool) *DivElement {
+// call. A radio button is a choice in a group (see AccessSelected), not a toggle.
+func (d *DivElement) AccessChecked(on bool) *DivElement {
 	a := d.access()
 	a.checked, a.checkedSet, a.toggle = on, true, true
 	return d
 }
 
-// Expanded marks the element as one that opens and closes, such as a row with
+// AccessExpanded marks the element as one that opens and closes, such as a row with
 // details or a dropdown trigger, and says whether it is open. Assistive
 // technology reports the state and can open or close the element. Opening and
 // closing run the element's click handler, which must toggle the state, when
 // the element is not already in the requested state.
-func (d *DivElement) Expanded(open bool) *DivElement {
+func (d *DivElement) AccessExpanded(open bool) *DivElement {
 	a := d.access()
 	a.expandable, a.expanded = true, open
 	return d
 }
 
-// Selected marks the element as one item of a selection, such as the selected
+// AccessSelected marks the element as one item of a selection, such as the selected
 // note in a list, and says whether it is chosen. The item must be inside a
 // SelectionContainer. Selecting an item that is not chosen runs its click
 // handler, which must choose it.
-func (d *DivElement) Selected(on bool) *DivElement {
+func (d *DivElement) AccessSelected(on bool) *DivElement {
 	a := d.access()
 	a.selectable, a.selected = true, on
 	return d
@@ -165,9 +165,9 @@ func (d *DivElement) DescribedBy(keys ...string) *DivElement {
 	return d
 }
 
-// Hidden leaves the element and its children out of the accessibility tree.
+// AccessHidden leaves the element and its children out of the accessibility tree.
 // It does not change how the element is drawn.
-func (d *DivElement) Hidden() *DivElement { d.access().hidden = true; return d }
+func (d *DivElement) AccessHidden() *DivElement { d.access().hidden = true; return d }
 
 // listItem marks the element as the pos-th of size items in a list, so that
 // assistive technology can say "40 of 10,000" for a row of a virtualized list.
@@ -360,7 +360,7 @@ func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 			rt.setExpandedFrom(n, req.Action == access.ActionExpand)
 		}
 	case access.ActionSelect:
-		// A radio button is a selection item by its role, though it is set with Checked.
+		// A radio button is a selection item by its role, though it is set with AccessChecked.
 		if n.div != nil && n.div.acc != nil && (n.div.acc.selectable || radioRole(role)) && !isSelected(role, n.div.acc) {
 			rt.clickNode(n)
 		}

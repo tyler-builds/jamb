@@ -70,7 +70,7 @@ func inboxButton(ctx *ui.Context, s *Store) ui.Element {
 	}
 	// The badge is drawn over the bell's corner. Its text is in the bell's name,
 	// so the badge is hidden from assistive technology.
-	badge := ui.Div().Hidden().Absolute().Right(-2).Top(-4).Child(ui.Badge(unread).Variant(ui.BadgeDanger))
+	badge := ui.Div().AccessHidden().Absolute().Right(-2).Top(-4).Child(ui.Badge(unread).Variant(ui.BadgeDanger))
 	wrap := ui.Div().Shrink(0).Child(bell).Child(badge)
 	if !open.Get() {
 		return wrap

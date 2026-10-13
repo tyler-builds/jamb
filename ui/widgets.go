@@ -160,7 +160,7 @@ type ButtonElement struct {
 	styles   ButtonStyle
 	key      string
 	name     string // the accessible name, see Label
-	toggle   bool   // a toggle button, see Checked
+	toggle   bool   // a toggle button, see AccessChecked
 	checked  bool
 	inert    bool         // set by DropdownMenu: the wrapper is exposed instead (see accessRole)
 	handle   *FocusHandle // set by Modal.Default, so the modal can focus the button
@@ -216,10 +216,13 @@ func (b *ButtonElement) accessName() string {
 	return b.tooltip
 }
 
-// Checked makes the button a toggle button, such as a pin that is on or off.
+// AccessChecked makes the button a toggle button, such as a pin that is on or off.
 // Assistive technology reports its state, and the button's click handler
 // changes it. Give an icon-only toggle a Label that names what it toggles.
-func (b *ButtonElement) Checked(on bool) *ButtonElement { b.toggle, b.checked = true, on; return b }
+func (b *ButtonElement) AccessChecked(on bool) *ButtonElement {
+	b.toggle, b.checked = true, on
+	return b
+}
 
 // Tooltip shows s below the button after the pointer rests on it.
 func (b *ButtonElement) Tooltip(s string) *ButtonElement { b.tooltip = s; return b }

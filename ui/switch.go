@@ -162,7 +162,7 @@ func (s *SwitchElement) expand(ctx *Context) Element {
 	on := s.on.Get()
 	st := resolveSwitch(t, on, s.disabled, s.styles)
 	d := Div().asPart("Switch.Track").Style(st.Track).
-		Role(access.RoleSwitch).Label(s.label).Checked(on)
+		Role(access.RoleSwitch).Label(s.label).AccessChecked(on)
 	d.spaceOnly = true // Enter goes on to the modal default button, as on Windows
 	if on {
 		d.Style(st.TrackChecked)

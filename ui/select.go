@@ -356,19 +356,19 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		switch {
 		case sel >= 0 && s.renderValue != nil:
 			ps.Selected = true
-			shown = Div().asPart("Select.Value").Grow(1).Hidden().Style(st.Value).
+			shown = Div().asPart("Select.Value").Grow(1).AccessHidden().Style(st.Value).
 				Child(s.renderValue(s.options[sel], ps))
 		case sel >= 0:
-			shown = Div().asPart("Select.Value").Grow(1).Hidden().Style(st.Value).Child(Text(label).NoWrap())
+			shown = Div().asPart("Select.Value").Grow(1).AccessHidden().Style(st.Value).Child(Text(label).NoWrap())
 		default:
-			shown = Div().asPart("Select.Placeholder").Grow(1).Hidden().Style(st.Placeholder).
+			shown = Div().asPart("Select.Placeholder").Grow(1).AccessHidden().Style(st.Placeholder).
 				Child(Text(s.placeholder).NoWrap())
 		}
 		field := Div().asPart("Select.Trigger").Style(st.Trigger).
 			Child(shown).
 			Child(Div().asPart("Select.Chevron").Shrink(0).Style(st.Chevron).Child(Icon(chevron).Size(16)))
 		a := field.access()
-		field.Role(access.RoleComboBox).Expanded(open.Get())
+		field.Role(access.RoleComboBox).AccessExpanded(open.Get())
 		a.value, a.readOnly = label, true
 		name, labelledBy := s.name, s.labelledBy
 		if w.label != "" {
@@ -523,9 +523,9 @@ func (s *SelectElement[T]) list(st SelectStyle, t *Theme, sel, hl int, shut func
 				mark.Child(Icon(icons.Check).Size(14))
 			}
 			row := Div().asPart("Select.Option").Style(style).
-				Role(access.RoleListItem).Selected(on).Label(o.Label).Child(mark)
+				Role(access.RoleListItem).AccessSelected(on).Label(o.Label).Child(mark)
 			if s.renderOption != nil {
-				row.Child(Div().Hidden().Child(s.renderOption(o, ps)))
+				row.Child(Div().AccessHidden().Child(s.renderOption(o, ps)))
 			} else {
 				row.Child(Text(o.Label).NoWrap())
 			}

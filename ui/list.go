@@ -55,7 +55,7 @@ func (l *UniformListElement) Style(s Style) *UniformListElement { l.style = l.st
 func (l *UniformListElement) Handle(h *ListHandle) *UniformListElement { l.handle = h; return l }
 
 // SelectionContainer makes the list the group that holds its rows as selection
-// items, such as the notes in a sidebar. Rows that call Selected are the items.
+// items, such as the notes in a sidebar. Rows that call AccessSelected are the items.
 func (l *UniformListElement) SelectionContainer() *UniformListElement { l.selectable = true; return l }
 
 // ListHandle scrolls a UniformList or a ListOf from code.

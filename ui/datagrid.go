@@ -1319,7 +1319,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 	}
 	r.listItem(q+1, sh.n)
 	if g.mode != SelectionNone {
-		r.Selected(on)
+		r.AccessSelected(on)
 	}
 	r.OnMouseDown(func(e *MouseEvent) {
 		if e.Button == input.ButtonLeft {
@@ -1412,7 +1412,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 			// A cell aligned to the start fills its width, so the content can take a
 			// percentage of it (as a progress bar does). Other cells keep the content's
 			// width, so their Justify places it.
-			wrap := Div().Hidden()
+			wrap := Div().AccessHidden()
 			if alignOf(cl.Align) == Start {
 				wrap.Grow(1)
 			}
@@ -1535,7 +1535,7 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 			hc.Style(st.HeaderCellSorted)
 		}
 		if cl.RenderHeader != nil {
-			hc.Child(Div().Hidden().Child(cl.RenderHeader(cl.Header, PartState{Selected: isSorted, HighContrast: highContrast})))
+			hc.Child(Div().AccessHidden().Child(cl.RenderHeader(cl.Header, PartState{Selected: isSorted, HighContrast: highContrast})))
 		} else {
 			hc.Child(Text(cl.Header).Truncate())
 		}

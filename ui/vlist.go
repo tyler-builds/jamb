@@ -59,7 +59,7 @@ func (l *ListElement) Style(s Style) *ListElement { l.style = l.style.Merge(s); 
 func (l *ListElement) Handle(h *ListHandle) *ListElement { l.handle = h; return l }
 
 // SelectionContainer makes the list the group that holds its rows as selection
-// items, such as the notes in a sidebar. Rows that call Selected are the items.
+// items, such as the notes in a sidebar. Rows that call AccessSelected are the items.
 func (l *ListElement) SelectionContainer() *ListElement { l.selectable = true; return l }
 
 // Bottom is for chat-like lists. When the rows are shorter than the viewport

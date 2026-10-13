@@ -272,9 +272,9 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				style = style.Merge(st.TabDisabled)
 			}
 			tab := Div().asPart("Tabs.Tab").Key(t.tabKey(tb.Value)).Style(style).
-				Role(access.RoleTab).Label(tb.Label).Selected(on)
+				Role(access.RoleTab).Label(tb.Label).AccessSelected(on)
 			if t.renderTab != nil {
-				tab.Child(Div().Hidden().Child(t.renderTab(tb, ps)))
+				tab.Child(Div().AccessHidden().Child(t.renderTab(tb, ps)))
 			} else {
 				if tb.Icon != nil {
 					tab.Child(Icon(tb.Icon).Size(16))

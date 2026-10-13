@@ -625,7 +625,7 @@ func (dm *DropdownMenuElement) expand(ctx *Context) Element {
 			path.Set(highlightPath(built, keyboard))
 			open.Set(true)
 		}
-		d := Div().AlignSelf(Start).Shrink(0).Expanded(open.Get()).
+		d := Div().AlignSelf(Start).Shrink(0).AccessExpanded(open.Get()).
 			OnClick(func() {
 				if open.Peek() {
 					closeMenu(true)

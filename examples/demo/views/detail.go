@@ -63,7 +63,7 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 			label = "Starred"
 		}
 		// The star is tinted like the project list's, so a starred project reads the same in both windows.
-		star := ui.Div().Key("star").Label("Star").Checked(p.Starred).Row().Align(ui.Center).Gap(8).Height(ui.Px(32)).PaddingX(12).Radius(8).
+		star := ui.Div().Key("star").Label("Star").AccessChecked(p.Starred).Row().Align(ui.Center).Gap(8).Height(ui.Px(32)).PaddingX(12).Radius(8).
 			Background(t.Surface).Border(1, t.Border).Transition(150 * time.Millisecond).
 			Hover(ui.Style{Background: t.SurfaceHover}).
 			OnClick(func() { s.ToggleStar(id) }).

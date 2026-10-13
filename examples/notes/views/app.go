@@ -369,7 +369,7 @@ func titleOf(n *store.Note) string {
 // text.
 func (a *App) noteRow(t *ui.Theme, n *store.Note, selected bool) ui.Element {
 	// Tab reaches the row; Enter opens the note, as a click does.
-	return ui.Div().Role(access.RoleListItem).Selected(selected).MarginY(1).
+	return ui.Div().Role(access.RoleListItem).AccessSelected(selected).MarginY(1).
 		Gap(3).PaddingX(10).PaddingY(9).Radius(8).Transition(fast).
 		Hover(ui.Style{Background: t.SurfaceHover}).
 		When(selected, func(d *ui.DivElement) { d.Background(t.SurfaceActive) }).

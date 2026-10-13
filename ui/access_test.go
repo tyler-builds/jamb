@@ -155,7 +155,7 @@ func TestAccessFlattensLayoutContainers(t *testing.T) {
 func TestAccessHiddenSubtreeIsLeftOut(t *testing.T) {
 	r := newAccessRig(func(ctx *Context) Element {
 		return Div().Column().Children(
-			Div().Hidden().Child(Button("Secret")),
+			Div().AccessHidden().Child(Button("Secret")),
 			Button("Shown"),
 		)
 	})

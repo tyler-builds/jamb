@@ -214,13 +214,13 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 	draw := func(ps PartState) *DivElement {
 		header := Div().asPart("Collapsible.Header").Key(c.headerKey()).Style(st.Header).
 			Style(Style{Corners: corners}).
-			Role(access.RoleButton).Label(c.title).Expanded(on).
+			Role(access.RoleButton).Label(c.title).AccessExpanded(on).
 			Child(Div().asPart("Collapsible.Chevron").Style(st.Chevron).Child(Icon(chevron).Size(14)))
 		if on {
 			header.Style(st.HeaderOpen)
 		}
 		if c.renderHeader != nil {
-			header.Child(Div().Hidden().Child(c.renderHeader(c.title, ps)))
+			header.Child(Div().AccessHidden().Child(c.renderHeader(c.title, ps)))
 		} else {
 			header.Child(Text(c.title))
 		}

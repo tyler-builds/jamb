@@ -25,9 +25,9 @@ func TestAccessTogglesReportTheirState(t *testing.T) {
 	clicks := 0
 	r := newAccessRig(func(ctx *Context) Element {
 		return Div().Column().Children(
-			Div().Role(access.RoleSwitch).Checked(true).Label("Dark mode").OnClick(func() { clicks++ }),
-			Div().Role(access.RoleCheckBox).Checked(false).Label("Compact").OnClick(func() { clicks++ }),
-			IconButton(icons.Bell).Label("Pin note").Checked(true).OnClick(func() { clicks++ }),
+			Div().Role(access.RoleSwitch).AccessChecked(true).Label("Dark mode").OnClick(func() { clicks++ }),
+			Div().Role(access.RoleCheckBox).AccessChecked(false).Label("Compact").OnClick(func() { clicks++ }),
+			IconButton(icons.Bell).Label("Pin note").AccessChecked(true).OnClick(func() { clicks++ }),
 		)
 	})
 	tr := r.tree()
@@ -63,7 +63,7 @@ func TestAccessExpandAndCollapseRunTheClickWhenNeeded(t *testing.T) {
 	open := NewSignal(false)
 	clicks := 0
 	r := newAccessRig(func(ctx *Context) Element {
-		return Div().Column().Child(Div().Expanded(open.Get()).Child(Text("Build 42")).OnClick(func() {
+		return Div().Column().Child(Div().AccessExpanded(open.Get()).Child(Text("Build 42")).OnClick(func() {
 			clicks++
 			open.Set(!open.Peek())
 		}))
@@ -97,7 +97,7 @@ func TestAccessSelectionItemsAndContainers(t *testing.T) {
 	sel := NewSignal("All")
 	clicks := 0
 	chip := func(name, cur string) Element {
-		return Div().Role(access.RoleButton).Selected(cur == name).OnClick(func() {
+		return Div().Role(access.RoleButton).AccessSelected(cur == name).OnClick(func() {
 			clicks++
 			sel.Set(name)
 		}).Child(Text(name))
@@ -137,7 +137,7 @@ func TestAccessSelectionItemsAndContainers(t *testing.T) {
 
 func TestAccessSelectionItemOutsideAContainerWarns(t *testing.T) {
 	r := newAccessRig(func(ctx *Context) Element {
-		return Div().Column().Child(Div().Role(access.RoleButton).Selected(true).Child(Text("Loose")).OnClick(func() {}))
+		return Div().Column().Child(Div().Role(access.RoleButton).AccessSelected(true).Child(Text("Loose")).OnClick(func() {}))
 	})
 	r.tree()
 	if got := warningsContaining(r.warnings, "outside a selection container"); len(got) != 1 {
@@ -167,7 +167,7 @@ func TestAccessLabelledByAndDescribedByResolveKeys(t *testing.T) {
 			Text("Name").Key("name-label"),
 			Text("Up to 40 characters").Key("name-help"),
 			TextInput(NewSignal("")).Label("Name").LabelledBy("name-label").DescribedBy("name-help"),
-			Div().Role(access.RoleSwitch).Checked(true).Label("Dark mode").LabelledBy("name-label").OnClick(func() {}),
+			Div().Role(access.RoleSwitch).AccessChecked(true).Label("Dark mode").LabelledBy("name-label").OnClick(func() {}),
 		)
 	})
 	tr := r.tree()
@@ -387,7 +387,7 @@ func TestAccessListRowsWithTheirOwnRoleAreTheItems(t *testing.T) {
 		}
 		return Div().Size(Full, Px(120)).Child(ListOf(items, func(i int) string { return fmt.Sprint(i) },
 			func(i int) Element {
-				return Div().Role(access.RoleListItem).Selected(i == sel.Get()).OnClick(func() { sel.Set(i) }).
+				return Div().Role(access.RoleListItem).AccessSelected(i == sel.Get()).OnClick(func() { sel.Set(i) }).
 					Child(Text(fmt.Sprintf("Note %d", i+1)))
 			}).SelectionContainer().Style(Style{Height: Px(120)}))
 	})
@@ -414,7 +414,7 @@ func TestAccessEventsDeriveFromTheSnapshot(t *testing.T) {
 	dark := NewSignal(false)
 	open := NewSignal(false)
 	r := newAccessRig(func(ctx *Context) Element {
-		d := Div().Column().Child(Div().Role(access.RoleSwitch).Checked(dark.Get()).Label("Dark mode").
+		d := Div().Column().Child(Div().Role(access.RoleSwitch).AccessChecked(dark.Get()).Label("Dark mode").
 			OnClick(func() { dark.Set(!dark.Peek()) }))
 		if open.Get() {
 			d.Child(Modal("Confirm", Text("Sure?")))

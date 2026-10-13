@@ -56,7 +56,7 @@ func Sidebar(s *Store) ui.Element {
 		nav := func(p Page, ic *icons.Icon, label string, badge int, a *ui.Action) ui.Element {
 			active := p == page
 			// Tab reaches each item; Enter or Space opens its page.
-			item := ui.Div().Key("nav-"+label).Selected(active).Row().Align(ui.Center).Gap(10).MinHeight(ui.Px(36)).PaddingX(10).Radius(8).
+			item := ui.Div().Key("nav-"+label).AccessSelected(active).Row().Align(ui.Center).Gap(10).MinHeight(ui.Px(36)).PaddingX(10).Radius(8).
 				TextColor(t.TextMuted).Transition(fast).Tooltip(tip(ctx, label, a)).
 				Hover(ui.Style{Background: t.SurfaceHover, TextColor: t.Text}).
 				When(active, func(d *ui.DivElement) {
@@ -119,7 +119,7 @@ func themeSwitch(ctx *ui.Context) ui.Element {
 	t := ctx.Theme()
 	option := func(ic *icons.Icon, label string, theme *ui.Theme) ui.Element {
 		active := ctx.AppTheme() == theme
-		return ui.Div().Row().Grow(1).Height(ui.Px(30)).Radius(6).Center().Gap(6).Selected(active).
+		return ui.Div().Row().Grow(1).Height(ui.Px(30)).Radius(6).Center().Gap(6).AccessSelected(active).
 			TextColor(t.TextMuted).Transition(fast).Tooltip(tip(ctx, label+" theme", ToggleTheme)).
 			Hover(ui.Style{TextColor: t.Text}).
 			When(active, func(d *ui.DivElement) {

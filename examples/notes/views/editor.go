@@ -55,7 +55,7 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 			if pinned && t.HighContrast {
 				pinIcon = icons.StarFilled // the pinned state shows in the shape under high contrast
 			}
-			pin := ui.IconButton(pinIcon).Label("Pin note").Checked(pinned).Tooltip("Pin").OnClick(func() { a.s.TogglePin(n) })
+			pin := ui.IconButton(pinIcon).Label("Pin note").AccessChecked(pinned).Tooltip("Pin").OnClick(func() { a.s.TogglePin(n) })
 			if pinned {
 				pin.Style(ui.Style{TextColor: t.Warning}).Tooltip("Unpin")
 			}
@@ -67,7 +67,7 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 				Child(pin).
 				Child(ui.IconButton(icons.Trash).Label("Delete note").Tooltip("Delete note").OnClick(func() { a.confirm.Set(n.ID) })).
 				Child(ui.Div().Width(ui.Px(1)).Height(ui.Px(20)).MarginX(4).Background(t.Border)).
-				Child(ui.IconButton(themeIcon).Label("Toggle theme").Checked(t.Dark).Tooltip("Toggle theme (" + ctx.KeysFor(ToggleTheme) + ")").OnClick(func() { toggleTheme(ctx) }))
+				Child(ui.IconButton(themeIcon).Label("Toggle theme").AccessChecked(t.Dark).Tooltip("Toggle theme (" + ctx.KeysFor(ToggleTheme) + ")").OnClick(func() { toggleTheme(ctx) }))
 		}
 		return bar.Child(actions)
 	}).Key("toolbar-" + n.ID)

@@ -252,7 +252,7 @@ func (p *ProgressBarElement) expand(ctx *Context) Element {
 	if !p.indeterminate {
 		// The value is what assistive technology reads through the range, so the
 		// readout is hidden from it.
-		root.Child(Div().asPart("ProgressBar.Label").Hidden().MinWidth(Px(44)).Align(End).Style(st.Label).
+		root.Child(Div().asPart("ProgressBar.Label").AccessHidden().MinWidth(Px(44)).Align(End).Style(st.Label).
 			Child(Text(p.readout())))
 	}
 	return p.size.apply(root)

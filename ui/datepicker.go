@@ -473,7 +473,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 			root.Key(d.key)
 		}
 		a := root.access()
-		root.Role(access.RoleComboBox).Expanded(open.Get())
+		root.Role(access.RoleComboBox).AccessExpanded(open.Get())
 		name, labelledBy := d.name, d.labelledBy
 		if w.label != "" {
 			name, labelledBy = w.label, w.labelledBy
@@ -671,7 +671,7 @@ func (d *DatePickerElement) dayCell(c calendarView, day time.Time, row, col int)
 		Label(c.loc.longDate(day)).Child(Text(fmt.Sprintf("%d", day.Day())).NoWrap())
 	a := cell.access()
 	a.gridRow, a.gridCol = row, col
-	cell.Selected(on)
+	cell.AccessSelected(on)
 	if day.Month() != c.focus.Month() || day.Year() != c.focus.Year() {
 		cell.Style(st.DayOutsideMonth)
 	}
