@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"math"
 	"strings"
 	"time"
@@ -111,13 +112,15 @@ type editorElement struct {
 	onChange    func(string)
 	onBlur      func()
 	onCancel    func()
-	description string // a literal description, read after the name (see fieldOptions)
-	onStep      func(dir int)
-	style       Style
-	autoFocus   bool
-	handle      *FocusHandle
-	part        string // the Text part of the field, see asPart
-	selection   Color  // the background of the selected text (FieldStyle.Selection)
+	// onPasteImage takes an image pasted when the clipboard has no text.
+	onPasteImage func(image.Image)
+	description  string // a literal description, read after the name (see fieldOptions)
+	onStep       func(dir int)
+	style        Style
+	autoFocus    bool
+	handle       *FocusHandle
+	part         string // the Text part of the field, see asPart
+	selection    Color  // the background of the selected text (FieldStyle.Selection)
 	// selectionText is the color of the selected text, drawn over the selection;
 	// unset, the selected text keeps its color.
 	selectionText Color

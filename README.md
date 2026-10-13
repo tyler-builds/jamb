@@ -267,7 +267,11 @@ which returns the text and whether there is any, and `ctx.SetClipboard(s)`.
 Text fields use the same clipboard. Images go through
 `ctx.ClipboardImage()`, which returns an `image.Image` (show it with
 `ui.ImageFromImage`, or save it with `image/png`), and
-`ctx.SetClipboardImage(img)`. Copying text replaces an image and the other way
+`ctx.SetClipboardImage(img)`. `ctx.ClipboardHasImage()` says whether there is one
+without reading it, cheaply enough for a render (to enable a Paste image menu
+item). A `TextInput` or `TextArea` with `.OnPasteImage(fn)` hands fn the image
+when the user pastes and the clipboard holds an image but no text, as a message
+box that attaches screenshots wants. Copying text replaces an image and the other way
 round, as on the system clipboard. On Windows an image is read as PNG when the
 program that copied it offered one (browsers, Office and the Snipping Tool do)
 and otherwise as a bitmap, and written as both, with its transparency. HTML is

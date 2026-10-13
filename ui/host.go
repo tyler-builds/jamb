@@ -28,8 +28,9 @@ func (h *runtimeHost) SetServices(clipboard func() (string, bool), setClipboard 
 
 // SetImageClipboard connects the platform's image clipboard (see
 // Context.ClipboardImage).
-func (h *runtimeHost) SetImageClipboard(get func() (image.Image, bool), set func(image.Image)) {
-	h.rt().services.ClipboardImage, h.rt().services.SetClipboardImage = get, set
+func (h *runtimeHost) SetImageClipboard(get func() (image.Image, bool), set func(image.Image), has func() bool) {
+	s := &h.rt().services
+	s.ClipboardImage, s.SetClipboardImage, s.HasClipboardImage = get, set, has
 }
 
 // SetCancelComposition connects the platform's way to make the input method

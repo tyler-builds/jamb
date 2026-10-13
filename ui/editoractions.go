@@ -343,5 +343,13 @@ func (rt *Runtime) editorCut(id uint64) {
 func (rt *Runtime) editorPaste(id uint64) {
 	if s, ok := rt.clipboard(); ok && s != "" {
 		rt.editorInsert(id, s, editOther)
+		return
+	}
+	n := rt.byID[id]
+	if n == nil || n.editor == nil || n.editor.onPasteImage == nil || n.editor.locked() {
+		return
+	}
+	if img, ok := rt.clipboardImage(); ok {
+		n.editor.onPasteImage(img)
 	}
 }

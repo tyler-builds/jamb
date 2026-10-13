@@ -406,6 +406,7 @@ type platformServices struct {
 	// image (see Context.ClipboardImage).
 	ClipboardImage    func() (image.Image, bool)
 	SetClipboardImage func(image.Image)
+	HasClipboardImage func() bool
 	// WakeAt schedules a frame at a future time (caret blinking).
 	WakeAt func(time.Time)
 	// OpenURL opens a URL with the system (see Context.OpenURL).
@@ -419,6 +420,7 @@ type platformServices struct {
 func (rt *Runtime) hostSetServices(s platformServices) {
 	s.OpenURL = rt.services.OpenURL
 	s.ClipboardImage, s.SetClipboardImage = rt.services.ClipboardImage, rt.services.SetClipboardImage
+	s.HasClipboardImage = rt.services.HasClipboardImage
 	s.CancelComposition = rt.services.CancelComposition
 	rt.services = s
 }
@@ -443,6 +445,13 @@ func (rt *Runtime) clipboardImage() (image.Image, bool) {
 		return rt.services.ClipboardImage()
 	}
 	return rt.memImage, rt.memImage != nil
+}
+
+func (rt *Runtime) hasClipboardImage() bool {
+	if rt.services.HasClipboardImage != nil {
+		return rt.services.HasClipboardImage()
+	}
+	return rt.memImage != nil
 }
 
 func (rt *Runtime) setClipboardImage(img image.Image) {

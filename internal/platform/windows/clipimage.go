@@ -47,6 +47,11 @@ func (w *window) ClipboardImage() (image.Image, bool) {
 	return img, true
 }
 
+// HasClipboardImage implements platform.Window.
+func (w *window) HasClipboardImage() bool {
+	return win32.ClipboardHas(append(pngFormats(), win32.CF_DIB)...)
+}
+
 // SetClipboardImage implements platform.Window.
 func (w *window) SetClipboardImage(img image.Image) {
 	nrgba := toNRGBA(img)

@@ -196,6 +196,12 @@ func (c *Context) SetClipboard(s string) { c.rt.setClipboard(s) }
 // transparency when the program that copied them kept it.
 func (c *Context) ClipboardImage() (image.Image, bool) { return c.rt.clipboardImage() }
 
+// ClipboardHasImage reports whether the clipboard holds an image, without
+// reading it, which can take a while for a large one. It is cheap enough to
+// call in a render, such as to enable a Paste image menu item; the result is
+// not reactive, so it is read again on the next render.
+func (c *Context) ClipboardHasImage() bool { return c.rt.hasClipboardImage() }
+
 // SetClipboardImage replaces the clipboard's contents with img, which other
 // programs can paste, with its transparency where they support it.
 func (c *Context) SetClipboardImage(img image.Image) { c.rt.setClipboardImage(img) }

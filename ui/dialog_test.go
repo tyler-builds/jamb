@@ -100,13 +100,13 @@ func TestHeadlessClipboardRoundTrips(t *testing.T) {
 func TestHeadlessClipboardImage(t *testing.T) {
 	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	ctx := &Context{rt: rt}
-	if _, ok := ctx.ClipboardImage(); ok {
+	if _, ok := ctx.ClipboardImage(); ok || ctx.ClipboardHasImage() {
 		t.Fatal("a new clipboard holds an image")
 	}
 	ctx.SetClipboard("text")
 	img := image.NewNRGBA(image.Rect(0, 0, 2, 2))
 	ctx.SetClipboardImage(img)
-	if got, ok := ctx.ClipboardImage(); !ok || got != image.Image(img) {
+	if got, ok := ctx.ClipboardImage(); !ok || got != image.Image(img) || !ctx.ClipboardHasImage() {
 		t.Fatalf("ClipboardImage() = %v, %v after SetClipboardImage", got, ok)
 	}
 	if _, ok := ctx.Clipboard(); ok {
@@ -126,11 +126,14 @@ func TestContextClipboardImageUsesPlatform(t *testing.T) {
 	platformImg := image.NewNRGBA(image.Rect(0, 0, 1, 1))
 	h := (*runtimeHost)(rt)
 	h.SetImageClipboard(func() (image.Image, bool) { return platformImg, true },
-		func(img image.Image) { written = append(written, img) })
+		func(img image.Image) { written = append(written, img) }, func() bool { return true })
 	h.SetServices(func() (string, bool) { return "", false }, func(string) {}, nil)
 	ctx := &Context{rt: rt}
 	if got, ok := ctx.ClipboardImage(); !ok || got != image.Image(platformImg) {
 		t.Errorf("ClipboardImage() = %v, %v; want the platform's image", got, ok)
+	}
+	if !ctx.ClipboardHasImage() {
+		t.Error("ClipboardHasImage() is false; the platform has one")
 	}
 	ctx.SetClipboardImage(platformImg)
 	if len(written) != 1 {

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"slices"
 	"time"
 
@@ -497,14 +498,15 @@ type fieldOptions struct {
 	trailingEl  Element // drawn in the Trailing part, after the text (see Trailing)
 	onSubmit    func(string)
 	onChange    func(string)
-	onBlur      func()        // set by NumberInput, which checks its text on blur
-	onCancel    func()        // set by DataGrid, which ends an edit on Escape in place of Cancel
-	description string        // set by DataGrid, to say why the last save failed (a literal, not a key)
-	onStep      func(dir int) // set by NumberInput, for Up and Down
-	readOnly    bool          // see ReadOnly
-	tooltip     string        // shown over the frame; the field's description when it has none
-	disabled    bool          // see Disabled
-	styles      FieldStyle    // the instance's parts: from Styles, and the frame's Style
+	onPasteImg  func(image.Image) // see OnPasteImage
+	onBlur      func()            // set by NumberInput, which checks its text on blur
+	onCancel    func()            // set by DataGrid, which ends an edit on Escape in place of Cancel
+	description string            // set by DataGrid, to say why the last save failed (a literal, not a key)
+	onStep      func(dir int)     // set by NumberInput, for Up and Down
+	readOnly    bool              // see ReadOnly
+	tooltip     string            // shown over the frame; the field's description when it has none
+	disabled    bool              // see Disabled
+	styles      FieldStyle        // the instance's parts: from Styles, and the frame's Style
 	key         string
 	borderless  bool
 	ctlSize     controlSize // see Small and Large
@@ -574,6 +576,15 @@ func (ti *TextInputElement) OnChange(fn func(string)) *TextInputElement { ti.onC
 // focused, and its text selected and copied. Assistive technology reports it as
 // read-only. Its frame is the FrameReadOnly part.
 func (ti *TextInputElement) ReadOnly(on bool) *TextInputElement { ti.readOnly = on; return ti }
+
+// OnPasteImage runs fn with the image on the clipboard when the user pastes
+// (Ctrl+V or the Paste action) and the clipboard holds an image but no text,
+// as when a screenshot is pasted into a message box. Without it, such a paste
+// does nothing. A read-only or disabled field ignores it.
+func (ti *TextInputElement) OnPasteImage(fn func(image.Image)) *TextInputElement {
+	ti.onPasteImg = fn
+	return ti
+}
 
 // Tooltip shows s below the field after the pointer rests on it. Assistive
 // technology reads it as the field's description, unless it has another.
@@ -694,6 +705,13 @@ func (ta *TextAreaElement) OnChange(fn func(string)) *TextAreaElement { ta.onCha
 // focused, and its text selected and copied. Assistive technology reports it as
 // read-only. Its frame is the FrameReadOnly part.
 func (ta *TextAreaElement) ReadOnly(on bool) *TextAreaElement { ta.readOnly = on; return ta }
+
+// OnPasteImage runs fn with the image on the clipboard when the user pastes
+// and the clipboard holds an image but no text (see TextInputElement.OnPasteImage).
+func (ta *TextAreaElement) OnPasteImage(fn func(image.Image)) *TextAreaElement {
+	ta.onPasteImg = fn
+	return ta
+}
 
 // Tooltip shows s below the field after the pointer rests on it. Assistive
 // technology reads it as the field's description, unless it has another.
@@ -833,7 +851,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		onStep: f.onStep, autoFocus: f.autoFocus, handle: h, invalid: w.invalid, required: w.required, align: f.align,
 		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
-		readOnly: f.readOnly, disabled: f.disabled,
+		readOnly: f.readOnly, disabled: f.disabled, onPasteImage: f.onPasteImg,
 	}
 	if multiline && minRows > 0 {
 		size := t.FontSize

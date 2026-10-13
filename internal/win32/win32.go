@@ -36,6 +36,7 @@ var (
 	procGlobalUnlock            = kernel32.NewProc("GlobalUnlock")
 	procGlobalSize              = kernel32.NewProc("GlobalSize")
 	procRegisterClipboardFormat = user32.NewProc("RegisterClipboardFormatW")
+	procIsClipboardFormatAvail  = user32.NewProc("IsClipboardFormatAvailable")
 	procImmGetContext           = imm32.NewProc("ImmGetContext")
 	procImmReleaseContext       = imm32.NewProc("ImmReleaseContext")
 	procImmSetCompositionWindow = imm32.NewProc("ImmSetCompositionWindow")
@@ -568,6 +569,18 @@ func RegisterClipboardFormat(name string) uint32 {
 	}
 	r, _, _ := procRegisterClipboardFormat.Call(uintptr(unsafe.Pointer(p)))
 	return uint32(r)
+}
+
+// ClipboardHas reports whether the clipboard holds data in one of formats,
+// including formats the system would make from the data it holds. It does not
+// open the clipboard.
+func ClipboardHas(formats ...uint32) bool {
+	for _, f := range formats {
+		if r, _, _ := procIsClipboardFormatAvail.Call(uintptr(f)); f != 0 && r != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // ReadClipboard returns the clipboard's text, if any.

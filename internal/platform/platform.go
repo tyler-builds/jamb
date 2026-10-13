@@ -162,6 +162,9 @@ type Window interface {
 	SetClipboard(text string)
 	// ClipboardImage returns the clipboard's image, if it holds one.
 	ClipboardImage() (image.Image, bool)
+	// HasClipboardImage reports whether the clipboard holds an image, without
+	// reading it.
+	HasClipboardImage() bool
 	// SetClipboardImage replaces the clipboard's contents with img.
 	SetClipboardImage(img image.Image)
 	// SetTextInputRect tells the OS where text is being typed (the caret,

@@ -393,7 +393,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rh = hostOf(h.rt)
 	h.rh.SetWakeFunc(w.Wake)
 	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
-	h.rh.SetImageClipboard(w.ClipboardImage, w.SetClipboardImage)
+	h.rh.SetImageClipboard(w.ClipboardImage, w.SetClipboardImage, w.HasClipboardImage)
 	h.rh.SetOpenURL(w.OpenURL)
 	h.rh.SetCancelComposition(w.CancelComposition)
 	h.rt.SetWindow(h.handle)
@@ -733,7 +733,7 @@ func (h *host) FrameWaitable() uintptr {
 type runtimeHost interface {
 	SetWakeFunc(fn func())
 	SetServices(clipboard func() (string, bool), setClipboard func(string), wakeAt func(time.Time))
-	SetImageClipboard(get func() (image.Image, bool), set func(image.Image))
+	SetImageClipboard(get func() (image.Image, bool), set func(image.Image), has func() bool)
 	SetOpenURL(fn func(string) error)
 	SetCancelComposition(fn func())
 	Compose(text string, cursor, clauseStart, clauseEnd int)

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"runtime"
 	"strings"
 	"testing"
@@ -333,5 +334,37 @@ func TestEditorWordKeysUseTheWindowsConvention(t *testing.T) {
 	r.key(input.KeyBackspace, ctrl) // deletes "Next" back to the start of its unit
 	if v.Peek() != "small note-taking app. " {
 		t.Errorf("Ctrl+Backspace left %q", v.Peek())
+	}
+}
+
+// Pasting into a field whose clipboard holds an image and no text hands the
+// image to OnPasteImage; text on the clipboard is pasted as text. A read-only
+// field ignores the image.
+func TestEditorPasteImage(t *testing.T) {
+	for _, readOnly := range []bool{false, true} {
+		v := NewSignal("")
+		var pasted []image.Image
+		r := newEditorRig(t, func(ctx *Context) Element {
+			return Div().Padding(10).Child(TextArea(v).ReadOnly(readOnly).
+				OnPasteImage(func(img image.Image) { pasted = append(pasted, img) }))
+		})
+		r.click(100, 27)
+		img := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+		r.rt.setClipboardImage(img)
+		r.key(input.KeyV, ctrl)
+		if readOnly {
+			if len(pasted) != 0 {
+				t.Fatal("a read-only field took a pasted image")
+			}
+			continue
+		}
+		if len(pasted) != 1 || pasted[0] != image.Image(img) || v.Peek() != "" {
+			t.Fatalf("pasted %d images, value %q; want the image and no text", len(pasted), v.Peek())
+		}
+		r.rt.setClipboard("words")
+		r.key(input.KeyV, ctrl)
+		if len(pasted) != 1 || v.Peek() != "words" {
+			t.Fatalf("pasted %d images, value %q after pasting text", len(pasted), v.Peek())
+		}
 	}
 }
