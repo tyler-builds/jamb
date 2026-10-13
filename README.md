@@ -1721,7 +1721,12 @@ ui.Component(func(ctx *ui.Context) ui.Element {
 Inside a component, `ctx.Window()` controls its window: `Minimize()`,
 `ToggleMaximize()`, `Close()`, `SetTitle(s)`, and the reactive reads
 `Maximized()` and `Focused()`, which re-render the component when they change.
-A headless runtime (in tests) has no window, so the actions do nothing.
+`Position()`, `Size()`, `SetPosition(x, y)` and `SetSize(w, h)` read and change
+the window's place and content size in logical pixels, as `app.Window` takes them
+(a maximized or fullscreen window is restored first). `SetFullscreen(on)` makes the
+window cover its monitor without a frame, and puts it back where it was;
+`Fullscreen()` reports which. A headless runtime (in tests) has no window, so the
+actions do nothing, and `Size()` is the viewport's.
 
 ### Custom title bars
 

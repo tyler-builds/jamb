@@ -61,6 +61,10 @@ var (
 	procSetProcessDpiAwarenessContext = user32.NewProc("SetProcessDpiAwarenessContext")
 	procAdjustWindowRectExForDpi      = user32.NewProc("AdjustWindowRectExForDpi")
 	procSetWindowPos                  = user32.NewProc("SetWindowPos")
+	procGetWindowLongPtrW             = user32.NewProc("GetWindowLongPtrW")
+	procSetWindowLongPtrW             = user32.NewProc("SetWindowLongPtrW")
+	procGetWindowPlacement            = user32.NewProc("GetWindowPlacement")
+	procSetWindowPlacement            = user32.NewProc("SetWindowPlacement")
 	procGetKeyState                   = user32.NewProc("GetKeyState")
 	procMonitorFromWindow             = user32.NewProc("MonitorFromWindow")
 	procGetMonitorInfoW               = user32.NewProc("GetMonitorInfoW")
@@ -199,6 +203,8 @@ const (
 	SWP_NOSIZE       = 0x0001
 	SWP_NOMOVE       = 0x0002
 	SWP_FRAMECHANGED = 0x0020
+	// SWP_NOOWNERZORDER leaves the owner window's place in the z-order alone.
+	SWP_NOOWNERZORDER = 0x0200
 
 	SW_MINIMIZE = 6
 	SW_MAXIMIZE = 3
@@ -435,6 +441,52 @@ func GetWindowRect(hwnd uintptr) RECT {
 
 func SetWindowPos(hwnd uintptr, x, y, w, h int32, flags uint32) {
 	procSetWindowPos.Call(hwnd, 0, uintptr(x), uintptr(y), uintptr(w), uintptr(h), uintptr(flags))
+}
+
+// gwlStyle is GWL_STYLE (-16) as the unsigned argument the call takes.
+const gwlStyle = ^uintptr(15)
+
+// WindowStyle returns the window's style bits (GWL_STYLE).
+func WindowStyle(hwnd uintptr) uintptr {
+	r, _, _ := procGetWindowLongPtrW.Call(hwnd, gwlStyle)
+	return r
+}
+
+// SetWindowStyle replaces the window's style bits (GWL_STYLE). Call
+// SetWindowPos with SWP_FRAMECHANGED afterwards so the frame is redrawn.
+func SetWindowStyle(hwnd, style uintptr) { procSetWindowLongPtrW.Call(hwnd, gwlStyle, style) }
+
+// WINDOWPLACEMENT is a window's normal, minimized and maximized positions.
+type WINDOWPLACEMENT struct {
+	Length           uint32
+	Flags            uint32
+	ShowCmd          uint32
+	PtMinPosition    POINT
+	PtMaxPosition    POINT
+	RcNormalPosition RECT
+}
+
+// GetWindowPlacement returns the window's placement, to restore it later.
+func GetWindowPlacement(hwnd uintptr) WINDOWPLACEMENT {
+	wp := WINDOWPLACEMENT{}
+	wp.Length = uint32(unsafe.Sizeof(wp))
+	procGetWindowPlacement.Call(hwnd, uintptr(unsafe.Pointer(&wp)))
+	return wp
+}
+
+// SetWindowPlacement restores a placement from GetWindowPlacement.
+func SetWindowPlacement(hwnd uintptr, wp *WINDOWPLACEMENT) {
+	procSetWindowPlacement.Call(hwnd, uintptr(unsafe.Pointer(wp)))
+}
+
+// MonitorRect returns the whole area of the monitor nearest to hwnd, taskbar
+// included (see WorkArea for the area without it).
+func MonitorRect(hwnd uintptr) RECT {
+	mon, _, _ := procMonitorFromWindow.Call(hwnd, MONITOR_DEFAULTTONEAREST)
+	mi := MONITORINFO{}
+	mi.CbSize = uint32(unsafe.Sizeof(mi))
+	procGetMonitorInfoW.Call(mon, uintptr(unsafe.Pointer(&mi)))
+	return mi.RcMonitor
 }
 
 // WorkArea returns the work area of the monitor nearest to hwnd.

@@ -129,6 +129,15 @@ type Window interface {
 	ToggleMaximize()
 	// Maximized reports whether the window is maximized.
 	Maximized() bool
+	// SetSize sets the size of the client area, and SetPosition moves the
+	// window's outer top-left corner, both in logical pixels at the window's
+	// scale. A maximized or fullscreen window is restored first.
+	SetSize(width, height int)
+	SetPosition(x, y int)
+	// SetFullscreen makes the window cover its monitor without a frame, or
+	// puts it back where it was. Fullscreen reports which.
+	SetFullscreen(on bool)
+	Fullscreen() bool
 	// Focus brings the window to the front and gives it keyboard focus.
 	Focus()
 	// Wake schedules a call to Handler.OnFrame. It is safe to call from any

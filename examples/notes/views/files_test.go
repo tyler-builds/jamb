@@ -23,6 +23,12 @@ func (f *fakeWindow) Maximized() bool                                       { re
 func (f *fakeWindow) Close()                                                {}
 func (f *fakeWindow) SetTitle(string)                                       {}
 func (f *fakeWindow) Focused() bool                                         { return true }
+func (f *fakeWindow) Position() (int, int)                                  { return 0, 0 }
+func (f *fakeWindow) Size() (int, int)                                      { return 800, 600 }
+func (f *fakeWindow) SetPosition(int, int)                                  {}
+func (f *fakeWindow) SetSize(int, int)                                      {}
+func (f *fakeWindow) SetFullscreen(bool)                                    {}
+func (f *fakeWindow) Fullscreen() bool                                      { return false }
 func (f *fakeWindow) MessageBox(dialog.MessageOptions, func(dialog.Button)) {}
 
 func (f *fakeWindow) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {

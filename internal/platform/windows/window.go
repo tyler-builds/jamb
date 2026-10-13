@@ -32,11 +32,17 @@ type window struct {
 	handler platform.Handler
 	opts    platform.WindowOptions
 
-	dpi     uint32
-	width   int
-	height  int
-	cursor  input.Cursor
-	cursors map[input.Cursor]uintptr
+	dpi    uint32
+	width  int
+	height int
+
+	// fullscreen is set while the window covers its monitor; savedStyle and
+	// savedPlacement are what SetFullscreen(false) restores.
+	fullscreen     bool
+	savedStyle     uintptr
+	savedPlacement win32.WINDOWPLACEMENT
+	cursor         input.Cursor
+	cursors        map[input.Cursor]uintptr
 
 	wakePending atomic.Bool
 	frameWanted bool // set on the UI thread
@@ -333,6 +339,55 @@ func (w *window) ToggleMaximize() {
 // Maximized implements platform.Window.
 func (w *window) Maximized() bool { return win32.IsZoomed(w.hwnd) }
 
+// restoreForGeometry leaves fullscreen and maximized, so a new size or
+// position applies to the restored window.
+func (w *window) restoreForGeometry() {
+	if w.fullscreen {
+		w.SetFullscreen(false)
+	}
+	if win32.IsZoomed(w.hwnd) {
+		win32.ShowWindow(w.hwnd, win32.SW_RESTORE)
+	}
+}
+
+func (w *window) SetSize(width, height int) {
+	w.restoreForGeometry()
+	ww, wh := w.outerSize(width, height, w.dpi)
+	win32.SetWindowPos(w.hwnd, 0, 0, ww, wh, win32.SWP_NOMOVE|win32.SWP_NOZORDER|win32.SWP_NOACTIVATE)
+}
+
+func (w *window) SetPosition(x, y int) {
+	w.restoreForGeometry()
+	win32.SetWindowPos(w.hwnd, int32(scaleInt(x, w.dpi)), int32(scaleInt(y, w.dpi)), 0, 0,
+		win32.SWP_NOSIZE|win32.SWP_NOZORDER|win32.SWP_NOACTIVATE)
+}
+
+func (w *window) Fullscreen() bool { return w.fullscreen }
+
+// SetFullscreen removes the frame and covers the monitor the window is on, as
+// Windows apps conventionally do: the style and placement are saved, and
+// restored when the window leaves fullscreen.
+func (w *window) SetFullscreen(on bool) {
+	if on == w.fullscreen {
+		return
+	}
+	if on {
+		w.savedStyle = win32.WindowStyle(w.hwnd)
+		w.savedPlacement = win32.GetWindowPlacement(w.hwnd)
+		m := win32.MonitorRect(w.hwnd)
+		w.fullscreen = true
+		win32.SetWindowStyle(w.hwnd, w.savedStyle&^win32.WS_OVERLAPPEDWINDOW)
+		win32.SetWindowPos(w.hwnd, m.Left, m.Top, m.Right-m.Left, m.Bottom-m.Top,
+			win32.SWP_NOOWNERZORDER|win32.SWP_FRAMECHANGED)
+		return
+	}
+	w.fullscreen = false
+	win32.SetWindowStyle(w.hwnd, w.savedStyle)
+	win32.SetWindowPlacement(w.hwnd, &w.savedPlacement)
+	win32.SetWindowPos(w.hwnd, 0, 0, 0, 0,
+		win32.SWP_NOMOVE|win32.SWP_NOSIZE|win32.SWP_NOZORDER|win32.SWP_NOOWNERZORDER|win32.SWP_FRAMECHANGED)
+}
+
 // Focus implements platform.Window. Windows only lets an app take the
 // foreground when the user is working with it; otherwise the taskbar flashes.
 func (w *window) Focus() {
@@ -526,6 +581,10 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		}
 
 	case win32.WM_NCHITTEST:
+		if w.fullscreen {
+			// A fullscreen window has no frame and no title bar to drag.
+			return win32.HTCLIENT
+		}
 		if w.opts.CustomTitleBar {
 			return w.hitTest(lp)
 		}

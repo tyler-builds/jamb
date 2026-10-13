@@ -76,6 +76,19 @@ type WindowControls interface {
 	// component, it is reactive.
 	Focused() bool
 
+	// Position returns the window's top-left corner on the screen, and Size
+	// the size of its content, in logical pixels as app.Window takes them.
+	Position() (x, y int)
+	Size() (width, height int)
+	// SetPosition moves the window and SetSize resizes its content, in logical
+	// pixels. A maximized or fullscreen window is restored first.
+	SetPosition(x, y int)
+	SetSize(width, height int)
+	// SetFullscreen makes the window cover its monitor without a frame, or puts
+	// it back where it was. Fullscreen reports which.
+	SetFullscreen(on bool)
+	Fullscreen() bool
+
 	// OpenFiles shows the system's file-open dialog, owned by this window. It
 	// returns at once; done runs on the UI thread when the dialog closes, with
 	// the files chosen or Canceled set. See the dialog package.
@@ -122,7 +135,49 @@ func (w windowRef) SetTitle(title string) {
 }
 
 func (w windowRef) Maximized() bool { return w.rt.maximized.Get() }
-func (w windowRef) Focused() bool   { return w.rt.focused.Get() }
+
+// The geometry goes to the app's controls. A headless runtime has no window: its
+// position is 0, 0 and its size is the viewport's.
+
+func (w windowRef) Position() (x, y int) {
+	if c := w.rt.windowCtl; c != nil {
+		return c.Position()
+	}
+	return 0, 0
+}
+
+func (w windowRef) Size() (width, height int) {
+	if c := w.rt.windowCtl; c != nil {
+		return c.Size()
+	}
+	return int(w.rt.viewW), int(w.rt.viewH)
+}
+
+func (w windowRef) SetPosition(x, y int) {
+	if c := w.rt.windowCtl; c != nil {
+		c.SetPosition(x, y)
+	}
+}
+
+func (w windowRef) SetSize(width, height int) {
+	if c := w.rt.windowCtl; c != nil {
+		c.SetSize(width, height)
+	}
+}
+
+func (w windowRef) SetFullscreen(on bool) {
+	if c := w.rt.windowCtl; c != nil {
+		c.SetFullscreen(on)
+	}
+}
+
+func (w windowRef) Fullscreen() bool {
+	if c := w.rt.windowCtl; c != nil {
+		return c.Fullscreen()
+	}
+	return false
+}
+func (w windowRef) Focused() bool { return w.rt.focused.Get() }
 
 // The dialogs go to the app's controls. A headless runtime has no window, so
 // they do nothing and done is not called.

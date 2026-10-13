@@ -667,6 +667,24 @@ func (c windowControls) Close()            { c.h.win.Close() }
 func (c windowControls) SetTitle(s string) { c.h.win.SetTitle(s) }
 func (c windowControls) Focused() bool     { return c.h.focused }
 
+// Position and Size are in logical pixels: the window's pixels divided by its
+// scale, as app.Window's X, Y, Width and Height are.
+func (c windowControls) Position() (x, y int) {
+	f, s := c.h.win.Frame(), c.h.win.Scale()
+	return int(float32(f.X)/s + 0.5), int(float32(f.Y)/s + 0.5)
+}
+
+func (c windowControls) Size() (width, height int) {
+	w, h := c.h.win.Size()
+	s := c.h.win.Scale()
+	return int(float32(w)/s + 0.5), int(float32(h)/s + 0.5)
+}
+
+func (c windowControls) SetPosition(x, y int)      { c.h.win.SetPosition(x, y) }
+func (c windowControls) SetSize(width, height int) { c.h.win.SetSize(width, height) }
+func (c windowControls) SetFullscreen(on bool)     { c.h.win.SetFullscreen(on) }
+func (c windowControls) Fullscreen() bool          { return c.h.win.Fullscreen() }
+
 func (c windowControls) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
 	c.h.win.ShowFileDialog(dialog.Open, o, done)
 }

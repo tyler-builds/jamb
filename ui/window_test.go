@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -94,8 +95,8 @@ func TestWindowAreaOnlyPaintedElements(t *testing.T) {
 
 // fakeWindow records the actions a title bar performs on its window.
 type fakeWindow struct {
-	maximized, focused bool
-	calls              []string
+	maximized, focused, fullscreen bool
+	calls                          []string
 	// The dialogs are recorded in calls; their callbacks are kept, so a test
 	// answers a dialog by calling fileDone or msgDone.
 	fileOpts []dialog.FileOptions
@@ -104,12 +105,23 @@ type fakeWindow struct {
 	msgDone  func(dialog.Button)
 }
 
-func (f *fakeWindow) Minimize()         { f.calls = append(f.calls, "minimize") }
-func (f *fakeWindow) ToggleMaximize()   { f.calls = append(f.calls, "toggle") }
-func (f *fakeWindow) Maximized() bool   { return f.maximized }
-func (f *fakeWindow) Close()            { f.calls = append(f.calls, "close") }
-func (f *fakeWindow) SetTitle(s string) { f.calls = append(f.calls, "title:"+s) }
-func (f *fakeWindow) Focused() bool     { return f.focused }
+func (f *fakeWindow) Minimize()            { f.calls = append(f.calls, "minimize") }
+func (f *fakeWindow) ToggleMaximize()      { f.calls = append(f.calls, "toggle") }
+func (f *fakeWindow) Maximized() bool      { return f.maximized }
+func (f *fakeWindow) Close()               { f.calls = append(f.calls, "close") }
+func (f *fakeWindow) SetTitle(s string)    { f.calls = append(f.calls, "title:"+s) }
+func (f *fakeWindow) Focused() bool        { return f.focused }
+func (f *fakeWindow) Position() (int, int) { return 10, 20 }
+func (f *fakeWindow) Size() (int, int)     { return 640, 480 }
+func (f *fakeWindow) SetPosition(x, y int) {
+	f.calls = append(f.calls, fmt.Sprintf("move:%d,%d", x, y))
+}
+func (f *fakeWindow) SetSize(w, h int) { f.calls = append(f.calls, fmt.Sprintf("size:%dx%d", w, h)) }
+func (f *fakeWindow) SetFullscreen(on bool) {
+	f.fullscreen = on
+	f.calls = append(f.calls, fmt.Sprintf("fullscreen:%v", on))
+}
+func (f *fakeWindow) Fullscreen() bool { return f.fullscreen }
 
 func (f *fakeWindow) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
 	f.calls = append(f.calls, "open")
@@ -244,5 +256,30 @@ func TestSharedSignalRerendersInEveryWindow(t *testing.T) {
 	b.rt.Frame(time.Now())
 	if a.runs != 2 || b.runs != 2 {
 		t.Errorf("after Set: a rendered %d times, b %d; want 2 each", a.runs, b.runs)
+	}
+}
+
+// The window's geometry goes through to the app's controls, and a headless
+// runtime reports its viewport.
+func TestWindowGeometryControls(t *testing.T) {
+	var ctl WindowControls
+	r := newOverlayRig(func(ctx *Context) Element { ctl = ctx.Window(); return Div() }, 300, 200)
+	if w, h := ctl.Size(); w != 300 || h != 200 {
+		t.Fatalf("headless size %dx%d, want the viewport", w, h)
+	}
+	fw := &fakeWindow{}
+	r.rt.SetWindowControls(fw)
+	ctl.SetSize(800, 600)
+	ctl.SetPosition(40, 50)
+	ctl.SetFullscreen(true)
+	if !ctl.Fullscreen() {
+		t.Fatal("Fullscreen is false after SetFullscreen(true)")
+	}
+	if x, y := ctl.Position(); x != 10 || y != 20 {
+		t.Fatalf("position %d,%d, want the window's", x, y)
+	}
+	want := []string{"size:800x600", "move:40,50", "fullscreen:true"}
+	if fmt.Sprint(fw.calls) != fmt.Sprint(want) {
+		t.Fatalf("calls %v, want %v", fw.calls, want)
 	}
 }
