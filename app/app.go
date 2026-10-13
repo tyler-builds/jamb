@@ -113,10 +113,37 @@ const (
 
 // App is an application instance. A process has one App: its windows share
 // the UI thread, the text system and the GPU device.
-type App struct{}
+type App struct {
+	fonts []appFont
+}
+
+// appFont is a font given to App.Font.
+type appFont struct {
+	family string
+	weight ui.FontWeight
+	data   []byte
+}
 
 // New creates an application.
 func New() *App { return &App{} }
+
+// Font registers a font file (TrueType or OpenType data, such as a //go:embed
+// file) as the upright face of family at weight, for every window of the app.
+// Text uses it with Font(family) or Style.FontFamily; a weight the family has no
+// face for uses the nearest one, and italic text uses the upright face. A family
+// named like a built-in one ("" for the UI font, "mono") replaces that face.
+//
+//	app.New().
+//		Font("Inter", ui.FontRegular, interRegular).
+//		Font("Inter", ui.FontBold, interBold).
+//		Run(app.Window{...})
+//
+// The fonts are parsed while the first window opens. Data that is not a font
+// makes RunE return an error, and Run print it and exit.
+func (a *App) Font(family string, weight ui.FontWeight, data []byte) *App {
+	a.fonts = append(a.fonts, appFont{family, weight, data})
+	return a
+}
 
 // Run opens the window and blocks until the app quits: when the last window
 // closes, or when a QuitWhenClosed window closes. On failure it prints the
@@ -139,13 +166,10 @@ func (a *App) RunE(w Window) error {
 	prepareDevice()
 	// Parse fonts and warm the shaper while the first window and GPU device
 	// are being created; the first window's runtime picks the result up.
-	ready := make(chan *text.System, 1)
+	ready := make(chan textResult, 1)
 	application.textReady = ready
-	go func() {
-		ts := text.NewSystem()
-		ts.Warm(w.Theme.FontSize)
-		ready <- ts
-	}()
+	fonts, size := a.fonts, w.Theme.FontSize
+	go func() { ready <- loadText(fonts, size) }()
 	return runPlatform(func() error {
 		_, err := openWindow(w, nil)
 		return err
@@ -218,7 +242,7 @@ func (h *WindowHandle) onUI(fn func(*host)) {
 // thread, except textReady, which the goroutine started by RunE fills once.
 var application struct {
 	dev       devOptions
-	textReady chan *text.System
+	textReady chan textResult
 	text      *text.System // the shared text system, once received
 	windows   []*host      // open windows, in the order they opened
 	opened    int          // windows opened so far
@@ -276,14 +300,39 @@ func origin(cfg Window) *platform.Point {
 	return nil
 }
 
-// sharedText returns the text system all windows use. The first call waits for
-// the goroutine started by RunE; it reports whether it had to wait.
-func sharedText() (*text.System, bool) {
-	if application.text != nil {
-		return application.text, false
+// loadText creates the text system with the app's fonts registered, and warms
+// it at the theme's font size.
+func loadText(fonts []appFont, size float32) textResult {
+	ts := text.NewSystem()
+	for _, f := range fonts {
+		if err := ts.Registry().Register(f.family, f.weight, f.data); err != nil {
+			return textResult{err: fmt.Errorf("app.Font(%q, %d): %w", f.family, f.weight, err)}
+		}
 	}
-	application.text = <-application.textReady
-	return application.text, true
+	ts.Warm(size)
+	return textResult{ts: ts}
+}
+
+// textResult is what the goroutine started by RunE sends: the text system, or
+// the error of a font the app registered.
+type textResult struct {
+	ts  *text.System
+	err error
+}
+
+// sharedText returns the text system all windows use. The first call waits for
+// the goroutine started by RunE; it reports whether it had to wait. It fails
+// when a font given to App.Font could not be loaded.
+func sharedText() (*text.System, bool, error) {
+	if application.text != nil {
+		return application.text, false, nil
+	}
+	res := <-application.textReady
+	if res.err != nil {
+		return nil, true, res.err
+	}
+	application.text = res.ts
+	return application.text, true, nil
 }
 
 // host is one window: it implements platform.Handler and drives the window's
@@ -333,7 +382,10 @@ func (h *host) OnCreate(w platform.Window) error {
 	}
 	h.dev.tracef("renderer ready in %v%s", time.Since(t0), desc)
 	t1 := time.Now()
-	ts, waited := sharedText()
+	ts, waited, err := sharedText()
+	if err != nil {
+		return err
+	}
 	if waited {
 		h.dev.tracef("fonts ready (waited %v after the renderer)", time.Since(t1))
 	}

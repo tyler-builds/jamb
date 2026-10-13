@@ -195,6 +195,7 @@ ui.Div()                       // flex container; children stack vertically by d
 
 ui.Text("hi").FontSize(15).Semibold().Italic().TextColor(c).Truncate().MaxLines(2).Align(ui.Center)
 ui.Textf("Count: %d", n)
+ui.Text("Total").Font("Inter")                    // a family registered with app.New().Font (below); .Mono() for code
 ui.Icon(icons.Folder).Size(16).Color(c)          // color defaults to the inherited text color
                                                  // icons.All lists every icon; see the icon list below
 ui.Image(src).Size(ui.Px(34), ui.Px(34)).Radius(17).Fit(ui.FitCover)
@@ -1004,6 +1005,19 @@ ui.Text(body).HighlightMatches(query, ui.Highlight{Background: t.AccentSoft, Col
   A family without an italic face for that weight uses its upright face: there
   is no synthetic slant. Segoe UI and Consolas have italics on Windows; the
   embedded Go fonts are the fallback elsewhere.
+- An app ships its own fonts with `app.New().Font(family, weight, data)`, once per
+  face, and uses them with `Font(family)` on a `Text` or `FontFamily` in a `Style`:
+
+  ```go
+  //go:embed fonts/Inter-Regular.ttf
+  var interRegular []byte
+
+  app.New().Font("Inter", ui.FontRegular, interRegular).Run(app.Window{...})
+  ```
+
+  The fonts are parsed while the first window opens; data that is not a font makes
+  `RunE` return an error. A registered family has upright faces only, so italic text
+  in it uses the upright face.
 - A weight the family has no face for uses the nearest face, and the heavier
   one on a tie, as Windows' DirectWrite does. Medium (500) in Segoe UI, which
   has Regular and Semibold faces, is drawn Semibold. The family's own faces
