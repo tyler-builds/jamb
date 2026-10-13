@@ -204,6 +204,10 @@ func (r *RadioGroupElement[T]) MaxWidth(l Length) *RadioGroupElement[T] {
 	return r
 }
 func (r *RadioGroupElement[T]) Grow(f float32) *RadioGroupElement[T] { r.size.setGrow(f); return r }
+func (r *RadioGroupElement[T]) GridSpan(cols, rows int) *RadioGroupElement[T] {
+	r.size.setSpan(cols, rows)
+	return r
+}
 
 // Styles sets the look of the parts of the radio group, for this instance only.
 // Set fields win over the theme's RadioGroup and the defaults; see

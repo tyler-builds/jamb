@@ -263,13 +263,14 @@ func (s *SplitElement) OnChange(fn func(float64)) *SplitElement { s.onChange = f
 
 // The sizing methods give the split's outer box a size. A split fills its container
 // by default; see Sizing in docs/styling.md.
-func (s *SplitElement) Width(l Length) *SplitElement     { s.size.setWidth(l); return s }
-func (s *SplitElement) Height(l Length) *SplitElement    { s.size.setHeight(l); return s }
-func (s *SplitElement) MinWidth(l Length) *SplitElement  { s.size.setMinWidth(l); return s }
-func (s *SplitElement) MinHeight(l Length) *SplitElement { s.size.setMinHeight(l); return s }
-func (s *SplitElement) MaxWidth(l Length) *SplitElement  { s.size.setMaxWidth(l); return s }
-func (s *SplitElement) MaxHeight(l Length) *SplitElement { s.size.setMaxHeight(l); return s }
-func (s *SplitElement) Grow(f float32) *SplitElement     { s.size.setGrow(f); return s }
+func (s *SplitElement) Width(l Length) *SplitElement          { s.size.setWidth(l); return s }
+func (s *SplitElement) Height(l Length) *SplitElement         { s.size.setHeight(l); return s }
+func (s *SplitElement) MinWidth(l Length) *SplitElement       { s.size.setMinWidth(l); return s }
+func (s *SplitElement) MinHeight(l Length) *SplitElement      { s.size.setMinHeight(l); return s }
+func (s *SplitElement) MaxWidth(l Length) *SplitElement       { s.size.setMaxWidth(l); return s }
+func (s *SplitElement) MaxHeight(l Length) *SplitElement      { s.size.setMaxHeight(l); return s }
+func (s *SplitElement) Grow(f float32) *SplitElement          { s.size.setGrow(f); return s }
+func (s *SplitElement) GridSpan(cols, rows int) *SplitElement { s.size.setSpan(cols, rows); return s }
 
 // Styles sets the look of the parts of the split, for this instance only. Set fields
 // win over the theme's Split and the defaults; see SplitStyle and docs/styling.md.

@@ -149,6 +149,10 @@ func (c *CollapsibleElement) Width(l Length) *CollapsibleElement    { c.size.set
 func (c *CollapsibleElement) MinWidth(l Length) *CollapsibleElement { c.size.setMinWidth(l); return c }
 func (c *CollapsibleElement) MaxWidth(l Length) *CollapsibleElement { c.size.setMaxWidth(l); return c }
 func (c *CollapsibleElement) Grow(f float32) *CollapsibleElement    { c.size.setGrow(f); return c }
+func (c *CollapsibleElement) GridSpan(cols, rows int) *CollapsibleElement {
+	c.size.setSpan(cols, rows)
+	return c
+}
 
 // Styles sets the look of the parts of the section, for this instance only. Set
 // fields win over the theme's Collapsible and the defaults; see CollapsibleStyle
@@ -298,6 +302,10 @@ func (a *AccordionElement) Width(l Length) *AccordionElement    { a.size.setWidt
 func (a *AccordionElement) MinWidth(l Length) *AccordionElement { a.size.setMinWidth(l); return a }
 func (a *AccordionElement) MaxWidth(l Length) *AccordionElement { a.size.setMaxWidth(l); return a }
 func (a *AccordionElement) Grow(f float32) *AccordionElement    { a.size.setGrow(f); return a }
+func (a *AccordionElement) GridSpan(cols, rows int) *AccordionElement {
+	a.size.setSpan(cols, rows)
+	return a
+}
 
 // SingleOpen makes opening a section close the others. A section that is closed
 // stays closed, so the group can be closed entirely.

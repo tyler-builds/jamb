@@ -395,6 +395,10 @@ func (g *DataGridElement[T]) MaxHeight(l Length) *DataGridElement[T] {
 	return g
 }
 func (g *DataGridElement[T]) Grow(f float32) *DataGridElement[T] { g.size.setGrow(f); return g }
+func (g *DataGridElement[T]) GridSpan(cols, rows int) *DataGridElement[T] {
+	g.size.setSpan(cols, rows)
+	return g
+}
 
 // FocusHandle lets code focus the grid (see NewFocusHandle). A Field that wraps
 // the control gives it its own handle, which takes precedence.

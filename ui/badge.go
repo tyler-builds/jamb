@@ -161,10 +161,11 @@ func (b *BadgeElement) StatusDot() *BadgeElement { b.leadDot = true; return b }
 
 // The sizing methods give the badge's outer box a size. A badge is as wide as its
 // text by default; see Sizing in docs/styling.md.
-func (b *BadgeElement) Width(l Length) *BadgeElement    { b.size.setWidth(l); return b }
-func (b *BadgeElement) MinWidth(l Length) *BadgeElement { b.size.setMinWidth(l); return b }
-func (b *BadgeElement) MaxWidth(l Length) *BadgeElement { b.size.setMaxWidth(l); return b }
-func (b *BadgeElement) Grow(f float32) *BadgeElement    { b.size.setGrow(f); return b }
+func (b *BadgeElement) Width(l Length) *BadgeElement          { b.size.setWidth(l); return b }
+func (b *BadgeElement) MinWidth(l Length) *BadgeElement       { b.size.setMinWidth(l); return b }
+func (b *BadgeElement) MaxWidth(l Length) *BadgeElement       { b.size.setMaxWidth(l); return b }
+func (b *BadgeElement) Grow(f float32) *BadgeElement          { b.size.setGrow(f); return b }
+func (b *BadgeElement) GridSpan(cols, rows int) *BadgeElement { b.size.setSpan(cols, rows); return b }
 
 // Styles sets the look of the parts of the badge, for this instance only. Set
 // fields win over the theme's Badge and Badges and the defaults; see BadgeStyle

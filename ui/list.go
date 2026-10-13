@@ -49,6 +49,10 @@ func (l *UniformListElement) MaxHeight(v Length) *UniformListElement {
 	return l
 }
 func (l *UniformListElement) Grow(f float32) *UniformListElement { l.size.setGrow(f); return l }
+func (l *UniformListElement) GridSpan(cols, rows int) *UniformListElement {
+	l.size.setSpan(cols, rows)
+	return l
+}
 
 // UniformList creates a list of count rows. row(i) is called only for rows
 // near the viewport, so count can be large:

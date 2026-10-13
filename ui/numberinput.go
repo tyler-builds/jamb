@@ -312,6 +312,10 @@ func (n *NumberInputElement[T]) MaxWidth(l Length) *NumberInputElement[T] {
 	return n
 }
 func (n *NumberInputElement[T]) Grow(f float32) *NumberInputElement[T] { n.size.setGrow(f); return n }
+func (n *NumberInputElement[T]) GridSpan(cols, rows int) *NumberInputElement[T] {
+	n.size.setSpan(cols, rows)
+	return n
+}
 
 // Styles sets the look of the parts of the number input, for this instance only.
 // Set fields win over the theme's NumberInput and the defaults; see

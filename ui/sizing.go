@@ -11,10 +11,11 @@ const (
 	hasMaxWidth
 	hasMaxHeight
 	hasGrow
+	hasSpan
 )
 
 // sizing is the size a widget's outer box is given by its sizing methods: Width,
-// Height, MinWidth, MinHeight, MaxWidth, MaxHeight and Grow. A widget embeds the
+// Height, MinWidth, MinHeight, MaxWidth, MaxHeight, Grow and GridSpan. A widget embeds the
 // fields it has methods for, so every widget gives its sizes the same way. A field
 // the app has not set keeps the widget's default. A field it has set is written
 // over the theme, the Styles of the instance and the defaults, whatever the order
@@ -32,11 +33,19 @@ func (z *sizing) setMinHeight(l Length) { z.style.MinHeight = l; z.set |= hasMin
 func (z *sizing) setMaxWidth(l Length)  { z.style.MaxWidth = l; z.set |= hasMaxWidth }
 func (z *sizing) setMaxHeight(l Length) { z.style.MaxHeight = l; z.set |= hasMaxHeight }
 func (z *sizing) setGrow(f float32)     { z.style.Grow = f; z.set |= hasGrow }
+func (z *sizing) setSpan(cols, rows int) {
+	z.style.ColSpan, z.style.RowSpan = cols, rows
+	z.set |= hasSpan
+}
 
 // applyTo writes the fields the app has set over st.
 func (z *sizing) applyTo(st *Style) {
 	if z.set&hasWidth != 0 {
 		st.Width = z.style.Width
+	} else {
+		// A widget's default width gives way to a grid cell; one the app set
+		// does not.
+		st.softWidth = true
 	}
 	if z.set&hasHeight != 0 {
 		st.Height = z.style.Height
@@ -55,6 +64,9 @@ func (z *sizing) applyTo(st *Style) {
 	}
 	if z.set&hasGrow != 0 {
 		st.Grow = z.style.Grow
+	}
+	if z.set&hasSpan != 0 {
+		st.ColSpan, st.RowSpan = z.style.ColSpan, z.style.RowSpan
 	}
 }
 

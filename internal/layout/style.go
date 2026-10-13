@@ -21,6 +21,8 @@ const (
 	UnitPx
 	// UnitPercent is relative to the containing block's content box.
 	UnitPercent
+	// UnitFr is a share of a grid's free space (see Fr); elsewhere it is Auto.
+	UnitFr
 )
 
 // Length is a size or offset.
@@ -154,12 +156,29 @@ type Style struct {
 	// min-content width, as CSS's min(specified width, content) allows. The default
 	// keeps a fixed width as the floor.
 	ContentMin bool
+	// SoftWidth marks Width as a default that a grid cell may override: the
+	// item fills its cell as an item with an automatic width does. Elsewhere
+	// the width applies.
+	SoftWidth bool
 	// MatchParentWidth makes a Floating child at least as wide as its parent's
 	// border box, so a popup can be as wide as the control it opens from. Its
 	// content is laid out at that width.
 	MatchParentWidth bool
 
 	OverflowX, OverflowY Overflow
+
+	// Grid, when it has columns, lays out the children in a grid instead of a
+	// row or column (see grid.go). ColSpan and RowSpan are how many columns and
+	// rows a grid item covers; 0 means 1.
+	Grid             *Grid
+	ColSpan, RowSpan int
+}
+
+// Grid is the tracks of a grid: the size of each column, and of the first
+// rows (the rest fit their content). Sizes are Px, Percent of the grid's
+// content box, Auto (fit the content) or Fr (a share of the space left).
+type Grid struct {
+	Columns, Rows []Length
 }
 
 // Measurer reports the natural size of a leaf's content (text, images...).

@@ -255,6 +255,10 @@ func (p *TimePickerElement) MaxHeight(l Length) *TimePickerElement {
 	return p
 }
 func (p *TimePickerElement) Grow(f float32) *TimePickerElement { p.size.setGrow(f); return p }
+func (p *TimePickerElement) GridSpan(cols, rows int) *TimePickerElement {
+	p.size.setSpan(cols, rows)
+	return p
+}
 
 // Styles sets the look of the parts of the time picker, for this instance only. Set fields
 // win over the theme's TimePicker and the defaults; see TimePickerStyle and docs/styling.md.

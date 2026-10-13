@@ -255,6 +255,10 @@ func (s *SelectElement[T]) MinHeight(l Length) *SelectElement[T] { s.size.setMin
 func (s *SelectElement[T]) MaxWidth(l Length) *SelectElement[T]  { s.size.setMaxWidth(l); return s }
 func (s *SelectElement[T]) MaxHeight(l Length) *SelectElement[T] { s.size.setMaxHeight(l); return s }
 func (s *SelectElement[T]) Grow(f float32) *SelectElement[T]     { s.size.setGrow(f); return s }
+func (s *SelectElement[T]) GridSpan(cols, rows int) *SelectElement[T] {
+	s.size.setSpan(cols, rows)
+	return s
+}
 
 // Styles sets the look of the parts of the select, for this instance only. Set
 // fields win over the theme's Select and the defaults; see SelectStyle and

@@ -286,9 +286,11 @@ ui.TextInput(query).Icon(icons.Search).Trailing(clearButton).Styles(ui.FieldStyl
 
 Every built-in widget that has a box of its own takes the same sizing methods:
 `Width`, `Height` (where a height means something), `MinWidth`, `MinHeight`,
-`MaxWidth`, `MaxHeight` and `Grow`. The lengths are `ui.Px`, `ui.Percent`, `ui.Full`
-(100 percent) and `ui.Auto`. `Grow` takes a share of the free space of a row or a
-column, as a `Div` does. The methods size the widget's outer box: the frame of a text
+`MaxWidth`, `MaxHeight`, `Grow` and `GridSpan`. The lengths are `ui.Px`, `ui.Percent`,
+`ui.Full` (100 percent) and `ui.Auto`. `Grow` takes a share of the free space of a row
+or a column, as a `Div` does, and `GridSpan(cols, rows)` covers more cells of a grid
+(see Grid layout in the README). In a grid cell a widget fills the cell in place of
+its default width; a width set with `Width` is kept. The methods size the widget's outer box: the frame of a text
 field or a number input, the trigger of a select, the track of a slider and the bar
 of a progress bar (its readout included), the control of a check box, the group of
 radio buttons, the tab list of `Tabs`, the section of a collapsible, the panel of a

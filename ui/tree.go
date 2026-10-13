@@ -150,13 +150,14 @@ type TreeElement struct {
 
 // The sizing methods give the tree's outer box a size, over its Style. See Sizing
 // in docs/styling.md.
-func (tv *TreeElement) Width(l Length) *TreeElement     { tv.size.setWidth(l); return tv }
-func (tv *TreeElement) Height(l Length) *TreeElement    { tv.size.setHeight(l); return tv }
-func (tv *TreeElement) MinWidth(l Length) *TreeElement  { tv.size.setMinWidth(l); return tv }
-func (tv *TreeElement) MinHeight(l Length) *TreeElement { tv.size.setMinHeight(l); return tv }
-func (tv *TreeElement) MaxWidth(l Length) *TreeElement  { tv.size.setMaxWidth(l); return tv }
-func (tv *TreeElement) MaxHeight(l Length) *TreeElement { tv.size.setMaxHeight(l); return tv }
-func (tv *TreeElement) Grow(f float32) *TreeElement     { tv.size.setGrow(f); return tv }
+func (tv *TreeElement) Width(l Length) *TreeElement          { tv.size.setWidth(l); return tv }
+func (tv *TreeElement) Height(l Length) *TreeElement         { tv.size.setHeight(l); return tv }
+func (tv *TreeElement) MinWidth(l Length) *TreeElement       { tv.size.setMinWidth(l); return tv }
+func (tv *TreeElement) MinHeight(l Length) *TreeElement      { tv.size.setMinHeight(l); return tv }
+func (tv *TreeElement) MaxWidth(l Length) *TreeElement       { tv.size.setMaxWidth(l); return tv }
+func (tv *TreeElement) MaxHeight(l Length) *TreeElement      { tv.size.setMaxHeight(l); return tv }
+func (tv *TreeElement) Grow(f float32) *TreeElement          { tv.size.setGrow(f); return tv }
+func (tv *TreeElement) GridSpan(cols, rows int) *TreeElement { tv.size.setSpan(cols, rows); return tv }
 
 // FocusHandle lets code focus the tree (see NewFocusHandle). A Field that wraps
 // the control gives it its own handle, which takes precedence.

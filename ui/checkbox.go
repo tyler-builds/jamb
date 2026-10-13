@@ -240,6 +240,10 @@ func (c *CheckboxElement) MinHeight(l Length) *CheckboxElement { c.size.setMinHe
 func (c *CheckboxElement) MaxWidth(l Length) *CheckboxElement  { c.size.setMaxWidth(l); return c }
 func (c *CheckboxElement) MaxHeight(l Length) *CheckboxElement { c.size.setMaxHeight(l); return c }
 func (c *CheckboxElement) Grow(f float32) *CheckboxElement     { c.size.setGrow(f); return c }
+func (c *CheckboxElement) GridSpan(cols, rows int) *CheckboxElement {
+	c.size.setSpan(cols, rows)
+	return c
+}
 
 // Styles sets the look of the parts of the check box, for this instance only.
 // Set fields win over the theme's Checkbox and the defaults; see CheckboxStyle

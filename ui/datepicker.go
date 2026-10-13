@@ -295,6 +295,10 @@ func (d *DatePickerElement) MaxHeight(l Length) *DatePickerElement {
 	return d
 }
 func (d *DatePickerElement) Grow(f float32) *DatePickerElement { d.size.setGrow(f); return d }
+func (d *DatePickerElement) GridSpan(cols, rows int) *DatePickerElement {
+	d.size.setSpan(cols, rows)
+	return d
+}
 
 // Styles sets the look of the parts of the date picker, for this instance only. Set fields
 // win over the theme's DatePicker and the defaults; see DatePickerStyle and docs/styling.md.

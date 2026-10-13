@@ -173,6 +173,10 @@ func (p *ProgressBarElement) Width(l Length) *ProgressBarElement    { p.size.set
 func (p *ProgressBarElement) MinWidth(l Length) *ProgressBarElement { p.size.setMinWidth(l); return p }
 func (p *ProgressBarElement) MaxWidth(l Length) *ProgressBarElement { p.size.setMaxWidth(l); return p }
 func (p *ProgressBarElement) Grow(f float32) *ProgressBarElement    { p.size.setGrow(f); return p }
+func (p *ProgressBarElement) GridSpan(cols, rows int) *ProgressBarElement {
+	p.size.setSpan(cols, rows)
+	return p
+}
 
 // Color sets the color of the fill, for an app that has a color of its own, such as
 // a project's. The default is the theme accent. The app is responsible for the

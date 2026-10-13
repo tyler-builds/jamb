@@ -212,7 +212,11 @@ func (e *Engine) computeSize(n *Node, cbW, cbH, availW, forcedW, forcedH float32
 		if !isNaN(h) {
 			innerH = max(h-padV, 0)
 		}
-		cw, ch = e.flex(n, innerW, innerH, innerAvail, false)
+		if n.isGrid() {
+			cw, ch = e.grid(n, innerW, innerH, innerAvail, false)
+		} else {
+			cw, ch = e.flex(n, innerW, innerH, innerAvail, false)
+		}
 	}
 	if isNaN(w) {
 		w = clamp(cw+padH, minW, maxW)
@@ -256,6 +260,9 @@ func (e *Engine) minContentSize(n *Node, cbW float32) (float32, bool) {
 	}
 	if w := s.Width.resolve(cbW); !isNaN(w) && !s.ContentMin {
 		return clamp(w, minW, maxW), true
+	}
+	if n.isGrid() {
+		return clamp(e.gridMinContent(n)+n.padH(), minW, maxW), true
 	}
 	row := s.Direction == Row
 	var cw float32
@@ -306,7 +313,11 @@ func (e *Engine) arrange(n *Node) {
 		return
 	}
 	innerW, innerH := max(n.W-n.padH(), 0), max(n.H-n.padV(), 0)
-	e.flex(n, innerW, innerH, innerW, true)
+	if n.isGrid() {
+		e.grid(n, innerW, innerH, innerW, true)
+	} else {
+		e.flex(n, innerW, innerH, innerW, true)
+	}
 	e.arrangeAbsolute(n)
 
 	// Scrollable extent: farthest child edge plus trailing padding.

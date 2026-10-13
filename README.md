@@ -906,6 +906,36 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
   A double-click opens or closes it. Keys are kept by node key, so focus and the
   selection stay with their node as the rows scroll.
 
+### Grid layout
+
+`Div().Grid(columns...)` lays the children out in a grid instead of a row or a
+column, one per cell, row by row. It saves the nested rows of forms and dashboards:
+
+```go
+ui.Div().Grid(ui.Auto, ui.Fr(1), ui.Px(120)).Gap(12).
+	Child(ui.Text("Name")).Child(ui.TextInput(name)).Child(ui.Button("Check")).
+	Child(ui.Text("Notes")).Child(ui.TextArea(notes).GridSpan(2, 1))
+```
+
+- **Columns.** `ui.Px` and `ui.Percent` take that width. `ui.Auto` fits the widest
+  item in the column, and shrinks towards the narrowest wrap of its text when the
+  grid is too narrow. `ui.Fr(n)` takes n shares of what the others leave.
+- **Rows** are as tall as their tallest item. `GridRows(...)` sizes the first rows
+  the same way (an `Fr` row shares the grid's height, when it has one); the rest
+  fit their content.
+- **Spans.** `GridSpan(cols, rows)` (on a `Div`, `Text` and every widget with the
+  sizing methods) covers more cells. An item that does not fit in the rest of its
+  row starts the next one, and the cells it skipped stay empty. Items that span
+  tracks do not size `Auto` columns; a row grows to fit an item spanning into it.
+- **Cells.** Items fill their cells unless they have a size of their own. A
+  widget's default width (a text field's 240 px) gives way to the cell; a width
+  set with `Width` is kept. `AlignSelf`, or `Align` on the grid, places an item
+  in a taller row. `Gap` separates rows and columns.
+
+The style fields are `GridColumns`, `GridRows`, `ColSpan` and `RowSpan`, so a theme
+or a `Style` value can set them too. It is a subset of CSS grid: there are no named
+areas, explicit line placement, dense packing or subgrids.
+
 ### Split panes
 
 `ui.Split(first, second)` lays out two panes with a divider between them that the
@@ -3088,10 +3118,10 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   announce a message when pressed. The dev script step `idle` did not return after
   the Components page was scrolled three times (`wait` works); it was not
   investigated.
-- **Not attempted (non-goals).** Tray,
-  CSS grid, and the optional utility-class shorthand
-  (`.Class("flex col gap-2")`). The shorthand was skipped in favor of typed
-  styles.
+- **Not attempted (non-goals).** Tray icons, and the optional utility-class
+  shorthand (`.Class("flex col gap-2")`). The shorthand was skipped in favor of
+  typed styles. Grid layout, once a non-goal, is in (see Grid layout); it is a
+  subset of CSS grid, without named areas, explicit placement or subgrids.
 
 ## License
 

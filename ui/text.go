@@ -152,6 +152,13 @@ func (t *TextElement) NoWrap() *TextElement { t.noWrap = true; return t }
 // Grow lets the text take free space on its parent's main axis.
 func (t *TextElement) Grow(f float32) *TextElement { t.style.Grow = f; return t }
 
+// GridSpan makes the text cover cols columns and rows rows of the grid it is
+// in (see DivElement.Grid).
+func (t *TextElement) GridSpan(cols, rows int) *TextElement {
+	t.style.ColSpan, t.style.RowSpan = cols, rows
+	return t
+}
+
 // Width sets a fixed width, or a Percent or Full width of the parent. Text has no
 // defaults of its own, so a size set here is the one the text has (see Style).
 func (t *TextElement) Width(l Length) *TextElement { t.style.Width = l; return t }

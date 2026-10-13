@@ -1473,7 +1473,7 @@ func (rt *Runtime) restyle(id uint64) {
 	}
 	ls.MatchParentWidth = d.matchAnchor
 	ls.Hidden = d.noDisplay
-	if ls != n.lay.Style {
+	if !ls.Equal(n.lay.Style) {
 		n.lay.Style = ls
 		rt.invalidateLayout(n)
 	}

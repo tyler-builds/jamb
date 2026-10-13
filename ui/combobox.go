@@ -352,6 +352,10 @@ func (c *ComboboxElement[T]) MaxHeight(l Length) *ComboboxElement[T] {
 	return c
 }
 func (c *ComboboxElement[T]) Grow(f float32) *ComboboxElement[T] { c.size.setGrow(f); return c }
+func (c *ComboboxElement[T]) GridSpan(cols, rows int) *ComboboxElement[T] {
+	c.size.setSpan(cols, rows)
+	return c
+}
 
 // Styles sets the look of the parts of the combobox, for this instance only. Set
 // fields win over the theme's Combobox and the defaults; see ComboboxStyle and

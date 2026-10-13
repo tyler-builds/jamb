@@ -160,10 +160,11 @@ func (s *SwitchElement) OnChange(fn func(bool)) *SwitchElement { s.onChange = fn
 
 // The sizing methods give the track a width. The track is 38 px wide by default, and
 // the knob stays 3 px from the end it is at. See Sizing in docs/styling.md.
-func (s *SwitchElement) Width(l Length) *SwitchElement    { s.size.setWidth(l); return s }
-func (s *SwitchElement) MinWidth(l Length) *SwitchElement { s.size.setMinWidth(l); return s }
-func (s *SwitchElement) MaxWidth(l Length) *SwitchElement { s.size.setMaxWidth(l); return s }
-func (s *SwitchElement) Grow(f float32) *SwitchElement    { s.size.setGrow(f); return s }
+func (s *SwitchElement) Width(l Length) *SwitchElement          { s.size.setWidth(l); return s }
+func (s *SwitchElement) MinWidth(l Length) *SwitchElement       { s.size.setMinWidth(l); return s }
+func (s *SwitchElement) MaxWidth(l Length) *SwitchElement       { s.size.setMaxWidth(l); return s }
+func (s *SwitchElement) Grow(f float32) *SwitchElement          { s.size.setGrow(f); return s }
+func (s *SwitchElement) GridSpan(cols, rows int) *SwitchElement { s.size.setSpan(cols, rows); return s }
 
 // Styles sets the look of the parts of the switch, for this instance only. Set
 // fields win over the theme's Switch and the defaults; see SwitchStyle and

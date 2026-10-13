@@ -186,6 +186,39 @@ func (d *DivElement) Flex() *DivElement { return d }
 // Row lays children out horizontally.
 func (d *DivElement) Row() *DivElement { d.style.Direction = Row; return d }
 
+// Grid lays the children out in a grid, in place of a row or column: one cell
+// each, row by row, with a column for each size in columns. A column of Px or
+// Percent takes that width; Auto fits its widest item (shrinking towards the
+// narrowest wrap of its text when the grid is too narrow); Fr takes a share of
+// what the others leave. Rows are as tall as their tallest item, unless
+// GridRows sizes them. Gap separates rows and columns. A child covers more
+// cells with GridSpan; one that does not fit in the rest of its row starts the
+// next one. Items fill their cells unless they have a size of their own, and
+// AlignSelf (or Align on the grid) places them in a taller row.
+//
+//	ui.Div().Grid(ui.Auto, ui.Fr(1)).Gap(12).
+//		Child(ui.Text("Name")).Child(ui.TextInput(name)).
+//		Child(ui.Text("Notes")).Child(ui.TextArea(notes))
+func (d *DivElement) Grid(columns ...Length) *DivElement {
+	d.style.GridColumns = append([]Length(nil), columns...)
+	return d
+}
+
+// GridRows sizes the first rows of a grid, as Grid sizes its columns; rows
+// past them fit their content. Fr rows share the grid's height, when it has
+// one.
+func (d *DivElement) GridRows(rows ...Length) *DivElement {
+	d.style.GridRows = append([]Length(nil), rows...)
+	return d
+}
+
+// GridSpan makes the element cover cols columns and rows rows of the grid it
+// is in (see Grid).
+func (d *DivElement) GridSpan(cols, rows int) *DivElement {
+	d.style.ColSpan, d.style.RowSpan = cols, rows
+	return d
+}
+
 // Column lays children out vertically (the default).
 func (d *DivElement) Column() *DivElement { d.style.Direction = Column; return d }
 

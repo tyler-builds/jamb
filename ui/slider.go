@@ -174,10 +174,11 @@ func (s *SliderElement) Disabled(d bool) *SliderElement { s.disabled = d; return
 // The sizing methods give the slider's outer box a size, including its readout. A
 // slider fills its container by default, so Width(Px(240)) fixes it and
 // MinWidth keeps its track usable. See Sizing in docs/styling.md.
-func (s *SliderElement) Width(l Length) *SliderElement    { s.size.setWidth(l); return s }
-func (s *SliderElement) MinWidth(l Length) *SliderElement { s.size.setMinWidth(l); return s }
-func (s *SliderElement) MaxWidth(l Length) *SliderElement { s.size.setMaxWidth(l); return s }
-func (s *SliderElement) Grow(f float32) *SliderElement    { s.size.setGrow(f); return s }
+func (s *SliderElement) Width(l Length) *SliderElement          { s.size.setWidth(l); return s }
+func (s *SliderElement) MinWidth(l Length) *SliderElement       { s.size.setMinWidth(l); return s }
+func (s *SliderElement) MaxWidth(l Length) *SliderElement       { s.size.setMaxWidth(l); return s }
+func (s *SliderElement) Grow(f float32) *SliderElement          { s.size.setGrow(f); return s }
+func (s *SliderElement) GridSpan(cols, rows int) *SliderElement { s.size.setSpan(cols, rows); return s }
 
 // Format sets how the value is shown beside the track. The default shows the
 // value with as many decimals as the step has.

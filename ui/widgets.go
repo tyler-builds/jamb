@@ -231,13 +231,14 @@ func (b *ButtonElement) Disabled(d bool) *ButtonElement { b.disabled = d; return
 // The sizing methods give the button's outer box a size. A button is as wide as
 // its label by default, and Width(Full) fills its container (see Sizing in
 // docs/styling.md).
-func (b *ButtonElement) Width(l Length) *ButtonElement     { b.size.setWidth(l); return b }
-func (b *ButtonElement) Height(l Length) *ButtonElement    { b.size.setHeight(l); return b }
-func (b *ButtonElement) MinWidth(l Length) *ButtonElement  { b.size.setMinWidth(l); return b }
-func (b *ButtonElement) MinHeight(l Length) *ButtonElement { b.size.setMinHeight(l); return b }
-func (b *ButtonElement) MaxWidth(l Length) *ButtonElement  { b.size.setMaxWidth(l); return b }
-func (b *ButtonElement) MaxHeight(l Length) *ButtonElement { b.size.setMaxHeight(l); return b }
-func (b *ButtonElement) Grow(f float32) *ButtonElement     { b.size.setGrow(f); return b }
+func (b *ButtonElement) Width(l Length) *ButtonElement          { b.size.setWidth(l); return b }
+func (b *ButtonElement) Height(l Length) *ButtonElement         { b.size.setHeight(l); return b }
+func (b *ButtonElement) MinWidth(l Length) *ButtonElement       { b.size.setMinWidth(l); return b }
+func (b *ButtonElement) MinHeight(l Length) *ButtonElement      { b.size.setMinHeight(l); return b }
+func (b *ButtonElement) MaxWidth(l Length) *ButtonElement       { b.size.setMaxWidth(l); return b }
+func (b *ButtonElement) MaxHeight(l Length) *ButtonElement      { b.size.setMaxHeight(l); return b }
+func (b *ButtonElement) Grow(f float32) *ButtonElement          { b.size.setGrow(f); return b }
+func (b *ButtonElement) GridSpan(cols, rows int) *ButtonElement { b.size.setSpan(cols, rows); return b }
 
 // Label names the button for assistive technology. A button with text needs
 // no label, since its text is its name; an icon-only button does.
@@ -638,6 +639,10 @@ func (ti *TextInputElement) MinHeight(l Length) *TextInputElement { ti.size.setM
 func (ti *TextInputElement) MaxWidth(l Length) *TextInputElement  { ti.size.setMaxWidth(l); return ti }
 func (ti *TextInputElement) MaxHeight(l Length) *TextInputElement { ti.size.setMaxHeight(l); return ti }
 func (ti *TextInputElement) Grow(f float32) *TextInputElement     { ti.size.setGrow(f); return ti }
+func (ti *TextInputElement) GridSpan(cols, rows int) *TextInputElement {
+	ti.size.setSpan(cols, rows)
+	return ti
+}
 
 // Borderless drops the field's frame and padding, for inputs that should
 // look like plain text until clicked (titles, inline renames). The Frame part
@@ -736,6 +741,10 @@ func (ta *TextAreaElement) MinHeight(l Length) *TextAreaElement { ta.size.setMin
 func (ta *TextAreaElement) MaxWidth(l Length) *TextAreaElement  { ta.size.setMaxWidth(l); return ta }
 func (ta *TextAreaElement) MaxHeight(l Length) *TextAreaElement { ta.size.setMaxHeight(l); return ta }
 func (ta *TextAreaElement) Grow(f float32) *TextAreaElement     { ta.size.setGrow(f); return ta }
+func (ta *TextAreaElement) GridSpan(cols, rows int) *TextAreaElement {
+	ta.size.setSpan(cols, rows)
+	return ta
+}
 
 // MinRows sets the minimum height in lines (default 3).
 func (ta *TextAreaElement) MinRows(n int) *TextAreaElement { ta.minRows = n; return ta }

@@ -17,6 +17,10 @@ func Px(v float32) Length { return layout.Px(v) }
 // Percent returns a length relative to the parent's content box.
 func Percent(v float32) Length { return layout.Percent(v) }
 
+// Fr returns a flexible grid track that takes v shares of the space the other
+// tracks leave (see DivElement.Grid). Elsewhere it acts as Auto.
+func Fr(v float32) Length { return layout.Fr(v) }
+
 // Auto sizes from content (or stretches, depending on alignment).
 var Auto = layout.Auto
 
@@ -143,9 +147,12 @@ type Style struct {
 	// contentMin lets the element shrink below its fixed width to its content's
 	// min-content width (see layout.Style.ContentMin); text fields use it.
 	contentMin bool
-	Align      Alignment // children on the cross axis
-	AlignSelf  Alignment
-	Justify    Alignment // children on the main axis
+	// softWidth marks Width as a widget's default, which a grid cell overrides
+	// (see layout.Style.SoftWidth); sizing sets it when the app gave no width.
+	softWidth bool
+	Align     Alignment // children on the cross axis
+	AlignSelf Alignment
+	Justify   Alignment // children on the main axis
 	// Absolute removes the element from the flow; position it with Inset.
 	Absolute  bool
 	Inset     Edges
@@ -153,6 +160,12 @@ type Style struct {
 	OverflowX Overflow
 	OverflowY Overflow
 	ZIndex    int
+	// GridColumns makes the element a grid (see DivElement.Grid), with one
+	// track per column; GridRows sizes its first rows, and the others fit their
+	// content. ColSpan and RowSpan make a grid item cover that many columns and
+	// rows; 0 means 1.
+	GridColumns, GridRows []Length
+	ColSpan, RowSpan      int
 
 	// Visuals
 	Background  Color
@@ -259,6 +272,18 @@ func (s Style) Merge(o Style) Style {
 	mergeF(&s.Grow, o.Grow)
 	mergeF(&s.Shrink, o.Shrink)
 	mergeLen(&s.Basis, o.Basis)
+	if o.GridColumns != nil {
+		s.GridColumns = o.GridColumns
+	}
+	if o.GridRows != nil {
+		s.GridRows = o.GridRows
+	}
+	if o.ColSpan != 0 {
+		s.ColSpan = o.ColSpan
+	}
+	if o.RowSpan != 0 {
+		s.RowSpan = o.RowSpan
+	}
 	s.NoShrink = s.NoShrink || o.NoShrink
 	s.fitWidth = s.fitWidth || o.fitWidth
 	s.contentMin = s.contentMin || o.contentMin
@@ -402,6 +427,7 @@ func (s *Style) layoutStyle(shrinkDefault float32) layout.Style {
 	ls.AlignSelf = align(s.AlignSelf)
 	ls.FitWidth = s.fitWidth
 	ls.ContentMin = s.contentMin
+	ls.SoftWidth = s.softWidth
 	if s.Absolute {
 		ls.Position = layout.Absolute
 		in := [4]*Length{&ls.Top, &ls.Right, &ls.Bottom, &ls.Left}
@@ -413,6 +439,10 @@ func (s *Style) layoutStyle(shrinkDefault float32) layout.Style {
 	}
 	ls.OverflowX = layout.Overflow(s.OverflowX)
 	ls.OverflowY = layout.Overflow(s.OverflowY)
+	if len(s.GridColumns) > 0 {
+		ls.Grid = &layout.Grid{Columns: s.GridColumns, Rows: s.GridRows}
+	}
+	ls.ColSpan, ls.RowSpan = s.ColSpan, s.RowSpan
 	return ls
 }
 
