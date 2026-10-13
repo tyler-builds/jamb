@@ -259,6 +259,19 @@ func (p *Path) ArcTo(rx, ry, rotation float32, large, sweep bool, x, y float32) 
 	p.pts[len(p.pts)-1] = p.cur
 }
 
+// Bounds returns the box of the path's points, control points included, and
+// false for an empty path.
+func (p *Path) Bounds() (x0, y0, x1, y1 float32, ok bool) {
+	if len(p.pts) == 0 {
+		return 0, 0, 0, 0, false
+	}
+	x0, y0, x1, y1 = p.pts[0].X, p.pts[0].Y, p.pts[0].X, p.pts[0].Y
+	for _, pt := range p.pts[1:] {
+		x0, y0, x1, y1 = min(x0, pt.X), min(y0, pt.Y), max(x1, pt.X), max(y1, pt.Y)
+	}
+	return x0, y0, x1, y1, true
+}
+
 // Transform returns the path with every point transformed by m.
 func (p *Path) Transform(m Matrix) *Path {
 	q := &Path{verbs: append([]verb(nil), p.verbs...), pts: make([]Point, len(p.pts)), hasCur: p.hasCur}

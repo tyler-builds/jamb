@@ -363,7 +363,8 @@ ui.Canvas(func(p *ui.Painter, w, h float32) {
 - **State.** `Save` and `Restore` around `Translate`, `Scale`, `Rotate`, `Clip` and
   `Alpha`.
 - **Text.** `Text` places one line at a point, aligned with `Align` and `VAlign`,
-  and `MeasureText` sizes it. Text uses the text renderer (ClearType where it is
+  in the inherited text color unless `Color` is set (`p.TextColor()` returns it,
+  to draw shapes that match), and `MeasureText` sizes it. Text uses the text renderer (ClearType where it is
   on) and is drawn over the shapes; it follows the transform's position but is
   not rotated, scaled or clipped.
 
@@ -377,6 +378,34 @@ The canvas is a `Div` (300x150 by default): size it with `Size`, take the pointe
 with `OnMouseMove` and the others, whose `LocalX` and `LocalY` are canvas
 coordinates when it has no padding or border, and add children to lay elements
 over the drawing. Assistive technology sees an image named by `Label`.
+
+### SVG images
+
+`ui.SVG(src)` draws an SVG file, sharp at any size, scale and zoom:
+
+```go
+//go:embed logo.svg
+var logoSVG []byte
+var logo = ui.MustSVG(logoSVG) // parse once
+
+ui.SVG(logo).Size(ui.Px(120), ui.Px(40)).Alt("Acme")
+```
+
+It takes the image's own size (width and height, else the viewBox) unless `Size`
+sets one, and fits the image in its box as its `preserveAspectRatio` says.
+`currentColor` is the inherited text color, as for an `Icon`, so monochrome icon
+sets such as Lucide's or Heroicons' SVG files follow the text and the theme;
+`Color` sets it instead, and high contrast always uses the text color. Without
+`Alt` the image is decorative and left out of the access tree.
+
+What is drawn: paths and the basic shapes, groups, `use` and `symbol`, transforms,
+fills and strokes (caps, joins, dashes) in colors or linear and radial gradients,
+fill rules, opacity, clip paths, and styles from presentation attributes, `style`
+attributes and style sheets whose selectors are a type, a class or an id (as
+Illustrator and Figma write them). What is not: text, filters, masks, patterns,
+markers, embedded images and animation. An SVG is drawn with the canvas's
+rasterizer and drawn again only when its size, scale or color changes, so a list
+of icons does not redraw when its component renders.
 
 ### Focus and the keyboard
 

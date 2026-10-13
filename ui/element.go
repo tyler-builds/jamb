@@ -47,7 +47,10 @@ type handlers struct {
 // background, border, radius, shadow, clipping, scrolling and event handlers.
 // Create one with Div and configure it with chained methods.
 type DivElement struct {
-	canvas       func(p *Painter, w, h float32) // see Canvas
+	canvas func(p *Painter, w, h float32) // see Canvas
+	// canvasKey, when set, says what the drawing depends on: it is drawn again
+	// when the key changes, rather than whenever the element is built (see SVG).
+	canvasKey    any
 	style        Style
 	hover        *Style
 	pressed      *Style

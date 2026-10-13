@@ -42,8 +42,13 @@ type Painter struct {
 	c     *vector.Canvas
 	rt    *Runtime
 	k     float32 // physical pixels per logical pixel
+	fg    Color
 	texts *[]canvasText
 }
+
+// TextColor returns the text color the canvas inherits, as text in its place
+// would be drawn, to draw shapes that match the text around them.
+func (p *Painter) TextColor() Color { return p.fg }
 
 // canvasText is text a Painter placed, drawn over the canvas's image.
 type canvasText struct {
@@ -211,7 +216,7 @@ type StrokeStyle struct {
 // TextStyle is how Painter.Text draws text.
 type TextStyle struct {
 	Size   float32 // 0 means the theme's text size
-	Color  Color   // zero means the theme's text color
+	Color  Color   // zero means the inherited text color (see Painter.TextColor)
 	Weight FontWeight
 	// Align places the text horizontally against x: Start puts its left edge
 	// there, Center its middle, End its right edge. VAlign does the same
@@ -289,7 +294,7 @@ func (p *Painter) Text(x, y float32, s string, st TextStyle) {
 	y -= alignShift(st.VAlign, l.Height)
 	c := st.Color
 	if c.IsZero() {
-		c = p.rt.theme.Text
+		c = p.fg
 	}
 	*p.texts = append(*p.texts, canvasText{x: x, y: y, l: l, color: c})
 }
@@ -330,13 +335,16 @@ type canvasState struct {
 	vc     *vector.Canvas
 	tex    *scene.Texture
 	el     *DivElement // the element the drawing is of; a new one draws again
+	key    any         // or, when the element has a canvasKey, that key
+	fg     Color       // the inherited text color it was drawn with
 	pw, ph int         // the drawing's size in physical pixels
 	texts  []canvasText
 }
 
 // paintCanvas draws a canvas div's drawing in its content box, at x, y of
-// size w x h, drawing it again first when needed.
-func (rt *Runtime) paintCanvas(n *node, x, y, w, h, opacity float32) {
+// size w x h, drawing it again first when needed. fg is the inherited text
+// color.
+func (rt *Runtime) paintCanvas(n *node, x, y, w, h float32, fg Color, opacity float32) {
 	s := &n.style
 	be := s.borderEdges()
 	box := scene.Rect{X: x + be.Left + s.Padding.Left, Y: y + be.Top + s.Padding.Top}
@@ -356,13 +364,17 @@ func (rt *Runtime) paintCanvas(n *node, x, y, w, h, opacity float32) {
 		cs = &canvasState{vc: vector.NewCanvas(pw, ph)}
 		st.canvas = cs
 	}
-	if cs.el != n.div || cs.pw != pw || cs.ph != ph {
-		cs.el, cs.pw, cs.ph = n.div, pw, ph
+	changed := cs.el != n.div
+	if key := n.div.canvasKey; key != nil {
+		changed = cs.key != key
+	}
+	if changed || cs.pw != pw || cs.ph != ph || cs.fg != fg {
+		cs.el, cs.key, cs.fg, cs.pw, cs.ph = n.div, n.div.canvasKey, fg, pw, ph
 		cs.texts = cs.texts[:0]
 		cs.vc.Reset(pw, ph)
 		k := float32(pw) / box.W
 		cs.vc.SetTransform(vector.Scale(k, float32(ph)/box.H))
-		n.div.canvas(&Painter{c: cs.vc, rt: rt, k: k, texts: &cs.texts}, box.W, box.H)
+		n.div.canvas(&Painter{c: cs.vc, rt: rt, k: k, fg: fg, texts: &cs.texts}, box.W, box.H)
 		img := cs.vc.Image()
 		if cs.tex == nil || cs.tex.Width != pw || cs.tex.Height != ph {
 			// The texture keeps its ID through size changes, so the renderer
