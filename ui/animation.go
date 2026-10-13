@@ -44,7 +44,9 @@ type animState struct {
 
 // expand renders fn for the progress now. An animation that is still running
 // registers its instance, so the next Frame renders it again; one that has
-// ended renders its last value and then nothing more.
+// ended renders its last value and then nothing more. Whether the instance
+// keeps asking for frames is decided after the paint (see settleAnims), since
+// an instance the paint does not draw has no need of them.
 func (a *AnimateElement) expand(ctx *Context) Element {
 	if a.fn == nil {
 		return nil
@@ -61,8 +63,7 @@ func (a *AnimateElement) expand(ctx *Context) Element {
 		p = float32(now.Sub(st.anim.start).Seconds() / d.Seconds())
 	}
 	running := p < 1
-	looping := a.anim.Repeat && a.anim.Duration > 0
-	if looping {
+	if a.anim.looping() {
 		running = true
 		p -= float32(math.Floor(float64(p)))
 	}
@@ -70,24 +71,130 @@ func (a *AnimateElement) expand(ctx *Context) Element {
 	if rt.sys.ReducedMotion {
 		// With reduced motion a finite animation jumps to its end, and a
 		// repeating one stops at its first frame, so nothing asks for a frame.
-		running, looping = false, false
+		running = false
 		p = 1
-		if a.anim.Repeat && a.anim.Duration > 0 {
+		if a.anim.looping() {
 			p = 0
 		}
 	}
-	if running && rt.undisplayed(ctx.inst.parentNode) {
-		// Hidden by Display: the animation asks for no frame (see holdAnim).
-		rt.holdAnim(ctx.inst)
-	} else if running {
-		if looping {
-			rt.looping = true
-		} else {
-			rt.animating = true
-		}
+	if running {
 		rt.animInsts = append(rt.animInsts, ctx.inst)
 	}
 	return a.fn(a.anim.easing()(p))
+}
+
+// looping reports whether the animation repeats forever.
+func (a Animation) looping() bool { return a.Repeat && a.Duration > 0 }
+
+// settleAnims decides which running Animate instances keep the frames coming,
+// once the frame's paint is done. An instance whose element that paint drew
+// keeps going. One it did not draw (scrolled or clipped out of view, or hidden
+// by Display) asks for no frame and waits in pausedAnims. Its progress is
+// time based, so when a later paint draws it again it is rendered at the
+// progress of that moment and runs on from there, with no jump. Without a paint
+// this frame nothing can be told apart, so every instance keeps going.
+func (rt *Runtime) settleAnims(painted bool) {
+	for pass := 0; ; pass++ {
+		kept := rt.animInsts[:0]
+		for _, inst := range rt.animInsts {
+			if inst.disposed {
+				continue
+			}
+			if painted && !rt.drawn(inst) {
+				// An instance the paint did not draw gets one more render before it
+				// pauses. A reused instance whose parent was rebuilt keeps its old
+				// root, which is no longer in the tree; rendering it again attaches
+				// the new one. Without this grace the animation would never be drawn.
+				if _, paused := rt.pausedAnims[inst]; paused {
+					continue
+				}
+				if _, graced := rt.graceAnims[inst]; graced {
+					delete(rt.graceAnims, inst)
+					rt.pauseAnim(inst)
+					continue
+				}
+				rt.addGrace(inst)
+			} else {
+				if len(rt.pausedAnims) > 0 {
+					delete(rt.pausedAnims, inst)
+				}
+				if len(rt.graceAnims) > 0 {
+					delete(rt.graceAnims, inst)
+				}
+			}
+			kept = append(kept, inst)
+			if a, ok := inst.el.(*AnimateElement); ok && a.anim.looping() {
+				rt.looping = true
+			} else {
+				rt.animating = true
+			}
+		}
+		clear(rt.animInsts[len(kept):])
+		rt.animInsts = kept
+		// A paused instance that is drawn now is rendered again, and the frame
+		// is painted again so the new progress shows. Its render registers it
+		// for the next pass. The passes are bounded: each one resumes only the
+		// instances that a paint has just drawn.
+		if !painted || pass == 2 || !rt.resumeAnims() {
+			return
+		}
+		if rt.needLayout {
+			rt.layout()
+		}
+		rt.paintFrame(0)
+	}
+}
+
+// drawn reports whether the last paint drew inst's element.
+func (rt *Runtime) drawn(inst *componentInstance) bool {
+	return inst.root != nil && inst.root.paintGen == rt.paintGen
+}
+
+// addGrace records a running instance that the paint did not draw, for its one
+// more render (see settleAnims).
+func (rt *Runtime) addGrace(inst *componentInstance) {
+	if rt.graceAnims == nil {
+		rt.graceAnims = map[*componentInstance]struct{}{}
+	}
+	rt.graceAnims[inst] = struct{}{}
+}
+
+// pauseAnim records a running instance that the paint did not draw.
+func (rt *Runtime) pauseAnim(inst *componentInstance) {
+	if rt.pausedAnims == nil {
+		rt.pausedAnims = map[*componentInstance]struct{}{}
+	}
+	rt.pausedAnims[inst] = struct{}{}
+}
+
+// resumeAnims renders again the paused instances that the last paint drew, so
+// that they show their progress at this moment. It reports whether any did.
+func (rt *Runtime) resumeAnims() bool {
+	for inst := range rt.graceAnims {
+		if inst.disposed {
+			delete(rt.graceAnims, inst)
+		}
+	}
+	var resume []*componentInstance
+	for inst := range rt.pausedAnims {
+		if inst.disposed {
+			delete(rt.pausedAnims, inst)
+			continue
+		}
+		if rt.drawn(inst) {
+			delete(rt.pausedAnims, inst)
+			resume = append(resume, inst)
+		}
+	}
+	if len(resume) > 0 {
+		// A build pass of its own, as rebuildDirty runs: the instances render
+		// under a new generation, so each claims its identity afresh.
+		rt.gen++
+		for _, inst := range resume {
+			rt.rerender(inst)
+		}
+	}
+	return len(resume) > 0
 }
 
 // easing returns the easing function of a, the default when none is set.

@@ -532,8 +532,12 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 // caretVisible implements blinking: on, then off, each for the system's blink
 // time (530 ms by default), starting at the last activity, and solid after a
 // while of inactivity or when the system's blink is off. While it blinks it
-// schedules exactly the frames needed to toggle it.
+// schedules exactly the frames needed to toggle it. In a window that is not
+// active the caret is hidden and nothing blinks, as a native text field does.
 func (rt *Runtime) caretVisible(es *editState) bool {
+	if rt.windowInactive {
+		return false
+	}
 	since := rt.lastFrame.Sub(es.activity)
 	if since < 0 || since >= caretBlinkStop || rt.sys.CaretBlinkOff {
 		return true

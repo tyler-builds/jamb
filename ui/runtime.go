@@ -264,18 +264,19 @@ type Runtime struct {
 	posted []func()
 
 	needLayout, needPaint bool
-	animating             bool                 // something animates: the next frame must come
-	looping               bool                 // a repeating Animate runs: the next frame must come, but it never ends
-	animInsts             []*componentInstance // Animate instances that were running; re-rendered by the next Frame
-	hiddenAnims           []*componentInstance // Animate instances held back while hidden by Display (see revealAnims)
-	listStale             bool                 // a UniformList must rebuild its rows before the frame ends
-	toasts                []*toastEntry        // the stack of toasts, oldest first (see Context.Toast)
-	toastNext             uint64               // the ID of the last toast made
-	toastVer              *Signal[int]         // changes when the stack changes; the Toaster renders it
-	toastAt               time.Time            // when the toasts last ran their time
-	toastMax              int                  // how many toasts show at once (0: the default)
-	toastRegion           uint64               // the node ID of the toast region, 0 when none is shown
-	toastReturn           uint64               // the focus before the toast region took it (F6)
+	animating             bool                            // something animates: the next frame must come
+	looping               bool                            // a repeating Animate runs: the next frame must come, but it never ends
+	animInsts             []*componentInstance            // Animate instances that were running; re-rendered by the next Frame
+	pausedAnims           map[*componentInstance]struct{} // running Animate instances the last paint did not draw (see settleAnims)
+	graceAnims            map[*componentInstance]struct{} // Animate instances the last paint did not draw, given one more render first
+	listStale             bool                            // a UniformList must rebuild its rows before the frame ends
+	toasts                []*toastEntry                   // the stack of toasts, oldest first (see Context.Toast)
+	toastNext             uint64                          // the ID of the last toast made
+	toastVer              *Signal[int]                    // changes when the stack changes; the Toaster renders it
+	toastAt               time.Time                       // when the toasts last ran their time
+	toastMax              int                             // how many toasts show at once (0: the default)
+	toastRegion           uint64                          // the node ID of the toast region, 0 when none is shown
+	toastReturn           uint64                          // the focus before the toast region took it (F6)
 	scrolled              bool
 	wake                  func()
 	warn                  func(string)
@@ -290,6 +291,9 @@ type Runtime struct {
 	// keyboardModality is true when the last input was a key press and false
 	// after a pointer press. FocusVisible styles show only while it is true.
 	keyboardModality bool
+	// windowInactive is set while the window is not the active window (see
+	// WindowFocus). A text field's caret is then neither drawn nor blinked.
+	windowInactive bool
 	// revealFocus asks the next paint to scroll the focused element into view
 	// (set by Tab), in its nearest vertically scrolling ancestor.
 	revealFocus bool
@@ -606,7 +610,7 @@ func (rt *Runtime) Stats() FrameStats { return rt.stats }
 
 // NeedsFrame reports whether something changed since the last Frame.
 func (rt *Runtime) NeedsFrame() bool {
-	return rt.looping || !rt.Settled() || rt.toastsTimed()
+	return rt.looping || !rt.Settled()
 }
 
 // Settled reports whether the UI has come to rest: nothing changed since the
@@ -627,7 +631,9 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 	rt.animating, rt.looping = false, false
 	dt := float32(0.016)
 	if !rt.lastFrame.IsZero() {
-		dt = min(float32(now.Sub(rt.lastFrame).Seconds()), 0.1)
+		// Never negative: a clock that steps back would make the easing factors
+		// (and so the colors) infinite or NaN, and nothing would ever settle.
+		dt = min(max(float32(now.Sub(rt.lastFrame).Seconds()), 0), 0.1)
 	}
 	rt.lastFrame = now
 	rt.stats = FrameStats{Restyled: rt.restyled}
@@ -636,6 +642,7 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 	rt.runPosted()
 	rt.expirePending(now)
 	rt.tickToasts(now)
+	rt.wakeToasts(now)
 	if rt.tipCandidate != 0 && rt.tipShown != rt.tipCandidate && rt.tipCandidate != rt.tipDismissed && !now.Before(rt.tipAt) {
 		rt.showTip(rt.tipCandidate)
 	}
@@ -670,7 +677,8 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 	// A drag near a scroll container's edge scrolls it; the target under the
 	// pointer is found again once the content has moved.
 	dragScrolled := rt.autoscrollDrag(dt)
-	if rt.needPaint || continuing || rt.animating || rt.looping {
+	painted := rt.needPaint || continuing || rt.animating || rt.looping
+	if painted {
 		rt.paintFrame(dt)
 	}
 	if dragScrolled {
@@ -687,12 +695,14 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 			rt.layout()
 		}
 		rt.paintFrame(0)
+		painted = true
 	}
 	if relayout || rt.scrolled {
 		// Content may have moved under a stationary pointer.
 		rt.scrolled = false
 		rt.updateHover()
 	}
+	rt.settleAnims(painted)
 	rt.publishAccess()
 	rt.stats.Nodes = len(rt.byID)
 	rt.stats.Quads, rt.stats.Glyphs = len(rt.scene.Quads), len(rt.scene.Glyphs)
@@ -869,7 +879,6 @@ func (rt *Runtime) rebuildDirty() {
 			}
 		}
 	}
-	rt.revealAnims()
 }
 
 func (rt *Runtime) rootTextStyle() textStyle {

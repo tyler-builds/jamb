@@ -806,6 +806,10 @@ func (rt *Runtime) deliverText(s string) {
 // WindowFocus reports the window gaining or losing focus.
 func (rt *Runtime) WindowFocus(focused bool) {
 	rt.focused.Set(focused)
+	// The caret of a text field is drawn only while the window is active, so
+	// the change to it is painted here (see caretVisible).
+	rt.windowInactive = !focused
+	rt.needPaint = true
 	if !focused {
 		rt.setPressed(nil)
 		rt.cancelDrag()

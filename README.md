@@ -140,7 +140,10 @@ Each concern is replaceable independently:
    previous frame stays pinned 1:1 instead of being stretched, and frames for
    a new size are presented without waiting for vsync.
 6. **Idle.** If nothing changed, the loop blocks in `GetMessage` and uses
-   0% CPU. Animations keep it rendering, paced by vsync.
+   0% CPU. Animations keep it rendering, paced by vsync, but only those drawn
+   on screen. A covered window stops rendering until DXGI reports it visible
+   again (`RegisterOcclusionStatusWindow`). A shown toast wakes the window when
+   its time runs out, and a caret wakes it at each blink.
 
 ## API guide
 
@@ -930,7 +933,8 @@ ctx.Toast(ui.ToastSuccess, "Project created").Action("Undo", undo) // in a handl
   own time with `Duration`, stay until dismissed with `Sticky`, or go with `Dismiss`.
   By default an info toast stays 5 seconds, a success toast 4, a warning toast 8, and an
   error toast until it is dismissed. Its time does not run while the pointer is over it
-  or keyboard focus is in it. The stack shows 3 toasts at most (`Toaster().Max(n)`).
+  or keyboard focus is in it. A shown toast asks for no frames while its time
+  runs: the window is woken when the toast runs out. The stack shows 3 toasts at most (`Toaster().Max(n)`).
   When a new toast would pass the limit, the oldest toast that is neither hovered nor
   holding keyboard focus goes. A toast a user is reading or using is kept, and if every
   toast is in use the stack grows for the time being. The stack sits in the window's
@@ -1059,6 +1063,11 @@ ui.Animate("bar", ui.Animation{Duration: 600 * time.Millisecond, Easing: ease.Ou
   0..1; nil is ease-out cubic. `Repeat` loops forever (for `Animate`). An
   `Animate` restarts from 0 when its key changes, and stops asking for frames
   when it ends: after the end its function runs once more with t = 1.
+- An animation whose element is out of view asks for no frames either: clipped
+  or scrolled out of the viewport, hidden by `Display(false)`, or in a window
+  that is minimized or covered by another window. The progress is time based,
+  so when the element is drawn again the animation shows the progress of that
+  moment and runs on from there, with no jump.
 - `github.com/tyler-builds/jamb/ease` has `Linear`, `In`, `Out`, `InOut` (quadratic), `InCubic`,
   `OutCubic`, `InOutCubic`, `Bounce(f)` (out and back) and `Reverse(f)`.
 - `.Offset(x, y)` moves an element after layout: its place in the flow does
@@ -2078,6 +2087,8 @@ no code):
 - **Text cursor.** The caret of a text field blinks at the system's blink time
   (`GetCaretBlinkTime`; a blink time of infinity keeps it solid) and is as thick as
   the system's cursor thickness (`SPI_GETCARETWIDTH`) times 1.5 logical pixels.
+  In a window that is not the active window the caret is hidden and does not
+  blink, as a native text field does; it returns when the window is activated.
 
 The settings are read at start and again on `WM_SETTINGCHANGE` and
 `WM_SYSCOLORCHANGE`, so a change shows without a restart. jamb reads them and

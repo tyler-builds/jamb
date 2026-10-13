@@ -211,6 +211,7 @@ func (rt *Runtime) toast(v ToastVariant, text string) *Toast {
 		rt.toasts = slices.Delete(rt.toasts, i, i+1)
 	}
 	rt.bumpToasts()
+	rt.wakeToasts(rt.now()) // a toast's end is a wake-up, even when no frame is asked for
 	p := access.Polite
 	if v >= ToastWarning {
 		p = access.Assertive
@@ -261,6 +262,18 @@ func (rt *Runtime) toastsTimed() bool {
 		}
 	}
 	return false
+}
+
+// wakeToasts asks for a frame at the moment the next running toast runs out, so
+// that a shown toast needs no frames while its time runs. A paused toast (hovered,
+// or with focus inside) asks for none: the pause ending changes what is drawn, and
+// that asks for a frame of its own.
+func (rt *Runtime) wakeToasts(now time.Time) {
+	for _, e := range rt.toasts {
+		if !e.sticky && !e.hovered && !rt.focusWithin(toastKey(e.id)) {
+			rt.wakeAt(now.Add(e.left))
+		}
+	}
 }
 
 // tickToasts runs the time of each toast that is not paused, and dismisses the

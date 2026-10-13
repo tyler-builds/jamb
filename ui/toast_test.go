@@ -233,12 +233,34 @@ func TestToastRegionEscapeReturnsFocus(t *testing.T) {
 	}
 }
 
-func TestToastTimeWaitsForAnAnimationFrame(t *testing.T) {
+// A toast's time runs without frames: the runtime asks to be woken when the
+// toast runs out, and dismisses it then.
+func TestToastWakesWhenItRunsOut(t *testing.T) {
 	r := toastRig(t)
+	var wakes []time.Time
+	r.rt.SetServices(Services{WakeAt: func(at time.Time) { wakes = append(wakes, at) }})
 	r.rt.toast(ToastInfo, "Saved")
-	r.frame()
-	if !r.rt.NeedsFrame() {
-		t.Error("a toast on screen asks for no frames, so its time would not run")
+	created := r.now
+	// The toast's entrance transition runs for a few frames first.
+	for i := 0; i < 100 && r.rt.NeedsFrame(); i++ {
+		r.frame()
+	}
+	if r.rt.NeedsFrame() {
+		t.Fatal("a toast on screen asks for frames after its entrance")
+	}
+	end := created.Add(toastDefaultTime(ToastInfo))
+	if len(wakes) == 0 || !wakes[len(wakes)-1].Equal(end) {
+		t.Fatalf("wake-ups %v, want the toast's end at %v", wakes, end)
+	}
+	r.now = end.Add(-time.Millisecond)
+	r.rt.Frame(r.now)
+	if len(r.rt.toasts) != 1 {
+		t.Fatal("the toast was dismissed before its time ran out")
+	}
+	r.now = end
+	r.rt.Frame(r.now)
+	if len(r.rt.toasts) != 0 {
+		t.Error("the toast is still shown when its time has run out")
 	}
 }
 

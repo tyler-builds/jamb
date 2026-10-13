@@ -569,6 +569,11 @@ func (h *host) OnFrame(w platform.Window) bool {
 		h.err = err
 		return false
 	}
+	if o, ok := h.r.(interface{ Occluded() bool }); ok && o.Occluded() {
+		// Covered by another window: the frame was not shown, so the window
+		// stops asking for frames until DXGI wakes it (see render/d3d11).
+		return false
+	}
 	h.frames++
 	if h.frames == 1 {
 		if h.primary {

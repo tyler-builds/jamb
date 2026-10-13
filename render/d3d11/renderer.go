@@ -144,7 +144,18 @@ type Renderer struct {
 	swapFlags   uint32
 	resized     bool // the swap chain changed size this frame
 	presentWait time.Duration
+	// occluded is set when the last Present found the window covered by another
+	// window, so its frame was not shown. occlusionFactory and occlusionCookie
+	// record the registration that wakes the window when it is visible again.
+	occluded         bool
+	occlusionFactory *com
+	occlusionCookie  uint32
 }
+
+// Occluded reports whether the last frame was not shown because another window
+// covers this one. Such a window should stop asking for frames until it is
+// woken: DXGI posts win32.WM_OCCLUSION to it when it is visible again.
+func (r *Renderer) Occluded() bool { return r.occluded }
 
 // Describe summarizes the swap chain configuration, for diagnostics.
 func (r *Renderer) Describe() string {
@@ -777,7 +788,8 @@ func (r *Renderer) EndFrame() error {
 	t0 := time.Now()
 	hr, _, _ = syscall.SyscallN(r.swap.fn(8), r.swap.this(), sync, 0) // Present
 	r.presentWait = time.Since(t0)
-	if hr == dxgiStatusOccluded {
+	r.occluded = hr == dxgiStatusOccluded
+	if r.occluded {
 		return nil
 	}
 	return r.checkDevice("IDXGISwapChain::Present", hr)
@@ -1010,11 +1022,30 @@ func flipWaitable(effect uint32) uint32 {
 // device limits the latency, as it always did.
 func (r *Renderer) finishSwapChain(swap *com, flags uint32) {
 	r.swap, r.swapFlags = swap, flags
+	r.watchOcclusion()
 	if flags&dxgiSwapChainFlagWaitable != 0 && r.attachWaitable() {
 		return
 	}
 	r.swapFlags = flags &^ dxgiSwapChainFlagWaitable
 	r.limitLatency()
+}
+
+// watchOcclusion asks DXGI to post win32.WM_OCCLUSION to the window when its
+// occlusion state changes. The registration is made once per factory: DXGI
+// keeps it for the factory's life, and a window that was covered is woken by
+// it when it shows again. Without it the window would stop only until the
+// next input.
+func (r *Renderer) watchOcclusion() {
+	if r.occlusionCookie != 0 && r.occlusionFactory == r.factory {
+		return
+	}
+	var cookie uint32
+	hr, _, _ := syscall.SyscallN(r.factory.fn(21), r.factory.this(), r.hwnd, win32.WM_OCCLUSION,
+		uintptr(unsafe.Pointer(&cookie))) // IDXGIFactory2::RegisterOcclusionStatusWindow
+	if hresult(hr).failed() {
+		return
+	}
+	r.occlusionFactory, r.occlusionCookie = r.factory, cookie
 }
 
 // attachWaitable asks the swap chain for its waitable object and limits its

@@ -121,6 +121,73 @@ three runs each, after 6 s idle):
   renderer now names cache files with FNV-128, and jamb imports no crypto
   package.
 
+### Idle work: animations, occlusion, caret and toasts (2026-10-12)
+
+The idle audit looked for work the app does when nothing changes. Method: each
+binary runs alone for 60 s after a 5 s settle. CPU is the change in the
+process's `TotalProcessorTime`. Wake-ups are the process's
+`ContextSwitchesPersec`, summed over its threads (`Win32_PerfRawData_PerfProc_Thread`,
+read at the start and end of the window). The frame count is the number of
+`JAMB_TRACE` per-second lines. Each run has its own focus state, read back
+with `GetForegroundWindow`. A process takes the foreground after an Alt tap, because
+Windows refuses `SetForegroundWindow` from a background process. CPU readings have
+15.6 ms granularity, so differences under about 0.2% over 60 s are noise.
+
+| Case | Before: CPU / wake-ups/s / frames | After: CPU / wake-ups/s / frames |
+|---|---|---|
+| Plain window (hello), focused | 0.52% / 354 / 0 | 0.50% / 337 / 0 |
+| Demo Dashboard, focused | 0.23% / 349 / 0 | 0.52% / 327 / 0 (noise) |
+| Demo Dashboard, unfocused | 0.13% / 151 / 4 | 0.16% / 145 / 4 |
+| Notes, caret blinking, focused (click every 10 s) | 0.29% / 153 / 26 | 0.08% / 156 / 26 |
+| Notes, caret blinking, unfocused | 0.23% / 185 / 23 | 0.44% / 182 / 18 (CPU within noise) |
+| Demo, Components page, motion bars off screen | 25% (1.27 s in 5 s) | 0% |
+| Demo, Components page animating, window covered by another window (20 s) | 31% (6.25 s in 20 s) | 0%, no frames |
+
+What the numbers show:
+
+- Off-screen animations no longer run. The Components page's motion bars were the
+  largest idle cost in the demo: a visible window with nothing visible animating
+  now costs nothing.
+- A covered window stops rendering. The covered demo draws nothing, and the
+  current build presents nothing while covered. Rendering resumes when DXGI wakes the
+  window (`WM_OCCLUSION`), which was observed in a live run. A live run that brought the
+  window back with a visible animation on screen was not completed.
+- The caret of an unfocused window is hidden and does not blink. The frame counts in
+  the notes rows are dominated by the synthetic clicks that keep the caret active, so
+  they do not isolate the blink. The unit test checks the behavior directly.
+
+**Wake-ups that remain** (each one is reported, with its source):
+
+- The GPU vendor's Direct3D user-mode driver runs one thread that wakes about 90 times
+  a second once a Direct3D device exists. It is not jamb's code: Go's scheduler is idle
+  (`GODEBUG=schedtrace` shows no activity), and the thread's start address maps into the
+  driver's module. A plain Win32 window (Notepad) wakes 0.4 times a second. This cost
+  is the same for any Direct3D 11 application on the same driver, so the comparison
+  with another framework on Windows should be read with it in mind.
+- Timers in jamb (only when pending): the caret blink (two wake-ups a second while
+  the caret blinks, none after 15 s without input or in an unfocused window), tooltip
+  delay, chord timeout, the toast expiry (one wake-up at the end of the toast's time,
+  replacing one frame per vsync while a toast was shown), and debounce timers in the
+  example apps. The keymap file watcher runs only in apps that set a keymap file.
+- None of jamb's timers runs on the idle path of a plain window.
+
+#### Memory, startup and binary size (measured, not changed)
+
+- Memory: the private working set of the plain window and the demo is the same
+  before and after (95 MB and 106 MB, 60 s idle). Most of it is outside Go's heap.
+  The glyph atlases already start at 1024×1024 and double when full. The
+  ClearType atlas keeps 4 bytes per texel (4 MB) and the grayscale one 1 MB, both
+  kept as CPU copies so a lost device can be rebuilt without rasterizing again. That
+  is a design choice, and the saving it would give up is small.
+- Startup: one traced run of the current demo gives the renderer ready in 180 ms and the
+  first frame 219 ms after process start, which matches the floor described above.
+  No change was made: the device creation is the critical path.
+- Binary size (default `go build`, Windows amd64): plain window 11.9 MB, demo 15.6 MB,
+  unchanged by this pass. The largest contributors are go-text's script and language
+  tables (about 1.8 MB, data the shaper uses), the runtime's function tables
+  (`runtime.pclntab`, about 2 MB), and encoding/json (about 0.3 MB, linked by the keymap file loader).
+  `regexp` is not linked.
+
 ### Multiple windows
 
 Measured 2026-10-09 with the same machine as above, the demo's main window

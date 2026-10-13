@@ -184,6 +184,9 @@ const (
 	WM_IME_STARTCOMPOSITION = 0x010D
 	WM_IME_COMPOSITION      = 0x010F
 	WM_APP                  = 0x8000
+	// WM_OCCLUSION is posted to a window by DXGI when the window's occlusion
+	// state changes (see render/d3d11).
+	WM_OCCLUSION = WM_APP + 3
 
 	PM_REMOVE = 0x0001
 

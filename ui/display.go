@@ -1,7 +1,5 @@
 package ui
 
-import "slices"
-
 // undisplayed reports whether n is hidden by Display, itself or through an
 // ancestor. It is false for nil.
 func (rt *Runtime) undisplayed(n *node) bool {
@@ -35,30 +33,4 @@ func (rt *Runtime) moveFocusOutOfHidden() {
 		}
 	}
 	rt.setFocus(to)
-}
-
-// holdAnim records an instance whose repeating or running animation is hidden
-// by Display. It asks for no frame; revealAnims renders it again once shown.
-func (rt *Runtime) holdAnim(inst *componentInstance) {
-	if !slices.Contains(rt.hiddenAnims, inst) {
-		rt.hiddenAnims = append(rt.hiddenAnims, inst)
-	}
-}
-
-// revealAnims renders again the instances whose animations were held while
-// hidden and are shown now, so that each shows its progress at this moment and
-// runs on from there. An instance that has gone is dropped.
-func (rt *Runtime) revealAnims() {
-	if len(rt.hiddenAnims) == 0 {
-		return
-	}
-	shown := slices.Clone(rt.hiddenAnims)
-	rt.hiddenAnims = slices.DeleteFunc(rt.hiddenAnims, func(inst *componentInstance) bool {
-		return inst.disposed || !rt.undisplayed(inst.parentNode)
-	})
-	for _, inst := range shown {
-		if !inst.disposed && !rt.undisplayed(inst.parentNode) {
-			rt.rerender(inst)
-		}
-	}
 }

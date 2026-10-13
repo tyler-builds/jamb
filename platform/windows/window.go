@@ -441,6 +441,11 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	case msgWake:
 		return 0
 
+	case win32.WM_OCCLUSION:
+		// The window may be visible again: render, which shows what changed while it was covered.
+		w.Wake()
+		return 0
+
 	case win32.WM_TIMER:
 		if wp == wakeTimerID {
 			w.onTimer()
