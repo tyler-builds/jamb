@@ -25,7 +25,7 @@ go run ./examples/notes                        # run the notes app
 go run ./cmd/jamb dev ./examples/notes         # rebuild + restart on every save, window position preserved
 go run ./cmd/jamb package --installer ./examples/demo   # Windows zip and setup.exe in examples/demo/dist (see Packaging)
 go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/...   # headless tests (no window, no GPU)
-go build -trimpath -ldflags "-s -w -H windowsgui" -o jamb-demo.exe ./examples/demo   # ~7 MB release build
+go build -trimpath -ldflags "-s -w -H windowsgui" -o jamb-demo.exe ./examples/demo   # ~10 MB release build
 ```
 
 Results against the performance targets are in [BENCHMARKS.md](BENCHMARKS.md):

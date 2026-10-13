@@ -28,13 +28,13 @@ benchmarks instead.
 | No-op rebuild | 219 ms | |
 | Cold build (empty GOCACHE, compiles the std lib too) | 7.7 s | |
 | Save → new window on screen (`jamb dev`) | **1.05–1.36 s** | |
-| Binary size | 10.4 MB default, **7.1 MB** with `-trimpath -ldflags "-s -w"` (2026-10-08; was 5.4 / 3.9 MB before HarfBuzz shaping and later features) | 5–30 MB ✅ |
+| Binary size | Demo 13.6 MB default, **9.9 MB** with `-trimpath -ldflags "-s -w"`; hello 10.1 / 7.2 MB (2026-10-12; see [Startup memory and binary size](#startup-memory-and-binary-size-2026-10-12)) | 5–30 MB ✅ |
 | Repository size | 487 KB (≈9k lines of Go, including tests) | |
 | Dependencies | `golang.org/x/image` only (plus pieces of `x/text` and `x/sys`); 59 MB in the module cache | |
 | Build cache produced by a cold build | 51 MB (in the shared GOCACHE, not the repo) | |
-| Startup (process start → first frame on screen) | **~200 ms**, of which ~180 ms is `D3D11CreateDeviceAndSwapChain` | perceptually instant ✅ |
+| Startup (process start → first frame on screen) | **~195 ms**, of which ~180 ms is creating the Direct3D device (2026-10-12) | perceptually instant ✅ |
 | Idle CPU | **0 ms of CPU in 10 s** (1 frame rendered in total) | ≈0% ✅ |
-| Idle memory | 41 MB private working set (Task Manager's Memory column; 74 MB working set, 102 MB private bytes); Go heap ~14 MB (2026-10-08; see below) | reasonably small ✅ |
+| Idle memory | Demo: 33 MB private working set (Task Manager's Memory column; 71 MB working set, 88 MB private bytes). Hello: 23 MB private working set, 77 MB private bytes (2026-10-12; see below) | reasonably small ✅ |
 | Interactive FPS | holds 164 FPS (display refresh) in every mode tested | 60 / 120 FPS ✅ |
 | Uncapped throughput (vsync off) | 319 FPS repaint-only, 285 FPS with a full re-render every frame | |
 | CPU per frame, full re-render of every component | **~0.3 ms** avg (build + layout + paint + GPU submit) | budget 8.3 ms at 120 Hz |
@@ -173,6 +173,8 @@ What the numbers show:
 
 #### Memory, startup and binary size (measured, not changed)
 
+These were changed later; see [Startup memory and binary size](#startup-memory-and-binary-size-2026-10-12).
+
 - Memory: the private working set of the plain window and the demo is the same
   before and after (95 MB and 106 MB, 60 s idle). Most of it is outside Go's heap.
   The glyph atlases already start at 1024×1024 and double when full. The
@@ -187,6 +189,52 @@ What the numbers show:
   tables (about 1.8 MB, data the shaper uses), the runtime's function tables
   (`runtime.pclntab`, about 2 MB), and encoding/json (about 0.3 MB, linked by the keymap file loader).
   `regexp` is not linked.
+
+### Startup memory and binary size (2026-10-12)
+
+A comparison with GPUI (`docs/comparison-gpui.md`) showed jamb behind on memory and
+binary size, so this pass changed both. The hello figures come from the comparison
+script (release build, `-trimpath -ldflags "-s -w -H windowsgui"`, memory read after
+about two minutes idle), except the Go heap, which an in-process probe read after 3 s.
+
+| | Before | After |
+|---|---|---|
+| Hello, private bytes | 100.7 MB | 78.2 MB |
+| Hello, working set | 78.1 MB | 58.8 MB |
+| Hello, GPU dedicated / shared memory | 18.6 / 6.2 MB | 13.8 / 0.6 MB |
+| Hello, Go heap in use (after GC) | 17.9 MB | 6.8 MB |
+| Hello, stripped binary | 8.45 MB | 7.18 MB |
+| Demo, default `go build` (6 s idle) | 102 MB private bytes, 41 MB private working set | 88 MB private bytes, 33 MB private working set |
+| Demo, stripped binary | (not measured) | 9.85 MB |
+
+What changed:
+
+- **Glyph atlases** start at 256×256 instead of 1024×1024 and double when full. The
+  ClearType atlas keeps 4 bytes per texel on the CPU (for device-loss recovery) and on
+  the GPU, so the old starting size cost about 5 MB on each side before any glyph was
+  drawn.
+- **System font files** are memory-mapped instead of read onto the Go heap. The pages
+  are shared with other processes and do not count as private memory.
+- **Startup font loading** parses the faces the built-in widgets use (Regular and
+  Semibold; Medium resolves to Semibold in Segoe UI). Bold, which no built-in widget
+  draws, loads on first use. Each parsed face costs a few megabytes in go-text.
+- **Embedded fonts.** Windows builds embed only Go Regular. Segoe UI and Consolas ship
+  with every supported Windows version, so the other eight Go faces were never used
+  and added 1.3 MB to every binary.
+- **Device creation** starts on a goroutine before the first window is created. It
+  saves about 10 ms: the device takes about 180 ms inside the graphics driver, and the
+  window and fonts were already faster than that.
+
+What remains: the Direct3D driver accounts for about 50 MB of private bytes in every
+process that creates a device. Of the Go heap, most is go-text's parsed font tables
+(it parses each face's outlines when the font loads). The Go runtime's own
+bookkeeping adds a few megabytes on top.
+
+Startup was measured too. Launches of the same executable file paint the first frame
+at about 266 ms from the launch call (the trace puts it about 195 ms after process
+start). The first launch of a newly copied executable takes about 230 ms longer,
+because Windows Defender scans the file first. The earlier comparison launched a new
+copy every time, which is why it reported about 750 ms.
 
 ### Multiple windows
 
