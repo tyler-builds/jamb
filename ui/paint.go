@@ -188,6 +188,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 			}
 			sc.AddQuad(q)
 		}
+		if visible && n.div != nil && n.div.canvas != nil {
+			rt.paintCanvas(n, x, y, w, h, opacity)
+		}
 	case kindText:
 		if visible {
 			rt.paintText(n, x, y, w, fg, opacity)

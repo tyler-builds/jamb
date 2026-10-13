@@ -47,6 +47,7 @@ type handlers struct {
 // background, border, radius, shadow, clipping, scrolling and event handlers.
 // Create one with Div and configure it with chained methods.
 type DivElement struct {
+	canvas       func(p *Painter, w, h float32) // see Canvas
 	style        Style
 	hover        *Style
 	pressed      *Style

@@ -334,6 +334,50 @@ ui.Div().Radius(14).ScrollY()                             // children are clippe
 - Hit testing and scrolling still use the rectangle, so a press in a corner
   that the rounding hides reaches the content there.
 
+### Canvas
+
+`ui.Canvas(draw)` is an element you paint with shapes, as an HTML canvas: charts,
+graphs, diagrams and custom widgets. `draw` gets a `*ui.Painter` and the canvas's
+content size in logical pixels:
+
+```go
+ui.Canvas(func(p *ui.Painter, w, h float32) {
+	area := ui.NewPath().MoveTo(0, h)
+	for i, v := range values {
+		area.LineTo(float32(i)*w/float32(len(values)-1), h-v*h)
+	}
+	p.Stroke(area, ui.StrokeStyle{Width: 2, Color: t.Accent, Join: ui.JoinRound})
+	area.LineTo(w, h).Close()
+	p.Fill(area, ui.LinearPaint(0, 0, 0, h,
+		ui.ColorStop{At: 0, Color: t.Accent.Alpha(0.4)}, ui.ColorStop{At: 1, Color: t.Accent.Alpha(0)}))
+	p.Text(4, 4, "Visits", ui.TextStyle{Color: t.TextMuted})
+}).Size(ui.Full, ui.Px(160)).Label("Visits this week, rising")
+```
+
+- **Paths.** `MoveTo`, `LineTo`, `QuadTo`, `CubicTo`, `Arc`, SVG's `ArcTo`, `Close`,
+  and `Rect`, `RoundRect`, `Ellipse` and `Circle`. `EvenOdd` makes nested subpaths
+  holes.
+- **Painting.** `Fill` and `FillRect` take a `Paint`: a `Color`, `LinearPaint` or
+  `RadialPaint` (with `Focus`). `Stroke` takes a `StrokeStyle`: width, caps, joins,
+  miter limit and dashes.
+- **State.** `Save` and `Restore` around `Translate`, `Scale`, `Rotate`, `Clip` and
+  `Alpha`.
+- **Text.** `Text` places one line at a point, aligned with `Align` and `VAlign`,
+  and `MeasureText` sizes it. Text uses the text renderer (ClearType where it is
+  on) and is drawn over the shapes; it follows the transform's position but is
+  not rotated, scaled or clipped.
+
+Shapes are drawn on the CPU (`internal/vector`) at the display's resolution, and
+the drawing is kept: `draw` runs again only when the component that made the
+canvas renders, or when its size, the display scale or the zoom changes. Read the
+signals the drawing depends on in the component's render. A chart of 1000 points
+at 800x400 pixels takes about 10 ms to draw.
+
+The canvas is a `Div` (300x150 by default): size it with `Size`, take the pointer
+with `OnMouseMove` and the others, whose `LocalX` and `LocalY` are canvas
+coordinates when it has no padding or border, and add children to lay elements
+over the drawing. Assistive technology sees an image named by `Label`.
+
 ### Focus and the keyboard
 
 There are three kinds of focus style:

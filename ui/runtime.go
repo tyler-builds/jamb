@@ -49,6 +49,8 @@ type nodeState struct {
 
 	// imageStart is when an animated image was first drawn (see imageTexture).
 	imageStart time.Time
+	// canvas is a canvas's drawing (see paintCanvas).
+	canvas *canvasState
 
 	scrollX, scrollY float32
 	targetX, targetY float32
