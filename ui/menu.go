@@ -39,19 +39,6 @@ const (
 	MenuCheckRadio
 )
 
-// MenuRole is the accessibility role of a menu entry, named as in WAI-ARIA
-// (menuitem, menuitemcheckbox, menuitemradio, separator), so that UI
-// Automation can expose menus later. Nothing reads it yet.
-type MenuRole uint8
-
-const (
-	RoleMenuItem         MenuRole = iota // menuitem
-	RoleMenuItemCheckbox                 // menuitemcheckbox; Checked is its state
-	RoleMenuItemRadio                    // menuitemradio; Checked is its state
-	RoleSeparator                        // separator
-	RoleGroupLabel                       // a label over a group; not focusable
-)
-
 // MenuItem is one entry of a menu. Set Action, which shows the action's
 // shortcut and runs through the normal action dispatch, or OnClick. If both
 // are set, Action runs. A non-empty Submenu opens a menu to the right instead
@@ -74,19 +61,19 @@ func MenuSeparator() MenuItem { return MenuItem{Kind: MenuKindSeparator} }
 // MenuSection is a group label, such as "Status". It runs nothing.
 func MenuSection(label string) MenuItem { return MenuItem{Kind: MenuKindSection, Label: label} }
 
-// Role returns the item's accessibility role.
-func (m MenuItem) Role() MenuRole {
+// accessRole returns the item's accessibility role, as in WAI-ARIA's menuitem,
+// menuitemcheckbox, menuitemradio and separator. Checked is the state of a
+// check or radio item.
+func (m MenuItem) accessRole() access.Role {
 	switch {
 	case m.Kind == MenuKindSeparator:
-		return RoleSeparator
-	case m.Kind == MenuKindSection:
-		return RoleGroupLabel
+		return access.RoleSeparator
 	case m.Check == MenuCheckRadio:
-		return RoleMenuItemRadio
+		return access.RoleMenuItemRadio
 	case m.Check == MenuCheckBox:
-		return RoleMenuItemCheckbox
+		return access.RoleMenuItemCheck
 	}
-	return RoleMenuItem
+	return access.RoleMenuItem
 }
 
 // text is the label an item shows: its Label, or its Action's label.
@@ -487,7 +474,7 @@ func (m *menuView) row(k, i int, it MenuItem, path []int, gutter bool) Element {
 	// The name is the label alone: the shortcut is shown, but assistive technology
 	// reads the label, as a menu does.
 	a := r.access()
-	a.role, a.disabled, a.checked, a.checkedSet = menuAccessRole(it.Role()), it.Disabled, it.Checked, true
+	a.role, a.disabled, a.checked, a.checkedSet = it.accessRole(), it.Disabled, it.Checked, true
 	a.name = it.text()
 	a.highlighted = hl && on
 	a.level = k + 1

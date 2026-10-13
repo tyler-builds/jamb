@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 )
 
@@ -92,16 +93,15 @@ func dropdownRig(items func() []MenuItem, focusable bool) *overlayRig {
 func TestMenuRoles(t *testing.T) {
 	tests := []struct {
 		item MenuItem
-		want MenuRole
+		want access.Role
 	}{
-		{MenuItem{Label: "Open"}, RoleMenuItem},
-		{MenuItem{Label: "Star", Check: MenuCheckBox, Checked: true}, RoleMenuItemCheckbox},
-		{MenuItem{Label: "Active", Check: MenuCheckRadio}, RoleMenuItemRadio},
-		{MenuSeparator(), RoleSeparator},
-		{MenuSection("Status"), RoleGroupLabel},
+		{MenuItem{Label: "Open"}, access.RoleMenuItem},
+		{MenuItem{Label: "Star", Check: MenuCheckBox, Checked: true}, access.RoleMenuItemCheck},
+		{MenuItem{Label: "Active", Check: MenuCheckRadio}, access.RoleMenuItemRadio},
+		{MenuSeparator(), access.RoleSeparator},
 	}
 	for _, tc := range tests {
-		if got := tc.item.Role(); got != tc.want {
+		if got := tc.item.accessRole(); got != tc.want {
 			t.Errorf("%q: role %v, want %v", tc.item.Label, got, tc.want)
 		}
 	}

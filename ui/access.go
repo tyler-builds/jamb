@@ -190,19 +190,6 @@ func setListPosition(w *DivElement, r Element, pos, size int) {
 	w.listItem(pos, size)
 }
 
-// menuAccessRole maps a menu entry's role to the access role.
-func menuAccessRole(r MenuRole) access.Role {
-	switch r {
-	case RoleMenuItemCheckbox:
-		return access.RoleMenuItemCheck
-	case RoleMenuItemRadio:
-		return access.RoleMenuItemRadio
-	case RoleSeparator:
-		return access.RoleSeparator
-	}
-	return access.RoleMenuItem
-}
-
 // accessAnnouncements is the queue of Announce calls, drained by the next
 // published tree. It is shared by the runtimes of the process, so it has a lock.
 var accessAnnouncements struct {

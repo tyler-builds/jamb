@@ -1412,9 +1412,8 @@ ui.MenuBar(
   Windows' menu mode does not swallow the keys that follow.
 - **Look.** Menus use the theme's surface, border, shadow and highlight colors.
   They enter and leave with the same motion as the command palette.
-- **Roles.** `item.Role()` returns the WAI-ARIA name of an entry (`RoleMenuItem`,
-  `RoleMenuItemCheckbox`, `RoleMenuItemRadio`, `RoleSeparator`, `RoleGroupLabel`),
-  so that UI Automation can expose menus later. Nothing reads it yet.
+- **Roles.** Entries take the WAI-ARIA menu roles in the access tree: menu item,
+  check and radio menu items (with their checked state), and separator.
 - **Not implemented.** Alt+letter mnemonics. The labels take no `&` marks, and
   Alt followed by another key does not open a menu.
 
