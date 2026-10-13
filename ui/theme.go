@@ -107,6 +107,12 @@ type Theme struct {
 	Toasts ToastVariants
 	// Tooltip is the look of every tooltip.
 	Tooltip TooltipStyle
+	// Avatar is the look of every avatar.
+	Avatar AvatarStyle
+	// Tag is the look of every tag.
+	Tag TagStyle
+	// Skeleton is the look of every skeleton placeholder.
+	Skeleton SkeletonStyle
 }
 
 // darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme

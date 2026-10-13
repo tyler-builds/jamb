@@ -1090,6 +1090,33 @@ ctx.Toast(ui.ToastSuccess, "Project created").Action("Undo", undo) // in a handl
   info and success, and assertively for warning and error, as the existing
   announcements are. Its group is named by its text.
 
+### Avatars, tags and skeletons
+
+An avatar shows a person's initials, or an image, in a circle. Its fill is picked from its
+name, so a name keeps its color. A tag is a small chip for a label or a filter, and its remove
+button takes the tag away. A skeleton is a placeholder that pulses while content loads. They
+use the theme's colors, follow high contrast, the Text size and reduced motion. Their looks are
+`ui.AvatarStyle`, `ui.TagStyle` and `ui.SkeletonStyle`: per app in `Theme.Avatar`, `Theme.Tag`
+and `Theme.Skeleton`, or per instance with `Styles`.
+
+```go
+ui.Avatar("Dana Lee")                                // "DL" on a color picked from the name
+ui.Avatar("Dana Lee").Image(photo).Size(48)          // an image cropped to the circle
+ui.Avatar("Dana Lee").Decorative()                   // beside the name, which is read already
+ui.Tag("Sales").Icon(icons.Folder).OnRemove(remove)  // a chip with a button named "Remove Sales"
+ui.Skeleton().Lines(3)                               // placeholder lines while content loads
+ui.Skeleton().Circle(32)                             // a placeholder for an avatar
+```
+
+- **Avatar.** The initials are the first letter of the first and last words of the name, or one
+  letter for a name of one word. An empty name shows an empty circle, named "Avatar". Without
+  `Decorative`, the avatar is an image named by the name, so it is read as the person's name.
+- **Tag.** A tag is as wide as its text by default. Under `MaxWidth`, a long text ends with an
+  ellipsis. `OnRemove` adds a button that works with the mouse, Enter and Space.
+- **Skeleton.** It is hidden from assistive technology. The app marks the region that is loading
+  as busy, or labels it "Loading". It pulses about once every 1.2 seconds, between full and half
+  opacity, and it is still under reduced motion and high contrast.
+
 ### Rich text
 
 `ui.Rich` joins segments into one text element. It wraps, truncates and
