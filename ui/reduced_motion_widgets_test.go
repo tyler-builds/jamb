@@ -188,6 +188,14 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				r.now = r.now.Add(600 * time.Millisecond)
 				r.frame()
 			}},
+		{name: "ColorPicker", animates: true,
+			root: func(open *Signal[bool]) func(*Context) Element {
+				fill := NewSignal(Hex("#3B82F6"))
+				return func(ctx *Context) Element {
+					return Div().Column().Child(ColorPicker(fill).Label("Fill"))
+				}
+			},
+			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) { clickPart(t, r, "ColorPicker.Trigger") }},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

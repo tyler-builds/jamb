@@ -123,6 +123,9 @@ type Theme struct {
 	// DateRangePicker is the look of every date range picker and its calendar. It is not
 	// DatePicker: a range has its own parts, such as DayInRange.
 	DateRangePicker DateRangePickerStyle
+	// ColorPicker is the look of every color picker: its trigger, its panel and the
+	// sliders of the panel.
+	ColorPicker ColorPickerStyle
 }
 
 // darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme

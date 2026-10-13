@@ -568,6 +568,33 @@ number input is a spin box that holds its text field, as Microsoft's Spinner
 control type describes
 ([Spinner control type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).
 
+### Color picker
+
+`ui.ColorPicker(value)` edits a `ui.Color`. The trigger shows a swatch of the color and
+its hex text, such as "#3B82F6". A click, Enter or Space opens a panel below it, which
+Escape or a click outside closes, with focus back on the trigger. The panel holds a
+saturation and brightness area, a hue slider, an opacity slider, a hex text field and
+the preset swatches.
+
+```go
+ui.ColorPicker(fill).Label("Fill color").Alpha().
+	Swatches(ui.Hex("#ef4444"), ui.Hex("#22c55e"), ui.Hex("#3b82f6")).
+	OnChange(func(c ui.Color) { ... })
+```
+
+- The area takes focus when the panel opens. Its arrow keys move the saturation (Left and
+  Right) and the brightness (Up and Down) by 1 percent, and by 10 percent with Shift.
+- `Alpha()` adds the opacity slider and the eight-digit hex form, `#RRGGBBAA`. The hex
+  field accepts `#RGB` and `#RRGGBB` otherwise. It is applied on Enter or when it loses
+  focus; text that is not a color is refused, and the color does not change.
+- The hue is kept while the saturation or the brightness is 0, so a grey keeps the hue
+  the user chose.
+- Assistive technology sees the trigger as a button named by `Label` (default "Color"),
+  and the area as a slider named "Saturation and brightness" with its percentages.
+- Under high contrast the area shows its hue alone, since gradients are drawn solid
+  there; the thumb still marks the saturation and the brightness.
+- The look is `ui.ColorPickerStyle`, set in `Theme.ColorPicker` or with `.Styles(...)`.
+
 ### Combobox
 
 A combo box is an editable text field with a list of suggestions below it: `ui.Combobox`.

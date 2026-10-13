@@ -78,6 +78,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Pagination:    base.Pagination,
 
 		DateRangePicker: base.DateRangePicker,
+		ColorPicker:     base.ColorPicker,
 	}
 	return t
 }

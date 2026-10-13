@@ -47,7 +47,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
-   (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.SidebarNav`, `Theme.Breadcrumbs`, `Theme.Pagination`, and `Theme.FormField` (the label, help text and error
+   (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.SidebarNav`, `Theme.Breadcrumbs`, `Theme.Pagination`, `Theme.ColorPicker`, and `Theme.FormField` (the label, help text and error
    of every field) and `Theme.Form` (the error summary of every form). Each is a field of `ui.Theme`, and the
    high-contrast theme takes it from the base theme.
 3. **The instance.** Set on one widget with `.Styles(...)`. Calling `.Styles` again
@@ -526,6 +526,7 @@ parts that the code applies.
 | `TimePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Button`, `Message`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected` | none | none | done |
 | `DateRangePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `CalendarButton`, `Message`, `Popup`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayInRange`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
+| `ColorPicker` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `Swatch`, `Popup`, `Area`, `AreaFocusVisible`, `Thumb`, `Slider`, `Preset`, `PresetFocusVisible` | none | none | done |
 | `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
 | `NumberInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |
