@@ -193,9 +193,9 @@ func (s *stress) begin(h *host, secs float64) {
 	s.lastFrame = now
 	switch s.mode {
 	case "rebuild":
-		h.rt.InvalidateAll()
+		h.rh.InvalidateAll()
 	default:
-		h.rt.Invalidate()
+		h.rh.Invalidate()
 	}
 }
 
@@ -477,7 +477,7 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 		case "shot":
 			s.shotPath = st.arg
 			s.i++
-			rt.Invalidate()
+			hostOf(rt).Invalidate()
 			return true // capture happens on the next frame
 		case "a11ydump":
 			if err := os.WriteFile(st.arg, []byte(rt.AccessTree().Dump()), 0o644); err != nil {

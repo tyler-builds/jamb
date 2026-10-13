@@ -88,7 +88,7 @@ func BenchmarkScale(b *testing.B) {
 				b.ReportAllocs()
 				gc := startGC()
 				for b.Loop() {
-					a.rt.InvalidateAll()
+					a.rt.hostInvalidateAll()
 					a.rt.Frame(time.Now())
 					st := a.rt.Stats()
 					r, bu, l = r+st.Rendered, bu+st.NodesBuilt, l+st.NodesLaidOut
@@ -135,7 +135,7 @@ func BenchmarkScale(b *testing.B) {
 				b.ReportAllocs()
 				gc := startGC()
 				for b.Loop() {
-					a.rt.Invalidate()
+					a.rt.hostInvalidate()
 					a.rt.Frame(time.Now())
 				}
 				gc.report(b)

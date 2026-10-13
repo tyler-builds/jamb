@@ -64,7 +64,7 @@ func TestContextClipboardUsesPlatform(t *testing.T) {
 	text, has := "from the platform", true
 	var written []string
 	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
-	rt.SetServices(Services{
+	rt.hostSetServices(platformServices{
 		Clipboard:    func() (string, bool) { return text, has },
 		SetClipboard: func(s string) { written = append(written, s) },
 	})

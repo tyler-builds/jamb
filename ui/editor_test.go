@@ -232,7 +232,7 @@ func TestTextAreaKeepsCaretVisibleInScroller(t *testing.T) {
 	if scroller.st.scrollY == 0 {
 		t.Fatal("Ctrl+End did not scroll the caret into view")
 	}
-	caret, _ := r.rt.TextInputRect()
+	caret, _ := r.rt.hostTextInputRect()
 	if caret.Bottom() > 400 || caret.Y < 0 {
 		t.Errorf("caret at y=%v..%v is outside the 400px viewport", caret.Y, caret.Bottom())
 	}

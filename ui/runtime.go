@@ -306,7 +306,7 @@ type Runtime struct {
 	stats    FrameStats
 	restyled int // restyles since the last frame (they happen during input handling)
 
-	services       Services
+	services       platformServices
 	windowCtl      WindowControls // the app's window, see SetWindowControls
 	maximized      *Signal[bool]  // the window's state, read by Context.Window
 	focused        *Signal[bool]
@@ -384,18 +384,18 @@ type Runtime struct {
 	acc *accessState
 }
 
-// Services are platform capabilities the runtime uses when available. The
+// platformServices are platform capabilities the runtime uses when available. The
 // app package wires them to the window; headless runtimes (tests) work
 // without them, with an in-process clipboard.
-type Services struct {
+type platformServices struct {
 	Clipboard    func() (string, bool)
 	SetClipboard func(string)
 	// WakeAt schedules a frame at a future time (caret blinking).
 	WakeAt func(time.Time)
 }
 
-// SetServices connects platform capabilities.
-func (rt *Runtime) SetServices(s Services) { rt.services = s }
+// hostSetServices connects platform capabilities.
+func (rt *Runtime) hostSetServices(s platformServices) { rt.services = s }
 
 func (rt *Runtime) clipboard() (string, bool) {
 	if rt.services.Clipboard != nil {
@@ -418,9 +418,9 @@ func (rt *Runtime) wakeAt(t time.Time) {
 	}
 }
 
-// TextInputRect returns the caret of the focused text editor in logical
+// hostTextInputRect returns the caret of the focused text editor in logical
 // pixels, so the platform can place input-method windows next to it.
-func (rt *Runtime) TextInputRect() (scene.Rect, bool) {
+func (rt *Runtime) hostTextInputRect() (scene.Rect, bool) {
 	r := rt.textInput
 	z := rt.zoom
 	return scene.Rect{X: r.X * z, Y: r.Y * z, W: r.W * z, H: r.H * z}, rt.hasTextInput
@@ -458,9 +458,9 @@ func NewRuntime(root func(ctx *Context) Element, theme *Theme, ts *text.System) 
 	}
 }
 
-// SetWakeFunc registers the function called (from any goroutine) when the
+// hostSetWakeFunc registers the function called (from any goroutine) when the
 // runtime needs a new frame. It is called at most once between frames.
-func (rt *Runtime) SetWakeFunc(fn func()) { rt.wake = fn }
+func (rt *Runtime) hostSetWakeFunc(fn func()) { rt.wake = fn }
 
 // SetWarnFunc replaces where non-fatal warnings (such as duplicate keys) go.
 // The default prints to stderr.
@@ -538,7 +538,7 @@ func (rt *Runtime) SetZoom(z float32) {
 	}
 	rt.zoom = z
 	rt.applyZoom()
-	rt.InvalidateAll() // components that show the zoom level re-render
+	rt.hostInvalidateAll() // components that show the zoom level re-render
 	if rt.onZoom != nil {
 		rt.onZoom(z)
 	}
@@ -567,19 +567,19 @@ func (rt *Runtime) zoomStep(dir int) {
 // Ctrl+- / Ctrl+0 keys and Ctrl+wheel zooming.
 func (rt *Runtime) SetZoomShortcuts(on bool) { rt.zoomKeys = on }
 
-// OnZoom registers fn to be called after the zoom changes, so an app
+// hostOnZoom registers fn to be called after the zoom changes, so an app
 // can remember it.
-func (rt *Runtime) OnZoom(fn func(float32)) { rt.onZoom = fn }
+func (rt *Runtime) hostOnZoom(fn func(float32)) { rt.onZoom = fn }
 
-// Invalidate forces the next Frame to repaint even if nothing changed.
-func (rt *Runtime) Invalidate() {
+// hostInvalidate forces the next Frame to repaint even if nothing changed.
+func (rt *Runtime) hostInvalidate() {
 	rt.needPaint = true
 	rt.requestFrame()
 }
 
-// InvalidateAll re-renders every component on the next frame. Used for
+// hostInvalidateAll re-renders every component on the next frame. Used for
 // benchmarking the worst case; applications should rely on signals instead.
-func (rt *Runtime) InvalidateAll() {
+func (rt *Runtime) hostInvalidateAll() {
 	for _, inst := range rt.instances {
 		inst.invalidate()
 	}
@@ -589,7 +589,7 @@ func (rt *Runtime) InvalidateAll() {
 func (rt *Runtime) SetTheme(t *Theme) {
 	rt.appTheme = t
 	rt.applyTheme()
-	rt.InvalidateAll()
+	rt.hostInvalidateAll()
 }
 
 // AppTheme returns the theme the app set with SetTheme. Under high contrast the
@@ -602,8 +602,8 @@ func (rt *Runtime) Theme() *Theme { return rt.theme }
 // Text returns the runtime's text system.
 func (rt *Runtime) Text() *text.System { return rt.text }
 
-// Cursor returns the cursor for the element under the pointer.
-func (rt *Runtime) Cursor() input.Cursor { return rt.cursor }
+// hostCursor returns the cursor for the element under the pointer.
+func (rt *Runtime) hostCursor() input.Cursor { return rt.cursor }
 
 // Stats returns statistics about the last frame.
 func (rt *Runtime) Stats() FrameStats { return rt.stats }

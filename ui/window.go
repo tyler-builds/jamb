@@ -34,12 +34,12 @@ const (
 // stays usable.
 func (d *DivElement) WindowArea(a WindowArea) *DivElement { d.area = a; return d }
 
-// WindowAreaAt returns the title-bar area under (x, y), in device-logical
+// hostWindowAreaAt returns the title-bar area under (x, y), in device-logical
 // pixels as for PointerMove, or WindowAreaNone. A point is in an WindowAreaDrag area
 // unless an element above that area on the hit path takes input of its own:
 // one with OnClick, OnMouseDown, focus (which includes text fields) or OnDrag.
 // It uses the hit testing of the last paint, so painted elements only.
-func (rt *Runtime) WindowAreaAt(x, y float32) WindowArea {
+func (rt *Runtime) hostWindowAreaAt(x, y float32) WindowArea {
 	x, y = x/rt.zoom, y/rt.zoom
 	for _, n := range rt.hitTest(x, y) {
 		d := n.div
@@ -155,9 +155,9 @@ func (w windowRef) MessageBox(o dialog.MessageOptions, done func(dialog.Button))
 // before the first frame.
 func (rt *Runtime) SetWindowControls(c WindowControls) { rt.windowCtl = c }
 
-// SetMaximized records whether the window is maximized, for components that
+// hostSetMaximized records whether the window is maximized, for components that
 // read Context.Window().Maximized(). Call it on the UI thread.
-func (rt *Runtime) SetMaximized(on bool) { rt.maximized.Set(on) }
+func (rt *Runtime) hostSetMaximized(on bool) { rt.maximized.Set(on) }
 
 // TitleBarButtons returns the minimize, maximize-or-restore and close buttons
 // of a custom title bar, for its right end. They are sized like Windows 11's

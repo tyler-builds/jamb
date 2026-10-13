@@ -30,7 +30,7 @@ func TestCaretDoesNotBlinkInAnInactiveWindow(t *testing.T) {
 	// The rig's first frame ran on the real clock, so the test clock starts there too.
 	r.now = time.Now()
 	var wakes []time.Time
-	r.rt.SetServices(Services{WakeAt: func(at time.Time) { wakes = append(wakes, at) }})
+	r.rt.hostSetServices(platformServices{WakeAt: func(at time.Time) { wakes = append(wakes, at) }})
 	h.Focus()
 	r.rt.Frame(r.now)
 	ed := firstEditor(r.rt.tree)
@@ -51,7 +51,7 @@ func TestCaretDoesNotBlinkInAnInactiveWindow(t *testing.T) {
 
 	// The focus change ends the field's focus transition after a few frames.
 	wakes = nil
-	r.rt.WindowFocus(false)
+	r.rt.hostWindowFocus(false)
 	for i := 0; i < 100 && r.rt.NeedsFrame(); i++ {
 		r.now = r.now.Add(16 * time.Millisecond)
 		r.rt.Frame(r.now)
@@ -68,7 +68,7 @@ func TestCaretDoesNotBlinkInAnInactiveWindow(t *testing.T) {
 		t.Error("an inactive window with a caret asks for frames")
 	}
 
-	r.rt.WindowFocus(true)
+	r.rt.hostWindowFocus(true)
 	r.rt.Frame(r.now)
 	if len(wakes) == 0 {
 		t.Error("the caret does not blink again once the window is active")

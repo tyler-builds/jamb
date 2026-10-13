@@ -1535,8 +1535,9 @@ WCAG 2 ratios of each pair the built-in widgets use, in both themes.
 Zoom: Ctrl+= (or Ctrl++, numpad +) zooms in, Ctrl+- zooms out, Ctrl+0
 resets, and Ctrl+mouse wheel zooms. Levels run 50% to 300% (`ui.ZoomLevels`).
 In code: `rt.Zoom()`, `rt.SetZoom(z)`, `rt.ZoomIn()`, `rt.ZoomOut()`,
-`rt.ResetZoom()`, `rt.SetZoomShortcuts(false)` to turn the keys off, and
-`rt.OnZoom(fn)`; components use `ctx.Zoom()` and `ctx.SetZoom(z)`.
+`rt.ResetZoom()` and `rt.SetZoomShortcuts(false)` to turn the keys off;
+components use `ctx.Zoom()` and `ctx.SetZoom(z)`, and `app.Window.OnZoom` runs
+when the zoom changes.
 `rt.Post(fn)` runs fn on the UI thread at the next frame; call it from
 background goroutines to hand them their results. A component that holds its
 `ui.Context` can call `ctx.Post(fn)` for the same thing.

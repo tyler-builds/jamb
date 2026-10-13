@@ -52,8 +52,8 @@ func TestClickDispatchAndHover(t *testing.T) {
 	}, 400, 300, 1)
 	rt.PointerMove(50, 30, 0)
 	rt.Frame(time.Now())
-	if rt.Cursor() != input.CursorPointer {
-		t.Errorf("cursor over clickable = %v, want pointer", rt.Cursor())
+	if rt.hostCursor() != input.CursorPointer {
+		t.Errorf("cursor over clickable = %v, want pointer", rt.hostCursor())
 	}
 	inner := rt.tree.children[0]
 	if inner.style.Background != Hex("#ff0000") {
@@ -140,7 +140,7 @@ func BenchmarkFrameRebuild(b *testing.B) {
 	}, 1000, 800, 1)
 	b.ReportAllocs()
 	for b.Loop() {
-		rt.InvalidateAll()
+		rt.hostInvalidateAll()
 		rt.Frame(time.Now())
 	}
 	b.ReportMetric(float64(rt.Stats().Nodes), "nodes")

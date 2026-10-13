@@ -232,8 +232,8 @@ func TestLinkClickRunsOnlyTheLink(t *testing.T) {
 	paintNow(rt)
 	x, y := caretPoint(t, rt, "r", 6) // inside "project"
 	rt.PointerMove(x, y, 0)
-	if rt.Cursor() != input.CursorPointer {
-		t.Errorf("cursor over the link = %v, want pointer", rt.Cursor())
+	if rt.hostCursor() != input.CursorPointer {
+		t.Errorf("cursor over the link = %v, want pointer", rt.hostCursor())
 	}
 	rt.PointerDown(x, y, input.ButtonLeft, 1, 0)
 	rt.PointerUp(x, y, input.ButtonLeft, 0)
@@ -256,13 +256,13 @@ func TestCursorIsPointerOnlyOverTheLink(t *testing.T) {
 	paintNow(rt)
 	x, y := caretPoint(t, rt, "r", 6)
 	rt.PointerMove(x, y, 0)
-	if rt.Cursor() != input.CursorPointer {
-		t.Errorf("cursor over the link = %v, want pointer", rt.Cursor())
+	if rt.hostCursor() != input.CursorPointer {
+		t.Errorf("cursor over the link = %v, want pointer", rt.hostCursor())
 	}
 	x, y = caretPoint(t, rt, "r", 1)
 	rt.PointerMove(x, y, 0)
-	if rt.Cursor() != input.CursorDefault {
-		t.Errorf("cursor over plain text = %v, want default", rt.Cursor())
+	if rt.hostCursor() != input.CursorDefault {
+		t.Errorf("cursor over plain text = %v, want default", rt.hostCursor())
 	}
 }
 

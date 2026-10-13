@@ -68,7 +68,7 @@ func (rt *Runtime) SetSystemSettings(s SystemSettings) {
 	rt.textFactor = float32(s.TextScale) / 100
 	rt.caretWidth = defaultCaretWidth * float32(s.CaretWidth)
 	rt.applyTheme()
-	rt.InvalidateAll()
+	rt.hostInvalidateAll()
 }
 
 // SystemSettings returns the settings the runtime uses, normalized.

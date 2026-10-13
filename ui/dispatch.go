@@ -265,8 +265,8 @@ func (rt *Runtime) PointerMove(x, y float32, mods input.Modifiers) {
 	}
 }
 
-// PointerLeave handles the pointer leaving the window.
-func (rt *Runtime) PointerLeave() {
+// hostPointerLeave handles the pointer leaving the window.
+func (rt *Runtime) hostPointerLeave() {
 	rt.mouseIn = false
 	rt.updateHover()
 }
@@ -803,8 +803,8 @@ func (rt *Runtime) deliverText(s string) {
 	}
 }
 
-// WindowFocus reports the window gaining or losing focus.
-func (rt *Runtime) WindowFocus(focused bool) {
+// hostWindowFocus reports the window gaining or losing focus.
+func (rt *Runtime) hostWindowFocus(focused bool) {
 	rt.focused.Set(focused)
 	// The caret of a text field is drawn only while the window is active, so
 	// the change to it is painted here (see caretVisible).

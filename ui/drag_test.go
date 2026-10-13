@@ -204,7 +204,7 @@ func TestDragEndsWithoutADropOnCancelAndMisses(t *testing.T) {
 		cancel func(rt *Runtime, x, y float32)
 	}{
 		{"escape", func(rt *Runtime, x, y float32) { rt.KeyDown(input.KeyEscape, 0, false); rt.KeyUp(input.KeyEscape, 0) }},
-		{"window blur", func(rt *Runtime, x, y float32) { rt.WindowFocus(false) }},
+		{"window blur", func(rt *Runtime, x, y float32) { rt.hostWindowFocus(false) }},
 		{"release over nothing", func(rt *Runtime, x, y float32) { rt.PointerUp(250, 280, input.ButtonLeft, 0) }},
 	}
 	for _, c := range cases {

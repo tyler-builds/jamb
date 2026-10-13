@@ -214,7 +214,7 @@ func TestManyUpdatesWakeOnce(t *testing.T) {
 	}
 	rt := newTestRuntime(rowsApp(values), 600, 4000, 1)
 	var wakes atomic.Int32
-	rt.SetWakeFunc(func() { wakes.Add(1) })
+	rt.hostSetWakeFunc(func() { wakes.Add(1) })
 	for _, v := range values {
 		v.Set("y")
 	}

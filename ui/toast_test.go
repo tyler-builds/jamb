@@ -238,7 +238,7 @@ func TestToastRegionEscapeReturnsFocus(t *testing.T) {
 func TestToastWakesWhenItRunsOut(t *testing.T) {
 	r := toastRig(t)
 	var wakes []time.Time
-	r.rt.SetServices(Services{WakeAt: func(at time.Time) { wakes = append(wakes, at) }})
+	r.rt.hostSetServices(platformServices{WakeAt: func(at time.Time) { wakes = append(wakes, at) }})
 	r.rt.toast(ToastInfo, "Saved")
 	created := r.now
 	// The toast's entrance transition runs for a few frames first.

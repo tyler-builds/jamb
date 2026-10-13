@@ -78,13 +78,13 @@ func TestScrollbarHoverThickensAndShowsArrow(t *testing.T) {
 	}, 300, 400, 1)
 	rt.PointerMove(150, 100, 0)
 	frame(rt)
-	if rt.Cursor() != CursorText {
+	if rt.hostCursor() != CursorText {
 		t.Fatal("setup: expected the text cursor over the list")
 	}
 	rt.PointerMove(294, 30, 0)
 	frame(rt)
-	if rt.sbHot.id == 0 || rt.Cursor() != CursorDefault {
-		t.Errorf("over the scrollbar: hot=%v cursor=%v; want hot and an arrow", rt.sbHot, rt.Cursor())
+	if rt.sbHot.id == 0 || rt.hostCursor() != CursorDefault {
+		t.Errorf("over the scrollbar: hot=%v cursor=%v; want hot and an arrow", rt.sbHot, rt.hostCursor())
 	}
 }
 
@@ -117,7 +117,7 @@ func TestZoomShortcutsAndCoordinates(t *testing.T) {
 			Child(Div().Key("btn").Size(Px(100), Px(40)).OnClick(func() { clicks++ })).
 			Child(Text("Zoomed text").Key("label"))
 	}, 600, 400, 1)
-	rt.OnZoom(func(z float32) { reported = z })
+	rt.hostOnZoom(func(z float32) { reported = z })
 
 	rt.Press(input.KeyEqual, input.ModCtrl) // 110%
 	rt.Press(input.KeyEqual, input.ModCtrl) // 125%

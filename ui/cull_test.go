@@ -156,7 +156,7 @@ func TestCullingHitTestsOnlyPaintedRows(t *testing.T) {
 		}
 	}
 	// A hover-only frame repaints just the visible rows.
-	rt.Invalidate()
+	rt.hostInvalidate()
 	frame(rt)
 	if got := rt.Stats().NodesPainted; got >= 200 {
 		t.Errorf("repaint painted %d nodes; want fewer than 200", got)
@@ -256,7 +256,7 @@ func TestCullingFocusedEditorRevealsWhileScrolledOut(t *testing.T) {
 	if scroller.st.scrollY >= 700 {
 		t.Errorf("typing left the caret scrolled out of view (scrollY %v)", scroller.st.scrollY)
 	}
-	caret, _ := r.rt.TextInputRect()
+	caret, _ := r.rt.hostTextInputRect()
 	if caret.Y < 0 || caret.Bottom() > 400 {
 		t.Errorf("caret at y=%v..%v is outside the 400px viewport", caret.Y, caret.Bottom())
 	}

@@ -740,7 +740,7 @@ func TestChordWaitsThenFallsBack(t *testing.T) {
 				}
 			})
 	})
-	r.rt.SetServices(Services{WakeAt: func(t time.Time) { wakes = append(wakes, t) }})
+	r.rt.hostSetServices(platformServices{WakeAt: func(t time.Time) { wakes = append(wakes, t) }})
 	r.rt.AddBindings(Bind("ctrl+k", single), Bind("ctrl+k ctrl+t", chord))
 
 	r.key(input.KeyK, ctrl)

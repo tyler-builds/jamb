@@ -13,7 +13,7 @@ import (
 func TestPostRunsOnNextFrame(t *testing.T) {
 	r := newKeyRig(func(ctx *Context) Element { return Div() })
 	woke := make(chan struct{}, 1)
-	r.rt.SetWakeFunc(func() {
+	r.rt.hostSetWakeFunc(func() {
 		select {
 		case woke <- struct{}{}:
 		default:

@@ -42,7 +42,7 @@ func TestWindowAreaDragsUnlessAnInteractiveChildIsHit(t *testing.T) {
 		{"below the title bar", 100, 150, WindowAreaNone},
 	}
 	for _, c := range cases {
-		if got := rt.WindowAreaAt(c.x, c.y); got != c.want {
+		if got := rt.hostWindowAreaAt(c.x, c.y); got != c.want {
 			t.Errorf("%s at (%v, %v): WindowAreaAt = %v, want %v", c.name, c.x, c.y, got, c.want)
 		}
 	}
@@ -54,10 +54,10 @@ func TestWindowAreaIgnoresZoomLikePointerInput(t *testing.T) {
 	rt.Frame(time.Now())
 	// The title bar is 60 logical pixels tall, so at zoom 2 it spans device
 	// pixels 0..120; points are device pixels, as for PointerMove.
-	if got := rt.WindowAreaAt(700, 80); got != WindowAreaDrag {
+	if got := rt.hostWindowAreaAt(700, 80); got != WindowAreaDrag {
 		t.Errorf("zoomed WindowAreaAt(700, 80) = %v, want WindowAreaDrag", got)
 	}
-	if got := rt.WindowAreaAt(700, 130); got != WindowAreaNone {
+	if got := rt.hostWindowAreaAt(700, 130); got != WindowAreaNone {
 		t.Errorf("zoomed WindowAreaAt(700, 130) = %v, want WindowAreaNone", got)
 	}
 }
@@ -66,7 +66,7 @@ func TestWindowAreaNoneWithoutMarkers(t *testing.T) {
 	rt := newTestRuntime(func(ctx *Context) Element {
 		return Div().Size(Full, Px(60)).Child(Text("plain"))
 	}, 300, 200, 1)
-	if got := rt.WindowAreaAt(10, 10); got != WindowAreaNone {
+	if got := rt.hostWindowAreaAt(10, 10); got != WindowAreaNone {
 		t.Errorf("an unmarked window: WindowAreaAt = %v, want WindowAreaNone", got)
 	}
 }
@@ -82,12 +82,12 @@ func TestWindowAreaOnlyPaintedElements(t *testing.T) {
 			))
 	}
 	rt := newTestRuntime(root, 300, 100, 1)
-	if got := rt.WindowAreaAt(10, 10); got != WindowAreaDrag {
+	if got := rt.hostWindowAreaAt(10, 10); got != WindowAreaDrag {
 		t.Fatalf("before scrolling: %v, want WindowAreaDrag", got)
 	}
 	rt.Scroll(10, 10, 0, 300, true, 0)
 	rt.Frame(time.Now())
-	if got := rt.WindowAreaAt(10, 10); got != WindowAreaNone {
+	if got := rt.hostWindowAreaAt(10, 10); got != WindowAreaNone {
 		t.Errorf("after scrolling the drag area out of view: %v, want WindowAreaNone", got)
 	}
 }
@@ -146,7 +146,7 @@ func TestWindowStateIsReactive(t *testing.T) {
 
 	// The app flips the state; the component that read it re-renders.
 	win.maximized = true
-	rt.SetMaximized(true)
+	rt.hostSetMaximized(true)
 	if !rt.NeedsFrame() {
 		t.Fatal("changing the window state did not request a frame")
 	}
@@ -156,7 +156,7 @@ func TestWindowStateIsReactive(t *testing.T) {
 	}
 	// Restoring it re-renders again, with the new value.
 	win.maximized = false
-	rt.SetMaximized(false)
+	rt.hostSetMaximized(false)
 	rt.Frame(time.Now())
 	if runs != 3 || seen[len(seen)-1] {
 		t.Errorf("after restoring: renders=%d seen=%v; want a third render that sees restored", runs, seen)
@@ -171,12 +171,12 @@ func TestWindowFocusIsReactive(t *testing.T) {
 	}, DarkTheme(), nil)
 	rt.SetViewport(300, 200, 1)
 	rt.Frame(time.Now())
-	rt.WindowFocus(true)
+	rt.hostWindowFocus(true)
 	rt.Frame(time.Now())
 	if runs != 2 {
 		t.Fatalf("losing or gaining focus: renders=%d, want 2", runs)
 	}
-	rt.WindowFocus(false)
+	rt.hostWindowFocus(false)
 	rt.Frame(time.Now())
 	if runs != 3 {
 		t.Errorf("after blur: renders=%d, want 3", runs)
@@ -228,7 +228,7 @@ func TestSharedSignalRerendersInEveryWindow(t *testing.T) {
 			w.runs++
 			return Textf("v=%d", shared.Get())
 		}, DarkTheme(), ts)
-		w.rt.SetWakeFunc(func() { w.woke++ })
+		w.rt.hostSetWakeFunc(func() { w.woke++ })
 		w.rt.SetViewport(300, 200, 1)
 		w.rt.Frame(time.Now())
 		return w

@@ -25,8 +25,11 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/dialog"
+	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/render"
+	"github.com/tyler-builds/jamb/internal/scene"
+	"github.com/tyler-builds/jamb/internal/uihost"
 	"github.com/tyler-builds/jamb/internal/watch"
 	"github.com/tyler-builds/jamb/keymap"
 	"github.com/tyler-builds/jamb/text"
@@ -294,6 +297,7 @@ type host struct {
 
 	win     platform.Window
 	rt      *ui.Runtime
+	rh      runtimeHost // the host side of rt
 	r       render.Renderer
 	focused bool
 
@@ -334,12 +338,13 @@ func (h *host) OnCreate(w platform.Window) error {
 		h.dev.tracef("fonts ready (waited %v after the renderer)", time.Since(t1))
 	}
 	h.rt = ui.NewRuntime(h.cfg.Root, h.cfg.Theme, ts)
-	h.rt.SetWakeFunc(w.Wake)
-	h.rt.SetServices(ui.Services{Clipboard: w.Clipboard, SetClipboard: w.SetClipboard, WakeAt: w.WakeAt})
+	h.rh = hostOf(h.rt)
+	h.rh.SetWakeFunc(w.Wake)
+	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
 	h.rt.SetWindowControls(windowControls{h})
 	h.rt.SetAccessWarnings(h.dev.a11yWarn)
 	h.applySettings()
-	h.rt.SetMaximized(w.Maximized())
+	h.rh.SetMaximized(w.Maximized())
 	h.rt.AddBindings(h.cfg.Bindings...)
 	if h.cfg.KeymapFile != "" {
 		h.keymapFile = &keymap.File{Path: h.cfg.KeymapFile, Actions: h.cfg.Actions}
@@ -349,7 +354,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	if h.cfg.Zoom > 0 {
 		h.rt.SetZoom(h.cfg.Zoom)
 	}
-	h.rt.OnZoom(h.cfg.OnZoom)
+	h.rh.OnZoom(h.cfg.OnZoom)
 	h.updateViewport(w)
 	if h.primary {
 		if h.dev.stress != "" {
@@ -431,13 +436,13 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 	case platform.EventSettingsChanged:
 		h.applySettings()
 	case platform.EventWindowState:
-		h.rt.SetMaximized(w.Maximized())
+		h.rh.SetMaximized(w.Maximized())
 	case platform.EventFileDrop:
 		h.rt.DropFiles(x, y, e.Paths)
 	case platform.EventMouseMove:
 		h.rt.PointerMove(x, y, e.Mods)
 	case platform.EventMouseLeave:
-		h.rt.PointerLeave()
+		h.rh.PointerLeave()
 	case platform.EventMouseDown:
 		h.rt.PointerDown(x, y, e.Button, e.Clicks, e.Mods)
 	case platform.EventMouseUp:
@@ -452,12 +457,12 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 		h.rt.TextInput(e.Text)
 	case platform.EventFocus:
 		h.focused = true
-		h.rt.WindowFocus(true)
+		h.rh.WindowFocus(true)
 	case platform.EventBlur:
 		h.focused = false
-		h.rt.WindowFocus(false)
+		h.rh.WindowFocus(false)
 	}
-	w.SetCursor(h.rt.Cursor())
+	w.SetCursor(h.rh.Cursor())
 	if h.rt.NeedsFrame() {
 		w.Wake()
 	}
@@ -501,7 +506,7 @@ func (h *host) OnClose(w platform.Window) bool {
 }
 
 // HasMenuBar implements platform.MenuBarHandler.
-func (h *host) HasMenuBar() bool { return h.rt != nil && h.rt.HasMenuBar() }
+func (h *host) HasMenuBar() bool { return h.rh != nil && h.rh.HasMenuBar() }
 
 // AccessBridge implements platform.AccessHandler. It is nil until the runtime
 // exists, which the adapter treats as no accessibility support yet.
@@ -519,7 +524,7 @@ func (h *host) TitleArea(w platform.Window, x, y float32) platform.TitleArea {
 		return platform.TitleNone
 	}
 	s := w.Scale()
-	switch h.rt.WindowAreaAt(x/s, y/s) {
+	switch h.rh.WindowAreaAt(x/s, y/s) {
 	case ui.WindowAreaDrag:
 		return platform.TitleDrag
 	case ui.WindowAreaMinimize:
@@ -549,7 +554,7 @@ func (h *host) OnFrame(w platform.Window) bool {
 	sc := h.rt.Frame(frameStart)
 	// Tell the OS where the caret is, for input-method (IME) windows.
 	var ime platform.Rect
-	if r, ok := h.rt.TextInputRect(); ok {
+	if r, ok := h.rh.TextInputRect(); ok {
 		s := w.Scale()
 		ime = platform.Rect{X: int(r.X * s), Y: int(r.Y * s), W: int(r.W*s + 1), H: int(r.H * s)}
 	}
@@ -689,3 +694,22 @@ func (h *host) FrameWaitable() uintptr {
 	}
 	return 0
 }
+
+// runtimeHost is the window host's side of a ui.Runtime: the methods that only
+// app calls, which ui keeps out of its public API (see internal/uihost).
+type runtimeHost interface {
+	SetWakeFunc(fn func())
+	SetServices(clipboard func() (string, bool), setClipboard func(string), wakeAt func(time.Time))
+	SetMaximized(on bool)
+	OnZoom(fn func(float32))
+	Invalidate()
+	InvalidateAll()
+	PointerLeave()
+	WindowFocus(focused bool)
+	Cursor() input.Cursor
+	HasMenuBar() bool
+	TextInputRect() (scene.Rect, bool)
+	WindowAreaAt(x, y float32) ui.WindowArea
+}
+
+func hostOf(rt *ui.Runtime) runtimeHost { return uihost.Of(rt).(runtimeHost) }
