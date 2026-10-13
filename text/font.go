@@ -16,14 +16,6 @@ import (
 	"unicode"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/gofont/gobolditalic"
-	"golang.org/x/image/font/gofont/goitalic"
-	"golang.org/x/image/font/gofont/gomedium"
-	"golang.org/x/image/font/gofont/gomediumitalic"
-	"golang.org/x/image/font/gofont/gomono"
-	"golang.org/x/image/font/gofont/gomonobolditalic"
-	"golang.org/x/image/font/gofont/gomonoitalic"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
@@ -127,6 +119,8 @@ type lazyFont struct {
 	font *Font
 	err  error
 	done bool
+	// embedded marks a face that only an embedded font provides; see pick.
+	embedded bool
 }
 
 func (l *lazyFont) get() (*Font, error) {
@@ -192,17 +186,12 @@ func NewRegistry() *Registry {
 			r.addSource(fam, k, func() (*Font, error) { return loadFirst(paths) })
 		}
 	}
-	// Embedded fonts guarantee text renders on every platform. Italic faces
-	// fall back to the embedded Go italics the same way upright ones do.
-	r.addEmbedded(FamilySans, faceKey{Regular, false}, "Go Regular", goregular.TTF)
-	r.addEmbedded(FamilySans, faceKey{Medium, false}, "Go Medium", gomedium.TTF)
-	r.addEmbedded(FamilySans, faceKey{Bold, false}, "Go Bold", gobold.TTF)
-	r.addEmbedded(FamilyMono, faceKey{Regular, false}, "Go Mono", gomono.TTF)
-	r.addEmbedded(FamilySans, faceKey{Regular, true}, "Go Italic", goitalic.TTF)
-	r.addEmbedded(FamilySans, faceKey{Medium, true}, "Go Medium Italic", gomediumitalic.TTF)
-	r.addEmbedded(FamilySans, faceKey{Bold, true}, "Go Bold Italic", gobolditalic.TTF)
-	r.addEmbedded(FamilyMono, faceKey{Regular, true}, "Go Mono Italic", gomonoitalic.TTF)
-	r.addEmbedded(FamilyMono, faceKey{Bold, true}, "Go Mono Bold Italic", gomonobolditalic.TTF)
+	// Embedded fonts guarantee text renders on every platform. They are a
+	// last resort: a weight the system lacks is drawn with another of the
+	// family's own faces, not with an embedded face of exactly that weight.
+	for _, e := range embeddedFonts() {
+		r.addEmbedded(e.family, e.key, e.name, e.data)
+	}
 	for _, spec := range systemFallbackFonts() {
 		path := spec.path
 		r.fallbacks = append(r.fallbacks, fallback{
@@ -252,6 +241,14 @@ func (r *Registry) addSource(familyName string, k faceKey, load func() (*Font, e
 	r.fam(familyName).sources[k] = &lazyFont{load: load}
 }
 
+// embeddedFont is a font compiled into the binary; see embeddedFonts.
+type embeddedFont struct {
+	family string
+	key    faceKey
+	name   string
+	data   []byte
+}
+
 // addEmbedded registers data as the source for a face, or as the fallback
 // for an existing (system) source of that face.
 func (r *Registry) addEmbedded(familyName string, k faceKey, name string, data []byte) {
@@ -262,10 +259,10 @@ func (r *Registry) addEmbedded(familyName string, k faceKey, name string, data [
 				return font, nil
 			}
 			return ParseFont(name, data)
-		}}
+		}, embedded: prev.embedded}
 		return
 	}
-	r.addSource(familyName, k, func() (*Font, error) { return ParseFont(name, data) })
+	f.sources[k] = &lazyFont{load: func() (*Font, error) { return ParseFont(name, data) }, embedded: true}
 }
 
 // Register adds (or replaces) an upright font for a family and weight. Use it
@@ -283,7 +280,9 @@ func (r *Registry) Register(familyName string, w Weight, data []byte) error {
 	return nil
 }
 
-// Font returns the closest available face for a family, weight and slant.
+// Font returns the closest available face for a family, weight and slant
+// (see weightRank): Medium in a family without a Medium face, such as Segoe UI,
+// is drawn Semibold, as DirectWrite draws it.
 // Unknown families fall back to the sans family. A family without an italic
 // face for that weight uses its upright face (there is no synthetic slant).
 func (r *Registry) Font(familyName string, w Weight, italic bool) *Font {
@@ -300,8 +299,10 @@ func (r *Registry) Font(familyName string, w Weight, italic bool) *Font {
 	return font
 }
 
-// pick loads the nearest source of the wanted slant, trying the nearest weight
-// first.
+// pick loads the best source of the wanted slant, in weightRank order. Faces
+// only an embedded font provides come after the family's own faces, so that,
+// for example, Medium text on Windows stays in Segoe UI rather than switching
+// typeface to Go Medium.
 func (r *Registry) pick(familyName string, f *family, k faceKey) *Font {
 	keys := make([]faceKey, 0, len(f.sources))
 	for cand := range f.sources {
@@ -309,14 +310,15 @@ func (r *Registry) pick(familyName string, f *family, k faceKey) *Font {
 			keys = append(keys, cand)
 		}
 	}
-	// Nearest weight first; on ties prefer the heavier face.
-	dist := func(c Weight) int {
-		if c >= k.w {
-			return int(c-k.w) * 2
+	slices.SortFunc(keys, func(a, b faceKey) int {
+		if ea, eb := f.sources[a].embedded, f.sources[b].embedded; ea != eb {
+			if ea {
+				return 1
+			}
+			return -1
 		}
-		return int(k.w-c)*2 + 1
-	}
-	slices.SortFunc(keys, func(a, b faceKey) int { return dist(a.w) - dist(b.w) })
+		return weightRank(k.w, a.w) - weightRank(k.w, b.w)
+	})
 	for _, cand := range keys {
 		if font, err := f.sources[cand].get(); err == nil {
 			return font
@@ -330,6 +332,17 @@ func (r *Registry) pick(familyName string, f *family, k faceKey) *Font {
 	}
 	font, _ := ParseFont("Go Regular", goregular.TTF)
 	return font
+}
+
+// weightRank orders the weights a family has for a wanted weight, lowest
+// first: the nearest weight, and on a tie the heavier one. This is how
+// Windows' DirectWrite resolves a weight a family lacks; for example, Medium
+// (500) in Segoe UI, which has 400 and 600 faces, resolves to Semibold.
+func weightRank(want, have Weight) int {
+	if have >= want {
+		return int(have-want) * 2
+	}
+	return int(want-have)*2 + 1
 }
 
 // fallbackFonts returns the fallback chain, loading it on first use.

@@ -6,6 +6,16 @@ import (
 	"os"
 	"path/filepath"
 	"unicode"
+
+	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/gofont/gobolditalic"
+	"golang.org/x/image/font/gofont/goitalic"
+	"golang.org/x/image/font/gofont/gomedium"
+	"golang.org/x/image/font/gofont/gomediumitalic"
+	"golang.org/x/image/font/gofont/gomono"
+	"golang.org/x/image/font/gofont/gomonobolditalic"
+	"golang.org/x/image/font/gofont/gomonoitalic"
+	"golang.org/x/image/font/gofont/goregular"
 )
 
 func winFont(name string) string {
@@ -14,6 +24,22 @@ func winFont(name string) string {
 		dir = `C:\Windows`
 	}
 	return filepath.Join(dir, "Fonts", name)
+}
+
+// embeddedFonts are the Go fonts, used only for faces no system font
+// provides (see pick).
+func embeddedFonts() []embeddedFont {
+	return []embeddedFont{
+		{FamilySans, faceKey{Regular, false}, "Go Regular", goregular.TTF},
+		{FamilySans, faceKey{Medium, false}, "Go Medium", gomedium.TTF},
+		{FamilySans, faceKey{Bold, false}, "Go Bold", gobold.TTF},
+		{FamilyMono, faceKey{Regular, false}, "Go Mono", gomono.TTF},
+		{FamilySans, faceKey{Regular, true}, "Go Italic", goitalic.TTF},
+		{FamilySans, faceKey{Medium, true}, "Go Medium Italic", gomediumitalic.TTF},
+		{FamilySans, faceKey{Bold, true}, "Go Bold Italic", gobolditalic.TTF},
+		{FamilyMono, faceKey{Regular, true}, "Go Mono Italic", gomonoitalic.TTF},
+		{FamilyMono, faceKey{Bold, true}, "Go Mono Bold Italic", gomonobolditalic.TTF},
+	}
 }
 
 func systemFonts() map[string]map[faceKey][]string {

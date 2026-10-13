@@ -997,6 +997,11 @@ ui.Text(body).HighlightMatches(query, ui.Highlight{Background: t.AccentSoft, Col
   A family without an italic face for that weight uses its upright face: there
   is no synthetic slant. Segoe UI and Consolas have italics on Windows; the
   embedded Go fonts are the fallback elsewhere.
+- A weight the family has no face for uses the nearest face, and the heavier
+  one on a tie, as Windows' DirectWrite does. Medium (500) in Segoe UI, which
+  has Regular and Semibold faces, is drawn Semibold. The family's own faces
+  always come before the embedded Go fonts, so text never switches typeface
+  because of its weight.
 - Rich text is display-only. `TextArea` stays single-style.
 
 ### Drag and drop
