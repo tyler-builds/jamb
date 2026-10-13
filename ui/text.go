@@ -16,6 +16,8 @@ type TextElement struct {
 	noWrap   bool
 	italic   bool
 	key      string
+	// selectable lets the user select and copy the text (see Selectable).
+	selectable bool
 	// segs and highlights make the text rich (see Rich and Highlight).
 	segs       []Segment
 	highlights []highlightRange

@@ -120,7 +120,7 @@ func EditorActions() []*Action {
 // depth wins. In a palette, for example, BindIn("Palette > Editor", "up", ...)
 // beats the field's own Up.
 func DefaultBindings() []Binding {
-	return []Binding{
+	return append([]Binding{
 		BindIn("Editor", "left", moveLeft),
 		BindIn("Editor", "right", moveRight),
 		BindIn("Editor", "ctrl+left", moveWordLeft),
@@ -169,7 +169,7 @@ func DefaultBindings() []Binding {
 		BindIn("Combobox > Editor", "up", comboboxUp),
 		BindIn("Combobox > Editor", "enter", comboboxEnter),
 		BindIn("Combobox > Editor", "escape", comboboxEscape),
-	}
+	}, selectableTextBindings()...)
 }
 
 // editorMoveTo puts the caret at p. Without extend the selection collapses

@@ -1002,6 +1002,10 @@ func (b *accessBuilder) emitText(n *node, absorbed bool) []access.ID {
 	id := accID(n.id)
 	an := &access.Node{ID: id, Role: access.RoleStaticText, Name: s, Key: n.key, Bounds: b.bounds(n)}
 	an.States = b.offscreen(n)
+	if n.st != nil && n.st.sel != nil {
+		// A click focuses selectable text (see Selectable).
+		an.States |= access.StateFocusable
+	}
 	if n.rich != nil {
 		for i, seg := range n.rich.segs {
 			if seg.onClick == nil {

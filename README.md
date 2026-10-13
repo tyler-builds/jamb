@@ -1120,6 +1120,25 @@ ui.Text(body).HighlightMatches(query, ui.Highlight{Background: t.AccentSoft, Col
   because of its weight.
 - Rich text is display-only. `TextArea` stays single-style.
 
+### Selectable text
+
+Text and rich text are not selectable by default, as labels in Windows apps are
+not. `Selectable()` makes one selectable, for error messages, details panes and
+anything users copy from:
+
+```go
+ui.Text(err.Error()).Selectable()
+ui.Rich(ui.Seg("Order "), ui.Seg(id).Mono(), ui.Seg(" shipped")).Selectable()
+```
+
+Drag selects, a double-click selects a word, a triple-click a paragraph, and
+Shift+click extends. A click puts keyboard focus on the text, without making it a
+Tab stop, so `Ctrl+A` selects all and `Ctrl+C` or `Ctrl+Insert` copies; the actions
+are `text.select-all` and `text.copy` in the `SelectableText` key context. The
+selection is drawn in the text fields' selection colors and cleared when focus
+moves away. A click on a link in selectable rich text still follows the link.
+Selection stays within one text element; it does not run across paragraphs.
+
 ### Drag and drop
 
 Drag and drop is typed, as in GPUI: a drag carries a Go value, and a target

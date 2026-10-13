@@ -51,6 +51,8 @@ type nodeState struct {
 	imageStart time.Time
 	// canvas is a canvas's drawing (see paintCanvas).
 	canvas *canvasState
+	// sel is the selection of a selectable text (see Selectable).
+	sel *textSelection
 
 	scrollX, scrollY float32
 	targetX, targetY float32
@@ -1275,6 +1277,12 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		}
 		n.lay.Style = e.style.layoutStyle(1)
 		n.lay.Measure = n
+		if e.selectable {
+			if n.style.Cursor == CursorDefault {
+				n.style.Cursor = CursorText
+			}
+			rt.buildSelectable(n)
+		}
 		rt.setOverhang(n)
 		return n
 	case *IconElement:

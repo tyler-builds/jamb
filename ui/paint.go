@@ -293,16 +293,21 @@ func (rt *Runtime) paintText(n *node, x, y, w float32, fg Color, opacity float32
 	case End:
 		align = 2
 	}
+	tx, ty := x+s.Padding.Left, y+s.Padding.Top
 	if n.rich != nil {
 		l := rt.text.LayoutSpans(n.textEl.text, n.textStyle(), n.rich.spans, contentW+0.01)
 		n.rich.lay = l
-		rt.text.DrawRich(&rt.scene, l, x+s.Padding.Left, y+s.Padding.Top, contentW, rt.scale, align, func(span int) text.RunPaint {
+		rects := rt.textSelectionRects(n, l, tx, ty, opacity)
+		rt.text.DrawRich(&rt.scene, l, tx, ty, contentW, rt.scale, align, func(span int) text.RunPaint {
 			return rt.runPaint(n, span, fg, opacity)
 		})
+		rt.redrawSelected(rects, func(c Color) { rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, c.Alpha(opacity).scene()) })
 		return
 	}
 	l := rt.text.Layout(n.textEl.text, n.textStyle(), contentW+0.01)
-	rt.text.Draw(&rt.scene, l, x+s.Padding.Left, y+s.Padding.Top, contentW, rt.scale, align, fg.Alpha(opacity).scene())
+	rects := rt.textSelectionRects(n, l, tx, ty, opacity)
+	rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, fg.Alpha(opacity).scene())
+	rt.redrawSelected(rects, func(c Color) { rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, c.Alpha(opacity).scene()) })
 }
 
 func (rt *Runtime) paintIcon(n *node, x, y float32, c Color) {
