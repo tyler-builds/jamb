@@ -2869,7 +2869,13 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   - **Paragraph direction.** It is always left-to-right, so an Arabic-only
     paragraph is right-to-left inside but left-aligned. Arrow keys move in
     logical order through mixed-direction text.
-  - **Emoji.** Drawn monochrome.
+  - **Emoji.** Drawn in color on Windows, from the color layers (COLR
+    version 0) of Segoe UI Emoji, through DirectWrite; they fade with the text
+    color's alpha. Skin tones, VS16 and ZWJ sequences (such as woman
+    technologist, U+1F469 U+200D U+1F4BB) shape to one emoji. Not drawn in
+    color: emoji fonts with only bitmap or SVG glyphs, and COLR version 1
+    gradients. Keycaps (a digit, U+FE0F, U+20E3) take the digit from the text
+    font, and Windows has no flag emoji, so flags show as letters.
   - **Rendering.** On Windows, glyph masks come from DirectWrite (hinted
     vertically: crossbars and x-height/cap-height edges land on whole pixels
     while stems keep their subpixel position). When the user has ClearType

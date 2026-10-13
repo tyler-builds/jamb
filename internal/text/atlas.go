@@ -111,7 +111,8 @@ func (a *Atlas) Upload(x, y int, m *image.Alpha) {
 	t.MarkDirty(x, y, x+b.Dx(), y+b.Dy())
 }
 
-// uploadRGBA copies a 4-byte-per-texel mask into a Subpixel8 atlas at (x, y).
+// uploadRGBA copies a 4-byte-per-texel mask into a Subpixel8 or RGBA8 atlas at
+// (x, y).
 func (a *Atlas) uploadRGBA(x, y int, m *image.RGBA) {
 	t := a.Texture
 	b := m.Bounds()

@@ -87,7 +87,7 @@ func systemFallbackFonts() []fallbackSpec {
 	// Segoe UI already covers Latin, Greek, Cyrillic, Arabic and Hebrew.
 	// Fallbacks are loaded lazily, only when a character needs them.
 	return []fallbackSpec{
-		{winFont("seguiemj.ttf"), isEmoji}, // emoji, drawn monochrome
+		{winFont("seguiemj.ttf"), isEmoji}, // emoji, drawn in color (see color.go)
 		{winFont("Nirmala.ttc"), inTables(unicode.Devanagari, unicode.Bengali, unicode.Gurmukhi, unicode.Gujarati,
 			unicode.Oriya, unicode.Tamil, unicode.Telugu, unicode.Kannada, unicode.Malayalam, unicode.Sinhala)},
 		{winFont("LeelawUI.ttf"), inTables(unicode.Thai, unicode.Lao, unicode.Khmer, unicode.Myanmar)},

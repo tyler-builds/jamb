@@ -21,5 +21,12 @@ func dwriteGlyphClearType(f *Font, id sfnt.GlyphIndex, size, fx float32, bgr boo
 	return 0, 0, nil, false
 }
 
+// hasColor reports that there are no color glyphs off Windows.
+func (f *Font) hasColor() bool { return false }
+
+func dwriteColorGlyph(f *Font, id sfnt.GlyphIndex, size, fx float32, fg [3]float32, alloc func(w, h int) *image.RGBA) (dx, dy int, m *image.RGBA, ok bool) {
+	return 0, 0, nil, false
+}
+
 // platformSubpixel reports that there is no subpixel text off Windows.
 func platformSubpixel() (s subpixelSettings, ok bool) { return s, false }

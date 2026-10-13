@@ -45,6 +45,8 @@ type System struct {
 	sub      *Atlas
 	subBGR   bool
 	rgbaTemp *image.RGBA
+	// color holds color glyphs (emoji), premultiplied; nil until one is drawn.
+	color *Atlas
 
 	// Shaping pipeline (go-text/typesetting), reused between layouts.
 	seg      shaping.Segmenter
@@ -75,6 +77,7 @@ type glyphKey struct {
 	size uint32 // physical pixel size × 64
 	bin  uint8
 	aa   uint8
+	fg   uint32 // see colorKey
 }
 
 type maskEntry struct {
@@ -82,9 +85,16 @@ type maskEntry struct {
 	x, y, w, h int
 	// Offset from the pen position (baseline origin) to the mask's top-left.
 	dx, dy int
-	// sub is set when the mask lives in the subpixel atlas.
-	sub bool
+	// in is the atlas the mask lives in.
+	in uint8
 }
+
+// The atlases a mask can live in (maskEntry.in).
+const (
+	inGray     uint8 = iota // System.atlas: coverage
+	inSubpixel              // System.sub: ClearType coverage
+	inColor                 // System.color: a color glyph
+)
 
 // MaskKey identifies a cached non-glyph mask such as an icon at a size.
 type MaskKey struct {
@@ -280,19 +290,17 @@ func (sys *System) DrawRich(sc *scene.Scene, l *Layout, x, y, boxWidth, scale fl
 					bin = subpixelBins - 1
 				}
 				py := float32(math.Round(float64((baseline + g.Y) * scale)))
-				e, ok := sys.glyph(glyphKey{g.font, g.ID, sizeKey, bin, aa}, physSize)
+				e, ok := sys.glyph(glyphKey{g.font, g.ID, sizeKey, bin, aa, colorKey(g.font, rp.Color)}, physSize)
 				if !ok || e.w == 0 {
 					continue
 				}
-				tex := sys.atlas.Texture
-				if e.sub {
-					tex = sys.sub.Texture
+				bounds := scene.Rect{X: ix + float32(e.dx), Y: py + float32(e.dy), W: float32(e.w), H: float32(e.h)}
+				src := scene.Rect{X: float32(e.x), Y: float32(e.y), W: float32(e.w), H: float32(e.h)}
+				if e.in == inColor {
+					sc.AddImage(scene.ImageDraw{Bounds: bounds, Texture: sys.color.Texture, Src: src, Opacity: rp.Color.A})
+					continue
 				}
-				sc.AddGlyph(tex, scene.Glyph{
-					Bounds: scene.Rect{X: ix + float32(e.dx), Y: py + float32(e.dy), W: float32(e.w), H: float32(e.h)},
-					Src:    scene.Rect{X: float32(e.x), Y: float32(e.y), W: float32(e.w), H: float32(e.h)},
-					Color:  rp.Color,
-				})
+				sc.AddGlyph(sys.atlasOf(e.in).Texture, scene.Glyph{Bounds: bounds, Src: src, Color: rp.Color})
 			}
 			if !rp.Underline && !rp.Strike {
 				continue
@@ -327,12 +335,24 @@ func pixelRect(x, y, w, h, scale float32) scene.Rect {
 
 // glyph returns the atlas entry for a glyph, rasterizing it if needed.
 func (sys *System) glyph(k glyphKey, physSize float32) (maskEntry, bool) {
-	if e, ok := sys.glyphs[k]; ok && e.gen == sys.atlasOf(e.sub).Generation {
+	if e, ok := sys.glyphs[k]; ok && e.gen == sys.atlasOf(e.in).Generation {
 		return e, true
+	}
+	if k.fg != 0 {
+		if dx, dy, m, ok := dwriteColorGlyph(k.font, k.id, physSize, float32(k.bin)/subpixelBins, keyColor(k.fg), sys.rgbaScratch); ok {
+			a := sys.colorAtlas()
+			e := maskEntry{gen: a.Generation, dx: dx, dy: dy, in: inColor}
+			if m == nil {
+				sys.glyphs[k] = e // whitespace
+				return e, true
+			}
+			return sys.store(&e, a, m.Rect.Dx(), m.Rect.Dy(), func(x, y int) { a.uploadRGBA(x, y, m) }, func() { sys.glyphs[k] = e })
+		}
+		// Not a color glyph: a mask, tinted with the text color.
 	}
 	if k.aa == aaSubpixel {
 		if dx, dy, m, ok := dwriteGlyphClearType(k.font, k.id, physSize, float32(k.bin)/subpixelBins, sys.subBGR, sys.rgbaScratch); ok {
-			e := maskEntry{gen: sys.sub.Generation, dx: dx, dy: dy, sub: true}
+			e := maskEntry{gen: sys.sub.Generation, dx: dx, dy: dy, in: inSubpixel}
 			if m == nil {
 				sys.glyphs[k] = e // whitespace
 				return e, true
@@ -415,9 +435,12 @@ func (sys *System) Mask(k MaskKey, draw func(dst *image.Alpha)) (tex *scene.Text
 	return sys.atlas.Texture, scene.Rect{X: float32(e.x), Y: float32(e.y), W: float32(e.w), H: float32(e.h)}, true
 }
 
-func (sys *System) atlasOf(sub bool) *Atlas {
-	if sub {
+func (sys *System) atlasOf(in uint8) *Atlas {
+	switch in {
+	case inSubpixel:
 		return sys.sub
+	case inColor:
+		return sys.colorAtlas()
 	}
 	return sys.atlas
 }
@@ -433,11 +456,11 @@ func (sys *System) store(e *maskEntry, a *Atlas, w, h int, upload func(x, y int)
 	x, y, cleared := a.Alloc(w, h)
 	if cleared {
 		for k, v := range sys.glyphs {
-			if v.sub == e.sub {
+			if v.in == e.in {
 				delete(sys.glyphs, k)
 			}
 		}
-		if !e.sub {
+		if e.in == inGray {
 			clear(sys.masks)
 		}
 		e.gen = a.Generation

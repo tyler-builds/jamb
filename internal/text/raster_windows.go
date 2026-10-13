@@ -98,10 +98,13 @@ func dwFactory() *dwCom {
 	return dwFactoryHandle
 }
 
-// dwFace caches the IDWriteFontFace of a Font.
+// dwFace caches the IDWriteFontFace of a Font, and whether it has color
+// glyphs.
 type dwFace struct {
-	once sync.Once
-	face *dwCom
+	once      sync.Once
+	face      *dwCom
+	colorOnce sync.Once
+	color     bool
 }
 
 // dwriteFace returns the DirectWrite face for f, or nil when f is not backed by
@@ -189,6 +192,139 @@ func dwriteGlyph(f *Font, id sfnt.GlyphIndex, size, fx float32, alloc func(w, h 
 		return 0, 0, nil, false
 	}
 	return int(r.Left), int(r.Top), m, true
+}
+
+// dwColorGlyphRun is DWRITE_COLOR_GLYPH_RUN (88 bytes on amd64): one layer of
+// a color glyph, and its color.
+type dwColorGlyphRun struct {
+	GlyphRun     dwGlyphRun
+	Description  uintptr
+	BaselineX    float32
+	BaselineY    float32
+	Color        [4]float32 // R, G, B, A
+	PaletteIndex uint16
+}
+
+var _ [88 - unsafe.Sizeof(dwColorGlyphRun{})]struct{}
+var _ [unsafe.Sizeof(dwColorGlyphRun{}) - 88]struct{}
+
+const (
+	dwENoColor        = 0x8898500C // DWRITE_E_NOCOLOR: the run has no color glyphs
+	dwForegroundColor = 0xFFFF     // a layer's palette index for the text color
+)
+
+// hasColor reports whether f has color glyphs: whether it has an OpenType
+// COLR table, as Segoe UI Emoji does.
+func (f *Font) hasColor() bool {
+	f.dw.colorOnce.Do(func() {
+		face := f.dwriteFace()
+		if face == nil {
+			return
+		}
+		// IDWriteFontFace::TryGetFontTable, vtable 12, and ReleaseFontTable, 13.
+		// The tag's first letter is its low byte.
+		const colr = 'C' | 'O'<<8 | 'L'<<16 | 'R'<<24
+		var data, ctx uintptr
+		var size uint32
+		var exists int32
+		hr, _, _ := syscall.SyscallN(face.fn(12), face.this(), colr, uintptr(unsafe.Pointer(&data)),
+			uintptr(unsafe.Pointer(&size)), uintptr(unsafe.Pointer(&ctx)), uintptr(unsafe.Pointer(&exists)))
+		if int32(hr) >= 0 && exists != 0 {
+			f.dw.color = true
+			syscall.SyscallN(face.fn(13), face.this(), ctx)
+		}
+	})
+	return f.dw.color
+}
+
+// dwriteColorGlyph rasterizes glyph id of the color font f as it is in color:
+// DirectWrite splits it into layers, each a glyph of one color, and they are
+// drawn over each other, in order, into a premultiplied RGBA image. Layers of
+// the text color take fg (straight R, G, B). It takes the arguments of
+// dwriteGlyph, and ok is false when the glyph has no color layers.
+func dwriteColorGlyph(f *Font, id sfnt.GlyphIndex, size, fx float32, fg [3]float32, alloc func(w, h int) *image.RGBA) (dx, dy int, m *image.RGBA, ok bool) {
+	face := f.dwriteFace()
+	if face == nil || id > 0xFFFF {
+		return 0, 0, nil, false
+	}
+	fac := dwFactory()
+	gi := uint16(id)
+	run := dwGlyphRun{FontFace: face.this(), FontEmSize: size, GlyphCount: 1, GlyphIndices: &gi}
+	// IDWriteFactory2::TranslateColorGlyphRun, vtable 28. The baseline origin's
+	// two floats are the first arguments after this, which Windows takes in
+	// XMM1 and XMM2; Go's system call copies the first four arguments into the
+	// XMM registers as well.
+	var layers *dwCom
+	hr, _, _ := syscall.SyscallN(fac.fn(28), fac.this(), uintptr(math.Float32bits(fx)), 0,
+		uintptr(unsafe.Pointer(&run)), 0, dwMeasuringNatural, 0, 0, uintptr(unsafe.Pointer(&layers)))
+	if int32(hr) < 0 || layers == nil {
+		return 0, 0, nil, false // dwENoColor: an ordinary glyph
+	}
+	defer layers.release()
+	type layer struct {
+		r     dwRect
+		mask  []byte
+		color [4]float32
+	}
+	var all []layer
+	var bounds dwRect
+	for {
+		// IDWriteColorGlyphRunEnumerator::MoveNext, vtable 3, and
+		// GetCurrentRun, 4. The run lives until the next MoveNext.
+		var has int32
+		hr, _, _ = syscall.SyscallN(layers.fn(3), layers.this(), uintptr(unsafe.Pointer(&has)))
+		if int32(hr) < 0 {
+			return 0, 0, nil, false
+		}
+		if has == 0 {
+			break
+		}
+		var cr *dwColorGlyphRun
+		hr, _, _ = syscall.SyscallN(layers.fn(4), layers.this(), uintptr(unsafe.Pointer(&cr)))
+		if int32(hr) < 0 || cr == nil {
+			return 0, 0, nil, false
+		}
+		c := cr.Color
+		if cr.PaletteIndex == dwForegroundColor {
+			c = [4]float32{fg[0], fg[1], fg[2], 1}
+		}
+		var an *dwCom
+		hr, _, _ = syscall.SyscallN(fac.fn(30), fac.this(), uintptr(unsafe.Pointer(&cr.GlyphRun)), 0,
+			dwRenderingNaturalSymmetric, dwMeasuringNatural, dwGridFitEnabled, dwAntialiasGrayscale,
+			uintptr(math.Float32bits(cr.BaselineX)), uintptr(math.Float32bits(cr.BaselineY)), uintptr(unsafe.Pointer(&an)))
+		if int32(hr) < 0 || an == nil {
+			return 0, 0, nil, false
+		}
+		var r dwRect
+		hr, _, _ = syscall.SyscallN(an.fn(3), an.this(), dwTextureAliased1x1, uintptr(unsafe.Pointer(&r)))
+		w, h := int(r.Right-r.Left), int(r.Bottom-r.Top)
+		if int32(hr) < 0 || w <= 0 || h <= 0 {
+			an.release()
+			continue // an empty layer
+		}
+		mask := make([]byte, w*h)
+		hr, _, _ = syscall.SyscallN(an.fn(4), an.this(), dwTextureAliased1x1, uintptr(unsafe.Pointer(&r)),
+			uintptr(unsafe.Pointer(&mask[0])), uintptr(len(mask)))
+		an.release()
+		if int32(hr) < 0 {
+			return 0, 0, nil, false
+		}
+		if len(all) == 0 {
+			bounds = r
+		} else {
+			bounds = dwRect{min(bounds.Left, r.Left), min(bounds.Top, r.Top), max(bounds.Right, r.Right), max(bounds.Bottom, r.Bottom)}
+		}
+		all = append(all, layer{r, mask, c})
+	}
+	if len(all) == 0 {
+		return 0, 0, nil, true // whitespace
+	}
+	w, h := int(bounds.Right-bounds.Left), int(bounds.Bottom-bounds.Top)
+	m = alloc(w, h)
+	for _, l := range all {
+		compositeLayer(m, l.mask, int(l.r.Right-l.r.Left), int(l.r.Left-bounds.Left), int(l.r.Top-bounds.Top), l.color)
+	}
+	return int(bounds.Left), int(bounds.Top), m, true
 }
 
 const (
