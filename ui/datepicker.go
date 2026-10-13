@@ -172,6 +172,14 @@ type DatePickerElement struct {
 	rules       []Validator[time.Time] // the validators of the value (see Validate)
 	wire        fieldWire              // what a Field gives the field (see Field)
 	focusHandle *FocusHandle           // see FocusHandle
+	small       bool                   // see Small
+}
+
+// Small makes the field compact: 28 px high with smaller text, like
+// Button.Small and TextInput.Small, for toolbars and dense forms.
+func (d *DatePickerElement) Small() *DatePickerElement {
+	d.small = true
+	return d
 }
 
 // FocusHandle lets code focus the date field (see NewFocusHandle). A Field that wraps
@@ -517,7 +525,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		}
 		a.invalid, a.required = isInvalid || w.invalid, w.required
 
-		fst := resolveField(t, fieldLayout{width: Full, disabled: d.disabled}, st.Field)
+		fst := resolveField(t, fieldLayout{width: Full, disabled: d.disabled, small: d.small}, st.Field)
 		if d.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)

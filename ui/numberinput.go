@@ -95,10 +95,16 @@ const spinGap = 2
 // numberInputDefaults returns the built-in look of a number input of the given
 // width, with spin buttons of placement when spin is set, from the colors of t. A
 // disabled field has the disabled frame (see fieldDefaults).
-func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool) NumberInputStyle {
+func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disabled, spin, small bool) NumberInputStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
+	// h is the frame's height at the Text size of 100 percent: 28 for Small, as
+	// TextInput.Small is.
+	h := float32(34)
+	if small {
+		h = 28
+	}
 	d := NumberInputStyle{
-		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled}),
+		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled, small: small}),
 		SpinButton:             Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond},
 		SpinButtonHover:        Style{Background: t.SurfaceHover, TextColor: t.Text},
 		SpinButtonPressed:      Style{Background: t.SurfaceActive},
@@ -117,14 +123,14 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 		// The column sits at the field's right edge, inside the frame, at the field's
 		// height: its two buttons share that height. It scales with the Text size.
 		// The frame has no gap and no right padding, so the column is at its edge.
-		d.Frame.Gap, d.Frame.Padding, d.Frame.MinHeight = 0, Edges{Left: 10}, Px(34*scale)
+		d.Frame.Gap, d.Frame.Padding, d.Frame.MinHeight = 0, Edges{Left: 10}, Px(h*scale)
 		// The column is inset by the gap from the border at its top, right and bottom, and
 		// the two buttons are twice the gap apart, so each fill is inset on every side that
 		// meets the border or the other button. The two buttons fill the rest of the column.
 		gap := spinGap * scale
-		d.SpinButtons = Style{Direction: Column, Width: Px(18 * scale), Height: Px(34 * scale), NoShrink: true,
+		d.SpinButtons = Style{Direction: Column, Width: Px(18 * scale), Height: Px(h * scale), NoShrink: true,
 			Padding: Edges{Top: gap, Right: gap, Bottom: gap}, Gap: 2 * gap}
-		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Full, Height: Px(17*scale - 2*gap)}
+		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Full, Height: Px(h/2*scale - 2*gap)}
 		// A ring would be drawn outside the buttons, into the frame's clipped edge,
 		// so the focus is an inner outline.
 		d.SpinButtonFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
@@ -144,8 +150,8 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 // resolveNumberInput returns the look of a number input: the defaults, merged
 // with the theme's Field, then the theme's NumberInput, then the instance's
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveNumberInput(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool, inst NumberInputStyle) NumberInputStyle {
-	st := numberInputDefaults(t, placement, scale, disabled, spin)
+func resolveNumberInput(t *Theme, placement SpinPlacement, scale float32, disabled, spin, small bool, inst NumberInputStyle) NumberInputStyle {
+	st := numberInputDefaults(t, placement, scale, disabled, spin, small)
 	for _, o := range []NumberInputStyle{{FieldStyle: t.Field}, t.NumberInput, inst} {
 		if t.HighContrast {
 			o = o.plain()
@@ -185,6 +191,14 @@ type NumberInputElement[T int | float64] struct {
 	wire        fieldWire      // what a Field gives the field (see Field)
 	onChange    func(T)        // see OnChange
 	focusHandle *FocusHandle   // see FocusHandle
+	small       bool           // see Small
+}
+
+// Small makes the field compact: 28 px high with smaller text, like
+// Button.Small and TextInput.Small, for toolbars and dense forms.
+func (n *NumberInputElement[T]) Small() *NumberInputElement[T] {
+	n.small = true
+	return n
 }
 
 // FocusHandle lets code focus the number's text (see NewFocusHandle). A Field that wraps
@@ -296,7 +310,7 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		scale := float32(ctx.TextScale()) / 100
-		st := resolveNumberInput(t, n.placement, scale, n.disabled, n.spin && !n.disabled, n.styles)
+		st := resolveNumberInput(t, n.placement, scale, n.disabled, n.spin && !n.disabled, n.small, n.styles)
 		v := n.value.Get()
 		// The field keeps its own text while the user types. draft is that text,
 		// and seen is the value it was last made from, so that a value set from

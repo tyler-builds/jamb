@@ -186,6 +186,14 @@ type ComboboxElement[T comparable] struct {
 	onChange    func(string)
 	focus       *FocusHandle // the editor's focus handle, see FocusHandle
 	wire        fieldWire    // what a Field gives the field (see Field)
+	small       bool         // see Small
+}
+
+// Small makes the field compact: 28 px high with smaller text, like
+// Button.Small and TextInput.Small, for toolbars and dense forms.
+func (c *ComboboxElement[T]) Small() *ComboboxElement[T] {
+	c.small = true
+	return c
 }
 
 // Combobox creates an editable text field that reads and writes text, with the
@@ -352,7 +360,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		st := resolveCombobox(t, c.styles)
-		lay := fieldLayout{width: Full, disabled: c.disabled}
+		lay := fieldLayout{width: Full, disabled: c.disabled, small: c.small}
 		fst := resolveField(t, lay, st.Field)
 		w := c.wire
 

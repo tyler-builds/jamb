@@ -82,7 +82,7 @@ const selectWidth = 220
 
 // selectDefaults returns the built-in look of a select of the given width, from
 // the colors of t. Under high contrast a disabled select is all GrayText.
-func selectDefaults(t *Theme, width float32, disabled bool) SelectStyle {
+func selectDefaults(t *Theme, width float32, disabled, small bool) SelectStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	placeholder, chevron := t.TextSubtle, t.TextMuted
 	if disabled && t.HighContrast {
@@ -105,6 +105,10 @@ func selectDefaults(t *Theme, width float32, disabled bool) SelectStyle {
 			Radius: 4, NoShrink: true, FontSize: 13, TextColor: t.Text},
 		OptionDisabled: Style{TextColor: t.Disabled},
 	}
+	if small {
+		// The compact trigger matches Button.Small and TextInput.Small.
+		d.Trigger.MinHeight, d.Trigger.Padding, d.Trigger.FontSize = Px(28), XY(8, 0), 13
+	}
 	if t.HighContrast {
 		// The highlighted option is the Highlight color, as a selected item is.
 		d.TriggerDisabled = Style{TextColor: t.Disabled, BorderColor: t.Disabled}
@@ -119,8 +123,8 @@ func selectDefaults(t *Theme, width float32, disabled bool) SelectStyle {
 // resolveSelect returns the look of a select: the defaults, merged with the
 // theme's Select and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveSelect(t *Theme, width float32, disabled bool, inst SelectStyle) SelectStyle {
-	st := selectDefaults(t, width, disabled)
+func resolveSelect(t *Theme, width float32, disabled, small bool, inst SelectStyle) SelectStyle {
+	st := selectDefaults(t, width, disabled, small)
 	for _, o := range []SelectStyle{t.Select, inst} {
 		if t.HighContrast {
 			o = o.plain()
@@ -157,6 +161,14 @@ type SelectElement[T comparable] struct {
 	rules        []Validator[T] // the validators of the value (see Validate)
 	wire         fieldWire      // what a Field gives the field (see Field)
 	focusHandle  *FocusHandle   // see FocusHandle
+	small        bool           // see Small
+}
+
+// Small makes the field compact: 28 px high with smaller text, like
+// Button.Small and TextInput.Small, for toolbars and dense forms.
+func (s *SelectElement[T]) Small() *SelectElement[T] {
+	s.small = true
+	return s
 }
 
 // FocusHandle lets code focus the select (see NewFocusHandle). A Field that wraps
@@ -269,7 +281,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
-		st := resolveSelect(t, selectWidth*textScale(ctx), s.disabled, s.styles)
+		st := resolveSelect(t, selectWidth*textScale(ctx), s.disabled, s.small, s.styles)
 		cur := s.value.Get()
 		sel := indexOf(s.options, cur)
 		open := Local(ctx, "open", false)

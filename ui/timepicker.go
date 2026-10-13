@@ -137,6 +137,14 @@ type TimePickerElement struct {
 	rules       []Validator[time.Time] // the validators of the value (see Validate)
 	wire        fieldWire              // what a Field gives the field (see Field)
 	focusHandle *FocusHandle           // see FocusHandle
+	small       bool                   // see Small
+}
+
+// Small makes the field compact: 28 px high with smaller text, like
+// Button.Small and TextInput.Small, for toolbars and dense forms.
+func (p *TimePickerElement) Small() *TimePickerElement {
+	p.small = true
+	return p
 }
 
 // FocusHandle lets code focus the time field (see NewFocusHandle). A Field that wraps
@@ -494,7 +502,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		}
 		a.invalid, a.required = isInvalid || w.invalid, w.required
 
-		fst := resolveField(t, fieldLayout{width: Full, disabled: p.disabled}, st.Field)
+		fst := resolveField(t, fieldLayout{width: Full, disabled: p.disabled, small: p.small}, st.Field)
 		if p.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)
