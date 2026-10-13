@@ -45,6 +45,10 @@ func drawingSection(t *ui.Theme) ui.Element {
 		sample(t, "Grid: Auto, Fr(1) and Px(96) columns, a spanning field", gridSample()))
 }
 
+// chartInset is how far the chart's first and last points are from its sides,
+// so the day labels centered under them fit.
+const chartInset = 18
+
 // visitsChart is a canvas line chart with a filled area, axis labels and a
 // readout of the day under the pointer.
 func visitsChart(t *ui.Theme) ui.Element {
@@ -53,7 +57,7 @@ func visitsChart(t *ui.Theme) ui.Element {
 		h := hover.Get()
 		accent, muted, grid := t.Accent, t.TextMuted, t.Border
 		return ui.Canvas(func(p *ui.Painter, w, ht float32) {
-			const left, bottom, top = 8, 22, 10
+			const left, bottom, top = chartInset, 22, 10
 			plotH := ht - bottom - top
 			x := func(i int) float32 { return left + float32(i)*(w-2*left)/float32(len(visits)-1) }
 			y := func(v float32) float32 { return top + plotH - v/320*plotH }
@@ -84,8 +88,8 @@ func visitsChart(t *ui.Theme) ui.Element {
 		}).Size(ui.Px(360), ui.Px(150)).
 			Label("Visits this week, from 120 on Monday to 280 on Sunday, highest on Saturday at 300").
 			OnMouseMove(func(e *ui.MouseEvent) {
-				step := (e.Width - 16) / float32(len(visits)-1)
-				i := int(math.Round(float64((e.LocalX - 8) / step)))
+				step := (e.Width - 2*chartInset) / float32(len(visits)-1)
+				i := int(math.Round(float64((e.LocalX - chartInset) / step)))
 				hover.Set(min(max(i, 0), len(visits)-1))
 			}).
 			OnMouseLeave(func() { hover.Set(-1) })
@@ -99,7 +103,7 @@ func gridSample() ui.Element {
 		email := ui.Local(ctx, "email", "")
 		notes := ui.Local(ctx, "notes", "")
 		return ui.Div().Width(ui.Px(420)).Grid(ui.Auto, ui.Fr(1), ui.Px(96)).Gap(8).Align(ui.Center).
-			Child(ui.Text("Name")).Child(ui.TextInput(name).Label("Name")).Child(ui.Button("Check").Small()).
+			Child(ui.Text("Name")).Child(ui.TextInput(name).Label("Name")).Child(ui.Button("Check").Small().OnClick(pressed("Check"))).
 			Child(ui.Text("Email")).Child(ui.TextInput(email).Label("Email").GridSpan(2, 1)).
 			Child(ui.Text("Notes")).Child(ui.TextArea(notes).Label("Notes").GridSpan(2, 1))
 	})
