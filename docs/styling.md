@@ -45,7 +45,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
-   `Theme.MenuBar`, `Theme.Modal`, `Theme.ProgressBar`, `Theme.ProgressRing`,
+   `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
    (per kind), `Theme.Tooltip`, and `Theme.FormField` (the label, help text and error
    of every field) and `Theme.Form` (the error summary of every form). Each is a field of `ui.Theme`, and the
@@ -322,6 +322,7 @@ the Text size of 100 percent:
 | `DataGrid`, `Tree`, `ListOf`, `UniformList` | fills the container's width; give a height (`Height`, `MaxHeight`, or `Grow` in a column) so the rows scroll inside it |
 | `Split` | fills the container's width; its height is the container's, as `Full` gives (set `Height` or `Grow` in a column with other children) |
 | `Modal` | a 420 px panel; a percentage is of the window's width |
+| `Drawer` | a 360 px panel at the left or right, the window's height; a 280 px panel at the top or bottom, the window's width |
 | `Text` | automatic, as a `Div`: fills a column, as wide as its words in a row |
 
 A form field (`Field`) takes the same methods on its outer box, so a labeled field is sized as a unit. Its control keeps its own width: a control whose width is `Auto` or `Full` fills the field, and a fixed one keeps its size. A content-sized control, such as a button, stays as wide as its content.
@@ -533,6 +534,8 @@ parts that the code applies.
 | `DropdownMenu`, `ContextMenu` | `Panel`, `Item`, `ItemHighlighted`, `ItemDisabled`, `Separator`, `SectionLabel`, `Shortcut`, `Check`, `SubmenuChevron` | none | none | done |
 | `MenuBar` | `BarItem`, `BarItemHover`, `BarItemFocusVisible`, `BarItemOpen` | none | none | done |
 | `Modal` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | none | none | done |
+| `Drawer` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | `Side` (`DrawerRight`, `DrawerLeft`, `DrawerTop`, `DrawerBottom`) | none | done |
+| `Popover` | `Panel` | `Placement` | none | done |
 | `ProgressBar` | `Track`, `Fill`, `Label` | `Indeterminate()` (the sliding segment is `Fill`) | none | done |
 | `ProgressRing` | `Ring`, `Dot` | sizes (`RingSmall`, `RingMedium`, `RingLarge`) | none | done |
 | `Badge` | `Badge`, `Label`, `Dot` | `Neutral`, `Accent`, `Success`, `Warning`, `Danger` (style per variant in `Theme.Badges`) | none | done |

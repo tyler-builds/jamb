@@ -1868,6 +1868,40 @@ ctx.Window().MessageBox(dialog.MessageOptions{
 - The notes and demo apps use these dialogs. The Components page of the demo
   shows each one.
 
+### Popovers and drawers
+
+`ui.Popover(trigger, content)` opens a floating panel of any content next to its
+trigger, such as filters or a short form. It opens and closes itself, like a
+`DropdownMenu`: a click, Enter or Space on the trigger toggles it, and Escape or a
+click outside closes it. Focus moves to the panel's first field or button when it
+opens, and Escape returns it to the trigger. Assistive technology sees the trigger
+as a button that opens a dialog, and the panel as that dialog.
+
+```go
+ui.Popover(ui.Button("Filters").Icon(icons.Filter), func() ui.Element {
+	return filterForm()                 // runs while the panel is open
+}).Placement(ui.BelowStart).            // default; any Placement, flipped when it does not fit
+	OnChange(func(open bool) { ... })
+```
+
+`ui.Drawer(title, body)` is a modal panel that slides in from an edge of the
+window: settings, details or filters that need more room. It behaves as a
+`ui.Modal` does (build it only while open, last in the window's root element;
+focus moves in and returns, Tab stays inside, Escape closes it), and a press on the
+backdrop also closes it. A left or right drawer is 360 px wide and as tall as the
+window; a top or bottom one is 280 px high and as wide as the window.
+
+```go
+ui.If(open.Get(), ui.Drawer("Filters", filters).
+	Side(ui.DrawerRight).               // DrawerRight (default), DrawerLeft, DrawerTop, DrawerBottom
+	Width(ui.Px(420)).                  // across its side
+	Footer(reset, apply).Default(apply).
+	OnClose(func() { open.Set(false) }))
+```
+
+Their looks are `ui.PopoverStyle` (`Panel`) and `ui.DrawerStyle` (the modal's parts),
+set in `Theme.Popover` and `Theme.Drawer` or with `.Styles(...)`.
+
 ### Modal dialogs
 
 `ui.Modal` is a dialog in the app's own look: a dimmed backdrop, and a panel

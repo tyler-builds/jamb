@@ -63,3 +63,25 @@ func labeledField(t *ui.Theme, label string, field ui.Element) ui.Element {
 		Child(ui.Text(label).FontSize(12).Medium().TextColor(t.TextMuted).Key(fieldLabel(label))).
 		Child(field)
 }
+
+// sampleDrawer is the drawer of the Components page: display settings that
+// slide in from the right, with the window's own controls in it.
+func sampleDrawer(s *Store) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		if !s.DrawerOpen.Get() {
+			return nil
+		}
+		t := ctx.Theme()
+		density := ui.Local(ctx, "density", "comfortable")
+		closeFn := func() { s.DrawerOpen.Set(false) }
+		body := ui.Div().Column().Gap(14).
+			Child(ui.Text("Changes apply to this sample only.").FontSize(13).TextColor(t.TextMuted)).
+			Child(ui.RadioGroup(density,
+				ui.Option[string]{Value: "comfortable", Label: "Comfortable"},
+				ui.Option[string]{Value: "compact", Label: "Compact"},
+			).Label("Density"))
+		done := ui.Button("Done").OnClick(closeFn)
+		return ui.Drawer("Display settings", body).Side(ui.DrawerRight).
+			Footer(done).Default(done).OnClose(closeFn)
+	})
+}

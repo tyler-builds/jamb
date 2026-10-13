@@ -107,7 +107,8 @@ var placementList = []struct {
 }{
 	{"BelowStart", ui.BelowStart}, {"BelowCenter", ui.BelowCenter}, {"BelowEnd", ui.BelowEnd},
 	{"AboveStart", ui.AboveStart}, {"AboveCenter", ui.AboveCenter}, {"AboveEnd", ui.AboveEnd},
-	{"RightStart", ui.RightStart}, {"LeftStart", ui.LeftStart},
+	{"RightStart", ui.RightStart}, {"RightCenter", ui.RightCenter}, {"RightEnd", ui.RightEnd},
+	{"LeftStart", ui.LeftStart}, {"LeftCenter", ui.LeftCenter}, {"LeftEnd", ui.LeftEnd},
 }
 
 // placements has one button per Placement. Each opens a popover beside its
@@ -128,7 +129,8 @@ func placements(t *ui.Theme) ui.Element {
 			row.Child(anchor)
 		}
 		return ui.Div().Gap(12).Child(row).
-			Child(ui.Text("Escape closes an open popover, as a click outside it does.").FontSize(12).TextColor(t.TextMuted))
+			Child(ui.Text("Escape closes an open popover, as a click outside it does.").FontSize(12).TextColor(t.TextMuted)).
+			Child(popoverSample(t))
 	})
 }
 
@@ -304,5 +306,20 @@ func focusWithinSample(t *ui.Theme) ui.Element {
 		return ui.Div().Width(ui.Px(220)).Padding(8).Radius(8).Border(1, t.Border).
 			FocusWithin(ui.Style{BorderColor: t.Accent}).
 			Child(ui.TextInput(draft).Label("Draft").Placeholder("Click inside the frame").Width(ui.Full))
+	})
+}
+
+// popoverSample is a Popover: a button that opens a small form next to it,
+// which takes focus, and closes on Escape or a click outside.
+func popoverSample(t *ui.Theme) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		query := ui.Local(ctx, "query", "")
+		mine := ui.Local(ctx, "mine", false)
+		return sample(t, "Popover", ui.Popover(ui.Button("Filters").Key("filters").Secondary().Small(), func() ui.Element {
+			return ui.Div().Column().Gap(10).Width(ui.Px(240)).
+				Child(ui.Text("Filter projects").Semibold()).
+				Child(ui.TextInput(query).Label("Name contains").Placeholder("Name contains").Width(ui.Full)).
+				Child(ui.Checkbox("Only my projects", mine))
+		}))
 	})
 }

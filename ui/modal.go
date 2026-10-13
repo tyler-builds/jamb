@@ -40,6 +40,10 @@ type ModalElement struct {
 	styles   ModalStyle
 	size     sizing // the panel's sizes, from the sizing methods (see Sizing in docs/styling.md)
 	key      string // the element key, see Key
+	// drawer makes the modal a Drawer: its panel is against the window's side
+	// edge, with the Drawer parts and styles.
+	drawer bool
+	side   DrawerSide
 }
 
 // Key identifies the modal among its siblings, so it keeps its state when the
@@ -187,7 +191,14 @@ func (*ModalElement) isElement() {}
 
 func (m *ModalElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
-	st := resolveModal(t, m.styles)
+	part := "Modal"
+	var st ModalStyle
+	if m.drawer {
+		part = "Drawer"
+		st = resolveDrawer(t, m.side, m.styles)
+	} else {
+		st = resolveModal(t, m.styles)
+	}
 	closeFn := func() {
 		if m.onClose != nil {
 			m.onClose()
@@ -195,18 +206,35 @@ func (m *ModalElement) expand(ctx *Context) Element {
 	}
 	spec := &modalSpec{def: m.def, initial: m.initial}
 
-	footer := Div().asPart("Modal.Footer").Style(st.Footer).Shrink(0).Children(m.footer...)
+	footer := Div().asPart(part + ".Footer").Style(st.Footer).Shrink(0).Children(m.footer...)
 	footer.modalFooter = true
 	// The panel is at most the window's height less the margin, so its title and footer
 	// stay on screen. A body that does not fit scrolls, and the focus reveals the field
 	// in it (see FocusHandle.Focus).
 	_, winH := ctx.WindowSize()
-	panel := Div().asPart("Modal.Panel").Overlay(OverCenter).Style(st.Panel).MaxHeight(Px(winH-2*modalMargin)).
+	placement, margin := OverCenter, float32(modalMargin)
+	enter, exit := Fade().Slide(0, -6).Grow(0.98), Fade().Grow(0.98)
+	if m.drawer {
+		// A drawer's panel is against the window's edge, across the whole side,
+		// and slides in from it.
+		placement, margin = edgeOf(m.side), 0
+		dx, dy := float32(24), float32(0)
+		switch m.side {
+		case DrawerLeft:
+			dx = -24
+		case DrawerTop:
+			dx, dy = 0, -24
+		case DrawerBottom:
+			dx, dy = 0, 24
+		}
+		enter, exit = Fade().Slide(dx, dy), Fade().Slide(dx, dy)
+	}
+	panel := Div().asPart(part+".Panel").Overlay(placement).Style(st.Panel).
 		// The panel and the backdrop take focus by click, so a click on either
 		// does not leave the modal without focus. Neither is in the Tab order.
 		Focusable().TabStop(false).
-		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
-		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
+		Enter(enter, Animation{Duration: 140 * time.Millisecond}).
+		Exit(exit, Animation{Duration: 90 * time.Millisecond}).
 		// A press on the panel is not a press on the backdrop behind it.
 		OnMouseDown(func(e *MouseEvent) { e.StopPropagation() }).
 		// The overlay's dismiss handler: Escape closes the topmost overlay with
@@ -214,15 +242,27 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		// the backdrop, which the panel counts as its parent, so it does not
 		// reach this.
 		OnClickOutside(closeFn).
-		Child(Div().asPart("Modal.Title").Style(st.Title).Shrink(0).Child(Text(m.title))).
-		Child(Div().asPart("Modal.Body").Style(st.Body).Grow(1).ScrollY().Child(m.body)).
+		Child(Div().asPart(part + ".Title").Style(st.Title).Shrink(0).Child(Text(m.title))).
+		Child(Div().asPart(part + ".Body").Style(st.Body).Grow(1).ScrollY().Child(m.body)).
 		Child(footer).
 		Role(access.RoleDialog).Label(m.title)
 
+	if !m.drawer {
+		panel.MaxHeight(Px(winH - 2*margin))
+	}
+	if m.drawer {
+		// The panel spans the backdrop, which covers the window, so it follows the
+		// window's size without being built again.
+		if m.side == DrawerLeft || m.side == DrawerRight {
+			panel.Height(Full)
+		} else {
+			panel.Width(Full)
+		}
+	}
 	m.size.apply(panel)
 	// The backdrop's padding is the margin around the panel, so a panel of 100% is the
 	// window less the margin.
-	backdrop := Div().asPart("Modal.Scrim").Absolute().Inset(0).Style(st.Scrim).Padding(modalMargin).
+	backdrop := Div().asPart(part+".Scrim").Absolute().Inset(0).Style(st.Scrim).Padding(margin).
 		Focusable().TabStop(false).
 		Enter(Fade(), Animation{Duration: 140 * time.Millisecond}).
 		Exit(Fade(), Animation{Duration: 90 * time.Millisecond}).

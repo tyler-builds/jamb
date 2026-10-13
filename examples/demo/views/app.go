@@ -39,6 +39,7 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			// form sample of the Components page.
 			Child(newProjectModal(s)).
 			Child(sampleModal(s)).
+			Child(sampleDrawer(s)).
 			// Last of all, so the toasts sit above the modals. One Toaster shows every toast.
 			Child(ui.Toaster().Key("toaster"))
 	}

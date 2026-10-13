@@ -61,6 +61,7 @@ func dialogsSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 			s.SampleName.Set("")
 			s.SampleOpen.Set(true)
 		})),
+		sample(t, "Drawer", ui.Button("Open drawer").Secondary().OnClick(func() { s.DrawerOpen.Set(true) })),
 		sample(t, "Clipboard", ui.Div().Row().Gap(8).
 			Child(ui.Button("Copy text").Secondary().OnClick(func() {
 				ctx.SetClipboard("Copied from the Components page")

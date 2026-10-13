@@ -95,6 +95,7 @@ type Store struct {
 	// SampleOpen shows the form sample of the Components page. SampleName is its
 	// field, and SampleResult is what it last saved.
 	SampleOpen   *ui.Signal[bool]
+	DrawerOpen   *ui.Signal[bool] // the drawer sample of the Components page
 	SampleName   *ui.Signal[string]
 	SampleResult *ui.Signal[string]
 
@@ -152,6 +153,7 @@ func NewStore() *Store {
 		NewDue:       ui.NewSignal(time.Time{}),
 		NewForm:      ui.NewForm(),
 		SampleOpen:   ui.NewSignal(false),
+		DrawerOpen:   ui.NewSignal(false),
 		SampleName:   ui.NewSignal(""),
 		SampleResult: ui.NewSignal(""),
 		details:      map[int]ui.Window{},
