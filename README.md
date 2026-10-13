@@ -2763,6 +2763,8 @@ On the Projects page:
   mark), a Status submenu with radio items, and a disabled Archive item.
 - The Components page (Ctrl+4) shows the controls, overlays, gradients, rounded
   clipping, per-side borders, motion and focus styles, one section each. Its
+  Drawing and layout section has a canvas chart that follows the pointer, SVG
+  images, selectable text and a form laid out as a grid. Its
   Menus section has a dropdown and a context menu with a submenu; their shortcuts
   come from the demo's bindings.
 - The Components page's **Form controls** section shows each form control in its
