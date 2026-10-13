@@ -773,8 +773,10 @@ func TestTabsUnderlineDrawsOneLinePerTab(t *testing.T) {
 }
 
 func TestNumberInputSpinButtonsByPlacement(t *testing.T) {
-	// The stacked buttons are a column in the frame's flow, each the field's height less
-	// the gap, with the gap at the column's top and bottom and twice the gap between them.
+	// The stacked buttons are a column in the frame's flow that fills the frame
+	// inside its border, so the field is 34 px high like the other fields. The two
+	// buttons share it, with the gap at the column's top and bottom and twice the
+	// gap between them.
 	r := newAccessRig(func(ctx *Context) Element {
 		return partNumberInput(NewSignal(8), NumberInputStyle{}, SpinStacked, false)
 	})
@@ -782,8 +784,11 @@ func TestNumberInputSpinButtonsByPlacement(t *testing.T) {
 	if group.style.Direction != Column {
 		t.Errorf("stacked: group direction %v, want Column", group.style.Direction)
 	}
-	if h := buttonNode(t, r, "Increase").style.Height; h != Px(17-2*spinGap) {
-		t.Errorf("stacked: Increase height %v, want %v", h, Px(17-2*spinGap))
+	if h := partNode(t, r.rt, "NumberInput.Frame", "").lay.H; h != 34 {
+		t.Errorf("stacked: field height %v, want 34", h)
+	}
+	if h := buttonNode(t, r, "Increase").lay.H; h != 16-2*spinGap {
+		t.Errorf("stacked: Increase height %v, want %v", h, 16-2*spinGap)
 	}
 	// The inline buttons have no group: each is laid over an edge of the frame.
 	r = newAccessRig(func(ctx *Context) Element {

@@ -22,7 +22,7 @@ func TestSmallFieldsAreCompact(t *testing.T) {
 			return s
 		}},
 		{"NumberInput", "NumberInput.Frame", func(small bool) Element {
-			n := NumberInput(NewSignal(3), 0, 9, 1).Label("N").SpinButtons(SpinInline)
+			n := NumberInput(NewSignal(3), 0, 9, 1).Label("N").SpinButtons(SpinStacked)
 			if small {
 				n.Small()
 			}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
+	"github.com/tyler-builds/jamb/internal/layout"
 )
 
 // SpinPlacement is where a number input's spin buttons are drawn. The zero
@@ -130,7 +131,9 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 		gap := spinGap * scale
 		d.SpinButtons = Style{Direction: Column, Width: Px(18 * scale), Height: Px(h * scale), NoShrink: true,
 			Padding: Edges{Top: gap, Right: gap, Bottom: gap}, Gap: 2 * gap}
-		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Full, Height: Px(h/2*scale - 2*gap)}
+		// The two buttons share the column's height (see stackedSpin). They may be
+		// shorter than their icon, inside the thicker border of an invalid field.
+		d.SpinButton = Style{TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Full, Grow: 1, MinHeight: Px(0)}
 		// A ring would be drawn outside the buttons, into the frame's clipped edge,
 		// so the focus is an inner outline.
 		d.SpinButtonFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
@@ -460,7 +463,14 @@ func (n *NumberInputElement[T]) stackedSpin(st NumberInputStyle, frame Style, v 
 	gap := spinGap * scale
 	down := n.spinButton(st, frame, -1, "Decrease", icons.ChevronDown, 12*scale, gap, v <= n.lo, step)
 	up := n.spinButton(st, frame, 1, "Increase", icons.ChevronUp, 12*scale, gap, v >= n.hi, step)
-	return Div().asPart("NumberInput.SpinButtons").Style(st.SpinButtons).Child(up).Child(down)
+	col := st.SpinButtons
+	// The column fills the frame inside its border, so the field is as high as the
+	// other fields: the frame's height is its outer height, border included. The
+	// border is the one drawn, which is thicker on an invalid field.
+	if col.Height.Unit == layout.UnitPx && frame.MinHeight.Unit == layout.UnitPx && col.Height.Value == frame.MinHeight.Value {
+		col.Height = Px(frame.MinHeight.Value - 2*frame.BorderWidth)
+	}
+	return Div().asPart("NumberInput.SpinButtons").Style(col).Child(up).Child(down)
 }
 
 // inlineSpin returns the inline spin buttons: the decrease button at the frame's left
