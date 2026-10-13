@@ -133,6 +133,7 @@ func (a *App) RunE(w Window) error {
 	w = withDefaults(w)
 	application.dev = loadDevOptions()
 	application.gpu.adapter = gpuAdapter
+	prepareDevice()
 	// Parse fonts and warm the shaper while the first window and GPU device
 	// are being created; the first window's runtime picks the result up.
 	ready := make(chan *text.System, 1)

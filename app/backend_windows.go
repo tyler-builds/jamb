@@ -13,6 +13,27 @@ import (
 // window creates it; later windows only get a swap chain.
 var gpu *d3d11.Device
 
+// gpuPending delivers the device that prepareDevice started creating, until
+// the first window takes it.
+var gpuPending chan gpuResult
+
+type gpuResult struct {
+	dev *d3d11.Device
+	err error
+}
+
+// prepareDevice starts creating the shared device on another goroutine.
+// Creating it loads the graphics driver, which takes longer than anything
+// else at startup, so it overlaps with creating the first window and parsing
+// fonts. A Direct3D 11 device may be created on any thread.
+func prepareDevice() {
+	gpuPending = make(chan gpuResult, 1)
+	go func() {
+		dev, err := d3d11.NewDevice()
+		gpuPending <- gpuResult{dev, err}
+	}()
+}
+
 func runPlatform(start func() error) error { return windows.Run(start) }
 
 func openPlatform(opts platform.WindowOptions, h platform.Handler) (platform.Window, error) {
@@ -46,11 +67,17 @@ func gpuAdapter() string {
 
 func newRenderer(w platform.Window, width, height int) (render.Renderer, error) {
 	if gpu == nil {
-		dev, err := d3d11.NewDevice()
-		if err != nil {
-			return nil, err
+		var res gpuResult
+		if gpuPending != nil {
+			res = <-gpuPending
+			gpuPending = nil
+		} else {
+			res.dev, res.err = d3d11.NewDevice()
 		}
-		gpu = dev
+		if res.err != nil {
+			return nil, res.err
+		}
+		gpu = res.dev
 	}
 	r, err := gpu.NewRenderer(w.Handle(), width, height)
 	if err != nil {

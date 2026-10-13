@@ -23,6 +23,8 @@ func postUI(fn func()) {}
 
 func quitUI() {}
 
+func prepareDevice() {}
+
 func newRenderer(w platform.Window, width, height int) (render.Renderer, error) {
 	return nil, fmt.Errorf("no GPU backend for %s yet", runtime.GOOS)
 }
