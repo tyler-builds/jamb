@@ -900,12 +900,17 @@ func (b *accessBuilder) offscreen(n *node) access.State {
 	return 0
 }
 
-// actions returns the actions a div node supports. A disabled node supports
-// none. A node inside a scroll container can be scrolled into view when it is a
-// list row, a control, or can take focus.
+// actions returns the actions a div node supports. A node inside a scroll
+// container can be scrolled into view when it is a list row, a control, or can
+// take focus. A disabled node supports nothing else: scrolling it into view
+// does not use it, and UI Automation expects every item of a scrolled list to
+// support it (the ScrollItem pattern), enabled or not.
 func (b *accessBuilder) actions(n *node, role access.Role, st access.State) []access.Action {
 	d := n.div
 	if d.acc != nil && d.acc.disabled {
+		if scrollContainer(n) != nil && (role == access.RoleListItem || role.Interactive()) {
+			return []access.Action{access.ActionScrollIntoView}
+		}
 		return nil
 	}
 	var out []access.Action

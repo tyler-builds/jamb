@@ -483,6 +483,25 @@ func TestAccessDisabledElementRefusesRequests(t *testing.T) {
 	}
 }
 
+// A disabled item of a scrolled list can still be scrolled into view, and
+// supports nothing else: UI Automation expects every item of a scrolled list to
+// support ScrollItem, enabled or not.
+func TestAccessDisabledListItemScrollsIntoView(t *testing.T) {
+	sel := NewSignal("a")
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Row().Height(Px(120)).Child(Sidebar(sel,
+			SidebarItem{Key: "a", Label: "Inbox"},
+			SidebarItem{Key: "b", Label: "People", Disabled: true}))
+	})
+	item := accesstest.Find(t, r.tree(), access.RoleListItem, "People")
+	if !item.States.Has(access.StateDisabled) {
+		t.Fatalf("the item is not disabled: [%s]", item.States)
+	}
+	if len(item.Actions) != 1 || !item.Has(access.ActionScrollIntoView) {
+		t.Fatalf("a disabled list item supports %v, want only scrolling into view", item.Actions)
+	}
+}
+
 // Each menu panel has a name, since it takes keyboard focus: a dropdown menu has
 // its trigger's name, and a menu bar's popup has its menu's name.
 func TestAccessMenuPanelsAreNamed(t *testing.T) {
