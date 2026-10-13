@@ -122,11 +122,11 @@ func TestColorPickerParseHex(t *testing.T) {
 // TestColorPickerFormatHex checks the hex text the picker shows, and that it parses
 // back to the same color.
 func TestColorPickerFormatHex(t *testing.T) {
+	if got := formatHex(Hex("#3b82f6"), true); got != "#3B82F6" {
+		t.Errorf("an opaque color with alpha formats as %q, want #3B82F6", got)
+	}
 	if got := formatHex(Hex("#3b82f6"), false); got != "#3B82F6" {
 		t.Errorf("formatHex = %q, want #3B82F6", got)
-	}
-	if got := formatHex(Hex("#3b82f6"), true); got != "#3B82F6FF" {
-		t.Errorf("formatHex with alpha = %q, want #3B82F6FF", got)
 	}
 	if got := formatHex(Hex("#3b82f680"), true); got != "#3B82F680" {
 		t.Errorf("formatHex with alpha = %q, want #3B82F680", got)
@@ -329,7 +329,7 @@ func TestColorPickerAccessNames(t *testing.T) {
 	accesstest.Find(t, r.tree(), access.RoleSlider, "Hue")
 	accesstest.Find(t, r.tree(), access.RoleSlider, "Opacity")
 	// With Alpha the presets are named by their eight-digit hex value, as the hex text is.
-	accesstest.Find(t, r.tree(), access.RoleButton, "#EF4444FF")
+	accesstest.Find(t, r.tree(), access.RoleButton, "#EF4444") // opaque: no alpha digits
 	if len(r.warnings) != 0 {
 		t.Errorf("development warnings: %v", r.warnings)
 	}

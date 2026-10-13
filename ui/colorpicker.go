@@ -320,11 +320,14 @@ func parseHex(s string, alpha bool) (Color, bool) {
 	return c, err == nil
 }
 
-// formatHex returns c as hex text: #RRGGBB, and #RRGGBBAA when alpha is set.
+// formatHex returns c as hex text: #RRGGBB, and #RRGGBBAA when alpha is set and
+// the color is not opaque.
 func formatHex(c Color, alpha bool) string {
 	ch := func(x float32) int { return int(math.Round(float64(min(max(x, 0), 1)) * 255)) }
 	s := fmt.Sprintf("#%02X%02X%02X", ch(c.R), ch(c.G), ch(c.B))
-	if alpha {
+	// The alpha is written only when the color is not opaque: #3B82F6 rather
+	// than #3B82F6FF.
+	if alpha && ch(c.A) < 255 {
 		s += fmt.Sprintf("%02X", ch(c.A))
 	}
 	return s

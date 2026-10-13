@@ -843,7 +843,7 @@ ui.DateRangePicker(start, end).Label("Trip dates").
 - The field is a combo box for assistive technology, with the range as its value. Each day is named by its
   long date, and its description is "Start of range", "End of range" or "In range".
 - The keys are those of `DatePicker`. `Placeholder`, `Disabled`, `FirstDay`, `Key`, `Label`, `Small`,
-  `Large`, `Tooltip`, `Styles` and the sizing methods are as for a date picker; a range is 240 px wide at
+  `Large`, `Tooltip`, `Styles` and the sizing methods are as for a date picker; a range is 280 px wide at
   the Text size of 100 percent. Its look is `DateRangePickerStyle`, and `Theme.DateRangePicker` sets it for
   every range picker (see docs/styling.md).
 - The calendar shows one month at a time. A range has no `Validate`; a form reads the two signals.

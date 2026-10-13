@@ -317,7 +317,7 @@ the Text size of 100 percent:
 | `Select` | 220 px, a fixed size; `Full` stretches it, and the list is at least as wide as the field |
 | `Combobox` | 240 px at the Text size of 100 percent, like a text field; `Full` stretches it, and the list is at least as wide as the field |
 | `DatePicker` | 180 px at the Text size of 100 percent; `Full` stretches it, and the calendar is its own size |
-| `DateRangePicker` | 240 px at the Text size of 100 percent; `Full` stretches it, and the calendar is its own size |
+| `DateRangePicker` | 280 px at the Text size of 100 percent, room for two dates; `Full` stretches it, and the calendar is its own size |
 | `TimePicker` | 140 px at the Text size of 100 percent; `Full` stretches it, and the list is at least as wide as the field |
 | `Slider`, `ProgressBar` (also when indeterminate) | fills the container, and at least 160 px, so it is visible where its container has no width |
 | `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |

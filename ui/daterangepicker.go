@@ -11,7 +11,7 @@ import (
 
 // dateRangePickerWidth is the default width of a date range picker at the Text size of 100
 // percent, in logical pixels. It scales with the Text size.
-const dateRangePickerWidth = 240
+const dateRangePickerWidth = 280
 
 // DateRangePickerStyle is the look of each part of a date range picker. A part's style merges
 // over the built-in defaults, then over the theme's DateRangePicker, then over the Styles of the
@@ -155,7 +155,7 @@ type DateRangePickerElement struct {
 }
 
 // DateRangePicker creates a date range picker that reads and writes the start and the end of a
-// range. The default width is 240 px at the Text size of 100 percent. A zero start is no range, and
+// range. The default width is 280 px at the Text size of 100 percent. A zero start is no range, and
 // the field is empty.
 func DateRangePicker(start, end *Signal[time.Time]) *DateRangePickerElement {
 	return &DateRangePickerElement{start: start, end: end}
