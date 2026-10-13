@@ -35,10 +35,12 @@ Results against the performance targets are in [BENCHMARKS.md](BENCHMARKS.md):
 - Idle CPU is zero.
 - A full re-render costs ~0.3 ms of CPU per frame.
 
+**Compared with GPUI:** [docs/comparison-gpui.md](docs/comparison-gpui.md) measures the same hello-world app built with jamb and with GPUI (Zed's Rust UI framework): project size, binary size, build times, startup, idle CPU and memory.
+
 ## Repository layout
 
 ```
-go.work             workspace: the framework (.), cmd/jamb, examples/demo and examples/notes
+go.work             workspace: the framework (.), cmd/jamb, examples/demo, examples/hello and examples/notes
 go.mod             module "github.com/tyler-builds/jamb", the framework
 app/               runs an app: window + renderer + ui runtime, dev hooks
 ui/                declarative API: Div, Text, Button, TextInput, TextArea, Icon, Image,
@@ -63,12 +65,14 @@ examples/demo/     module "github.com/tyler-builds/jamb/examples/demo", consumes
   views/           sidebar, header, Dashboard, Projects, Activity, Settings
   assets/          embedded images
   jamb.json, icon.png   packaging settings and icon (see Packaging)
+examples/hello/    module "github.com/tyler-builds/jamb/examples/hello", the smallest complete app: one window, a Signal and a button
 examples/notes/    module "github.com/tyler-builds/jamb/examples/notes", a note-taking app (see below)
   store/           notes as signals, ordering, JSON persistence on a background goroutine
   views/           sidebar, note list, editor pane, actions and the command palette
 docs/              screenshots/ (PNG captures), benchmarks/ (bench-before.txt, bench-after.txt)
 scripts/bench.sh   reproduces the build and footprint numbers
 scripts/a11y-check.ps1  live UI Automation checks of the examples (see Tools)
+scripts/compare-gpui.ps1  reproduces the jamb and GPUI hello-world comparison (docs/comparison-gpui.md)
 ```
 
 ## Architecture
