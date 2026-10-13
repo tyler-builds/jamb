@@ -395,6 +395,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
 	h.rh.SetImageClipboard(w.ClipboardImage, w.SetClipboardImage)
 	h.rh.SetOpenURL(w.OpenURL)
+	h.rh.SetCancelComposition(w.CancelComposition)
 	h.rt.SetWindow(h.handle)
 	h.rt.SetAccessWarnings(h.dev.a11yWarn)
 	h.applySettings()
@@ -507,6 +508,8 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 		h.rt.KeyUp(e.Key, e.Mods)
 	case platform.EventTextInput:
 		h.rt.TextInput(e.Text)
+	case platform.EventComposition:
+		h.rh.Compose(e.Text, e.Cursor, e.ClauseStart, e.ClauseEnd)
 	case platform.EventFocus:
 		h.focused = true
 		h.rh.WindowFocus(true)
@@ -732,6 +735,8 @@ type runtimeHost interface {
 	SetServices(clipboard func() (string, bool), setClipboard func(string), wakeAt func(time.Time))
 	SetImageClipboard(get func() (image.Image, bool), set func(image.Image))
 	SetOpenURL(fn func(string) error)
+	SetCancelComposition(fn func())
+	Compose(text string, cursor, clauseStart, clauseEnd int)
 	SetMaximized(on bool)
 	OnZoom(fn func(float32))
 	Invalidate()

@@ -32,6 +32,17 @@ func (h *runtimeHost) SetImageClipboard(get func() (image.Image, bool), set func
 	h.rt().services.ClipboardImage, h.rt().services.SetClipboardImage = get, set
 }
 
+// SetCancelComposition connects the platform's way to make the input method
+// drop what it is composing (see commitComposition).
+func (h *runtimeHost) SetCancelComposition(fn func()) { h.rt().services.CancelComposition = fn }
+
+// Compose shows what an input method is composing in the focused text field:
+// text, with the input method's caret at byte cursor and the clause being
+// converted from byte clauseStart to clauseEnd. Empty text ends it.
+func (h *runtimeHost) Compose(text string, cursor, clauseStart, clauseEnd int) {
+	h.rt().hostCompose(composition{text: text, cursor: cursor, clauseStart: clauseStart, clauseEnd: clauseEnd})
+}
+
 // SetOpenURL connects the platform's way to open a URL (see Context.OpenURL).
 func (h *runtimeHost) SetOpenURL(fn func(string) error) { h.rt().services.OpenURL = fn }
 

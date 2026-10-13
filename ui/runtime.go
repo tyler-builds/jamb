@@ -322,6 +322,7 @@ type Runtime struct {
 	focused        *Signal[bool]
 	memClipboard   string      // used when no platform clipboard is wired in
 	memImage       image.Image // the image on that clipboard
+	composing      uint64      // the editor an input method composes in (see composition)
 	clock          func() time.Time
 	captureID      uint64 // element receiving pointer moves while a button is held
 	drag           dragState
@@ -409,12 +410,16 @@ type platformServices struct {
 	WakeAt func(time.Time)
 	// OpenURL opens a URL with the system (see Context.OpenURL).
 	OpenURL func(string) error
+	// CancelComposition tells the input method to drop what it is composing
+	// (see commitComposition).
+	CancelComposition func()
 }
 
 // hostSetServices connects platform capabilities.
 func (rt *Runtime) hostSetServices(s platformServices) {
 	s.OpenURL = rt.services.OpenURL
 	s.ClipboardImage, s.SetClipboardImage = rt.services.ClipboardImage, rt.services.SetClipboardImage
+	s.CancelComposition = rt.services.CancelComposition
 	rt.services = s
 }
 
@@ -914,6 +919,13 @@ func (rt *Runtime) rebuildDirty() {
 	}
 	if rt.focusID != 0 && rt.byID[rt.focusID] == nil {
 		rt.focusID = 0
+	}
+	if rt.composing != 0 && rt.byID[rt.composing] == nil {
+		// The field went away while an input method composed in it.
+		rt.composing = 0
+		if rt.services.CancelComposition != nil {
+			rt.services.CancelComposition()
+		}
 	}
 	rt.moveFocusOutOfHidden()
 	if id := rt.pendingFocus; id != 0 {

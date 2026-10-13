@@ -40,6 +40,8 @@ var (
 	procImmReleaseContext       = imm32.NewProc("ImmReleaseContext")
 	procImmSetCompositionWindow = imm32.NewProc("ImmSetCompositionWindow")
 	procImmSetCandidateWindow   = imm32.NewProc("ImmSetCandidateWindow")
+	procImmGetCompositionString = imm32.NewProc("ImmGetCompositionStringW")
+	procImmNotifyIME            = imm32.NewProc("ImmNotifyIME")
 
 	procRegisterClassExW              = user32.NewProc("RegisterClassExW")
 	procCreateWindowExW               = user32.NewProc("CreateWindowExW")
@@ -190,7 +192,9 @@ const (
 	WM_NCMOUSELEAVE         = 0x02A2
 	WM_TIMER                = 0x0113
 	WM_IME_STARTCOMPOSITION = 0x010D
+	WM_IME_ENDCOMPOSITION   = 0x010E
 	WM_IME_COMPOSITION      = 0x010F
+	WM_IME_SETCONTEXT       = 0x0281
 	WM_APP                  = 0x8000
 	// WM_OCCLUSION is posted to a window by DXGI when the window's occlusion
 	// state changes (see render/d3d11).
@@ -871,6 +875,84 @@ func SetIMEPosition(hwnd uintptr, x, y, h int32) {
 	cand := candidateForm{Style: cfsExclude, Pos: POINT{x, y + h}, Area: RECT{x, y, x + 1, y + h}}
 	procImmSetCandidateWindow.Call(ctx, uintptr(unsafe.Pointer(&cand)))
 	_ = cfsCandidatePos
+}
+
+// The flags of WM_IME_COMPOSITION, and of WM_IME_SETCONTEXT, that the window
+// uses.
+const (
+	GCS_COMPSTR                 = 0x0008
+	GCS_COMPATTR                = 0x0010
+	GCS_CURSORPOS               = 0x0080
+	GCS_RESULTSTR               = 0x0800
+	ISC_SHOWUICOMPOSITIONWINDOW = 0x80000000
+)
+
+// Composition is what an input method reports with WM_IME_COMPOSITION. The
+// strings are UTF-16. Attrs has one ATTR_* value per unit of Text, and Cursor
+// is the caret as a unit index in Text.
+type Composition struct {
+	Result []uint16 // the confirmed text, when the flags have GCS_RESULTSTR
+	Text   []uint16 // the text being composed, when they have GCS_COMPSTR
+	Attrs  []byte
+	Cursor int
+}
+
+// ReadComposition reads the parts of the window's input method composition
+// that flags, the lParam of WM_IME_COMPOSITION, says changed.
+func ReadComposition(hwnd uintptr, flags uint32) Composition {
+	var c Composition
+	if procImmGetContext.Find() != nil || procImmGetCompositionString.Find() != nil {
+		return c
+	}
+	ctx, _, _ := procImmGetContext.Call(hwnd)
+	if ctx == 0 {
+		return c
+	}
+	defer procImmReleaseContext.Call(hwnd, ctx)
+	read := func(index uint32) []byte {
+		n, _, _ := procImmGetCompositionString.Call(ctx, uintptr(index), 0, 0)
+		if int32(n) <= 0 {
+			return nil
+		}
+		b := make([]byte, int32(n))
+		procImmGetCompositionString.Call(ctx, uintptr(index), uintptr(unsafe.Pointer(&b[0])), n)
+		return b
+	}
+	units := func(b []byte) []uint16 {
+		if len(b) < 2 {
+			return nil
+		}
+		return unsafe.Slice((*uint16)(unsafe.Pointer(&b[0])), len(b)/2)
+	}
+	if flags&GCS_RESULTSTR != 0 {
+		c.Result = units(read(GCS_RESULTSTR))
+	}
+	if flags&GCS_COMPSTR != 0 {
+		c.Text = units(read(GCS_COMPSTR))
+		c.Attrs = read(GCS_COMPATTR)
+		if r, _, _ := procImmGetCompositionString.Call(ctx, GCS_CURSORPOS, 0, 0); int32(r) >= 0 {
+			c.Cursor = int(int32(r))
+		} else {
+			c.Cursor = len(c.Text)
+		}
+	}
+	return c
+}
+
+// CancelComposition makes the window's input method drop the text it is
+// composing. The input method may send its composition messages before this
+// returns.
+func CancelComposition(hwnd uintptr) {
+	if procImmGetContext.Find() != nil || procImmNotifyIME.Find() != nil {
+		return
+	}
+	ctx, _, _ := procImmGetContext.Call(hwnd)
+	if ctx == 0 {
+		return
+	}
+	defer procImmReleaseContext.Call(hwnd, ctx)
+	const niCompositionStr, cpsCancel = 0x0015, 0x0004
+	procImmNotifyIME.Call(ctx, niCompositionStr, cpsCancel, 0)
 }
 
 func LOWORD(v uintptr) uint16 { return uint16(v & 0xffff) }

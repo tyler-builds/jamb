@@ -168,6 +168,10 @@ type Window interface {
 	// in physical client pixels) so input-method windows appear next to it.
 	// A zero rect means no text field has focus.
 	SetTextInputRect(r Rect)
+	// CancelComposition makes the input method drop the text it is composing,
+	// without typing it and without sending an EventComposition for it. The
+	// application types the composition itself first when it should be kept.
+	CancelComposition()
 
 	// ShowFileDialog opens a file or folder dialog owned by this window. It
 	// returns at once, and done runs on the UI thread when the dialog closes.
@@ -273,6 +277,14 @@ const (
 	// animation effects, caret, or system colors). The application re-reads
 	// them with the platform's ReadSettings.
 	EventSettingsChanged
+	// EventComposition is sent while an input method (IME) composes text, such
+	// as Chinese, Japanese or Korean, which the focused field shows in place.
+	// Text is the text being composed, and empty when the composition ends;
+	// Cursor is the input method's caret in it, and ClauseStart and ClauseEnd
+	// are the clause being converted (equal when there is none), all as byte
+	// offsets in Text. The text the input method confirms arrives afterwards,
+	// or in the same message, as an EventTextInput.
+	EventComposition
 )
 
 // Event is a flat, allocation-free event record. Which fields are meaningful
@@ -300,4 +312,7 @@ type Event struct {
 	Text   string
 	// Paths are the files of an EventFileDrop, as local file system paths.
 	Paths []string
+	// Cursor, ClauseStart and ClauseEnd are byte offsets in Text of an
+	// EventComposition.
+	Cursor, ClauseStart, ClauseEnd int
 }

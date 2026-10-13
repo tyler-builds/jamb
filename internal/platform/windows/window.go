@@ -55,7 +55,10 @@ type window struct {
 	maximized   bool // last reported state, see platform.EventWindowState
 	wakeAt      time.Time
 	imeRect     platform.Rect
-	caretH      int32 // height of the hidden system caret, or 0 when there is none (see placeCaret)
+	// imeCanceling is set while CancelComposition runs, so the composition
+	// messages the input method sends then are not reported.
+	imeCanceling bool
+	caretH       int32 // height of the hidden system caret, or 0 when there is none (see placeCaret)
 	// caption is the title-bar button the mouse went down on; its action runs
 	// when the button is released over it.
 	caption platform.TitleArea
@@ -527,11 +530,29 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 			return 0
 		}
 
+	case win32.WM_IME_SETCONTEXT:
+		// Text fields draw the composition themselves (see ime.go); the input
+		// method keeps its candidate list.
+		if wp != 0 {
+			lp &^= win32.ISC_SHOWUICOMPOSITIONWINDOW
+		}
+		return win32.DefWindowProc(hwnd, msg, wp, lp)
+
 	case win32.WM_IME_STARTCOMPOSITION:
-		// Place the composition window at the caret, then let Windows draw it.
+		// Place the candidate list at the caret. The default window procedure
+		// would open the composition window, so it does not see this.
 		if r := w.imeRect; r.H > 0 {
 			win32.SetIMEPosition(hwnd, int32(r.X), int32(r.Y), int32(r.H))
 		}
+		return 0
+
+	case win32.WM_IME_COMPOSITION:
+		w.onComposition(uint32(lp))
+		return 0
+
+	case win32.WM_IME_ENDCOMPOSITION:
+		w.onEndComposition()
+		return 0
 
 	case win32.WM_ERASEBKGND:
 		return 1

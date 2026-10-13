@@ -255,8 +255,12 @@ the end of the next word and the start of the word before, as on macOS and Linux
 (`text.NextWord` and `text.PrevWord`). Text areas keep the caret visible
 inside the nearest scroll container. Text is shaped with HarfBuzz (via
 `go-text/typesetting`), so ligatures, right-to-left scripts, complex scripts
-and font fallback for other writing systems all work. Input-method windows
-open at the caret.
+and font fallback for other writing systems all work. Text typed with an input
+method (IME), such as Chinese, Japanese or Korean, is composed inside the field:
+the text being composed shows at the caret, underlined, with the clause being
+converted underlined more heavily, and the input method's candidate list opens
+next to that clause. It becomes part of the value when the input method confirms
+it. A click, a key the field handles, or focus moving away types it as shown.
 
 App code reads and writes the clipboard's plain text with `ctx.Clipboard()`,
 which returns the text and whether there is any, and `ctx.SetClipboard(s)`.
@@ -2857,8 +2861,11 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
   and what was not.
 - **Text.** Shaping, bidi display, fallback, selection, clipboard and undo
   work. Still missing:
-  - **IME.** Composition text appears in the system's window at the caret,
-    not inline in the field.
+  - **IME.** Text fields draw the composition inline, through the IMM32
+    composition messages; it has not been checked by hand with the Chinese,
+    Japanese and Korean input methods yet. Elements that take text with
+    `OnTextInput` see only the confirmed text, and assistive technology is not
+    told about the composition.
   - **Paragraph direction.** It is always left-to-right, so an Arabic-only
     paragraph is right-to-left inside but left-aligned. Arrow keys move in
     logical order through mixed-direction text.

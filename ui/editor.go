@@ -60,7 +60,11 @@ type editState struct {
 	content       *access.TextContent
 	contentLayout *text.Layout
 
-	// From the last paint, for hit testing.
+	// comp is what an input method is composing here (see composition).
+	comp composition
+
+	// From the last paint, for hit testing. While a composition shows, the
+	// layout is of the text with the composition in it.
 	layout           *text.Layout
 	originX, originY float32 // text origin relative to the node
 }
@@ -196,7 +200,10 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	// The keys of a field are actions (see DefaultBindings).
 	for _, ea := range editorActions {
 		fn := ea.fn
-		d.OnAction(ea.a, func() { fn(rt, id) })
+		d.OnAction(ea.a, func() {
+			rt.commitComposition()
+			fn(rt, id)
+		})
 	}
 	d.h.onMouseDown = func(ev *MouseEvent) { rt.editorMouseDown(id, ev) }
 	d.h.onMouseMove = func(ev *MouseEvent) { rt.editorMouseMove(id, ev) }
@@ -211,7 +218,7 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 		d.OnAction(moveUp, func() { e.onStep(1) })
 		d.OnAction(moveDown, func() { e.onStep(-1) })
 	}
-	d.h.onTextInput = func(s string) { rt.editorInsert(id, s, editTyping) }
+	d.h.onTextInput = func(s string) { rt.editorTyped(id, s) }
 	d.h.onFocus = func() { rt.editorTouched(id) }
 	d.h.onBlur = e.onBlur
 	if len(e.labelledBy) > 0 || len(e.describedBy) > 0 {
@@ -378,6 +385,8 @@ func (rt *Runtime) editorHit(n *node, es *editState, ev *MouseEvent) int {
 }
 
 func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
+	// A click types what is being composed first: the layout it hits shows it.
+	rt.commitComposition()
 	n, es, v := rt.editorOf(id)
 	if n == nil || ev.Button != input.ButtonLeft {
 		return
@@ -462,10 +471,18 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	if !e.multiline {
 		wrap = float32(math.Inf(1))
 	}
-	l := rt.text.Layout(v, st, wrap)
-	es.layout = l
 	focused := rt.focusID == n.id
-	caretX, caretTop := l.Caret(es.caret)
+	// While an input method composes, the text shown has the composition at
+	// the caret, and the caret is the input method's.
+	composing := focused && rt.composing == n.id && es.comp.text != ""
+	shown, at, caretAt := v, 0, es.caret
+	if composing {
+		shown, at = composedText(v, es)
+		caretAt = at + es.comp.cursor
+	}
+	l := rt.text.Layout(shown, st, wrap)
+	es.layout = l
+	caretX, caretTop := l.Caret(caretAt)
 
 	// A single-line text that fits is not scrolled: it sits at its alignment, and the
 	// alignment is left out once the text is wider than the field, which scrolls instead.
@@ -496,7 +513,7 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	if clip {
 		rt.scene.PushClip(rt.px(scene.Rect{X: cx - 1, Y: y, W: cw + 2, H: n.lay.H}))
 	}
-	selected := focused && es.hasSelection() && (!e.selection.IsZero() || !e.selectionText.IsZero())
+	selected := focused && !composing && es.hasSelection() && (!e.selection.IsZero() || !e.selectionText.IsZero())
 	if selected {
 		a, b := es.selection()
 		sel := e.selection.Alpha(opacity)
@@ -511,7 +528,7 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 			}
 		}
 	}
-	if v == "" {
+	if shown == "" {
 		if e.placeholder != "" {
 			pc := fg
 			if !e.placeholderColor.IsZero() {
@@ -537,6 +554,9 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 		caretW := rt.caretWidth
 		caret := scene.Rect{X: tx + caretX - caretW/2, Y: cy + caretTop, W: caretW, H: l.LineHeight}
 		rt.textInput = caret
+		if composing {
+			rt.textInput = rt.paintComposition(l, es, at, tx, cy, fg.Alpha(opacity), caret)
+		}
 		rt.hasTextInput = true
 		if es.reveal {
 			es.reveal = false
