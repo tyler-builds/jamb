@@ -366,7 +366,7 @@ theme's colors. States are parts too (`TabSelected`, `OptionHighlighted`,
 variants (`Tabs.Variant(ui.TabsSegmented)`, `NumberField.SpinButtons(ui.SpinStacked)`,
 `Button.Variant(ui.Danger)`, `Badge.Variant(ui.BadgeSuccess)`, `Toaster.Placement`),
 and render slots (`Tabs.RenderTab`, `Select.RenderValue`, `Select.RenderOption`,
-`Collapsible.RenderHeader`, `TreeView.RenderRow`, `TreeView.RenderLabel`,
+`Collapsible.RenderHeader`, `Tree.RenderRow`, `Tree.RenderLabel`,
 `TextInput.Leading`, `TextInput.Trailing`) draw one part with your own content while
 the widget keeps its keyboard, focus, selection and accessible names. Under high
 contrast the parts use the system colors, and text scale and reduced motion still
@@ -738,8 +738,8 @@ ui.Tabs(count, tabs...).RenderTab(func(tab ui.Tab[int], s ui.PartState) ui.Eleme
 ui.Collapsible("Advanced options", open, content).Key("advanced") // *ui.Signal[bool]
 ui.Accordion(sectionA, sectionB, sectionC).SingleOpen()          // one section open at a time
 
-ui.TreeView(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[string]: the selected node's key
-	Style(ui.Style{MaxHeight: ui.Px(320)}).OnSelect(func(key string) { ... })
+ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[string]: the selected node's key
+	Style(ui.Style{MaxHeight: ui.Px(320)}).OnChange(func(key string) { ... })
 // ui.TreeNode{Key: "src", Label: "src", Icon: icons.Folder,
 //	Children: func() []ui.TreeNode { return loadSrc() }}   // nil Children: a leaf
 ```
@@ -1991,7 +1991,7 @@ The controls, with no app code, once their roles and states are set:
 - A `Tabs` group is a Tab control: its tabs are tab items with SelectionItem, and
   its panel is a pane named by its tab. Tabs have no Invoke pattern, since they are
   selected. A `Collapsible` header is a button that expands and collapses, and its
-  content is a group named by the header. A `TreeView` is a tree whose items expand
+  content is a group named by the header. A `Tree` is a tree whose items expand
   and collapse, with their level and position in their set. Every tree item has
   ExpandCollapse, and a leaf reports that it has no children. Only the rows in view
   are in the tree.

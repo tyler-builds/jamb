@@ -46,10 +46,10 @@ func TestPartClearRemovesBackgroundDefault(t *testing.T) {
 				return Div().Column().Child(TextInput(sig).Label("Name").Styles(FieldStyle{Frame: st}))
 			})
 		}, "TextInput.Frame", ""},
-		{"TreeView.Row", func(st Style) *accessRig {
+		{"Tree.Row", func(st Style) *accessRig {
 			sel := NewSignal("src")
 			return newAccessRig(func(ctx *Context) Element { return partTree(sel, TreeStyle{RowSelected: st}, nil, nil) })
-		}, "TreeView.Row", "src"},
+		}, "Tree.Row", "src"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

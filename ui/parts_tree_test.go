@@ -18,7 +18,7 @@ func partTree(sel *Signal[string], st TreeStyle, row, label func(TreeNode, PartS
 		}},
 		{Key: "src", Label: "Source"},
 	}
-	tv := TreeView(nodes, sel).Key("files").Label("Project files").Styles(st)
+	tv := Tree(nodes, sel).Key("files").Label("Project files").Styles(st)
 	if row != nil {
 		tv.RenderRow(row)
 	}
@@ -50,15 +50,15 @@ func testTreeParts(t *testing.T, applied map[string]bool) {
 		act   func(*testing.T, *accessRig)
 	}
 	cases := []treeCase{
-		{part: "TreeView.Row", set: func(s *TreeStyle, m Style) { s.Row = m }, sel: "docs", drawn: "TreeView.Row"},
-		{part: "TreeView.RowHover", set: func(s *TreeStyle, m Style) { s.RowHover = m }, sel: "docs", drawn: "TreeView.Row",
+		{part: "Tree.Row", set: func(s *TreeStyle, m Style) { s.Row = m }, sel: "docs", drawn: "Tree.Row"},
+		{part: "Tree.RowHover", set: func(s *TreeStyle, m Style) { s.RowHover = m }, sel: "docs", drawn: "Tree.Row",
 			act: func(t *testing.T, r *accessRig) { hoverNode(r, keyNode(t, r.rt, "src")) }},
-		{part: "TreeView.RowSelected", set: func(s *TreeStyle, m Style) { s.RowSelected = m }, sel: "src", drawn: "TreeView.Row"},
-		{part: "TreeView.Chevron", set: func(s *TreeStyle, m Style) { s.Chevron = m }, sel: "src", drawn: "TreeView.Chevron"},
-		{part: "TreeView.Icon", set: func(s *TreeStyle, m Style) { s.Icon = m }, sel: "src", drawn: "TreeView.Icon"},
-		{part: "TreeView.Label", set: func(s *TreeStyle, m Style) { s.Label = m }, sel: "src", drawn: "TreeView.Label"},
-		{part: "TreeView.TreeFocusVisible", set: func(s *TreeStyle, m Style) { s.TreeFocusVisible = m }, sel: "src", drawn: "TreeView.Tree",
-			act: func(t *testing.T, r *accessRig) { focusNode(r, partNode(t, r.rt, "TreeView.Tree", "")) }},
+		{part: "Tree.RowSelected", set: func(s *TreeStyle, m Style) { s.RowSelected = m }, sel: "src", drawn: "Tree.Row"},
+		{part: "Tree.Chevron", set: func(s *TreeStyle, m Style) { s.Chevron = m }, sel: "src", drawn: "Tree.Chevron"},
+		{part: "Tree.Icon", set: func(s *TreeStyle, m Style) { s.Icon = m }, sel: "src", drawn: "Tree.Icon"},
+		{part: "Tree.Label", set: func(s *TreeStyle, m Style) { s.Label = m }, sel: "src", drawn: "Tree.Label"},
+		{part: "Tree.TreeFocusVisible", set: func(s *TreeStyle, m Style) { s.TreeFocusVisible = m }, sel: "src", drawn: "Tree.Tree",
+			act: func(t *testing.T, r *accessRig) { focusNode(r, partNode(t, r.rt, "Tree.Tree", "")) }},
 	}
 	for _, c := range cases {
 		applied[c.part] = true
@@ -91,7 +91,7 @@ func TestTreeIndentAndSelectedRowIsNotBold(t *testing.T) {
 	if got, want := child.style.Padding.Left, float32(4+30); got != want {
 		t.Errorf("level 2 indent: left padding %v, want %v", got, want)
 	}
-	for _, n := range partNodes(r.rt, "TreeView.Label") {
+	for _, n := range partNodes(r.rt, "Tree.Label") {
 		if n.parent != nil && n.parent.key == "docs" && n.style.FontWeight != 0 {
 			t.Errorf("the selected row's label has weight %v, want the default", n.style.FontWeight)
 		}
@@ -143,7 +143,7 @@ func TestTreeRenderSlotsKeepBehaviorAndNames(t *testing.T) {
 // reach the row, and the focus ring of the tree stays.
 func TestTreeUnderHighContrast(t *testing.T) {
 	theme := *DarkTheme
-	theme.TreeView = TreeStyle{RowSelected: Style{Background: markBG, TextColor: markFG}, Indent: 12}
+	theme.Tree = TreeStyle{RowSelected: Style{Background: markBG, TextColor: markFG}, Indent: 12}
 	sel := NewSignal("src")
 	r := newThemedRig(&theme, func(ctx *Context) Element { return partTree(sel, TreeStyle{}, nil, nil) })
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastBlack()})
@@ -156,8 +156,8 @@ func TestTreeUnderHighContrast(t *testing.T) {
 	if got := effectiveTextColor(n); got != th.AccentText {
 		t.Errorf("high contrast: the selected row's text is %v, want HighlightText %v", got, th.AccentText)
 	}
-	focusNode(r, partNode(t, r.rt, "TreeView.Tree", ""))
-	if len(partNode(t, r.rt, "TreeView.Tree", "").style.Shadows) == 0 {
+	focusNode(r, partNode(t, r.rt, "Tree.Tree", ""))
+	if len(partNode(t, r.rt, "Tree.Tree", "").style.Shadows) == 0 {
 		t.Errorf("high contrast: the focused tree has no focus ring")
 	}
 }

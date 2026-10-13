@@ -44,7 +44,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Field` (the frame of every
    `TextInput`, `TextArea` and `NumberField`), `Theme.NumberField`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
-   `Theme.Switch`, `Theme.Collapsible`, `Theme.TreeView`, `Theme.DataGrid`, `Theme.Menu`,
+   `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
    (per kind), `Theme.Tooltip`, and `Theme.FormField` (the label, help text and error
@@ -358,8 +358,8 @@ accessible role and name.
 | `TextInput.Leading(el)`, `TextArea.Leading(el)` | adds an element before the text, after the icon | the element you pass, drawn as it is |
 | `TextInput.Trailing(el)`, `TextArea.Trailing(el)` | adds an element after the text | the element you pass, drawn as it is |
 | `Collapsible.RenderHeader(fn)` | the title in the header; the chevron stays | the title and a `PartState` (`Selected` is open) |
-| `TreeView.RenderRow(fn)` | the icon and label of each row; the chevron stays | the `TreeNode` and a `PartState` |
-| `TreeView.RenderLabel(fn)` | the text of each row; the icon stays (not used with `RenderRow`) | the `TreeNode` and a `PartState` |
+| `Tree.RenderRow(fn)` | the icon and label of each row; the chevron stays | the `TreeNode` and a `PartState` |
+| `Tree.RenderLabel(fn)` | the text of each row; the icon stays (not used with `RenderRow`) | the `TreeNode` and a `PartState` |
 | `DataColumn.Cell` (in `DataGrid`) | the content of each cell of the column; the cell keeps its text, focus and selection | the row's data and nothing else (the content is hidden from assistive technology, unless the column is `Interactive`, when its controls are exposed) |
 | `DataColumn.Editor` (in `DataGrid`) | the text field of an edit, replaced by the editor it returns (a Select, a NumberField, a CheckBox); the cell keeps its frame and the message popover | the row's data, the pending value, and the `change`, `commit` and `cancel` functions |
 | `DataColumn.RenderHeader` (in `DataGrid`) | the text of the column's header; the sort arrow stays | the header label and a `PartState` (`Selected` is the sorted column) |
@@ -521,7 +521,7 @@ parts that the code applies.
 | `Switch` | `Track`, `TrackChecked`, `TrackHover`, `TrackFocusVisible`, `TrackDisabled`, `Knob`, `KnobChecked`, `KnobDisabled` | none | none | done |
 | `RadioGroup` | `Group`, `Radio`, `RadioFocusVisible`, `RadioDisabled`, `Ring`, `RingChecked`, `RingDisabled`, `RingInvalid`, `Dot`, `DotDisabled`, `Label`, `LabelDisabled` | none | none | done |
 | `Collapsible`, `Accordion` | `Section`, `Header`, `HeaderHover`, `HeaderOpen`, `HeaderFocusVisible`, `HeaderDisabled`, `Chevron`, `Content` | none | `RenderHeader` | done |
-| `TreeView` | `Row`, `RowHover`, `RowSelected`, `Chevron`, `Icon`, `Label`, `TreeFocusVisible` | none | `RenderRow`, `RenderLabel` | done |
+| `Tree` | `Row`, `RowHover`, `RowSelected`, `Chevron`, `Icon`, `Label`, `TreeFocusVisible` | none | `RenderRow`, `RenderLabel` | done |
 | `DataGrid` | `Grid`, `GridFocusVisible`, `Header`, `HeaderCell`, `HeaderCellHover`, `HeaderCellSorted`, `SortIndicator`, `ResizeHandle`, `Row`, `RowHover`, `RowSelected`, `RowAlternate`, `Cell`, `CellFocused`, `Empty`, `CellEditing`, `Editor`, `EditorMessage` | `DataGridComfortable`, `DataGridCompact`, `Striped()` | `DataColumn.Cell`, `DataColumn.RenderHeader` | done |
 | `DropdownMenu`, `ContextMenu` | `Panel`, `Item`, `ItemHighlighted`, `ItemDisabled`, `Separator`, `SectionLabel`, `Shortcut`, `Check`, `SubmenuChevron` | none | none | done |
 | `MenuBar` | `BarItem`, `BarItemHover`, `BarItemFocusVisible`, `BarItemOpen` | none | none | done |

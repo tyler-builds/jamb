@@ -85,12 +85,12 @@ func TestWidgetPartPrecedence(t *testing.T) {
 						Styles(CollapsibleStyle{Section: borderStyle(inst)}))
 				})
 			}},
-		{name: "TreeView", part: "TreeView.Row",
-			theme: func(th *Theme, c Color) { th.TreeView.Row.Background = c },
+		{name: "Tree", part: "Tree.Row",
+			theme: func(th *Theme, c Color) { th.Tree.Row.Background = c },
 			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
 				nodes := []TreeNode{{Key: "src", Label: "Source"}}
 				return newThemedRig(th, func(ctx *Context) Element {
-					return Div().Column().Child(TreeView(nodes, NewSignal("")).Label("Files").Styles(TreeStyle{Row: bgStyle(inst)}))
+					return Div().Column().Child(Tree(nodes, NewSignal("")).Label("Files").Styles(TreeStyle{Row: bgStyle(inst)}))
 				})
 			}},
 		{name: "Menu", part: "Menu.Panel",

@@ -54,9 +54,9 @@ func navigationSection() ui.Element {
 				ui.Collapsible("Text alerts", sms, panelText(t, "Send a text message for each change.")).Key("nav.smsSection"),
 				ui.Collapsible("Push alerts", push, panelText(t, "Send a push notification for each change.")).Key("nav.pushSection"),
 			).Key("nav.accordion").SingleOpen())),
-			sample(t, "Tree view", ui.Div().Width(ui.Px(420)).Child(ui.TreeView(files, node).
+			sample(t, "Tree view", ui.Div().Width(ui.Px(420)).Child(ui.Tree(files, node).
 				Key("nav.tree").Label("Project files").Style(ui.Style{MaxHeight: ui.Px(200)}))),
-			sample(t, "Tree view, 10,000 generated folders", ui.Div().Width(ui.Px(420)).Child(ui.TreeView(folders, big).
+			sample(t, "Tree view, 10,000 generated folders", ui.Div().Width(ui.Px(420)).Child(ui.Tree(folders, big).
 				Key("nav.bigTree").Label("Generated folders").Style(ui.Style{Height: ui.Px(200)}))),
 		}
 		// Each sample is a column, not a wrapped row, since the tabs and the tree are wide.

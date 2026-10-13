@@ -10,7 +10,7 @@ import (
 	"github.com/tyler-builds/jamb/input"
 )
 
-// TreeNode is one node of a TreeView. Key identifies the node in the whole tree:
+// TreeNode is one node of a Tree. Key identifies the node in the whole tree:
 // the keyboard focus, the selection and the open state are kept by it, so it must
 // be unique and stable. Children is nil for a node that cannot have children. For
 // any other node it returns the node's children, and it is called only while the
@@ -23,7 +23,7 @@ type TreeNode struct {
 }
 
 // TreeStyle is the look of each part of a tree. A part's style merges over the
-// built-in defaults, then over the theme's TreeView, then over the Styles of the
+// built-in defaults, then over the theme's Tree, then over the Styles of the
 // instance; see docs/styling.md. Row is each visible row, indented by its level
 // by Indent pixels per level (a row's own left padding, when its Row style sets
 // one, replaces the indent). Chevron is the click target that opens and closes a
@@ -98,11 +98,11 @@ func treeDefaults(t *Theme) TreeStyle {
 }
 
 // resolveTree returns the look of a tree: the defaults, merged with the theme's
-// TreeView and then the instance's Styles. Under high contrast the two overrides
+// Tree and then the instance's Styles. Under high contrast the two overrides
 // are plain (see plainStyle).
 func resolveTree(t *Theme, inst TreeStyle) TreeStyle {
 	st := treeDefaults(t)
-	for _, o := range []TreeStyle{t.TreeView, inst} {
+	for _, o := range []TreeStyle{t.Tree, inst} {
 		if t.HighContrast {
 			o = o.plain()
 		}
@@ -146,10 +146,10 @@ type TreeElement struct {
 	renderLabel func(node TreeNode, state PartState) Element
 }
 
-// TreeView creates a tree of nodes, with the node whose key equals selected's
+// Tree creates a tree of nodes, with the node whose key equals selected's
 // value selected. The nodes shown first are the top level, and every node is
 // closed until the user opens it.
-func TreeView(nodes []TreeNode, selected *Signal[string]) *TreeElement {
+func Tree(nodes []TreeNode, selected *Signal[string]) *TreeElement {
 	return &TreeElement{nodes: nodes, selected: selected}
 }
 
@@ -166,13 +166,13 @@ func (tv *TreeElement) Label(name string) *TreeElement { tv.name = name; return 
 func (tv *TreeElement) Style(s Style) *TreeElement { tv.style = tv.style.Merge(s); return tv }
 
 // Styles sets the look of the parts of the tree, for this instance only. Set
-// fields win over the theme's TreeView and the defaults; see TreeStyle and
+// fields win over the theme's Tree and the defaults; see TreeStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (tv *TreeElement) Styles(st TreeStyle) *TreeElement { tv.styles = tv.styles.merge(st); return tv }
 
-// OnSelect runs fn with the key of the node after the selection changes, by a
+// OnChange runs fn with the key of the node after the selection changes, by a
 // click, the keys or a typed letter. The signal is set first.
-func (tv *TreeElement) OnSelect(fn func(key string)) *TreeElement { tv.onSelect = fn; return tv }
+func (tv *TreeElement) OnChange(fn func(key string)) *TreeElement { tv.onSelect = fn; return tv }
 
 // RenderRow replaces the icon and the label of each row with what fn returns. The
 // row keeps its chevron, its level, key, selection, keys and accessible name, which
@@ -394,7 +394,7 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 		list.decorate = func(c *DivElement) {
 			// The ring is the tree's own, drawn on the list while it has focus.
 			focus := Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}.Merge(st.TreeFocusVisible)
-			c.asPart("TreeView.Tree").Role(access.RoleTree).Focusable().FocusVisible(focus).
+			c.asPart("Tree.Tree").Role(access.RoleTree).Focusable().FocusVisible(focus).
 				OnKeyDown(keys).OnTextInput(typeahead)
 			if tv.name != "" {
 				c.Label(tv.name)
@@ -416,7 +416,7 @@ func (tv *TreeElement) row(st TreeStyle, t *Theme, r treeRow, i int, sel string,
 	// draw returns the row in the state ps describes. The level sets the left
 	// padding, which the Row style replaces when it sets one.
 	draw := func(ps PartState) *DivElement {
-		row := Div().asPart("TreeView.Row").Key(r.key).
+		row := Div().asPart("Tree.Row").Key(r.key).
 			Style(Style{Padding: Edges{Left: 4 + float32(r.level-1)*st.Indent}}).Style(st.Row)
 		if on {
 			row.Style(st.RowSelected)
@@ -426,7 +426,7 @@ func (tv *TreeElement) row(st TreeStyle, t *Theme, r treeRow, i int, sel string,
 
 		// The chevron is a click target of its own: a click on it opens or closes the
 		// node and does not select it, as the Windows glyph does.
-		chev := Div().asPart("TreeView.Chevron").Style(st.Chevron)
+		chev := Div().asPart("Tree.Chevron").Style(st.Chevron)
 		chev.access().inert = true // the row is the item; assistive technology uses its Expand action
 		if r.expandable {
 			glyph := icons.ChevronRight
@@ -443,9 +443,9 @@ func (tv *TreeElement) row(st TreeStyle, t *Theme, r treeRow, i int, sel string,
 			row.Child(Div().AccessHidden().Child(tv.renderRow(node, ps)))
 		} else {
 			if r.icon != nil {
-				row.Child(Div().asPart("TreeView.Icon").Style(st.Icon).Child(Icon(r.icon).Size(16)))
+				row.Child(Div().asPart("Tree.Icon").Style(st.Icon).Child(Icon(r.icon).Size(16)))
 			}
-			label := Div().asPart("TreeView.Label").Style(st.Label)
+			label := Div().asPart("Tree.Label").Style(st.Label)
 			if tv.renderLabel != nil {
 				label.Child(Div().AccessHidden().Child(tv.renderLabel(node, ps)))
 			} else {

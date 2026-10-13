@@ -76,8 +76,8 @@ type Theme struct {
 	// Collapsible is the look of every collapsible section, including the
 	// sections of an Accordion.
 	Collapsible CollapsibleStyle
-	// TreeView is the look of every tree.
-	TreeView TreeStyle
+	// Tree is the look of every tree.
+	Tree TreeStyle
 	// DataGrid is the look of every data grid.
 	DataGrid DataGridStyle
 	// Menu is the look of every menu: dropdown, context and the menus of a MenuBar.

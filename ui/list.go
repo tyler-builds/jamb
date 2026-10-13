@@ -17,7 +17,7 @@ type UniformListElement struct {
 	key        string
 	handle     *ListHandle
 	selectable bool // see SelectionContainer
-	// decorate, when set, adjusts the scroll container. A TreeView sets its role,
+	// decorate, when set, adjusts the scroll container. A Tree sets its role,
 	// keys and focus with it.
 	decorate func(c *DivElement)
 	// ownPos leaves the positions of the rows to the rows. A tree item's position

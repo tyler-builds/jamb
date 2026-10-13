@@ -105,14 +105,14 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				}
 			},
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) { r.clickKey(t, "adv/header") }},
-		{name: "TreeView",
+		{name: "Tree",
 			root: func(open *Signal[bool]) func(*Context) Element {
 				sel := NewSignal("src")
 				nodes := []TreeNode{{Key: "src", Label: "Source", Children: func() []TreeNode {
 					return []TreeNode{{Key: "a", Label: "A"}}
 				}}}
 				return func(ctx *Context) Element {
-					return Div().Column().Child(TreeView(nodes, sel).Label("Files").Key("files"))
+					return Div().Column().Child(Tree(nodes, sel).Label("Files").Key("files"))
 				}
 			},
 			// The keyboard opens a node without a reveal, which is what a tree has no

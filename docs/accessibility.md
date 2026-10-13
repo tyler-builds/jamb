@@ -1519,7 +1519,7 @@ decisions, and are marked as such.
 - **Narrator and NVDA** passes for the navigation widgets are pending, as for earlier
   phases, and are for a person to run.
 - **Tree multi-select** is not implemented. The open state of a tree is kept by the
-  tree, and the app cannot set or read it; `OnSelect` reports the selection only.
+  tree, and the app cannot set or read it; `OnChange` reports the selection only.
 - **Live level and position reads** go through the .NET client's internal
   `UiaCoreApi.UiaGetPropertyValue`, found by reflection. A Windows or .NET update could
   change it. The Go adapter tests check the values independently.

@@ -400,9 +400,9 @@ func treeDemo(sel *Signal[string], asked *int) []TreeNode {
 // treeRig builds treeDemo in a tree of height 300, and records the selections.
 func treeRig(sel *Signal[string], asked *int, picked *[]string) *accessRig {
 	return newAccessRig(func(ctx *Context) Element {
-		return Div().Column().Child(TreeView(treeDemo(sel, asked), sel).Key("files").
+		return Div().Column().Child(Tree(treeDemo(sel, asked), sel).Key("files").
 			Label("Project files").Style(Style{Height: Px(300)}).
-			OnSelect(func(key string) { *picked = append(*picked, key) }))
+			OnChange(func(key string) { *picked = append(*picked, key) }))
 	})
 }
 
@@ -461,7 +461,7 @@ func TestTreeKeysMoveSelectOpenAndClose(t *testing.T) {
 		t.Fatalf("Space did not close Docs")
 	}
 	if len(picked) == 0 || picked[len(picked)-1] != "docs" {
-		t.Fatalf("OnSelect ran %v, want the last selection docs", picked)
+		t.Fatalf("OnChange ran %v, want the last selection docs", picked)
 	}
 	if len(r.warnings) != 0 {
 		t.Fatalf("warnings: %v", r.warnings)
@@ -552,8 +552,8 @@ func bigTreeRig(sel *Signal[string], picked *[]string) *accessRig {
 			Children: func() []TreeNode { return []TreeNode{{Key: fmt.Sprintf("n%05d/c", i), Label: "child"}} }}
 	}
 	return newAccessRig(func(ctx *Context) Element {
-		return Div().Column().Child(TreeView(nodes, sel).Key("big").Label("Big").
-			Style(Style{Height: Px(300)}).OnSelect(func(k string) { *picked = append(*picked, k) }))
+		return Div().Column().Child(Tree(nodes, sel).Key("big").Label("Big").
+			Style(Style{Height: Px(300)}).OnChange(func(k string) { *picked = append(*picked, k) }))
 	})
 }
 
@@ -588,7 +588,7 @@ func TestTreeVirtualizesAndKeepsFocusAndSelection(t *testing.T) {
 		t.Fatalf("focus is on node %d, want the selected row %d", tree.Focus, last.ID)
 	}
 	if len(picked) == 0 || picked[len(picked)-1] != "n09999" {
-		t.Fatalf("OnSelect ran %v, want n09999 last", picked)
+		t.Fatalf("OnChange ran %v, want n09999 last", picked)
 	}
 	if len(r.warnings) != 0 {
 		t.Fatalf("warnings: %v", r.warnings)
