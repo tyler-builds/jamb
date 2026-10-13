@@ -2,6 +2,7 @@ package views
 
 import (
 	"testing"
+	"time"
 
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -11,7 +12,7 @@ import (
 func TestCreateProjectUndoRemovesIt(t *testing.T) {
 	s := NewStore()
 	before := len(s.Projects.Get())
-	id := s.CreateProject("Temporary", "")
+	id := s.CreateProject("Temporary", "", time.Time{})
 	if s.Selected.Peek() != id {
 		t.Fatalf("the new project is not selected")
 	}

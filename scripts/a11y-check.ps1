@@ -153,6 +153,7 @@ $CT = @{
     Pane     = [System.Windows.Automation.ControlType]::Pane
     DataGrid = [System.Windows.Automation.ControlType]::DataGrid
     DataItem = [System.Windows.Automation.ControlType]::DataItem
+    Calendar = [System.Windows.Automation.ControlType]::Calendar
     HeaderItem = [System.Windows.Automation.ControlType]::HeaderItem
 }
 $Passed = 0
@@ -224,6 +225,19 @@ function Find-One($Root, [string]$Name, $Type = $null) {
     $hits = @(Find-Named $Root $Name $Type)
     Assert ($hits.Count -ge 1) "no element named '$Name'"
     return $hits[0]
+}
+
+# Scroll-Into-View scrolls the element into view with its ScrollItem pattern, or with the pattern of
+# the nearest ancestor that has one. A text field does not expose the pattern itself.
+function Scroll-Into-View($El) {
+    $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+    $node = $El
+    for ($i = 0; $i -lt 6 -and $null -ne $node; $i++) {
+        $p = $null
+        if ($node.TryGetCurrentPattern([System.Windows.Automation.ScrollItemPatternIdentifiers]::Pattern, [ref]$p)) { $p.ScrollIntoView(); return }
+        $node = $walker.GetParent($node)
+    }
+    throw "no ScrollItem pattern for '$($El.Current.Name)' or its ancestors"
 }
 
 function Get-Pattern($El, $Pattern) {
@@ -634,6 +648,110 @@ try {
         Wait-Gone { Find-Named $win 'Channel' $CT.List | Select-Object -First 1 } 'the list to close' | Out-Null
     }
 
+    # The date picker and the time picker of the Date and time section (see Components). Alt+Down
+    # opens the calendar with focus on a day; the arrows move it, Enter chooses it and closes the
+    # calendar, and Escape closes it with the value kept and the focus back in the field.
+    Check 'demo: a date picker is a ComboBox, its calendar takes focus on Alt+Down, and Enter chooses a day' {
+        $edit = Find-One $win 'Due date' $CT.Edit
+        $box = Find-One $win 'Due date' $CT.ComboBox
+        $ec = Require-Pattern $box ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+        $vp = Require-Pattern $edit ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
+        Scroll-Into-View $edit
+        Wait-For { if ($edit.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom) { $true } else { $null } } 'the date picker to be in view' | Out-Null
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        $edit.SetFocus()
+        Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -eq 'Due date') { $true } } 'focus on the date field' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('%{DOWN}')
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded) { $true } } 'the date picker to expand' | Out-Null
+        Wait-For { $null -ne (Find-Named $win 'Due date' $CT.Calendar | Select-Object -First 1) } 'the calendar named for its field, Due date' | Out-Null
+        $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+        Assert ($focused.Current.ControlType -eq $CT.DataItem) "the focus is on a $($focused.Current.LocalizedControlType), not a day, after Alt+Down"
+        $before = $focused.Current.Name
+        [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}')
+        Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -ne $before) { $true } else { $null } } 'the arrow to move the focus to the next day' | Out-Null
+        # A day that the rules disable does not close the calendar, so the arrow moves on to the next day.
+        for ($k = 0; $k -lt 8; $k++) {
+            [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+            Start-Sleep -Milliseconds 250
+            [System.Windows.Forms.Application]::DoEvents()
+            if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) { break }
+            [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}')
+            Start-Sleep -Milliseconds 150
+        }
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) { $true } else { $null } } 'Enter to close the calendar' | Out-Null
+        Wait-For { if ($vp.Current.Value -ne '') { $true } else { $null } } 'the date to be set in the field' | Out-Null
+        Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -eq 'Due date') { $true } else { $null } } 'focus back in the date field' | Out-Null
+    }
+
+    Check 'demo: Escape closes the calendar, keeps the date, and returns focus to the date field' {
+        $edit = Find-One $win 'Due date' $CT.Edit
+        $box = Find-One $win 'Due date' $CT.ComboBox
+        $ec = Require-Pattern $box ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+        $vp = Require-Pattern $edit ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        $edit.SetFocus()
+        Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -eq 'Due date') { $true } else { $null } } 'focus on the date field' | Out-Null
+        $kept = $vp.Current.Value
+        [System.Windows.Forms.SendKeys]::SendWait('%{DOWN}')
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded) { $true } else { $null } } 'the date picker to expand' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}')
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) { $true } else { $null } } 'Escape to close the calendar' | Out-Null
+        Assert ($vp.Current.Value -eq $kept) "Escape changed the date from '$kept' to '$($vp.Current.Value)'"
+        Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -eq 'Due date') { $true } else { $null } } 'focus back in the date field after Escape' | Out-Null
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Date and time section' {
+            $edit = Find-One $win 'Due date' $CT.Edit
+            Scroll-Into-View $edit
+            Wait-For { if ($edit.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom) { $true } else { $null } } 'the Date and time section to be in view' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-date-time'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+
+        Check 'demo: AxeWindowsCLI scan of the date picker with its calendar open' {
+            $edit = Find-One $win 'Due date' $CT.Edit
+            $box = Find-One $win 'Due date' $CT.ComboBox
+            $ec = Require-Pattern $box ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+            [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+            $edit.SetFocus()
+            Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -eq 'Due date') { $true } else { $null } } 'focus on the date field' | Out-Null
+            [System.Windows.Forms.SendKeys]::SendWait('%{DOWN}')
+            Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded) { $true } else { $null } } 'the date picker to expand' | Out-Null
+            try {
+                $errors = Invoke-AxeScan $demo 'demo-calendar-open'
+            } finally {
+                # Cleanup only: Escape closes the calendar, so the other checks see the page as it was.
+                if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded) {
+                    [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                }
+            }
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI with the calendar open"
+            "$errors errors"
+        }
+    }
+
+    Check 'demo: a time picker is a ComboBox with a list of times, and Alt+Down, Down and Enter choose one' {
+        $edit = Find-One $win 'Start time' $CT.Edit
+        $box = Find-One $win 'Start time' $CT.ComboBox
+        $ec = Require-Pattern $box ([System.Windows.Automation.ExpandCollapsePatternIdentifiers]::Pattern) 'ExpandCollapse'
+        $vp = Require-Pattern $edit ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
+        Scroll-Into-View $edit
+        Wait-For { if ($edit.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom) { $true } else { $null } } 'the time picker to be in view' | Out-Null
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        $edit.SetFocus()
+        Wait-For { if (([System.Windows.Automation.AutomationElement]::FocusedElement).Current.Name -eq 'Start time') { $true } else { $null } } 'focus on the time field' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('%{DOWN}')
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded) { $true } else { $null } } 'the time picker to expand' | Out-Null
+        Wait-For { $null -ne (Find-Named $win 'Start time' $CT.List | Select-Object -First 1) } 'the list named for its field, Start time' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        Wait-For { if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) { $true } else { $null } } 'Enter to close the time list' | Out-Null
+        Wait-For { if ($vp.Current.Value -match '\d') { $true } else { $null } } 'the time to be set in the field' | Out-Null
+    }
+
     Check 'demo: a slider has RangeValue, and SetValue moves it' {
         $slider = Find-One $win 'Volume' $CT.Slider
         $rv = Require-Pattern $slider ([System.Windows.Automation.RangeValuePatternIdentifiers]::Pattern) 'RangeValue'
@@ -901,14 +1019,14 @@ try {
         $g = Require-Pattern $grid ([System.Windows.Automation.GridPattern]::Pattern) 'Grid'
         $t = Require-Pattern $grid ([System.Windows.Automation.TablePattern]::Pattern) 'Table'
         Assert ($g.Current.RowCount -eq 6) "RowCount is $($g.Current.RowCount), want the 6 projects"
-        Assert ($g.Current.ColumnCount -eq 6) "ColumnCount is $($g.Current.ColumnCount), want 6 (with the Open column)"
-        Assert (@($t.Current.GetColumnHeaders()).Count -eq 6) 'GetColumnHeaders does not give the 6 header items'
+        Assert ($g.Current.ColumnCount -eq 7) "ColumnCount is $($g.Current.ColumnCount), want 7 (with the Due and Open columns)"
+        Assert (@($t.Current.GetColumnHeaders()).Count -eq 7) 'GetColumnHeaders does not give the 7 header items'
         $cell = $g.GetItem(0, 0)
         Assert ($null -ne $cell) 'GetItem(0, 0) is null for a visible cell'
         $gi = Require-Pattern $cell ([System.Windows.Automation.GridItemPattern]::Pattern) 'GridItem'
         Assert ($gi.Current.Row -eq 0 -and $gi.Current.Column -eq 0) 'the first cell is not at row 0, column 0'
         Require-Pattern $cell ([System.Windows.Automation.TableItemPattern]::Pattern) 'TableItem' | Out-Null
-        "RowCount 6, ColumnCount 6"
+        "RowCount 6, ColumnCount 7"
     }
 
     Check 'demo: a Projects header sorts with Invoke, and its name and ItemStatus say so' {

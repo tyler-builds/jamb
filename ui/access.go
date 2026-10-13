@@ -1169,7 +1169,7 @@ func highlightedRow(n *node) *node {
 		return nil
 	}
 	switch n.div.acc.role {
-	case access.RoleMenu, access.RoleList, access.RoleTree, access.RoleDataGrid, access.RoleComboBox:
+	case access.RoleMenu, access.RoleList, access.RoleTree, access.RoleDataGrid, access.RoleCalendar, access.RoleComboBox:
 	default:
 		return nil
 	}

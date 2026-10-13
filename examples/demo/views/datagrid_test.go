@@ -22,8 +22,8 @@ func TestProjectsTableShowsTheVisibleProjects(t *testing.T) {
 	if want := len(r.s.Visible()); g.GridRows != want {
 		t.Fatalf("the grid has %d rows, want the %d visible projects", g.GridRows, want)
 	}
-	if g.GridColumns != 6 {
-		t.Errorf("the grid has %d columns, want 6", g.GridColumns)
+	if g.GridColumns != 7 {
+		t.Errorf("the grid has %d columns, want 7 (with the Due column)", g.GridColumns)
 	}
 	r.bridge.Perform(g.ID, access.ActionFocus)
 	r.frame()

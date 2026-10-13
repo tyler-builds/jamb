@@ -19,6 +19,7 @@ import (
 const (
 	// Control types.
 	ctButton      = 50000
+	ctCalendar    = 50001 // UIA_CalendarControlTypeId
 	ctCheckBox    = 50002
 	ctComboBox    = 50003
 	ctEdit        = 50004
@@ -221,6 +222,7 @@ const (
 //	tab list, tab             Tab, TabItem      tab list, tab
 //	tree                      Tree              tree
 //	tree item                 TreeItem          tree item
+//	calendar                  Calendar          calendar (Grid and Table patterns)
 //	progress bar, busy ring   ProgressBar      progress bar (read-only RangeValue when determinate)
 //	unknown                   Pane              unknown
 //
@@ -281,6 +283,8 @@ func controlType(r access.Role) int32 {
 		return ctProgressBar
 	case access.RoleDataGrid:
 		return ctDataGrid
+	case access.RoleCalendar:
+		return ctCalendar
 	case access.RoleDataItem:
 		return ctDataItem
 	case access.RoleHeaderItem:
@@ -676,7 +680,7 @@ func supports(k coreKind, n *access.Node) bool {
 	case kindScrollItem:
 		return n.Has(access.ActionScrollIntoView)
 	case kindGrid, kindTable:
-		return n.Role == access.RoleDataGrid
+		return n.Role == access.RoleDataGrid || n.Role == access.RoleCalendar
 	case kindGridItem, kindTableItem:
 		return n.Role == access.RoleDataItem && n.GridRow > 0
 	case kindText:

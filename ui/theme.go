@@ -53,7 +53,11 @@ type Theme struct {
 	// Combobox is the look of every combo box: its text frame (Field), its list and
 	// its rows.
 	Combobox ComboboxStyle
-	Slider   SliderStyle
+	// DatePicker and TimePicker are the look of every date picker (with its calendar) and
+	// every time picker.
+	DatePicker DatePickerStyle
+	TimePicker TimePickerStyle
+	Slider     SliderStyle
 	// Field is the text frame of every TextInput and TextArea, and of every
 	// NumberField's frame, before the NumberField parts below.
 	Field       FieldStyle

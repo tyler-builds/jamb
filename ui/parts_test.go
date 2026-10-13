@@ -203,6 +203,8 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("DataGrid", func(t *testing.T) { testDataGridParts(t, applied) })
 	t.Run("Forms", func(t *testing.T) { testFormParts(t, applied) })
 	t.Run("Combobox", func(t *testing.T) { testComboboxParts(t, applied) })
+	t.Run("DatePicker", func(t *testing.T) { testDatePickerParts(t, applied) })
+	t.Run("TimePicker", func(t *testing.T) { testTimePickerParts(t, applied) })
 
 	// The table and docs/styling.md list the same parts, in both directions.
 	documented := documentedParts(t)

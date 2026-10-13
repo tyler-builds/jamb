@@ -46,6 +46,7 @@ type Project struct {
 	Progress    float32 // 0..1
 	Tasks       int
 	Updated     time.Time
+	Due         time.Time // the due date, which the New Project form sets; zero when there is none
 	Starred     bool
 	Icon        *icons.Icon
 	Color       ui.Color
@@ -89,6 +90,7 @@ type Store struct {
 	NewOpen *ui.Signal[bool]
 	NewName *ui.Signal[string]
 	NewDesc *ui.Signal[string]
+	NewDue  *ui.Signal[time.Time] // the optional due date of the New Project form (see DatePicker)
 	// NewForm checks the New Project form. It is reset when the form opens and closes.
 	NewForm *ui.Form
 	// SampleOpen shows the form sample of the Components page. SampleName is its
@@ -122,8 +124,8 @@ var palette = []string{"#818cf8", "#34d399", "#f472b6", "#fbbf24", "#38bdf8", "#
 func NewStore() *Store {
 	now := time.Now()
 	seed := []Project{
-		{Name: "Project Alpha", Description: "Native GPU renderer and the scene graph that feeds it.", Status: StatusActive, Progress: 0.72, Tasks: 18, Updated: now.Add(-2 * time.Minute), Starred: true, Icon: icons.Zap},
-		{Name: "Project Beta", Description: "Flexbox-style layout engine with measure caching.", Status: StatusActive, Progress: 0.45, Tasks: 9, Updated: now.Add(-48 * time.Minute), Icon: icons.Layers},
+		{Name: "Project Alpha", Description: "Native GPU renderer and the scene graph that feeds it.", Status: StatusActive, Progress: 0.72, Tasks: 18, Updated: now.Add(-2 * time.Minute), Due: now.AddDate(0, 0, 14), Starred: true, Icon: icons.Zap},
+		{Name: "Project Beta", Description: "Flexbox-style layout engine with measure caching.", Status: StatusActive, Progress: 0.45, Tasks: 9, Updated: now.Add(-48 * time.Minute), Due: now.AddDate(0, 0, 3), Icon: icons.Layers},
 		{Name: "Text Pipeline", Description: "Font loading, shaping, glyph atlas and subpixel positioning.", Status: StatusActive, Progress: 0.6, Tasks: 12, Updated: now.Add(-3 * time.Hour), Icon: icons.Box},
 		{Name: "Windows Adapter", Description: "Win32 windowing, DPI awareness and input in pure Go.", Status: StatusDone, Progress: 1, Tasks: 0, Updated: now.Add(-26 * time.Hour), Starred: true, Icon: icons.Dashboard},
 		{Name: "macOS Adapter", Description: "Cocoa windowing with a Metal backend behind render.Renderer.", Status: StatusPaused, Progress: 0.1, Tasks: 23, Updated: now.Add(-5 * 24 * time.Hour), Icon: icons.Moon},
@@ -148,6 +150,7 @@ func NewStore() *Store {
 		NewOpen:      ui.NewSignal(false),
 		NewName:      ui.NewSignal(""),
 		NewDesc:      ui.NewSignal(""),
+		NewDue:       ui.NewSignal(time.Time{}),
 		NewForm:      ui.NewForm(),
 		SampleOpen:   ui.NewSignal(false),
 		SampleName:   ui.NewSignal(""),
@@ -174,6 +177,7 @@ const defaultDescription = "Freshly created. Add a description and some tasks."
 func (s *Store) OpenNewProject() {
 	s.NewName.Set("")
 	s.NewDesc.Set("")
+	s.NewDue.Set(time.Time{})
 	s.NewForm.Reset()
 	s.NewOpen.Set(true)
 }
@@ -186,9 +190,9 @@ func (s *Store) CloseNewProject() {
 
 // CreateProject adds a project with the name and description given, puts it at
 // the top of the list and selects it, and shows the Projects page with every
-// project listed. An empty description gets defaultDescription. It returns the
-// new project's ID.
-func (s *Store) CreateProject(name, desc string) int {
+// project listed. An empty description gets defaultDescription, and a zero due is no
+// due date. It returns the new project's ID.
+func (s *Store) CreateProject(name, desc string, due time.Time) int {
 	if desc == "" {
 		desc = defaultDescription
 	}
@@ -197,7 +201,7 @@ func (s *Store) CreateProject(name, desc string) int {
 	ics := []*icons.Icon{icons.Star, icons.Folder, icons.Activity, icons.Box, icons.Layers}
 	s.Projects.Update(func(ps []Project) []Project {
 		p := Project{
-			ID: id, Name: name, Description: desc,
+			ID: id, Name: name, Description: desc, Due: due,
 			Status: StatusActive, Progress: 0, Tasks: 0, Updated: time.Now(),
 			Icon: ics[id%len(ics)], Color: ui.Hex(palette[id%len(palette)]),
 		}

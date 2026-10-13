@@ -119,7 +119,7 @@ func gridHeaders(t *access.Tree, grid *access.Node) []*access.Node {
 // gridOf returns the data grid that holds node n, which is a cell or a row, or nil.
 func gridOf(t *access.Tree, n *access.Node) *access.Node {
 	for p := t.Node(n.Parent); p != nil; p = t.Node(p.Parent) {
-		if p.Role == access.RoleDataGrid {
+		if p.Role == access.RoleDataGrid || p.Role == access.RoleCalendar {
 			return p
 		}
 	}

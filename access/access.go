@@ -65,6 +65,7 @@ const (
 	RoleDataGrid                  // a grid of rows and columns, such as a DataGrid (see Node.GridRows)
 	RoleDataItem                  // a cell of a data grid (see Node.GridRow and Node.GridColumn)
 	RoleHeaderItem                // a column header of a data grid, with its sort state in its name
+	RoleCalendar                  // a month of days, a grid with a header of weekday names (see DatePicker)
 )
 
 var roleNames = [...]string{
@@ -104,6 +105,7 @@ var roleNames = [...]string{
 	RoleDataGrid:      "data grid",
 	RoleDataItem:      "data item",
 	RoleHeaderItem:    "header item",
+	RoleCalendar:      "calendar",
 }
 
 // String returns the role's name, such as "check box".

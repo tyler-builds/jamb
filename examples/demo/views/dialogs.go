@@ -17,7 +17,7 @@ func newProjectModal(s *Store) ui.Element {
 			return nil
 		}
 		form := s.NewForm.OnSubmit(func() error {
-			id := s.CreateProject(strings.TrimSpace(s.NewName.Peek()), strings.TrimSpace(s.NewDesc.Peek()))
+			id := s.CreateProject(strings.TrimSpace(s.NewName.Peek()), strings.TrimSpace(s.NewDesc.Peek()), s.NewDue.Peek())
 			notify(ctx, s, ui.ToastSuccess, "Project created").Action("Undo", func() { s.DeleteProject(id) })
 			s.CloseNewProject()
 			return nil
@@ -29,7 +29,9 @@ func newProjectModal(s *Store) ui.Element {
 			Child(form.Field("name", "Name", ui.TextInput(s.NewName).Placeholder("Project name").Width(ui.Full).
 				Validate(ui.Required[string](), ui.MaxLength(80))).Required()).
 			Child(form.Field("description", "Description", ui.TextArea(s.NewDesc).Placeholder("What the project is for").
-				MinRows(3).Width(ui.Full)).Description("Optional. Shown on the project's page."))
+				MinRows(3).Width(ui.Full)).Description("Optional. Shown on the project's page.")).
+			Child(form.Field("due", "Due date", ui.DatePicker(s.NewDue).Width(ui.Full)).
+				Description("Optional. Shown in the Due column of the projects table."))
 		return ui.Modal("New project", body).Footer(cancel, create).Default(create).
 			OnClose(s.CloseNewProject).CloseOnBackdrop()
 	})

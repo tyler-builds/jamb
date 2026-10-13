@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/ui"
@@ -43,6 +44,9 @@ func projectsTable(t *ui.Theme, s *Store, visible []Project, picked *ui.Signal[[
 				return nil
 			},
 			Align: ui.End, Width: 120, Resizable: true},
+		{Header: "Due", Key: "due", Text: func(p Project) string { return dueText(p.Due) },
+			Compare: func(a, b Project) int { return a.Due.Compare(b.Due) },
+			Width:   130, Resizable: true},
 		{Header: "Updated", Key: "updated", Text: func(p Project) string { return ago(p.Updated) },
 			Compare: func(a, b Project) int { return a.Updated.Compare(b.Updated) },
 			Width:   140, Resizable: true},
@@ -124,4 +128,13 @@ func projectsViewTabs(view *ui.Signal[int]) ui.Element {
 		ui.Tab[int]{Value: 0, Label: "Cards"},
 		ui.Tab[int]{Value: 1, Label: "Table"},
 	).Key("projects-view").Label("Projects view").Variant(ui.TabsSegmented)
+}
+
+// dueText is the Due column's text: the due date, or "None" for a project with none. Sorting
+// puts the projects with no due date first, since their date is the zero time.
+func dueText(d time.Time) string {
+	if d.IsZero() {
+		return "None"
+	}
+	return d.Format("Jan 2, 2006")
 }

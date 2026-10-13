@@ -145,6 +145,7 @@ README.
 | E. Verification | Accessibility Insights for Windows checks on the examples, a manual NVDA and Narrator script, automated tests that read the real UI Automation tree |
 | F. Form controls | Check boxes with a mixed state, switches, radio groups, selects, sliders and number fields; the RangeValue pattern; the Windows ComboBox, Slider and Spinner control types |
 | G. Navigation and layout | Tabs with automatic activation, Ctrl+Tab, and lazily built panels; collapsible sections and an accordion; a tree view that builds only its visible rows, with Tree and TreeItem control types, levels and positions in their sets |
+| M. Date and time | `ui.DatePicker` and `ui.TimePicker`, the calendar with the Calendar control type and the Grid and Table patterns, and the keys of the WAI-ARIA date picker dialog pattern |
 | K. Forms | `ui.Field` (label, help text, required marker, error), validators on the controls, `ui.NewForm` with the submit flow, the error summary, and an async submit; IsRequiredForForm and IsDataValidForForm |
 
 ## Testing
@@ -1882,3 +1883,27 @@ Phase L adds `ui.Combobox`, an editable text field with a list of suggestions. I
 - **The manual screen reader pass** (NVDA and Narrator) for the combobox is not yet run. Check that the highlighted suggestion is read once as the focus moves, and that the count announcement is not repeated with the suggestion's own name.
 - **Narrator's handling** of a focus event on a row of a combo box's list has not been checked on a device.
 - **Retry** is not offered on an error. A button in the list would be reached by the mouse only, since the keys stay in the text; editing the text asks again.
+
+## Phase M: what changed from this design
+
+Phase M adds `ui.DatePicker` and `ui.TimePicker`, and the Calendar control type they need for the calendar. Their keys, values and look are in the README (Date and time) and in docs/styling.md. This section records the decisions that bind the accessibility side and the sources they follow.
+
+**The calendar is a Calendar.** The popup has the role `access.RoleCalendar`, which maps to UI Automation's Calendar control type (`UIA_CalendarControlTypeId`, 50001). Microsoft's Calendar requirements say a calendar supports the Grid and Table patterns and has "a DataGrid, with a header, header items for the days of the week, and list items for the days" (https://learn.microsoft.com/en-us/dotnet/framework/ui-automation/ui-automation-support-for-the-calendar-control-type). The framework's grid already gives a RoleDataGrid the Grid and Table patterns, so the calendar reuses that path: the adapter's `supports` and `gridOf` accept a calendar as they accept a data grid. Each day is a data item at a grid position, not a list item. The Microsoft page shows days as list items; the task asked for data items, and the grid cells are the ones the adapter already gives the GridItem pattern, so this is a deliberate difference. The report notes it for review.
+
+**Focus is on the calendar, and the highlighted day is the focus.** A calendar opened from the field takes keyboard focus, as a select's list does: the popup is the focused element, and its highlighted day is the focus target (`highlightedRow`, which now includes the calendar). The screen reader reads the day with its long date, such as "Tuesday, October 13, 2026", and the field keeps its ComboBox role with Expanded. Enter or Space chooses and closes the calendar and returns focus to the field; Escape and Tab close it. These follow the WAI-ARIA date picker dialog pattern (https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/examples/datepicker-dialog/), with two differences noted in the README: Tab closes the calendar rather than moving focus within it, and the navigation buttons are for the pointer.
+
+**The field is a ComboBox.** The text field under the ComboBox is an Edit, and the root is a ComboBox with ExpandCollapse from its Expanded state and a Value that is its text. The time picker is the same shape. Microsoft's ComboBox control type covers an editable field that opens a list, so the framework's combo box mapping serves both. The DatePicker's calendar button is a Button named "Choose date".
+
+**Names.** The calendar and the list of times are named by their field, as a combo box's list is, so the calendar is "Due date" and the list of times is "Start time". A name must not contain the control type: AxeWindowsCLI reports "The Name property must not include the element's control type" for a calendar named "Due date calendar", and the name was changed for that reason. The list of times, and a calendar with no field name, are named "Times" and "Date" when the field has no name.
+
+**Days, names and states.** A day's name is its long date from the locale (on Windows, `GetDateFormatEx`), a day that cannot be chosen is disabled, the chosen day is selected (SelectionItem), and today has the description "Today". The weekday names are header items. The month and year are announced politely when the keys or the navigation buttons change the month (`Announce`, as the combo box announces its count). The "Today" description and the "Choose date" and "Show times" names are English, which is a localization gap.
+
+**The list of times.** The time picker's list is a List with each time a ListItem, the highlighted time is the focus target through the combo box's highlight (as in Phase L), and the time the field holds is selected. Up and Down step the time when the list is closed, so a screen reader user can change the time without opening the list.
+
+**Verification.** The unit tests check the roles, names, the grid size (6 by 7), the selected and disabled states, the description of today, and the month announcement (`datepicker_test.go`, `timepicker_test.go`). The UI Automation mapping is tested in `platform/windows/uia_calendar_test.go`. `scripts/a11y-check.ps1` has checks for the date picker's ComboBox, its calendar taking focus on Alt+Down with Right and Enter, Escape returning focus, the time picker's list, and AxeWindowsCLI scans of the Date and time section and of the calendar open. The keyboard checks passed in none of the live runs of this session: the foreground window was another app (Windows Search), so every focus wait timed out. The Axe scan of the section passed in the normal run. The results are in the report, not here.
+
+**Open items.**
+
+- **The focus-dependent checks** of the date and time pickers, and the rest of the script's focus checks, need a run with the app in the foreground. They are unverified live.
+- **The manual screen reader pass** for the calendar (NVDA and Narrator) is not yet run. Check that the day is read once as focus moves, that the month is announced without repeating the day, and that "unavailable" is read for a disabled day.
+- **Localization** of the "Today" description and the "Choose date" and "Show times" names is not done.

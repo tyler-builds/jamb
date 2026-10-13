@@ -570,6 +570,114 @@ describes keyboard navigation through the suggestion list, with the text box upd
 from the highlighted item. It does not describe the APG's model, in which DOM focus
 stays in the combobox; the APG model is the one used here.
 
+### Date and time
+
+`ui.DatePicker` is a text field for a day, with a calendar below it, and `ui.TimePicker` is a
+text field for a time of day, with a list of times below it. Both read and write a
+`*ui.Signal[time.Time]`. The text is in the short date and clock format of the user's
+locale, and the value is set when the text is a date or a time that can be chosen.
+
+```go
+var due = ui.NewSignal(time.Time{}) // a zero time is no date
+
+ui.DatePicker(due).Label("Due date").Placeholder("MM/DD/YYYY").
+	Min(today).Max(today.AddDate(0, 0, 90)).   // the days that can be chosen
+	DisableDays(func(d time.Time) bool { return d.Weekday() == time.Saturday || d.Weekday() == time.Sunday })
+
+var start = ui.NewSignal(time.Time{}) // a zero time is no time; only the clock is read
+ui.TimePicker(start).Label("Start time").MinuteStep(15). // the list has a time every 15 minutes
+	Min(eight).Max(eighteen)
+
+// A date and a time on one value: each picker keeps the part it does not set.
+ui.DatePicker(when).Label("Meeting date")
+ui.TimePicker(when).Label("Meeting time")
+```
+
+The value of a date picker is a `time.Time` whose day is the chosen day. Its time of day is
+kept when the day changes, and a date picker set from the signal shows only the day. The value
+of a time picker is a `time.Time` whose clock is the chosen time. Its day is kept when the time
+changes, and a new time takes today's day when the value has none. So a date picker and a time
+picker on one signal are a date and time picker, with no third widget. Set the value with
+`Signal.Set`; `OnChange` runs only for a change the user makes.
+
+| Method | What it does |
+| --- | --- |
+| `DatePicker`: `Min(t)`, `Max(t)` | the earliest and the latest day that can be chosen; the time of day is ignored (a zero time is no limit) |
+| `DatePicker`: `DisableDays(fn)` | rules out the days for which `fn` returns true; they are drawn dimmed, marked unavailable, and refused when typed |
+| `DatePicker`: `FirstDay(d)` | the first day of the week in the calendar (default: the locale's) |
+| `TimePicker`: `MinuteStep(n)` | the minutes between the times of the list, and the step of Up and Down (default 15) |
+| `TimePicker`: `Min(t)`, `Max(t)` | the earliest and the latest time that can be chosen; only the clock is used |
+| both: `Validate(rules...)` | validators of the value, such as `ui.Required[time.Time]()`; a zero time is no date or time |
+| both: `OnChange(fn)`, `Placeholder(s)`, `Label(s)`, `LabelledBy(keys...)`, `Disabled(bool)`, `Key(k)`, `Styles(st)` | as for the other fields |
+| both: `Width`, `Height`, `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow` | the sizing methods (see Sizing in docs/styling.md); a date picker is 180 px and a time picker 140 px at the Text size of 100 percent |
+
+`DisableDays` is the name of the rule because `Disabled(bool)` disables the whole field,
+as it does for every control.
+
+**Typing.** A date is read in the order of the locale's short date (month, day and year in
+the US, day, month and year in most of Europe, year first in some), with any punctuation
+between the numbers. A year of two digits is read in the century of the current year, or the
+one before when the result would be more than 20 years ahead. A date with no year is in the
+current year. Eight digits, such as `10132026`, are read in the same order. Month names are not
+read. A time is read with its hour and minute separated by punctuation or a space, or with the
+digits run together, such as `930` or `1430`; `AM` and `PM` (or `a` and `p`) make the hour a
+12 hour one, and without one the hour is on the 24 hour clock. Enter applies a text that is
+valid; a text that is not is kept with a message that gives an example, and the value does not
+change. Leaving the field applies a valid text and otherwise shows the value again, as a number
+field does, so a form never submits a text the field does not hold. An empty text is no date
+or time.
+
+**The calendar and the list.** Alt+Down and F4 open the calendar of a date picker, with the
+keys on the chosen day, or on today when there is none. Its keys follow the WAI-ARIA date
+picker dialog pattern (https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/examples/datepicker-dialog/):
+
+| Key | Moves or does |
+| --- | --- |
+| Left, Right | one day back or forward |
+| Up, Down | one week back or forward |
+| Home, End | the first and the last day of the week (the week starts on the locale's first day) |
+| Page Up, Page Down | one month back or forward; the day stays, or is the last day of a shorter month |
+| Shift+Page Up, Shift+Page Down | one year back or forward |
+| Enter, Space | choose the day, and close the calendar; focus returns to the field |
+| Escape | close the calendar without a change; focus returns to the field |
+| Tab | close the calendar without a change, and move on from the field |
+
+A day that cannot be chosen is still reached by the keys, so the screen reader can say it is
+unavailable, but Enter does not choose it. The month changes with the keys, and its name is
+announced politely. The navigation buttons of the calendar are for the pointer; the keys above
+move a month and a year.
+
+For a time picker, Up and Down step the time by the minute step while the list is closed, and
+move the highlight through the list while it is open (Down to the next row, as the rows show).
+Alt+Down and F4 open the list with the time the field holds highlighted. Enter chooses the
+highlighted time, or applies the typed text when no time is highlighted. Escape and Tab close
+the list. Focus stays in the text, as it does in a combo box.
+
+**Locale.** On Windows, the short date pattern, the first day of the week, whether the clock is
+12 or 24 hours, the AM and PM designators, the time separator, and the names of the days and the
+months come from the user's locale settings, read with `GetLocaleInfoEx` and `GetDateFormatEx`.
+Elsewhere, and where those settings cannot be read, the formats are those of en-US. The locale is
+read once. The month and day names of the calendar and of the accessible names follow it.
+
+**Accessibility.** A date picker and a time picker are ComboBoxes for assistive technology, with
+Expand and Collapse for the calendar or the list, and a Value that is the text. The calendar is a
+Calendar (`RoleCalendar`, UI Automation's Calendar control type, with the Grid and Table
+patterns). Its weekday names are header items, each day is a data item in a grid of six week
+rows and seven columns, named by its long date (such as "Tuesday, October 13, 2026"), and the
+chosen day is selected. A day that cannot be chosen is disabled, and today has the description
+"Today". See docs/accessibility.md, Phase M.
+
+**Styling.** `DatePickerStyle` and `TimePickerStyle` are the looks of the parts, as the other
+widgets' styles are, and `Theme.DatePicker` and `Theme.TimePicker` are the defaults of every
+picker in the app. The parts are in docs/styling.md. Under high contrast the selected day is
+drawn in the system Highlight colors, today and the focused day are outlined, and no state is
+shown by a change of weight.
+
+**Limits.** Months are not read from names in the text. Only the calendar's month and year
+buttons are for the pointer, and the calendar closes on Tab rather than keeping focus. The
+date picker has no time of day of its own, so a time is set with a time picker on the same
+signal. The Today description is in English. Text areas for dates and times are not provided.
+
 ### Shrinking and minimum sizes
 
 When a row is narrower than its content, its items shrink in proportion to their
