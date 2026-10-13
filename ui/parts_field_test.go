@@ -14,16 +14,19 @@ func partTextInput(sig *Signal[string], st FieldStyle) Element {
 
 // partField is a text field of widget ("TextInput" or "TextArea") with the
 // instance style st. With slots, it has a Leading and a Trailing element, and a
-// TextInput also has an icon before its text.
-func partField(widget string, sig *Signal[string], st FieldStyle, slots bool) Element {
+// TextInput also has an icon before its text. state is "", "disabled" or
+// "readonly".
+func partField(widget string, sig *Signal[string], st FieldStyle, slots bool, state string) Element {
 	if widget == "TextArea" {
-		ta := TextArea(sig).Label("Notes").Placeholder("Write here").Styles(st)
+		ta := TextArea(sig).Label("Notes").Placeholder("Write here").Styles(st).
+			Disabled(state == "disabled").ReadOnly(state == "readonly")
 		if slots {
 			ta.Leading(Text("lead")).Trailing(Text("trail"))
 		}
 		return Div().Column().Child(ta)
 	}
-	ti := TextInput(sig).Label("Name").Placeholder("Your name").Styles(st)
+	ti := TextInput(sig).Label("Name").Placeholder("Your name").Styles(st).
+		Disabled(state == "disabled").ReadOnly(state == "readonly")
 	if slots {
 		ti.Icon(icons.Check).Leading(Text("lead")).Trailing(Text("trail"))
 	}
@@ -38,7 +41,8 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 	type fieldCase struct {
 		part  string // the part's name, without the widget
 		set   func(*FieldStyle, Style)
-		slots bool // the field has a Leading and a Trailing element
+		slots bool   // the field has a Leading and a Trailing element
+		state string // "disabled" or "readonly" builds the field in that state
 		act   func(*testing.T, *accessRig)
 	}
 	cases := []fieldCase{
@@ -47,6 +51,8 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 			act: func(t *testing.T, r *accessRig) { hoverNode(r, partNode(t, r.rt, widget+".Frame", "")) }},
 		{part: "FrameFocusWithin", set: func(s *FieldStyle, m Style) { s.FrameFocusWithin = m },
 			act: func(t *testing.T, r *accessRig) { focusNode(r, editorNode(t, r.rt)) }},
+		{part: "FrameDisabled", set: func(s *FieldStyle, m Style) { s.FrameDisabled = m }, state: "disabled"},
+		{part: "FrameReadOnly", set: func(s *FieldStyle, m Style) { s.FrameReadOnly = m }, state: "readonly"},
 		{part: "Text", set: func(s *FieldStyle, m Style) { s.Text = m }},
 		{part: "Placeholder", set: func(s *FieldStyle, m Style) { s.Placeholder = m }},
 		{part: "Selection", set: func(s *FieldStyle, m Style) { s.Selection = m }},
@@ -59,7 +65,7 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 		t.Run(name, func(t *testing.T) {
 			var st FieldStyle
 			c.set(&st, Style{Background: markBG, TextColor: markFG})
-			r := newAccessRig(func(ctx *Context) Element { return partField(widget, NewSignal(""), st, c.slots) })
+			r := newAccessRig(func(ctx *Context) Element { return partField(widget, NewSignal(""), st, c.slots, c.state) })
 			if c.act != nil {
 				c.act(t, r)
 			}
@@ -196,7 +202,7 @@ func TestBorderlessFieldDrawsNoFrame(t *testing.T) {
 // area, in rows, grows with the Text size setting.
 func TestTextAreaMinRowsFollowTextScale(t *testing.T) {
 	height := func(scale int) float32 {
-		r := newAccessRig(func(ctx *Context) Element { return partField("TextArea", NewSignal(""), FieldStyle{}, false) })
+		r := newAccessRig(func(ctx *Context) Element { return partField("TextArea", NewSignal(""), FieldStyle{}, false, "") })
 		if scale != 100 {
 			r.rt.SetSystemSettings(SystemSettings{TextScale: scale})
 			r.frame()

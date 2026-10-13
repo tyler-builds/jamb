@@ -202,6 +202,7 @@ ui.IconButton(icons.Bell)
 ui.TextInput(signal).Placeholder("Search…").Icon(icons.Search).OnSubmit(fn).OnChange(fn)
 ui.TextArea(signal).Placeholder("Start writing…").MinRows(10)    // multi-line editor
   // both: .Borderless() .AutoFocus() .FocusHandle(h) .Style(ui.Style{FontSize: 28})
+  // both: .ReadOnly(true) (focusable, selectable, copyable; not editable) and .Disabled(true)
   // TextInput also: .Small() (28 px, like Button.Small)
   // Style on a field sizes and decorates its frame (Width, Height, Padding,
   // Radius, Background, Border...); font fields style the text inside.

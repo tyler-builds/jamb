@@ -121,7 +121,15 @@ type editorElement struct {
 	placeholderColor Color
 	// invalid and required are the states a Field gives the field (see fieldWire).
 	invalid, required bool
+	// readOnly shows the text and lets it be selected and copied, but not
+	// changed. disabled also takes the field out of the tab order and ignores
+	// the pointer.
+	readOnly, disabled bool
 }
+
+// locked reports whether the text can't be changed by the user or by
+// assistive technology.
+func (e *editorElement) locked() bool { return e.readOnly || e.disabled }
 
 func (*editorElement) isElement() {}
 
@@ -165,6 +173,19 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 		n.st.edit = &editState{}
 	}
 	id := n.id
+	if e.disabled {
+		// A disabled field shows its text and nothing else: it can't be focused,
+		// selected or edited.
+		s.Cursor = CursorDefault
+		n.style = s
+		d := &DivElement{style: s}
+		d.asPart(e.part)
+		d.access().disabled = true
+		d.access().labelledBy, d.access().describedBy = e.labelledBy, e.describedBy
+		n.div = d
+		rt.setOverhang(n)
+		return
+	}
 	d := &DivElement{style: s, focusable: true, capture: true, autoFocus: e.autoFocus, handle: e.handle}
 	d.asPart(e.part)
 	if e.multiline {
@@ -200,6 +221,7 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 		d.access().description = e.description
 	}
 	d.access().invalid, d.access().required = e.invalid, e.required
+	d.access().readOnly = e.readOnly
 	n.div = d
 	rt.setOverhang(n)
 }
@@ -238,7 +260,7 @@ func (rt *Runtime) now() time.Time {
 // (or deleting) within a second forms one undo step; a typed space ends it.
 func (rt *Runtime) editorSet(id uint64, nv string, caret int, kind editKind) {
 	n, es, v := rt.editorOf(id)
-	if n == nil {
+	if n == nil || (nv != v && n.editor.locked()) {
 		return
 	}
 	if nv != v {
@@ -294,7 +316,7 @@ func (rt *Runtime) editorDelete(id uint64, from, to int) {
 
 func (rt *Runtime) editorUndo(id uint64, redo bool) {
 	n, es, v := rt.editorOf(id)
-	if n == nil {
+	if n == nil || n.editor.locked() {
 		return
 	}
 	from, to := &es.undo, &es.redo

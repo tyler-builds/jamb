@@ -227,12 +227,19 @@ override of `TabSelected` changes that segment as well.
 
 `TextInput`, `TextArea` and `NumberInput` share one text frame, and its parts are a
 `ui.FieldStyle`: the box around the text (`Frame`) with its states (`FrameHover`,
-`FrameFocusWithin`, `FrameDisabled` and `FrameInvalid`), the text inside (`Text`),
+`FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly` and `FrameInvalid`), the text inside (`Text`),
 the placeholder (`Placeholder`), the selected text (`Selection`), and the containers
 of the content before and after the text (`Leading` and `Trailing`). A `NumberInput`
 takes the same frame, and its `NumberInputStyle` embeds the `FieldStyle`. Its
 `Placeholder`, `Leading` and `Trailing` parts have no effect, because a number input
 has none of that content.
+
+A read-only field (`ReadOnly(true)`) draws `FrameReadOnly` over its frame: by default
+a slightly different fill (the theme's `SurfaceHover`, or `SurfaceActive` in a dark
+theme), with the border and full-contrast text kept, since its text is meant to be
+read and copied. Under high contrast it keeps the window color. It has no hover state. A disabled field
+(`Disabled(true)`) draws `FrameDisabled`, dimmed by default (GrayText under high
+contrast), and takes no pointer or keyboard input.
 
 The frame's layers are the defaults, then `Theme.Field`, then the instance. A
 `NumberInput` takes `Theme.NumberInput` between the theme's `Field` and its own
@@ -515,7 +522,7 @@ parts that the code applies.
 | `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
 | `NumberInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |
-| `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
+| `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
 | `Checkbox`, `CheckboxTri` | `Control`, `ControlFocusVisible`, `ControlDisabled`, `Box`, `BoxHover`, `BoxChecked`, `BoxMixed`, `BoxDisabled`, `BoxInvalid`, `Mark`, `Dash`, `Label`, `LabelDisabled` | none | none | done |
 | `Switch` | `Track`, `TrackChecked`, `TrackHover`, `TrackFocusVisible`, `TrackDisabled`, `Knob`, `KnobChecked`, `KnobDisabled` | none | none | done |
 | `RadioGroup` | `Group`, `Radio`, `RadioFocusVisible`, `RadioDisabled`, `Ring`, `RingChecked`, `RingDisabled`, `RingInvalid`, `Dot`, `DotDisabled`, `Label`, `LabelDisabled` | none | none | done |

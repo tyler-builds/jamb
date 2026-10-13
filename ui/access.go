@@ -1031,7 +1031,8 @@ func (b *accessBuilder) emitImage(n *node) []access.ID {
 }
 
 // emitField returns a text field node for an editor. Its value is the text it
-// holds, and it can be set by an assistive technology.
+// holds, and an assistive technology can set it unless the field is read-only
+// or disabled. A disabled field can't be focused either.
 func (b *accessBuilder) emitField(n *node) []access.ID {
 	id := accID(n.id)
 	role := access.RoleTextField
@@ -1047,6 +1048,14 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 		an.Text = b.textInfo(n, n.st.edit, v)
 	}
 	an.States = access.StateFocusable | b.offscreen(n)
+	switch {
+	case n.editor.disabled:
+		an.States = access.StateDisabled | b.offscreen(n)
+		an.Actions = nil
+	case n.editor.readOnly:
+		an.States |= access.StateReadOnly
+		an.Actions = []access.Action{access.ActionFocus, access.ActionSetTextSelection}
+	}
 	if id == b.focus {
 		an.States |= access.StateFocused
 	}

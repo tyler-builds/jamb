@@ -304,9 +304,10 @@ func (dividerElement) expand(ctx *Context) Element {
 // takes its theme's and instance's NumberInput parts; see docs/styling.md.
 //
 // Frame is the box around the text. Its states are FrameHover, while the pointer
-// is over an enabled field, and FrameFocusWithin, while the focus is inside it.
-// FrameDisabled and FrameInvalid are the frame of a disabled number input and of
-// a number input whose text is not a valid number; only NumberInput draws them.
+// is over an editable field, and FrameFocusWithin, while the focus is inside it.
+// FrameDisabled is the frame of a disabled field, FrameReadOnly that of a
+// read-only one (see TextInputElement.ReadOnly), and FrameInvalid that of a field
+// whose value is not valid.
 // Text is the text inside the frame, with its TextColor and font, and Selection
 // is the background of the selected text. Placeholder is the text shown while a
 // TextInput or TextArea is empty. Leading and Trailing are the containers of the
@@ -318,8 +319,9 @@ type FieldStyle struct {
 	Frame            Style // the box around the text; not drawn when a field is Borderless
 	FrameHover       Style // the frame while the pointer is over it, if the field is enabled (paint only)
 	FrameFocusWithin Style // the frame while the focus is inside it (paint only)
-	FrameDisabled    Style // the frame of a disabled number input
-	FrameInvalid     Style // the frame of a number input whose text is not a valid number
+	FrameDisabled    Style // the frame of a disabled field
+	FrameReadOnly    Style // the frame of a read-only field
+	FrameInvalid     Style // the frame of a field whose value is not valid
 	Text             Style // the text inside the frame: TextColor and font
 	Placeholder      Style // the placeholder, while the field is empty
 	Selection        Style // the background of the selected text
@@ -334,6 +336,7 @@ func (s FieldStyle) merge(o FieldStyle) FieldStyle {
 		FrameHover:       s.FrameHover.Merge(o.FrameHover),
 		FrameFocusWithin: s.FrameFocusWithin.Merge(o.FrameFocusWithin),
 		FrameDisabled:    s.FrameDisabled.Merge(o.FrameDisabled),
+		FrameReadOnly:    s.FrameReadOnly.Merge(o.FrameReadOnly),
 		FrameInvalid:     s.FrameInvalid.Merge(o.FrameInvalid),
 		Text:             s.Text.Merge(o.Text),
 		Placeholder:      s.Placeholder.Merge(o.Placeholder),
@@ -350,6 +353,7 @@ func (s FieldStyle) plain() FieldStyle {
 		FrameHover:       plainStyle(s.FrameHover),
 		FrameFocusWithin: plainStyle(s.FrameFocusWithin),
 		FrameDisabled:    plainStyle(s.FrameDisabled),
+		FrameReadOnly:    plainStyle(s.FrameReadOnly),
 		FrameInvalid:     plainStyle(s.FrameInvalid),
 		Text:             plainStyle(s.Text),
 		Placeholder:      plainStyle(s.Placeholder),
@@ -360,7 +364,7 @@ func (s FieldStyle) plain() FieldStyle {
 }
 
 // fieldLayout is the layout a text frame is built for: a multi-line editor, a
-// compact one (Small), or a disabled number input.
+// compact one (Small), or a disabled field.
 type fieldLayout struct {
 	multiline, small, disabled bool
 	width                      Length // the frame's width by default (see textFieldWidth)
@@ -392,6 +396,18 @@ func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
 	if t.HighContrast {
 		// The selection is the Highlight color with HighlightText on it, as Windows draws it.
 		d.Selection = Style{Background: t.Accent, TextColor: t.AccentText}
+	}
+	// A read-only field keeps its border and full-contrast text, on a fill that
+	// sets it apart from an editable one. The step between surfaces is smaller in
+	// the dark theme, so it takes the next one.
+	// Under high contrast it keeps the window color, as every field does there:
+	// the theme's surfaces are system colors such as Highlight.
+	switch {
+	case t.HighContrast:
+	case t.Dark:
+		d.FrameReadOnly = Style{Background: t.SurfaceActive}
+	default:
+		d.FrameReadOnly = Style{Background: t.SurfaceHover}
 	}
 	if !lay.disabled {
 		d.Frame.Cursor = CursorText
@@ -444,6 +460,8 @@ type fieldOptions struct {
 	onCancel    func()        // set by DataGrid, which ends an edit on Escape in place of Cancel
 	description string        // set by DataGrid, to say why the last save failed (a literal, not a key)
 	onStep      func(dir int) // set by NumberInput, for Up and Down
+	readOnly    bool          // see ReadOnly
+	disabled    bool          // see Disabled
 	styles      FieldStyle    // the instance's parts: from Styles, and the frame's Style
 	key         string
 	borderless  bool
@@ -510,6 +528,15 @@ func (ti *TextInputElement) Icon(ic *icons.Icon) *TextInputElement      { ti.ico
 func (ti *TextInputElement) OnSubmit(fn func(string)) *TextInputElement { ti.onSubmit = fn; return ti }
 func (ti *TextInputElement) OnChange(fn func(string)) *TextInputElement { ti.onChange = fn; return ti }
 
+// ReadOnly shows the text without letting it change: the field can still be
+// focused, and its text selected and copied. Assistive technology reports it as
+// read-only. Its frame is the FrameReadOnly part.
+func (ti *TextInputElement) ReadOnly(on bool) *TextInputElement { ti.readOnly = on; return ti }
+
+// Disabled shows the text but takes the field out of use: it can't be focused,
+// selected or changed. Its frame is the FrameDisabled part.
+func (ti *TextInputElement) Disabled(d bool) *TextInputElement { ti.disabled = d; return ti }
+
 // Style is merged into the Frame part of the field, over the Styles of the
 // instance: Padding, Margin, Radius, Background and BorderColor/BorderWidth apply
 // to the frame, and FontSize, FontWeight, FontFamily and TextColor are inherited
@@ -572,7 +599,7 @@ func (ti *TextInputElement) Validate(rules ...Validator[string]) *TextInputEleme
 }
 
 func (ti *TextInputElement) expand(ctx *Context) Element {
-	lay := fieldLayout{small: ti.small, width: Px(textFieldWidth * textScale(ctx))}
+	lay := fieldLayout{small: ti.small, disabled: ti.disabled, width: Px(textFieldWidth * textScale(ctx))}
 	st := resolveField(ctx.Theme(), lay, ti.styles)
 	return ti.fieldOptions.expand(ctx, st, false, 0)
 }
@@ -612,6 +639,15 @@ func (ta *TextAreaElement) DescribedBy(keys ...string) *TextAreaElement {
 	return ta
 }
 func (ta *TextAreaElement) OnChange(fn func(string)) *TextAreaElement { ta.onChange = fn; return ta }
+
+// ReadOnly shows the text without letting it change: the field can still be
+// focused, and its text selected and copied. Assistive technology reports it as
+// read-only. Its frame is the FrameReadOnly part.
+func (ta *TextAreaElement) ReadOnly(on bool) *TextAreaElement { ta.readOnly = on; return ta }
+
+// Disabled shows the text but takes the field out of use: it can't be focused,
+// selected or changed. Its frame is the FrameDisabled part.
+func (ta *TextAreaElement) Disabled(d bool) *TextAreaElement { ta.disabled = d; return ta }
 
 // Style is merged into the Frame part of the editor, as for TextInputElement.Style.
 func (ta *TextAreaElement) Style(s Style) *TextAreaElement {
@@ -664,7 +700,7 @@ func (ta *TextAreaElement) Validate(rules ...Validator[string]) *TextAreaElement
 }
 
 func (ta *TextAreaElement) expand(ctx *Context) Element {
-	lay := fieldLayout{multiline: true, width: Px(textFieldWidth * textScale(ctx))}
+	lay := fieldLayout{multiline: true, disabled: ta.disabled, width: Px(textFieldWidth * textScale(ctx))}
 	st := resolveField(ctx.Theme(), lay, ta.styles)
 	return ta.fieldOptions.expand(ctx, st, true, ta.minRows)
 }
@@ -738,6 +774,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		onStep: f.onStep, autoFocus: f.autoFocus, handle: h, invalid: w.invalid, required: w.required, align: f.align,
 		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
+		readOnly: f.readOnly, disabled: f.disabled,
 	}
 	if multiline && minRows > 0 {
 		size := t.FontSize
@@ -750,10 +787,21 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		ed.style.MinHeight = Px(float32(minRows) * size * float32(ctx.TextScale()) / 100 * 1.4)
 	}
 	var box *DivElement
-	if f.borderless {
+	switch {
+	case f.borderless && f.disabled:
+		box = Div().Row().Align(Start).Gap(8)
+	case f.borderless:
 		box = Div().Row().Align(Start).Gap(8).Cursor(CursorText).
 			OnMouseDown(func(*MouseEvent) { h.Focus() })
-	} else {
+	case f.disabled:
+		// A disabled field takes no pointer input, so it has no hover state.
+		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).Style(st.FrameDisabled).Cursor(CursorDefault)
+	case f.readOnly:
+		// A read-only field is not edited, so it has no hover state either.
+		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).Style(st.FrameReadOnly).
+			FocusWithin(st.FrameFocusWithin).
+			OnMouseDown(func(*MouseEvent) { h.Focus() })
+	default:
 		// Clicks on the frame (padding, icon) still focus the text.
 		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).
 			Hover(st.FrameHover).FocusWithin(st.FrameFocusWithin).

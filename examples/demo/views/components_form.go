@@ -40,6 +40,9 @@ func formControlsSection() ui.Element {
 		prefs := ui.Local(ctx, "form.prefs", ui.NewForm()).Peek()
 		channelFocus := ui.Local(ctx, "form.channelFocus", ui.NewFocusHandle()).Peek()
 		saved := ui.Local(ctx, "form.saved", "")
+		// The read-only and disabled text fields hold sample text that can't be changed.
+		token := ui.Local(ctx, "form.token", "jmb_live_7f3a9c21")
+		lockedNote := ui.Local(ctx, "form.lockedNote", "Archived project")
 		prefs.OnSubmit(func() error {
 			saved.Set("Preferences saved: sends by " + channelsOf(email.Peek(), text.Peek(), push.Peek()) +
 				fmt.Sprintf(", quiet from %02d:00 to %02d:00.", fromHour.Peek(), toHour.Peek()))
@@ -70,6 +73,8 @@ func formControlsSection() ui.Element {
 			formSample(t, "Slider, disabled", ui.Slider(volume, 0, 100, 5).Label("Volume, disabled").Format(percentOf).Width(ui.Px(200)).Disabled(true), percentOf(volume.Get())),
 			formSample(t, "Number input", ui.NumberInput(quiet, 0, 23, 1).Label("Sample quiet hours").SpinButtons(ui.SpinInline), fmt.Sprintf("%02d:00", quiet.Get())),
 			formSample(t, "Number input, disabled", ui.NumberInput(quiet, 0, 23, 1).Label("Sample quiet hours, disabled").Disabled(true), fmt.Sprintf("%02d:00", quiet.Get())),
+			formSample(t, "Text input, read-only", ui.TextInput(token).Label("Access token").ReadOnly(true).Width(ui.Px(200)), "select and copy it"),
+			formSample(t, "Text input, disabled", ui.TextInput(lockedNote).Label("Project name, disabled").Disabled(true).Width(ui.Px(200)), lockedNote.Get()),
 		}
 		row := ui.Div().Row().Wrap().Align(ui.Start).Gap(22)
 		for _, s := range samples {
