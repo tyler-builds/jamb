@@ -15,7 +15,7 @@ func testBadgeParts(t *testing.T, applied map[string]bool) {
 	cases := []badgeCase{
 		{part: "Badge.Badge", set: func(s *BadgeStyle, m Style) { s.Badge = m }, build: func() *BadgeElement { return Badge(5) }, drawn: "Badge.Badge"},
 		{part: "Badge.Label", set: func(s *BadgeStyle, m Style) { s.Label = m }, build: func() *BadgeElement { return Badge(5) }, drawn: "Badge.Label", text: true},
-		{part: "Badge.Dot", set: func(s *BadgeStyle, m Style) { s.Dot = m }, build: func() *BadgeElement { return BadgeText("New").Dot() }, drawn: "Badge.Dot"},
+		{part: "Badge.Dot", set: func(s *BadgeStyle, m Style) { s.Dot = m }, build: func() *BadgeElement { return BadgeText("New").StatusDot() }, drawn: "Badge.Dot"},
 	}
 	for _, c := range cases {
 		applied[c.part] = true

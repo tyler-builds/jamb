@@ -31,7 +31,7 @@ func fieldLabel(label string) string { return "field:" + label }
 
 // statusBadge is the badge that names a project's status.
 func statusBadge(s Status) *ui.BadgeElement {
-	return ui.BadgeText(s.String()).Variant(statusVariant(s)).Dot()
+	return ui.BadgeText(s.String()).Variant(statusVariant(s)).StatusDot()
 }
 
 // statusVariant maps a project status to a badge variant.

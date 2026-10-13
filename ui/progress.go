@@ -137,17 +137,11 @@ type ProgressBarElement struct {
 	styles        ProgressBarStyle
 }
 
-// ProgressBar creates a determinate bar showing value. The range is 0 to 1 by
-// default; see Range. The bar fills the width of its container by default (see
-// Width).
+// ProgressBar creates a bar showing value. The range is 0 to 1 by default; see
+// Min and Max. For work of unknown length, see Indeterminate. The bar fills the
+// width of its container by default (see Width).
 func ProgressBar(value float64) *ProgressBarElement {
 	return &ProgressBarElement{value: value, lo: 0, hi: 1}
-}
-
-// IndeterminateProgressBar creates a bar for work of unknown length. It slides
-// while the work runs, and is drawn in the middle when reduced motion is on.
-func IndeterminateProgressBar() *ProgressBarElement {
-	return &ProgressBarElement{indeterminate: true, lo: 0, hi: 1}
 }
 
 func (*ProgressBarElement) isElement()           {}
@@ -159,11 +153,18 @@ func (p *ProgressBarElement) Key(k string) *ProgressBarElement { p.key = k; retu
 // the bar is named "Progress", or "Loading…" when it is indeterminate.
 func (p *ProgressBarElement) Label(name string) *ProgressBarElement { p.name = name; return p }
 
-// Range sets the bounds of the value, lo to hi. A value outside them is clamped.
-func (p *ProgressBarElement) Range(lo, hi float64) *ProgressBarElement {
-	p.lo, p.hi = lo, hi
-	return p
-}
+// Indeterminate makes the bar show work of unknown length, such as
+// ui.ProgressBar(0).Indeterminate(). It slides while the work runs, and is drawn
+// in the middle when reduced motion is on. Its value is not shown.
+func (p *ProgressBarElement) Indeterminate() *ProgressBarElement { p.indeterminate = true; return p }
+
+// Min sets the low end of the value's range, 0 by default. A value outside the
+// range is clamped.
+func (p *ProgressBarElement) Min(lo float64) *ProgressBarElement { p.lo = lo; return p }
+
+// Max sets the high end of the value's range, 1 by default. A value outside the
+// range is clamped.
+func (p *ProgressBarElement) Max(hi float64) *ProgressBarElement { p.hi = hi; return p }
 
 // The sizing methods give the bar's outer box a size, including its readout. A bar
 // fills its container by default; Width(Px(240)) fixes it, and the track keeps the

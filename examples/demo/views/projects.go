@@ -85,7 +85,7 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 		Child(ui.Text(p.Name).FontSize(15).Semibold().Truncate().HighlightMatches(q, matchHighlight(t))).
 		Child(statusBadge(p.Status))
 	if open {
-		titles.Child(ui.BadgeText("Open in window").Variant(ui.BadgeAccent).Dot())
+		titles.Child(ui.BadgeText("Open in window").Variant(ui.BadgeAccent).StatusDot())
 	}
 	star := ui.Div().Size(ui.Px(30), ui.Px(30)).Radius(7).Center().
 		TextColor(t.TextSubtle).Transition(fast).

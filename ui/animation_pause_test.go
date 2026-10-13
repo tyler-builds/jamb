@@ -138,7 +138,7 @@ func TestOffscreenFiniteAnimationShowsItsEndWhenVisible(t *testing.T) {
 func TestOffscreenProgressIndicatorsAreIdle(t *testing.T) {
 	indicators := map[string]func() Element{
 		"ring": func() Element { return ProgressRing().Key("ring").Label("Loading") },
-		"bar":  func() Element { return IndeterminateProgressBar().Key("bar").Label("Loading") },
+		"bar":  func() Element { return ProgressBar(0).Indeterminate().Key("bar").Label("Loading") },
 	}
 	for name, el := range indicators {
 		t.Run(name, func(t *testing.T) {

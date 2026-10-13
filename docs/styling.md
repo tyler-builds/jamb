@@ -309,7 +309,7 @@ the Text size of 100 percent:
 | `Combobox` | 240 px at the Text size of 100 percent, like a text field; `Full` stretches it, and the list is at least as wide as the field |
 | `DatePicker` | 180 px at the Text size of 100 percent; `Full` stretches it, and the calendar is its own size |
 | `TimePicker` | 140 px at the Text size of 100 percent; `Full` stretches it, and the list is at least as wide as the field |
-| `Slider`, `ProgressBar`, `IndeterminateProgressBar` | fills the container, and at least 160 px, so it is visible where its container has no width |
+| `Slider`, `ProgressBar` (also when indeterminate) | fills the container, and at least 160 px, so it is visible where its container has no width |
 | `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |
 | `Collapsible`, `Accordion` | fills the container |
 | `Split` | fills the container's width; its height is the container's, as `Full` gives (set `Height` or `Grow` in a column with other children) |
@@ -525,8 +525,7 @@ parts that the code applies.
 | `DropdownMenu`, `ContextMenu` | `Panel`, `Item`, `ItemHighlighted`, `ItemDisabled`, `Separator`, `SectionLabel`, `Shortcut`, `Check`, `SubmenuChevron` | none | none | done |
 | `MenuBar` | `BarItem`, `BarItemHover`, `BarItemFocusVisible`, `BarItemOpen` | none | none | done |
 | `Modal` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | none | none | done |
-| `ProgressBar` | `Track`, `Fill`, `Label` | none | none | done |
-| `IndeterminateProgressBar` | `Track`, `Fill` | none | none | done |
+| `ProgressBar` | `Track`, `Fill`, `Label` | `Indeterminate()` (the sliding segment is `Fill`) | none | done |
 | `ProgressRing` | `Ring`, `Dot` | sizes (`RingSmall`, `RingMedium`, `RingLarge`) | none | done |
 | `Badge` | `Badge`, `Label`, `Dot` | `Neutral`, `Accent`, `Success`, `Warning`, `Danger` (style per variant in `Theme.Badges`) | none | done |
 | `Toast` | `Container`, `Icon`, `Text`, `Action`, `Close` | `Info`, `Success`, `Warning`, `Error` (style per kind in `Theme.Toasts`; placement with `Toaster.Placement`) | none | done |

@@ -106,9 +106,9 @@ func sizeCases() []sizeCase {
 				return ProgressBar(0.5).Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
 			}},
 		{name: "IndeterminateProgressBar", box: 400, auto: autoFill,
-			def: func() Element { return IndeterminateProgressBar() },
+			def: func() Element { return ProgressBar(0).Indeterminate() },
 			set: func(w, minW, maxW Length, g float32) Element {
-				return IndeterminateProgressBar().Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
+				return ProgressBar(0).Indeterminate().Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
 			}},
 		{name: "Checkbox", part: "Checkbox.Control", box: 400, auto: autoContent,
 			def: func() Element { return Checkbox("Include", NewSignal(false)) },

@@ -43,21 +43,19 @@ func testProgressParts(t *testing.T, applied map[string]bool) {
 	}
 	// The indeterminate bar's segment is the Fill part, drawn in the middle with
 	// reduced motion. The track is the same part as in the determinate bar.
-	applied["IndeterminateProgressBar.Fill"] = true
-	t.Run("IndeterminateProgressBar.Fill", func(t *testing.T) {
+	t.Run("ProgressBar.Indeterminate.Fill", func(t *testing.T) {
 		var st ProgressBarStyle
 		st.Fill = Style{Background: markBG}
 		r := reducedRig(func(ctx *Context) Element {
-			return Div().Column().Child(IndeterminateProgressBar().Label("Working").Styles(st))
+			return Div().Column().Child(ProgressBar(0).Indeterminate().Label("Working").Styles(st))
 		})
 		wantBackground(t, partNode(t, r.rt, "ProgressBar.Fill", ""), "IndeterminateProgressBar.Fill", markBG)
 	})
-	applied["IndeterminateProgressBar.Track"] = true
-	t.Run("IndeterminateProgressBar.Track", func(t *testing.T) {
+	t.Run("ProgressBar.Indeterminate.Track", func(t *testing.T) {
 		var st ProgressBarStyle
 		st.Track = Style{Background: markBG}
 		r := reducedRig(func(ctx *Context) Element {
-			return Div().Column().Child(IndeterminateProgressBar().Label("Working").Styles(st))
+			return Div().Column().Child(ProgressBar(0).Indeterminate().Label("Working").Styles(st))
 		})
 		wantBackground(t, partNode(t, r.rt, "ProgressBar.Track", ""), "IndeterminateProgressBar.Track", markBG)
 	})

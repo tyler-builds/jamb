@@ -69,7 +69,7 @@ func TestProgressBarDeterminateIsReadOnlyRange(t *testing.T) {
 }
 
 func TestProgressBarClampsAndFormats(t *testing.T) {
-	bar := ProgressBar(150).Range(0, 100).Label("Import").
+	bar := ProgressBar(150).Min(0).Max(100).Label("Import").
 		Format(func(v float64) string { return strconv.FormatFloat(v, 'f', 0, 64) + " items" })
 	r := newAccessRig(feedbackRoot(bar))
 	r.frame()
@@ -83,7 +83,7 @@ func TestProgressBarClampsAndFormats(t *testing.T) {
 }
 
 func TestIndeterminateProgressBarHasNoRange(t *testing.T) {
-	r := newAccessRig(feedbackRoot(IndeterminateProgressBar()))
+	r := newAccessRig(feedbackRoot(ProgressBar(0).Indeterminate()))
 	r.frame()
 	n := progressNode(t, r, "Loading…")
 	if n.Range != nil {
@@ -114,7 +114,7 @@ func TestProgressReducedMotionIsStatic(t *testing.T) {
 		name string
 		el   func() Element
 	}{
-		{"indeterminate bar", func() Element { return IndeterminateProgressBar() }},
+		{"indeterminate bar", func() Element { return ProgressBar(0).Indeterminate() }},
 		{"ring", func() Element { return ProgressRing() }},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -223,7 +223,7 @@ func TestProgressBarColorIsTheFill(t *testing.T) {
 // TestBadgeTextDotIsHidden checks that the dot of a badge is not read: the badge
 // is named by its text alone, and draws without warnings.
 func TestBadgeTextDotIsHidden(t *testing.T) {
-	r := newAccessRig(feedbackRoot(BadgeText("Done").Dot().Variant(BadgeSuccess)))
+	r := newAccessRig(feedbackRoot(BadgeText("Done").StatusDot().Variant(BadgeSuccess)))
 	r.frame()
 	accesstest.Find(t, r.tree(), access.RoleGroup, "Done")
 	if len(r.warnings) != 0 {

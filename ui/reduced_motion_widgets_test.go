@@ -151,7 +151,7 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 		{name: "ProgressBar", animates: true,
 			root: func(open *Signal[bool]) func(*Context) Element {
 				return func(ctx *Context) Element {
-					return Div().Column().Child(IndeterminateProgressBar().Label("Working"))
+					return Div().Column().Child(ProgressBar(0).Indeterminate().Label("Working"))
 				}
 			},
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) {}},

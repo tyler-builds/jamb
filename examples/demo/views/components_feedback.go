@@ -20,9 +20,9 @@ func feedbackSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 	}
 	return section(t, "Feedback",
 		sample(t, "Determinate", ui.ProgressBar(0.6).Label("Determinate progress").Width(ui.Px(240))),
-		sample(t, "Steps, 3 of 8", ui.ProgressBar(3).Range(0, 8).Label("Setup steps").
+		sample(t, "Steps, 3 of 8", ui.ProgressBar(3).Min(0).Max(8).Label("Setup steps").
 			Format(func(v float64) string { return fmt.Sprintf("%.0f of 8", v) }).Width(ui.Px(240))),
-		sample(t, "Indeterminate", ui.IndeterminateProgressBar().Label("Searching").Width(ui.Px(240))),
+		sample(t, "Indeterminate", ui.ProgressBar(0).Indeterminate().Label("Searching").Width(ui.Px(240))),
 		sample(t, "Busy ring, three sizes", ui.Div().Row().Align(ui.Center).Gap(16).
 			Child(ui.ProgressRing().Size(ui.RingSmall).Label("Small busy indicator")).
 			Child(ui.ProgressRing().Size(ui.RingMedium).Label("Medium busy indicator")).

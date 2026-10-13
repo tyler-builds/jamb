@@ -30,7 +30,7 @@ const (
 // built-in defaults of its variant, then over the theme's Badge, then over the
 // theme's Badges for that variant, then over the Styles of the instance; see
 // docs/styling.md. Badge is the pill, Label its text and Dot the dot: the dot
-// that a badge with Dot() shows before its text, or a badge that is only a dot
+// that a badge with StatusDot() shows before its text, or a badge that is only a dot
 // (BadgeDot). A variant's colors are in its defaults, so an override of Badge or
 // Dot sets the color for the variants it applies to.
 type BadgeStyle struct {
@@ -118,7 +118,7 @@ type BadgeElement struct {
 	noun     string
 	key      string
 	attached bool // set by DivElement.Badged: the owner names the badge
-	leadDot  bool // a dot before the text (see Dot)
+	leadDot  bool // a dot before the text (see StatusDot)
 	styles   BadgeStyle
 	size     sizing // the badge's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
@@ -155,9 +155,9 @@ func (b *BadgeElement) Max(n int) *BadgeElement { b.max = n; return b }
 // "items" makes a badge of 6 read "6 items". It is not drawn.
 func (b *BadgeElement) Noun(s string) *BadgeElement { b.noun = s; return b }
 
-// Dot puts a dot in front of the text, in the text color, as a status chip does.
+// StatusDot puts a dot in front of the text, in the text color, as a status chip does.
 // The dot is hidden from assistive technology: the text is what is read.
-func (b *BadgeElement) Dot() *BadgeElement { b.leadDot = true; return b }
+func (b *BadgeElement) StatusDot() *BadgeElement { b.leadDot = true; return b }
 
 // The sizing methods give the badge's outer box a size. A badge is as wide as its
 // text by default; see Sizing in docs/styling.md.

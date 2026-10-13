@@ -707,7 +707,7 @@ follows CSS Flexbox's automatic minimum size of flex items
   a `NumberInput`): its fixed width is a ceiling, and in a shrinking row it keeps the
   room for six digits and no more, so it does not collapse to a letter's width. A
   `MinWidth` replaces that minimum.
-- **Bars and sliders** (`ProgressBar`, `IndeterminateProgressBar`, `Slider`) keep a
+- **Bars and sliders** (`ProgressBar`, also when indeterminate, and `Slider`) keep a
   default minimum of 160 px, so they stay visible in a container that has no width of
   its own. `MinWidth` replaces it.
 - **A word longer than its container breaks inside the word**, so a URL stays within
@@ -890,11 +890,11 @@ a word as well as by a color. Their looks are `ui.ProgressBarStyle`, `ui.Progres
 `Theme.Toasts`, and per toast with `Toast.Styles`) and `ui.TooltipStyle`.
 
 ```go
-ui.ProgressBar(0.45).Label("Upload").Color(accent)    // determinate: 0 to 1, or .Range(lo, hi); Color is the fill
-ui.BadgeText("Active").Variant(ui.BadgeAccent).Dot() // a word with a dot in front
-ui.ProgressBar(3).Range(0, 8).Label("Setup steps").
+ui.ProgressBar(0.45).Label("Upload").Color(accent)    // 0 to 1, or set .Min(lo).Max(hi); Color is the fill
+ui.BadgeText("Active").Variant(ui.BadgeAccent).StatusDot() // a word with a dot in front
+ui.ProgressBar(3).Min(0).Max(8).Label("Setup steps").
 	Format(func(v float64) string { return fmt.Sprintf("%.0f of 8", v) })
-ui.IndeterminateProgressBar().Label("Searching")      // work of unknown length
+ui.ProgressBar(0).Indeterminate().Label("Searching")      // work of unknown length
 ui.ProgressRing().Size(ui.RingSmall).Label("Sending reply") // busy: RingSmall, RingMedium, RingLarge
 ui.Badge(6).Noun("items").Variant(ui.BadgeAccent)     // a count; above Max (99) it shows 99+
 ui.BadgeText("New").Variant(ui.BadgeSuccess)          // a word
@@ -925,7 +925,7 @@ ctx.Toast(ui.ToastSuccess, "Project created").Action("Undo", undo) // in a handl
   outlined, and its text carries the meaning. A badge's text is dark on the bright
   Success and Warning fills, and light on the others, in both themes. Every variant's
   text is 4.5:1 or more against its fill in both themes, and under both high contrast
-  schemes. `Dot()` puts a dot in front of a text badge, as a status chip has one; the dot
+  schemes. `StatusDot()` puts a dot in front of a text badge, as a status chip has one; the dot
   is hidden from assistive technology.
 - **Badge on an element.** `Badged` adds the badge to the end of the element and adds
   its text to the element's accessible name, as in "Projects, 6 items". The badge is
