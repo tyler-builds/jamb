@@ -207,7 +207,7 @@ the same in every variant.
 - `Button.Variant(ui.ButtonPrimary | ui.ButtonSecondary | ui.ButtonGhost | ui.ButtonDanger)` picks the look of
   a button. Its style is the theme's `Button` (every variant), then the variant's own
   in `Theme.Buttons` (`Primary`, `Secondary`, `Ghost`, `Danger`), then the instance's
-  `Styles`. `Small()` is a size, not a variant, so it is not styled as one.
+  `Styles`. `Small()` and `Large()` are sizes, not variants, so they are not styled as one.
 - `Badge.Variant(ui.BadgeNeutral | BadgeAccent | BadgeSuccess | BadgeWarning | BadgeDanger)`
   works the same way, with `Theme.Badge` and `Theme.Badges`.
 - A toast's kind (`ToastInfo`, `ToastSuccess`, `ToastWarning`, `ToastError`) sets its

@@ -137,7 +137,7 @@ type TimePickerElement struct {
 	rules       []Validator[time.Time] // the validators of the value (see Validate)
 	wire        fieldWire              // what a Field gives the field (see Field)
 	focusHandle *FocusHandle           // see FocusHandle
-	small       bool                   // see Small
+	ctlSize     controlSize            // see Small and Large
 	tooltip     string                 // see Tooltip
 }
 
@@ -151,7 +151,15 @@ func (p *TimePickerElement) Tooltip(s string) *TimePickerElement {
 // Small makes the field compact: 28 px high with smaller text, like
 // Button.Small and TextInput.Small, for toolbars and dense forms.
 func (p *TimePickerElement) Small() *TimePickerElement {
-	p.small = true
+	p.ctlSize = sizeSmall
+	return p
+}
+
+// Large makes the field larger: 40 px high with 16 px text, like
+// Button.Large and TextInput.Large, for touch-friendly or prominent forms.
+// Small and Large replace each other.
+func (p *TimePickerElement) Large() *TimePickerElement {
+	p.ctlSize = sizeLarge
 	return p
 }
 
@@ -513,7 +521,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		}
 		a.invalid, a.required = isInvalid || w.invalid, w.required
 
-		fst := resolveField(t, fieldLayout{width: Full, disabled: p.disabled, small: p.small}, st.Field)
+		fst := resolveField(t, fieldLayout{width: Full, disabled: p.disabled, size: p.ctlSize}, st.Field)
 		if p.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)

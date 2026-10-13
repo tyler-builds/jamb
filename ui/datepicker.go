@@ -172,7 +172,7 @@ type DatePickerElement struct {
 	rules       []Validator[time.Time] // the validators of the value (see Validate)
 	wire        fieldWire              // what a Field gives the field (see Field)
 	focusHandle *FocusHandle           // see FocusHandle
-	small       bool                   // see Small
+	ctlSize     controlSize            // see Small and Large
 	tooltip     string                 // see Tooltip
 }
 
@@ -186,7 +186,15 @@ func (d *DatePickerElement) Tooltip(s string) *DatePickerElement {
 // Small makes the field compact: 28 px high with smaller text, like
 // Button.Small and TextInput.Small, for toolbars and dense forms.
 func (d *DatePickerElement) Small() *DatePickerElement {
-	d.small = true
+	d.ctlSize = sizeSmall
+	return d
+}
+
+// Large makes the field larger: 40 px high with 16 px text, like
+// Button.Large and TextInput.Large, for touch-friendly or prominent forms.
+// Small and Large replace each other.
+func (d *DatePickerElement) Large() *DatePickerElement {
+	d.ctlSize = sizeLarge
 	return d
 }
 
@@ -533,7 +541,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		}
 		a.invalid, a.required = isInvalid || w.invalid, w.required
 
-		fst := resolveField(t, fieldLayout{width: Full, disabled: d.disabled, small: d.small}, st.Field)
+		fst := resolveField(t, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, st.Field)
 		if d.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)

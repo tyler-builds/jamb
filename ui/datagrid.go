@@ -1469,7 +1469,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 // the grid's keys as described in DataGrid, and its frame is invalid while the last
 // save failed. The message of that save is drawn by row, under the cell.
 func (g *DataGridElement[T]) editor(rc dgRowCtx[T], cl DataColumn[T]) Element {
-	fe := resolveField(rc.t, fieldLayout{small: true}, rc.st.Editor)
+	fe := resolveField(rc.t, fieldLayout{size: sizeSmall}, rc.st.Editor)
 	if rc.ed.err != "" {
 		// The editor has focus while it is invalid, so the invalid frame also takes the
 		// place of the focus frame: the Accent border would hide the danger color.

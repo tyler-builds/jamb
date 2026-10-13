@@ -83,20 +83,54 @@ func (bv ButtonVariants) of(v ButtonVariant) ButtonStyle {
 	return bv.Primary
 }
 
+// controlSize is the size of a control: the default, Small or Large. The
+// controls that have Small and Large share these sizes, so they line up in a row.
+type controlSize uint8
+
+const (
+	sizeDefault controlSize = iota
+	sizeSmall
+	sizeLarge
+)
+
+// field returns a field's height, horizontal padding and text size at s, at the
+// Text size of 100 percent.
+func (s controlSize) field() (h, padX, fontSize float32) {
+	switch s {
+	case sizeSmall:
+		return 28, 8, 13
+	case sizeLarge:
+		return 40, 12, 16
+	}
+	return 34, 10, 14
+}
+
+// buttonIconSize is the size of a button's icon at size s.
+func buttonIconSize(s controlSize) float32 {
+	switch s {
+	case sizeSmall:
+		return 14
+	case sizeLarge:
+		return 18
+	}
+	return 16
+}
+
 // buttonDefaults returns the built-in look of a button of variant v, from the
-// colors of t. small is the compact size, iconOnly a button with no label, and
+// colors of t. size is its size, iconOnly a button with no label, and
 // disabled the state the disabled style is chosen for. Under high contrast a
 // disabled button is GrayText and not dimmed.
-func buttonDefaults(t *Theme, v ButtonVariant, small, iconOnly bool) ButtonStyle {
-	h, px, fs := float32(34), float32(14), float32(14)
-	if small {
-		h, px, fs = 28, 10, 13
+func buttonDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly bool) ButtonStyle {
+	h, _, fs := size.field()
+	px := float32(14)
+	switch size {
+	case sizeSmall:
+		px = 10
+	case sizeLarge:
+		px = 18
 	}
 	if iconOnly {
-		px = (h - 16) / 2
-		if small {
-			px = (h - 14) / 2
-		}
+		px = (h - buttonIconSize(size)) / 2
 	}
 	d := ButtonStyle{
 		Root: Style{Direction: Row, Align: Center, Justify: Center, Gap: 7, MinHeight: Px(h),
@@ -137,8 +171,8 @@ func buttonDefaults(t *Theme, v ButtonVariant, small, iconOnly bool) ButtonStyle
 // resolveButton returns the look of a button: the defaults of its variant,
 // merged with the theme's Button, the theme's Buttons for the variant, and then
 // the instance's Styles. Under high contrast the overrides are plain.
-func resolveButton(t *Theme, v ButtonVariant, small, iconOnly bool, inst ButtonStyle) ButtonStyle {
-	st := buttonDefaults(t, v, small, iconOnly)
+func resolveButton(t *Theme, v ButtonVariant, size controlSize, iconOnly bool, inst ButtonStyle) ButtonStyle {
+	st := buttonDefaults(t, v, size, iconOnly)
 	for _, o := range []ButtonStyle{t.Button, t.Buttons.of(v), inst} {
 		if t.HighContrast {
 			o = o.plain()
@@ -153,7 +187,7 @@ type ButtonElement struct {
 	label    string
 	icon     *icons.Icon
 	variant  ButtonVariant
-	small    bool
+	ctlSize  controlSize // see Small and Large
 	disabled bool
 	onClick  func()
 	tooltip  string
@@ -186,8 +220,12 @@ func (b *ButtonElement) Primary() *ButtonElement                { return b.Varia
 func (b *ButtonElement) Secondary() *ButtonElement              { return b.Variant(ButtonSecondary) }
 func (b *ButtonElement) Ghost() *ButtonElement                  { return b.Variant(ButtonGhost) }
 func (b *ButtonElement) Danger() *ButtonElement                 { return b.Variant(ButtonDanger) }
-func (b *ButtonElement) Small() *ButtonElement                  { b.small = true; return b }
-func (b *ButtonElement) Disabled(d bool) *ButtonElement         { b.disabled = d; return b }
+func (b *ButtonElement) Small() *ButtonElement                  { b.ctlSize = sizeSmall; return b }
+
+// Large makes the button larger: 40 px high with 16 px text, for prominent or
+// touch-friendly actions. Small and Large replace each other.
+func (b *ButtonElement) Large() *ButtonElement          { b.ctlSize = sizeLarge; return b }
+func (b *ButtonElement) Disabled(d bool) *ButtonElement { b.disabled = d; return b }
 
 // The sizing methods give the button's outer box a size. A button is as wide as
 // its label by default, and Width(Full) fills its container (see Sizing in
@@ -249,11 +287,8 @@ func (b *ButtonElement) Styles(st ButtonStyle) *ButtonElement {
 
 func (b *ButtonElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
-	iconSize := float32(16)
-	if b.small {
-		iconSize = 14
-	}
-	st := resolveButton(t, b.variant, b.small, b.label == "", b.styles)
+	iconSize := buttonIconSize(b.ctlSize)
+	st := resolveButton(t, b.variant, b.ctlSize, b.label == "", b.styles)
 	d := Div().asPart("Button.Root").Style(st.Root)
 	if b.disabled {
 		d.Style(st.RootDisabled).Cursor(CursorNotAllowed)
@@ -370,8 +405,9 @@ func (s FieldStyle) plain() FieldStyle {
 // fieldLayout is the layout a text frame is built for: a multi-line editor, a
 // compact one (Small), or a disabled field.
 type fieldLayout struct {
-	multiline, small, disabled bool
-	width                      Length // the frame's width by default (see textFieldWidth)
+	multiline, disabled bool
+	size                controlSize
+	width               Length // the frame's width by default (see textFieldWidth)
 }
 
 // textFieldWidth is the default width of a text field at the Text size of 100
@@ -419,8 +455,9 @@ func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
 	switch {
 	case lay.multiline:
 		d.Frame.Align, d.Frame.MinHeight, d.Frame.Padding = Start, Auto, XY(10, 8)
-	case lay.small:
-		d.Frame.MinHeight, d.Frame.Padding, d.Frame.FontSize = Px(28), XY(8, 0), 13
+	case lay.size != sizeDefault:
+		h, px, fs := lay.size.field()
+		d.Frame.MinHeight, d.Frame.Padding, d.Frame.FontSize = Px(h), XY(px, 0), fs
 	}
 	if t.HighContrast {
 		d.FrameInvalid.BorderColor = t.Text
@@ -470,7 +507,7 @@ type fieldOptions struct {
 	styles      FieldStyle    // the instance's parts: from Styles, and the frame's Style
 	key         string
 	borderless  bool
-	small       bool
+	ctlSize     controlSize // see Small and Large
 	autoFocus   bool
 	handle      *FocusHandle
 	widget      string              // the widget this field is, for the part names (see asPart)
@@ -574,7 +611,11 @@ func (ti *TextInputElement) Leading(el Element) *TextInputElement { ti.leadingEl
 func (ti *TextInputElement) Trailing(el Element) *TextInputElement { ti.trailingEl = el; return ti }
 
 // Small makes a compact field (28px tall, 13px text), matching Button.Small.
-func (ti *TextInputElement) Small() *TextInputElement { ti.small = true; return ti }
+func (ti *TextInputElement) Small() *TextInputElement { ti.ctlSize = sizeSmall; return ti }
+
+// Large makes the field larger: 40 px high with 16 px text, like Button.Large.
+// Small and Large replace each other.
+func (ti *TextInputElement) Large() *TextInputElement { ti.ctlSize = sizeLarge; return ti }
 
 // The sizing methods give the field's frame a size. A field is textFieldWidth wide
 // by default, so Width(Full) fills its container, and the frame never shrinks below
@@ -608,7 +649,7 @@ func (ti *TextInputElement) Validate(rules ...Validator[string]) *TextInputEleme
 }
 
 func (ti *TextInputElement) expand(ctx *Context) Element {
-	lay := fieldLayout{small: ti.small, disabled: ti.disabled, width: Px(textFieldWidth * textScale(ctx))}
+	lay := fieldLayout{size: ti.ctlSize, disabled: ti.disabled, width: Px(textFieldWidth * textScale(ctx))}
 	st := resolveField(ctx.Theme(), lay, ti.styles)
 	return ti.fieldOptions.expand(ctx, st, false, 0)
 }

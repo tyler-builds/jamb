@@ -186,7 +186,7 @@ type ComboboxElement[T comparable] struct {
 	onChange    func(string)
 	focus       *FocusHandle // the editor's focus handle, see FocusHandle
 	wire        fieldWire    // what a Field gives the field (see Field)
-	small       bool         // see Small
+	ctlSize     controlSize  // see Small and Large
 	tooltip     string       // see Tooltip
 }
 
@@ -200,7 +200,15 @@ func (c *ComboboxElement[T]) Tooltip(s string) *ComboboxElement[T] {
 // Small makes the field compact: 28 px high with smaller text, like
 // Button.Small and TextInput.Small, for toolbars and dense forms.
 func (c *ComboboxElement[T]) Small() *ComboboxElement[T] {
-	c.small = true
+	c.ctlSize = sizeSmall
+	return c
+}
+
+// Large makes the field larger: 40 px high with 16 px text, like
+// Button.Large and TextInput.Large, for touch-friendly or prominent forms.
+// Small and Large replace each other.
+func (c *ComboboxElement[T]) Large() *ComboboxElement[T] {
+	c.ctlSize = sizeLarge
 	return c
 }
 
@@ -368,7 +376,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		st := resolveCombobox(t, c.styles)
-		lay := fieldLayout{width: Full, disabled: c.disabled, small: c.small}
+		lay := fieldLayout{width: Full, disabled: c.disabled, size: c.ctlSize}
 		fst := resolveField(t, lay, st.Field)
 		w := c.wire
 

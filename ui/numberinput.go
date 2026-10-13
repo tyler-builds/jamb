@@ -96,16 +96,13 @@ const spinGap = 2
 // numberInputDefaults returns the built-in look of a number input of the given
 // width, with spin buttons of placement when spin is set, from the colors of t. A
 // disabled field has the disabled frame (see fieldDefaults).
-func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disabled, spin, small bool) NumberInputStyle {
+func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool, size controlSize) NumberInputStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	// h is the frame's height at the Text size of 100 percent: 28 for Small, as
-	// TextInput.Small is.
-	h := float32(34)
-	if small {
-		h = 28
-	}
+	// h is the frame's height at the Text size of 100 percent, as for the other
+	// controls of that size.
+	h, _, _ := size.field()
 	d := NumberInputStyle{
-		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled, small: small}),
+		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled, size: size}),
 		SpinButton:             Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond},
 		SpinButtonHover:        Style{Background: t.SurfaceHover, TextColor: t.Text},
 		SpinButtonPressed:      Style{Background: t.SurfaceActive},
@@ -153,8 +150,8 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 // resolveNumberInput returns the look of a number input: the defaults, merged
 // with the theme's Field, then the theme's NumberInput, then the instance's
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveNumberInput(t *Theme, placement SpinPlacement, scale float32, disabled, spin, small bool, inst NumberInputStyle) NumberInputStyle {
-	st := numberInputDefaults(t, placement, scale, disabled, spin, small)
+func resolveNumberInput(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool, size controlSize, inst NumberInputStyle) NumberInputStyle {
+	st := numberInputDefaults(t, placement, scale, disabled, spin, size)
 	for _, o := range []NumberInputStyle{{FieldStyle: t.Field}, t.NumberInput, inst} {
 		if t.HighContrast {
 			o = o.plain()
@@ -194,7 +191,7 @@ type NumberInputElement[T int | float64] struct {
 	wire        fieldWire      // what a Field gives the field (see Field)
 	onChange    func(T)        // see OnChange
 	focusHandle *FocusHandle   // see FocusHandle
-	small       bool           // see Small
+	ctlSize     controlSize    // see Small and Large
 	tooltip     string         // see Tooltip
 }
 
@@ -208,7 +205,15 @@ func (n *NumberInputElement[T]) Tooltip(s string) *NumberInputElement[T] {
 // Small makes the field compact: 28 px high with smaller text, like
 // Button.Small and TextInput.Small, for toolbars and dense forms.
 func (n *NumberInputElement[T]) Small() *NumberInputElement[T] {
-	n.small = true
+	n.ctlSize = sizeSmall
+	return n
+}
+
+// Large makes the field larger: 40 px high with 16 px text, like
+// Button.Large and TextInput.Large, for touch-friendly or prominent forms.
+// Small and Large replace each other.
+func (n *NumberInputElement[T]) Large() *NumberInputElement[T] {
+	n.ctlSize = sizeLarge
 	return n
 }
 
@@ -321,7 +326,7 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		scale := float32(ctx.TextScale()) / 100
-		st := resolveNumberInput(t, n.placement, scale, n.disabled, n.spin && !n.disabled, n.small, n.styles)
+		st := resolveNumberInput(t, n.placement, scale, n.disabled, n.spin && !n.disabled, n.ctlSize, n.styles)
 		v := n.value.Get()
 		// The field keeps its own text while the user types. draft is that text,
 		// and seen is the value it was last made from, so that a value set from

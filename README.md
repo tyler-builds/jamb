@@ -199,14 +199,14 @@ ui.Text("Total").Font("Inter")                    // a family registered with ap
 ui.Icon(icons.Folder).Size(16).Color(c)          // color defaults to the inherited text color
                                                  // icons.All lists every icon; see the icon list below
 ui.Image(src).Size(ui.Px(34), ui.Px(34)).Radius(17).Fit(ui.FitCover)
-ui.Button("Save").Icon(icons.Check).Secondary().Small().OnClick(fn)   // Primary|Secondary|Ghost|Danger
+ui.Button("Save").Icon(icons.Check).Secondary().Small().OnClick(fn)   // Primary|Secondary|Ghost|Danger; Small|Large
 ui.IconButton(icons.Bell)
 ui.TextInput(signal).Placeholder("Search…").Icon(icons.Search).OnSubmit(fn).OnChange(fn)
 ui.TextArea(signal).Placeholder("Start writing…").MinRows(10)    // multi-line editor
   // both: .Borderless() .AutoFocus() .FocusHandle(h) .Style(ui.Style{FontSize: 28})
   // both: .ReadOnly(true) (focusable, selectable, copyable; not editable) and .Disabled(true)
-  // TextInput also: .Small() (28 px, like Button.Small); so do Select, Combobox, NumberInput,
-  // DatePicker and TimePicker, so a toolbar of small controls lines up
+  // TextInput also: .Small() (28 px, like Button.Small) and .Large() (40 px, 16 px text); so do
+  // Select, Combobox, NumberInput, DatePicker and TimePicker, so a row of them lines up
   // Style on a field sizes and decorates its frame (Width, Height, Padding,
   // Radius, Background, Border...); font fields style the text inside.
   // Styles(ui.FieldStyle{...}) sets the frame's parts (Frame, FrameFocusWithin,
