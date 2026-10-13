@@ -213,7 +213,7 @@ ui.Divider(), ui.Spacer(), ui.If(cond, el), ui.Map(items, fn)
 
 // Focus from code (shortcuts, focusing a field you just created):
 h := ui.NewFocusHandle()
-ui.TextInput(query).FocusHandle(h)
+ui.TextInput(query).FocusHandle(h) // every interactive control takes one: Button, Select, Tabs, DataGrid...
 h.Focus()    // takes effect on the next frame, after the change that created the field
 saved := ctx.FocusedHandle()  // whatever has focus now (or nothing), to restore later
 saved.FocusNow()              // focuses it at once; does nothing and returns false if its element is gone
@@ -1875,7 +1875,7 @@ it with `Inline()`, which suits settings rows. `Description(s)` is the help text
 found (such as one from a server), and `Check(fn)` checks a whole field, such as a
 group of check boxes, with `fn() error` (it reads its signals with `Get`). `Focus(h)`
 gives the element that takes focus for a field whose control is a group; a
-`Checkbox` takes a handle with its `FocusHandle` method for that. A field
+`Checkbox` (like every other control) takes a handle with its `FocusHandle` method for that. A field
 outside a form (`ui.Field(...)` on its own) is checked the same way, but only as the
 user works with it.
 

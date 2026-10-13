@@ -156,6 +156,14 @@ type SelectElement[T comparable] struct {
 	renderOption func(Option[T], PartState) Element
 	rules        []Validator[T] // the validators of the value (see Validate)
 	wire         fieldWire      // what a Field gives the field (see Field)
+	focusHandle  *FocusHandle   // see FocusHandle
+}
+
+// FocusHandle lets code focus the select (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (s *SelectElement[T]) FocusHandle(h *FocusHandle) *SelectElement[T] {
+	s.focusHandle = h
+	return s
 }
 
 // Select creates a drop-down list that reads and writes value. The options are
@@ -272,6 +280,9 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		back := Local(ctx, "back", NewFocusHandle())
 		// ret is the field's handle: the one a Field gave it, else back.
 		ret := back.Peek()
+		if s.focusHandle != nil {
+			ret = s.focusHandle
+		}
 		w := s.wire
 		if w.handle != nil {
 			ret = w.handle

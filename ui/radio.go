@@ -118,17 +118,25 @@ func resolveRadioGroup(t *Theme, inst RadioGroupStyle) RadioGroupStyle {
 // to the next option and select it. Up and Left go back; Down and Right go on.
 // They wrap around and skip disabled options, as Windows radio buttons do.
 type RadioGroupElement[T comparable] struct {
-	value      *Signal[T]
-	options    []Option[T]
-	name       string // the group's accessible name, see Label
-	labelledBy []string
-	key        string
-	disabled   bool
-	onChange   func(T)
-	styles     RadioGroupStyle
-	rules      []Validator[T] // the validators of the value (see Validate)
-	wire       fieldWire      // what a Field gives the group (see Field)
-	size       sizing         // the group's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	value       *Signal[T]
+	options     []Option[T]
+	name        string // the group's accessible name, see Label
+	labelledBy  []string
+	key         string
+	disabled    bool
+	onChange    func(T)
+	styles      RadioGroupStyle
+	rules       []Validator[T] // the validators of the value (see Validate)
+	wire        fieldWire      // what a Field gives the group (see Field)
+	size        sizing         // the group's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	focusHandle *FocusHandle   // see FocusHandle
+}
+
+// FocusHandle lets code focus the group's tab stop: the checked option, or the first enabled one (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (r *RadioGroupElement[T]) FocusHandle(h *FocusHandle) *RadioGroupElement[T] {
+	r.focusHandle = h
+	return r
 }
 
 // RadioGroup creates a group of radio buttons that reads and writes value.
@@ -213,6 +221,9 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 		handleOf := func(j int) *FocusHandle {
 			if j == stop && w.handle != nil {
 				return w.handle
+			}
+			if j == stop && r.focusHandle != nil {
+				return r.focusHandle
 			}
 			return handles[j]
 		}

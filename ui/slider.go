@@ -129,6 +129,14 @@ type SliderElement struct {
 	format       func(float64) string
 	onChange     func(float64)
 	styles       SliderStyle
+	focusHandle  *FocusHandle // see FocusHandle
+}
+
+// FocusHandle lets code focus the slider (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (s *SliderElement) FocusHandle(h *FocusHandle) *SliderElement {
+	s.focusHandle = h
+	return s
 }
 
 // Slider creates a slider that reads and writes value, from lo to hi in steps of
@@ -284,6 +292,9 @@ func (s *SliderElement) expand(ctx *Context) Element {
 			}
 			track.Cursor(CursorNotAllowed)
 			return root
+		}
+		if s.focusHandle != nil {
+			track.FocusHandle(s.focusHandle)
 		}
 		track.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
 			OnMouseDown(func(e *MouseEvent) {

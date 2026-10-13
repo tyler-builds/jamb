@@ -115,13 +115,21 @@ func resolveSwitch(t *Theme, on, disabled bool, inst SwitchStyle) SwitchStyle {
 // track and a knob, without text: its label is what assistive technology reads,
 // and the text beside it is drawn by the app.
 type SwitchElement struct {
-	label    string
-	on       *Signal[bool]
-	key      string
-	disabled bool
-	onChange func(bool)
-	styles   SwitchStyle
-	size     sizing // the track's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	label       string
+	on          *Signal[bool]
+	key         string
+	disabled    bool
+	onChange    func(bool)
+	styles      SwitchStyle
+	size        sizing       // the track's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	focusHandle *FocusHandle // see FocusHandle
+}
+
+// FocusHandle lets code focus the switch (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (s *SwitchElement) FocusHandle(h *FocusHandle) *SwitchElement {
+	s.focusHandle = h
+	return s
 }
 
 // Switch creates a switch that is on while on is true. label names the switch
@@ -184,6 +192,9 @@ func (s *SwitchElement) expand(ctx *Context) Element {
 		return s.size.apply(d)
 	}
 	d.Hover(st.TrackHover)
+	if s.focusHandle != nil {
+		d.FocusHandle(s.focusHandle)
+	}
 	return s.size.apply(d.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
 		OnClick(func() {
 			s.on.Set(!on)

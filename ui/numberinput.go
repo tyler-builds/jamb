@@ -168,22 +168,30 @@ func resolveNumberInput(t *Theme, placement SpinPlacement, scale float32, disabl
 //
 // Assistive technology reports it as a spin box, which holds the text field.
 type NumberInputElement[T int | float64] struct {
-	value      *Signal[T]
-	lo, hi     T
-	step       T
-	name       string // the accessible name, see Label
-	labelledBy []string
-	key        string
-	disabled   bool
-	spin       bool // set by SpinButtons
-	placement  SpinPlacement
-	align      Alignment // where the text sits in the field (see Align)
-	precision  int       // the decimals of a float, or -1 for the decimals of the step
-	size       sizing    // the frame's sizes, from the sizing methods (see Sizing in docs/styling.md)
-	styles     NumberInputStyle
-	rules      []Validator[T] // the validators of the value (see Validate)
-	wire       fieldWire      // what a Field gives the field (see Field)
-	onChange   func(T)        // see OnChange
+	value       *Signal[T]
+	lo, hi      T
+	step        T
+	name        string // the accessible name, see Label
+	labelledBy  []string
+	key         string
+	disabled    bool
+	spin        bool // set by SpinButtons
+	placement   SpinPlacement
+	align       Alignment // where the text sits in the field (see Align)
+	precision   int       // the decimals of a float, or -1 for the decimals of the step
+	size        sizing    // the frame's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	styles      NumberInputStyle
+	rules       []Validator[T] // the validators of the value (see Validate)
+	wire        fieldWire      // what a Field gives the field (see Field)
+	onChange    func(T)        // see OnChange
+	focusHandle *FocusHandle   // see FocusHandle
+}
+
+// FocusHandle lets code focus the number's text (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (n *NumberInputElement[T]) FocusHandle(h *FocusHandle) *NumberInputElement[T] {
+	n.focusHandle = h
+	return n
 }
 
 // OnChange runs fn with the new value after the user changes it: by typing and
@@ -384,7 +392,7 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 			return n.size.apply(root)
 		}
 
-		fo := fieldOptions{value: draft, name: name, labelledBy: labelledBy,
+		fo := fieldOptions{value: draft, name: name, labelledBy: labelledBy, handle: n.focusHandle,
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, onStep: step,
 			widget: "NumberInput", wire: w, align: n.align}
 		// The invalid frame is drawn thicker and in the danger color (the text color under

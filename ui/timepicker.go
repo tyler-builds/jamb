@@ -136,6 +136,14 @@ type TimePickerElement struct {
 	onChange    func(time.Time)
 	rules       []Validator[time.Time] // the validators of the value (see Validate)
 	wire        fieldWire              // what a Field gives the field (see Field)
+	focusHandle *FocusHandle           // see FocusHandle
+}
+
+// FocusHandle lets code focus the time field (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (p *TimePickerElement) FocusHandle(h *FocusHandle) *TimePickerElement {
+	p.focusHandle = h
+	return p
 }
 
 // TimePicker creates a time picker that reads and writes value, with a list of the times
@@ -282,6 +290,9 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		ls := Local(ctx, "list", &timeList{}).Peek()
 		back := Local(ctx, "back", NewFocusHandle())
 		ret := back.Peek()
+		if p.focusHandle != nil {
+			ret = p.focusHandle
+		}
 		w := p.wire
 		if w.handle != nil {
 			ret = w.handle

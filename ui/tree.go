@@ -144,6 +144,14 @@ type TreeElement struct {
 	styles      TreeStyle
 	renderRow   func(node TreeNode, state PartState) Element
 	renderLabel func(node TreeNode, state PartState) Element
+	focusHandle *FocusHandle // see FocusHandle
+}
+
+// FocusHandle lets code focus the tree (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (tv *TreeElement) FocusHandle(h *FocusHandle) *TreeElement {
+	tv.focusHandle = h
+	return tv
 }
 
 // Tree creates a tree of nodes, with the node whose key equals selected's
@@ -396,6 +404,9 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 			focus := Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}.Merge(st.TreeFocusVisible)
 			c.asPart("Tree.Tree").Role(access.RoleTree).Focusable().FocusVisible(focus).
 				OnKeyDown(keys).OnTextInput(typeahead)
+			if tv.focusHandle != nil {
+				c.FocusHandle(tv.focusHandle)
+			}
 			if tv.name != "" {
 				c.Label(tv.name)
 			}

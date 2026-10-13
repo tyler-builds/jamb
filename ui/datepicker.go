@@ -171,6 +171,14 @@ type DatePickerElement struct {
 	onChange    func(time.Time)
 	rules       []Validator[time.Time] // the validators of the value (see Validate)
 	wire        fieldWire              // what a Field gives the field (see Field)
+	focusHandle *FocusHandle           // see FocusHandle
+}
+
+// FocusHandle lets code focus the date field (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (d *DatePickerElement) FocusHandle(h *FocusHandle) *DatePickerElement {
+	d.focusHandle = h
+	return d
 }
 
 // DatePicker creates a date picker that reads and writes value. The default width is 180 px
@@ -311,6 +319,9 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		focus := Local(ctx, "focus", time.Time{})
 		back := Local(ctx, "back", NewFocusHandle())
 		ret := back.Peek()
+		if d.focusHandle != nil {
+			ret = d.focusHandle
+		}
 		w := d.wire
 		if w.handle != nil {
 			ret = w.handle

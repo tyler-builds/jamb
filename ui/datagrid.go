@@ -361,21 +361,29 @@ func resolveDataGrid(t *Theme, d DataGridDensity, textFactor float32, inst DataG
 // editor is not laid out, but the edit, its text and its focus are kept, and the
 // editor is laid out again when the row comes back (see docs/accessibility.md).
 type DataGridElement[T any] struct {
-	rows       []T
-	key        func(T) string
-	cols       []DataColumn[T]
-	name       string
-	keyStr     string
-	style      Style
-	density    DataGridDensity
-	striped    bool
-	mode       SelectionMode
-	sel        *Signal[[]string]
-	sort       *Signal[SortState]
-	onActivate func(row T)
-	loading    bool
-	empty      Element
-	styles     DataGridStyle
+	rows        []T
+	key         func(T) string
+	cols        []DataColumn[T]
+	name        string
+	keyStr      string
+	style       Style
+	density     DataGridDensity
+	striped     bool
+	mode        SelectionMode
+	sel         *Signal[[]string]
+	sort        *Signal[SortState]
+	onActivate  func(row T)
+	loading     bool
+	empty       Element
+	styles      DataGridStyle
+	focusHandle *FocusHandle // see FocusHandle
+}
+
+// FocusHandle lets code focus the grid (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (g *DataGridElement[T]) FocusHandle(h *FocusHandle) *DataGridElement[T] {
+	g.focusHandle = h
+	return g
 }
 
 // DataGrid creates a table of rows, with a column for each of cols. key gives
@@ -665,6 +673,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	sh.data = rows
 	if sh.focus == nil {
 		sh.focus, sh.editFocus, sh.draft = NewFocusHandle(), NewFocusHandle(), NewSignal("")
+	}
+	if g.focusHandle != nil {
+		sh.focus = g.focusHandle
 	}
 	if sh.dup != "" && !sh.warned && rt.warn != nil {
 		sh.warned = true

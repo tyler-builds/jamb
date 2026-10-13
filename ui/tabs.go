@@ -140,16 +140,24 @@ func resolveTabs(th *Theme, v TabsVariant, inst TabsStyle) TabsStyle {
 // The tabs take the space their parent gives them, as a column does, so the panel
 // can fill a window: a list in a panel grows to the height left under the tabs.
 type TabsElement[T comparable] struct {
-	selected  *Signal[T]
-	tabs      []Tab[T]
-	name      string // the accessible name of the tab list, see Label
-	key       string
-	onChange  func(T)
-	keep      bool // see KeepMounted
-	variant   TabsVariant
-	styles    TabsStyle
-	renderTab func(Tab[T], PartState) Element
-	size      sizing // the tab list's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	selected    *Signal[T]
+	tabs        []Tab[T]
+	name        string // the accessible name of the tab list, see Label
+	key         string
+	onChange    func(T)
+	keep        bool // see KeepMounted
+	variant     TabsVariant
+	styles      TabsStyle
+	renderTab   func(Tab[T], PartState) Element
+	size        sizing       // the tab list's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	focusHandle *FocusHandle // see FocusHandle
+}
+
+// FocusHandle lets code focus the selected tab (the tab Tab reaches) (see NewFocusHandle). A Field that wraps
+// the control gives it its own handle, which takes precedence.
+func (t *TabsElement[T]) FocusHandle(h *FocusHandle) *TabsElement[T] {
+	t.focusHandle = h
+	return t
 }
 
 // Tabs creates a tab list over tabs, showing the panel of the tab that selected
@@ -252,6 +260,9 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		// focus takes keyboard focus to the selected tab, on the frame after a
 		// change. The handle is attached to that tab alone.
 		focus := Local(ctx, "focus", NewFocusHandle()).Peek()
+		if t.focusHandle != nil {
+			focus = t.focusHandle
+		}
 		// choose selects the tab at index i and moves focus to it.
 		choose := func(i int) {
 			if i < 0 || opts[i].Disabled || i == sel {

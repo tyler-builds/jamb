@@ -163,7 +163,7 @@ type ButtonElement struct {
 	toggle   bool   // a toggle button, see AccessChecked
 	checked  bool
 	inert    bool         // set by DropdownMenu: the wrapper is exposed instead (see accessRole)
-	handle   *FocusHandle // set by Modal.Default, so the modal can focus the button
+	handle   *FocusHandle // see FocusHandle; Modal.Default sets one if there is none
 	size     sizing
 }
 
@@ -215,6 +215,10 @@ func (b *ButtonElement) accessName() string {
 	}
 	return b.tooltip
 }
+
+// FocusHandle lets code focus the button (see NewFocusHandle). A modal's
+// Default button keeps the handle it was given.
+func (b *ButtonElement) FocusHandle(h *FocusHandle) *ButtonElement { b.handle = h; return b }
 
 // AccessChecked makes the button a toggle button, such as a pin that is on or off.
 // Assistive technology reports its state, and the button's click handler
