@@ -106,12 +106,12 @@ func brand(t *ui.Theme, focused bool) ui.Element {
 			BackgroundGradient(ui.LinearGradient(135, t.Accent, ui.Hex("#c026d3")).InOklab()).
 			Shadow(ui.Shadow{Y: 2, Blur: 8, Color: t.Accent.Alpha(0.45)}).
 			Child(ui.Icon(icons.Zap).Size(16).Color(ui.Hex("#ffffff")))).
-		Child(ui.Text("Jamb").Size(17).Bold()).
-		Child(ui.Text("v0.1").Size(12).Color(t.TextSubtle))
+		Child(ui.Text("Jamb").FontSize(17).Bold()).
+		Child(ui.Text("v0.1").FontSize(12).TextColor(t.TextSubtle))
 }
 
 func sectionLabel(t *ui.Theme, s string) ui.Element {
-	return ui.Text(s).Size(12).Medium().Color(t.TextSubtle).
+	return ui.Text(s).FontSize(12).Medium().TextColor(t.TextSubtle).
 		Style(ui.Style{Padding: ui.Edges{Top: 14, Left: 10, Bottom: 6}})
 }
 
@@ -127,7 +127,7 @@ func themeSwitch(ctx *ui.Context) ui.Element {
 			}).
 			OnClick(func() { ctx.SetTheme(theme) }).
 			Child(ui.Icon(ic).Size(14)).
-			Child(ui.Text(label).Size(13).Medium())
+			Child(ui.Text(label).FontSize(13).Medium())
 	}
 	return ui.Div().Row().Padding(3).Gap(3).Radius(9).Background(t.SurfaceActive.Alpha(0.6)).MarginBottom(10).
 		SelectionContainer().Label("Theme").
@@ -149,15 +149,15 @@ func userCard(s *Store) ui.Element {
 				Hover(ui.Style{Background: t.SurfaceHover}).
 				OnClick(fn).
 				Child(ui.Icon(ic).Size(15).Color(t.TextMuted)).
-				Child(ui.Text(label).Size(13))
+				Child(ui.Text(label).FontSize(13))
 		}
 		card := ui.Div().Key("user-card").Row().Align(ui.Center).Gap(10).Padding(8).Radius(10).
 			Transition(fast).Hover(ui.Style{Background: t.SurfaceHover}).
 			OnClick(toggle).
 			Child(ui.Image(avatar).Alt("Account avatar").Size(ui.Px(34), ui.Px(34)).Radius(17)).
 			Child(ui.Div().Grow(1).Gap(1).
-				Child(ui.Text("Alex Rivera").Size(13).Semibold().Truncate()).
-				Child(ui.Text("alex@example.com").Size(12).Color(t.TextSubtle).Truncate())).
+				Child(ui.Text("Alex Rivera").FontSize(13).Semibold().Truncate()).
+				Child(ui.Text("alex@example.com").FontSize(12).TextColor(t.TextSubtle).Truncate())).
 			Child(ui.Icon(icons.MoreHorizontal).Size(16).Color(t.TextSubtle))
 		if open.Get() {
 			card.Child(ui.Div().Key("user-menu").Overlay(ui.AboveEnd).Width(ui.Px(200)).Padding(4).
@@ -217,7 +217,7 @@ func titleBar(t *ui.Theme, focused bool, title string) ui.Element {
 	bar := ui.Div().Row().Align(ui.Center).MinHeight(ui.Px(32)).Shrink(0).WindowArea(ui.AreaDrag)
 	if title != "" {
 		bar.Child(ui.Div().Grow(1).MinWidth(ui.Px(0)).PaddingX(12).Opacity(focusOpacity(focused)).
-			Child(ui.Text(title).Size(12).Medium().Color(t.TextSubtle).Truncate()))
+			Child(ui.Text(title).FontSize(12).Medium().TextColor(t.TextSubtle).Truncate()))
 	} else {
 		bar.Child(ui.Div().Grow(1))
 	}
@@ -239,7 +239,7 @@ func header(ctx *ui.Context, s *Store, page Page, focused bool) ui.Element {
 	return ui.Div().Row().Wrap().MinHeight(ui.Px(60)).Shrink(0).Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(24).Gap(16).
 		WindowArea(ui.AreaDrag).
 		Child(ui.Div().Row().Align(ui.Center).Gap(8).MinWidth(ui.Px(0)).Opacity(focusOpacity(focused)).
-			Child(ui.Text("Workspace").Color(t.TextSubtle).Truncate()). // gives way first when narrow
+			Child(ui.Text("Workspace").TextColor(t.TextSubtle).Truncate()). // gives way first when narrow
 			Child(ui.Icon(icons.ChevronRight).Size(14).Color(t.TextSubtle)).
 			Child(ui.Text(pageTitles[page]).Medium().Truncate())).
 		Child(ui.Div().Row().Align(ui.Center).Gap(8).Wrap().

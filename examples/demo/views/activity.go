@@ -154,7 +154,7 @@ func Activity(s *Store) ui.Element {
 				Child(ui.TextInput(s.EventQuery).Label("Filter events").Placeholder("Filter events").Icon(icons.Search).
 					Style(ui.Style{Width: ui.Px(260), MinWidth: ui.Px(140)}).
 					OnChange(func(q string) { s.announceQuiet(eventCountText(len(s.matchingEvents(q)), q)) })).
-				Child(ui.Text(count).Size(12).Color(t.TextMuted).NoWrap())).
+				Child(ui.Text(count).FontSize(12).TextColor(t.TextMuted).NoWrap())).
 			Child(ui.Div().Row().Align(ui.Center).Gap(8).Wrap().
 				Child(ui.Button("Jump to top").Icon(icons.ChevronUp).Secondary().Small().Key("jump-top").
 					OnClick(func() { s.activity.ScrollToItem(0) })).
@@ -171,8 +171,8 @@ func Activity(s *Store) ui.Element {
 		}
 		return ui.Div().Grow(1).MinHeight(ui.Px(0)).PaddingX(32).PaddingY(28).Gap(20).
 			Child(ui.Div().Gap(4).Shrink(0).
-				Child(ui.Div().Heading(1).Child(ui.Text("Activity").Size(26).Semibold())).
-				Child(ui.Textf("%s events from %d people", thousands(len(events)), len(people)).Color(t.TextMuted))).
+				Child(ui.Div().Heading(1).Child(ui.Text("Activity").FontSize(26).Semibold())).
+				Child(ui.Textf("%s events from %d people", thousands(len(events)), len(people)).TextColor(t.TextMuted))).
 			Child(toolbar).
 			Child(Card(t).MaxWidth(ui.Px(900)).Grow(1).MinHeight(ui.Px(0)).Gap(0).Padding(6).Child(body))
 	})
@@ -215,12 +215,12 @@ func eventRow(t *ui.Theme, s *Store, e event, compact, open bool, query string) 
 	).HighlightMatches(query, hl).Grow(1).Truncate()
 	text := ui.Div().Grow(1).MinWidth(ui.Px(0)).Gap(4).Child(header)
 	if e.body != "" {
-		text.Child(ui.Text(e.body).Size(13).Color(t.TextMuted).MaxLines(6).HighlightMatches(query, hl))
+		text.Child(ui.Text(e.body).FontSize(13).TextColor(t.TextMuted).MaxLines(6).HighlightMatches(query, hl))
 	}
 	if e.kind == buildEvent && open {
 		details := ui.Div().Key(fmt.Sprintf("details-%d", e.id)).Gap(2).PaddingY(2)
 		for _, line := range e.details {
-			details.Child(ui.Text(line).Size(12).Mono().Color(t.TextMuted))
+			details.Child(ui.Text(line).FontSize(12).Mono().TextColor(t.TextMuted))
 		}
 		text.Child(details)
 	}
@@ -240,15 +240,15 @@ func eventRow(t *ui.Theme, s *Store, e event, compact, open bool, query string) 
 			OnClick(func() { s.ToggleExpanded(e.id) }).
 			Child(ui.Icon(chevron).Size(14).Color(t.TextSubtle).Style(ui.Style{Margin: ui.Edges{Top: 2}}))
 	}
-	row.Child(ui.Text(when).Size(12).Color(t.TextSubtle).NoWrap())
+	row.Child(ui.Text(when).FontSize(12).TextColor(t.TextSubtle).NoWrap())
 	return ui.Div().Child(row).Child(ui.Div().Height(ui.Px(1)).MarginX(12).Background(t.Border.Alpha(0.6)))
 }
 
 // noEvents is the empty state of the timeline, with a button to clear the filter.
 func noEvents(t *ui.Theme, s *Store) ui.Element {
 	return ui.Div().Key("no-events").Grow(1).Padding(48).Gap(10).Align(ui.Center).Justify(ui.Center).
-		Child(ui.Text("No events match").Size(15).Semibold()).
-		Child(ui.Text("Try a different filter.").Color(t.TextMuted)).
+		Child(ui.Text("No events match").FontSize(15).Semibold()).
+		Child(ui.Text("Try a different filter.").TextColor(t.TextMuted)).
 		Child(ui.Button("Clear filter").Secondary().Small().Style(ui.Style{Margin: ui.Edges{Top: 6}}).
 			OnClick(func() { s.EventQuery.Set("") }))
 }

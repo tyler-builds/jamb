@@ -31,7 +31,7 @@ func navigationSection() ui.Element {
 					return ui.Div().Column().Gap(8).Children(
 						panelText(t, "Alpha panel"),
 						ui.TextInput(note).Label("Note").Placeholder("Type a note").Width(ui.Full),
-						ui.Text("Text typed here is kept when another tab is selected.").Size(11).Color(t.TextSubtle),
+						ui.Text("Text typed here is kept when another tab is selected.").FontSize(11).TextColor(t.TextSubtle),
 					)
 				}},
 				ui.Tab[string]{Value: "beta", Label: "Beta", Panel: func() ui.Element { return panelText(t, "Beta panel") }},
@@ -64,14 +64,14 @@ func navigationSection() ui.Element {
 		col.Children(samples...)
 		return Card(t).Gap(14).
 			Child(SectionTitle(t, "Navigation and layout")).
-			Child(ui.Text("Tab moves to the selected tab. Left and Right select the neighbouring tabs; Ctrl+Tab goes to the next tab from the tab list or the panel.").Size(12).Color(t.TextMuted)).
+			Child(ui.Text("Tab moves to the selected tab. Left and Right select the neighbouring tabs; Ctrl+Tab goes to the next tab from the tab list or the panel.").FontSize(12).TextColor(t.TextMuted)).
 			Child(col)
 	})
 }
 
 // panelText is the content of a sample panel.
 func panelText(t *ui.Theme, s string) ui.Element {
-	return ui.Text(s).Color(t.TextMuted)
+	return ui.Text(s).TextColor(t.TextMuted)
 }
 
 // projectFiles is a small file tree with a folder that has nested folders, to show

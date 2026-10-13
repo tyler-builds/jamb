@@ -9,7 +9,7 @@ Direct3D 11 renderer reached through COM vtables.
 func (v *ProjectsView) Render(ctx *ui.Context) ui.Element {
     t := ctx.Theme()
     return ui.Div().Row().Height(ui.Px(52)).Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(16).
-        Child(ui.Text("Projects").Size(22).Bold()).
+        Child(ui.Text("Projects").FontSize(22).Bold()).
         Child(ui.Button("New Project").Icon(icons.Plus).OnClick(v.createProject)).
         Background(t.Surface)
 }
@@ -190,7 +190,7 @@ ui.Div()                       // flex container; children stack vertically by d
   .Tooltip("Save")             // label below after 500 ms of hover; Button has .Tooltip too
   .Key("stable-id").Child(el).Children(els...)
 
-ui.Text("hi").Size(15).Semibold().Italic().Color(c).Truncate().MaxLines(2).Align(ui.Center)
+ui.Text("hi").FontSize(15).Semibold().Italic().TextColor(c).Truncate().MaxLines(2).Align(ui.Center)
 ui.Textf("Count: %d", n)
 ui.Icon(icons.Folder).Size(16).Color(c)          // color defaults to the inherited text color
                                                  // icons.All lists every icon; see the icon list below

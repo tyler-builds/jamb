@@ -27,8 +27,8 @@ func Settings(s *Store) ui.Element {
 		return ui.Div().Grow(1).ScrollY().
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(760)).
 				Child(ui.Div().Gap(4).
-					Child(ui.Div().Heading(1).Child(ui.Text("Settings").Size(26).Semibold())).
-					Child(ui.Text("Preferences are plain signals; switches and sliders re-render only this page.").Color(t.TextMuted))).
+					Child(ui.Div().Heading(1).Child(ui.Text("Settings").FontSize(26).Semibold())).
+					Child(ui.Text("Preferences are plain signals; switches and sliders re-render only this page.").TextColor(t.TextMuted))).
 				Child(ui.Tabs(tab,
 					ui.Tab[string]{Value: "appearance", Label: "Appearance", Panel: func() ui.Element {
 						return Card(t).Gap(14).
@@ -73,16 +73,16 @@ func shortcuts(ctx *ui.Context) ui.Element {
 	t := ctx.Theme()
 	card := Card(t).Gap(10).
 		Child(SectionTitle(t, "Keyboard shortcuts")).
-		Child(ui.Text("The shortcuts work on every page.").Size(13).Color(t.TextMuted))
+		Child(ui.Text("The shortcuts work on every page.").FontSize(13).TextColor(t.TextMuted))
 	for _, a := range shortcutActions {
 		keys := ctx.KeysFor(a)
 		if keys == "" {
 			continue
 		}
 		card.Child(ui.Divider()).Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(16).PaddingY(4).
-			Child(ui.Text(a.Label()).Size(13)).
+			Child(ui.Text(a.Label()).FontSize(13)).
 			Child(ui.Div().PaddingX(8).Height(ui.Px(22)).Radius(5).Center().Background(t.SurfaceActive).
-				Child(ui.Text(keys).Size(12).Mono().Color(t.TextMuted).NoWrap())))
+				Child(ui.Text(keys).FontSize(12).Mono().TextColor(t.TextMuted).NoWrap())))
 	}
 	return card
 }

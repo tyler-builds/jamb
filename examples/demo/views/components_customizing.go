@@ -94,9 +94,9 @@ func customizingSection() ui.Element {
 		return Card(t).Gap(14).
 			Child(SectionTitle(t, "Customizing")).
 			Child(ui.Text("Each part of a built-in widget can be styled: set it for the app in the theme, change it on one instance, or pick a variant. A render slot draws the content of one part. The widget keeps its keys, focus, selection and accessible names. Under high contrast the colors are the system colors, and sizes still apply.").
-				Size(12).Color(t.TextMuted)).
+				FontSize(12).TextColor(t.TextMuted)).
 			Child(ui.Div().Row().Wrap().Gap(22).Align(ui.Start).Children(samples...)).
 			Child(ui.Text("A tab's accessible name is its label, so put in the label what a user must hear, such as a count.").
-				Size(12).Color(t.TextMuted))
+				FontSize(12).TextColor(t.TextMuted))
 	})
 }

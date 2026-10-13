@@ -45,8 +45,8 @@ func Projects(s *Store) ui.Element {
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(1100)).
 				Child(ui.Div().Row().Align(ui.End).Justify(ui.SpaceBetween).Gap(16).Wrap().
 					Child(ui.Div().Gap(4).
-						Child(ui.Div().Heading(1).Child(ui.Text("Projects").Size(26).Semibold())).
-						Child(ui.Textf("%d projects · %d active", len(all), active).Color(t.TextMuted))).
+						Child(ui.Div().Heading(1).Child(ui.Text("Projects").FontSize(26).Semibold())).
+						Child(ui.Textf("%d projects · %d active", len(all), active).TextColor(t.TextMuted))).
 					Child(ui.Div().Row().Align(ui.Center).Gap(12).Wrap().
 						Child(projectsViewTabs(view)).
 						Child(filters(t, s)))).
@@ -82,7 +82,7 @@ func filters(t *ui.Theme, s *Store) ui.Element {
 func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Element {
 	q := s.Query.Peek()
 	titles := ui.Div().Row().Align(ui.Center).Gap(10).
-		Child(ui.Text(p.Name).Size(15).Semibold().Truncate().HighlightMatches(q, matchHighlight(t))).
+		Child(ui.Text(p.Name).FontSize(15).Semibold().Truncate().HighlightMatches(q, matchHighlight(t))).
 		Child(statusBadge(p.Status))
 	if open {
 		titles.Child(ui.BadgeText("Open in window").Variant(ui.BadgeAccent).Dot())
@@ -122,19 +122,19 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 		Child(IconTile(t, p.Icon, p.Color, 44)).
 		Child(ui.Div().Grow(1).Gap(6).
 			Child(titles).
-			Child(ui.Text(p.Description).Size(13).Color(t.TextMuted).Truncate().HighlightMatches(q, matchHighlight(t))).
+			Child(ui.Text(p.Description).FontSize(13).TextColor(t.TextMuted).Truncate().HighlightMatches(q, matchHighlight(t))).
 			Child(ui.Div().Row().Align(ui.Center).Gap(12).Wrap().MarginTop(4).
 				Child(ui.ProgressBar(float64(p.Progress)).Color(progressColor(t, p.Color)).Label(p.Name + " progress").MaxWidth(ui.Px(336))).
 				Child(ui.Div().Row().Align(ui.Center).Gap(5).TextColor(t.TextSubtle).
 					Child(ui.Icon(icons.Check).Size(13)).
-					Child(ui.Textf("%d open tasks", p.Tasks).Size(12))))).
+					Child(ui.Textf("%d open tasks", p.Tasks).FontSize(12))))).
 		Child(ui.Div().Align(ui.End).Gap(8).Shrink(0).
 			Child(ui.Div().Row().Align(ui.Center).Gap(4).
 				Child(ui.IconButton(icons.ArrowUpRight).Label("Open in window").Tooltip("Open in window").OnClick(func() { OpenProject(s, p.ID) })).
 				Child(star)).
 			Child(ui.Div().Row().Align(ui.Center).Gap(5).TextColor(t.TextSubtle).
 				Child(ui.Icon(icons.Clock).Size(13)).
-				Child(ui.Text("Updated " + ago(p.Updated)).Size(12).NoWrap())))
+				Child(ui.Text("Updated " + ago(p.Updated)).FontSize(12).NoWrap())))
 
 	// The insertion line is drawn in the gap on the side the drop would land.
 	if mark := s.DropMark.Get(); mark.ID == p.ID {
@@ -175,7 +175,7 @@ func projectPreview(t *ui.Theme, p Project) ui.Element {
 	return ui.Div().Row().Align(ui.Center).Gap(8).PaddingX(10).PaddingY(6).Radius(10).
 		Background(t.Surface).Border(1, t.Accent).Shadow(ui.ShadowMd).
 		Child(IconTile(t, p.Icon, p.Color, 22)).
-		Child(ui.Text(p.Name).Size(13).Semibold().NoWrap())
+		Child(ui.Text(p.Name).FontSize(13).Semibold().NoWrap())
 }
 
 func starColor(t *ui.Theme, on bool) ui.Color {
@@ -188,8 +188,8 @@ func starColor(t *ui.Theme, on bool) ui.Color {
 func emptyState(t *ui.Theme, s *Store) ui.Element {
 	return ui.Div().Padding(48).Gap(10).Align(ui.Center).Radius(12).Border(1, t.Border).
 		Child(IconTile(t, icons.Search, t.TextMuted, 48)).
-		Child(ui.Text("No projects match").Size(15).Semibold()).
-		Child(ui.Text("Try a different search or filter.").Color(t.TextMuted)).
+		Child(ui.Text("No projects match").FontSize(15).Semibold()).
+		Child(ui.Text("Try a different search or filter.").TextColor(t.TextMuted)).
 		Child(ui.Button("Clear filters").Secondary().Small().Style(ui.Style{Margin: ui.Edges{Top: 6}}).OnClick(func() {
 			s.Query.Set("")
 			s.Filter.Set(-1)

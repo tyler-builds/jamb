@@ -181,7 +181,7 @@ func dataGridSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 		Child(ui.Text("100,000 deploy runs. Click a header to sort, drag its edge to resize, and select rows with Ctrl or Shift. " +
 			"Enter opens the focused row. In the Actions column, Enter or F2 reaches the Retry of a failed run. " +
 			"In the Label column, Enter, F2 or typing edits the label, which is at most 40 characters. " +
-			"In the Status column, Enter or F2 opens a choice of status.").Size(13).Color(t.TextMuted)).
+			"In the Status column, Enter or F2 opens a choice of status.").FontSize(13).TextColor(t.TextMuted)).
 		Child(ui.Div().Row().Wrap().Align(ui.Center).Gap(18).
 			Child(ui.Tabs(density,
 				ui.Tab[int]{Value: 0, Label: "Comfortable"},
@@ -189,6 +189,6 @@ func dataGridSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 			).Key("runs-density").Label("Row density").Variant(ui.TabsSegmented)).
 			Child(ui.Checkbox("Striped", striped).Key("runs-striped")).
 			Child(ui.Checkbox("No rows", none).Key("runs-none")).
-			Child(ui.Text(fmt.Sprintf("%d selected", len(picked.Get()))).Size(13).Color(t.TextMuted))).
+			Child(ui.Text(fmt.Sprintf("%d selected", len(picked.Get()))).FontSize(13).TextColor(t.TextMuted))).
 		Child(grid)
 }

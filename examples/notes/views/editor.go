@@ -22,8 +22,8 @@ func (a *App) editorPane() ui.Element {
 		if n == nil {
 			return pane.Center().Gap(12).
 				Child(ui.Icon(icons.Layers).Size(40).Color(t.TextSubtle)).
-				Child(ui.Text("No note selected").Size(16).Semibold()).
-				Child(ui.Text("Create one with Ctrl+N.").Color(t.TextMuted)).
+				Child(ui.Text("No note selected").FontSize(16).Semibold()).
+				Child(ui.Text("Create one with Ctrl+N.").TextColor(t.TextMuted)).
 				Child(ui.Button("New note").Icon(icons.Plus).OnClick(a.newNote))
 		}
 		// Keyed by note: each note gets its own editor state (caret, undo).
@@ -36,11 +36,11 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 		t := ctx.Theme()
 		confirming := a.confirm.Get() == n.ID
 		bar := ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).PaddingX(16).MinHeight(ui.Px(56)).Shrink(0).
-			Child(ui.Text("Edited " + relative(n.Updated.Get())).Size(13).Color(t.TextSubtle).Truncate())
+			Child(ui.Text("Edited " + relative(n.Updated.Get())).FontSize(13).TextColor(t.TextSubtle).Truncate())
 		actions := ui.Div().Row().Align(ui.Center).Gap(4)
 		if confirming {
 			actions.
-				Child(ui.Text("Delete this note?").Size(13).Color(t.TextMuted).NoWrap()).
+				Child(ui.Text("Delete this note?").FontSize(13).TextColor(t.TextMuted).NoWrap()).
 				Child(ui.Button("Cancel").Key("confirm-cancel").Ghost().Small().OnClick(func() { a.confirm.Set("") })).
 				Child(ui.Button("Delete").Key("confirm-delete").Danger().Small().Icon(icons.Trash).OnClick(func() {
 					a.confirm.Set("")
@@ -108,9 +108,9 @@ func (a *App) meta(n *store.Note) ui.Element {
 		body := n.Body.Get()
 		words := len(strings.FieldsFunc(body, func(r rune) bool { return unicode.IsSpace(r) }))
 		return ui.Div().Row().Gap(14).
-			Child(ui.Text("Created " + n.Created.Format("Jan 2, 2006")).Size(12).Color(t.TextSubtle)).
-			Child(ui.Textf("%s words", commas(words)).Size(12).Color(t.TextSubtle)).
-			Child(ui.Textf("%s characters", commas(len([]rune(body)))).Size(12).Color(t.TextSubtle))
+			Child(ui.Text("Created " + n.Created.Format("Jan 2, 2006")).FontSize(12).TextColor(t.TextSubtle)).
+			Child(ui.Textf("%s words", commas(words)).FontSize(12).TextColor(t.TextSubtle)).
+			Child(ui.Textf("%s characters", commas(len([]rune(body)))).FontSize(12).TextColor(t.TextSubtle))
 	})
 }
 

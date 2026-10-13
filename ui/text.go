@@ -44,8 +44,8 @@ func (t *TextElement) elementKey() string { return t.key }
 // Key gives the element a stable identity among its siblings.
 func (t *TextElement) Key(k string) *TextElement { t.key = k; return t }
 
-// Size sets the font size in logical pixels.
-func (t *TextElement) Size(px float32) *TextElement { t.style.FontSize = px; return t }
+// FontSize sets the font size in logical pixels.
+func (t *TextElement) FontSize(px float32) *TextElement { t.style.FontSize = px; return t }
 
 // Weight sets the font weight.
 func (t *TextElement) Weight(w FontWeight) *TextElement { t.style.FontWeight = w; return t }
@@ -55,8 +55,8 @@ func (t *TextElement) Medium() *TextElement   { return t.Weight(FontMedium) }
 func (t *TextElement) Semibold() *TextElement { return t.Weight(FontSemibold) }
 func (t *TextElement) Bold() *TextElement     { return t.Weight(FontBold) }
 
-// Color sets the text color.
-func (t *TextElement) Color(c Color) *TextElement { t.style.TextColor = c; return t }
+// TextColor sets the text color.
+func (t *TextElement) TextColor(c Color) *TextElement { t.style.TextColor = c; return t }
 
 // Italic sets the whole text in the italic face (upright when the family has none).
 func (t *TextElement) Italic() *TextElement { t.italic = true; return t }

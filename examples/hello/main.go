@@ -20,7 +20,7 @@ func main() {
 		Root: func(ctx *ui.Context) ui.Element {
 			t := ctx.Theme()
 			return ui.Div().Column().Center().Gap(24).Background(t.Background).
-				Child(ui.Text("Hello, world!").Size(24).Color(t.Text)).
+				Child(ui.Text("Hello, world!").FontSize(24).TextColor(t.Text)).
 				Child(ui.Button(fmt.Sprintf("Clicked %d times", clicks.Get())).
 					OnClick(func() { clicks.Update(func(n int) int { return n + 1 }) }))
 		},

@@ -37,7 +37,7 @@ func widestWord(rt *Runtime, n *node) float32 {
 // rule it shrank to the width of its widest letter.
 func TestRowTextKeepsItsWordsWhenShrinking(t *testing.T) {
 	for _, scale := range []int{100, 150, 225} {
-		rt, n := shrinkRow(scale, 96, Text("18 open tasks").Size(12).Key("label"))
+		rt, n := shrinkRow(scale, 96, Text("18 open tasks").FontSize(12).Key("label"))
 		if n == nil {
 			t.Fatal("label not found")
 		}
@@ -57,7 +57,7 @@ func TestWordWiderThanItsRowBreaksInsideTheWord(t *testing.T) {
 	const url = "https://example.invalid/projects/0123456789abcdef0123456789abcdef0123456789abcdef"
 	rt := newTestRuntime(func(ctx *Context) Element {
 		return Div().Child(Div().Width(Px(96)).Row().
-			Child(Text(url).Size(12).Key("label")))
+			Child(Text(url).FontSize(12).Key("label")))
 	}, 400, 300, 1)
 	rt.Frame(time.Now())
 	r, ok := rt.Find("label")
@@ -76,7 +76,7 @@ func TestWordWiderThanItsRowBreaksInsideTheWord(t *testing.T) {
 // Truncate keeps one line with an ellipsis: it opts out of the minimum, so it may
 // shrink below its widest word.
 func TestTruncateOptsOutOfTheMinimum(t *testing.T) {
-	rt, n := shrinkRow(100, 60, Text("18 open tasks").Size(12).Truncate().Key("label"))
+	rt, n := shrinkRow(100, 60, Text("18 open tasks").FontSize(12).Truncate().Key("label"))
 	if n == nil {
 		t.Fatal("label not found")
 	}
@@ -88,7 +88,7 @@ func TestTruncateOptsOutOfTheMinimum(t *testing.T) {
 
 // NoWrap is one line: it keeps its full width rather than shrink into its words.
 func TestNoWrapKeepsItsFullWidth(t *testing.T) {
-	rt, n := shrinkRow(100, 96, Text("18 open tasks").Size(12).NoWrap().Key("label"))
+	rt, n := shrinkRow(100, 96, Text("18 open tasks").FontSize(12).NoWrap().Key("label"))
 	if n == nil {
 		t.Fatal("label not found")
 	}
@@ -101,7 +101,7 @@ func TestNoWrapKeepsItsFullWidth(t *testing.T) {
 
 // An explicit MinWidth replaces the automatic minimum.
 func TestExplicitMinWidthOptsOutOfTheMinimum(t *testing.T) {
-	rt, n := shrinkRow(100, 60, Text("18 open tasks").Size(12).Style(Style{MinWidth: Px(0)}).Key("label"))
+	rt, n := shrinkRow(100, 60, Text("18 open tasks").FontSize(12).Style(Style{MinWidth: Px(0)}).Key("label"))
 	if n == nil {
 		t.Fatal("label not found")
 	}
@@ -113,7 +113,7 @@ func TestExplicitMinWidthOptsOutOfTheMinimum(t *testing.T) {
 
 // A rich text takes the minimum of its spans, so its words stay whole too.
 func TestRichTextKeepsItsWordsWhenShrinking(t *testing.T) {
-	rt, n := shrinkRow(225, 96, Rich(Seg("18 "), Seg("open tasks").Bold()).Size(12).Key("label"))
+	rt, n := shrinkRow(225, 96, Rich(Seg("18 "), Seg("open tasks").Bold()).FontSize(12).Key("label"))
 	if n == nil {
 		t.Fatal("label not found")
 	}
@@ -134,7 +134,7 @@ func BenchmarkShrinkingTextRows(b *testing.B) {
 				Child(Div().Width(Px(60)).MinWidth(Px(0)).Height(Px(20))).
 				Child(Div().Row().Align(Center).Gap(5).
 					Child(Icon(icons.Check).Size(13)).
-					Child(Text("18 open tasks in a shrinking row").Size(12))))
+					Child(Text("18 open tasks in a shrinking row").FontSize(12))))
 		}
 		return list
 	}, 300, 300, 1)

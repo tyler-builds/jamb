@@ -53,26 +53,26 @@ func welcome(t *ui.Theme, highContrast bool) ui.Element {
 	if highContrast {
 		return ui.Div().Height(ui.Px(150)).Radius(14).Padding(28).Justify(ui.Center).Gap(6).
 			Background(t.Surface).Border(1, t.Border).
-			Child(ui.Text("Welcome back, Alex").Size(26).Bold().Color(t.Text)).
-			Child(ui.Text("Three projects moved forward today. The renderer is idle at 0% CPU.").Color(t.Text))
+			Child(ui.Text("Welcome back, Alex").FontSize(26).Bold().TextColor(t.Text)).
+			Child(ui.Text("Three projects moved forward today. The renderer is idle at 0% CPU.").TextColor(t.Text))
 	}
 	return ui.Div().Height(ui.Px(150)).Radius(14).ClipContent().Shadow(ui.ShadowMd).
 		Child(ui.Image(banner).Alt("Project banner").Size(ui.Full, ui.Full)).
 		Child(ui.Div().Inset(0).Padding(28).Justify(ui.Center).Gap(6).
 			Background(ui.Color{A: 0.12}).
-			Child(ui.Text("Welcome back, Alex").Size(26).Bold().Color(ui.Hex("#ffffff"))).
+			Child(ui.Text("Welcome back, Alex").FontSize(26).Bold().TextColor(ui.Hex("#ffffff"))).
 			Child(ui.Text("Three projects moved forward today. The renderer is idle at 0% CPU.").
-				Color(ui.Hex("#ffffffd9"))))
+				TextColor(ui.Hex("#ffffffd9"))))
 }
 
 func stat(t *ui.Theme, ic *icons.Icon, label string, value *ui.TextElement, hint string, c ui.Color) ui.Element {
 	return Card(t).Grow(1).Basis(ui.Px(0)).
 		// The icon moves below the label when the tile is too narrow for both.
 		Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).Wrap().
-			Child(ui.Text(label).Size(13).Medium().Color(t.TextMuted)).
+			Child(ui.Text(label).FontSize(13).Medium().TextColor(t.TextMuted)).
 			Child(IconTile(t, ic, c, 30))).
-		Child(value.Size(28).Semibold()).
-		Child(ui.Text(hint).Size(12).Color(t.TextSubtle))
+		Child(value.FontSize(28).Semibold()).
+		Child(ui.Text(hint).FontSize(12).TextColor(t.TextSubtle))
 }
 
 // chart's bars grow from the baseline when the page is first shown. The
@@ -83,7 +83,7 @@ func chart(t *ui.Theme) *ui.DivElement {
 		Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).
 			Child(ui.Div().Gap(2).
 				Child(SectionTitle(t, "Weekly activity")).
-				Child(ui.Text("Commits per day, last two weeks").Size(12).Color(t.TextSubtle))).
+				Child(ui.Text("Commits per day, last two weeks").FontSize(12).TextColor(t.TextSubtle))).
 			Child(ui.BadgeText("+18%").Variant(ui.BadgeSuccess).Dot())).
 		Child(ui.Animate("weekly-bars", grow, func(p float32) ui.Element {
 			bars := ui.Div().Row().Align(ui.End).Gap(8).Height(ui.Px(150))
@@ -111,8 +111,8 @@ func DeployCounter(s *Store) ui.Element {
 		return Card(t).Grow(1).Basis(ui.Px(0)).MinWidth(ui.Px(210)).Justify(ui.SpaceBetween).
 			Child(ui.Div().Gap(2).
 				Child(SectionTitle(t, "Deploys this week")).
-				Child(ui.Text("A reactive counter backed by a signal").Size(12).Color(t.TextSubtle))).
-			Child(ui.Textf("%d", n).Size(44).Bold()).
+				Child(ui.Text("A reactive counter backed by a signal").FontSize(12).TextColor(t.TextSubtle))).
+			Child(ui.Textf("%d", n).FontSize(44).Bold()).
 			Child(ui.Div().Row().Gap(8).
 				Child(ui.Button("Deploy").Icon(icons.ArrowUpRight).OnClick(func() { s.Deploys.Set(s.Deploys.Peek() + 1) })).
 				Child(ui.Button("Reset").Secondary().OnClick(func() { s.Deploys.Set(0) })))

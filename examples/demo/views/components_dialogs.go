@@ -75,8 +75,8 @@ func dialogsSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 				}
 				result.Set(fmt.Sprintf("The clipboard holds %d characters of text.", utf8.RuneCountInString(text)))
 			}))),
-		sample(t, "Result", ui.Div().MaxWidth(ui.Px(560)).Child(ui.Text(result.Get()).Size(13).Color(t.TextMuted))),
-		ui.If(s.SampleResult.Get() != "", sample(t, "Modal form result", ui.Text(s.SampleResult.Get()).Size(13).Color(t.TextMuted))),
+		sample(t, "Result", ui.Div().MaxWidth(ui.Px(560)).Child(ui.Text(result.Get()).FontSize(13).TextColor(t.TextMuted))),
+		ui.If(s.SampleResult.Get() != "", sample(t, "Modal form result", ui.Text(s.SampleResult.Get()).FontSize(13).TextColor(t.TextMuted))),
 	)
 }
 

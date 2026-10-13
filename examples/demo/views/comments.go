@@ -141,13 +141,13 @@ func Comments(s *Store, id int, h *ui.ListHandle) ui.Element {
 			Child(ui.Div().Row().Align(ui.Center).Gap(8).
 				Child(ui.Icon(icons.Inbox).Size(15).Color(t.TextMuted)).
 				Child(SectionTitle(t, "Comments")).
-				Child(ui.Text(fmt.Sprintf("%d", len(thread))).Size(12).Color(t.TextSubtle))).
+				Child(ui.Text(fmt.Sprintf("%d", len(thread))).FontSize(12).TextColor(t.TextSubtle))).
 			Child(Card(t).Padding(12).Grow(1).MinHeight(ui.Px(0)).Gap(0).Child(body))
 		if s.Typing.Get() == id {
 			// A busy ring, not a counter: the reply has no known time.
 			column.Child(ui.Div().Row().Align(ui.Center).Gap(8).
 				Child(ui.ProgressRing().Size(ui.RingSmall).Label(teammate + " is typing")).
-				Child(ui.Text(teammate + " is typing…").Size(12).Color(t.TextMuted)))
+				Child(ui.Text(teammate + " is typing…").FontSize(12).TextColor(t.TextMuted)))
 		}
 		return column.Child(ui.TextInput(draft).Label("Comment").Placeholder("Write a comment and press Enter").
 			Width(ui.Full).OnSubmit(send).Key("composer"))
@@ -168,9 +168,9 @@ func messageRow(t *ui.Theme, m Message) ui.Element {
 		bubble.Background(t.AccentSoft).Border(1, edge)
 	}
 	bubble.Child(ui.Div().Row().Align(ui.Center).Gap(8).
-		Child(ui.Text(m.Author).Size(12).Semibold().Color(t.TextMuted)).
-		Child(ui.Text(ago(m.At)).Size(11).Color(t.TextSubtle))).
-		Child(ui.Text(m.Body).Size(13))
+		Child(ui.Text(m.Author).FontSize(12).Semibold().TextColor(t.TextMuted)).
+		Child(ui.Text(ago(m.At)).FontSize(11).TextColor(t.TextSubtle))).
+		Child(ui.Text(m.Body).FontSize(13))
 	row := ui.Div().Row().PaddingY(5)
 	if mine {
 		row.Justify(ui.End)

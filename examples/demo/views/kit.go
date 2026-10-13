@@ -19,7 +19,7 @@ func Card(t *ui.Theme) *ui.DivElement {
 
 // SectionTitle is a small heading above a group of content.
 func SectionTitle(t *ui.Theme, title string) *ui.DivElement {
-	return ui.Div().Heading(2).Child(ui.Text(title).Size(15).Semibold().Color(t.Text))
+	return ui.Div().Heading(2).Child(ui.Text(title).FontSize(15).Semibold().TextColor(t.Text))
 }
 
 // settingLabel is the key of a setting's title. The setting's control is
@@ -68,7 +68,7 @@ func SettingRow(t *ui.Theme, title, desc string, control ui.Element) ui.Element 
 	return ui.Div().Row().Align(ui.Center).Gap(16).PaddingY(4).
 		Child(ui.Div().Grow(1).Gap(3).
 			Child(ui.Text(title).Medium().Key(settingLabel(title))).
-			Child(ui.Text(desc).Size(13).Color(t.TextMuted))).
+			Child(ui.Text(desc).FontSize(13).TextColor(t.TextMuted))).
 		Child(control)
 }
 

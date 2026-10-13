@@ -60,6 +60,6 @@ func sampleModal(s *Store) ui.Element {
 // labeledField is a field with its label above it.
 func labeledField(t *ui.Theme, label string, field ui.Element) ui.Element {
 	return ui.Div().Column().Gap(6).
-		Child(ui.Text(label).Size(12).Medium().Color(t.TextMuted).Key(fieldLabel(label))).
+		Child(ui.Text(label).FontSize(12).Medium().TextColor(t.TextMuted).Key(fieldLabel(label))).
 		Child(field)
 }

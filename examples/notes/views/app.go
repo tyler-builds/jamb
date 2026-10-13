@@ -263,7 +263,7 @@ func (a *App) sidebar() ui.Element {
 				msg = "No notes match"
 			}
 			list = ui.Div().Grow(1).Child(ui.Div().Padding(24).Align(ui.Center).
-				Child(ui.Text(msg).Color(t.TextMuted)))
+				Child(ui.Text(msg).TextColor(t.TextMuted)))
 		} else {
 			list = ui.ListOf(entries, sidebarKey, func(e sidebarEntry) ui.Element {
 				if e.note == nil {
@@ -290,7 +290,7 @@ func (a *App) sidebar() ui.Element {
 				Child(ui.Div().Row().Align(ui.Center).Gap(10).
 					Child(ui.Div().Size(ui.Px(26), ui.Px(26)).Radius(7).Background(t.Accent).Center().
 						Child(ui.Icon(icons.Layers).Size(15).Color(ui.Hex("#ffffff")))).
-					Child(ui.Div().Heading(1).Child(ui.Text("Notes").Size(17).Bold()))).
+					Child(ui.Div().Heading(1).Child(ui.Text("Notes").FontSize(17).Bold()))).
 				Child(ui.IconButton(icons.Plus).Label("New note").Tooltip("New note (" + ctx.KeysFor(NewNote) + ")").OnClick(a.newNote))).
 			Child(ui.Div().PaddingX(12).PaddingY(4).Shrink(0).
 				Child(ui.Div().Row().Align(ui.Center).Gap(6).
@@ -351,7 +351,7 @@ func sidebarKey(e sidebarEntry) string {
 }
 
 func sectionLabel(t *ui.Theme, s string) ui.Element {
-	return ui.Text(s).Size(12).Medium().Color(t.TextSubtle).
+	return ui.Text(s).FontSize(12).Medium().TextColor(t.TextSubtle).
 		Style(ui.Style{Padding: ui.Edges{Top: 12, Left: 8, Bottom: 4}})
 }
 
@@ -379,7 +379,7 @@ func (a *App) noteRow(t *ui.Theme, n *store.Note, selected bool) ui.Element {
 		OnDrag(ui.Drag(n).Preview(func() ui.Element {
 			return ui.Div().PaddingX(10).PaddingY(5).Radius(999).Background(t.Surface).
 				Border(1, t.Accent).Shadow(ui.ShadowMd).
-				Child(ui.Text(titleOf(n)).Size(13).Semibold().NoWrap()) // reads the title, so it follows edits
+				Child(ui.Text(titleOf(n)).FontSize(13).Semibold().NoWrap()) // reads the title, so it follows edits
 		})).
 		Dragging(ui.Style{Opacity: 0.5}).
 		Child(a.noteBody(n))
@@ -405,8 +405,8 @@ func (a *App) noteBody(n *store.Note) ui.Element {
 			Child(ui.Div().Row().Align(ui.Center).Gap(6).
 				Child(ui.If(n.Pinned.Get(), ui.Icon(icons.Star).Size(12).Color(t.Warning))).
 				Child(title.Semibold().Truncate().Grow(1)).
-				Child(ui.Text(shortDate(n.Updated.Get())).Size(12).Color(t.TextSubtle).NoWrap())).
-			Child(snippet.Size(13).Color(t.TextMuted).Truncate())
+				Child(ui.Text(shortDate(n.Updated.Get())).FontSize(12).TextColor(t.TextSubtle).NoWrap())).
+			Child(snippet.FontSize(13).TextColor(t.TextMuted).Truncate())
 	}).Key(n.ID)
 }
 
@@ -439,14 +439,14 @@ func (a *App) status(count int) ui.Element {
 		bar := ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).Gap(8).PaddingX(16).MinHeight(ui.Px(40)).Shrink(0).
 			Child(ui.Div().Row().Align(ui.Center).Gap(6).MinWidth(ui.Px(0)).
 				Child(ui.Icon(icons.Check).Size(13).Color(color)).
-				Child(ui.Text(label).Size(12).Color(color).Truncate())).
+				Child(ui.Text(label).FontSize(12).TextColor(color).Truncate())).
 			Child(ui.Div().Row().Align(ui.Center).Gap(8).
 				Child(ui.If(ctx.Zoom() != 1, // shown only when zoomed; click to reset
 					ui.Div().Key("zoom").PaddingX(6).PaddingY(2).Radius(5).Transition(fast).
 						Hover(ui.Style{Background: t.SurfaceHover}).
 						OnClick(func() { ctx.SetZoom(1) }).
-						Child(ui.Textf("%.0f%%", ctx.Zoom()*100).Size(12).Color(t.TextMuted)))).
-				Child(ui.Textf("%d notes", count).Size(12).Color(t.TextSubtle).NoWrap()))
+						Child(ui.Textf("%.0f%%", ctx.Zoom()*100).FontSize(12).TextColor(t.TextMuted)))).
+				Child(ui.Textf("%d notes", count).FontSize(12).TextColor(t.TextSubtle).NoWrap()))
 		if msg == "" {
 			return bar
 		}
@@ -455,7 +455,7 @@ func (a *App) status(count int) ui.Element {
 		return ui.Div().Shrink(0).
 			Child(ui.Div().Key("keymap-error").Row().Align(ui.Center).Gap(6).PaddingEdges(ui.Edges{Top: 8, Left: 16, Right: 16}).Tooltip(msg).
 				Child(ui.Icon(icons.Alert).Size(13).Color(t.Danger).Style(ui.Style{AlignSelf: ui.Start, Margin: ui.Edges{Top: 2}})).
-				Child(ui.Text("keymap: " + keymapProblem(msg)).Size(12).Color(t.Danger).MaxLines(2).Grow(1))).
+				Child(ui.Text("keymap: " + keymapProblem(msg)).FontSize(12).TextColor(t.Danger).MaxLines(2).Grow(1))).
 			Child(bar)
 	})
 }

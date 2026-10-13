@@ -77,7 +77,7 @@ func inboxButton(ctx *ui.Context, s *Store) ui.Element {
 	}
 	rows := ui.Div().Column().Gap(2)
 	if len(items) == 0 {
-		rows.Child(ui.Div().Padding(8).Child(ui.Text("No notifications").Size(13).Color(t.TextMuted)))
+		rows.Child(ui.Div().Padding(8).Child(ui.Text("No notifications").FontSize(13).TextColor(t.TextMuted)))
 	}
 	for _, it := range items {
 		rows.Child(inboxRow(t, it))
@@ -88,7 +88,7 @@ func inboxButton(ctx *ui.Context, s *Store) ui.Element {
 		Exit(ui.Fade().Grow(0.98), ui.Animation{Duration: 90 * time.Millisecond}).
 		OnClickOutside(close).
 		Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(4).
-			Child(ui.Text("Notifications").Size(13).Semibold()).
+			Child(ui.Text("Notifications").FontSize(13).Semibold()).
 			Child(ui.Button("Mark all read").Key("inbox-read").Ghost().Small().Disabled(unread == 0).
 				OnClick(func() { s.markAllRead() }))).
 		Child(rows)
@@ -102,8 +102,8 @@ func inboxRow(t *ui.Theme, it inboxItem) ui.Element {
 	row := ui.Div().Row().Align(ui.Center).Gap(10).PaddingX(4).PaddingY(6).Radius(6).
 		Child(ui.Icon(ic).Size(15).Color(c)).
 		Child(ui.Div().Grow(1).MinWidth(ui.Px(0)).Gap(1).
-			Child(ui.Text(it.Text).Size(13).Weight(weightOf(it.Read)).Color(textOf(t, it.Read))).
-			Child(ui.Text(ago(it.At)).Size(11).Color(t.TextSubtle)))
+			Child(ui.Text(it.Text).FontSize(13).Weight(weightOf(it.Read)).TextColor(textOf(t, it.Read))).
+			Child(ui.Text(ago(it.At)).FontSize(11).TextColor(t.TextSubtle)))
 	if !it.Read {
 		row.Child(ui.BadgeDot().Variant(ui.BadgeAccent))
 	}

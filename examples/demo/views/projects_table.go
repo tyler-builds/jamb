@@ -81,7 +81,7 @@ func projectNameCell(t *ui.Theme, p Project) ui.Element {
 func projectsTableBar(t *ui.Theme, s *Store, picked *ui.Signal[[]string]) ui.Element {
 	keys := picked.Get()
 	return ui.Div().Row().Align(ui.Center).Gap(12).
-		Child(ui.Text(fmt.Sprintf("%d selected", len(keys))).Size(13).Color(t.TextMuted)).
+		Child(ui.Text(fmt.Sprintf("%d selected", len(keys))).FontSize(13).TextColor(t.TextMuted)).
 		Child(ui.Button("Star selected").Secondary().Small().Disabled(len(keys) == 0).
 			OnClick(func() { s.StarKeys(picked.Peek()) }))
 }

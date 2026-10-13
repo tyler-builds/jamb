@@ -33,7 +33,7 @@ func (a *App) tagChips() ui.Element {
 					Over(ui.Style{Background: t.AccentSoft, BorderColor: t.Accent})).
 				Key("chip-" + tag).
 				Child(ui.Icon(icons.Hash).Size(11)).
-				Child(ui.Text(tag).Size(12).Medium().NoWrap()))
+				Child(ui.Text(tag).FontSize(12).Medium().NoWrap()))
 		}
 		return chips
 	})
@@ -56,7 +56,7 @@ func (a *App) tagEditor(n *store.Note) ui.Element {
 				PaddingEdges(ui.Edges{Top: 2, Bottom: 2, Left: 9, Right: 3}).
 				Background(t.AccentSoft).TextColor(t.Accent).
 				Key("pill-" + tag).
-				Child(ui.Text(tag).Size(12).Medium().NoWrap()).
+				Child(ui.Text(tag).FontSize(12).Medium().NoWrap()).
 				Child(ui.Div().Size(ui.Px(16), ui.Px(16)).Radius(8).Center().
 					Cursor(ui.CursorPointer).Transition(fast).
 					Hover(ui.Style{Background: t.SurfaceHover}).

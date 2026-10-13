@@ -52,9 +52,9 @@ func formsSection(t *ui.Theme) ui.Element {
 		return Card(t).Gap(14).
 			Child(SectionTitle(t, "Forms")).
 			Child(ui.Text("A required name with help text, an email on the same row as its label, and a summary of the errors on submit. Save takes a moment, and a name that is taken is refused by the server.").
-				Size(13).Color(t.TextMuted)).
+				FontSize(13).TextColor(t.TextMuted)).
 			Child(body).
 			Child(actions).
-			Child(ui.Text(result.Get()).Size(13).Color(t.TextMuted))
+			Child(ui.Text(result.Get()).FontSize(13).TextColor(t.TextMuted))
 	})
 }

@@ -38,14 +38,14 @@ func dateTimeSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 				Child(ui.Div().Row().Gap(16).Align(ui.Start).
 					Child(ui.Field("Meeting date", ui.DatePicker(when)).Width(ui.Px(200))).
 					Child(ui.Field("Meeting time", ui.TimePicker(when)).Width(ui.Px(160)))).
-				Child(ui.Text(meeting).Size(13).Color(t.TextMuted))),
+				Child(ui.Text(meeting).FontSize(13).TextColor(t.TextMuted))),
 		sample(t, "In a form, required",
 			ui.Div().Column().Gap(10).
 				Child(form.Summary()).
 				Child(form.Field("review", "Review date", ui.DatePicker(review).
 					Validate(ui.Required[time.Time]())).Required()).
 				Child(ui.Button("Save review").Key("dt-save").Primary().OnClick(form.Submit)).
-				Child(ui.Text(result.Get()).Size(13).Color(t.TextMuted))))
+				Child(ui.Text(result.Get()).FontSize(13).TextColor(t.TextMuted))))
 }
 
 // startOfToday returns today at local midnight.

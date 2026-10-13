@@ -79,7 +79,7 @@ func formControlsSection() ui.Element {
 		return Card(t).Gap(14).
 			Child(SectionTitle(t, "Form controls")).
 			Child(ui.Text("Each control in its normal and disabled states, with the value it holds. Type a number out of range or text that is not a number, then press Enter or leave the field.").
-				Size(13).Color(t.TextMuted)).
+				FontSize(13).TextColor(t.TextMuted)).
 			Child(row).
 			Child(ui.Divider()).
 			Child(SectionTitle(t, "Notification preferences")).
@@ -99,25 +99,25 @@ func formControlsSection() ui.Element {
 						return errors.New("Choose at least one channel.")
 					})).
 				Child(ui.Div().Gap(10).Width(ui.Px(240)).
-					Child(ui.Text("How often").Size(13).Medium().Color(t.TextMuted)).
+					Child(ui.Text("How often").FontSize(13).Medium().TextColor(t.TextMuted)).
 					Child(ui.RadioGroup(prefFreq,
 						ui.Option[string]{Value: "immediate", Label: "As they happen"},
 						ui.Option[string]{Value: "daily", Label: "Daily digest"},
 						ui.Option[string]{Value: "weekly", Label: "Weekly digest", Disabled: true},
 					).Label("How often"))).
 				Child(ui.Div().Gap(10).Width(ui.Px(240)).
-					Child(ui.Text("Preferred channel").Size(13).Medium().Color(t.TextMuted)).
+					Child(ui.Text("Preferred channel").FontSize(13).Medium().TextColor(t.TextMuted)).
 					Child(ui.Select(prefChannel,
 						ui.Option[string]{Value: "email", Label: "Email"},
 						ui.Option[string]{Value: "sms", Label: "Text message"},
 						ui.Option[string]{Value: "phone", Label: "Phone call"},
 					).Label("Preferred channel").Width(ui.Px(240))).
-					Child(ui.Text("Alert volume").Size(13).Medium().Color(t.TextMuted)).
+					Child(ui.Text("Alert volume").FontSize(13).Medium().TextColor(t.TextMuted)).
 					Child(ui.Slider(prefVolume, 0, 100, 5).Label("Alert volume").Format(percentOf).Width(ui.Px(240)))).
 				Child(ui.Div().Gap(10).
 					Child(ui.Div().Row().Align(ui.Start).Gap(10).
 						Child(prefs.Field("from", "Quiet hours from", ui.NumberField(fromHour, 0, 23, 1).SpinButtons(ui.SpinInline))).
-						Child(ui.Text("to").Color(t.TextMuted)).
+						Child(ui.Text("to").TextColor(t.TextMuted)).
 						Child(prefs.Field("to", "Quiet hours to", ui.NumberField(toHour, 0, 23, 1).SpinButtons(ui.SpinInline)).
 							Check(func() error {
 								if fromHour.Get() == toHour.Get() {
@@ -129,12 +129,12 @@ func formControlsSection() ui.Element {
 				// is as wide as the label needs at a large Text size.
 				Child(ui.Div().Gap(8).MinWidth(ui.Px(240)).
 					Child(ui.Button("Save preferences").Key("prefs-save").Primary().OnClick(prefs.Submit)).
-					Child(ui.Text(saved.Get()).Size(13).Color(t.TextMuted))).
+					Child(ui.Text(saved.Get()).FontSize(13).TextColor(t.TextMuted))).
 				Child(ui.Div().Gap(4).Width(ui.Px(240)).
 					Child(ui.Textf("Sends by %s, %s, at volume %s.",
-						channelsOf(email.Get(), text.Get(), push.Get()), prefFreq.Get(), percentOf(prefVolume.Get())).Size(13)).
-					Child(ui.Textf("Quiet from %02d:00 to %02d:00.", fromHour.Get(), toHour.Get()).Size(13)).
-					Child(ui.Text(fmt.Sprintf("Preferred channel: %s.", channelName(prefChannel.Get()))).Size(13))))
+						channelsOf(email.Get(), text.Get(), push.Get()), prefFreq.Get(), percentOf(prefVolume.Get())).FontSize(13)).
+					Child(ui.Textf("Quiet from %02d:00 to %02d:00.", fromHour.Get(), toHour.Get()).FontSize(13)).
+					Child(ui.Text(fmt.Sprintf("Preferred channel: %s.", channelName(prefChannel.Get()))).FontSize(13))))
 	})
 }
 
@@ -153,9 +153,9 @@ func checkAll(a, b, c bool) ui.CheckState {
 // formSample is one control with a readout of its value, under it.
 func formSample(t *ui.Theme, label string, control ui.Element, readout string) ui.Element {
 	return ui.Div().Gap(8).Width(ui.Px(240)).
-		Child(ui.Text(label).Size(11).Color(t.TextSubtle)).
+		Child(ui.Text(label).FontSize(11).TextColor(t.TextSubtle)).
 		Child(control).
-		Child(ui.Text("Value: " + readout).Size(12).Color(t.TextMuted))
+		Child(ui.Text("Value: " + readout).FontSize(12).TextColor(t.TextMuted))
 }
 
 // radioSample is a radio group with a disabled option.

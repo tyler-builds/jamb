@@ -51,7 +51,7 @@ func splitSection() ui.Element {
 		col.Children(samples...)
 		return Card(t).Gap(14).
 			Child(SectionTitle(t, "Split panes")).
-			Child(ui.Text("Drag the divider, or focus it and use the arrow keys (Shift for a larger step). Home and End go to its limits. Enter collapses or restores a collapsible pane, as a double-click does.").Size(12).Color(t.TextMuted)).
+			Child(ui.Text("Drag the divider, or focus it and use the arrow keys (Shift for a larger step). Home and End go to its limits. Enter collapses or restores a collapsible pane, as a double-click does.").FontSize(12).TextColor(t.TextMuted)).
 			Child(col)
 	})
 }

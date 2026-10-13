@@ -134,7 +134,7 @@ func BenchmarkFrameRebuild(b *testing.B) {
 				Child(Div().Size(Px(32), Px(32)).Radius(8).Background(Hex("#6366f1"))).
 				Child(Div().Grow(1).Gap(4).
 					Child(Textf("Row %d", i).Semibold()).
-					Child(Text("A description that is long enough to wrap at narrow widths.").Size(13))))
+					Child(Text("A description that is long enough to wrap at narrow widths.").FontSize(13))))
 		}
 		return list
 	}, 1000, 800, 1)

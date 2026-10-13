@@ -64,7 +64,7 @@ func comboboxSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 				Child(ui.Combobox(fruit, containsOptions(comboFruits)).Label("Fruit, from the list").
 					Placeholder("Type a fruit").AllowFree(false).Width(ui.Px(260)).
 					OnPick(func(v string) { chosen.Set(v) })).
-				Child(ui.Text(choiceText(chosen.Get())).Color(t.TextMuted).Size(13))),
+				Child(ui.Text(choiceText(chosen.Get())).TextColor(t.TextMuted).FontSize(13))),
 		sample(t, "Suggestions in the background",
 			ui.Combobox[string](slow, nil).Label("City, found in the background").Placeholder("Type a city").
 				Width(ui.Px(260)).MinChars(1).

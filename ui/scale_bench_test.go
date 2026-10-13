@@ -47,7 +47,7 @@ func newScaleApp(nodes int) *scaleApp {
 					Child(Div().Size(Px(24), Px(24)).Radius(6).Background(Hex("#6366f1"))).
 					Child(Div().Grow(1).Gap(2).
 						Child(Text(v.Get()).Semibold()).
-						Child(Text("A secondary line of text that wraps at narrow widths.").Size(12)))
+						Child(Text("A secondary line of text that wraps at narrow widths.").FontSize(12)))
 			}).Key(fmt.Sprint(i)))
 		}
 		return Div().Height(Full).Child(list)
@@ -183,7 +183,7 @@ func benchListRow(i int) Element {
 			Child(Div().Size(Px(24), Px(24)).Radius(6).Background(Hex("#6366f1"))).
 			Child(Div().Grow(1).Gap(2).
 				Child(Text(fmt.Sprintf("Row %d", i)).Semibold()).
-				Child(Text("A secondary line of text that wraps at narrow widths.").Size(12)))
+				Child(Text("A secondary line of text that wraps at narrow widths.").FontSize(12)))
 	}).Key(fmt.Sprint(i))
 }
 

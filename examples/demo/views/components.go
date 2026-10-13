@@ -17,8 +17,8 @@ func Components(s *Store) ui.Element {
 		return ui.Div().Grow(1).ScrollY().
 			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(1100)).
 				Child(ui.Div().Gap(4).
-					Child(ui.Div().Heading(1).Child(ui.Text("Components").Size(26).Semibold())).
-					Child(ui.Text("One section per part of the framework. Hover, click and Tab to try them.").Color(t.TextMuted))).
+					Child(ui.Div().Heading(1).Child(ui.Text("Components").FontSize(26).Semibold())).
+					Child(ui.Text("One section per part of the framework. Hover, click and Tab to try them.").TextColor(t.TextMuted))).
 				Child(section(t, "Text",
 					sample(t, "Italic", ui.Text("Italic text").Italic()),
 					sample(t, "Mono", ui.Text("Mono text").Mono()),
@@ -70,7 +70,7 @@ func section(t *ui.Theme, title string, samples ...ui.Element) ui.Element {
 
 // sample is one labeled example in a section.
 func sample(t *ui.Theme, label string, el ui.Element) ui.Element {
-	return ui.Div().Gap(6).Child(el).Child(ui.Text(label).Size(11).Color(t.TextSubtle))
+	return ui.Div().Gap(6).Child(el).Child(ui.Text(label).FontSize(11).TextColor(t.TextSubtle))
 }
 
 // pressed is the action of a sample button. It announces the press, so that a
@@ -81,7 +81,7 @@ func pressed(label string) func() {
 
 // wordHighlight is a word styled by one Highlight.
 func wordHighlight(word string, h ui.Highlight) *ui.TextElement {
-	return ui.Text(word).Size(15).Highlight(0, len(word), h)
+	return ui.Text(word).FontSize(15).Highlight(0, len(word), h)
 }
 
 // clickSample is a rich text with a hover style and a clickable segment. Its
@@ -95,8 +95,8 @@ func clickSample(t *ui.Theme) ui.Element {
 				ui.Seg("this word").Hover(ui.Highlight{Color: t.Accent, Underline: true}),
 				ui.Seg(", then click "),
 				ui.Seg("this one").Color(t.Accent).Underline().OnClick(func() { clicks.Set(clicks.Peek() + 1) }),
-			).Size(15)).
-			Child(ui.Textf("Clicked %d times", clicks.Get()).Size(12).Color(t.TextMuted)))
+			).FontSize(15)).
+			Child(ui.Textf("Clicked %d times", clicks.Get()).FontSize(12).TextColor(t.TextMuted)))
 	})
 }
 
@@ -123,12 +123,12 @@ func placements(t *ui.Theme) ui.Element {
 				anchor.Child(ui.Div().Key("popover").Overlay(p.at).OverlayGap(10).Padding(10).Radius(8).
 					Background(t.Surface).Border(1, t.Border).Shadow(ui.ShadowMd).
 					OnClickOutside(func() { open.Set(-1) }).
-					Child(ui.Text("Opened " + p.name).Size(12).Medium()))
+					Child(ui.Text("Opened " + p.name).FontSize(12).Medium()))
 			}
 			row.Child(anchor)
 		}
 		return ui.Div().Gap(12).Child(row).
-			Child(ui.Text("Escape closes an open popover, as a click outside it does.").Size(12).Color(t.TextMuted))
+			Child(ui.Text("Escape closes an open popover, as a click outside it does.").FontSize(12).TextColor(t.TextMuted))
 	})
 }
 
@@ -156,7 +156,7 @@ func contextSample(t *ui.Theme) ui.Element {
 		completed := ui.Local(ctx, "completed", false)
 		box := ui.Div().Key("context-menu-sample").Width(ui.Px(240)).MinHeight(ui.Px(64)).Padding(8).Radius(8).Border(1, t.Border).Center().
 			Focusable().FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
-			Child(ui.Text("Right-click, or focus it and press Shift+F10").Size(12).Color(t.TextMuted)).
+			Child(ui.Text("Right-click, or focus it and press Shift+F10").FontSize(12).TextColor(t.TextMuted)).
 			ContextMenu(func() []ui.MenuItem {
 				return []ui.MenuItem{
 					{Action: GoProjects},
@@ -203,7 +203,7 @@ func clipSection(t *ui.Theme) ui.Element {
 	rows := ui.Div()
 	for i := range 12 {
 		rows.Child(ui.Div().Height(ui.Px(34)).Background(t.SurfaceActive).Center().
-			Child(ui.Text(fmt.Sprintf("Row %d", i+1)).Size(12).Color(t.TextMuted)))
+			Child(ui.Text(fmt.Sprintf("Row %d", i+1)).FontSize(12).TextColor(t.TextMuted)))
 	}
 	scroller := ui.Div().Size(ui.Px(220), ui.Px(120)).Radius(14).Background(t.Surface).
 		Border(1, t.Border).ScrollY().Child(rows)
@@ -213,12 +213,12 @@ func clipSection(t *ui.Theme) ui.Element {
 			line, text = t.Accent, t.Text
 		}
 		return ui.Div().PaddingX(4).PaddingY(6).BorderEdges(ui.Edges{Bottom: 2}, line).
-			Child(ui.Text(label).Size(13).Color(text))
+			Child(ui.Text(label).FontSize(13).TextColor(text))
 	}
 	bar := ui.Div().Width(ui.Px(220)).PaddingX(12).PaddingY(10).Radius(8).Background(t.Surface).
-		BorderEdges(ui.Edges{Left: 3}, t.Accent).Child(ui.Text("Left accent bar").Size(12))
+		BorderEdges(ui.Edges{Left: 3}, t.Accent).Child(ui.Text("Left accent bar").FontSize(12))
 	mixed := ui.Div().Width(ui.Px(220)).PaddingX(12).PaddingY(10).Radius(12).Background(t.Surface).
-		BorderEdges(ui.Edges{Top: 1, Right: 3, Bottom: 1, Left: 3}, t.Accent).Child(ui.Text("Mixed widths").Size(12))
+		BorderEdges(ui.Edges{Top: 1, Right: 3, Bottom: 1, Left: 3}, t.Accent).Child(ui.Text("Mixed widths").FontSize(12))
 	return Card(t).Gap(14).
 		Child(SectionTitle(t, "Clipping and borders")).
 		Child(ui.Div().Row().Wrap().Align(ui.Start).Gap(22).
@@ -258,7 +258,7 @@ func motionSection(t *ui.Theme) ui.Element {
 // easeRow is a ball that travels a track on the curve, repeating forever.
 func easeRow(t *ui.Theme, name string, curve func(float32) float32) ui.Element {
 	return ui.Div().Row().Align(ui.Center).Gap(12).
-		Child(ui.Text(name).Size(12).Color(t.TextMuted).Style(ui.Style{MinWidth: ui.Px(110)})).
+		Child(ui.Text(name).FontSize(12).TextColor(t.TextMuted).Style(ui.Style{MinWidth: ui.Px(110)})).
 		Child(ui.Animate("ease-"+name, ui.Animation{Duration: 1600 * time.Millisecond, Easing: curve, Repeat: true},
 			func(p float32) ui.Element {
 				return ui.Div().Height(ui.Px(14)).Width(ui.Px(260)).Radius(7).Background(t.SurfaceActive).
@@ -269,7 +269,7 @@ func easeRow(t *ui.Theme, name string, curve func(float32) float32) ui.Element {
 // tile is a small labeled card for the transform and scroll samples.
 func tile(t *ui.Theme, label string) *ui.DivElement {
 	return ui.Div().Size(ui.Px(90), ui.Px(56)).Radius(10).Background(t.Surface).Border(1, t.Border).
-		Center().Child(ui.Text(label).Size(12).Color(t.TextMuted))
+		Center().Child(ui.Text(label).FontSize(12).TextColor(t.TextMuted))
 }
 
 // focusSection shows the focus styles, the Tab order, and a horizontal scroller.
@@ -278,7 +278,7 @@ func focusSection(t *ui.Theme) ui.Element {
 	box := func(label string) *ui.DivElement {
 		// Minimums, not a size: the box grows with its label at a large Text size.
 		return ui.Div().MinWidth(ui.Px(96)).MinHeight(ui.Px(34)).Radius(8).Border(1, t.Border).Center().
-			FocusVisible(ring).Child(ui.Text(label).Size(12))
+			FocusVisible(ring).Child(ui.Text(label).FontSize(12))
 	}
 	scroller := ui.Div().Row().ScrollX().Gap(10).Padding(4)
 	for i := range 12 {

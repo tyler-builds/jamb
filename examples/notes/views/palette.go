@@ -65,7 +65,7 @@ func (a *App) palette() ui.Element {
 			rows.Child(a.paletteRow(ctx, t, act, i == sel))
 		}
 		if len(matches) == 0 {
-			rows.Child(ui.Div().Padding(12).Child(ui.Text("No matching commands").Color(t.TextMuted)))
+			rows.Child(ui.Div().Padding(12).Child(ui.Text("No matching commands").TextColor(t.TextMuted)))
 		}
 
 		panel := ui.Div().Key("palette").KeyContext("Palette").Overlay(ui.BelowCenter).Width(ui.Px(520)).
@@ -106,5 +106,5 @@ func (a *App) paletteRow(ctx *ui.Context, t *ui.Theme, act *ui.Action, selected 
 			ctx.Dispatch(act)
 		}).
 		Child(ui.Text(act.Label()).Grow(1).Truncate()).
-		Child(ui.Text(ctx.KeysFor(act)).Size(12).Color(t.TextSubtle).NoWrap())
+		Child(ui.Text(ctx.KeysFor(act)).FontSize(12).TextColor(t.TextSubtle).NoWrap())
 }
