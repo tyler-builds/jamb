@@ -7,19 +7,25 @@
     Builds the two identical hello apps (examples/hello in this repository, and the
     gpui-hello project next to it) and measures:
 
-      - project size: source files and lines, dependency sources, build output sizes,
-        dependency counts, toolchain install sizes;
-      - release binary size (Go stripped and default; Rust release and size profile);
-      - clean build times (fresh build cache or target directory, dependencies already
-        downloaded) and incremental build times (a text change, then a whitespace change);
+      - project size: source files and lines, dependency sources, dependency counts,
+        toolchain install sizes;
+      - binary size (Go stripped and default; Rust release and debug);
+      - incremental build times (a text change, then a whitespace change);
+      - with -IncludeCleanBuilds, clean build times (fresh build cache or target
+        directory, dependencies already downloaded) and the build output sizes;
       - optionally, the one-time dependency download into temporary caches;
-      - startup to the first painted frame, idle CPU and memory (focused and unfocused),
+      - startup to the first painted frame, for the first launch of a new copy of the
+        executable and for warm launches of the same file, idle CPU and memory (focused
+        and unfocused),
         CPU during continuous pointer movement, and CPU during continuous resizing.
 
-    Every build uses temporary caches and target directories, and every temporary
-    directory and process the script starts is removed on exit, including after a
-    failure. The only source edits are to examples/hello/main.go and gpui-hello's
-    src\main.rs, and each is restored from a byte-for-byte backup in a finally block.
+    By default the builds use the normal Go build cache and gpui-hello's own target
+    folder (see -GpuiTargetDir), so only the first run compiles GPUI from scratch.
+    With -IncludeCleanBuilds, every build uses a temporary cache or target directory.
+    Every temporary directory and process the script starts is removed on exit,
+    including after a failure. The only source edits are to examples/hello/main.go
+    and gpui-hello's src\main.rs, and each is restored from a byte-for-byte backup
+    in a finally block.
 
     The pointer and resize phases move the real mouse cursor for a few seconds at a
     time and resize the app window. Run the script only when that is acceptable. The
@@ -37,7 +43,13 @@
     The gpui-hello project. Default: a sibling folder named gpui-hello.
 
 .PARAMETER Runs
-    Repetitions of every clean build and every runtime measurement. Default 3.
+    Repetitions of every runtime measurement and incremental build, and with
+    -IncludeCleanBuilds of every clean build. Default 3.
+
+.PARAMETER WarmLaunches
+    Launches of the same executable file per runtime run, after its first launch.
+    Their times are the warm startup figures; the last one stays open for the idle,
+    memory, pointer and resize samples. Default 5.
 
 .PARAMETER SettleSeconds
     Pause after a window is painted, and after a focus change, before idle sampling.
@@ -58,6 +70,15 @@
 .PARAMETER SkipInteraction
     Skip the pointer-movement and resize samples. Use it when the cursor must not move.
 
+.PARAMETER IncludeCleanBuilds
+    Also time clean builds: each build runs -Runs times with an empty build cache or
+    target directory, and that directory's size is recorded. GPUI's release and
+    debug clean builds take about 4 minutes per run on the reference machine.
+
+.PARAMETER GpuiTargetDir
+    Cargo target directory for the default builds. Default: gpui-hello's own target
+    folder, so it stays warm between runs of the script.
+
 .PARAMETER IncludeDownload
     Also measure the first-time dependency download into temporary GOMODCACHE and
     CARGO_HOME directories. Slow on the Rust side (the zed git repository is cloned).
@@ -76,12 +97,15 @@ param(
     [string]$JambRoot = '',
     [string]$GpuiRoot = '',
     [int]$Runs = 3,
+    [ValidateRange(1, 100)][int]$WarmLaunches = 5,
     [int]$SettleSeconds = 8,
     [int]$IdleSeconds = 60,
     [int]$MoveSeconds = 10,
     [switch]$SkipGo,
     [switch]$SkipRust,
     [switch]$SkipInteraction,
+    [switch]$IncludeCleanBuilds,
+    [string]$GpuiTargetDir = '',
     [switch]$IncludeDownload,
     [string]$ShotDir = '',
     [string]$OutFile = ''
@@ -94,6 +118,7 @@ if (-not $JambRoot) { $JambRoot = Split-Path -Parent $PSScriptRoot }
 $JambRoot = (Resolve-Path -LiteralPath $JambRoot).Path
 if (-not $GpuiRoot) { $GpuiRoot = Join-Path (Split-Path -Parent $JambRoot) 'gpui-hello' }
 $GpuiRoot = (Resolve-Path -LiteralPath $GpuiRoot).Path
+if (-not $GpuiTargetDir) { $GpuiTargetDir = Join-Path $GpuiRoot 'target' }
 if (-not $ShotDir) { $ShotDir = Join-Path $JambRoot 'docs\screenshots' }
 $goHello = Join-Path $JambRoot 'examples\hello'
 $goMain = Join-Path $goHello 'main.go'
@@ -103,7 +128,7 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('compare-gpui-' + [guid]::NewGuid(
 New-Item -ItemType Directory -Path $work | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $work 'logs'), (Join-Path $work 'bin') | Out-Null
 $started = New-Object System.Collections.ArrayList
-$R = [ordered]@{}
+$R = [ordered]@{ buildRetries = @() }
 
 if (-not ('Cmp.Win32' -as [type])) {
     Add-Type -AssemblyName System.Drawing
@@ -234,8 +259,20 @@ function Get-Summary([double[]]$Values) {
 function MB([double]$Bytes) { return [math]::Round($Bytes / 1MB, 2) }
 
 # Runs a build command in a generated batch file, so quoting survives PowerShell.
-# Returns the wall-clock seconds; throws with the log path on a non-zero exit.
+# Returns the wall-clock seconds. A failed build is retried once, because the MSVC
+# linker occasionally fails on a file an antivirus is still scanning; the retry is
+# recorded in buildRetries and its time is the one returned. A second failure
+# throws with the log path.
 function Invoke-Build([string]$Dir, [string]$Command, [hashtable]$EnvVars, [string]$Name) {
+    try {
+        return Invoke-BuildOnce $Dir $Command $EnvVars $Name
+    } catch {
+        $R.buildRetries += @("$Name ($($_.Exception.Message))")
+        return Invoke-BuildOnce $Dir $Command $EnvVars "$Name-retry"
+    }
+}
+
+function Invoke-BuildOnce([string]$Dir, [string]$Command, [hashtable]$EnvVars, [string]$Name) {
     $log = Join-Path $work "logs\$Name.log"
     $bat = Join-Path $work "logs\$Name.cmd"
     Set-Content -LiteralPath $bat -Encoding ASCII -Value @(
@@ -330,17 +367,11 @@ function Resize-Window([IntPtr]$Hwnd, [int]$Seconds) {
     [void][Cmp.Win32]::SetWindowPos($Hwnd, [IntPtr]::Zero, 0, 0, 800, 600, $flags)
 }
 
-# Starts a copy of the app from its own temporary folder, waits for a visible window
-# titled "Hello" that has a non-blank client area, and measures idle, pointer and
-# resize CPU. Returns one result object.
-function Measure-App($App, [int]$Run) {
-    $dir = Join-Path $work "run\$($App.key)-$Run"
-    New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    $exe = Join-Path $dir (Split-Path -Leaf $App.exe)
-    Copy-Item -LiteralPath $App.exe -Destination $exe
-
+# Starts the app and waits for a visible window titled "Hello" with a non-blank
+# client area. Times are from the launch call. The caller disposes of the capture.
+function Start-Hello($App, [string]$Exe) {
     $clock = [Diagnostics.Stopwatch]::StartNew()
-    $p = Start-Process -FilePath $exe -PassThru
+    $p = Start-Process -FilePath $Exe -PassThru
     [void]$started.Add($p)
     $deadline = (Get-Date).AddSeconds(60)
     $hwnd = [IntPtr]::Zero
@@ -364,6 +395,38 @@ function Measure-App($App, [int]$Run) {
     }
     $paintedMs = $clock.Elapsed.TotalMilliseconds
     if ($distinct -le 1) { throw "$($App.key): window never showed content" }
+    return [pscustomobject]@{ proc = $p; hwnd = $hwnd; bmp = $bmp; visibleMs = $visibleMs; paintedMs = $paintedMs }
+}
+
+function Stop-Hello($Launch) {
+    $Launch.bmp.Dispose()
+    Stop-Process -Id $Launch.proc.Id -Force -ErrorAction SilentlyContinue
+    [void]$Launch.proc.WaitForExit(10000)
+    [Threading.Thread]::Sleep(500)
+}
+
+# Copies the app into its own temporary folder and launches the copy: once as a new
+# file (an antivirus scans a file it has not seen before it runs), then
+# $WarmLaunches more times from the same file, as on every later start. The last
+# launch stays open for the idle, pointer and resize samples. Returns one result.
+function Measure-App($App, [int]$Run) {
+    $dir = Join-Path $work "run\$($App.key)-$Run"
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $exe = Join-Path $dir (Split-Path -Leaf $App.exe)
+    Copy-Item -LiteralPath $App.exe -Destination $exe
+
+    $first = Start-Hello $App $exe
+    Stop-Hello $first
+    $warmVisible = @(); $warmPainted = @()
+    for ($k = 1; $k -le $WarmLaunches; $k++) {
+        $launch = Start-Hello $App $exe
+        $warmVisible += $launch.visibleMs
+        $warmPainted += $launch.paintedMs
+        if ($k -lt $WarmLaunches) { Stop-Hello $launch }
+    }
+    $p = $launch.proc
+    $hwnd = $launch.hwnd
+    $bmp = $launch.bmp
     if ($App.shot) { $bmp.Save((Join-Path $ShotDir $App.shot), [Drawing.Imaging.ImageFormat]::Png) }
     $client = "$($bmp.Width)x$($bmp.Height)"
     $bmp.Dispose()
@@ -410,8 +473,10 @@ function Measure-App($App, [int]$Run) {
     return [ordered]@{
         app = $App.key
         run = $Run
-        visibleMs = [math]::Round($visibleMs, 1)
-        paintedMs = [math]::Round($paintedMs, 1)
+        firstVisibleMs = [math]::Round($first.visibleMs, 1)
+        firstPaintedMs = [math]::Round($first.paintedMs, 1)
+        warmVisibleMs = @($warmVisible | ForEach-Object { [math]::Round($_, 1) })
+        warmPaintedMs = @($warmPainted | ForEach-Object { [math]::Round($_, 1) })
         client = $client
         dpi = $dpi
         focusedOk = $focusedOk
@@ -540,112 +605,113 @@ try {
     $rustupHome = if ($env:RUSTUP_HOME) { $env:RUSTUP_HOME } else { Join-Path $env:USERPROFILE '.rustup' }
     $R.gpuiToolchain = [ordered]@{ toolchain1_95_0MB = MB (Get-DirBytes (Join-Path $rustupHome 'toolchains\1.95.0-x86_64-pc-windows-msvc')) }
 
-    # Clean builds and incremental builds: jamb
+    # Builds and incremental builds: jamb. By default one build each with the normal
+    # Go build cache; with -IncludeCleanBuilds, $Runs timed builds each with an empty cache.
     $goRelFlags = '-trimpath -ldflags "-s -w -H windowsgui"'
     if (-not $SkipGo) {
-        $goRel = @(); $goDbg = @(); $goRelCache = @(); $goDbgCache = @()
-        $cleanRel = @(); $cleanDbg = @()
-        for ($i = 1; $i -le $Runs; $i++) {
-            $cache = Join-Path $work "gocache-rel-$i"
-            $cleanRel += Invoke-Build $JambRoot "go build $goRelFlags -o `"$work\bin\jamb-rel-$i.exe`" ./examples/hello" @{ GOCACHE = $cache } "go-clean-rel-$i"
-            $goRelCache += MB (Get-DirBytes $cache)
-            $cache = Join-Path $work "gocache-dbg-$i"
-            $cleanDbg += Invoke-Build $JambRoot "go build -o `"$work\bin\jamb-dbg-$i.exe`" ./examples/hello" @{ GOCACHE = $cache } "go-clean-dbg-$i"
-            $goDbgCache += MB (Get-DirBytes $cache)
-            if ($i -lt $Runs) { Remove-Item -LiteralPath (Join-Path $work "gocache-dbg-$i") -Recurse -Force; Remove-Item -LiteralPath (Join-Path $work "gocache-rel-$i") -Recurse -Force }
+        $R.jambBuild = [ordered]@{}
+        $goEnv = @{ rel = @{}; dbg = @{} }
+        if ($IncludeCleanBuilds) {
+            $goRelCache = @(); $goDbgCache = @(); $cleanRel = @(); $cleanDbg = @()
+            for ($i = 1; $i -le $Runs; $i++) {
+                $cache = Join-Path $work "gocache-rel-$i"
+                $cleanRel += Invoke-Build $JambRoot "go build $goRelFlags -o `"$work\bin\jamb-rel.exe`" ./examples/hello" @{ GOCACHE = $cache } "go-clean-rel-$i"
+                $goRelCache += MB (Get-DirBytes $cache)
+                $cache = Join-Path $work "gocache-dbg-$i"
+                $cleanDbg += Invoke-Build $JambRoot "go build -o `"$work\bin\jamb-default.exe`" ./examples/hello" @{ GOCACHE = $cache } "go-clean-dbg-$i"
+                $goDbgCache += MB (Get-DirBytes $cache)
+                if ($i -lt $Runs) { Remove-Item -LiteralPath (Join-Path $work "gocache-dbg-$i") -Recurse -Force; Remove-Item -LiteralPath (Join-Path $work "gocache-rel-$i") -Recurse -Force }
+            }
+            $goEnv.rel = @{ GOCACHE = (Join-Path $work "gocache-rel-$Runs") }
+            $goEnv.dbg = @{ GOCACHE = (Join-Path $work "gocache-dbg-$Runs") }
+            $R.jambBuild.cleanReleaseSeconds = Get-Summary $cleanRel
+            $R.jambBuild.cleanDefaultSeconds = Get-Summary $cleanDbg
+            $R.jambBuild.goCacheAfterReleaseMB = Get-Summary $goRelCache
+            $R.jambBuild.goCacheAfterDefaultMB = Get-Summary $goDbgCache
+        } else {
+            Invoke-Build $JambRoot "go build $goRelFlags -o `"$work\bin\jamb-rel.exe`" ./examples/hello" @{} 'go-rel' | Out-Null
+            Invoke-Build $JambRoot "go build -o `"$work\bin\jamb-default.exe`" ./examples/hello" @{} 'go-dbg' | Out-Null
         }
-        Copy-Item -LiteralPath "$work\bin\jamb-dbg-$Runs.exe" -Destination "$work\bin\jamb-default.exe"
-        Copy-Item -LiteralPath "$work\bin\jamb-rel-$Runs.exe" -Destination "$work\bin\jamb-rel.exe"
         $specBytesCmd = "go build -trimpath -ldflags `"-s -w`" -o `"$work\bin\jamb-spec.exe`" ./examples/hello"
-        Invoke-Build $JambRoot $specBytesCmd @{ GOCACHE = (Join-Path $work "gocache-rel-$Runs") } 'go-spec' | Out-Null
+        Invoke-Build $JambRoot $specBytesCmd $goEnv.rel 'go-spec' | Out-Null
 
-        # Incremental: a text change (new literal), then whitespace-only changes, on the warm cache of the last run.
+        # Incremental: a text change (new literal), then whitespace-only changes, on a warm cache.
         $origGo = [IO.File]::ReadAllBytes($goMain)
         $origText = [Text.Encoding]::UTF8.GetString($origGo)
         $incRelText = @(); $incRelWs = @(); $incDbgText = @(); $incDbgWs = @()
         try {
             foreach ($mode in @('rel', 'dbg')) {
-                $cacheDir = Join-Path $work "gocache-$mode-$Runs"
                 $cmd = if ($mode -eq 'rel') { "go build $goRelFlags -o `"$work\bin\inc-jamb.exe`" ./examples/hello" } else { "go build -o `"$work\bin\inc-jamb.exe`" ./examples/hello" }
                 for ($i = 1; $i -le $Runs; $i++) {
                     Write-Bytes $goMain ([Text.Encoding]::UTF8.GetBytes($origText.Replace('Hello, world!', "Hello, world! $i")))
-                    $t = Invoke-Build $JambRoot $cmd @{ GOCACHE = $cacheDir } "go-inc-text-$mode-$i"
+                    $t = Invoke-Build $JambRoot $cmd $goEnv[$mode] "go-inc-text-$mode-$i"
                     if ($mode -eq 'rel') { $incRelText += $t } else { $incDbgText += $t }
                     Write-Bytes $goMain ([Text.Encoding]::UTF8.GetBytes($origText + ("`n" * $i)))
-                    $t = Invoke-Build $JambRoot $cmd @{ GOCACHE = $cacheDir } "go-inc-ws-$mode-$i"
+                    $t = Invoke-Build $JambRoot $cmd $goEnv[$mode] "go-inc-ws-$mode-$i"
                     if ($mode -eq 'rel') { $incRelWs += $t } else { $incDbgWs += $t }
                 }
             }
         } finally {
             Write-Bytes $goMain $origGo
         }
-        $R.jambBuild = [ordered]@{
-            cleanReleaseSeconds = Get-Summary $cleanRel
-            cleanDefaultSeconds = Get-Summary $cleanDbg
-            goCacheAfterReleaseMB = Get-Summary $goRelCache
-            goCacheAfterDefaultMB = Get-Summary $goDbgCache
-            incrementalReleaseTextSeconds = Get-Summary $incRelText
-            incrementalReleaseWhitespaceSeconds = Get-Summary $incRelWs
-            incrementalDefaultTextSeconds = Get-Summary $incDbgText
-            incrementalDefaultWhitespaceSeconds = Get-Summary $incDbgWs
-        }
+        $R.jambBuild.incrementalReleaseTextSeconds = Get-Summary $incRelText
+        $R.jambBuild.incrementalReleaseWhitespaceSeconds = Get-Summary $incRelWs
+        $R.jambBuild.incrementalDefaultTextSeconds = Get-Summary $incDbgText
+        $R.jambBuild.incrementalDefaultWhitespaceSeconds = Get-Summary $incDbgWs
         $R.jambBinary = [ordered]@{
             releaseStrippedMB = MB (Get-Item -LiteralPath "$work\bin\jamb-spec.exe").Length
             releaseGuiSubsystemMB = MB (Get-Item -LiteralPath "$work\bin\jamb-rel.exe").Length
             defaultMB = MB (Get-Item -LiteralPath "$work\bin\jamb-default.exe").Length
             note = 'releaseStrippedMB uses -trimpath -ldflags "-s -w" exactly; releaseGuiSubsystemMB adds -H windowsgui, which is what the runtime phase launches'
         }
-        Get-ChildItem -LiteralPath $work -Filter 'gocache-*' -Directory | Where-Object { $_.Name -ne "gocache-rel-$Runs" -and $_.Name -ne "gocache-dbg-$Runs" } | Remove-Item -Recurse -Force
+        Get-ChildItem -LiteralPath $work -Filter 'gocache-*' -Directory | Remove-Item -Recurse -Force
     }
 
-    # Clean builds and incremental builds: GPUI
+    # Builds and incremental builds: GPUI, release and debug profiles. By default one
+    # build each in $GpuiTargetDir; with -IncludeCleanBuilds, $Runs timed builds each
+    # in an empty target directory.
     if (-not $SkipRust) {
-        $rustBuilds = [ordered]@{ rel = @(); dbg = @(); size = @() }
-        $targetMB = [ordered]@{ rel = @(); dbg = @(); size = @() }
+        $R.gpuiBuild = [ordered]@{}
         $lastTarget = @{}
-        foreach ($mode in @('rel', 'dbg', 'size')) {
-            $flag = switch ($mode) { 'rel' { '--release' } 'dbg' { '' } 'size' { '--profile size' } }
-            for ($i = 1; $i -le $Runs; $i++) {
-                $target = Join-Path $work "target-$mode-$i"
-                $t = Invoke-Build $GpuiRoot "cargo build $flag --locked" @{ CARGO_TARGET_DIR = $target } "rust-clean-$mode-$i"
-                $rustBuilds[$mode] += $t
-                $targetMB[$mode] += MB (Get-DirBytes $target)
-                if ($i -lt $Runs) { Remove-Item -LiteralPath $target -Recurse -Force } else { $lastTarget[$mode] = $target }
+        $flags = @{ rel = '--release'; dbg = '' }
+        foreach ($mode in @('rel', 'dbg')) {
+            if ($IncludeCleanBuilds) {
+                $times = @(); $sizes = @()
+                for ($i = 1; $i -le $Runs; $i++) {
+                    $target = Join-Path $work "target-$mode-$i"
+                    $times += Invoke-Build $GpuiRoot "cargo build $($flags[$mode]) --locked" @{ CARGO_TARGET_DIR = $target } "rust-clean-$mode-$i"
+                    $sizes += MB (Get-DirBytes $target)
+                    if ($i -lt $Runs) { Remove-Item -LiteralPath $target -Recurse -Force } else { $lastTarget[$mode] = $target }
+                }
+                $label = if ($mode -eq 'rel') { 'Release' } else { 'Debug' }
+                $R.gpuiBuild["clean$($label)Seconds"] = Get-Summary $times
+                $R.gpuiBuild["targetAfter$($label)MB"] = Get-Summary $sizes
+            } else {
+                Invoke-Build $GpuiRoot "cargo build $($flags[$mode]) --locked" @{ CARGO_TARGET_DIR = $GpuiTargetDir } "rust-$mode" | Out-Null
+                $lastTarget[$mode] = $GpuiTargetDir
             }
         }
-        $profileDir = @{ rel = 'release'; dbg = 'debug'; size = 'size' }
         Copy-Item -LiteralPath (Join-Path $lastTarget['rel'] 'release\gpui-hello.exe') -Destination "$work\bin\gpui-rel.exe"
         Copy-Item -LiteralPath (Join-Path $lastTarget['dbg'] 'debug\gpui-hello.exe') -Destination "$work\bin\gpui-default.exe"
-        Copy-Item -LiteralPath (Join-Path $lastTarget['size'] 'size\gpui-hello.exe') -Destination "$work\bin\gpui-size.exe"
         $R.gpuiBinary = [ordered]@{
             releaseMB = MB (Get-Item -LiteralPath "$work\bin\gpui-rel.exe").Length
-            sizeProfileMB = MB (Get-Item -LiteralPath "$work\bin\gpui-size.exe").Length
             debugMB = MB (Get-Item -LiteralPath "$work\bin\gpui-default.exe").Length
             note = 'Windows release builds keep debug info in a separate .pdb, so the .exe sizes exclude it'
         }
-        $R.gpuiBuild = [ordered]@{
-            cleanReleaseSeconds = Get-Summary $rustBuilds.rel
-            cleanDebugSeconds = Get-Summary $rustBuilds.dbg
-            cleanSizeProfileSeconds = Get-Summary $rustBuilds.size
-            targetAfterReleaseMB = Get-Summary $targetMB.rel
-            targetAfterDebugMB = Get-Summary $targetMB.dbg
-            targetAfterSizeProfileMB = Get-Summary $targetMB.size
-        }
 
-        # Incremental on the warm target of the last run: a text change, then whitespace.
+        # Incremental on a warm target: a text change, then whitespace.
         $origRust = [IO.File]::ReadAllBytes($rustMain)
         $origRustText = [Text.Encoding]::UTF8.GetString($origRust)
         $incRelText = @(); $incRelWs = @(); $incDbgText = @(); $incDbgWs = @()
         try {
             foreach ($mode in @('rel', 'dbg')) {
-                $flag = if ($mode -eq 'rel') { '--release' } else { '' }
-                $target = $lastTarget[$mode]
+                $targetEnv = @{ CARGO_TARGET_DIR = $lastTarget[$mode] }
                 for ($i = 1; $i -le $Runs; $i++) {
                     Write-Bytes $rustMain ([Text.Encoding]::UTF8.GetBytes($origRustText.Replace('"Hello, world!"', "`"Hello, world! $i`"")))
-                    $t = Invoke-Build $GpuiRoot "cargo build $flag --locked" @{ CARGO_TARGET_DIR = $target } "rust-inc-text-$mode-$i"
+                    $t = Invoke-Build $GpuiRoot "cargo build $($flags[$mode]) --locked" $targetEnv "rust-inc-text-$mode-$i"
                     if ($mode -eq 'rel') { $incRelText += $t } else { $incDbgText += $t }
                     Write-Bytes $rustMain ([Text.Encoding]::UTF8.GetBytes($origRustText + ("`n" * $i)))
-                    $t = Invoke-Build $GpuiRoot "cargo build $flag --locked" @{ CARGO_TARGET_DIR = $target } "rust-inc-ws-$mode-$i"
+                    $t = Invoke-Build $GpuiRoot "cargo build $($flags[$mode]) --locked" $targetEnv "rust-inc-ws-$mode-$i"
                     if ($mode -eq 'rel') { $incRelWs += $t } else { $incDbgWs += $t }
                 }
             }
@@ -688,7 +754,6 @@ try {
     }
     if (-not $SkipRust) {
         $apps += [pscustomobject]@{ key = 'gpui'; exe = "$work\bin\gpui-rel.exe"; shot = 'comparison-gpui-hello.png' }
-        $apps += [pscustomobject]@{ key = 'gpui-size'; exe = "$work\bin\gpui-size.exe"; shot = $null }
     }
     $runtime = @()
     for ($run = 1; $run -le $Runs; $run++) {
@@ -702,8 +767,10 @@ try {
     foreach ($app in $apps) {
         $rows = @($runtime | Where-Object { $_.app -eq $app.key })
         $summaries[$app.key] = [ordered]@{
-            visibleMs = Get-Summary ([double[]]($rows | ForEach-Object { $_.visibleMs }))
-            paintedMs = Get-Summary ([double[]]($rows | ForEach-Object { $_.paintedMs }))
+            firstVisibleMs = Get-Summary ([double[]]($rows | ForEach-Object { $_.firstVisibleMs }))
+            firstPaintedMs = Get-Summary ([double[]]($rows | ForEach-Object { $_.firstPaintedMs }))
+            warmVisibleMs = Get-Summary ([double[]]($rows | ForEach-Object { $_.warmVisibleMs }))
+            warmPaintedMs = Get-Summary ([double[]]($rows | ForEach-Object { $_.warmPaintedMs }))
             idleFocusedCpuPct = Get-Summary ([double[]]($rows | ForEach-Object { $_.idleFocused.cpuPct }))
             idleFocusedCtxPerSec = Get-Summary ([double[]]($rows | ForEach-Object { $_.idleFocused.ctxPerSec }))
             idleUnfocusedCpuPct = Get-Summary ([double[]]($rows | ForEach-Object { $_.idleUnfocused.cpuPct }))
