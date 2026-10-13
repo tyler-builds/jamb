@@ -36,7 +36,7 @@ type Action struct {
 var NoAction = NewAction("no-action", "No action").Hide()
 
 // Unbind returns an action that removes a's bindings for the same keys ranked
-// below it: BindIn("Editor", "ctrl+z", ui.Unbind(ui.Undo)). Other bindings for
+// below it: BindIn("Editor", "ctrl+z", ui.Unbind(actions.Undo)). Other bindings for
 // those keys still apply.
 func Unbind(a *Action) *Action {
 	if a == nil {

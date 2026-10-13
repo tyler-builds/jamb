@@ -46,6 +46,7 @@ app/               runs an app: window + renderer + ui runtime, dev hooks
 ui/                declarative API: Div, Text, Button, TextInput, TextArea, Icon, Image,
                    Style, Theme, Signal, Component, FocusHandle, Animate; runtime (build → layout → paint, events)
 keymap/            key bindings from JSON files (Parse, Load, File); uses only ui's exported API
+actions/           the text fields' actions (Undo, Copy, MoveWordLeft...), for key bindings and menus
 ease/              easing functions for animation (Linear, OutCubic, Bounce...); imports nothing
 dialog/            native dialog types (file open, save and folder; message box), shared by ui and platform
 layout/            flexbox-subset layout engine (no drawing, no text)
@@ -1128,7 +1129,7 @@ app.Window{Bindings: []ui.Binding{                   // or rt.AddBindings(...)
 	ui.Bind("ctrl+k ctrl+t", ToggleTheme),           // a chord: the first stroke waits up to a second
 	ui.BindIn("Palette > Editor", "up", PaletteUp),  // only inside a Palette that holds a field
 	ui.BindIn("Editor", "ctrl+a", ui.NoAction),      // turns Ctrl+A off in text fields
-	ui.BindIn("Editor", "ctrl+z", ui.Unbind(ui.Undo)), // Ctrl+Z is no longer Undo in fields
+	ui.BindIn("Editor", "ctrl+z", ui.Unbind(actions.Undo)), // Ctrl+Z is no longer Undo in fields
 }}
 ctx.Dispatch(NewNote)                                // runs along the focus path; false if unhandled
 ctx.KeysFor(NewNote)                                 // "Ctrl+N", for tooltips
@@ -1143,7 +1144,7 @@ ctx.AvailableActions()                               // actions handled on the f
 ui.NoAction)` makes Ctrl+A do nothing in a text field: the key goes on to
 `OnKeyDown` and text input, as if nothing had bound it. `ui.Unbind(a)` removes
 `a`'s bindings for the same keys, and only those. `BindIn("Editor", "ctrl+z",
-ui.Unbind(ui.Undo))` frees Ctrl+Z from Undo in fields, and a global binding for
+ui.Unbind(actions.Undo))` frees Ctrl+Z from Undo in fields, and a global binding for
 Ctrl+Z still runs. A `NoAction` or `Unbind` affects only the bindings ranked
 below it, so one added earlier, or one in a shallower context, does nothing.
 `KeysFor` skips the bindings they turn off.
@@ -1159,10 +1160,10 @@ tightest, are `>`, `||`, `&&`, `==` and `!=`, and `!`; parentheses group.
 
 | Syntax | Matches when | Example |
 |---|---|---|
-| `Editor` | some context on the focus path has the identifier | `BindIn("Editor", "ctrl+d", ui.DeleteForward)` |
+| `Editor` | some context on the focus path has the identifier | `BindIn("Editor", "ctrl+d", actions.DeleteForward)` |
 | `mode == full`, `mode != full` | the attribute is, or is not, `full` (`!=` also matches when it is absent) | `BindIn("mode == full", "f2", rename)` |
 | `!Terminal` | no context on the focus path has the identifier | `BindIn("!Terminal", "ctrl+s", save)` |
-| `a && b`, `a \|\| b` | both, or either, match | `BindIn("Editor && mode == single_line", "enter", ui.Confirm)` |
+| `a && b`, `a \|\| b` | both, or either, match | `BindIn("Editor && mode == single_line", "enter", actions.Confirm)` |
 | `a > b` | `b` matches inside a context that matches `a` | `BindIn("Palette > Editor", "up", PaletteUp)` |
 | `(a \|\| b) > c` | grouping | `BindIn("Pane > (Editor \|\| Terminal)", "ctrl+w", close)` |
 
@@ -1275,7 +1276,8 @@ rather than panicking.
 **Text fields.** A `TextInput` has the context `Editor mode=single_line`, and a
 `TextArea` has `Editor mode=full`. Their keys are actions, bound by
 `ui.DefaultBindings()`, which `ui.NewRuntime` adds first, so a binding of the
-app's at the same depth wins. The actions are `ui.MoveLeft`, `MoveRight`,
+app's at the same depth wins. The actions are in the `actions` package:
+`actions.MoveLeft`, `MoveRight`,
 `MoveWordLeft`, `MoveWordRight`, `SelectLeft`, `SelectRight`, `SelectWordLeft`,
 `SelectWordRight`, `MoveUp`, `MoveDown`, `SelectUp`, `SelectDown`, `PageUp`,
 `PageDown`, `SelectPageUp`, `SelectPageDown`, `MoveLineStart`, `MoveLineEnd`,
@@ -1286,8 +1288,8 @@ app's at the same depth wins. The actions are `ui.MoveLeft`, `MoveRight`,
 hidden, so a palette does not list them. Rebind them like any action:
 
 ```go
-rt.AddBindings(ui.BindIn("Editor", "ctrl+d", ui.DeleteForward))       // a new key
-rt.AddBindings(ui.BindIn("Editor", "ctrl+backspace", ui.DeleteBack))  // replaces the default word delete
+rt.AddBindings(ui.BindIn("Editor", "ctrl+d", actions.DeleteForward))      // a new key
+rt.AddBindings(ui.BindIn("Editor", "ctrl+backspace", actions.DeleteBack)) // replaces the default word delete
 ```
 
 Behavior changes from earlier versions: a key the defaults don't list (Ctrl+Up,

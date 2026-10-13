@@ -187,8 +187,8 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	if e.onStep != nil {
 		// A stepping field takes Up and Down from the keys of the field, so they
 		// step its value rather than move the caret.
-		d.OnAction(MoveUp, func() { e.onStep(1) })
-		d.OnAction(MoveDown, func() { e.onStep(-1) })
+		d.OnAction(moveUp, func() { e.onStep(1) })
+		d.OnAction(moveDown, func() { e.onStep(-1) })
 	}
 	d.h.onTextInput = func(s string) { rt.editorInsert(id, s, editTyping) }
 	d.h.onFocus = func() { rt.editorTouched(id) }

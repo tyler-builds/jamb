@@ -537,14 +537,14 @@ func TestPlainContextLosesToFieldKeys(t *testing.T) {
 func TestRebindFieldKeys(t *testing.T) {
 	v := NewSignal("one two")
 	r := newKeyRig(func(ctx *Context) Element { return Div().Padding(10).Child(TextInput(v)) })
-	r.rt.AddBindings(BindIn("Editor", "ctrl+d", DeleteForward))
+	r.rt.AddBindings(BindIn("Editor", "ctrl+d", deleteForward))
 	r.click(100, 27)
 	r.key(input.KeyHome, 0)
 	r.key(input.KeyD, ctrl)
 	if v.Peek() != "ne two" {
 		t.Errorf("Ctrl+D (DeleteForward): %q, want %q", v.Peek(), "ne two")
 	}
-	r.rt.AddBindings(BindIn("Editor", "ctrl+backspace", DeleteBack))
+	r.rt.AddBindings(BindIn("Editor", "ctrl+backspace", deleteBack))
 	r.key(input.KeyEnd, 0)
 	r.key(input.KeyBackspace, ctrl)
 	if v.Peek() != "ne tw" {
@@ -595,7 +595,7 @@ func TestEditorActionsHiddenAndBound(t *testing.T) {
 			t.Errorf("%s has no default key", e.a.Name())
 		}
 	}
-	if got := r.rt.KeysFor(Redo); got != "Ctrl+Y" { // the last default for Redo
+	if got := r.rt.KeysFor(redo); got != "Ctrl+Y" { // the last default for Redo
 		t.Errorf("KeysFor(Redo) = %q, want Ctrl+Y", got)
 	}
 }
@@ -662,7 +662,7 @@ func TestUnbindRemovesActionForKeys(t *testing.T) {
 	r := newKeyRig(func(ctx *Context) Element {
 		return Div().OnAction(global, func() { hits++ }).Child(TextInput(v).FocusHandle(field))
 	})
-	r.rt.AddBindings(BindIn("Editor", "ctrl+z", Unbind(Undo)), Bind("ctrl+z", global))
+	r.rt.AddBindings(BindIn("Editor", "ctrl+z", Unbind(undo)), Bind("ctrl+z", global))
 	field.Focus()
 	r.frame()
 	r.key(input.KeyEnd, 0)
@@ -684,7 +684,7 @@ func TestUnbindOfOtherActionChangesNothing(t *testing.T) {
 	r := newKeyRig(func(ctx *Context) Element {
 		return Div().Child(TextInput(v).FocusHandle(field))
 	})
-	r.rt.AddBindings(BindIn("Editor", "ctrl+z", Unbind(SelectAll)))
+	r.rt.AddBindings(BindIn("Editor", "ctrl+z", Unbind(selectAll)))
 	field.Focus()
 	r.frame()
 	r.key(input.KeyEnd, 0)
@@ -700,21 +700,21 @@ func TestUnbindOfOtherActionChangesNothing(t *testing.T) {
 // binding that is still in force.
 func TestKeysForSkipsTurnedOffBindings(t *testing.T) {
 	r := newKeyRig(func(ctx *Context) Element { return Div() })
-	if got := r.rt.KeysFor(SelectAll); got != "Ctrl+A" {
+	if got := r.rt.KeysFor(selectAll); got != "Ctrl+A" {
 		t.Fatalf("KeysFor(SelectAll) by default = %q, want Ctrl+A", got)
 	}
 	r.rt.AddBindings(BindIn("Editor", "ctrl+a", NoAction))
-	if got := r.rt.KeysFor(SelectAll); got != "" {
+	if got := r.rt.KeysFor(selectAll); got != "" {
 		t.Errorf("KeysFor(SelectAll) after NoAction on its keys = %q, want \"\"", got)
 	}
-	r.rt.AddBindings(Bind("ctrl+a", SelectAll))
-	if got := r.rt.KeysFor(SelectAll); got != "Ctrl+A" {
+	r.rt.AddBindings(Bind("ctrl+a", selectAll))
+	if got := r.rt.KeysFor(selectAll); got != "Ctrl+A" {
 		t.Errorf("KeysFor(SelectAll) with a global binding = %q, want Ctrl+A (other context)", got)
 	}
 
 	r = newKeyRig(func(ctx *Context) Element { return Div() })
-	r.rt.AddBindings(BindIn("Editor", "ctrl+y", Unbind(Redo)))
-	if got := r.rt.KeysFor(Redo); got != "Ctrl+Shift+Z" {
+	r.rt.AddBindings(BindIn("Editor", "ctrl+y", Unbind(redo)))
+	if got := r.rt.KeysFor(redo); got != "Ctrl+Shift+Z" {
 		t.Errorf("KeysFor(Redo) after Unbind on Ctrl+Y = %q, want Ctrl+Shift+Z", got)
 	}
 	if got := r.rt.KeysFor(NoAction); got != "" {

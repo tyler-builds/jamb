@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tyler-builds/jamb/actions"
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -70,7 +71,7 @@ func TestParseKeepsFileOrder(t *testing.T) {
 	if got := r.rt.KeysFor(ui.NoAction); got != "" {
 		t.Errorf("KeysFor(NoAction) = %q, want nothing", got)
 	}
-	if got := r.rt.KeysFor(ui.Undo); got != "" {
+	if got := r.rt.KeysFor(actions.Undo); got != "" {
 		t.Errorf("KeysFor(Undo) = %q after its unbind, want nothing", got)
 	}
 }
@@ -105,7 +106,7 @@ func TestKeysForIsDeterministic(t *testing.T) {
 	}
 	r := newRig(func(ctx *ui.Context) ui.Element { return ui.Div() })
 	r.rt.AddBindings(bs...)
-	if got := r.rt.KeysFor(ui.Redo); got != "Ctrl+Shift+Z" {
+	if got := r.rt.KeysFor(actions.Redo); got != "Ctrl+Shift+Z" {
 		t.Errorf("KeysFor(Redo) = %q, want Ctrl+Shift+Z", got)
 	}
 }
@@ -150,7 +151,7 @@ func TestParseReportsEveryProblem(t *testing.T) {
 	// the global ctrl+n and the Editor ctrl+y.
 	r := newRig(func(ctx *ui.Context) ui.Element { return ui.Div() })
 	r.rt.AddBindings(bs...)
-	if got := r.rt.KeysFor(ui.Redo); got != "Ctrl+Y" {
+	if got := r.rt.KeysFor(actions.Redo); got != "Ctrl+Y" {
 		t.Errorf("KeysFor(Redo) = %q, want Ctrl+Y", got)
 	}
 }
@@ -289,10 +290,10 @@ func TestFileApplyKeepsDefaults(t *testing.T) {
 	if changed, err := f.Apply(r.rt); !changed || err != nil {
 		t.Fatalf("Apply: changed %v, err %v", changed, err)
 	}
-	if got := r.rt.KeysFor(ui.Undo); got != "" {
+	if got := r.rt.KeysFor(actions.Undo); got != "" {
 		t.Errorf("file unbinds Undo, but KeysFor shows %q", got)
 	}
-	if got := r.rt.KeysFor(ui.Redo); got != "Ctrl+Y" {
+	if got := r.rt.KeysFor(actions.Redo); got != "Ctrl+Y" {
 		t.Errorf("KeysFor(Redo) = %q, want the default Ctrl+Y", got)
 	}
 }

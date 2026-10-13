@@ -6,48 +6,49 @@ import (
 
 // The keys of a text field are actions, so key bindings can change them and
 // an app can bind the same actions. DefaultBindings maps the usual keys to
-// them; BindIn("Editor", "ctrl+d", DeleteForward) adds one more. Each action
-// does what its key did when fields handled keys directly.
+// them. The actions package exports them for apps (actions.Undo...), and
+// BindIn("Editor", "ctrl+d", actions.DeleteForward) adds one more key. Each
+// action does what its key did when fields handled keys directly.
 
 var (
-	MoveLeft          = NewAction("editor.move-left", "Move left").Hide()
-	MoveRight         = NewAction("editor.move-right", "Move right").Hide()
-	MoveWordLeft      = NewAction("editor.move-word-left", "Move word left").Hide()
-	MoveWordRight     = NewAction("editor.move-word-right", "Move word right").Hide()
-	SelectLeft        = NewAction("editor.select-left", "Select left").Hide()
-	SelectRight       = NewAction("editor.select-right", "Select right").Hide()
-	SelectWordLeft    = NewAction("editor.select-word-left", "Select word left").Hide()
-	SelectWordRight   = NewAction("editor.select-word-right", "Select word right").Hide()
-	MoveUp            = NewAction("editor.move-up", "Move up").Hide()
-	MoveDown          = NewAction("editor.move-down", "Move down").Hide()
-	SelectUp          = NewAction("editor.select-up", "Select up").Hide()
-	SelectDown        = NewAction("editor.select-down", "Select down").Hide()
-	PageUp            = NewAction("editor.page-up", "Page up").Hide()
-	PageDown          = NewAction("editor.page-down", "Page down").Hide()
-	SelectPageUp      = NewAction("editor.select-page-up", "Select page up").Hide()
-	SelectPageDown    = NewAction("editor.select-page-down", "Select page down").Hide()
-	MoveLineStart     = NewAction("editor.move-line-start", "Move to line start").Hide()
-	MoveLineEnd       = NewAction("editor.move-line-end", "Move to line end").Hide()
-	SelectLineStart   = NewAction("editor.select-line-start", "Select to line start").Hide()
-	SelectLineEnd     = NewAction("editor.select-line-end", "Select to line end").Hide()
-	MoveToStart       = NewAction("editor.move-to-start", "Move to start").Hide()
-	MoveToEnd         = NewAction("editor.move-to-end", "Move to end").Hide()
-	SelectToStart     = NewAction("editor.select-to-start", "Select to start").Hide()
-	SelectToEnd       = NewAction("editor.select-to-end", "Select to end").Hide()
-	DeleteBack        = NewAction("editor.delete-back", "Delete back").Hide()
-	DeleteForward     = NewAction("editor.delete-forward", "Delete forward").Hide()
-	DeleteWordBack    = NewAction("editor.delete-word-back", "Delete word back").Hide()
-	DeleteWordForward = NewAction("editor.delete-word-forward", "Delete word forward").Hide()
-	Newline           = NewAction("editor.newline", "New line").Hide()
-	Indent            = NewAction("editor.indent", "Indent").Hide()
-	Confirm           = NewAction("editor.confirm", "Confirm").Hide()
-	SelectAll         = NewAction("editor.select-all", "Select all").Hide()
-	Copy              = NewAction("editor.copy", "Copy").Hide()
-	Cut               = NewAction("editor.cut", "Cut").Hide()
-	Paste             = NewAction("editor.paste", "Paste").Hide()
-	Undo              = NewAction("editor.undo", "Undo").Hide()
-	Redo              = NewAction("editor.redo", "Redo").Hide()
-	Cancel            = NewAction("editor.cancel", "Cancel").Hide()
+	moveLeft          = NewAction("editor.move-left", "Move left").Hide()
+	moveRight         = NewAction("editor.move-right", "Move right").Hide()
+	moveWordLeft      = NewAction("editor.move-word-left", "Move word left").Hide()
+	moveWordRight     = NewAction("editor.move-word-right", "Move word right").Hide()
+	selectLeft        = NewAction("editor.select-left", "Select left").Hide()
+	selectRight       = NewAction("editor.select-right", "Select right").Hide()
+	selectWordLeft    = NewAction("editor.select-word-left", "Select word left").Hide()
+	selectWordRight   = NewAction("editor.select-word-right", "Select word right").Hide()
+	moveUp            = NewAction("editor.move-up", "Move up").Hide()
+	moveDown          = NewAction("editor.move-down", "Move down").Hide()
+	selectUp          = NewAction("editor.select-up", "Select up").Hide()
+	selectDown        = NewAction("editor.select-down", "Select down").Hide()
+	pageUp            = NewAction("editor.page-up", "Page up").Hide()
+	pageDown          = NewAction("editor.page-down", "Page down").Hide()
+	selectPageUp      = NewAction("editor.select-page-up", "Select page up").Hide()
+	selectPageDown    = NewAction("editor.select-page-down", "Select page down").Hide()
+	moveLineStart     = NewAction("editor.move-line-start", "Move to line start").Hide()
+	moveLineEnd       = NewAction("editor.move-line-end", "Move to line end").Hide()
+	selectLineStart   = NewAction("editor.select-line-start", "Select to line start").Hide()
+	selectLineEnd     = NewAction("editor.select-line-end", "Select to line end").Hide()
+	moveToStart       = NewAction("editor.move-to-start", "Move to start").Hide()
+	moveToEnd         = NewAction("editor.move-to-end", "Move to end").Hide()
+	selectToStart     = NewAction("editor.select-to-start", "Select to start").Hide()
+	selectToEnd       = NewAction("editor.select-to-end", "Select to end").Hide()
+	deleteBack        = NewAction("editor.delete-back", "Delete back").Hide()
+	deleteForward     = NewAction("editor.delete-forward", "Delete forward").Hide()
+	deleteWordBack    = NewAction("editor.delete-word-back", "Delete word back").Hide()
+	deleteWordForward = NewAction("editor.delete-word-forward", "Delete word forward").Hide()
+	newline           = NewAction("editor.newline", "New line").Hide()
+	indent            = NewAction("editor.indent", "Indent").Hide()
+	confirm           = NewAction("editor.confirm", "Confirm").Hide()
+	selectAll         = NewAction("editor.select-all", "Select all").Hide()
+	copyAction        = NewAction("editor.copy", "Copy").Hide()
+	cut               = NewAction("editor.cut", "Cut").Hide()
+	paste             = NewAction("editor.paste", "Paste").Hide()
+	undo              = NewAction("editor.undo", "Undo").Hide()
+	redo              = NewAction("editor.redo", "Redo").Hide()
+	cancel            = NewAction("editor.cancel", "Cancel").Hide()
 )
 
 // editorActions says what each action does to the field with the given id.
@@ -56,44 +57,44 @@ var editorActions = []struct {
 	a  *Action
 	fn func(rt *Runtime, id uint64)
 }{
-	{MoveLeft, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, -1, false, false) }},
-	{MoveRight, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, 1, false, false) }},
-	{MoveWordLeft, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, -1, true, false) }},
-	{MoveWordRight, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, 1, true, false) }},
-	{SelectLeft, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, -1, false, true) }},
-	{SelectRight, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, 1, false, true) }},
-	{SelectWordLeft, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, -1, true, true) }},
-	{SelectWordRight, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, 1, true, true) }},
-	{MoveUp, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyUp, false) }},
-	{MoveDown, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyDown, false) }},
-	{SelectUp, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyUp, true) }},
-	{SelectDown, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyDown, true) }},
-	{PageUp, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyPageUp, false) }},
-	{PageDown, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyPageDown, false) }},
-	{SelectPageUp, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyPageUp, true) }},
-	{SelectPageDown, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyPageDown, true) }},
-	{MoveLineStart, func(rt *Runtime, id uint64) { rt.editorLineEdge(id, true, false) }},
-	{MoveLineEnd, func(rt *Runtime, id uint64) { rt.editorLineEdge(id, false, false) }},
-	{SelectLineStart, func(rt *Runtime, id uint64) { rt.editorLineEdge(id, true, true) }},
-	{SelectLineEnd, func(rt *Runtime, id uint64) { rt.editorLineEdge(id, false, true) }},
-	{MoveToStart, func(rt *Runtime, id uint64) { rt.editorDocEdge(id, true, false) }},
-	{MoveToEnd, func(rt *Runtime, id uint64) { rt.editorDocEdge(id, false, false) }},
-	{SelectToStart, func(rt *Runtime, id uint64) { rt.editorDocEdge(id, true, true) }},
-	{SelectToEnd, func(rt *Runtime, id uint64) { rt.editorDocEdge(id, false, true) }},
-	{DeleteBack, func(rt *Runtime, id uint64) { rt.editorDeleteStep(id, -1, false) }},
-	{DeleteForward, func(rt *Runtime, id uint64) { rt.editorDeleteStep(id, 1, false) }},
-	{DeleteWordBack, func(rt *Runtime, id uint64) { rt.editorDeleteStep(id, -1, true) }},
-	{DeleteWordForward, func(rt *Runtime, id uint64) { rt.editorDeleteStep(id, 1, true) }},
-	{Newline, func(rt *Runtime, id uint64) { rt.editorInsert(id, "\n", editOther) }},
-	{Indent, func(rt *Runtime, id uint64) { rt.editorInsert(id, "    ", editTyping) }},
-	{Confirm, (*Runtime).editorConfirm},
-	{SelectAll, (*Runtime).editorSelectAll},
-	{Copy, (*Runtime).editorCopy},
-	{Cut, (*Runtime).editorCut},
-	{Paste, (*Runtime).editorPaste},
-	{Undo, func(rt *Runtime, id uint64) { rt.editorUndo(id, false) }},
-	{Redo, func(rt *Runtime, id uint64) { rt.editorUndo(id, true) }},
-	{Cancel, func(rt *Runtime, id uint64) {
+	{moveLeft, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, -1, false, false) }},
+	{moveRight, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, 1, false, false) }},
+	{moveWordLeft, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, -1, true, false) }},
+	{moveWordRight, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, 1, true, false) }},
+	{selectLeft, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, -1, false, true) }},
+	{selectRight, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, 1, false, true) }},
+	{selectWordLeft, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, -1, true, true) }},
+	{selectWordRight, func(rt *Runtime, id uint64) { rt.editorHorizontal(id, 1, true, true) }},
+	{moveUp, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyUp, false) }},
+	{moveDown, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyDown, false) }},
+	{selectUp, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyUp, true) }},
+	{selectDown, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyDown, true) }},
+	{pageUp, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyPageUp, false) }},
+	{pageDown, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyPageDown, false) }},
+	{selectPageUp, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyPageUp, true) }},
+	{selectPageDown, func(rt *Runtime, id uint64) { rt.editorVerticalMove(id, input.KeyPageDown, true) }},
+	{moveLineStart, func(rt *Runtime, id uint64) { rt.editorLineEdge(id, true, false) }},
+	{moveLineEnd, func(rt *Runtime, id uint64) { rt.editorLineEdge(id, false, false) }},
+	{selectLineStart, func(rt *Runtime, id uint64) { rt.editorLineEdge(id, true, true) }},
+	{selectLineEnd, func(rt *Runtime, id uint64) { rt.editorLineEdge(id, false, true) }},
+	{moveToStart, func(rt *Runtime, id uint64) { rt.editorDocEdge(id, true, false) }},
+	{moveToEnd, func(rt *Runtime, id uint64) { rt.editorDocEdge(id, false, false) }},
+	{selectToStart, func(rt *Runtime, id uint64) { rt.editorDocEdge(id, true, true) }},
+	{selectToEnd, func(rt *Runtime, id uint64) { rt.editorDocEdge(id, false, true) }},
+	{deleteBack, func(rt *Runtime, id uint64) { rt.editorDeleteStep(id, -1, false) }},
+	{deleteForward, func(rt *Runtime, id uint64) { rt.editorDeleteStep(id, 1, false) }},
+	{deleteWordBack, func(rt *Runtime, id uint64) { rt.editorDeleteStep(id, -1, true) }},
+	{deleteWordForward, func(rt *Runtime, id uint64) { rt.editorDeleteStep(id, 1, true) }},
+	{newline, func(rt *Runtime, id uint64) { rt.editorInsert(id, "\n", editOther) }},
+	{indent, func(rt *Runtime, id uint64) { rt.editorInsert(id, "    ", editTyping) }},
+	{confirm, (*Runtime).editorConfirm},
+	{selectAll, (*Runtime).editorSelectAll},
+	{copyAction, (*Runtime).editorCopy},
+	{cut, (*Runtime).editorCut},
+	{paste, (*Runtime).editorPaste},
+	{undo, func(rt *Runtime, id uint64) { rt.editorUndo(id, false) }},
+	{redo, func(rt *Runtime, id uint64) { rt.editorUndo(id, true) }},
+	{cancel, func(rt *Runtime, id uint64) {
 		// An editor that sets onCancel (a grid's cell editor) handles Escape itself.
 		if n := rt.byID[id]; n != nil && n.editor != nil && n.editor.onCancel != nil {
 			n.editor.onCancel()
@@ -104,7 +105,8 @@ var editorActions = []struct {
 }
 
 // EditorActions lists the actions of text fields, in the order of the editor
-// table. Keymap files may name them.
+// table. Keymap files may name them. The actions package has each of them as a
+// variable.
 func EditorActions() []*Action {
 	out := make([]*Action, 0, len(editorActions))
 	for _, e := range editorActions {
@@ -119,47 +121,47 @@ func EditorActions() []*Action {
 // beats the field's own Up.
 func DefaultBindings() []Binding {
 	return []Binding{
-		BindIn("Editor", "left", MoveLeft),
-		BindIn("Editor", "right", MoveRight),
-		BindIn("Editor", "ctrl+left", MoveWordLeft),
-		BindIn("Editor", "ctrl+right", MoveWordRight),
-		BindIn("Editor", "shift+left", SelectLeft),
-		BindIn("Editor", "shift+right", SelectRight),
-		BindIn("Editor", "ctrl+shift+left", SelectWordLeft),
-		BindIn("Editor", "ctrl+shift+right", SelectWordRight),
-		BindIn("Editor", "up", MoveUp),
-		BindIn("Editor", "down", MoveDown),
-		BindIn("Editor", "pageup", PageUp),
-		BindIn("Editor", "pagedown", PageDown),
-		BindIn("Editor", "shift+up", SelectUp),
-		BindIn("Editor", "shift+down", SelectDown),
-		BindIn("Editor", "shift+pageup", SelectPageUp),
-		BindIn("Editor", "shift+pagedown", SelectPageDown),
-		BindIn("Editor", "home", MoveLineStart),
-		BindIn("Editor", "end", MoveLineEnd),
-		BindIn("Editor", "shift+home", SelectLineStart),
-		BindIn("Editor", "shift+end", SelectLineEnd),
-		BindIn("Editor", "ctrl+home", MoveToStart),
-		BindIn("Editor", "ctrl+end", MoveToEnd),
-		BindIn("Editor", "ctrl+shift+home", SelectToStart),
-		BindIn("Editor", "ctrl+shift+end", SelectToEnd),
-		BindIn("Editor", "backspace", DeleteBack),
-		BindIn("Editor", "shift+backspace", DeleteBack),
-		BindIn("Editor", "ctrl+backspace", DeleteWordBack),
-		BindIn("Editor", "delete", DeleteForward),
-		BindIn("Editor", "ctrl+delete", DeleteWordForward),
-		BindIn("Editor", "ctrl+a", SelectAll),
-		BindIn("Editor", "ctrl+c", Copy),
-		BindIn("Editor", "ctrl+x", Cut),
-		BindIn("Editor", "ctrl+v", Paste),
-		BindIn("Editor", "ctrl+z", Undo),
-		BindIn("Editor", "ctrl+shift+z", Redo),
-		BindIn("Editor", "ctrl+y", Redo),
-		BindIn("Editor", "escape", Cancel),
-		BindIn("Editor && mode == full", "enter", Newline),
-		BindIn("Editor && mode == full", "shift+enter", Newline),
-		BindIn("Editor && mode == full", "tab", Indent),
-		BindIn("Editor && mode == single_line", "enter", Confirm),
+		BindIn("Editor", "left", moveLeft),
+		BindIn("Editor", "right", moveRight),
+		BindIn("Editor", "ctrl+left", moveWordLeft),
+		BindIn("Editor", "ctrl+right", moveWordRight),
+		BindIn("Editor", "shift+left", selectLeft),
+		BindIn("Editor", "shift+right", selectRight),
+		BindIn("Editor", "ctrl+shift+left", selectWordLeft),
+		BindIn("Editor", "ctrl+shift+right", selectWordRight),
+		BindIn("Editor", "up", moveUp),
+		BindIn("Editor", "down", moveDown),
+		BindIn("Editor", "pageup", pageUp),
+		BindIn("Editor", "pagedown", pageDown),
+		BindIn("Editor", "shift+up", selectUp),
+		BindIn("Editor", "shift+down", selectDown),
+		BindIn("Editor", "shift+pageup", selectPageUp),
+		BindIn("Editor", "shift+pagedown", selectPageDown),
+		BindIn("Editor", "home", moveLineStart),
+		BindIn("Editor", "end", moveLineEnd),
+		BindIn("Editor", "shift+home", selectLineStart),
+		BindIn("Editor", "shift+end", selectLineEnd),
+		BindIn("Editor", "ctrl+home", moveToStart),
+		BindIn("Editor", "ctrl+end", moveToEnd),
+		BindIn("Editor", "ctrl+shift+home", selectToStart),
+		BindIn("Editor", "ctrl+shift+end", selectToEnd),
+		BindIn("Editor", "backspace", deleteBack),
+		BindIn("Editor", "shift+backspace", deleteBack),
+		BindIn("Editor", "ctrl+backspace", deleteWordBack),
+		BindIn("Editor", "delete", deleteForward),
+		BindIn("Editor", "ctrl+delete", deleteWordForward),
+		BindIn("Editor", "ctrl+a", selectAll),
+		BindIn("Editor", "ctrl+c", copyAction),
+		BindIn("Editor", "ctrl+x", cut),
+		BindIn("Editor", "ctrl+v", paste),
+		BindIn("Editor", "ctrl+z", undo),
+		BindIn("Editor", "ctrl+shift+z", redo),
+		BindIn("Editor", "ctrl+y", redo),
+		BindIn("Editor", "escape", cancel),
+		BindIn("Editor && mode == full", "enter", newline),
+		BindIn("Editor && mode == full", "shift+enter", newline),
+		BindIn("Editor && mode == full", "tab", indent),
+		BindIn("Editor && mode == single_line", "enter", confirm),
 		// A combo box's keys come after the editor's: at the same depth the later
 		// binding runs first, and an action runs only while its combo box has a handler
 		// for it (see combobox.go).

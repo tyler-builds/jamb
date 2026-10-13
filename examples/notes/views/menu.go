@@ -1,6 +1,7 @@
 package views
 
 import (
+	"github.com/tyler-builds/jamb/actions"
 	"github.com/tyler-builds/jamb/ui"
 
 	"github.com/tyler-builds/jamb/examples/notes/store"
@@ -33,14 +34,14 @@ func (a *App) menuBar(ctx *ui.Context) ui.Element {
 			}},
 			ui.TopMenu{Label: "Edit", Items: func() []ui.MenuItem {
 				return []ui.MenuItem{
-					{Action: ui.Undo},
-					{Action: ui.Redo},
+					{Action: actions.Undo},
+					{Action: actions.Redo},
 					ui.MenuSeparator(),
-					{Action: ui.Cut},
-					{Action: ui.Copy},
-					{Action: ui.Paste},
+					{Action: actions.Cut},
+					{Action: actions.Copy},
+					{Action: actions.Paste},
 					ui.MenuSeparator(),
-					{Action: ui.SelectAll},
+					{Action: actions.SelectAll},
 				}
 			}},
 			ui.TopMenu{Label: "View", Items: func() []ui.MenuItem {

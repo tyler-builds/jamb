@@ -645,7 +645,7 @@ func (rt *Runtime) bindingKey(s keystroke) bool {
 	if s == (keystroke{input.KeyEscape, 0}) && rt.escapeDismisses() {
 		// The field's own Cancel would blur it. While an overlay or tooltip is
 		// open, Escape is left to keyDown, which closes that instead.
-		bs = slices.DeleteFunc(bs, func(b Binding) bool { return b.action == Cancel })
+		bs = slices.DeleteFunc(bs, func(b Binding) bool { return b.action == cancel })
 	}
 	seq := make([]keystroke, 0, len(rt.pending)+1)
 	for _, p := range rt.pending {
