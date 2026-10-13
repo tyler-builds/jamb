@@ -50,7 +50,7 @@ func TestBadgeVariantStyles(t *testing.T) {
 		r := newThemedRig(th, func(ctx *Context) Element { return Badge(3).Variant(v).Styles(st) })
 		return partNode(t, r.rt, "Badge.Badge", "").style.Background
 	}
-	th := *DarkTheme
+	th := *DarkTheme()
 	th.Badge.Badge.Background = all
 	th.Badges.Success.Badge.Background = success
 	if got := bg(&th, BadgeNeutral, BadgeStyle{}); got != all {
@@ -67,7 +67,7 @@ func TestBadgeVariantStyles(t *testing.T) {
 // TestBadgeUnderHighContrast checks that an app color does not reach a badge
 // under high contrast: it is the window color with an outline.
 func TestBadgeUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.Badge.Badge = Style{Background: markBG}
 	r := newThemedRig(&theme, func(ctx *Context) Element {
 		return Badge(4).Variant(BadgeDanger).Styles(BadgeStyle{Badge: Style{Background: markBG}})

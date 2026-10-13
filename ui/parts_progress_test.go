@@ -92,7 +92,7 @@ func testProgressParts(t *testing.T, applied map[string]bool) {
 // the window color with an outline, the fill is Highlight, and an app color is
 // not used for the fill.
 func TestProgressUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.ProgressBar = ProgressBarStyle{Fill: Style{Background: markBG}}
 	r := newThemedRig(&theme, func(ctx *Context) Element {
 		return Div().Column().Child(ProgressBar(0.5).Label("Upload").Color(Hex("#123456")))

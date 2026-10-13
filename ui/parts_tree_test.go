@@ -142,7 +142,7 @@ func TestTreeRenderSlotsKeepBehaviorAndNames(t *testing.T) {
 // selected row is Highlight with HighlightText on it, an app color does not
 // reach the row, and the focus ring of the tree stays.
 func TestTreeUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.Tree = TreeStyle{RowSelected: Style{Background: markBG, TextColor: markFG}, Indent: 12}
 	sel := NewSignal("src")
 	r := newThemedRig(&theme, func(ctx *Context) Element { return partTree(sel, TreeStyle{}, nil, nil) })

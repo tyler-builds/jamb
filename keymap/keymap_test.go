@@ -28,7 +28,7 @@ type rig struct {
 
 func newRig(root func(*ui.Context) ui.Element) *rig {
 	r := &rig{now: time.Unix(1_000_000, 0)}
-	r.rt = ui.NewRuntime(root, ui.DarkTheme, nil)
+	r.rt = ui.NewRuntime(root, ui.DarkTheme(), nil)
 	r.rt.SetViewport(500, 400, 1)
 	r.frame()
 	return r

@@ -51,7 +51,7 @@ func newScaleApp(nodes int) *scaleApp {
 			}).Key(fmt.Sprint(i)))
 		}
 		return Div().Height(Full).Child(list)
-	}, DarkTheme, benchText)
+	}, DarkTheme(), benchText)
 	a.rt.SetViewport(1200, 800, 1)
 	a.rt.Frame(time.Now())
 	return a
@@ -200,7 +200,7 @@ func newListBenchApp(count int, uniform bool) *Runtime {
 			list.Child(benchListRow(i))
 		}
 		return Div().Height(Full).Child(list)
-	}, DarkTheme, benchText)
+	}, DarkTheme(), benchText)
 	rt.SetViewport(1200, 800, 1)
 	rt.Frame(time.Now())
 	return rt

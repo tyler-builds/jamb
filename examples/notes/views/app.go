@@ -203,9 +203,9 @@ func (a *App) togglePin() {
 // toggleTheme switches between the dark and light themes.
 func toggleTheme(ctx *ui.Context) {
 	if ctx.Theme().Dark {
-		ctx.SetTheme(ui.LightTheme)
+		ctx.SetTheme(ui.LightTheme())
 	} else {
-		ctx.SetTheme(ui.DarkTheme)
+		ctx.SetTheme(ui.DarkTheme())
 	}
 }
 

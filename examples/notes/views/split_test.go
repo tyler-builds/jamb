@@ -21,7 +21,7 @@ func splitWindow(t *testing.T, dir string, width float64) (*ui.Runtime, *ui.Sign
 		t.Fatal(err)
 	}
 	sidebar := ui.NewSignal(width)
-	rt := ui.NewRuntime(RootWith(s, Layout{Sidebar: sidebar}), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(RootWith(s, Layout{Sidebar: sidebar}), ui.DarkTheme(), nil)
 	rt.AddBindings(Bindings()...)
 	var warnings []string
 	rt.SetWarnFunc(func(msg string) { warnings = append(warnings, msg) })

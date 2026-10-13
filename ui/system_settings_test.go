@@ -10,7 +10,7 @@ import (
 // runtime switches to it and back with the setting.
 func TestHighContrastThemeFromSystemColors(t *testing.T) {
 	c := HighContrastBlack()
-	th := HighContrastTheme(c, DarkTheme)
+	th := HighContrastTheme(c, DarkTheme())
 	checks := []struct {
 		name      string
 		got, want Color
@@ -35,10 +35,10 @@ func TestHighContrastThemeFromSystemColors(t *testing.T) {
 	if !th.Dark || th.Name != "high contrast" {
 		t.Errorf("a black window is a dark high contrast theme (dark %v, name %q)", th.Dark, th.Name)
 	}
-	if th.FontSize != DarkTheme.FontSize || th.Radius != DarkTheme.Radius {
+	if th.FontSize != DarkTheme().FontSize || th.Radius != DarkTheme().Radius {
 		t.Error("the high contrast theme does not keep the app's font size and radius")
 	}
-	if HighContrastTheme(HighContrastWhite(), LightTheme).Dark {
+	if HighContrastTheme(HighContrastWhite(), LightTheme()).Dark {
 		t.Error("a white window is a light high contrast theme")
 	}
 }
@@ -49,7 +49,7 @@ func TestSystemSettingsSwitchTheme(t *testing.T) {
 		hc = ctx.HighContrast()
 		return Div().Child(Text("x"))
 	}, 300, 200)
-	if r.rt.Theme() != DarkTheme {
+	if r.rt.Theme().Name != "dark" {
 		t.Fatal("the app's theme is not the default")
 	}
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastWhite()})
@@ -62,13 +62,14 @@ func TestSystemSettingsSwitchTheme(t *testing.T) {
 	}
 	// A theme the app sets stays in place under high contrast, and comes back
 	// when high contrast is off.
-	r.rt.SetTheme(LightTheme)
+	light := LightTheme()
+	r.rt.SetTheme(light)
 	if r.rt.Theme().Name != "high contrast" {
 		t.Error("SetTheme replaced the high contrast theme")
 	}
 	r.rt.SetSystemSettings(SystemSettings{})
 	r.frame()
-	if r.rt.Theme() != LightTheme || hc {
+	if r.rt.Theme() != light || hc {
 		t.Errorf("high contrast off: theme %q, the component sees %v", r.rt.Theme().Name, hc)
 	}
 }
@@ -322,7 +323,7 @@ func TestTextScaleIndependentOfDPI(t *testing.T) {
 // is exempt from the ratio (WCAG 1.4.3), but the text is kept readable.
 func TestHighContrastDisabledIsGrayText(t *testing.T) {
 	for _, c := range []SystemColors{HighContrastBlack(), HighContrastWhite()} {
-		th := HighContrastTheme(c, DarkTheme)
+		th := HighContrastTheme(c, DarkTheme())
 		if th.Disabled != c.GrayText {
 			t.Errorf("disabled color %v, want GrayText %v", th.Disabled, c.GrayText)
 		}

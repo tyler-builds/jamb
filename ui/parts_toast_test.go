@@ -55,7 +55,7 @@ func testTooltipParts(t *testing.T, applied map[string]bool) {
 	for _, c := range cases {
 		applied[c.part] = true
 		t.Run(c.part, func(t *testing.T) {
-			theme := *DarkTheme
+			theme := *DarkTheme()
 			c.set(&theme.Tooltip, Style{Background: markBG, TextColor: markFG})
 			r := newThemedRig(&theme, func(ctx *Context) Element {
 				return Div().Column().Child(Div().Key("t").Size(Px(100), Px(30)).Tooltip("Hello"))
@@ -77,7 +77,7 @@ func testTooltipParts(t *testing.T, applied map[string]bool) {
 // TestToastUnderHighContrast checks that a toast's border is the text color under
 // high contrast, so the box is outlined, and that an app color does not reach it.
 func TestToastUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.Toast = ToastStyle{Container: Style{Background: markBG}}
 	r := newThemedRig(&theme, func(ctx *Context) Element { return Div().Column().Child(Toaster()) })
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastBlack()})

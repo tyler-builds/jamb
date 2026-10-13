@@ -265,7 +265,7 @@ func TestToastWakesWhenItRunsOut(t *testing.T) {
 }
 
 func TestToastIconsDifferByShape(t *testing.T) {
-	th := LightTheme
+	th := LightTheme()
 	seen := map[*icons.Icon]ToastVariant{}
 	for v := ToastInfo; v <= ToastError; v++ {
 		ic, _ := toastIcon(th, v)

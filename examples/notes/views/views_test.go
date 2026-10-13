@@ -23,7 +23,7 @@ func newRig(t *testing.T) *rig {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rt := ui.NewRuntime(Root(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(Root(s), ui.DarkTheme(), nil)
 	rt.AddBindings(Bindings()...)
 	rt.SetViewport(1100, 720, 1)
 	r := &rig{t, s, rt}

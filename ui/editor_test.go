@@ -16,7 +16,7 @@ type editorRig struct {
 
 func newEditorRig(t *testing.T, root func(*Context) Element) *editorRig {
 	r := &editorRig{now: time.Unix(1_000_000, 0)}
-	r.rt = NewRuntime(root, DarkTheme, nil)
+	r.rt = NewRuntime(root, DarkTheme(), nil)
 	r.rt.clock = func() time.Time { return r.now }
 	r.rt.SetViewport(500, 400, 1)
 	frame(r.rt)
@@ -257,7 +257,7 @@ func TestFocusHandleAutoFocusAndFocusWithin(t *testing.T) {
 		t.Fatal("FocusHandle.Focus did not focus the search field")
 	}
 	box := r.rt.tree.children[0] // the search field's frame
-	if box.style.BorderColor != DarkTheme.Accent {
+	if box.style.BorderColor != DarkTheme().Accent {
 		t.Error("FocusWithin did not highlight the field frame")
 	}
 	show.Set(true)
@@ -266,7 +266,7 @@ func TestFocusHandleAutoFocusAndFocusWithin(t *testing.T) {
 	if h.Focused() {
 		t.Error("AutoFocus on the new field did not take focus")
 	}
-	if box.style.BorderColor == DarkTheme.Accent {
+	if box.style.BorderColor == DarkTheme().Accent {
 		t.Error("the search frame kept its focus style after losing focus")
 	}
 }

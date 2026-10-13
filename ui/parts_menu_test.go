@@ -33,7 +33,7 @@ func menuTrigger() Element { return Button("Actions").Key("trig") }
 // binding of the action is set so that the shortcut is drawn.
 func menuRig(ctxMenu bool, st MenuStyle) (*accessRig, *Action) {
 	note := NewAction("test.note", "New note")
-	th := *DarkTheme
+	th := *DarkTheme()
 	if ctxMenu {
 		th.Menu = st
 	}
@@ -162,7 +162,7 @@ func testMenuBarParts(t *testing.T, applied map[string]bool) {
 			var st MenuBarStyle
 			c.set(&st, Style{Background: markBG})
 			var sink []string
-			r := newThemedRig(DarkTheme, func(ctx *Context) Element {
+			r := newThemedRig(DarkTheme(), func(ctx *Context) Element {
 				return Div().Column().Child(MenuBar(
 					TopMenu{Label: "File", Items: func() []MenuItem { return sampleFile(&sink) }},
 					TopMenu{Label: "Edit", Items: func() []MenuItem { return sampleEdit(&sink) }},

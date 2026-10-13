@@ -68,29 +68,28 @@ set the outer size of a widget and win over the theme and `Styles`; the theme an
 
 ### The app's theme
 
-To style the parts for a whole app, make the app's theme from a copy of a built-in
-theme, and pass that copy to the app and to every theme switch. The copy is the
-app's; the built-in `ui.DarkTheme` and `ui.LightTheme` stay as they are.
+To style the parts for a whole app, start the app's theme from a built-in theme,
+and pass it to the app and to every theme switch. `ui.DarkTheme()` and
+`ui.LightTheme()` return a new copy on every call, so the app can change its copy
+freely.
 
 ```go
-// appTheme returns the dark theme of the app: a copy of the built-in one, with
-// a 3 px line under every underline tab.
+// appTheme returns the dark theme of the app: the built-in one, with a 3 px
+// line under every underline tab.
 func appTheme() *ui.Theme {
-	t := ui.DarkTheme.Clone()
+	t := ui.DarkTheme()
 	t.Tabs = ui.TabsStyle{Indicator: ui.Style{Height: ui.Px(3)}}
 	return t
 }
 
 // The app starts with it, and the theme switch uses it.
 application.Run(app.Window{Theme: appTheme(), Root: root})
-ctx.SetTheme(appLightTheme()) // the same, from ui.LightTheme.Clone()
+ctx.SetTheme(appLightTheme()) // the same, from ui.LightTheme()
 ```
 
-The built-in themes are variables, so setting a field on `ui.DarkTheme` changes it
-for the whole process, including other windows and any code that reads it. Do not
-do that: make a copy with `Clone`. `Clone` copies the theme's fields; the parts'
-shadows are shared with the built-in theme, so change a part by assigning a new
-style, not by changing a slice in place.
+To derive several themes from one of your own, copy it with `Clone`. `Clone`
+copies the theme's fields; the parts' shadows are shared with the original, so
+change a part by assigning a new style, not by changing a slice in place.
 
 ## Turning a default off
 
@@ -539,7 +538,7 @@ A theme-level change, an instance override, a variant, and a render slot, from t
 demo's Components page (Customizing):
 
 ```go
-appTheme() // a copy of ui.DarkTheme, with a 3 px line under underline tabs (see "The app's theme")
+appTheme() // ui.DarkTheme(), with a 3 px line under underline tabs (see "The app's theme")
 
 // One tab list, with a green line and a green selected label.
 ui.Tabs(section, tabs...).Styles(ui.TabsStyle{

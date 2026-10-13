@@ -172,7 +172,7 @@ func testSwitchParts(t *testing.T, applied map[string]bool) {
 // radio group and the switch: an app color does not reach their boxes, rings
 // and tracks, and the focus ring of the control stays.
 func TestControlsUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.Checkbox = CheckboxStyle{Box: Style{Background: markBG, Padding: All(3)}}
 	theme.RadioGroup = RadioGroupStyle{Ring: Style{Background: markBG}}
 	theme.Switch = SwitchStyle{Track: Style{Background: markBG}}

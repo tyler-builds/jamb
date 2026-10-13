@@ -12,7 +12,7 @@ import (
 // gets a background quad in the match color.
 func TestSearchHighlightsMatchesInNoteRows(t *testing.T) {
 	r := newRig(t)
-	soft := scene.Color(matchHighlight(ui.DarkTheme).Background)
+	soft := scene.Color(matchHighlight(ui.DarkTheme()).Background)
 	count := func() int {
 		n := 0
 		for _, q := range r.rt.Frame(time.Now()).Quads {

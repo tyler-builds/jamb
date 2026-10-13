@@ -792,7 +792,7 @@ func TestComboboxSizing(t *testing.T) {
 // Under high contrast the highlighted suggestion is drawn in the system Highlight
 // colors, and the match is underlined rather than colored (see ComboboxStyle).
 func TestComboboxHighContrastHighlight(t *testing.T) {
-	th := *DarkTheme
+	th := *DarkTheme()
 	th.HighContrast = true
 	text := NewSignal("")
 	cr := &comboRig{text: text}

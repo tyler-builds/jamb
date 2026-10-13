@@ -11,7 +11,7 @@ import (
 // tested headlessly: build a tree, run frames, inject input, inspect results.
 
 func newTestRuntime(root func(*Context) Element, w, h, scale float32) *Runtime {
-	rt := NewRuntime(root, DarkTheme, nil)
+	rt := NewRuntime(root, DarkTheme(), nil)
 	rt.SetViewport(w, h, scale)
 	rt.Frame(time.Now())
 	return rt

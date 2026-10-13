@@ -17,7 +17,7 @@ type keyRig struct {
 
 func newKeyRig(root func(*Context) Element) *keyRig {
 	r := &keyRig{now: time.Unix(1_000_000, 0)}
-	r.rt = NewRuntime(root, DarkTheme, nil)
+	r.rt = NewRuntime(root, DarkTheme(), nil)
 	r.rt.clock = func() time.Time { return r.now }
 	r.rt.SetViewport(500, 400, 1)
 	r.frame()

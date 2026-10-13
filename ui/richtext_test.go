@@ -175,7 +175,7 @@ func TestRichPaintsSegmentColorsBackgroundsAndUnderlines(t *testing.T) {
 		).Key("r"))
 	}, 400, 300, 1)
 	sc := paintNow(rt)
-	textColor := DarkTheme.Text.scene()
+	textColor := DarkTheme().Text.scene()
 	if got := countGlyphs(sc, red.scene()); got != 2 {
 		t.Errorf("red glyphs = %d, want 2 (the cd segment)", got)
 	}
@@ -214,11 +214,11 @@ func TestLinkUsesThemeLinkColorAndFollowsSetTheme(t *testing.T) {
 	rt := newTestRuntime(func(ctx *Context) Element {
 		return Div().Child(Rich(Link("open", func() {})).Key("r"))
 	}, 400, 300, 1)
-	if got := countGlyphs(paintNow(rt), DarkTheme.Link.scene()); got != 4 {
+	if got := countGlyphs(paintNow(rt), DarkTheme().Link.scene()); got != 4 {
 		t.Fatalf("accent glyphs = %d, want 4 in the dark theme", got)
 	}
-	rt.SetTheme(LightTheme)
-	if got := countGlyphs(paintNow(rt), LightTheme.Link.scene()); got != 4 {
+	rt.SetTheme(LightTheme())
+	if got := countGlyphs(paintNow(rt), LightTheme().Link.scene()); got != 4 {
 		t.Errorf("accent glyphs after SetTheme = %d, want 4 in the light theme", got)
 	}
 }
@@ -270,7 +270,7 @@ func TestLinkUnderlineShowsOnlyWhileHoveredAndDoesNotReshape(t *testing.T) {
 	rt := newTestRuntime(func(ctx *Context) Element {
 		return Div().Padding(10).Child(Rich(Seg("see "), Link("this", func() {})).Key("r"))
 	}, 400, 300, 1)
-	accent := DarkTheme.Link.scene()
+	accent := DarkTheme().Link.scene()
 	before := paintNow(rt)
 	if got := countQuads(before, accent, 1); got != 0 {
 		t.Fatalf("underline before hover = %d quads, want 0", got)

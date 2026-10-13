@@ -27,7 +27,7 @@ func isRing(q scene.Quad, c Color) bool {
 func ringQuads(rt *Runtime) int {
 	n := 0
 	for _, q := range rt.scene.Quads {
-		if isRing(q, DarkTheme.FocusRing) {
+		if isRing(q, DarkTheme().FocusRing) {
 			n++
 		}
 	}

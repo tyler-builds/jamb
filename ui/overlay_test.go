@@ -15,7 +15,7 @@ type overlayRig struct {
 
 func newOverlayRig(root func(*Context) Element, w, h float32) *overlayRig {
 	r := &overlayRig{now: time.Unix(1_000_000, 0)}
-	r.rt = NewRuntime(root, DarkTheme, nil)
+	r.rt = NewRuntime(root, DarkTheme(), nil)
 	r.rt.clock = func() time.Time { return r.now }
 	r.rt.SetViewport(w, h, 1)
 	r.rt.Frame(r.now)

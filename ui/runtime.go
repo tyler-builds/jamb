@@ -429,7 +429,7 @@ func (rt *Runtime) TextInputRect() (scene.Rect, bool) {
 // NewRuntime creates a runtime for the given root render function.
 func NewRuntime(root func(ctx *Context) Element, theme *Theme, ts *text.System) *Runtime {
 	if theme == nil {
-		theme = DarkTheme
+		theme = DarkTheme()
 	}
 	if ts == nil {
 		ts = text.NewSystem()

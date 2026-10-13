@@ -47,7 +47,7 @@ func testModalParts(t *testing.T, applied map[string]bool) {
 // not reach the scrim or the panel under high contrast, the panel's padding does,
 // and the scrim is the window color there.
 func TestModalUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.Modal = ModalStyle{Panel: Style{Background: markBG, Padding: All(5)}}
 	r := newThemedRig(&theme, func(ctx *Context) Element {
 		return partModal(ModalStyle{Scrim: Style{Background: markBG}, Panel: Style{Padding: All(11)}})

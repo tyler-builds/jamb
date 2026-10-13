@@ -387,7 +387,7 @@ func TestListOfDuplicateKeysWarnOnce(t *testing.T) {
 		return Div().Child(ListOf(items.Get(), vKey, func(id int) Element {
 			return Div().Key(vKey(id)).Height(Px(30)).Child(Text(vKey(id)))
 		}).Key("list").Style(Style{Height: Px(400)}))
-	}, DarkTheme, nil)
+	}, DarkTheme(), nil)
 	r.rt.clock = func() time.Time { return r.now }
 	r.rt.SetWarnFunc(func(s string) { warnings = append(warnings, s) })
 	r.rt.SetViewport(800, 600, 1)
@@ -411,7 +411,7 @@ func BenchmarkListOf(b *testing.B) {
 			return Div().Height(Full).Child(ListOf(items.Get(), vKey, func(id int) Element {
 				return Div().Key(vKey(id)).Height(Px(vHeight(id))).Child(Text(vKey(id)))
 			}).Style(Style{Height: Px(800)}))
-		}, DarkTheme, benchText)
+		}, DarkTheme(), benchText)
 		rt.SetViewport(1200, 800, 1)
 		rt.Frame(time.Now())
 		return rt, items

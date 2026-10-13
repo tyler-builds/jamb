@@ -26,7 +26,7 @@ type accessRig struct {
 
 func newAccessRig(root func(*Context) Element) *accessRig {
 	r := &accessRig{now: time.Unix(1_000_000, 0)}
-	r.rt = NewRuntime(root, DarkTheme, nil)
+	r.rt = NewRuntime(root, DarkTheme(), nil)
 	r.rt.clock = func() time.Time { return r.now }
 	r.rt.SetWarnFunc(func(s string) { r.warnings = append(r.warnings, s) })
 	r.rt.SetAccessWarnings(true)
@@ -409,7 +409,7 @@ func TestAccessNothingIsBuiltWithoutAnAssistiveTechnology(t *testing.T) {
 	text := NewSignal("a")
 	rt := NewRuntime(func(ctx *Context) Element {
 		return Div().Column().Children(Button("Go"), Text(text.Get()))
-	}, DarkTheme, nil)
+	}, DarkTheme(), nil)
 	rt.SetViewport(500, 400, 1)
 	now := time.Unix(1_000_000, 0)
 	for i := 0; i < 5; i++ {
@@ -440,7 +440,7 @@ func TestAccessDumpIsReadable(t *testing.T) {
 func TestAccessWarningsRunWithoutAnAssistiveTechnology(t *testing.T) {
 	rt := NewRuntime(func(ctx *Context) Element {
 		return Div().Column().Child(IconButton(icons.Bell))
-	}, DarkTheme, nil)
+	}, DarkTheme(), nil)
 	var warnings []string
 	rt.SetWarnFunc(func(s string) { warnings = append(warnings, s) })
 	rt.SetAccessWarnings(true)

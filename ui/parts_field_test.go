@@ -86,7 +86,7 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 // frame of a number input are not used, while its padding and the frame's border
 // are, the focus is drawn in Highlight, and a disabled number is GrayText.
 func TestFieldOverridesUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.Field = FieldStyle{Frame: Style{Background: markBG, Padding: All(7)}, Text: Style{TextColor: markFG}}
 	theme.NumberInput.FrameInvalid = Style{BorderColor: markBG, BorderWidth: 4}
 
@@ -160,13 +160,13 @@ func TestFieldThemeLayers(t *testing.T) {
 		inst  Style // the instance's frame
 		want  Color
 	}{
-		{"the defaults", Style{}, Style{}, Style{}, DarkTheme.Surface},
+		{"the defaults", Style{}, Style{}, Style{}, DarkTheme().Surface},
 		{"the theme's Field", Style{Background: fromField}, Style{}, Style{}, fromField},
 		{"the theme's NumberInput over Field", Style{Background: fromField}, Style{Background: fromNumber}, Style{}, fromNumber},
 		{"the instance over both", Style{Background: fromField}, Style{Background: fromNumber}, Style{Background: fromInstance}, fromInstance},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			theme := *DarkTheme
+			theme := *DarkTheme()
 			theme.Field.Frame = tc.field
 			theme.NumberInput.Frame = tc.num
 			r := newThemedRig(&theme, func(ctx *Context) Element {
@@ -212,13 +212,13 @@ func TestTextAreaMinRowsFollowTextScale(t *testing.T) {
 // frame is the Highlight color with HighlightText on it, and that the normal
 // theme's selection keeps its text color.
 func TestFieldSelectionUnderHighContrast(t *testing.T) {
-	hc := HighContrastTheme(HighContrastBlack(), DarkTheme)
+	hc := HighContrastTheme(HighContrastBlack(), DarkTheme())
 	sel := fieldDefaults(hc, fieldLayout{}).Selection
 	if sel.Background != hc.Accent || sel.TextColor != hc.AccentText {
 		t.Errorf("high contrast selection: background %v text %v, want Highlight %v with HighlightText %v",
 			sel.Background, sel.TextColor, hc.Accent, hc.AccentText)
 	}
-	if got := fieldDefaults(DarkTheme, fieldLayout{}).Selection.TextColor; !got.IsZero() {
+	if got := fieldDefaults(DarkTheme(), fieldLayout{}).Selection.TextColor; !got.IsZero() {
 		t.Errorf("normal selection sets a text color %v, want none", got)
 	}
 }

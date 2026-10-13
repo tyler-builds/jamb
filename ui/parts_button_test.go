@@ -62,7 +62,7 @@ func TestButtonVariantStyles(t *testing.T) {
 		r := newThemedRig(th, func(ctx *Context) Element { return partButton(v, st, false) })
 		return partNode(t, r.rt, "Button.Root", "").style.Background
 	}
-	th := *DarkTheme
+	th := *DarkTheme()
 	th.Button.Root.Background = themeAll
 	th.Buttons.Danger.Root.Background = themeDanger
 	if got := bg(&th, ButtonPrimary, ButtonStyle{}); got != themeAll {
@@ -87,11 +87,11 @@ func TestButtonPartPrecedence(t *testing.T) {
 		r := newThemedRig(th, func(ctx *Context) Element { return partButton(ButtonPrimary, st, false) })
 		return partNode(t, r.rt, "Button.Root", "").style.Background
 	}
-	plain := *DarkTheme
-	withTheme := *DarkTheme
+	plain := *DarkTheme()
+	withTheme := *DarkTheme()
 	withTheme.Button.Root.Background = themeBG
-	if got := bgOf(&plain, ButtonStyle{}); got != DarkTheme.Accent {
-		t.Errorf("no override: background %v, want the default %v", got, DarkTheme.Accent)
+	if got := bgOf(&plain, ButtonStyle{}); got != DarkTheme().Accent {
+		t.Errorf("no override: background %v, want the default %v", got, DarkTheme().Accent)
 	}
 	if got := bgOf(&withTheme, ButtonStyle{}); got != themeBG {
 		t.Errorf("theme override: background %v, want %v", got, themeBG)
@@ -104,7 +104,7 @@ func TestButtonPartPrecedence(t *testing.T) {
 // TestButtonPartsUnderHighContrast checks the guardrails for a button: an app
 // color does not reach the button, its spacing does, and the focus ring stays.
 func TestButtonPartsUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.Button = ButtonStyle{Root: Style{Background: markBG, TextColor: markFG, Padding: XY(9, 0)}}
 	r := newThemedRig(&theme, func(ctx *Context) Element {
 		return partButton(ButtonPrimary, ButtonStyle{Root: Style{Background: markBG, Padding: XY(12, 0)}}, false)

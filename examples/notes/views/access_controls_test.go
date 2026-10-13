@@ -20,7 +20,7 @@ func TestNotesControlsReportTheirStates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rt := ui.NewRuntime(Root(s), ui.DarkTheme, nil)
+	rt := ui.NewRuntime(Root(s), ui.DarkTheme(), nil)
 	rt.AddBindings(Bindings()...)
 	var warnings []string
 	rt.SetWarnFunc(func(msg string) { warnings = append(warnings, msg) })

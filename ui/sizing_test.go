@@ -377,7 +377,7 @@ func TestSizingPrecedence(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			th := *DarkTheme
+			th := *DarkTheme()
 			c.theme(&th, Px(300))
 			// The theme's width replaces the default.
 			if got := layoutOf(t, &th, c.part, c.inst(Auto)); got != 300 {

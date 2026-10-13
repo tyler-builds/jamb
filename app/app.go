@@ -47,7 +47,7 @@ type Window struct {
 	Height    int // logical pixels; default 720
 	MinWidth  int
 	MinHeight int
-	// Theme defaults to ui.DarkTheme.
+	// Theme defaults to ui.DarkTheme().
 	Theme *ui.Theme
 	// Root renders the whole window. It is a component: it re-runs when a
 	// signal it reads changes.
@@ -232,7 +232,7 @@ func withDefaults(w Window) Window {
 		w.Height = 720
 	}
 	if w.Theme == nil {
-		w.Theme = ui.DarkTheme
+		w.Theme = ui.DarkTheme()
 	}
 	return w
 }

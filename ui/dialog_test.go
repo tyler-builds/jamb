@@ -14,7 +14,7 @@ func TestDialogsReachTheWindow(t *testing.T) {
 	win := &fakeWindow{}
 	var got []dialog.FileResult
 	var answer dialog.Button
-	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme, nil)
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	rt.SetWindowControls(win)
 	rt.SetViewport(400, 300, 1)
 	rt.Frame(time.Now())
@@ -45,7 +45,7 @@ func TestDialogsReachTheWindow(t *testing.T) {
 // Without a window, as in headless tests, the dialogs do nothing: no callback
 // runs and nothing panics.
 func TestHeadlessDialogsDoNothing(t *testing.T) {
-	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme, nil)
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	ctx := &Context{rt: rt}
 	called := false
 	ctx.Window().OpenFiles(dialog.FileOptions{}, func(dialog.FileResult) { called = true })
@@ -63,7 +63,7 @@ func TestHeadlessDialogsDoNothing(t *testing.T) {
 func TestContextClipboardUsesPlatform(t *testing.T) {
 	text, has := "from the platform", true
 	var written []string
-	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme, nil)
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	rt.SetServices(Services{
 		Clipboard:    func() (string, bool) { return text, has },
 		SetClipboard: func(s string) { written = append(written, s) },
@@ -83,7 +83,7 @@ func TestContextClipboardUsesPlatform(t *testing.T) {
 }
 
 func TestHeadlessClipboardRoundTrips(t *testing.T) {
-	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme, nil)
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	ctx := &Context{rt: rt}
 	if _, ok := ctx.Clipboard(); ok {
 		t.Fatal("a new clipboard holds text")

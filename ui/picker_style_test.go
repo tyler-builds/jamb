@@ -10,7 +10,7 @@ import (
 
 // The theme's DatePicker is under the instance's Styles, and both are under the defaults.
 func TestDatePickerThemeThenInstance(t *testing.T) {
-	th := *DarkTheme
+	th := *DarkTheme()
 	th.DatePicker = DatePickerStyle{CalendarButton: Style{TextColor: markFG}, Popup: Style{Padding: All(11)}}
 	r := newThemedRig(&th, func(ctx *Context) Element {
 		return datePartElement(NewSignal(time.Time{}), DatePickerStyle{CalendarButton: Style{TextColor: markBG}}, nil)
@@ -64,7 +64,7 @@ func TestPickersClearRemovesDefaults(t *testing.T) {
 // drawn in the system Highlight colors, the focused day and today are outlined, and a
 // disabled day is GrayText. The sizes and the padding of the app's styles still apply.
 func TestPickersHighContrastGuardrails(t *testing.T) {
-	th := *DarkTheme
+	th := *DarkTheme()
 	th.DatePicker = DatePickerStyle{
 		Day:         Style{Background: markBG},
 		DaySelected: Style{Background: markBG, TextColor: markFG},
@@ -102,7 +102,7 @@ func TestPickersHighContrastGuardrails(t *testing.T) {
 
 // The high contrast default of a disabled day is GrayText, with no dimming.
 func TestDatePickerDisabledDayIsGrayTextUnderHighContrast(t *testing.T) {
-	th := *DarkTheme
+	th := *DarkTheme()
 	th.HighContrast = true
 	r := newThemedRig(&th, func(ctx *Context) Element {
 		return datePartElement(NewSignal(day(2026, time.October, 13)), DatePickerStyle{}, func(p *DatePickerElement) *DatePickerElement {
@@ -123,7 +123,7 @@ func TestDatePickerDisabledDayIsGrayTextUnderHighContrast(t *testing.T) {
 
 // The time picker's highlighted time is drawn in the Highlight colors under high contrast.
 func TestTimePickerHighContrastHighlight(t *testing.T) {
-	th := *DarkTheme
+	th := *DarkTheme()
 	th.TimePicker = TimePickerStyle{OptionHighlighted: Style{Background: markBG}}
 	r := themedPickerRig(t, &th, func(ctx *Context) Element {
 		return timePartElement(NewSignal(clockOn(9, 30)), TimePickerStyle{}, false)

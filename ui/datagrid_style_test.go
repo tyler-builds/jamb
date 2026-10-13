@@ -94,7 +94,7 @@ func dgRowNode(t *testing.T, r *accessRig, key string) *node {
 // TestDataGridPrecedence checks that an instance style wins over the theme's
 // DataGrid, which wins over the defaults, and that Clear removes a default.
 func TestDataGridPrecedence(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.DataGrid = DataGridStyle{Row: Style{Background: Hex("#101010")}}
 	sel := NewSignal([]string(nil))
 	sort := NewSignal(SortState{})
@@ -109,7 +109,7 @@ func TestDataGridPrecedence(t *testing.T) {
 	// The striped rows of the default look have a background; Clear removes it.
 	r = newAccessRig(partDataGrid(6, DataGridStyle{RowAlternate: Style{Clear: ClearBackground}}, sel, sort))
 	for _, n := range partNodes(r.rt, "DataGrid.Row") {
-		if n.style.Background == DarkTheme.Sidebar {
+		if n.style.Background == DarkTheme().Sidebar {
 			t.Fatalf("ClearBackground did not remove the striped background")
 		}
 	}
@@ -119,7 +119,7 @@ func TestDataGridPrecedence(t *testing.T) {
 // with HighlightText on it, that an app's colors do not reach the grid, and that
 // the focus ring stays.
 func TestDataGridHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.DataGrid = DataGridStyle{Row: Style{Background: markBG, TextColor: markFG}}
 	sel := NewSignal([]string{"i1"})
 	sort := NewSignal(SortState{Key: "N"})
@@ -181,7 +181,7 @@ func TestDataGridSelectedRowIsNotBold(t *testing.T) {
 	if !found {
 		t.Fatal("the selected row is not built")
 	}
-	if w := dataGridDefaults(DarkTheme, DataGridComfortable, 1).HeaderCellSorted.FontWeight; w != 0 {
+	if w := dataGridDefaults(DarkTheme(), DataGridComfortable, 1).HeaderCellSorted.FontWeight; w != 0 {
 		t.Errorf("the sorted header has weight %v, want the default", w)
 	}
 }

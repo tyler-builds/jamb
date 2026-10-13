@@ -106,8 +106,9 @@ type Theme struct {
 	Tooltip TooltipStyle
 }
 
-// DarkTheme is a neutral zinc palette with an indigo accent.
-var DarkTheme = &Theme{
+// darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme
+// return copies, so that changing a theme never changes it for another window.
+var darkTheme = &Theme{
 	Name:          "dark",
 	Dark:          true,
 	Background:    Hex("#0c0c0e"),
@@ -137,8 +138,7 @@ var DarkTheme = &Theme{
 	FontSize:      14,
 }
 
-// LightTheme is the light counterpart of DarkTheme.
-var LightTheme = &Theme{
+var lightTheme = &Theme{
 	Name:          "light",
 	Background:    Hex("#fafafa"),
 	Sidebar:       Hex("#f4f4f5"),
@@ -166,6 +166,14 @@ var LightTheme = &Theme{
 	Radius:        8,
 	FontSize:      14,
 }
+
+// DarkTheme returns the built-in dark theme: a neutral zinc palette with an
+// indigo accent. Each call returns a new copy, which the caller may change.
+func DarkTheme() *Theme { return darkTheme.Clone() }
+
+// LightTheme returns the built-in light theme, the counterpart of DarkTheme.
+// Each call returns a new copy, which the caller may change.
+func LightTheme() *Theme { return lightTheme.Clone() }
 
 // Clone returns a copy of the theme, to change for an app without changing the
 // built-in theme it was copied from. The copy shares the Shadows slices of its

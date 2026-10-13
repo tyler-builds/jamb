@@ -635,7 +635,7 @@ func TestPartStylePrecedence(t *testing.T) {
 				return partTabs(NewSignal("a"), TabsUnderline, st)
 			},
 			setTheme: func(th *Theme, c Color) { th.Tabs.Tab.Background = c }},
-		{name: "Select", part: "Select.Trigger", def: selectDefaults(DarkTheme, 220, false).Trigger.Background,
+		{name: "Select", part: "Select.Trigger", def: selectDefaults(DarkTheme(), 220, false).Trigger.Background,
 			build: func(th *Theme, inst bool) Element {
 				var st SelectStyle
 				if inst {
@@ -644,7 +644,7 @@ func TestPartStylePrecedence(t *testing.T) {
 				return partSelect(NewSignal(""), st, false)
 			},
 			setTheme: func(th *Theme, c Color) { th.Select.Trigger.Background = c }},
-		{name: "Slider", part: "Slider.Thumb", def: DarkTheme.Accent,
+		{name: "Slider", part: "Slider.Thumb", def: DarkTheme().Accent,
 			build: func(th *Theme, inst bool) Element {
 				var st SliderStyle
 				if inst {
@@ -653,7 +653,7 @@ func TestPartStylePrecedence(t *testing.T) {
 				return partSlider(NewSignal(50.0), st)
 			},
 			setTheme: func(th *Theme, c Color) { th.Slider.Thumb.Background = c }},
-		{name: "NumberInput", part: "NumberInput.Frame", def: DarkTheme.Surface,
+		{name: "NumberInput", part: "NumberInput.Frame", def: DarkTheme().Surface,
 			build: func(th *Theme, inst bool) Element {
 				var st NumberInputStyle
 				if inst {
@@ -662,7 +662,7 @@ func TestPartStylePrecedence(t *testing.T) {
 				return partNumberInput(NewSignal(8), st, SpinInline, false)
 			},
 			setTheme: func(th *Theme, c Color) { th.NumberInput.Frame.Background = c }},
-		{name: "TextInput", part: "TextInput.Frame", def: DarkTheme.Surface,
+		{name: "TextInput", part: "TextInput.Frame", def: DarkTheme().Surface,
 			build: func(th *Theme, inst bool) Element {
 				var st FieldStyle
 				if inst {
@@ -678,8 +678,8 @@ func TestPartStylePrecedence(t *testing.T) {
 				r := newThemedRig(th, func(ctx *Context) Element { return p.build(th, inst) })
 				return partNode(t, r.rt, p.part, p.key).style.Background
 			}
-			plain := *DarkTheme
-			withTheme := *DarkTheme
+			plain := *DarkTheme()
+			withTheme := *DarkTheme()
 			p.setTheme(&withTheme, themeBG)
 			if got := bgOf(&plain, false); got != p.def {
 				t.Errorf("no override: background %v, want the default %v", got, p.def)
@@ -700,7 +700,7 @@ func TestPartStylePrecedence(t *testing.T) {
 // the colors that an app sets for a part are not used, but its sizes and
 // spacing are, and the built-in focus ring and disabled colors remain.
 func TestPartOverridesUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.Tabs = TabsStyle{Tab: Style{Background: markBG, TextColor: markFG, Padding: All(7)}}
 	r := newThemedRig(&theme, func(ctx *Context) Element {
 		return partTabs(NewSignal("a"), TabsSegmented, TabsStyle{Tab: Style{Background: markBG, TextColor: markFG, Padding: All(9)}})

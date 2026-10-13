@@ -9,7 +9,7 @@ import (
 // BorderEdges insets the content by each side's width, as padding does.
 func TestBorderEdgesInsetContent(t *testing.T) {
 	r := newOverlayRig(func(ctx *Context) Element {
-		return Div().Key("box").Size(Px(100), Px(80)).BorderEdges(Edges{Top: 4, Left: 10}, DarkTheme.Accent).
+		return Div().Key("box").Size(Px(100), Px(80)).BorderEdges(Edges{Top: 4, Left: 10}, DarkTheme().Accent).
 			Child(Div().Key("child").Size(Px(10), Px(10)))
 	}, 800, 600)
 	box, child := r.find(t, "box"), r.find(t, "child")
@@ -69,7 +69,7 @@ func TestInnerCorners(t *testing.T) {
 func TestRoundedContainerEmitsRoundedClip(t *testing.T) {
 	r := newOverlayRig(func(ctx *Context) Element {
 		return Div().Column().
-			Child(Div().Key("round").Size(Px(100), Px(80)).Radius(12).BorderEdges(Edges{Top: 2}, DarkTheme.Accent).ScrollY().
+			Child(Div().Key("round").Size(Px(100), Px(80)).Radius(12).BorderEdges(Edges{Top: 2}, DarkTheme().Accent).ScrollY().
 				Child(Div().Height(Px(300)))).
 			Child(Div().Key("plain").Size(Px(100), Px(80)).ScrollY().Child(Div().Height(Px(300))))
 	}, 800, 600)

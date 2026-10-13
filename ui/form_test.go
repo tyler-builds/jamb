@@ -403,16 +403,16 @@ func TestEveryControlReportsItsRequiredState(t *testing.T) {
 }
 
 func TestMessagesLookAlikeInANumberInputAndAField(t *testing.T) {
-	if !reflect.DeepEqual(messageStyle(DarkTheme), numberInputDefaults(DarkTheme, SpinInline, 1, false, false).Message) {
+	if !reflect.DeepEqual(messageStyle(DarkTheme()), numberInputDefaults(DarkTheme(), SpinInline, 1, false, false).Message) {
 		t.Fatal("a number input's message and a field's error have different looks")
 	}
-	if !reflect.DeepEqual(messageStyle(DarkTheme), formFieldDefaults(DarkTheme).Error) {
+	if !reflect.DeepEqual(messageStyle(DarkTheme()), formFieldDefaults(DarkTheme()).Error) {
 		t.Fatal("a field's error is not the shared message look")
 	}
 }
 
 func TestFormPartsResolveInOrder(t *testing.T) {
-	th := DarkTheme.Clone()
+	th := DarkTheme().Clone()
 	th.FormField = FormFieldStyle{Label: Style{TextColor: Hex("#111111")}}
 	if got := resolveFormField(th, FormFieldStyle{}).Label.TextColor; got != Hex("#111111") {
 		t.Fatalf("theme label color = %v, want the theme's", got)
@@ -426,7 +426,7 @@ func TestFormPartsResolveInOrder(t *testing.T) {
 }
 
 func TestFormPartsFollowHighContrast(t *testing.T) {
-	hc := HighContrastTheme(HighContrastBlack(), DarkTheme)
+	hc := HighContrastTheme(HighContrastBlack(), DarkTheme())
 	st := resolveFormField(hc, FormFieldStyle{Label: Style{TextColor: Hex("#222222")}})
 	if st.Label.TextColor != hc.Text {
 		t.Fatalf("a label under high contrast is %v, want the system text color", st.Label.TextColor)

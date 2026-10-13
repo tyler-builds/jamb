@@ -79,7 +79,7 @@ func TestSettingsListsShortcuts(t *testing.T) {
 func TestProjectsHighlightSearchMatches(t *testing.T) {
 	s := NewStore()
 	rt := shortcutRig(s)
-	soft := scene.Color(matchHighlight(ui.DarkTheme).Background)
+	soft := scene.Color(matchHighlight(ui.DarkTheme()).Background)
 	count := func() int {
 		n := 0
 		for _, q := range rt.Frame(time.Now()).Quads {

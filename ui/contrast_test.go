@@ -36,7 +36,7 @@ type contrastPair struct {
 }
 
 func TestContrast(t *testing.T) {
-	for _, th := range []*Theme{DarkTheme, LightTheme} {
+	for _, th := range []*Theme{DarkTheme(), LightTheme()} {
 		t.Run(th.Name, func(t *testing.T) {
 			for _, p := range contrastPairs(th) {
 				ratio := contrastRatio(p.fg, p.bg)
@@ -194,7 +194,7 @@ func TestBadgeContrastHighContrast(t *testing.T) {
 		name string
 		c    SystemColors
 	}{{"black", HighContrastBlack()}, {"white", HighContrastWhite()}} {
-		th := HighContrastTheme(sc.c, DarkTheme)
+		th := HighContrastTheme(sc.c, DarkTheme())
 		for _, p := range append(badgePairs(th), progressPairs(th)...) {
 			r := contrastRatio(p.fg, p.bg)
 			t.Logf("high contrast %s: %s %.2f", sc.name, p.name, r)

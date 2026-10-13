@@ -207,7 +207,7 @@ func TestSpinButtonKeepsItsSizeOnHoverAndPress(t *testing.T) {
 		x, y := rest.X+rest.W/2, rest.Y+rest.H/2
 		r.rt.PointerMove(x, y, 0)
 		r.frame()
-		if bg := buttonNode(t, r, "Increase").style.Background; bg != DarkTheme.SurfaceHover {
+		if bg := buttonNode(t, r, "Increase").style.Background; bg != DarkTheme().SurfaceHover {
 			t.Errorf("%v: hovered fill is %v, want SurfaceHover", p, bg)
 		}
 		if got := rectOf(r, buttonNode(t, r, "Increase")); got != rest {
@@ -215,7 +215,7 @@ func TestSpinButtonKeepsItsSizeOnHoverAndPress(t *testing.T) {
 		}
 		r.rt.PointerDown(x, y, input.ButtonLeft, 1, 0)
 		r.frame()
-		if bg := buttonNode(t, r, "Increase").style.Background; bg != DarkTheme.SurfaceActive {
+		if bg := buttonNode(t, r, "Increase").style.Background; bg != DarkTheme().SurfaceActive {
 			t.Errorf("%v: pressed fill is %v, want SurfaceActive", p, bg)
 		}
 		if got := rectOf(r, buttonNode(t, r, "Increase")); got != rest {

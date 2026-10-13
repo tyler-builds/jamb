@@ -176,7 +176,7 @@ func TestWidgetPartPrecedence(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			plain := *DarkTheme
+			plain := *DarkTheme()
 			withTheme := plain
 			c.theme(&withTheme, themeColor)
 			read := func(r *accessRig) Color { return partColor(t, r, c.part, c.key, c.border) }

@@ -369,7 +369,7 @@ func TestDuplicateKeysWarnAndStaySeparate(t *testing.T) {
 		return Div().
 			Child(Div().Key("dup").Height(Px(30)).ScrollY().Child(Div().Height(Px(200)))).
 			Child(Div().Key("dup").Height(Px(30)).ScrollY().Child(Div().Height(Px(200))))
-	}, DarkTheme, nil)
+	}, DarkTheme(), nil)
 	rt.SetWarnFunc(func(s string) { warnings = append(warnings, s) })
 	rt.SetViewport(300, 300, 1)
 	frame(rt)

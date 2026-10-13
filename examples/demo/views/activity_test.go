@@ -169,7 +169,7 @@ func TestActivityFilterHighlightsAndCounts(t *testing.T) {
 	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
 	rt.Frame(time.Now())
-	soft := scene.Color(matchHighlight(ui.DarkTheme).Background)
+	soft := scene.Color(matchHighlight(ui.DarkTheme()).Background)
 	highlights := func() int {
 		n := 0
 		for _, q := range rt.Frame(time.Now()).Quads {

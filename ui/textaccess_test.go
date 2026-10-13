@@ -160,7 +160,7 @@ func TestWrappedLinesAndRectsFollowTheLayout(t *testing.T) {
 func TestAccessMovesAreTheEditorsWordMovement(t *testing.T) {
 	// The Move of a degenerate range by word is the editor's Ctrl+Right and
 	// Ctrl+Left, which go to text.NextWord and text.PrevWord, from every point.
-	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme, nil)
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	samples := []string{
 		"foo   bar, baz",
 		"naïve café 3rd-party_ok",
@@ -235,7 +235,7 @@ func TestTextContentIsSharedUntilTheTextOrLayoutChanges(t *testing.T) {
 // BenchmarkBuildTextContent measures the content of a long, wrapped text, which is
 // built again on each change to the text.
 func BenchmarkBuildTextContent(b *testing.B) {
-	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme, nil)
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	s := strings.Repeat("the quick brown fox jumps over the lazy dog ", 500)
 	l := rt.text.Layout(s, text.Style{Size: 14}, 400)
 	b.ReportMetric(float64(len(l.Lines)), "lines")
@@ -250,7 +250,7 @@ func BenchmarkBuildTextContent(b *testing.B) {
 // degenerate range gives the word unit that holds the position, and that moving by
 // a word and then expanding gives the next unit, as Notepad does.
 func TestWordExpandIsTheUnitAtThePosition(t *testing.T) {
-	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme, nil)
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	s := "A small note-taking app. Next line  \rSecond line, ok."
 	c := rt.buildTextContent(s, nil)
 	info := &access.TextInfo{Content: c}

@@ -114,7 +114,7 @@ func TestCollapsibleRenderHeader(t *testing.T) {
 // reach the header under high contrast, its padding does, and the focus ring of
 // the header stays.
 func TestCollapsibleUnderHighContrast(t *testing.T) {
-	theme := *DarkTheme
+	theme := *DarkTheme()
 	theme.Collapsible = CollapsibleStyle{Header: Style{Background: markBG, Padding: XY(7, 0)}}
 	sig := NewSignal(false)
 	r := newThemedRig(&theme, func(ctx *Context) Element {

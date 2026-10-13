@@ -14,7 +14,7 @@ import (
 func focusRings(sc *scene.Scene) int {
 	n := 0
 	for _, q := range sc.Quads {
-		if q.Background.A == 0 && q.BorderWidth > 0 && q.BorderColor == scene.Color(ui.DarkTheme.FocusRing) {
+		if q.Background.A == 0 && q.BorderWidth > 0 && q.BorderColor == scene.Color(ui.DarkTheme().FocusRing) {
 			n++
 		}
 	}

@@ -358,7 +358,7 @@ Every built-in widget with a look of its own has named parts. Each part is a typ
 `ui.TreeStyle`, `ui.MenuStyle`, `ui.MenuBarStyle`, `ui.ModalStyle`,
 `ui.ProgressBarStyle`, `ui.ProgressRingStyle`, `ui.BadgeStyle`, `ui.ToastStyle` and
 `ui.TooltipStyle`. Set a part for every widget of its kind in the theme (for
-example `ui.DarkTheme.Tabs`, `Theme.Button`, `Theme.Buttons.Danger` for one variant,
+example `Theme.Tabs`, `Theme.Button`, `Theme.Buttons.Danger` for one variant,
 `Theme.Toast`, `Theme.Tooltip`), or for one widget with `.Styles(...)`. The instance
 wins over the theme, and the theme over the built-in defaults, which follow the
 theme's colors. States are parts too (`TabSelected`, `OptionHighlighted`,
@@ -1513,8 +1513,9 @@ Some event semantics to know:
 - Tab cycles focus in tab order, and Enter or Space clicks the focused
   element (see "Focus and the keyboard").
 
-Theming: `ctx.Theme()` returns semantic colors, and `ctx.SetTheme(ui.LightTheme)`
-re-renders everything. `ui.DarkTheme` and `ui.LightTheme` are built in.
+Theming: `ctx.Theme()` returns semantic colors, and `ctx.SetTheme(ui.LightTheme())`
+re-renders everything. `ui.DarkTheme()` and `ui.LightTheme()` return a new copy of
+a built-in theme on each call.
 
 High contrast is automatic. When Windows high contrast is on (Settings, Accessibility,
 Contrast themes), the runtime uses `ui.HighContrastTheme`, a theme built from the

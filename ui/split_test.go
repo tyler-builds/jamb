@@ -393,7 +393,7 @@ func TestSplitMinimumLimitsMustBePixels(t *testing.T) {
 // TestSplitThemeAndClear checks the layers of the look: the theme's Split is
 // under the instance's Styles, and a Clear in a part removes the default fill.
 func TestSplitThemeAndClear(t *testing.T) {
-	th := *DarkTheme
+	th := *DarkTheme()
 	th.Split.Divider = Style{Background: markBG}
 	pos := NewSignal(0.5)
 	r := newThemedRig(&th, func(ctx *Context) Element { return partSplit(pos, SplitStyle{}) })
@@ -404,7 +404,7 @@ func TestSplitThemeAndClear(t *testing.T) {
 	})
 	wantBackground(t, partNode(t, r.rt, "Split.Divider", ""), "Split.Divider", markFG)
 
-	r = newThemedRig(DarkTheme, func(ctx *Context) Element {
+	r = newThemedRig(DarkTheme(), func(ctx *Context) Element {
 		return partSplit(pos, SplitStyle{Divider: Style{Clear: ClearBackground}})
 	})
 	if n := partNode(t, r.rt, "Split.Divider", ""); !n.style.Background.IsZero() {
@@ -417,7 +417,7 @@ func TestSplitThemeAndClear(t *testing.T) {
 // loses its color under high contrast.
 func TestSplitHighContrastDividerIsVisible(t *testing.T) {
 	sc := HighContrastBlack()
-	th := *HighContrastTheme(sc, DarkTheme)
+	th := *HighContrastTheme(sc, DarkTheme())
 	th.Split.Divider = Style{Background: markBG}
 	pos := NewSignal(0.5)
 	r := newThemedRig(&th, func(ctx *Context) Element { return partSplit(pos, SplitStyle{}) })

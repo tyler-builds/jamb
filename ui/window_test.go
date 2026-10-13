@@ -139,7 +139,7 @@ func TestWindowStateIsReactive(t *testing.T) {
 		runs++
 		seen = append(seen, ctx.Window().Maximized())
 		return Textf("maximized=%v", ctx.Window().Maximized())
-	}, DarkTheme, nil)
+	}, DarkTheme(), nil)
 	rt.SetWindowControls(win)
 	rt.SetViewport(300, 200, 1)
 	rt.Frame(time.Now())
@@ -168,7 +168,7 @@ func TestWindowFocusIsReactive(t *testing.T) {
 	rt := NewRuntime(func(ctx *Context) Element {
 		runs++
 		return Textf("focused=%v", ctx.Window().Focused())
-	}, DarkTheme, nil)
+	}, DarkTheme(), nil)
 	rt.SetViewport(300, 200, 1)
 	rt.Frame(time.Now())
 	rt.WindowFocus(true)
@@ -188,7 +188,7 @@ func TestWindowActionsReachTheControls(t *testing.T) {
 	rt := NewRuntime(func(ctx *Context) Element {
 		return Div().Child(Button("Min").OnClick(func() { ctx.Window().Minimize() })).
 			Child(Button("Max").OnClick(func() { ctx.Window().ToggleMaximize() }))
-	}, DarkTheme, nil)
+	}, DarkTheme(), nil)
 	rt.SetWindowControls(win)
 	rt.SetViewport(300, 200, 1)
 	rt.Frame(time.Now())
@@ -201,7 +201,7 @@ func TestWindowActionsReachTheControls(t *testing.T) {
 }
 
 func TestHeadlessWindowControlsDoNothing(t *testing.T) {
-	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme, nil)
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	ctx := &Context{rt: rt}
 	ctx.Window().Minimize()
 	ctx.Window().ToggleMaximize()
@@ -227,7 +227,7 @@ func TestSharedSignalRerendersInEveryWindow(t *testing.T) {
 		w.rt = NewRuntime(func(ctx *Context) Element {
 			w.runs++
 			return Textf("v=%d", shared.Get())
-		}, DarkTheme, ts)
+		}, DarkTheme(), ts)
 		w.rt.SetWakeFunc(func() { w.woke++ })
 		w.rt.SetViewport(300, 200, 1)
 		w.rt.Frame(time.Now())
