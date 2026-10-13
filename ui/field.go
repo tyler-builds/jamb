@@ -158,7 +158,14 @@ type FieldElement struct {
 	key      string // the key of the field in its form, see Form.Field
 	styles   FormFieldStyle
 	size     sizing // the field's box sizes, from the sizing methods (see Sizing in docs/styling.md)
+	elemKey  string // the element key, see Key
 }
+
+// Key identifies the field among its siblings, so it keeps its state when the
+// siblings around it change (see DivElement.Key).
+func (f *FieldElement) Key(k string) *FieldElement { f.elemKey = k; return f }
+
+func (f *FieldElement) elementKey() string { return f.elemKey }
 
 // Field creates a field with the label and the control. Add help text with
 // Description, and mark it required with Required.

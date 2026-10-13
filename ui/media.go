@@ -28,6 +28,9 @@ func Icon(ic *icons.Icon) *IconElement { return &IconElement{icon: ic, size: 16}
 func (*IconElement) isElement()           {}
 func (i *IconElement) elementKey() string { return i.key }
 
+// Key identifies the icon among its siblings (see DivElement.Key).
+func (i *IconElement) Key(k string) *IconElement { i.key = k; return i }
+
 // Size sets the icon's width and height in logical pixels.
 func (i *IconElement) Size(px float32) *IconElement { i.size = px; return i }
 
@@ -104,6 +107,9 @@ func Image(src *ImageSource) *ImageElement { return &ImageElement{src: src} }
 
 func (*ImageElement) isElement()           {}
 func (i *ImageElement) elementKey() string { return i.key }
+
+// Key identifies the image among its siblings (see DivElement.Key).
+func (i *ImageElement) Key(k string) *ImageElement { i.key = k; return i }
 
 // Size sets width and height.
 func (i *ImageElement) Size(w, h Length) *ImageElement {

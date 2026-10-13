@@ -573,7 +573,14 @@ type DropdownMenuElement struct {
 	trigger Element
 	build   func() []MenuItem
 	styles  MenuStyle
+	key     string // the element key, see Key
 }
+
+// Key identifies the menu among its siblings, so it keeps its state when the
+// siblings around it change (see DivElement.Key).
+func (dm *DropdownMenuElement) Key(k string) *DropdownMenuElement { dm.key = k; return dm }
+
+func (dm *DropdownMenuElement) elementKey() string { return dm.key }
 
 func (*DropdownMenuElement) isElement() {}
 

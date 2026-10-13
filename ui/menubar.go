@@ -80,7 +80,14 @@ func resolveMenuBar(t *Theme, inst MenuBarStyle) MenuBarStyle {
 type MenuBarElement struct {
 	menus  []TopMenu
 	styles MenuBarStyle
+	key    string // the element key, see Key
 }
+
+// Key identifies the menu bar among its siblings, so it keeps its state when the
+// siblings around it change (see DivElement.Key).
+func (mb *MenuBarElement) Key(k string) *MenuBarElement { mb.key = k; return mb }
+
+func (mb *MenuBarElement) elementKey() string { return mb.key }
 
 func (*MenuBarElement) isElement() {}
 

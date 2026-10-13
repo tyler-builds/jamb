@@ -39,7 +39,14 @@ type ModalElement struct {
 	backdrop bool
 	styles   ModalStyle
 	size     sizing // the panel's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	key      string // the element key, see Key
 }
+
+// Key identifies the modal among its siblings, so it keeps its state when the
+// siblings around it change (see DivElement.Key).
+func (m *ModalElement) Key(k string) *ModalElement { m.key = k; return m }
+
+func (m *ModalElement) elementKey() string { return m.key }
 
 // ModalStyle is the look of each part of a modal. A part's style merges over the
 // built-in defaults, then over the theme's Modal, then over the Styles of the
