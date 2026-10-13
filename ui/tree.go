@@ -145,7 +145,18 @@ type TreeElement struct {
 	renderRow   func(node TreeNode, state PartState) Element
 	renderLabel func(node TreeNode, state PartState) Element
 	focusHandle *FocusHandle // see FocusHandle
+	size        sizing       // see the sizing methods
 }
+
+// The sizing methods give the tree's outer box a size, over its Style. See Sizing
+// in docs/styling.md.
+func (tv *TreeElement) Width(l Length) *TreeElement     { tv.size.setWidth(l); return tv }
+func (tv *TreeElement) Height(l Length) *TreeElement    { tv.size.setHeight(l); return tv }
+func (tv *TreeElement) MinWidth(l Length) *TreeElement  { tv.size.setMinWidth(l); return tv }
+func (tv *TreeElement) MinHeight(l Length) *TreeElement { tv.size.setMinHeight(l); return tv }
+func (tv *TreeElement) MaxWidth(l Length) *TreeElement  { tv.size.setMaxWidth(l); return tv }
+func (tv *TreeElement) MaxHeight(l Length) *TreeElement { tv.size.setMaxHeight(l); return tv }
+func (tv *TreeElement) Grow(f float32) *TreeElement     { tv.size.setGrow(f); return tv }
 
 // FocusHandle lets code focus the tree (see NewFocusHandle). A Field that wraps
 // the control gives it its own handle, which takes precedence.
@@ -413,7 +424,7 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 		}
 		// The list sits in a column that takes the tree's style, so that the list
 		// fills the space the style gives it.
-		return Div().Column().Style(tv.style).Child(list)
+		return tv.size.apply(Div().Column().Style(tv.style)).Child(list)
 	})
 }
 

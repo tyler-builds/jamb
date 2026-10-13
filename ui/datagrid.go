@@ -377,7 +377,24 @@ type DataGridElement[T any] struct {
 	empty       Element
 	styles      DataGridStyle
 	focusHandle *FocusHandle // see FocusHandle
+	size        sizing       // see the sizing methods
 }
+
+// The sizing methods give the grid's outer box a size, over its Style. See Sizing
+// in docs/styling.md.
+func (g *DataGridElement[T]) Width(l Length) *DataGridElement[T]    { g.size.setWidth(l); return g }
+func (g *DataGridElement[T]) Height(l Length) *DataGridElement[T]   { g.size.setHeight(l); return g }
+func (g *DataGridElement[T]) MinWidth(l Length) *DataGridElement[T] { g.size.setMinWidth(l); return g }
+func (g *DataGridElement[T]) MinHeight(l Length) *DataGridElement[T] {
+	g.size.setMinHeight(l)
+	return g
+}
+func (g *DataGridElement[T]) MaxWidth(l Length) *DataGridElement[T] { g.size.setMaxWidth(l); return g }
+func (g *DataGridElement[T]) MaxHeight(l Length) *DataGridElement[T] {
+	g.size.setMaxHeight(l)
+	return g
+}
+func (g *DataGridElement[T]) Grow(f float32) *DataGridElement[T] { g.size.setGrow(f); return g }
 
 // FocusHandle lets code focus the grid (see NewFocusHandle). A Field that wraps
 // the control gives it its own handle, which takes precedence.
@@ -1293,7 +1310,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	list.header = g.headerRow(st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
 		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) })
 
-	root := Div().Column().Style(g.style).Child(list)
+	root := g.size.apply(Div().Column().Style(g.style)).Child(list)
 	if n == 0 {
 		msg := g.empty
 		if msg == nil {

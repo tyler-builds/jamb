@@ -319,6 +319,7 @@ the Text size of 100 percent:
 | `Slider`, `ProgressBar` (also when indeterminate) | fills the container, and at least 160 px, so it is visible where its container has no width |
 | `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |
 | `Collapsible`, `Accordion` | fills the container |
+| `DataGrid`, `Tree`, `ListOf`, `UniformList` | fills the container's width; give a height (`Height`, `MaxHeight`, or `Grow` in a column) so the rows scroll inside it |
 | `Split` | fills the container's width; its height is the container's, as `Full` gives (set `Height` or `Grow` in a column with other children) |
 | `Modal` | a 420 px panel; a percentage is of the window's width |
 | `Text` | automatic, as a `Div`: fills a column, as wide as its words in a row |

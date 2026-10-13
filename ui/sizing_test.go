@@ -157,6 +157,26 @@ func sizeCases() []sizeCase {
 			set: func(w, minW, maxW Length, g float32) Element {
 				return Field("Name", TextInput(NewSignal("")).Label("Name")).Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
 			}},
+		{name: "DataGrid", box: 400, auto: autoFill,
+			def: func() Element { return sizedGrid() },
+			set: func(w, minW, maxW Length, g float32) Element {
+				return sizedGrid().Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
+			}},
+		{name: "Tree", box: 400, auto: autoFill,
+			def: func() Element { return Tree([]TreeNode{{Key: "a", Label: "A"}}, NewSignal("a")).Label("Files") },
+			set: func(w, minW, maxW Length, g float32) Element {
+				return Tree([]TreeNode{{Key: "a", Label: "A"}}, NewSignal("a")).Label("Files").Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
+			}},
+		{name: "ListOf", box: 400, auto: autoFill,
+			def: func() Element { return sizedListOf() },
+			set: func(w, minW, maxW Length, g float32) Element {
+				return sizedListOf().Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
+			}},
+		{name: "UniformList", box: 400, auto: autoFill,
+			def: func() Element { return UniformList(3, func(i int) Element { return Text("row") }) },
+			set: func(w, minW, maxW Length, g float32) Element {
+				return UniformList(3, func(i int) Element { return Text("row") }).Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
+			}},
 		{name: "Modal", part: "Modal.Panel", box: 500, auto: autoSkip,
 			def: func() Element { return Modal("Settings", Text("Body")) },
 			set: func(w, minW, maxW Length, g float32) Element {
@@ -261,6 +281,10 @@ func TestSizingDefaults(t *testing.T) {
 		"Text":                     400,
 		"Field":                    400,
 		"Modal":                    modalWidth,
+		"DataGrid":                 400,
+		"Tree":                     400,
+		"ListOf":                   400,
+		"UniformList":              400,
 	}
 	for _, c := range sizeCases() {
 		t.Run(c.name, func(t *testing.T) {
@@ -511,4 +535,14 @@ func TestFieldControlsFillOnlyWhenTheirWidthSaysSo(t *testing.T) {
 			}
 		})
 	}
+}
+
+// sizedGrid and sizedListOf are small collections for the sizing tables.
+func sizedGrid() *DataGridElement[string] {
+	return DataGrid([]string{"a", "b"}, func(s string) string { return s },
+		DataColumn[string]{Header: "Name", Text: func(s string) string { return s }}).Label("Rows")
+}
+
+func sizedListOf() *ListElement {
+	return ListOf([]string{"a", "b"}, func(s string) string { return s }, func(s string) Element { return Text(s) })
 }

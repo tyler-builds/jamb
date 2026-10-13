@@ -31,7 +31,24 @@ type UniformListElement struct {
 	rowWidth float32
 	// before, when set, runs at paint before the offset of the list is stepped.
 	before func(n *node)
+	size   sizing // see the sizing methods
 }
+
+// The sizing methods give the list's outer box a size, over its Style. See Sizing
+// in docs/styling.md.
+func (l *UniformListElement) Width(v Length) *UniformListElement    { l.size.setWidth(v); return l }
+func (l *UniformListElement) Height(v Length) *UniformListElement   { l.size.setHeight(v); return l }
+func (l *UniformListElement) MinWidth(v Length) *UniformListElement { l.size.setMinWidth(v); return l }
+func (l *UniformListElement) MinHeight(v Length) *UniformListElement {
+	l.size.setMinHeight(v)
+	return l
+}
+func (l *UniformListElement) MaxWidth(v Length) *UniformListElement { l.size.setMaxWidth(v); return l }
+func (l *UniformListElement) MaxHeight(v Length) *UniformListElement {
+	l.size.setMaxHeight(v)
+	return l
+}
+func (l *UniformListElement) Grow(f float32) *UniformListElement { l.size.setGrow(f); return l }
 
 // UniformList creates a list of count rows. row(i) is called only for rows
 // near the viewport, so count can be large:
@@ -198,7 +215,7 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 		}
 		spacer.Child(wrap)
 	}
-	container := Div().ScrollY().Style(l.style).Role(access.RoleList)
+	container := l.size.apply(Div().ScrollY().Style(l.style)).Role(access.RoleList)
 	container.access().container = l.selectable
 	container.vlist = ls
 	if l.decorate != nil {

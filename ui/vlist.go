@@ -22,7 +22,18 @@ type ListElement struct {
 	handle     *ListHandle
 	bottom     bool
 	onAtEnd    func(atEnd bool)
+	size       sizing // see the sizing methods
 }
+
+// The sizing methods give the list's outer box a size, over its Style. See Sizing
+// in docs/styling.md.
+func (l *ListElement) Width(v Length) *ListElement     { l.size.setWidth(v); return l }
+func (l *ListElement) Height(v Length) *ListElement    { l.size.setHeight(v); return l }
+func (l *ListElement) MinWidth(v Length) *ListElement  { l.size.setMinWidth(v); return l }
+func (l *ListElement) MinHeight(v Length) *ListElement { l.size.setMinHeight(v); return l }
+func (l *ListElement) MaxWidth(v Length) *ListElement  { l.size.setMaxWidth(v); return l }
+func (l *ListElement) MaxHeight(v Length) *ListElement { l.size.setMaxHeight(v); return l }
+func (l *ListElement) Grow(f float32) *ListElement     { l.size.setGrow(f); return l }
 
 // ListOf creates a scrolling list of items whose rows may differ in height.
 // Only rows near the viewport are built. Each row's height is measured once
@@ -261,7 +272,7 @@ func (l *ListElement) expand(ctx *Context) Element {
 		spacer.Child(wrap)
 	}
 	vs.builtFrom, vs.built = from, to
-	container := Div().ScrollY().Style(l.style).Role(access.RoleList)
+	container := l.size.apply(Div().ScrollY().Style(l.style)).Role(access.RoleList)
 	container.access().container = l.selectable
 	container.vrows = vs
 	return container.Child(spacer)
