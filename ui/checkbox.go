@@ -155,6 +155,15 @@ type CheckboxElement struct {
 	wire     fieldWire         // what a Field gives the check box (see Field)
 	handle   *FocusHandle      // lets code focus the check box (see FocusHandle)
 	size     sizing            // the control's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	onChange func(bool)        // see OnChange
+}
+
+// OnChange runs fn with the box's new state after the user checks or clears it,
+// by a click, the Space key or assistive technology. The signal is set first. A
+// click on a CheckboxTri sets it on or off, never mixed, so fn gets true for on.
+func (c *CheckboxElement) OnChange(fn func(checked bool)) *CheckboxElement {
+	c.onChange = fn
+	return c
 }
 
 // FocusHandle lets code focus the check box (see NewFocusHandle). A Field that
@@ -276,7 +285,11 @@ func (c *CheckboxElement) expand(ctx *Context) Element {
 	box.Hover(st.BoxHover)
 	row.Cursor(CursorPointer).Focusable().FocusVisible(st.ControlFocusVisible).
 		OnClick(func() {
-			c.set(s.next())
+			next := s.next()
+			c.set(next)
+			if c.onChange != nil {
+				c.onChange(next == CheckOn)
+			}
 			if w.onEdit != nil {
 				w.onEdit()
 			}

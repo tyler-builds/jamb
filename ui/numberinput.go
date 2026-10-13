@@ -183,6 +183,16 @@ type NumberInputElement[T int | float64] struct {
 	styles     NumberInputStyle
 	rules      []Validator[T] // the validators of the value (see Validate)
 	wire       fieldWire      // what a Field gives the field (see Field)
+	onChange   func(T)        // see OnChange
+}
+
+// OnChange runs fn with the new value after the user changes it: by typing and
+// pressing Enter or leaving the field, by the Up and Down keys, by the spin
+// buttons, or by assistive technology. The signal is set first. It does not run
+// when the value stays the same, such as a step past the end of the range.
+func (n *NumberInputElement[T]) OnChange(fn func(T)) *NumberInputElement[T] {
+	n.onChange = fn
+	return n
 }
 
 // Validate sets the validators of the value, which are checked after the value
@@ -294,7 +304,11 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 
 		apply := func(x T) {
 			x = n.clamp(x)
+			old := n.value.Peek()
 			n.value.Set(x)
+			if n.onChange != nil && x != old {
+				defer n.onChange(x)
+			}
 			draft.Set(n.format(x))
 			seen.Set(x)
 			invalid.Set(false)

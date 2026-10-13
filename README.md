@@ -407,7 +407,9 @@ ui.RadioGroup(freq,                               // *ui.Signal[T], for any comp
 ui.Select(channel, ui.Option[string]{Value: "email", Label: "Email"}).Label("Channel").Placeholder("Choose").Width(ui.Px(240)).OnChange(func(v string) { ... })
 ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percent).OnChange(fn).Width(ui.Full)
 ui.NumberInput(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStacked).Precision(2) // int or float64
-// every control also takes .Key("id") and .Disabled(true); select, slider, number input, text input and text area
+// every control also takes .Key("id") and .Disabled(true), and every control with a value takes
+// .OnChange(fn), which runs after the user changes it (the signal is already set);
+// select, slider, number input, text input and text area
 // take .Styles(...); a number input's frame takes a FieldStyle, and its spin buttons and message their own parts.
 // Select takes RenderOption and RenderValue. See the Styling section.
 // The controls take the sizing methods (Width, MinWidth, MaxWidth and Grow, and Height where it
