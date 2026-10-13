@@ -62,11 +62,18 @@ func (d *DivElement) interactive() bool {
 	return d.h.onClick != nil || d.h.onMouseDown != nil || d.focusable || d.dragSpec != nil
 }
 
-// WindowControls is the app's handle on the window a runtime is shown in. Get
-// it inside a component with Context.Window.
-type WindowControls interface {
+// Window is a window of the app: the one a component is shown in
+// (Context.Window), or one opened with app.Open. Its methods may be called from
+// any goroutine. An action runs on the UI thread: at once when it is called
+// there, else in call order with the other posted work. A read from another
+// goroutine waits for the UI thread to answer it.
+type Window interface {
 	Minimize()
 	ToggleMaximize()
+	// Focus brings the window to the front and gives it keyboard focus.
+	Focus()
+	// Closed reports whether the window has closed, or failed to open.
+	Closed() bool
 	// Maximized reports whether the window is maximized. Read inside a
 	// component, it is reactive: the component re-renders when it changes.
 	Maximized() bool
@@ -135,6 +142,21 @@ func (w windowRef) SetTitle(title string) {
 }
 
 func (w windowRef) Maximized() bool { return w.rt.maximized.Get() }
+
+func (w windowRef) Focus() {
+	if c := w.rt.windowCtl; c != nil {
+		c.Focus()
+	}
+}
+
+// Closed reports false without an app window: a headless runtime is open for as
+// long as it is used.
+func (w windowRef) Closed() bool {
+	if c := w.rt.windowCtl; c != nil {
+		return c.Closed()
+	}
+	return false
+}
 
 // The geometry goes to the app's controls. A headless runtime has no window: its
 // position is 0, 0 and its size is the viewport's.
@@ -206,9 +228,9 @@ func (w windowRef) MessageBox(o dialog.MessageOptions, done func(dialog.Button))
 	}
 }
 
-// SetWindowControls connects the runtime to its window. The app calls it once,
+// SetWindow connects the runtime to its window. The app calls it once,
 // before the first frame.
-func (rt *Runtime) SetWindowControls(c WindowControls) { rt.windowCtl = c }
+func (rt *Runtime) SetWindow(w Window) { rt.windowCtl = w }
 
 // hostSetMaximized records whether the window is maximized, for components that
 // read Context.Window().Maximized(). Call it on the UI thread.

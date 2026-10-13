@@ -111,6 +111,8 @@ func (f *fakeWindow) Maximized() bool      { return f.maximized }
 func (f *fakeWindow) Close()               { f.calls = append(f.calls, "close") }
 func (f *fakeWindow) SetTitle(s string)    { f.calls = append(f.calls, "title:"+s) }
 func (f *fakeWindow) Focused() bool        { return f.focused }
+func (f *fakeWindow) Focus()               { f.calls = append(f.calls, "focus") }
+func (f *fakeWindow) Closed() bool         { return false }
 func (f *fakeWindow) Position() (int, int) { return 10, 20 }
 func (f *fakeWindow) Size() (int, int)     { return 640, 480 }
 func (f *fakeWindow) SetPosition(x, y int) {
@@ -152,7 +154,7 @@ func TestWindowStateIsReactive(t *testing.T) {
 		seen = append(seen, ctx.Window().Maximized())
 		return Textf("maximized=%v", ctx.Window().Maximized())
 	}, DarkTheme(), nil)
-	rt.SetWindowControls(win)
+	rt.SetWindow(win)
 	rt.SetViewport(300, 200, 1)
 	rt.Frame(time.Now())
 
@@ -201,7 +203,7 @@ func TestWindowActionsReachTheControls(t *testing.T) {
 		return Div().Child(Button("Min").OnClick(func() { ctx.Window().Minimize() })).
 			Child(Button("Max").OnClick(func() { ctx.Window().ToggleMaximize() }))
 	}, DarkTheme(), nil)
-	rt.SetWindowControls(win)
+	rt.SetWindow(win)
 	rt.SetViewport(300, 200, 1)
 	rt.Frame(time.Now())
 	ctx := &Context{rt: rt}
@@ -212,7 +214,7 @@ func TestWindowActionsReachTheControls(t *testing.T) {
 	}
 }
 
-func TestHeadlessWindowControlsDoNothing(t *testing.T) {
+func TestHeadlessWindowDoesNothing(t *testing.T) {
 	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
 	ctx := &Context{rt: rt}
 	ctx.Window().Minimize()
@@ -262,13 +264,13 @@ func TestSharedSignalRerendersInEveryWindow(t *testing.T) {
 // The window's geometry goes through to the app's controls, and a headless
 // runtime reports its viewport.
 func TestWindowGeometryControls(t *testing.T) {
-	var ctl WindowControls
+	var ctl Window
 	r := newOverlayRig(func(ctx *Context) Element { ctl = ctx.Window(); return Div() }, 300, 200)
 	if w, h := ctl.Size(); w != 300 || h != 200 {
 		t.Fatalf("headless size %dx%d, want the viewport", w, h)
 	}
 	fw := &fakeWindow{}
-	r.rt.SetWindowControls(fw)
+	r.rt.SetWindow(fw)
 	ctl.SetSize(800, 600)
 	ctl.SetPosition(40, 50)
 	ctl.SetFullscreen(true)

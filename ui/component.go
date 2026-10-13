@@ -144,7 +144,7 @@ func (c *Context) WindowSize() (w, h float32) { return c.rt.viewW, c.rt.viewH }
 // Window returns the window the component is shown in. Its Maximized and
 // Focused methods are reactive: the component re-renders when they change.
 // Without an app window (headless tests) the actions do nothing.
-func (c *Context) Window() WindowControls { return windowRef{c.rt} }
+func (c *Context) Window() Window { return windowRef{c.rt} }
 
 // Post runs fn on the UI thread at the start of the next frame (see
 // Runtime.Post). It is safe to call from a goroutine that holds the Context,

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tyler-builds/jamb/app"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -102,7 +101,7 @@ type Store struct {
 	nextID, nextMsg int
 	// details are the project windows open, by project ID. Only the UI thread
 	// uses them.
-	details map[int]*app.WindowHandle
+	details map[int]ui.Window
 	// activity scrolls the Activity page's list.
 	activity *ui.ListHandle
 	// matched caches the events for the last Activity filter, so the list
@@ -155,7 +154,7 @@ func NewStore() *Store {
 		SampleOpen:   ui.NewSignal(false),
 		SampleName:   ui.NewSignal(""),
 		SampleResult: ui.NewSignal(""),
-		details:      map[int]*app.WindowHandle{},
+		details:      map[int]ui.Window{},
 		activity:     ui.NewListHandle(),
 	}
 	for i := range seed {

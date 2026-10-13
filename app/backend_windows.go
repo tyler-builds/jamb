@@ -42,6 +42,8 @@ func openPlatform(opts platform.WindowOptions, h platform.Handler) (platform.Win
 
 func postUI(fn func()) { windows.Post(fn) }
 
+func onUIThread() bool { return windows.OnUIThread() }
+
 func quitUI() { windows.Quit() }
 
 // releaseDevice releases the shared device and its objects, as a removal

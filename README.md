@@ -1723,9 +1723,16 @@ h := app.Open(app.Window{
     OnClosed: func() { ... },                 // after the window has closed
     Root:     detailRoot,
 })
-h.Focus()          // bring it to the front
+h.Focus()          // bring it to the front; h is a ui.Window
 h.SetTitle("...")  // also Close(); h.Closed() reports whether it is gone
 ```
+
+`app.Open` returns a `ui.Window`, the same type as `ctx.Window()` inside a
+component, so either one can be moved, resized, made fullscreen, focused or
+closed (see below). Its methods may be called from any goroutine. An action
+runs on the UI thread, at once when it is called there and in call order
+otherwise, so an action right after `Open` runs once the window exists. A read
+from another goroutine waits for the UI thread to answer it.
 
 - The app quits when its last window closes. A `QuitWhenClosed` window quits
   the app when it closes, even with others open. Before it closes, it asks the
@@ -1749,7 +1756,7 @@ ui.Component(func(ctx *ui.Context) ui.Element {
 })
 ```
 
-Inside a component, `ctx.Window()` controls its window: `Minimize()`,
+Inside a component, `ctx.Window()` controls its window: `Focus()`, `Minimize()`,
 `ToggleMaximize()`, `Close()`, `SetTitle(s)`, and the reactive reads
 `Maximized()` and `Focused()`, which re-render the component when they change.
 `Position()`, `Size()`, `SetPosition(x, y)` and `SetSize(w, h)` read and change

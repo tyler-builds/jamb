@@ -195,6 +195,13 @@ func Quit() {
 	Post(func() { quitRequested = true })
 }
 
+// OnUIThread reports whether the caller runs on the UI thread. The loop's
+// goroutine is locked to its thread, so no other goroutine runs there.
+func OnUIThread() bool {
+	t := uiThread.Load()
+	return t != 0 && t == win32.GetCurrentThreadID()
+}
+
 // Post runs fn on the UI thread, in order with the other posted functions. It
 // is safe from any goroutine and wakes the loop if it is idle.
 func Post(fn func()) {

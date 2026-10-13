@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tyler-builds/jamb/app"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -86,10 +85,23 @@ func TestOpenWindowBadgeFollowsTheWindow(t *testing.T) {
 func TestOpenProjectFocusesItsOpenWindow(t *testing.T) {
 	s := NewStore()
 	id := s.Projects.Peek()[1].ID
-	open := &app.WindowHandle{} // not closed: the window is open
+	open := &openWindow{} // not closed: the window is open
 	s.details[id] = open
 	OpenProject(s, id)
 	if s.details[id] != open {
 		t.Error("opening a project with an open window replaced its window")
 	}
+	if !open.focused {
+		t.Error("opening a project with an open window did not focus it")
+	}
 }
+
+// openWindow is an open window that records Focus. Its other methods are not
+// called by the test.
+type openWindow struct {
+	ui.Window
+	focused bool
+}
+
+func (w *openWindow) Closed() bool { return false }
+func (w *openWindow) Focus()       { w.focused = true }

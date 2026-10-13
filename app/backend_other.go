@@ -21,6 +21,8 @@ func openPlatform(opts platform.WindowOptions, h platform.Handler) (platform.Win
 
 func postUI(fn func()) {}
 
+func onUIThread() bool { return false }
+
 func quitUI() {}
 
 func prepareDevice() {}

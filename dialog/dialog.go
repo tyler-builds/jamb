@@ -1,6 +1,6 @@
 // Package dialog describes the native dialogs an app opens from a window:
 // file open, file save, folder pick and message boxes. Application code calls
-// them through ui.WindowControls (ctx.Window()). The types are plain values,
+// them through ui.Window (ctx.Window()). The types are plain values,
 // so the ui and platform packages share them without depending on each other.
 //
 // A dialog belongs to the window that opened it. The call returns at once,

@@ -307,8 +307,8 @@ type Runtime struct {
 	restyled int // restyles since the last frame (they happen during input handling)
 
 	services       platformServices
-	windowCtl      WindowControls // the app's window, see SetWindowControls
-	maximized      *Signal[bool]  // the window's state, read by Context.Window
+	windowCtl      Window        // the app's window, see SetWindow
+	maximized      *Signal[bool] // the window's state, read by Context.Window
 	focused        *Signal[bool]
 	memClipboard   string // used when no platform clipboard is wired in
 	clock          func() time.Time

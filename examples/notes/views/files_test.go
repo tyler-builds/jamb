@@ -29,6 +29,8 @@ func (f *fakeWindow) SetPosition(int, int)                                  {}
 func (f *fakeWindow) SetSize(int, int)                                      {}
 func (f *fakeWindow) SetFullscreen(bool)                                    {}
 func (f *fakeWindow) Fullscreen() bool                                      { return false }
+func (f *fakeWindow) Focus()                                                {}
+func (f *fakeWindow) Closed() bool                                          { return false }
 func (f *fakeWindow) MessageBox(dialog.MessageOptions, func(dialog.Button)) {}
 
 func (f *fakeWindow) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
@@ -55,7 +57,7 @@ func (f *fakeWindow) record(kind string, o dialog.FileOptions, done func(dialog.
 func TestImportMenuOpensDialogAndImports(t *testing.T) {
 	r := newRig(t)
 	fw := &fakeWindow{}
-	r.rt.SetWindowControls(fw)
+	r.rt.SetWindow(fw)
 	dir := t.TempDir()
 	md := filepath.Join(dir, "Alpha.md")
 	txt := filepath.Join(dir, "beta.txt")
@@ -92,7 +94,7 @@ func TestImportMenuOpensDialogAndImports(t *testing.T) {
 func TestImportCanceledAndFailed(t *testing.T) {
 	r := newRig(t)
 	fw := &fakeWindow{}
-	r.rt.SetWindowControls(fw)
+	r.rt.SetWindow(fw)
 	before := len(r.s.Notes.Peek())
 	notice.Set("")
 
@@ -116,7 +118,7 @@ func TestImportCanceledAndFailed(t *testing.T) {
 func TestExportWritesChosenFormat(t *testing.T) {
 	r := newRig(t)
 	fw := &fakeWindow{}
-	r.rt.SetWindowControls(fw)
+	r.rt.SetWindow(fw)
 	n := r.s.Create()
 	n.Title.Set("Plan: Q3")
 	n.Body.Set("Line one\nLine two")
@@ -155,7 +157,7 @@ func TestExportWritesChosenFormat(t *testing.T) {
 func TestExportCanceledWritesNothing(t *testing.T) {
 	r := newRig(t)
 	fw := &fakeWindow{}
-	r.rt.SetWindowControls(fw)
+	r.rt.SetWindow(fw)
 	r.s.Selected.Set(r.s.Notes.Peek()[0].ID)
 	notice.Set("") // the status line is shared by the tests of this package
 	r.frame()
@@ -184,4 +186,4 @@ func TestExportNameMakesAFileName(t *testing.T) {
 	}
 }
 
-var _ ui.WindowControls = (*fakeWindow)(nil)
+var _ ui.Window = (*fakeWindow)(nil)

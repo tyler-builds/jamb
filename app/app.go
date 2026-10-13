@@ -20,11 +20,9 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sync/atomic"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
-	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/render"
@@ -170,6 +168,7 @@ func (a *App) RunE(w Window) error {
 	application.textReady = ready
 	fonts, size := a.fonts, w.Theme.FontSize
 	go func() { ready <- loadText(fonts, size) }()
+	defer endUI() // a read that waits for the UI thread stops waiting
 	return runPlatform(func() error {
 		_, err := openWindow(w, nil)
 		return err
@@ -177,11 +176,12 @@ func (a *App) RunE(w Window) error {
 }
 
 // Open opens another window. It is safe from event handlers and from
-// goroutines: the window is opened on the UI thread, and it is ready once the
-// returned handle's methods have an effect. The app keeps running while the
-// window is open (see Window.QuitWhenClosed).
-func Open(w Window) *WindowHandle {
-	h := &WindowHandle{}
+// goroutines: the window is opened on the UI thread. The returned ui.Window
+// controls it; actions on it before the window exists run once it is open, and
+// Closed reports whether it closed or failed to open. The app keeps running
+// while the window is open (see Window.QuitWhenClosed).
+func Open(w Window) ui.Window {
+	h := &appWindow{}
 	postUI(func() {
 		if w.Root == nil {
 			openFailed(w, h, errors.New("Window.Root is nil"))
@@ -197,45 +197,12 @@ func Open(w Window) *WindowHandle {
 // openFailed reports a window Open could not open. The window never existed,
 // so OnDestroy does not run; OnClosed is called here instead, so state the app
 // keeps per open window (a badge, a handle in a map) is released.
-func openFailed(w Window, h *WindowHandle, err error) {
+func openFailed(w Window, h *appWindow, err error) {
 	fmt.Fprintln(os.Stderr, "jamb: app.Open:", err)
 	h.closed.Store(true)
 	if w.OnClosed != nil {
 		w.OnClosed()
 	}
-}
-
-// WindowHandle controls a window opened with Open. Its methods may be called
-// from any goroutine; each runs on the UI thread, in call order.
-type WindowHandle struct {
-	win    *host // set on the UI thread once the window exists
-	closed atomic.Bool
-}
-
-// Close asks the window to close. Its OnClose may keep it open.
-func (h *WindowHandle) Close() {
-	h.onUI(func(w *host) { w.win.Close() })
-}
-
-// Focus brings the window to the front and gives it keyboard focus.
-func (h *WindowHandle) Focus() {
-	h.onUI(func(w *host) { w.win.Focus() })
-}
-
-// SetTitle changes the window's title.
-func (h *WindowHandle) SetTitle(title string) {
-	h.onUI(func(w *host) { w.win.SetTitle(title) })
-}
-
-// Closed reports whether the window has closed, or failed to open.
-func (h *WindowHandle) Closed() bool { return h.closed.Load() }
-
-func (h *WindowHandle) onUI(fn func(*host)) {
-	postUI(func() {
-		if h.win != nil {
-			fn(h.win)
-		}
-	})
 }
 
 // application is the state of the process's App. It is only used on the UI
@@ -265,8 +232,11 @@ func withDefaults(w Window) Window {
 }
 
 // openWindow creates a window for cfg and shows it. handle, when set, is the
-// Open handle that controls the window.
-func openWindow(cfg Window, handle *WindowHandle) (*host, error) {
+// window Open returned; otherwise the window gets its own.
+func openWindow(cfg Window, handle *appWindow) (*host, error) {
+	if handle == nil {
+		handle = &appWindow{}
+	}
 	h := &host{cfg: cfg, handle: handle, primary: application.opened == 0, dev: application.dev, openedAt: time.Now()}
 	application.opened++
 	opts := platform.WindowOptions{
@@ -339,8 +309,8 @@ func sharedText() (*text.System, bool, error) {
 // ui runtime and renderer.
 type host struct {
 	cfg      Window
-	handle   *WindowHandle
-	primary  bool // the first window of the process: it saves its geometry
+	handle   *appWindow // the window's ui.Window
+	primary  bool       // the first window of the process: it saves its geometry
 	dev      devOptions
 	openedAt time.Time
 
@@ -393,7 +363,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rh = hostOf(h.rt)
 	h.rh.SetWakeFunc(w.Wake)
 	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
-	h.rt.SetWindowControls(windowControls{h})
+	h.rt.SetWindow(h.handle)
 	h.rt.SetAccessWarnings(h.dev.a11yWarn)
 	h.applySettings()
 	h.rh.SetMaximized(w.Maximized())
@@ -419,9 +389,7 @@ func (h *host) OnCreate(w platform.Window) error {
 			}
 		}
 	}
-	if h.handle != nil {
-		h.handle.win = h
-	}
+	h.handle.host = h
 	application.windows = append(application.windows, h)
 	return nil
 }
@@ -695,10 +663,8 @@ func (h *host) OnDestroy(w platform.Window) {
 		h.stopWatch = nil
 	}
 	application.windows = slices.DeleteFunc(application.windows, func(o *host) bool { return o == h })
-	if h.handle != nil {
-		h.handle.closed.Store(true)
-		h.handle.win = nil
-	}
+	h.handle.closed.Store(true)
+	h.handle.host = nil
 	if h.cfg.OnClosed != nil {
 		h.cfg.OnClosed()
 	}
@@ -707,50 +673,6 @@ func (h *host) OnDestroy(w platform.Window) {
 	if len(application.windows) == 0 || (h.cfg.QuitWhenClosed && !application.quitting) {
 		quitUI()
 	}
-}
-
-// windowControls adapts a host to ui.WindowControls.
-type windowControls struct{ h *host }
-
-func (c windowControls) Minimize()         { c.h.win.Minimize() }
-func (c windowControls) ToggleMaximize()   { c.h.win.ToggleMaximize() }
-func (c windowControls) Maximized() bool   { return c.h.win.Maximized() }
-func (c windowControls) Close()            { c.h.win.Close() }
-func (c windowControls) SetTitle(s string) { c.h.win.SetTitle(s) }
-func (c windowControls) Focused() bool     { return c.h.focused }
-
-// Position and Size are in logical pixels: the window's pixels divided by its
-// scale, as app.Window's X, Y, Width and Height are.
-func (c windowControls) Position() (x, y int) {
-	f, s := c.h.win.Frame(), c.h.win.Scale()
-	return int(float32(f.X)/s + 0.5), int(float32(f.Y)/s + 0.5)
-}
-
-func (c windowControls) Size() (width, height int) {
-	w, h := c.h.win.Size()
-	s := c.h.win.Scale()
-	return int(float32(w)/s + 0.5), int(float32(h)/s + 0.5)
-}
-
-func (c windowControls) SetPosition(x, y int)      { c.h.win.SetPosition(x, y) }
-func (c windowControls) SetSize(width, height int) { c.h.win.SetSize(width, height) }
-func (c windowControls) SetFullscreen(on bool)     { c.h.win.SetFullscreen(on) }
-func (c windowControls) Fullscreen() bool          { return c.h.win.Fullscreen() }
-
-func (c windowControls) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
-	c.h.win.ShowFileDialog(dialog.Open, o, done)
-}
-
-func (c windowControls) SaveFile(o dialog.FileOptions, done func(dialog.FileResult)) {
-	c.h.win.ShowFileDialog(dialog.Save, o, done)
-}
-
-func (c windowControls) PickFolder(o dialog.FileOptions, done func(dialog.FileResult)) {
-	c.h.win.ShowFileDialog(dialog.Folder, o, done)
-}
-
-func (c windowControls) MessageBox(o dialog.MessageOptions, done func(dialog.Button)) {
-	c.h.win.ShowMessageBox(o, done)
 }
 
 // FrameWaitable implements platform.FrameWaiter: the window's swap chain

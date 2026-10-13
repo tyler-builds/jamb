@@ -15,7 +15,7 @@ func TestDialogsReachTheWindow(t *testing.T) {
 	var got []dialog.FileResult
 	var answer dialog.Button
 	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
-	rt.SetWindowControls(win)
+	rt.SetWindow(win)
 	rt.SetViewport(400, 300, 1)
 	rt.Frame(time.Now())
 
