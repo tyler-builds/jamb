@@ -146,6 +146,7 @@ README.
 | F. Form controls | Check boxes with a mixed state, switches, radio groups, selects, sliders and number fields; the RangeValue pattern; the Windows ComboBox, Slider and Spinner control types |
 | G. Navigation and layout | Tabs with automatic activation, Ctrl+Tab, and lazily built panels; collapsible sections and an accordion; a tree view that builds only its visible rows, with Tree and TreeItem control types, levels and positions in their sets |
 | M. Date and time | `ui.DatePicker` and `ui.TimePicker`, the calendar with the Calendar control type and the Grid and Table patterns, and the keys of the WAI-ARIA date picker dialog pattern |
+| Split panes | `ui.Split`: a focusable divider with the Separator role and the RangeValue pattern, keys of the window splitter pattern, panes as named groups |
 | K. Forms | `ui.Field` (label, help text, required marker, error), validators on the controls, `ui.NewForm` with the submit flow, the error summary, and an async submit; IsRequiredForForm and IsDataValidForForm |
 
 ## Testing
@@ -1907,3 +1908,29 @@ Phase M adds `ui.DatePicker` and `ui.TimePicker`, and the Calendar control type 
 - **The focus-dependent checks** of the date and time pickers, and the rest of the script's focus checks, need a run with the app in the foreground. They are unverified live.
 - **The manual screen reader pass** for the calendar (NVDA and Narrator) is not yet run. Check that the day is read once as focus moves, that the month is announced without repeating the day, and that "unavailable" is read for a disabled day.
 - **Localization** of the "Today" description and the "Choose date" and "Show times" names is not done.
+
+## Split panes: what changed from this design
+
+`ui.Split` is in place on Windows. Its divider is a focusable element in the access
+tree with the Separator role (`access.RoleSeparator`), the name given by `Label`
+(by default "Resize panes"), and a Range: the value is the position in the units of
+the position signal, and the minimum and maximum are the limits the divider can move
+between. The Windows Separator control type has no pattern of its own, and the
+RangeValue pattern is the one that carries the value; the Microsoft reference is the
+Separator control type page (https://technet.microsoft.com/en-us/ee671643(v=vs.71)).
+The keys follow the WAI-ARIA window splitter pattern
+(https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/), in which Enter toggles
+the primary pane and Home and End are optional.
+
+Checked on the platform side: the RangeValue set goes to the same
+`ActionSetRangeValue` the sliders use, and a change of the position is a change of
+the Range, so it is published as a RangeValue property change. The unit tests read
+the access tree and the published updates, and the notes app's test sets the value
+through the access bridge.
+
+Not verified: how other frameworks expose a splitter (WPF, WinUI or Chromium), which
+the earlier research did not reach. A screen reader pass on the split panes (NVDA and
+Narrator) and the live scripted checks in `scripts/a11y-check.ps1` have not been run
+for this change. The divider's Range minimum and maximum are updated at the split's
+next render, so after a window resize they can lag by a render until the next
+interaction; the value is not affected.

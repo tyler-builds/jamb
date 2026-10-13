@@ -155,6 +155,7 @@ $CT = @{
     DataItem = [System.Windows.Automation.ControlType]::DataItem
     Calendar = [System.Windows.Automation.ControlType]::Calendar
     HeaderItem = [System.Windows.Automation.ControlType]::HeaderItem
+    Separator = [System.Windows.Automation.ControlType]::Separator
 }
 $Passed = 0
 $Failed = 0
@@ -904,6 +905,40 @@ try {
         Wait-For { & $focusIs 'src' $CT.TreeItem } 'Up to move the focus back to src' | Out-Null
     }
 
+    Check 'demo: a split divider is a separator with RangeValue; Right, SetValue and Enter move and collapse it' {
+        $divider = Find-One $win 'Resize list' $CT.Separator
+        $rv = Require-Pattern $divider ([System.Windows.Automation.RangeValuePatternIdentifiers]::Pattern) 'RangeValue'
+        $divider.SetFocus()
+        [ForegroundWindow]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle) | Out-Null
+        Start-Sleep -Milliseconds 300
+        $before = $rv.Current.Value
+        [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}')
+        Wait-For { if ($rv.Current.Value -gt $before) { $true } else { $null } } 'Right to widen the first pane' | Out-Null
+        $rv.SetValue(0.5)
+        Wait-For { if ([Math]::Abs($rv.Current.Value - 0.5) -lt 0.01) { $true } else { $null } } 'SetValue to move the divider to 0.5' | Out-Null
+
+        # Enter collapses the Files pane of the collapsible sample, and Enter again restores it.
+        $collapse = Find-One $win 'Resize files' $CT.Separator
+        $collapse.SetFocus()
+        Start-Sleep -Milliseconds 200
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        Wait-Gone { Find-Named $win 'Files' $CT.Group | Select-Object -First 1 } 'Enter to collapse the Files pane' | Out-Null
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        Wait-For { $null -ne (Find-Named $win 'Files' $CT.Group | Select-Object -First 1) } 'Enter to restore the Files pane' | Out-Null
+    }
+
+    if ($axe) {
+        Check 'demo: AxeWindowsCLI scan of the Split panes section' {
+            $divider = Find-One $win 'Resize list' $CT.Separator
+            $item = Require-Pattern $divider ([System.Windows.Automation.ScrollItemPatternIdentifiers]::Pattern) 'ScrollItem'
+            $item.ScrollIntoView()
+            Wait-For { if ($divider.Current.BoundingRectangle.Top -lt $win.Current.BoundingRectangle.Bottom) { $true } else { $null } } 'the Split panes section to be in view' | Out-Null
+            $errors = Invoke-AxeScan $demo 'demo-split-panes'
+            Assert ($errors -eq 0) "$errors errors found by AxeWindowsCLI"
+            "$errors errors"
+        }
+    }
+
     if ($axe) {
         Check 'demo: AxeWindowsCLI scan of the Components page, scrolled to the navigation section' {
             $header = Find-One $win 'Advanced options' $CT.Button
@@ -1435,6 +1470,14 @@ try {
         $v = Require-Pattern $title ([System.Windows.Automation.ValuePattern]::Pattern) 'Value'
         $v.SetValue('Accessibility check')
         Wait-For { if ($v.Current.Value -eq 'Accessibility check') { $true } } 'the title to take the value' | Out-Null
+    }
+
+    Check 'notes: the sidebar divider takes a value through SetValue' {
+        $divider = Find-One $nwin 'Resize sidebar' $CT.Separator
+        $rv = Require-Pattern $divider ([System.Windows.Automation.RangeValuePatternIdentifiers]::Pattern) 'RangeValue'
+        $rv.SetValue(360)
+        Wait-For { if ([Math]::Abs($rv.Current.Value - 360) -lt 0.5) { $true } else { $null } } 'the sidebar to move to 360 px' | Out-Null
+        $rv.SetValue(300)
     }
 
     Check 'notes: the body reads and selects the word "small" through the Text pattern' {

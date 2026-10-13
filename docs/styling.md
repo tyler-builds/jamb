@@ -41,7 +41,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Border`, `Disabled` and the others), so the defaults follow the theme's colors.
    Some defaults depend on the state of the widget, such as a disabled select.
 2. **The theme.** Set on the `ui.Theme` for every widget of that kind in the app:
-   `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Field` (the frame of every
+   `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Field` (the frame of every
    `TextInput`, `TextArea` and `NumberField`), `Theme.NumberField`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Collapsible`, `Theme.TreeView`, `Theme.DataGrid`, `Theme.Menu`,
@@ -286,7 +286,7 @@ column, as a `Div` does. The methods size the widget's outer box: the frame of a
 field or a number field, the trigger of a select, the track of a slider and the bar
 of a progress bar (its readout included), the control of a check box, the group of
 radio buttons, the tab list of `Tabs`, the section of a collapsible, the panel of a
-modal, and the track of a switch.
+modal, and the track of a switch, and the split of `Split`.
 
 ```go
 ui.TextInput(query).Width(ui.Full)          // fills its container
@@ -313,6 +313,7 @@ the Text size of 100 percent:
 | `Slider`, `ProgressBar`, `IndeterminateProgressBar` | fills the container, and at least 160 px, so it is visible where its container has no width |
 | `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |
 | `Collapsible`, `Accordion` | fills the container |
+| `Split` | fills the container's width; its height is the container's, as `Full` gives (set `Height` or `Grow` in a column with other children) |
 | `Modal` | a 420 px panel; a percentage is of the window's width |
 | `Text` | automatic, as a `Div`: fills a column, as wide as its words in a row |
 
@@ -512,6 +513,7 @@ parts that the code applies.
 | `DatePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `CalendarButton`, `Message`, `Popup`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
 | `TimePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Button`, `Message`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected` | none | none | done |
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
+| `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
 | `NumberField` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |
 | `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
@@ -598,6 +600,8 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
 - The caret of a text field is not a part (see "The text frame"). Its width and blink
   follow the system settings.
 - The Slider has no render slot for the thumb (see above).
+- The Split has no render slot: its panes are the app's own elements, and the divider has no content of its own. Its bar is 1 px wide by default, in a 9 px hit area that the style does not change, so a `Divider` style sets the bar's thickness and not the hit area.
+- The Split's grip is a pill by default, not dots. A `Grip` style with `Clear: ui.ClearBackground` removes it.
 - The Tabs have no render slot for the panel: the panel is the app's own content.
 - The list of a select is at least as wide as the field, whatever the field's width.
   Its `Popup` part can set a larger minimum width, and the `Trigger` part can set the

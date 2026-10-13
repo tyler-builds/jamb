@@ -47,6 +47,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Tabs:          base.Tabs,
 		Select:        base.Select,
 		Slider:        base.Slider,
+		Split:         base.Split,
 		Field:         base.Field,
 		NumberField:   base.NumberField,
 		Button:        base.Button,

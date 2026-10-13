@@ -58,6 +58,7 @@ type Theme struct {
 	DatePicker DatePickerStyle
 	TimePicker TimePickerStyle
 	Slider     SliderStyle
+	Split      SplitStyle
 	// Field is the text frame of every TextInput and TextArea, and of every
 	// NumberField's frame, before the NumberField parts below.
 	Field       FieldStyle

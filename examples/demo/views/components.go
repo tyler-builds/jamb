@@ -38,6 +38,7 @@ func Components(s *Store) ui.Element {
 				Child(section(t, "Overlays", placements(t))).
 				Child(section(t, "Menus", dropdownSample(t), contextSample(t))).
 				Child(navigationSection()).
+				Child(splitSection()).
 				Child(formControlsSection()).
 				Child(formsSection(t)).
 				Child(comboboxSection(ctx, t)).

@@ -81,6 +81,22 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				}
 			},
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) { r.clickKey(t, "grp/b") }},
+		{name: "Split", animates: false,
+			root: func(open *Signal[bool]) func(*Context) Element {
+				pos := NewSignal(0.4)
+				collapsed := NewSignal(false)
+				return func(ctx *Context) Element {
+					return Split(Div(), Div()).Position(pos).Collapsible(FirstPane).Collapsed(collapsed)
+				}
+			},
+			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) {
+				// The split learns its length one frame after its first render, so the
+				// window settles before the action.
+				r.frame()
+				r.frame()
+				focusNode(r, partNode(t, r.rt, "Split.Handle", ""))
+				r.press(input.KeyEnter, 0)
+			}},
 		{name: "Collapsible",
 			root: func(open *Signal[bool]) func(*Context) Element {
 				adv := NewSignal(false)

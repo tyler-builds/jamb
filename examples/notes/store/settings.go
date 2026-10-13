@@ -9,6 +9,8 @@ import (
 // Settings are app preferences kept next to the notes file.
 type Settings struct {
 	Zoom float32 `json:"zoom,omitempty"`
+	// SidebarWidth is the width of the sidebar in logical pixels, as the divider left it.
+	SidebarWidth float64 `json:"sidebarWidth,omitempty"`
 }
 
 // SettingsPath returns the settings file that goes with a notes file.

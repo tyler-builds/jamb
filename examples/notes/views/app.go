@@ -59,8 +59,29 @@ type App struct {
 	list           *ui.ListHandle  // the sidebar's note list, scrolled to the selection
 }
 
-// Root returns the window's render function.
-func Root(s *store.Store) func(*ui.Context) ui.Element {
+// DefaultSidebarWidth is the width of the sidebar, in logical pixels, when the app
+// has not kept another.
+const DefaultSidebarWidth = 300
+
+// Layout is the window's layout, which the app keeps across runs. Sidebar holds the
+// width of the sidebar in logical pixels, which the divider between the sidebar and
+// the editor moves. A Layout with no Sidebar uses DefaultSidebarWidth.
+// OnSidebarChange, if set, runs each time the divider moves the sidebar, so the
+// app can save the width.
+type Layout struct {
+	Sidebar         *ui.Signal[float64]
+	OnSidebarChange func(width float64)
+}
+
+// Root returns the window's render function, with the default layout.
+func Root(s *store.Store) func(*ui.Context) ui.Element { return RootWith(s, Layout{}) }
+
+// RootWith returns the window's render function, with the layout given.
+func RootWith(s *store.Store, layout Layout) func(*ui.Context) ui.Element {
+	sidebar := layout.Sidebar
+	if sidebar == nil {
+		sidebar = ui.NewSignal(float64(DefaultSidebarWidth))
+	}
 	a := &App{
 		s:            s,
 		search:       ui.NewFocusHandle(),
@@ -88,9 +109,15 @@ func Root(s *store.Store) func(*ui.Context) ui.Element {
 			OnAction(ZoomReset, func() { ctx.SetZoom(1) }).
 			OnDrop(ui.Drop(a.importFiles)).
 			Child(a.menuBar(ctx)).
-			Child(a.sidebar()).
-			Child(ui.Div().Width(ui.Px(1)).Height(ui.Full).Background(t.Border)).
-			Child(a.editorPane()).
+			// The sidebar and the editor share the window; the divider moves the sidebar's width.
+			Child(ui.Split(a.sidebar(), a.editorPane()).PixelPosition(sidebar).
+				MinFirst(ui.Px(200)).MaxFirst(ui.Px(480)).MinSecond(ui.Px(320)).
+				Label("Resize sidebar").FirstLabel("Notes").SecondLabel("Editor").
+				OnChange(func(w float64) {
+					if layout.OnSidebarChange != nil {
+						layout.OnSidebarChange(w)
+					}
+				})).
 			Child(a.palette())
 	}
 }
@@ -258,7 +285,7 @@ func (a *App) sidebar() ui.Element {
 				}
 			})
 
-		return ui.Div().Width(ui.Px(300)).Height(ui.Full).Shrink(0).Background(t.Sidebar).
+		return ui.Div().Height(ui.Full).Shrink(0).Background(t.Sidebar).
 			Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(16).MinHeight(ui.Px(56)).Shrink(0).
 				Child(ui.Div().Row().Align(ui.Center).Gap(10).
 					Child(ui.Div().Size(ui.Px(26), ui.Px(26)).Radius(7).Background(t.Accent).Center().

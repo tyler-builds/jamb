@@ -111,6 +111,8 @@ func drawnBy(part string) string {
 		return "Slider.Track"
 	case "Slider.ThumbHover", "Slider.ThumbPressed":
 		return "Slider.Thumb"
+	case "Split.DividerHover", "Split.DividerActive", "Split.DividerFocusVisible":
+		return "Split.Divider"
 	case "Button.RootHover", "Button.RootPressed", "Button.RootDisabled", "Button.RootFocusVisible":
 		return "Button.Root"
 	case "NumberField.SpinButtonHover", "NumberField.SpinButtonPressed",
@@ -183,6 +185,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Tabs segmented", func(t *testing.T) { testTabsParts(t, TabsSegmented, applied) })
 	t.Run("Select", func(t *testing.T) { testSelectParts(t, applied) })
 	t.Run("Slider", func(t *testing.T) { testSliderParts(t, applied) })
+	t.Run("Split", func(t *testing.T) { testSplitParts(t, applied) })
 	t.Run("TextInput", func(t *testing.T) { testFieldParts(t, "TextInput", applied) })
 	t.Run("TextArea", func(t *testing.T) { testFieldParts(t, "TextArea", applied) })
 	t.Run("NumberField inline", func(t *testing.T) { testNumberFieldParts(t, SpinInline, applied) })
@@ -430,6 +433,47 @@ func testSelectParts(t *testing.T, applied map[string]bool) {
 			default:
 				wantBackground(t, partNode(t, r.rt, drawnBy(c.part), ""), c.part, markBG)
 			}
+		})
+	}
+}
+
+// partSplit is a split of two panes with the instance style st.
+func partSplit(pos *Signal[float64], st SplitStyle) Element {
+	return Div().Column().Child(Split(Div(), Div()).Position(pos).Styles(st))
+}
+
+func testSplitParts(t *testing.T, applied map[string]bool) {
+	t.Helper()
+	cases := []struct {
+		part string
+		set  func(*SplitStyle, Style)
+		act  func(t *testing.T, r *accessRig)
+	}{
+		{part: "Split.Divider", set: func(s *SplitStyle, m Style) { s.Divider = m }},
+		{part: "Split.DividerHover", set: func(s *SplitStyle, m Style) { s.DividerHover = m },
+			act: func(t *testing.T, r *accessRig) { hoverNode(r, partNode(t, r.rt, "Split.Divider", "")) }},
+		{part: "Split.DividerActive", set: func(s *SplitStyle, m Style) { s.DividerActive = m },
+			act: func(t *testing.T, r *accessRig) { pressNode(r, partNode(t, r.rt, "Split.Handle", "")) }},
+		{part: "Split.DividerFocusVisible", set: func(s *SplitStyle, m Style) { s.DividerFocusVisible = m },
+			act: func(t *testing.T, r *accessRig) { focusNode(r, partNode(t, r.rt, "Split.Handle", "")) }},
+		{part: "Split.Grip", set: func(s *SplitStyle, m Style) { s.Grip = m }},
+		{part: "Split.Pane", set: func(s *SplitStyle, m Style) { s.Pane = m }},
+	}
+	for _, c := range cases {
+		applied[c.part] = true
+		t.Run(c.part, func(t *testing.T) {
+			var st SplitStyle
+			c.set(&st, Style{Background: markBG})
+			pos := NewSignal(0.5)
+			r := newAccessRig(func(ctx *Context) Element { return partSplit(pos, st) })
+			if c.act != nil {
+				c.act(t, r)
+			}
+			if c.part == "Split.Pane" {
+				wantBackground(t, panesByX(t, r)[0], c.part, markBG)
+				return
+			}
+			wantBackground(t, partNode(t, r.rt, drawnBy(c.part), ""), c.part, markBG)
 		})
 	}
 }

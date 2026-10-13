@@ -49,6 +49,11 @@ func TestDemoAccessibility(t *testing.T) {
 		if p == PageActivity {
 			accesstest.Find(t, tr, access.RoleTextField, "Filter events")
 		}
+		if p == PageComponents {
+			// The Split panes section: a divider named for its list, and a collapsible one.
+			accesstest.Find(t, tr, access.RoleSeparator, "Resize list")
+			accesstest.Find(t, tr, access.RoleSeparator, "Resize files")
+		}
 	}
 
 	s.OpenNewProject()

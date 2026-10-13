@@ -347,7 +347,7 @@ Every built-in widget with a look of its own has named parts. Each part is a typ
 `ui.Style`, grouped in a style struct for its widget: `ui.TabsStyle`,
 `ui.SelectStyle`, `ui.SliderStyle`, `ui.FieldStyle` (shared by `TextInput`,
 `TextArea` and a number field), `ui.NumberFieldStyle`, `ui.ButtonStyle`,
-`ui.CheckboxStyle`, `ui.RadioGroupStyle`, `ui.SwitchStyle`, `ui.CollapsibleStyle`,
+`ui.CheckboxStyle`, `ui.RadioGroupStyle`, `ui.SwitchStyle`, `ui.CollapsibleStyle`, `ui.SplitStyle`,
 `ui.TreeStyle`, `ui.MenuStyle`, `ui.MenuBarStyle`, `ui.ModalStyle`,
 `ui.ProgressBarStyle`, `ui.ProgressRingStyle`, `ui.BadgeStyle`, `ui.ToastStyle` and
 `ui.TooltipStyle`. Set a part for every widget of its kind in the theme (for
@@ -795,6 +795,84 @@ ui.TreeView(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[
   selects a node, and a click on its chevron opens or closes it without selecting.
   A double-click opens or closes it. Keys are kept by node key, so focus and the
   selection stay with their node as the rows scroll.
+
+### Split panes
+
+`ui.Split(first, second)` lays out two panes with a divider between them that the
+user drags, or moves with the keys, to give one pane more of the space. The panes
+are any elements, so a split can hold another split. Its look is
+`ui.SplitStyle` (the divider, its hover, drag and focus states, the grip and the
+panes; see the Styling section), and its sizing methods are the same as the other
+widgets'.
+
+```go
+pos := ui.NewSignal(0.35)            // the first pane's share of the split, from 0 to 1
+ui.Split(list, details).Position(pos).Label("Resize list").
+	FirstLabel("List").SecondLabel("Details").
+	MinFirst(ui.Px(120)).MinSecond(ui.Px(160)).OnChange(func(v float64) { save(v) })
+
+width := ui.NewSignal(300.0)         // the first pane's width in logical pixels
+ui.Split(sidebar, editor).PixelPosition(width).MinFirst(ui.Px(200)).MaxFirst(ui.Px(480))
+
+ui.Split(top, bottom).Orientation(ui.SplitVertical).Position(split)    // stacked
+ui.Split(files, editor).Collapsible(ui.FirstPane).Collapsed(collapsed) // Enter collapses
+```
+
+**The position is a signal the app owns**, so it can be saved and restored. The
+default is a fraction: the first pane's share of the split's length, from 0 to 1.
+The panes keep their proportions when the window is resized. `PixelPosition` holds
+the first pane's size in logical pixels instead, and the second pane takes the rest
+of the space when the window is resized. The limits (`MinFirst`, `MaxFirst`,
+`MinSecond`, `MaxSecond`) take `ui.Px` lengths only, since they are compared with the
+split's size in pixels; a percentage panics. The divider keeps to the limits while
+it moves, and a fraction split keeps the limits as the layout does.
+
+With no `Position` the split keeps its position itself, starting at one half. An app
+that wants the position kept across runs passes a signal, as the notes app does.
+
+The divider is 1 px wide by default (`Divider`, its `Width` in a horizontal split
+and its `Height` in a vertical one), in a 9 px hit area, so it is easy to grab. The
+grip is a short pill over its middle.
+
+- **Pointer.** Dragging the divider moves it. The pointer is captured while the
+  button is held, so a drag that leaves the divider still moves it. The cursor is the
+  horizontal or vertical resize cursor. A double-click collapses or restores a
+  collapsible pane.
+- **Keyboard.** The divider is one Tab stop. Left and Right move it in a horizontal
+  split, and Up and Down in a vertical one, by 5 percent of the split or 10 logical
+  pixels. Shift with an arrow moves it by 10 percent or 50 logical pixels. Home and
+  End go to its limits. Enter collapses or restores the collapsible pane. A
+  collapsed split does not move with the keys or the pointer until it is restored.
+  The keys follow the window splitter pattern of the WAI-ARIA Authoring Practices
+  (https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/), which makes Enter the
+  toggle of the primary pane; the Home and End keys are the pattern's optional ones.
+  Shift and the Page keys are not part of the pattern, so Shift with an arrow is the
+  larger step.
+- **Collapse.** `Collapsible(p)` names the pane that collapses, and `Collapsed`
+  holds the state. A collapsed pane is hidden, with its content kept in the tree, so
+  its state survives the collapse. The other pane takes the whole split. The position
+  is not changed by a collapse, so restoring the pane brings back its previous size.
+- **Accessibility.** The divider is a focusable element with the Separator role, a
+  name (`Label`, by default "Resize panes") and the RangeValue pattern: the value is
+  the position in the units of the signal, and the minimum and maximum are the limits
+  the divider can move between. A change of the position is a change of the Range
+  value, which the accessibility tree publishes as a property change. Assistive
+  technology can set the value. Each pane is a group named by `FirstLabel` and
+  `SecondLabel`, when they are given. Microsoft has no splitter control type, so the
+  divider uses Separator, which the Windows Separator control type defines
+  (https://technet.microsoft.com/en-us/ee671643(v=vs.71)).
+  The control type that a splitter exposes in other frameworks was not verified
+  for this release.
+- **Layout.** A split fills its container by default, in both directions. In a
+  column with other children, give it a `Height` or a `Grow` so it has room. The
+  split learns its length from the layout of the frame before, so its range is
+  correct from the frame after its first layout. A window resize does not render
+  the split, so its range minimum and maximum follow its next render. The value does
+  not change with the resize in either mode.
+
+The demo's Components page has a "Split panes" section with a fraction split, a
+stacked one, a nested one, a collapsible pane and a pixel split with limits. The
+notes app's sidebar is a pixel split, and its width is kept in `settings.json`.
 
 ### Feedback
 
@@ -2497,7 +2575,11 @@ API. It exists to find API gaps; it found three, which became framework
 features: focus handles, `AutoFocus`, and `FocusWithin`.
 
 - Notes live in a JSON file in the user config directory, `jamb-notes/notes.json`
-  (override with `JAMB_NOTES_FILE`). The directory was called `goui-notes` before
+  (override with `JAMB_NOTES_FILE`).
+- The sidebar and the editor are a `ui.Split` with a pixel position. The sidebar's
+  width is saved in `settings.json` next to the notes file 400 ms after the divider
+  stops moving (and as the window closes), with the zoom, and it is restored on the
+  next start. The directory was called `goui-notes` before
   the rename; the app moves it to `jamb-notes` on first start, so existing notes,
   settings and keymap carry over. A background goroutine saves 400 ms after typing
   stops and reports progress through a signal.
