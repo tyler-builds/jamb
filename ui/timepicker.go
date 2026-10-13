@@ -138,6 +138,14 @@ type TimePickerElement struct {
 	wire        fieldWire              // what a Field gives the field (see Field)
 	focusHandle *FocusHandle           // see FocusHandle
 	small       bool                   // see Small
+	tooltip     string                 // see Tooltip
+}
+
+// Tooltip shows s below the field after the pointer rests on it. Assistive
+// technology reads it as the field's description, unless it has another.
+func (p *TimePickerElement) Tooltip(s string) *TimePickerElement {
+	p.tooltip = s
+	return p
 }
 
 // Small makes the field compact: 28 px high with smaller text, like
@@ -470,6 +478,9 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		}
 		a := root.access()
 		root.Role(access.RoleComboBox).AccessExpanded(open.Get())
+		if p.tooltip != "" && w.description == "" {
+			root.Description(p.tooltip) // the combo box is the node assistive technology reads
+		}
 		name, labelledBy := p.name, p.labelledBy
 		if w.label != "" {
 			name, labelledBy = w.label, w.labelledBy
@@ -532,7 +543,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		if placeholder == "" {
 			placeholder = loc.timePlaceholder()
 		}
-		fo := fieldOptions{value: draft, placeholder: placeholder, name: name, labelledBy: labelledBy,
+		fo := fieldOptions{tooltip: p.tooltip, value: draft, placeholder: placeholder, name: name, labelledBy: labelledBy,
 			describedBy: describedBy, widget: "TimePicker", handle: ret, wire: w,
 			onSubmit: func(text string) {
 				// Enter chooses the highlighted time, or applies the text.

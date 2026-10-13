@@ -130,6 +130,14 @@ type SliderElement struct {
 	onChange     func(float64)
 	styles       SliderStyle
 	focusHandle  *FocusHandle // see FocusHandle
+	tooltip      string       // see Tooltip
+}
+
+// Tooltip shows s below the slider after the pointer rests on it. Assistive
+// technology reads it as the slider's description, unless it has another.
+func (s *SliderElement) Tooltip(text string) *SliderElement {
+	s.tooltip = text
+	return s
 }
 
 // FocusHandle lets code focus the slider (see NewFocusHandle). A Field that wraps
@@ -261,7 +269,8 @@ func (s *SliderElement) expand(ctx *Context) Element {
 			Child(Div().Grow(f)).Child(thumb).Child(Div().Grow(1 - f))
 		track := Div().asPart("Slider.Track").Height(Px(22)).Grow(1).Shrink(1).Style(st.Track).
 			Child(Div().Row().Height(Px(22)).Align(Center).PaddingX(sliderThumb / 2).Child(rail)).
-			Child(overlay)
+			Child(overlay).
+			Tooltip(s.tooltip)
 
 		readout := fmtValue(s, v)
 		value := Div().asPart("Slider.ValueText").AccessHidden().MinWidth(Px(44)).Align(End).Style(st.ValueText).

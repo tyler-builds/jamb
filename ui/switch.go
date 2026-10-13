@@ -123,6 +123,14 @@ type SwitchElement struct {
 	styles      SwitchStyle
 	size        sizing       // the track's sizes, from the sizing methods (see Sizing in docs/styling.md)
 	focusHandle *FocusHandle // see FocusHandle
+	tooltip     string       // see Tooltip
+}
+
+// Tooltip shows s below the switch after the pointer rests on it. Assistive
+// technology reads it as the switch's description, unless it has another.
+func (s *SwitchElement) Tooltip(text string) *SwitchElement {
+	s.tooltip = text
+	return s
 }
 
 // FocusHandle lets code focus the switch (see NewFocusHandle). A Field that wraps
@@ -186,6 +194,8 @@ func (s *SwitchElement) expand(ctx *Context) Element {
 		k.Style(st.KnobDisabled)
 	}
 	d.Child(k)
+	// A tooltip also shows on a disabled switch, to say why it is disabled.
+	d.Tooltip(s.tooltip)
 	if s.disabled {
 		d.Style(st.TrackDisabled).Cursor(CursorNotAllowed)
 		d.access().disabled = true

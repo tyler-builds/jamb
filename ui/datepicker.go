@@ -173,6 +173,14 @@ type DatePickerElement struct {
 	wire        fieldWire              // what a Field gives the field (see Field)
 	focusHandle *FocusHandle           // see FocusHandle
 	small       bool                   // see Small
+	tooltip     string                 // see Tooltip
+}
+
+// Tooltip shows s below the field after the pointer rests on it. Assistive
+// technology reads it as the field's description, unless it has another.
+func (d *DatePickerElement) Tooltip(s string) *DatePickerElement {
+	d.tooltip = s
+	return d
 }
 
 // Small makes the field compact: 28 px high with smaller text, like
@@ -549,7 +557,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		if placeholder == "" {
 			placeholder = loc.datePlaceholder()
 		}
-		fo := fieldOptions{value: draft, placeholder: placeholder, name: name, labelledBy: labelledBy,
+		fo := fieldOptions{tooltip: d.tooltip, value: draft, placeholder: placeholder, name: name, labelledBy: labelledBy,
 			describedBy: describedBy, widget: "DatePicker", handle: ret, wire: w,
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, trailing: button}
 		fo.wire.invalid = isInvalid || w.invalid

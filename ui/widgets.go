@@ -465,6 +465,7 @@ type fieldOptions struct {
 	description string        // set by DataGrid, to say why the last save failed (a literal, not a key)
 	onStep      func(dir int) // set by NumberInput, for Up and Down
 	readOnly    bool          // see ReadOnly
+	tooltip     string        // shown over the frame; the field's description when it has none
 	disabled    bool          // see Disabled
 	styles      FieldStyle    // the instance's parts: from Styles, and the frame's Style
 	key         string
@@ -536,6 +537,10 @@ func (ti *TextInputElement) OnChange(fn func(string)) *TextInputElement { ti.onC
 // focused, and its text selected and copied. Assistive technology reports it as
 // read-only. Its frame is the FrameReadOnly part.
 func (ti *TextInputElement) ReadOnly(on bool) *TextInputElement { ti.readOnly = on; return ti }
+
+// Tooltip shows s below the field after the pointer rests on it. Assistive
+// technology reads it as the field's description, unless it has another.
+func (ti *TextInputElement) Tooltip(s string) *TextInputElement { ti.tooltip = s; return ti }
 
 // Disabled shows the text but takes the field out of use: it can't be focused,
 // selected or changed. Its frame is the FrameDisabled part.
@@ -649,6 +654,10 @@ func (ta *TextAreaElement) OnChange(fn func(string)) *TextAreaElement { ta.onCha
 // read-only. Its frame is the FrameReadOnly part.
 func (ta *TextAreaElement) ReadOnly(on bool) *TextAreaElement { ta.readOnly = on; return ta }
 
+// Tooltip shows s below the field after the pointer rests on it. Assistive
+// technology reads it as the field's description, unless it has another.
+func (ta *TextAreaElement) Tooltip(s string) *TextAreaElement { ta.tooltip = s; return ta }
+
 // Disabled shows the text but takes the field out of use: it can't be focused,
 // selected or changed. Its frame is the FrameDisabled part.
 func (ta *TextAreaElement) Disabled(d bool) *TextAreaElement { ta.disabled = d; return ta }
@@ -728,6 +737,11 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 	}
 	if w.description != "" {
 		description = w.description
+	}
+	if description == "" {
+		// A tooltip says more about the field, so assistive technology reads it as
+		// the description, as it does for a Div's tooltip.
+		description = f.tooltip
 	}
 	describedBy := slices.Concat(f.describedBy, w.describedBy)
 	onChange, onBlur, onSubmit := f.onChange, f.onBlur, f.onSubmit
@@ -811,6 +825,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 			Hover(st.FrameHover).FocusWithin(st.FrameFocusWithin).
 			OnMouseDown(func(*MouseEvent) { h.Focus() })
 	}
+	box.Tooltip(f.tooltip)
 	if f.icon != nil || f.leadingEl != nil {
 		lead := Div().asPart(f.widget + ".Leading").Style(st.Leading)
 		if f.icon != nil {

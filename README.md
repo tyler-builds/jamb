@@ -189,7 +189,7 @@ ui.Div()                       // flex container; children stack vertically by d
                                // hit first; flips to the other side if it doesn't fit
   .OnClickOutside(fn)          // any button pressed outside (an Overlay's parent counts as inside);
                                // on an Overlay, Escape also runs fn (see Actions and key bindings)
-  .Tooltip("Save")             // label below after 500 ms of hover; Button has .Tooltip too
+  .Tooltip("Save")             // label below after 500 ms of hover; every control has .Tooltip too
   .Key("stable-id").Child(el).Children(els...)
 
 ui.Text("hi").FontSize(15).Semibold().Italic().TextColor(c).Truncate().MaxLines(2).Align(ui.Center)

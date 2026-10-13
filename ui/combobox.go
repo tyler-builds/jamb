@@ -187,6 +187,14 @@ type ComboboxElement[T comparable] struct {
 	focus       *FocusHandle // the editor's focus handle, see FocusHandle
 	wire        fieldWire    // what a Field gives the field (see Field)
 	small       bool         // see Small
+	tooltip     string       // see Tooltip
+}
+
+// Tooltip shows s below the field after the pointer rests on it. Assistive
+// technology reads it as the field's description, unless it has another.
+func (c *ComboboxElement[T]) Tooltip(s string) *ComboboxElement[T] {
+	c.tooltip = s
+	return c
 }
 
 // Small makes the field compact: 28 px high with smaller text, like
@@ -596,6 +604,9 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 		}
 		a := root.access()
 		root.Role(access.RoleComboBox).AccessExpanded(open.Get())
+		if c.tooltip != "" && w.description == "" {
+			root.Description(c.tooltip) // the combo box is the node assistive technology reads
+		}
 		name, labelledBy := c.name, c.labelledBy
 		if w.label != "" {
 			name, labelledBy = w.label, w.labelledBy
@@ -632,7 +643,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 			return c.size.apply(root)
 		}
 
-		fo := fieldOptions{value: c.text, placeholder: c.placeholder, name: name, labelledBy: labelledBy,
+		fo := fieldOptions{tooltip: c.tooltip, value: c.text, placeholder: c.placeholder, name: name, labelledBy: labelledBy,
 			icon: c.icon, widget: "Combobox", handle: ret, wire: w, onChange: typed,
 			onBlur: func() {
 				shut()

@@ -130,6 +130,14 @@ type RadioGroupElement[T comparable] struct {
 	wire        fieldWire      // what a Field gives the group (see Field)
 	size        sizing         // the group's sizes, from the sizing methods (see Sizing in docs/styling.md)
 	focusHandle *FocusHandle   // see FocusHandle
+	tooltip     string         // see Tooltip
+}
+
+// Tooltip shows s below the group after the pointer rests on it. Assistive
+// technology reads it as the group's description, unless it has another.
+func (r *RadioGroupElement[T]) Tooltip(s string) *RadioGroupElement[T] {
+	r.tooltip = s
+	return r
 }
 
 // FocusHandle lets code focus the group's tab stop: the checked option, or the first enabled one (see NewFocusHandle). A Field that wraps
@@ -228,7 +236,7 @@ func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 			return handles[j]
 		}
 
-		g := Div().asPart("RadioGroup.Group").Style(st.Group).Role(access.RoleGroup).SelectionContainer()
+		g := Div().asPart("RadioGroup.Group").Style(st.Group).Role(access.RoleGroup).SelectionContainer().Tooltip(r.tooltip)
 		name, labelledBy := r.name, r.labelledBy
 		if w.label != "" {
 			name, labelledBy = w.label, w.labelledBy

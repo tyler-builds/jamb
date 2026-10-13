@@ -156,6 +156,14 @@ type CheckboxElement struct {
 	handle   *FocusHandle      // lets code focus the check box (see FocusHandle)
 	size     sizing            // the control's sizes, from the sizing methods (see Sizing in docs/styling.md)
 	onChange func(bool)        // see OnChange
+	tooltip  string            // see Tooltip
+}
+
+// Tooltip shows s below the check box after the pointer rests on it. Assistive
+// technology reads it as the check box's description, unless it has another.
+func (c *CheckboxElement) Tooltip(s string) *CheckboxElement {
+	c.tooltip = s
+	return c
 }
 
 // OnChange runs fn with the box's new state after the user checks or clears it,
@@ -276,6 +284,8 @@ func (c *CheckboxElement) expand(ctx *Context) Element {
 	if w.invalid {
 		box.Style(st.BoxInvalid)
 	}
+	// A tooltip also shows on a disabled box, to say why it is disabled.
+	row.Tooltip(c.tooltip)
 	if c.disabled {
 		row.Style(st.ControlDisabled).Cursor(CursorNotAllowed)
 		a.disabled = true

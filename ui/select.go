@@ -162,6 +162,14 @@ type SelectElement[T comparable] struct {
 	wire         fieldWire      // what a Field gives the field (see Field)
 	focusHandle  *FocusHandle   // see FocusHandle
 	small        bool           // see Small
+	tooltip      string         // see Tooltip
+}
+
+// Tooltip shows s below the select after the pointer rests on it. Assistive
+// technology reads it as the select's description, unless it has another.
+func (s *SelectElement[T]) Tooltip(text string) *SelectElement[T] {
+	s.tooltip = text
+	return s
 }
 
 // Small makes the field compact: 28 px high with smaller text, like
@@ -387,7 +395,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 			shown = Div().asPart("Select.Placeholder").Grow(1).AccessHidden().Style(st.Placeholder).
 				Child(Text(s.placeholder).NoWrap())
 		}
-		field := Div().asPart("Select.Trigger").Style(st.Trigger).
+		field := Div().asPart("Select.Trigger").Style(st.Trigger).Tooltip(s.tooltip).
 			Child(shown).
 			Child(Div().asPart("Select.Chevron").Shrink(0).Style(st.Chevron).Child(Icon(chevron).Size(16)))
 		a := field.access()

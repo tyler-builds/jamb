@@ -192,6 +192,14 @@ type NumberInputElement[T int | float64] struct {
 	onChange    func(T)        // see OnChange
 	focusHandle *FocusHandle   // see FocusHandle
 	small       bool           // see Small
+	tooltip     string         // see Tooltip
+}
+
+// Tooltip shows s below the field after the pointer rests on it. Assistive
+// technology reads it as the field's description, unless it has another.
+func (n *NumberInputElement[T]) Tooltip(s string) *NumberInputElement[T] {
+	n.tooltip = s
+	return n
 }
 
 // Small makes the field compact: 28 px high with smaller text, like
@@ -382,6 +390,9 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 		// The field is its column: the frame and the message row, at the field's width. Its default
 		// width is numberInputWidth at the Text size, and the sizing methods replace it.
 		root := Div().Column().Gap(6).Role(access.RoleSpinner).Style(Style{Width: Px(numberInputWidth * scale)})
+		if n.tooltip != "" && w.description == "" {
+			root.Description(n.tooltip) // the spin box is the node assistive technology reads
+		}
 		a := root.access()
 		if name != "" {
 			root.Label(name)
@@ -406,7 +417,7 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 			return n.size.apply(root)
 		}
 
-		fo := fieldOptions{value: draft, name: name, labelledBy: labelledBy, handle: n.focusHandle,
+		fo := fieldOptions{tooltip: n.tooltip, value: draft, name: name, labelledBy: labelledBy, handle: n.focusHandle,
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, onStep: step,
 			widget: "NumberInput", wire: w, align: n.align}
 		// The invalid frame is drawn thicker and in the danger color (the text color under
