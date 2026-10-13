@@ -67,7 +67,17 @@ type gpuTexture struct {
 	tex, srv      *com
 	width, height int
 	version       uint64
+	used          time.Time // when a frame last drew it (see sweepTextures)
 }
+
+// Textures no frame has drawn for textureIdle are released, checked every
+// textureSweep. A texture drawn again later is uploaded again from its
+// scene.Texture.Pix, as after Recover; this frees the GPU copies of images and
+// canvases that are gone.
+const (
+	textureIdle  = time.Minute
+	textureSweep = 10 * time.Second
+)
 
 type instanceBuffer struct {
 	buf      *com
@@ -101,7 +111,8 @@ type Device struct {
 	// costs no memory beyond what the texture already holds: w*h*4 bytes for an
 	// image, and each glyph atlas at its current size (up to 16 MB grayscale and
 	// 64 MB ClearType).
-	textures map[uint64]*gpuTexture
+	textures  map[uint64]*gpuTexture
+	lastSweep time.Time
 }
 
 // clipState is one level of the clip stack. rect is the intersection of every
@@ -695,13 +706,16 @@ func (r *Renderer) CaptureNextFrame(fn func(*image.RGBA, error)) { r.capture = f
 
 // EndFrame implements render.Renderer.
 func (r *Renderer) EndFrame() error {
+	now := time.Now()
 	for _, c := range r.commands {
 		if c.tex != nil {
 			if err := r.syncTexture(c.tex); err != nil {
 				return err
 			}
+			r.textures[c.tex.ID].used = now
 		}
 	}
+	r.sweepTextures(now)
 	if err := r.upload(pipeQuad, unsafe.Pointer(unsafe.SliceData(r.quads)), len(r.quads)); err != nil {
 		return err
 	}
@@ -824,6 +838,23 @@ func (r *Renderer) upload(p pipelineKind, data unsafe.Pointer, count int) error 
 	copy(unsafe.Slice((*byte)(ptrFrom(m.PData)), size), unsafe.Slice((*byte)(data), size))
 	syscall.SyscallN(r.ctx.fn(15), r.ctx.this(), vb.buf.this(), 0) // Unmap
 	return nil
+}
+
+// sweepTextures releases the textures that no window has drawn for
+// textureIdle. The device is shared, so a texture that one window still shows
+// is kept as long as that window draws.
+func (r *Renderer) sweepTextures(now time.Time) {
+	if now.Sub(r.lastSweep) < textureSweep {
+		return
+	}
+	r.lastSweep = now
+	for id, g := range r.textures {
+		if now.Sub(g.used) > textureIdle {
+			g.srv.Release()
+			g.tex.Release()
+			delete(r.textures, id)
+		}
+	}
 }
 
 func (r *Renderer) syncTexture(t *scene.Texture) error {
