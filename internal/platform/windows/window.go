@@ -935,6 +935,24 @@ func mapKey(vk uintptr) input.Key {
 		return input.KeyEqual
 	case 0xBD, 0x6D: // VK_OEM_MINUS, VK_SUBTRACT
 		return input.KeyMinus
+	case 0xBA: // VK_OEM_1
+		return input.KeySemicolon
+	case 0xBC: // VK_OEM_COMMA
+		return input.KeyComma
+	case 0xBE: // VK_OEM_PERIOD
+		return input.KeyPeriod
+	case 0xBF: // VK_OEM_2
+		return input.KeySlash
+	case 0xC0: // VK_OEM_3
+		return input.KeyBacktick
+	case 0xDB: // VK_OEM_4
+		return input.KeyLeftBracket
+	case 0xDC: // VK_OEM_5
+		return input.KeyBackslash
+	case 0xDD: // VK_OEM_6
+		return input.KeyRightBracket
+	case 0xDE: // VK_OEM_7
+		return input.KeyApostrophe
 	case 0x60: // VK_NUMPAD0
 		return input.Key0
 	case win32.VK_APPS:

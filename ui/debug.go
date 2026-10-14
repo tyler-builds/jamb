@@ -102,7 +102,7 @@ func (rt *Runtime) ContentWidth() float32 {
 // and composite elements (TextInput, Button, ...) belong to the element
 // they render. For elements that are not on screen, the rectangle comes from
 // layout: their position plus the scroll offsets of their scrolling ancestors.
-func (rt *Runtime) Find(key string) (scene.Rect, bool) {
+func (rt *Runtime) Find(key string) (Rect, bool) {
 	if n := rt.findKey(rt.tree, key); n != nil {
 		return rt.nodeRect(n), true
 	}

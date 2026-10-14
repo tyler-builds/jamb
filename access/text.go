@@ -41,10 +41,48 @@ type TextLine struct {
 	Right       float32
 }
 
+// TextModel is the text of a text field or text area, as the Text pattern reads
+// it. The pattern works in points (see TextContent). A model is never changed
+// after it is published, so any goroutine may read it. Implementations are
+// pointers, since TextInfo.Equal compares the models by identity.
+//
+// The pattern asks the model for the units around a point, and for a range's
+// text with a limit, rather than for the whole text, so that a large text need
+// not be copied for a query. TextContent is the model of a text that is held in
+// memory; the codeedit package has one over a rope.
+type TextModel interface {
+	// Len returns the last point, the end of the text.
+	Len() int
+	// PointOf returns the point at byte offset b, rounded down to a point.
+	PointOf(b int) int
+	// ByteOf returns the byte offset of point p, clamped to the text.
+	ByteOf(p int) int
+	// Span returns the points [a, b) of the unit u that holds point p, with
+	// 0 <= p < Len().
+	Span(u TextUnit, p int) (int, int)
+	// Next returns the point one unit after p, or Len() when there is none.
+	Next(u TextUnit, p int) int
+	// Prev returns the point one unit before p, or 0 when there is none.
+	Prev(u TextUnit, p int) int
+	// Line returns the visual line that holds point p, and the point where the
+	// line ends: the first point of the next line, or Len() on the last line.
+	Line(p int) (TextLine, int)
+	// CaretX returns the x of point p in layout units, on the line it belongs to.
+	CaretX(p int) float32
+	// Nearest returns the point nearest to the position (x, y) in layout units.
+	Nearest(x, y float32) int
+	// Read returns the text of the points [from, to), cut to at most max UTF-16
+	// code units (see UTF16Prefix). A negative max means no limit.
+	Read(from, to, max int) string
+	// SameText reports whether o holds the same text as the model. A change of
+	// text is reported separately from a change of selection (see Diff).
+	SameText(o TextModel) bool
+}
+
 // TextContent is the text of one editor, with the geometry of its layout. The
 // ui runtime builds it on the UI thread when the text or the layout changes, and
 // shares it between the snapshots that show that text. It is never changed after
-// it is built, so any goroutine may read it.
+// it is built, so any goroutine may read it. It implements TextModel.
 type TextContent struct {
 	Text   string     // the text, UTF-8, as the editor holds it
 	Points []int      // the byte offset of each point, from 0 to len(Text)
@@ -76,7 +114,7 @@ func (c *TextContent) ByteOf(p int) int {
 // TextInfo is the state of a text field or text area in one snapshot: its
 // content, its selection, and where the content is drawn in the window.
 type TextInfo struct {
-	Content *TextContent
+	Content TextModel
 	Anchor  int // the selection is the points between Anchor and Caret; a degenerate one is a caret
 	Caret   int // the end of the selection that moves
 	// OriginX and OriginY are the window position of the layout's top-left
@@ -117,34 +155,34 @@ func lastStart(starts []int, g int) int {
 	return max(i-1, 0)
 }
 
-// span returns the points [a, b) of the unit u that holds grapheme g, with
-// 0 <= g < Len().
-func (c *TextContent) span(u TextUnit, g int) (int, int) {
-	n := c.Len()
+// Span returns the points [a, b) of the unit u that holds point p, with
+// 0 <= p < Len().
+func (c *TextContent) Span(u TextUnit, p int) (int, int) {
 	switch u {
 	case UnitCharacter:
-		return g, g + 1
+		return p, p + 1
 	case UnitLine:
-		return c.lineSpan(g)
+		ln, end := c.Line(p)
+		return ln.Start, end
 	case UnitParagraph:
-		i := lastStart(c.Paras, g)
+		i := lastStart(c.Paras, p)
 		return c.Paras[i], c.endOf(c.Paras, i)
 	case UnitWord:
-		i := lastStart(c.Words, g)
+		i := lastStart(c.Words, p)
 		return c.Words[i], c.endOf(c.Words, i)
 	}
-	return 0, n // format, page and document
+	return 0, c.Len() // format, page and document
 }
 
-// lineSpan returns the points of the visual line that holds grapheme g.
-func (c *TextContent) lineSpan(g int) (int, int) {
-	i := sort.Search(len(c.Lines), func(i int) bool { return c.Lines[i].Start > g })
+// Line returns the visual line that holds point p, and the point where it ends.
+func (c *TextContent) Line(p int) (TextLine, int) {
+	i := sort.Search(len(c.Lines), func(i int) bool { return c.Lines[i].Start > p })
 	i = max(i-1, 0)
 	end := c.Len()
 	if i+1 < len(c.Lines) {
 		end = c.Lines[i+1].Start
 	}
-	return c.Lines[i].Start, end
+	return c.Lines[i], end
 }
 
 // endOf returns the end of the unit i of starts: the next start, or the end of
@@ -156,10 +194,10 @@ func (c *TextContent) endOf(starts []int, i int) int {
 	return c.Len()
 }
 
-// next returns the point one unit after p, or the end of the text when there is
+// Next returns the point one unit after p, or the end of the text when there is
 // none. A word unit moves to the start of the next word unit, as Ctrl+Right does on
 // Windows (see text.WordStarts).
-func (c *TextContent) next(u TextUnit, p int) int {
+func (c *TextContent) Next(u TextUnit, p int) int {
 	n := c.Len()
 	if p >= n {
 		return n
@@ -181,10 +219,10 @@ func (c *TextContent) next(u TextUnit, p int) int {
 	return n
 }
 
-// prev returns the point one unit before p, or 0 when there is none. A word unit
+// Prev returns the point one unit before p, or 0 when there is none. A word unit
 // follows the editor's Ctrl+Left: it moves to the start of the word before p,
 // past any separator.
-func (c *TextContent) prev(u TextUnit, p int) int {
+func (c *TextContent) Prev(u TextUnit, p int) int {
 	if p <= 0 {
 		return 0
 	}
@@ -205,6 +243,50 @@ func (c *TextContent) prev(u TextUnit, p int) int {
 	return 0
 }
 
+// CaretX returns the x of point p in layout units.
+func (c *TextContent) CaretX(p int) float32 { return c.X[p] }
+
+// Nearest returns the point nearest to the position (x, y) in layout units. Above
+// the text it is the first point of the first line; below it, the end of the last
+// line.
+func (c *TextContent) Nearest(x, y float32) int {
+	li := sort.Search(len(c.Lines), func(i int) bool { return c.Lines[i].Top+c.Lines[i].Height > y })
+	li = min(max(li, 0), len(c.Lines)-1)
+	ln := c.Lines[li]
+	// The points of the line run up to the next line's first point, which
+	// belongs to the next line. The last line also has the end of the text.
+	end := c.Len() + 1
+	if li+1 < len(c.Lines) {
+		end = c.Lines[li+1].Start
+	}
+	best, bestD := ln.Start, float32(-1)
+	for p := ln.Start; p < end; p++ {
+		d := c.X[p] - x
+		if d < 0 {
+			d = -d
+		}
+		if bestD < 0 || d < bestD {
+			best, bestD = p, d
+		}
+	}
+	return best
+}
+
+// Read returns the text of the points [from, to), cut to at most max UTF-16 code
+// units. A negative max means no limit.
+func (c *TextContent) Read(from, to, max int) string {
+	return UTF16Prefix(c.Text[c.ByteOf(from):c.ByteOf(to)], max)
+}
+
+// SameText reports whether o holds the same text as c. Another model is compared by
+// reading its whole text, which only a model of another kind needs.
+func (c *TextContent) SameText(o TextModel) bool {
+	if oc, ok := o.(*TextContent); ok {
+		return oc == c || oc.Text == c.Text
+	}
+	return o != nil && o.Read(0, o.Len(), -1) == c.Text
+}
+
 // firstAfter returns the first start after p, or fallback when there is none.
 func firstAfter(starts []int, p, fallback int) int {
 	i := sort.Search(len(starts), func(i int) bool { return starts[i] > p })
@@ -223,17 +305,21 @@ func lastBefore(starts []int, p int) int {
 	return 0
 }
 
+// lastGrapheme returns the point of the last grapheme cluster of a text that is
+// not empty.
+func lastGrapheme(c TextModel) int { return c.Prev(UnitCharacter, c.Len()) }
+
 // step moves point p by count units, one unit at a time, and returns the point
 // reached and the number of units moved, which is negative for a backward move.
 // It stops at the ends of the text.
-func (c *TextContent) step(u TextUnit, p, count int) (int, int) {
+func step(c TextModel, u TextUnit, p, count int) (int, int) {
 	moved := 0
 	for ; count > 0 && p < c.Len(); count-- {
-		p = c.next(u, p)
+		p = c.Next(u, p)
 		moved++
 	}
 	for ; count < 0 && p > 0; count++ {
-		p = c.prev(u, p)
+		p = c.Prev(u, p)
 		moved--
 	}
 	return p, moved
@@ -251,16 +337,18 @@ type TextRange struct {
 }
 
 // Content returns the content of the range's text.
-func (r TextRange) Content() *TextContent { return r.Info.Content }
+func (r TextRange) Content() TextModel { return r.Info.Content }
 
 // Degenerate reports whether the range is a position.
 func (r TextRange) Degenerate() bool { return r.Start == r.End }
 
 // Text returns the text between the endpoints.
-func (r TextRange) Text() string {
-	c := r.Content()
-	return c.Text[c.ByteOf(r.Start):c.ByteOf(r.End)]
-}
+func (r TextRange) Text() string { return r.Content().Read(r.Start, r.End, -1) }
+
+// GetText returns the text between the endpoints, cut to at most max UTF-16 code
+// units, as UI Automation's GetText asks for it. A negative max means no limit.
+// A model reads only the requested range.
+func (r TextRange) GetText(max int) string { return r.Content().Read(r.Start, r.End, max) }
 
 // Whole returns the range of the whole text of t.
 func (t *TextInfo) Whole() TextRange {
@@ -285,16 +373,16 @@ func (t *TextInfo) Selection() TextRange {
 // at its end. An empty text has no units and expands to nothing.
 func (r TextRange) Expand(u TextUnit) TextRange {
 	c := r.Content()
-	n := c.Len()
-	if n == 0 {
+	if c.Len() == 0 {
 		return TextRange{Info: r.Info}
 	}
+	last := lastGrapheme(c)
 	if r.Degenerate() {
-		a, b := c.span(u, min(r.Start, c.Len()-1))
+		a, b := c.Span(u, min(r.Start, last))
 		return TextRange{Info: r.Info, Start: a, End: b}
 	}
-	a, _ := c.span(u, min(r.Start, n-1))
-	_, b := c.span(u, r.End-1)
+	a, _ := c.Span(u, min(r.Start, last))
+	_, b := c.Span(u, c.Prev(UnitCharacter, r.End))
 	return TextRange{Info: r.Info, Start: a, End: b}
 }
 
@@ -320,18 +408,18 @@ func (r TextRange) Move(u TextUnit, count int) (TextRange, int) {
 		return r, 0
 	}
 	if r.Degenerate() {
-		p, moved := c.step(u, r.Start, count)
+		p, moved := step(c, u, r.Start, count)
 		if moved == 0 {
 			return r, 0
 		}
 		return TextRange{Info: r.Info, Start: p, End: p}, moved
 	}
-	a, _ := c.span(u, min(r.Start, c.Len()-1))
-	p, moved := c.step(u, a, count)
+	a, _ := c.Span(u, min(r.Start, lastGrapheme(c)))
+	p, moved := step(c, u, a, count)
 	if moved == 0 {
 		return r, 0
 	}
-	return TextRange{Info: r.Info, Start: p, End: c.next(u, p)}, moved
+	return TextRange{Info: r.Info, Start: p, End: c.Next(u, p)}, moved
 }
 
 // MoveEndpoint moves one endpoint of the range by count units of u, and returns
@@ -346,7 +434,7 @@ func (r TextRange) MoveEndpoint(start bool, u TextUnit, count int) (TextRange, i
 	if start {
 		p = r.Start
 	}
-	q, moved := c.step(u, p, count)
+	q, moved := step(c, u, p, count)
 	if moved == 0 {
 		return r, 0
 	}
@@ -412,26 +500,31 @@ func (r TextRange) Find(needle string, backward, ignoreCase bool) (TextRange, bo
 		return TextRange{}, false
 	}
 	nr := []rune(needle)
+	// The search works on the text of the range, with offsets from its start.
+	s := c.Read(r.Start, r.End, -1)
+	base := c.ByteOf(r.Start)
 	match := func(p int) (TextRange, bool) {
-		end, ok := matchFold(c.Text, c.ByteOf(p), c.ByteOf(r.End), nr, ignoreCase)
+		end, ok := matchFold(s, c.ByteOf(p)-base, len(s), nr, ignoreCase)
 		if !ok {
 			return TextRange{}, false
 		}
-		q := c.PointOf(end)
-		if c.Points[q] != end {
-			q++ // the match ends inside a grapheme cluster; take the whole cluster
+		q := c.PointOf(end + base)
+		if c.ByteOf(q) != end+base {
+			q = c.Next(UnitCharacter, q) // the match ends inside a grapheme cluster; take the whole cluster
 		}
 		return TextRange{Info: r.Info, Start: p, End: min(q, r.End)}, true
 	}
 	if backward {
-		for p := r.End - 1; p >= r.Start; p-- {
+		p := r.End
+		for p > r.Start {
+			p = c.Prev(UnitCharacter, p)
 			if m, ok := match(p); ok {
 				return m, true
 			}
 		}
 		return TextRange{}, false
 	}
-	for p := r.Start; p < r.End; p++ {
+	for p := r.Start; p < r.End; p = c.Next(UnitCharacter, p) {
 		if m, ok := match(p); ok {
 			return m, true
 		}
@@ -475,19 +568,16 @@ func (r TextRange) Rects() []Rect {
 	}
 	t, c := r.Info, r.Content()
 	var out []Rect
-	for i, ln := range c.Lines {
-		end := c.Len()
-		if i+1 < len(c.Lines) {
-			end = c.Lines[i+1].Start
+	for s := r.Start; s < r.End; {
+		ln, end := c.Line(s)
+		if end <= s {
+			break
 		}
-		s, e := max(r.Start, ln.Start), min(r.End, end)
-		if s >= e {
-			continue
-		}
-		x0 := c.X[s]
+		e := min(r.End, end)
+		x0 := c.CaretX(s)
 		x1 := ln.Right
 		if e < end {
-			x1 = c.X[e]
+			x1 = c.CaretX(e)
 		}
 		if x1 < x0 {
 			x0, x1 = x1, x0
@@ -497,6 +587,7 @@ func (r TextRange) Rects() []Rect {
 		if !rect.Empty() {
 			out = append(out, rect)
 		}
+		s = end
 	}
 	return out
 }
@@ -517,32 +608,10 @@ func intersect(r, c Rect) Rect {
 // the window, as a click or hover would find it. Above the text it is the first
 // point of the first line; below it, the end of the last line.
 func (t *TextInfo) PointAt(x, y float32) int {
-	c := t.Content
 	if t.Scale <= 0 {
 		return t.Caret
 	}
-	lx := (x - t.OriginX) / t.Scale
-	ly := (y - t.OriginY) / t.Scale
-	li := sort.Search(len(c.Lines), func(i int) bool { return c.Lines[i].Top+c.Lines[i].Height > ly })
-	li = min(max(li, 0), len(c.Lines)-1)
-	ln := c.Lines[li]
-	// The points of the line run up to the next line's first point, which
-	// belongs to the next line. The last line also has the end of the text.
-	end := c.Len() + 1
-	if li+1 < len(c.Lines) {
-		end = c.Lines[li+1].Start
-	}
-	best, bestD := ln.Start, float32(-1)
-	for p := ln.Start; p < end; p++ {
-		d := c.X[p] - lx
-		if d < 0 {
-			d = -d
-		}
-		if bestD < 0 || d < bestD {
-			best, bestD = p, d
-		}
-	}
-	return best
+	return t.Content.Nearest((x-t.OriginX)/t.Scale, (y-t.OriginY)/t.Scale)
 }
 
 // UTF16Prefix returns the longest prefix of s that has at most max UTF-16 code

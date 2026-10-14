@@ -59,6 +59,8 @@ type componentInstance struct {
 	parentNode *node     // node root is attached to (nil for the runtime root)
 	inh        textStyle // inherited text style root was built with
 	disposed   bool
+	// disposers are the functions registered with Context.OnDispose, run once when disposed.
+	disposers []func()
 
 	// watchesFocus is set when the last render asked whether its element is
 	// focused; a focus change then re-renders it.
@@ -218,6 +220,18 @@ func (c *Context) Invalidate() {
 	if c.inst != nil {
 		c.inst.invalidate()
 	}
+}
+
+// OnDispose registers fn to run when the component is removed from the tree, such as to close
+// a file or stop a worker it started. Callbacks run in the order they were registered, each
+// once, before the component's children are disposed. The registration lasts as long as the
+// component does, not as long as one render: a call in every render adds a callback in every
+// render. Guard the call so that it happens once, such as with a flag kept in Local.
+func (c *Context) OnDispose(fn func()) {
+	if c.inst == nil {
+		panic("ui.Context.OnDispose: no component is rendering; call it inside a ui.Component render function")
+	}
+	c.inst.disposers = append(c.inst.disposers, fn)
 }
 
 // Local returns a signal that belongs to the calling component and lives as

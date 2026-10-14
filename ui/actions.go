@@ -104,7 +104,13 @@ func (s keystroke) typesText() bool {
 	case s.key >= input.KeyA && s.key <= input.KeyZ, s.key >= input.Key0 && s.key <= input.Key9:
 		return true
 	}
-	return s.key == input.KeySpace || s.key == input.KeyEqual || s.key == input.KeyMinus
+	switch s.key {
+	case input.KeySpace, input.KeyEqual, input.KeyMinus, input.KeySlash, input.KeyBackslash,
+		input.KeyLeftBracket, input.KeyRightBracket, input.KeySemicolon, input.KeyApostrophe,
+		input.KeyComma, input.KeyPeriod, input.KeyBacktick:
+		return true
+	}
+	return false
 }
 
 // Bind maps keys to a: the binding applies everywhere, after any contextual
@@ -114,8 +120,12 @@ func (s keystroke) typesText() bool {
 // "f2".
 // Modifiers are ctrl, shift, alt and super; keys are a-z, 0-9, f1-f12,
 // enter, escape (or esc), backspace, delete, tab, space, left, right, up,
-// down, home, end, pageup, pagedown, insert, = and -. Bind panics on a
-// malformed keys string.
+// down, home, end, pageup, pagedown, insert, and the punctuation keys = - / \ [ ] ; ' , . `.
+// Bind panics on a malformed keys string.
+//
+// The punctuation keys name the physical key as the US layout prints it, so "ctrl+shift+["
+// is the key that is [ on the US layout. With Shift held that key types {, and the binding
+// still matches, since it is the same key position with Shift held.
 func Bind(keys string, a *Action) Binding {
 	b, err := ParseBinding("", keys, a)
 	if err != nil {
@@ -178,6 +188,9 @@ var keyNames = map[string]input.Key{
 	"up": input.KeyUp, "down": input.KeyDown, "home": input.KeyHome, "end": input.KeyEnd,
 	"pageup": input.KeyPageUp, "pagedown": input.KeyPageDown, "insert": input.KeyInsert,
 	"=": input.KeyEqual, "-": input.KeyMinus,
+	"/": input.KeySlash, "\\": input.KeyBackslash, "[": input.KeyLeftBracket, "]": input.KeyRightBracket,
+	";": input.KeySemicolon, "'": input.KeyApostrophe, ",": input.KeyComma, ".": input.KeyPeriod,
+	"`": input.KeyBacktick,
 }
 
 // parseKeys turns a keys string into strokes. The error names the offending
@@ -205,7 +218,8 @@ func parseKeys(keys string) ([]keystroke, error) {
 		k, ok := parseKeyName(name)
 		if !ok {
 			return nil, fmt.Errorf("unknown key %q; use a-z, 0-9, f1-f12, enter, escape, backspace, "+
-				"delete, tab, space, left, right, up, down, home, end, pageup, pagedown, insert, = or -", name)
+				"delete, tab, space, left, right, up, down, home, end, pageup, pagedown, insert, "+
+				"or one of = - / \\ [ ] ; ' , . `", name)
 		}
 		s.key = k
 		strokes = append(strokes, s)
@@ -278,6 +292,24 @@ func keyLabel(k input.Key) string {
 		return "="
 	case input.KeyMinus:
 		return "-"
+	case input.KeySlash:
+		return "/"
+	case input.KeyBackslash:
+		return "\\"
+	case input.KeyLeftBracket:
+		return "["
+	case input.KeyRightBracket:
+		return "]"
+	case input.KeySemicolon:
+		return ";"
+	case input.KeyApostrophe:
+		return "'"
+	case input.KeyComma:
+		return ","
+	case input.KeyPeriod:
+		return "."
+	case input.KeyBacktick:
+		return "`"
 	}
 	return ""
 }

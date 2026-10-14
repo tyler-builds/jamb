@@ -236,8 +236,9 @@ type Runtime struct {
 	theme    *Theme   // the effective theme: the app's, or the high contrast one
 	appTheme *Theme   // the theme the app set with SetTheme
 	strings  *Strings // the text the built-in controls show, complete (see SetStrings)
-	// imageDue is when the next frame of a drawn animated image is due; a
-	// frame at or after it repaints (see imageTexture).
+	// imageDue is when the next frame of a drawn animated image, or of a canvas's
+	// blinking caret, is due; a frame at or after it repaints (see imageTexture
+	// and noteDue).
 	imageDue time.Time
 	// themes is the light and dark theme the runtime follows the system with
 	// (see SetThemes), or nil when the app has set one theme.
@@ -479,11 +480,17 @@ func (rt *Runtime) wakeAt(t time.Time) {
 }
 
 // hostTextInputRect returns the caret of the focused text editor in logical
-// pixels, so the platform can place input-method windows next to it.
+// pixels, so the platform can place input-method windows next to it. A focused
+// element that takes the composition itself gives its own caret (see
+// CompositionCaret).
 func (rt *Runtime) hostTextInputRect() (scene.Rect, bool) {
-	r := rt.textInput
+	r, ok := rt.textInput, rt.hasTextInput
+	if n := rt.hookFocused(); n != nil && n.div.ime.caret != nil {
+		c := n.div.ime.caret()
+		r, ok = scene.Rect{X: n.abs.X + c.X, Y: n.abs.Y + c.Y, W: c.W, H: c.H}, true
+	}
 	z := rt.zoom
-	return scene.Rect{X: r.X * z, Y: r.Y * z, W: r.W * z, H: r.H * z}, rt.hasTextInput
+	return scene.Rect{X: r.X * z, Y: r.Y * z, W: r.W * z, H: r.H * z}, ok
 }
 
 // NewRuntime creates a runtime for the given root render function.
@@ -1104,6 +1111,12 @@ func (rt *Runtime) disposeInstance(inst *componentInstance) {
 	}
 	inst.disposed = true
 	inst.unsubscribe()
+	// Cleared before they run, so that each runs once and no closure outlives the instance.
+	disposers := inst.disposers
+	inst.disposers = nil
+	for _, fn := range disposers {
+		fn()
+	}
 	if rt.instances[inst.id] == inst {
 		delete(rt.instances, inst.id)
 		delete(rt.states, inst.id)

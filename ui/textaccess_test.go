@@ -60,11 +60,12 @@ func TestTextPointsCountGraphemeClusters(t *testing.T) {
 				return Div().Column().Children(TextArea(NewSignal(tc.value)).Label("Body").Width(Px(300)))
 			})
 			ti := textOf(t, r, access.RoleTextArea, "Body")
-			if got := ti.Content.Len(); got != tc.len {
-				t.Errorf("grapheme clusters = %d, want %d (points %v)", got, tc.len, ti.Content.Points)
+			c := ti.Content.(*access.TextContent)
+			if got := c.Len(); got != tc.len {
+				t.Errorf("grapheme clusters = %d, want %d (points %v)", got, tc.len, c.Points)
 			}
-			if ti.Content.Text != tc.value {
-				t.Errorf("content text %q, want %q", ti.Content.Text, tc.value)
+			if c.Text != tc.value {
+				t.Errorf("content text %q, want %q", c.Text, tc.value)
 			}
 		})
 	}
@@ -117,7 +118,7 @@ func TestWrappedLinesAndRectsFollowTheLayout(t *testing.T) {
 	})
 	field := accesstest.Find(t, r.tree(), access.RoleTextArea, "Notes")
 	ti := field.Text
-	c := ti.Content
+	c := ti.Content.(*access.TextContent)
 	layout := editorOfNode(t, r, field.ID).layout
 	if layout == nil {
 		t.Fatalf("the editor has no layout after a frame")

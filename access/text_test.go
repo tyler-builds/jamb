@@ -47,7 +47,11 @@ func testContent(s string, width int) *TextContent {
 			}
 		}
 		c.X[p] = float32(p-c.Lines[li].Start) * 8
-		c.Lines[li].Right = max(c.Lines[li].Right, c.X[p])
+		// Right leaves out the trailing spaces of the line, as TextLine describes: a point
+		// after a space is not the end of the text.
+		if p == 0 || s[p-1] != ' ' {
+			c.Lines[li].Right = max(c.Lines[li].Right, c.X[p])
+		}
 	}
 	c.Words = asciiWordStarts(s)
 	return c

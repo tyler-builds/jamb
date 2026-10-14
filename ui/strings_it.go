@@ -83,6 +83,20 @@ func italianStrings() *Strings {
 		SortedAscending:  "ordinato in ordine crescente",
 		SortedDescending: "ordinato in ordine decrescente",
 
+		CodeEditorFind:       "Trova",
+		CodeEditorReplace:    "Sostituisci",
+		CodeEditorReplaceAll: "Sostituisci tutto",
+		CodeEditorNext:       "Successivo",
+		CodeEditorPrevious:   "Precedente",
+		CodeEditorMatchCase:  "Maiuscole/minuscole",
+		CodeEditorWholeWord:  "Parola intera",
+		CodeEditorRegex:      "Espressione regolare",
+		CodeEditorGoToLine:   "Numero di riga",
+		CodeEditorNoMatches:  "Nessun risultato",
+		CodeEditorCount: func(current, total int) string {
+			return fmt.Sprintf("%d di %d", current, total)
+		},
+
 		Required: "Questo campo è obbligatorio.",
 	}
 }

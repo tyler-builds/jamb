@@ -2,6 +2,7 @@ package ui
 
 import (
 	"math"
+	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/internal/scene"
@@ -15,9 +16,10 @@ import (
 // and y going down.
 //
 // The drawing is kept between frames. draw runs again when the component that
-// made the canvas renders again, or when the canvas's size, the display scale
-// or the zoom changes, so read the signals the drawing depends on in the
-// component's render, not only in draw. Shapes are drawn on the CPU, at the
+// made the canvas renders again, when the canvas's size, the display scale or
+// the zoom changes, or when a caret it drew with Painter.CaretVisible blinks, so
+// read the signals the drawing depends on in the component's render, not only
+// in draw. Shapes are drawn on the CPU, at the
 // display's resolution, and text with the text renderer, over the shapes.
 //
 // The canvas is a Div: size it with Size (300 x 150 by default), handle the
@@ -44,6 +46,7 @@ type Painter struct {
 	k     float32 // physical pixels per logical pixel
 	fg    Color
 	texts *[]canvasText
+	caret caretDraw // what the drawing asked of the caret blink (see CaretVisible)
 }
 
 // TextColor returns the text color the canvas inherits, as text in its place
@@ -218,6 +221,13 @@ type TextStyle struct {
 	Size   float32 // 0 means the theme's text size
 	Color  Color   // zero means the inherited text color (see Painter.TextColor)
 	Weight FontWeight
+	// Mono sets the text in the monospace family, as code is set.
+	Mono bool
+	// Italic draws the text in the italic face of its family. A family with no
+	// italic face for the weight draws it upright: the text system has no
+	// synthetic oblique. Windows has italic faces for the sans and the monospace
+	// families, and the embedded fonts on other systems do too.
+	Italic bool
 	// Align places the text horizontally against x: Start puts its left edge
 	// there, Center its middle, End its right edge. VAlign does the same
 	// vertically against y, with Start its top.
@@ -306,7 +316,16 @@ func (p *Painter) MeasureText(s string, st TextStyle) (w, h float32) {
 }
 
 func (p *Painter) layout(s string, st TextStyle) *text.Layout {
-	ts := text.Style{Size: st.Size, Weight: st.Weight, NoWrap: true}
+	return p.rt.text.Layout(s, p.textStyle(st), float32(math.Inf(1)))
+}
+
+// textStyle returns the text style that st draws with: its family, weight, italic and size, with the
+// theme's text size and the Text size setting applied.
+func (p *Painter) textStyle(st TextStyle) text.Style {
+	ts := text.Style{Size: st.Size, Weight: st.Weight, Italic: st.Italic, NoWrap: true}
+	if st.Mono {
+		ts.Family = text.FamilyMono
+	}
 	if ts.Size == 0 {
 		ts.Size = p.rt.theme.FontSize
 	}
@@ -314,7 +333,41 @@ func (p *Painter) layout(s string, st TextStyle) *text.Layout {
 	if ts.Weight == 0 {
 		ts.Weight = text.Regular
 	}
-	return p.rt.text.Layout(s, ts, float32(math.Inf(1)))
+	return ts
+}
+
+// FontName returns the name that the platform knows the font of st by, such as "Consolas" for a
+// Mono text on Windows. It is "" when the font declares no name. The name is for assistive
+// technology and the inspector; drawing does not use it.
+func (p *Painter) FontName(st TextStyle) string {
+	return p.rt.text.FaceName(p.textStyle(st))
+}
+
+// Now returns the time of the frame being painted, the clock that CaretVisible blinks on. A
+// canvas that starts a blink on an edit or a click records Now in its next paint.
+func (p *Painter) Now() time.Time { return p.rt.lastFrame }
+
+// CaretVisible reports whether a text caret drawn now is on. The caret blinks from activity, the
+// time of its latest edit or move (see Now): on for half the system's caret blink period, then
+// off. It stays on, and does not blink, when the system's caret blink is off, when the user asks
+// for reduced motion, or after a while without activity. In an inactive window it is off and
+// nothing blinks. A blinking caret schedules the frame of its next change, and the canvas draws
+// again then, so ask only for a caret that is drawn.
+func (p *Painter) CaretVisible(activity time.Time) bool {
+	rt := p.rt
+	p.caret = caretDraw{used: true, inactive: rt.windowInactive}
+	if rt.windowInactive {
+		return false
+	}
+	if rt.sys.ReducedMotion {
+		return true
+	}
+	on, next := rt.caretBlink(activity)
+	if !next.IsZero() {
+		p.caret.due = next
+		rt.noteDue(next)
+	}
+	return on
 }
 
 // alignShift is how far text of width w moves back from the point it is
@@ -339,6 +392,31 @@ type canvasState struct {
 	fg     Color       // the inherited text color it was drawn with
 	pw, ph int         // the drawing's size in physical pixels
 	texts  []canvasText
+	caret  caretDraw // the caret state the drawing was made with
+}
+
+// caretDraw is what a drawing asked of a blinking caret: whether it asked, the window state it
+// saw, and when its next change is due (zero when the caret does not change by itself).
+type caretDraw struct {
+	used     bool
+	inactive bool
+	due      time.Time
+}
+
+// stale reports whether the caret the drawing showed has changed since: the window became active
+// or inactive, or the blink reached its next change.
+func (c caretDraw) stale(rt *Runtime) bool {
+	return c.used && (c.inactive != rt.windowInactive || (!c.due.IsZero() && !rt.lastFrame.Before(c.due)))
+}
+
+// noteDue asks for a frame at t, when a drawing changes by itself. The frame repaints, so the
+// canvas draws again. Like an animated image, it is reset by each paint and set again by the
+// drawings that are due.
+func (rt *Runtime) noteDue(t time.Time) {
+	if rt.imageDue.IsZero() || t.Before(rt.imageDue) {
+		rt.imageDue = t
+	}
+	rt.wakeAt(t)
 }
 
 // paintCanvas draws a canvas div's drawing in its content box, at x, y of
@@ -368,13 +446,16 @@ func (rt *Runtime) paintCanvas(n *node, x, y, w, h float32, fg Color, opacity fl
 	if key := n.div.canvasKey; key != nil {
 		changed = cs.key != key
 	}
-	if changed || cs.pw != pw || cs.ph != ph || cs.fg != fg {
+	stale := cs.caret.stale(rt)
+	if changed || stale || cs.pw != pw || cs.ph != ph || cs.fg != fg {
 		cs.el, cs.key, cs.fg, cs.pw, cs.ph = n.div, n.div.canvasKey, fg, pw, ph
 		cs.texts = cs.texts[:0]
 		cs.vc.Reset(pw, ph)
 		k := float32(pw) / box.W
 		cs.vc.SetTransform(vector.Scale(k, float32(ph)/box.H))
-		n.div.canvas(&Painter{c: cs.vc, rt: rt, k: k, fg: fg, texts: &cs.texts}, box.W, box.H)
+		pt := &Painter{c: cs.vc, rt: rt, k: k, fg: fg, texts: &cs.texts}
+		n.div.canvas(pt, box.W, box.H)
+		cs.caret = pt.caret
 		img := cs.vc.Image()
 		if cs.tex == nil || cs.tex.Width != pw || cs.tex.Height != ph {
 			// The texture keeps its ID through size changes, so the renderer
@@ -387,6 +468,8 @@ func (rt *Runtime) paintCanvas(n *node, x, y, w, h float32, fg Color, opacity fl
 		}
 		copy(cs.tex.Pix, img.Pix)
 		cs.tex.MarkDirty(0, 0, pw, ph)
+	} else if !cs.caret.due.IsZero() {
+		rt.noteDue(cs.caret.due) // the drawing is kept, and its caret's next change is still due
 	}
 	rt.scene.AddImage(scene.ImageDraw{Bounds: dst, Texture: cs.tex, Opacity: opacity})
 	if len(cs.texts) == 0 {

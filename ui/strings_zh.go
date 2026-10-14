@@ -82,6 +82,17 @@ func chineseMainlandStrings() *Strings {
 		SortedAscending:         "已升序排序",
 		SortedDescending:        "已降序排序",
 
+		CodeEditorFind:       "查找",
+		CodeEditorReplace:    "替换",
+		CodeEditorReplaceAll: "全部替换",
+		CodeEditorNext:       "下一个",
+		CodeEditorPrevious:   "上一个",
+		CodeEditorMatchCase:  "区分大小写",
+		CodeEditorWholeWord:  "全字匹配",
+		CodeEditorRegex:      "正则表达式",
+		CodeEditorGoToLine:   "行号",
+		CodeEditorNoMatches:  "无结果",
+
 		Required: "此字段为必填项。",
 	}
 }
@@ -158,6 +169,17 @@ func chineseTaiwanStrings() *Strings {
 		NoRows:                  "暫無資料",
 		CouldNotLoadSuggestions: "無法載入建議",
 		SuggestionCount:         func(n int) string { return fmt.Sprintf("%d 條建議", n) },
+
+		CodeEditorFind:       "查找",
+		CodeEditorReplace:    "取代",
+		CodeEditorReplaceAll: "全部取代",
+		CodeEditorNext:       "下一個",
+		CodeEditorPrevious:   "上一個",
+		CodeEditorMatchCase:  "大小寫",
+		CodeEditorWholeWord:  "全字匹配",
+		CodeEditorRegex:      "正規表示式",
+		CodeEditorGoToLine:   "行號",
+		CodeEditorNoMatches:  "無結果",
 
 		Required: "此欄位為必填。",
 	}
@@ -236,6 +258,16 @@ func chineseHongKongStrings() *Strings {
 		NoResults:               "暫無數據",
 		NoRows:                  "暫無數據",
 		CouldNotLoadSuggestions: "無法載入建議",
+
+		CodeEditorFind:       "查找",
+		CodeEditorReplace:    "取代",
+		CodeEditorReplaceAll: "全部取代",
+		CodeEditorNext:       "下一個",
+		CodeEditorPrevious:   "上一個",
+		CodeEditorMatchCase:  "大小寫",
+		CodeEditorWholeWord:  "全字匹配",
+		CodeEditorGoToLine:   "行號",
+		CodeEditorNoMatches:  "無結果",
 
 		Required: "此欄位為必填。",
 	}

@@ -865,6 +865,9 @@ func (rt *Runtime) TextInput(s string) {
 func (rt *Runtime) deliverText(s string) {
 	for _, n := range rt.keyPath() {
 		if n.div != nil && n.div.h.onTextInput != nil {
+			if rt.composing == n.id && n.div.composes() {
+				rt.dropComposition() // a confirmed result takes the place of the composition, as in editorTyped
+			}
 			n.div.h.onTextInput(s)
 			return
 		}

@@ -583,15 +583,25 @@ func (rt *Runtime) caretVisible(es *editState) bool {
 	if rt.windowInactive {
 		return false
 	}
-	since := rt.lastFrame.Sub(es.activity)
+	on, next := rt.caretBlink(es.activity)
+	if !next.IsZero() {
+		// The frame at next must repaint the caret, so it is due, as an animated image is (see noteDue).
+		rt.noteDue(next)
+	}
+	return on
+}
+
+// caretBlink returns whether a caret that blinks from activity is on at the last frame, and when
+// it next changes: zero when it stays as it is. It is solid after caretBlinkStop without activity,
+// and when the system's blink is off.
+func (rt *Runtime) caretBlink(activity time.Time) (on bool, next time.Time) {
+	since := rt.lastFrame.Sub(activity)
 	if since < 0 || since >= caretBlinkStop || rt.sys.CaretBlinkOff {
-		return true
+		return true, time.Time{}
 	}
 	blink := rt.sys.CaretBlink
 	phase := int(since / blink)
-	next := es.activity.Add(time.Duration(phase+1) * blink)
-	rt.wakeAt(next)
-	return phase%2 == 0
+	return phase%2 == 0, activity.Add(time.Duration(phase+1) * blink)
 }
 
 // revealCaret scrolls the nearest vertical scroll container so the caret

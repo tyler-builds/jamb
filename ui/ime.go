@@ -10,7 +10,9 @@ import (
 // would become and offers candidates, and only the confirmed text is typed.
 // The text being composed is drawn inside the focused field, at the caret and
 // underlined, as a native field draws it; it is not part of the field's value
-// until the input method confirms it, which arrives as typed text.
+// until the input method confirms it, which arrives as typed text. An element
+// that draws its own text takes the composition through OnComposition instead
+// (see element_input.go).
 
 // composition is the text an input method is composing in an editor. The
 // offsets are bytes in text.
@@ -23,12 +25,24 @@ type composition struct {
 	clauseStart, clauseEnd int
 }
 
+// clamped returns c with its offsets moved to the characters of its text.
+func (c composition) clamped() composition {
+	c.cursor = clampToRune(c.text, c.cursor)
+	c.clauseStart = clampToRune(c.text, c.clauseStart)
+	c.clauseEnd = max(clampToRune(c.text, c.clauseEnd), c.clauseStart)
+	return c
+}
+
 // hostCompose shows what an input method is composing in the focused field,
 // replacing what it showed before. Empty text ends the composition without
 // typing anything: the input method was canceled, or typed its result already.
 func (rt *Runtime) hostCompose(c composition) {
 	if rt.composing != 0 && rt.composing != rt.focusID {
 		rt.dropComposition() // focus moved without a focus change, as when the field went away
+	}
+	if n := rt.hookFocused(); n != nil {
+		rt.hostComposeHook(n, c)
+		return
 	}
 	n, es, v := rt.editorOf(rt.focusID)
 	if n == nil || n.editor.locked() {
@@ -46,18 +60,44 @@ func (rt *Runtime) hostCompose(c composition) {
 		a, b := es.selection()
 		rt.editorSet(n.id, v[:a]+v[b:], a, editOther)
 	}
-	c.cursor = clampToRune(c.text, c.cursor)
-	c.clauseStart = clampToRune(c.text, c.clauseStart)
-	c.clauseEnd = max(clampToRune(c.text, c.clauseEnd), c.clauseStart)
-	es.comp = c
+	es.comp = c.clamped()
 	rt.composing = n.id
 	rt.editorTouched(n.id)
 }
 
+// hostComposeHook shows what an input method is composing in n, the focused
+// element that takes the composition itself (see OnComposition). Empty text
+// ends it, as it does in a field.
+func (rt *Runtime) hostComposeHook(n *node, c composition) {
+	if c.text == "" {
+		if rt.composing != 0 {
+			rt.dropComposition()
+		}
+		return
+	}
+	rt.composing = n.id
+	n.div.ime.update(c.clamped().public())
+	rt.needPaint = true
+}
+
+// hookFocused returns the focused element when it takes the composition itself
+// (see OnComposition), or nil.
+func (rt *Runtime) hookFocused() *node {
+	if n := rt.byID[rt.focusID]; n != nil && n.div != nil && n.div.composes() {
+		return n
+	}
+	return nil
+}
+
 // dropComposition forgets the composition without typing it.
 func (rt *Runtime) dropComposition() {
-	if n := rt.byID[rt.composing]; n != nil && n.st != nil && n.st.edit != nil {
-		n.st.edit.comp = composition{}
+	if n := rt.byID[rt.composing]; n != nil {
+		if n.st != nil && n.st.edit != nil {
+			n.st.edit.comp = composition{}
+		}
+		if n.div != nil && n.div.composes() {
+			n.div.ime.update(Composition{})
+		}
 	}
 	rt.composing = 0
 	rt.needPaint = true
@@ -73,13 +113,20 @@ func (rt *Runtime) commitComposition() {
 	if id == 0 {
 		return
 	}
-	var t string
-	if n := rt.byID[id]; n != nil && n.st != nil && n.st.edit != nil {
-		t = n.st.edit.comp.text
-	}
-	rt.dropComposition()
-	if t != "" {
-		rt.editorInsert(id, t, editTyping)
+	if n := rt.byID[id]; n != nil && n.div != nil && n.div.composes() && n.div.ime.commit != nil {
+		// The element types its composition, and ends it (see OnCommitComposition).
+		rt.composing = 0
+		rt.needPaint = true
+		n.div.ime.commit()
+	} else {
+		var t string
+		if n := rt.byID[id]; n != nil && n.st != nil && n.st.edit != nil {
+			t = n.st.edit.comp.text
+		}
+		rt.dropComposition()
+		if t != "" {
+			rt.editorInsert(id, t, editTyping)
+		}
 	}
 	if rt.services.CancelComposition != nil {
 		rt.services.CancelComposition()

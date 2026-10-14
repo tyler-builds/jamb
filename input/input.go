@@ -114,4 +114,15 @@ const (
 	KeyMinus
 	// KeyMenu is the Menu (Apps) key, which opens a context menu.
 	KeyMenu
+	// The punctuation keys are named by the characters the US layout prints on them. They name
+	// the key's position, so on another layout the key may print a different character.
+	KeySlash        // /?
+	KeyBackslash    // \|
+	KeyLeftBracket  // [{
+	KeyRightBracket // ]}
+	KeySemicolon    // ;:
+	KeyApostrophe   // '"
+	KeyComma        // ,<
+	KeyPeriod       // .>
+	KeyBacktick     // `~
 )

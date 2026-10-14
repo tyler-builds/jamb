@@ -132,6 +132,26 @@ type Strings struct {
 	// without a message of its own.
 	FieldsNeedAttention func(n int) string
 	FormSubmitFailed    string
+
+	// The code editor (package codeedit): its default name, the labels of its find and
+	// replace bar and of its go-to-line bar, and the words that its matches count shows.
+	// CodeEditorCount is the count of matches, such as "3 of 12".
+	CodeEditorLabel      string
+	CodeEditorFind       string
+	CodeEditorReplace    string
+	CodeEditorReplaceOne string
+	CodeEditorReplaceAll string
+	CodeEditorNext       string
+	CodeEditorPrevious   string
+	CodeEditorClose      string
+	CodeEditorMatchCase  string
+	CodeEditorWholeWord  string
+	CodeEditorRegex      string
+	CodeEditorGoToLine   string
+	CodeEditorGo         string
+	CodeEditorNoMatches  string
+	CodeEditorBadPattern string
+	CodeEditorCount      func(current, total int) string
 }
 
 // englishStrings returns the English text. It is shared by the fallbacks, so its
@@ -243,6 +263,25 @@ func englishStrings() *Strings {
 			return fmt.Sprintf("%d fields need attention.", n)
 		},
 		FormSubmitFailed: "The form could not be submitted.",
+
+		CodeEditorLabel:      "Code editor",
+		CodeEditorFind:       "Find",
+		CodeEditorReplace:    "Replace",
+		CodeEditorReplaceOne: "Replace",
+		CodeEditorReplaceAll: "Replace all",
+		CodeEditorNext:       "Next",
+		CodeEditorPrevious:   "Previous",
+		CodeEditorClose:      "Close",
+		CodeEditorMatchCase:  "Match case",
+		CodeEditorWholeWord:  "Whole word",
+		CodeEditorRegex:      "Regular expression",
+		CodeEditorGoToLine:   "Line number",
+		CodeEditorGo:         "Go",
+		CodeEditorNoMatches:  "No results",
+		CodeEditorBadPattern: "Invalid pattern",
+		CodeEditorCount: func(current, total int) string {
+			return fmt.Sprintf("%d of %d", current, total)
+		},
 	}
 }
 

@@ -81,6 +81,12 @@ type accessInfo struct {
 	// setValue sets the value of an element, for the Set Value action (see DataGrid's
 	// editable cells). Nil means the element takes no value from assistive technology.
 	setValue func(v string)
+	// text is the Text pattern of an element that draws its own text (see TextPattern).
+	text func() *access.TextInfo
+	// selectText and revealText are the writable side of the Text pattern (see TextSelect and
+	// TextReveal).
+	selectText func(anchor, caret int)
+	revealText func()
 }
 
 // access returns the element's accessibility settings, creating them on use.
@@ -380,13 +386,19 @@ func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 	case access.ActionSetTextSelection:
 		if n.kind == kindEditor {
 			rt.editorSelect(n.id, req.Anchor, req.Caret)
+		} else if n.div != nil && n.div.acc != nil && n.div.acc.selectText != nil {
+			n.div.acc.selectText(req.Anchor, req.Caret)
 		}
 	case access.ActionSetRangeValue:
 		if n.div != nil && n.div.acc != nil && n.div.acc.setRange != nil {
 			n.div.acc.setRange(req.X)
 		}
 	case access.ActionScrollIntoView:
-		rt.scrollIntoView(n)
+		if n.div != nil && n.div.acc != nil && n.div.acc.revealText != nil {
+			n.div.acc.revealText()
+		} else {
+			rt.scrollIntoView(n)
+		}
 	case access.ActionScroll:
 		rt.scrollBy(n, float32(req.X), float32(req.Y))
 	case access.ActionSetScrollPercent:
@@ -658,6 +670,9 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 		an.GridRows, an.GridColumns = d.acc.gridRows, d.acc.gridCols
 		an.GridRow, an.GridColumn = d.acc.gridRow, d.acc.gridCol
 		an.ItemStatus = d.acc.status
+	}
+	if d.acc != nil && d.acc.text != nil {
+		an.Text = b.textPattern(n, d.acc.text)
 	}
 	b.checkState(an, d.acc, role)
 	b.relate(an, d.acc)
@@ -952,8 +967,12 @@ func (b *accessBuilder) actions(n *node, role access.Role, st access.State) []ac
 	if isScroll(n) {
 		out = append(out, access.ActionScroll, access.ActionSetScrollPercent)
 	}
-	if scrollContainer(n) != nil && (role == access.RoleListItem || d.focusable || role.Interactive()) {
+	if (scrollContainer(n) != nil && (role == access.RoleListItem || d.focusable || role.Interactive())) ||
+		(d.acc != nil && d.acc.revealText != nil) {
 		out = append(out, access.ActionScrollIntoView)
+	}
+	if d.acc != nil && d.acc.selectText != nil {
+		out = append(out, access.ActionSetTextSelection)
 	}
 	return out
 }

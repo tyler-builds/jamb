@@ -580,7 +580,8 @@ func uiaRangeGetText(this, maxLength, out uintptr) uintptr {
 	if hr != hrOK {
 		return hr
 	}
-	putPtr(out, bstrOf(access.UTF16Prefix(r.Text(), int(int32(maxLength)))))
+	// GetText reads only the range, cut to the limit, so the whole text is never copied.
+	putPtr(out, bstrOf(r.GetText(int(int32(maxLength)))))
 	return hrOK
 }
 

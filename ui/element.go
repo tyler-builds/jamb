@@ -121,6 +121,7 @@ type DivElement struct {
 	modal        *modalSpec        // set on the backdrop of a Modal (see modal.go)
 	modalFooter  bool              // set on a Modal's footer, which the initial focus skips
 	acc          *accessInfo       // accessibility role, name and states (see access.go)
+	ime          *compositionHooks // set by OnComposition, for an input method (see element_input.go)
 }
 
 // Div creates an empty container. Children stack vertically (Column) unless

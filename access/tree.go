@@ -219,7 +219,7 @@ func appendTextChanges(changed, selected []ID, old, n *Node) ([]ID, []ID) {
 	if old.Text == nil || n.Text == nil {
 		return changed, selected
 	}
-	if old.Text.Content.Text != n.Text.Content.Text {
+	if !old.Text.Content.SameText(n.Text.Content) {
 		changed = append(changed, n.ID)
 	}
 	if old.Text.Anchor != n.Text.Anchor || old.Text.Caret != n.Text.Caret {

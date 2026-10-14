@@ -358,6 +358,10 @@ var keyNames = map[string]input.Key{
 	"=": input.KeyEqual, "plus": input.KeyEqual, "-": input.KeyMinus, "minus": input.KeyMinus, "0": input.Key0,
 	"home": input.KeyHome, "end": input.KeyEnd, "space": input.KeySpace, "insert": input.KeyInsert,
 	"menu": input.KeyMenu,
+	// The punctuation keys name the physical key, as the US layout prints it (see ui.Bind).
+	"/": input.KeySlash, "\\": input.KeyBackslash, "[": input.KeyLeftBracket, "]": input.KeyRightBracket,
+	";": input.KeySemicolon, "'": input.KeyApostrophe, ",": input.KeyComma, ".": input.KeyPeriod,
+	"`": input.KeyBacktick,
 }
 
 // parseKey reads "enter", "a", "5", "f2", "ctrl+z" or "ctrl+shift+left". It
