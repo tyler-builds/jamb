@@ -154,7 +154,7 @@ func pressNode(r *accessRig, n *node) {
 
 // focusNode gives n keyboard focus, as a Tab or an arrow key would.
 func focusNode(r *accessRig, n *node) {
-	r.rt.keyboardModality = true
+	r.rt.setKeyboardModality(true) // as a key press does: it restyles the element that has focus
 	r.rt.setFocus(n.id)
 	r.frame()
 }

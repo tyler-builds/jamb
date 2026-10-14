@@ -67,22 +67,6 @@ func setScrollOffset(t *testing.T, rt *Runtime, key string, y float32) {
 	n.st.scrollY, n.st.targetY = y, y
 }
 
-// clickTree presses and releases the left button on the focusable element under the key,
-// as the tree has it now. The runtime's index by ID can keep an element that an earlier build
-// made, so the form helpers, which read that index, are not used here.
-func clickTree(t *testing.T, r *accessRig, key string) {
-	t.Helper()
-	n := r.rt.findKey(r.rt.tree, key)
-	if n == nil {
-		t.Fatalf("no element with key %q", key)
-	}
-	if f := firstFocusable(n); f != nil {
-		n = f
-	}
-	rc := r.rt.nodeRect(n)
-	r.clickAt(rc.X+rc.W/2, rc.Y+rc.H/2)
-}
-
 // focusedIn reports whether the focus of rt is on the focusable element under the key.
 func focusedIn(rt *Runtime, key string) bool {
 	n := rt.findKey(rt.tree, key)
@@ -142,9 +126,9 @@ func TestPanelKeepsItsStateAcrossMoves(t *testing.T) {
 	r.frame()
 
 	// Build the state: two bumps, typed text, a scroll offset, and the focus in the text field.
-	clickTree(t, r, "notes-bump")
-	clickTree(t, r, "notes-bump")
-	clickTree(t, r, "notes-text")
+	r.clickKey(t, "notes-bump")
+	r.clickKey(t, "notes-bump")
+	r.clickKey(t, "notes-text")
 	r.typeText("hello")
 	setScrollOffset(t, r.rt, "notes-scroll", 30)
 	check := dockStateCheck{t: t, disposed: &disposed, text: text}
@@ -230,9 +214,9 @@ func TestRecreatedDockKeepsItsPanels(t *testing.T) {
 		})
 	})
 	r.frame()
-	clickTree(t, r, "notes-bump")
-	clickTree(t, r, "notes-bump")
-	clickTree(t, r, "notes-text")
+	r.clickKey(t, "notes-bump")
+	r.clickKey(t, "notes-bump")
+	r.clickKey(t, "notes-text")
 	r.typeText("hello")
 	setScrollOffset(t, r.rt, "notes-scroll", 30)
 	check := dockStateCheck{t: t, disposed: &disposed, text: text}
@@ -266,7 +250,7 @@ func TestPanelOpenedInAnotherRuntimeKeepsItsFocusAndInput(t *testing.T) {
 			Key("dock").Floating(open))
 	})
 	r.frame()
-	clickTree(t, r, "notes-text")
+	r.clickKey(t, "notes-text")
 	r.typeText("ab")
 	sig.Set(DockFloatPanel(sig.Peek(), "notes", 30, 40, 300, 200))
 	r.frame()

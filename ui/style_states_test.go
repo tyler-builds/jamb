@@ -59,7 +59,6 @@ func documentedStateOf(p string, documented []string) (base, label string, ok bo
 // table reaches, with the reason. Each such part is logged by the test; a reason is
 // what the table cannot do headlessly, not a claim that the state is wrong.
 var layerStateNotDrawn = map[string]string{
-	"Dock.TabFocusVisible":            "after the press selects the tab and the dock re-renders, setFocus restyles a stale node from byID, not the live tab; remove this entry with the fix for that bug",
 	"NumberInput.SpinButtonDisabled":  "a spin button is disabled only at the limit of its value, which the table does not reach",
 	"Form.SummaryItemHover":           "the form summary lists the errors of a form that has failed validation",
 	"Form.SummaryItemFocusVisible":    "the form summary lists the errors of a form that has failed validation",
@@ -78,7 +77,6 @@ var layerStateNotDrawn = map[string]string{
 	"MenuBar.BarItemHover":            "the menu bar's items are not reached by the table; to be checked in a window",
 	"MenuBar.BarItemFocusVisible":     "the menu bar's items are not reached by the table; to be checked in a window",
 	"MenuBar.BarItemOpen":             "the open item is drawn while its menu is open",
-	"Sidebar.ItemFocusVisible":        "not reached by the table headlessly; to be checked in a window",
 	"Select.OptionHighlighted":        "the highlighted option is drawn in an open list",
 	"Select.OptionSelected":           "the selected option is drawn in an open list",
 	"Select.OptionDisabled":           "a disabled option is drawn in an open list",
