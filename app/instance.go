@@ -1,12 +1,11 @@
 package app
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
 	"strconv"
@@ -69,10 +68,12 @@ type instanceNames struct{ mutex, pipe, sid string }
 // SID sid in the session. The mutex is local to the session. The pipe is
 // machine-wide, so its name carries a digest of the user and the session, which
 // keeps two users, or two sessions of one user, from sharing a name. The digest is
-// not a secret: the pipe's security descriptor is what keeps other users out.
+// not a secret, so it is a 64-bit FNV-1a hash rather than a cryptographic one: the
+// pipe's security descriptor is what keeps other users out.
 func instanceNamesFor(appID, sid string, session uint32) (mutex, pipe string) {
-	sum := sha256.Sum256([]byte(sid + "\x00" + strconv.FormatUint(uint64(session), 10)))
-	return `Local\jamb-` + appID, `\\.\pipe\jamb-` + appID + "-" + hex.EncodeToString(sum[:8])
+	h := fnv.New64a()
+	h.Write([]byte(sid + "\x00" + strconv.FormatUint(uint64(session), 10)))
+	return `Local\jamb-` + appID, fmt.Sprintf(`\\.\pipe\jamb-%s-%016x`, appID, h.Sum64())
 }
 
 // SingleInstance makes the app a single instance per user and session. A later
