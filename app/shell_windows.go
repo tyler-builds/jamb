@@ -7,15 +7,36 @@ import (
 	"io"
 	"os"
 	"os/user"
-	"regexp"
+	"strings"
 	"time"
 
 	"github.com/tyler-builds/jamb/internal/platform/windows"
 )
 
-// sidPattern matches a user SID in its string form, such as S-1-5-21-... The SID
-// is written into a security descriptor string, so it is checked first.
-var sidPattern = regexp.MustCompile(`^S-1-[0-9]+(-[0-9]+)+$`)
+// isSID reports whether s is a user SID in its string form: S-1- followed by two
+// or more groups of decimal digits separated by hyphens, such as S-1-5-21-...
+// The SID is written into a security descriptor string, so it is checked first.
+func isSID(s string) bool {
+	rest, ok := strings.CutPrefix(s, "S-1-")
+	if !ok {
+		return false
+	}
+	groups := strings.Split(rest, "-")
+	if len(groups) < 2 {
+		return false
+	}
+	for _, g := range groups {
+		if g == "" {
+			return false
+		}
+		for i := 0; i < len(g); i++ {
+			if g[i] < '0' || g[i] > '9' {
+				return false
+			}
+		}
+	}
+	return true
+}
 
 // currentInstanceNames returns the instance names of appID for the current user in
 // the current session.
@@ -24,7 +45,7 @@ func currentInstanceNames(appID string) (instanceNames, error) {
 	if err != nil {
 		return instanceNames{}, err
 	}
-	if !sidPattern.MatchString(u.Uid) {
+	if !isSID(u.Uid) {
 		return instanceNames{}, fmt.Errorf("the user identifier %q is not a SID", u.Uid)
 	}
 	session, err := windows.SessionID()
