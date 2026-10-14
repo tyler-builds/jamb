@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tyler-builds/jamb/ui"
 )
 
 // scale maps data values to pixels linearly. The domain d0 to d1 maps to the
@@ -173,35 +175,37 @@ func timeTicks(lo, hi float64, n int, loc *time.Location) ([]float64, timeStep) 
 	return ticks, st
 }
 
-// timeTickFormat is the layout of a time tick's label for a step: the time of
-// day for steps shorter than a day, the date for days, the month and the year.
-func timeTickFormat(st timeStep) string {
+// formatTick returns the label of a time tick for a step, in the user's locale
+// (see ui.FormatDate): the time of day for steps shorter than a day (with
+// seconds for steps under a minute), the date for days, the month and the year
+// for months, and the year.
+func formatTick(t time.Time, st timeStep) string {
 	switch st.unit {
 	case unitSecond:
 		if st.n < 60 {
-			return "15:04:05"
+			return t.Format("15:04:05")
 		}
-		return "15:04"
+		return ui.FormatTime(t)
 	case unitDay:
-		return "2006-01-02"
+		return ui.FormatDate(t)
 	case unitMonth:
-		return "2006-01"
+		return ui.FormatMonthYear(t)
 	}
-	return "2006"
+	return t.Format("2006")
 }
 
-// formatTime returns the label of the time at the Unix seconds v: the date
-// when it is midnight, else the date and the time to the minute, or to the
-// second when it has seconds.
+// formatTime returns the label of the time at the Unix seconds v, in the
+// user's locale: the date when it is midnight, else the date and the time to
+// the minute, with the seconds when it has them.
 func formatTime(v float64, loc *time.Location) string {
 	t := time.Unix(int64(math.Floor(v)), 0).In(loc)
 	switch {
 	case t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0:
-		return t.Format("2006-01-02")
+		return ui.FormatDate(t)
 	case t.Second() == 0:
-		return t.Format("2006-01-02 15:04")
+		return ui.FormatDate(t) + " " + ui.FormatTime(t)
 	}
-	return t.Format("2006-01-02 15:04:05")
+	return ui.FormatDate(t) + " " + t.Format("15:04:05")
 }
 
 // formatNumber returns the default label of a number: a whole number as it is,

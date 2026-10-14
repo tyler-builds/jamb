@@ -211,7 +211,7 @@ func (c *Chart) positionTicks(m cartModel, n int) (ticks []float64, labels []str
 			if c.xa.Format != nil {
 				labels = append(labels, c.xa.Format(t))
 			} else {
-				labels = append(labels, time.Unix(int64(t), 0).In(c.timeZone()).Format(timeTickFormat(st)))
+				labels = append(labels, formatTick(time.Unix(int64(t), 0).In(c.timeZone()), st))
 			}
 		}
 		return ticks, labels

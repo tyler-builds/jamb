@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/tyler-builds/jamb/ui"
 )
 
 // Nice steps are 1, 2 or 5 times a power of ten, chosen for about n ticks.
@@ -61,8 +63,8 @@ func TestTimeTicks(t *testing.T) {
 	if st.unit != unitDay || st.n != 1 || len(ticks) != 8 {
 		t.Fatalf("a week of ticks: step %+v, %d ticks", st, len(ticks))
 	}
-	if got := formatTime(ticks[0], time.UTC); got != "2026-10-01" {
-		t.Errorf("first tick %s, want 2026-10-01", got)
+	if got, want := formatTime(ticks[0], time.UTC), ui.FormatDate(time.Date(2026, time.October, 1, 0, 0, 0, 0, time.UTC)); got != want {
+		t.Errorf("first tick %s, want %s", got, want)
 	}
 
 	lo = float64(time.Date(2026, time.January, 15, 0, 0, 0, 0, time.UTC).Unix())
@@ -107,17 +109,20 @@ func TestFormatNumber(t *testing.T) {
 	}
 }
 
-// Time labels show the date alone at midnight, and the time of day when there is one.
+// Time labels show the date alone at midnight, and the time of day when there
+// is one, in the user's locale (whatever this machine's is).
 func TestFormatTime(t *testing.T) {
-	midnight := float64(time.Date(2026, time.October, 13, 0, 0, 0, 0, time.UTC).Unix())
-	if got := formatTime(midnight, time.UTC); got != "2026-10-13" {
-		t.Errorf("midnight = %q", got)
+	day := time.Date(2026, time.October, 13, 0, 0, 0, 0, time.UTC)
+	midnight := float64(day.Unix())
+	if got, want := formatTime(midnight, time.UTC), ui.FormatDate(day); got != want {
+		t.Errorf("midnight = %q, want %q", got, want)
 	}
-	noon := midnight + 12*3600 + 30*60
-	if got := formatTime(noon, time.UTC); got != "2026-10-13 12:30" {
-		t.Errorf("12:30 = %q", got)
+	noonT := day.Add(12*time.Hour + 30*time.Minute)
+	noon := float64(noonT.Unix())
+	if got, want := formatTime(noon, time.UTC), ui.FormatDate(day)+" "+ui.FormatTime(noonT); got != want {
+		t.Errorf("12:30 = %q, want %q", got, want)
 	}
-	if got := formatTime(noon+7, time.UTC); got != "2026-10-13 12:30:07" {
-		t.Errorf("with seconds = %q", got)
+	if got, want := formatTime(noon+7, time.UTC), ui.FormatDate(day)+" 12:30:07"; got != want {
+		t.Errorf("with seconds = %q, want %q", got, want)
 	}
 }

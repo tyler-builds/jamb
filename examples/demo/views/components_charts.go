@@ -69,7 +69,7 @@ func chartsSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 			ui.Div().Width(ui.Px(420)).Child(charts.Line(
 				charts.Series[chartDay]{Name: "Visits", Data: chartWeek, Category: dayName, Y: visitsOf},
 				charts.Series[chartDay]{Name: "Returning", Data: chartWeek, Category: dayName, Y: returningOf},
-			).Title("Visits this week").Smooth().Height(ui.Px(220)).Element()))
+			).Title("Visits this week").Smooth().Height(ui.Px(220))))
 	}
 	return section(t, "Charts",
 		sample(t, "Switch the first chart to its table", toggle),
@@ -78,36 +78,36 @@ func chartsSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 			ui.Div().Width(ui.Px(420)).Child(charts.Area(
 				charts.Series[chartDay]{Name: "Visits", Data: chartWeek, Category: dayName, Y: visitsOf},
 				charts.Series[chartDay]{Name: "Returning", Data: chartWeek, Category: dayName, Y: returningOf},
-			).Stacked().Height(ui.Px(220)).Element())),
+			).Stacked().Height(ui.Px(220)))),
 		sample(t, "Bar: grouped, and stacked horizontally",
 			ui.Div().Width(ui.Px(420)).Child(charts.Bar(
 				charts.Series[chartDay]{Name: "Visits", Data: chartWeek, Category: dayName, Y: visitsOf},
 				charts.Series[chartDay]{Name: "Returning", Data: chartWeek, Category: dayName, Y: returningOf},
-			).Stacked().Horizontal().Height(ui.Px(220)).Element())),
+			).Stacked().Horizontal().Height(ui.Px(220)))),
 		sample(t, "Scatter: visits against returning visitors",
 			ui.Div().Width(ui.Px(420)).Child(charts.Scatter(
 				charts.Series[chartDay]{Name: "Days", Data: chartWeek,
 					X: visitsOf, Y: returningOf},
-			).XAxis(charts.Axis{Label: "Visits"}).YAxis(charts.Axis{Label: "Returning"}).Height(ui.Px(220)).Element())),
+			).XAxis(charts.Axis{Label: "Visits"}).YAxis(charts.Axis{Label: "Returning"}).Height(ui.Px(220)))),
 		sample(t, "Pie and donut: visits by source",
 			ui.Div().Row().Gap(16).Child(ui.Div().Width(ui.Px(200)).Child(charts.Pie(
 				charts.Series[chartDay]{Name: "Sources", Data: chartSources, Category: dayName, Y: visitsOf},
-			).Legend(charts.LegendNone).Height(ui.Px(200)).Element())).Child(ui.Div().Width(ui.Px(200)).Child(charts.Donut(
+			).Legend(charts.LegendNone).Height(ui.Px(200)))).Child(ui.Div().Width(ui.Px(200)).Child(charts.Donut(
 				charts.Series[chartDay]{Name: "Sources", Data: chartSources, Category: dayName, Y: visitsOf},
-			).Height(ui.Px(200)).Element()))),
+			).Height(ui.Px(200))))),
 		sample(t, "Radar: the week across its days",
 			ui.Div().Width(ui.Px(300)).Child(charts.Radar(
 				charts.Series[chartDay]{Name: "Visits", Data: chartWeek, Category: dayName, Y: visitsOf},
 				charts.Series[chartDay]{Name: "Returning", Data: chartWeek, Category: dayName, Y: returningOf},
-			).Height(ui.Px(260)).Element())),
+			).Height(ui.Px(260)))),
 		sample(t, "Candlestick: prices of a week",
 			ui.Div().Width(ui.Px(420)).Child(charts.Candlestick(charts.CandleSeries[chartPrice]{
 				Name: "Price", Data: chartPrices, Time: func(p chartPrice) time.Time { return p.day },
 				Open: func(p chartPrice) float64 { return p.open }, High: func(p chartPrice) float64 { return p.high },
 				Low: func(p chartPrice) float64 { return p.low }, Close: func(p chartPrice) float64 { return p.close },
-			}).Title("Price, 5 to 11 October").Height(ui.Px(220)).Element())),
+			}).Title("Price, 5 to 11 October").Height(ui.Px(220)))),
 		sample(t, "Sankey: visitors from source to page to outcome",
-			ui.Div().Width(ui.Px(520)).Child(charts.Sankey(chartFlows...).Height(ui.Px(260)).Element())),
+			ui.Div().Width(ui.Px(520)).Child(charts.Sankey(chartFlows...).Height(ui.Px(260)))),
 	)
 }
 

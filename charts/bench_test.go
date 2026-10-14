@@ -25,7 +25,7 @@ func walk100k() []float64 {
 // again, with the layout, the downsampling and the hover, as a live hover does.
 func benchChart(b *testing.B, c *Chart) {
 	b.Helper()
-	rt := ui.NewRuntime(func(*ui.Context) ui.Element { return ui.Div().Child(c.Element()) }, ui.DarkTheme(), nil)
+	rt := ui.NewRuntime(func(*ui.Context) ui.Element { return ui.Div().Child(c) }, ui.DarkTheme(), nil)
 	rt.SetViewport(800, 600, 1)
 	rt.SetSystemSettings(ui.SystemSettings{ReducedMotion: true})
 	now := time.Unix(1_000_000, 0)
@@ -59,7 +59,7 @@ func BenchmarkArea100k(b *testing.B) {
 // pixel, which the benchmarks time.
 func TestLargeLineFrameIsDrawn(t *testing.T) {
 	c := Line(Series[float64]{Name: "Walk", Data: walk100k(), Y: func(v float64) float64 { return v }})
-	newRig(func(*ui.Context) ui.Element { return ui.Div().Child(c.Element()) })
+	newRig(func(*ui.Context) ui.Element { return ui.Div().Child(c) })
 	g := c.last
 	if !g.drawn || g.plot.x1 <= g.plot.x0 {
 		t.Fatalf("the 100,000-point line was not drawn: %+v", g.plot)

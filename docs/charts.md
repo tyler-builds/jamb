@@ -18,14 +18,10 @@ ui.Div().Child(charts.Line(charts.Series[Visit]{
 	Y:    func(v Visit) float64 { return float64(v.Count) },
 }).Title("Visits this week").
 	YAxis(charts.Axis{Label: "Visits"}.Range(0, 400)).
-	Size(ui.Full, ui.Px(300)).
-	Element())
+	Size(ui.Full, ui.Px(300)))
 ```
 
-`Element` returns a `ui.Component`. The builder is not itself a `ui.Element`,
-because the runtime builds elements from the concrete types that the `ui`
-constructors return. Build the chart in the render function that places it, so
-that it follows the data.
+A chart is a `ui.Element` (it embeds `ui.Composite`), so it goes straight into a tree, and it keeps its state between renders; give it a `Key` when its place in the tree may change.
 
 | Constructor | Data | Options that apply |
 | --- | --- | --- |
@@ -49,7 +45,9 @@ index in `Data`.
 
 - **Category** axes place the categories in the order they first appear.
 - **Time** axes show ticks on whole seconds, days, months or years of the time
-  zone of the data, and the labels are ISO-like (`2006-01-02`).
+  zone of the data. The labels follow the user's region settings: `ui.FormatDate` for
+  days, `ui.FormatMonthYear` for months, `ui.FormatTime` for times of day, and
+  the year alone for years. Ticks under a minute apart show `15:04:05`.
 - **Number** axes use nice ticks in steps of 1, 2 or 5 times a power of ten.
 
 `Axis` configures an axis: `Label`, `Format`, the desired `Ticks`, `Grid`
@@ -57,9 +55,8 @@ index in `Data`.
 the range. Tick labels are measured with the painter, so the margins hold them,
 and labels that would overlap are thinned out.
 
-Locale-formatted dates are not available. The `ui` date formats are not exported,
-so the default labels are ISO-like; use `Axis.Format` or `Chart.Format` for
-another form.
+Tooltips, the summary and the keyboard announcements format times the same way.
+Use `Axis.Format` or `Chart.Format` for another form.
 
 ## Interaction
 
@@ -139,13 +136,14 @@ The parts are documented here and in the package doc. They are not listed in
 
 Lines and areas are reduced with Largest-Triangle-Three-Buckets to about two points
 per pixel of the plot's length, before they are drawn. The reduction of 100,000
-points takes about 0.3 ms (`BenchmarkLTTB`). On the development machine (an
-11th-generation Intel i5), a frame that re-renders a 100,000-point line takes about
-12 ms, of which about 2 ms is the frame itself (`BenchmarkLine100k` against a
-100-point line). Most of the rest is the vector rasterizer sorting the crossings of
-the stroke, which does not fall much when the points are halved, so the figure is
-not yet "a few milliseconds". Reducing the points further is not the fix; the
-rasterizer in `internal/vector` is.
+points takes about 0.3 ms (`BenchmarkLTTB`).
+
+The crosshair, the hover highlight and the tooltip are drawn on a layer of their
+own, above the plot. Moving the pointer re-renders only that layer, so the plot's
+canvas is not redrawn: a hover frame on a 100,000-point line or area takes about
+0.5 ms on the development machine. A frame that redraws the plot itself, such as
+a resize or a change of data, takes about 12 ms for 100,000 points; most of that
+is the vector rasterizer in `internal/vector` sorting the crossings of the stroke.
 
 ## Limits
 

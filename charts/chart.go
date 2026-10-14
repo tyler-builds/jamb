@@ -12,8 +12,7 @@
 //		Y:    func(v Visit) float64 { return float64(v.Count) },
 //	}).Title("Visits this week").
 //		YAxis(charts.Axis{Label: "Visits"}.Range(0, 400)).
-//		Size(ui.Full, ui.Px(300)).
-//		Element())
+//		Size(ui.Full, ui.Px(300)))
 //
 // The data is converted once, when the chart is built, so build the chart again
 // when the data changes; a chart built in a render function does that on each
@@ -92,7 +91,7 @@ const (
 // so that they chain. Element returns the chart as a ui.Element to place in a tree. Its
 // size is Full by 300 pixels unless Size or Height says otherwise.
 type Chart struct {
-	el     *ui.ComponentElement
+	ui.Composite
 	kind   kind
 	ds     dataset
 	sk     *sankey
@@ -113,18 +112,17 @@ type Chart struct {
 
 // newChart returns a chart of kind k over the data ds. Its element renders the chart.
 func newChart(k kind, ds dataset) *Chart {
-	c := &Chart{kind: k, ds: ds, legend: LegendBottom, width: ui.Full, height: ui.Px(300)}
-	c.el = ui.Component(c.render)
-	return c
+	return &Chart{kind: k, ds: ds, legend: LegendBottom, width: ui.Full, height: ui.Px(300)}
 }
 
-// Element returns the chart as an element, to place in a tree with ui.Div().Child or any
-// other container. The chart is then built on each render of the component that holds it,
-// and its state (the hidden series, the focus and the keyboard position) is kept by the
-// element, so give it a Key when its place in the tree may change.
+// Render builds the chart. A chart is an element: place it in a tree with
+// ui.Div().Child or any other container. It is built on each render of the
+// component that holds it, and its state (the hidden series, the focus and the
+// keyboard position) is kept by the element, so give it a Key when its place
+// in the tree may change.
 //
-//	ui.Div().Child(charts.Line(series).Title("Visits").Element())
-func (c *Chart) Element() ui.Element { return c.el }
+//	ui.Div().Child(charts.Line(series).Title("Visits"))
+func (c *Chart) Render(ctx *ui.Context) ui.Element { return c.render(ctx) }
 
 // Line returns a line chart of the series, one line for each. The points of a line
 // are joined in the order of their positions.
@@ -194,7 +192,7 @@ func (c *Chart) Label(s string) *Chart { c.name = s; return c }
 
 // Key gives the chart a stable identity among its siblings, so its state (the
 // hidden series, the focus and the keyboard position) survives reordering.
-func (c *Chart) Key(k string) *Chart { c.el.Key(k); return c }
+func (c *Chart) Key(k string) *Chart { c.SetKey(k); return c }
 
 // XAxis sets the horizontal axis of a chart, which places its positions: the
 // categories, the times or the numbers. In a horizontal bar chart the positions run
@@ -387,8 +385,11 @@ func (c *Chart) render(ctx *ui.Context) ui.Element {
 	// the next render, reads the layout of the last draw.
 	geo := ui.Local(ctx, "charts.geometry", &geometry{}).Peek()
 	c.last = geo
-	v := &view{c: c, t: t, st: c.resolveStyle(t), hidden: hidden.Get(), pointer: pointer.Get(),
-		cursor: cursor.Get(), focused: focused.Get(), geo: geo}
+	// The pointer, the keyboard position and the focus are read without
+	// subscribing: they change the hover layer only (see hoverLayer), so moving
+	// the pointer does not draw the chart again.
+	v := &view{c: c, t: t, st: c.resolveStyle(t), hidden: hidden.Get(), pointer: pointer.Peek(),
+		cursor: cursor.Peek(), focused: focused.Peek(), geo: geo}
 	build := func(progress float32) ui.Element {
 		v.progress = progress
 		return c.column(v, hidden, pointer, cursor, focused)
@@ -467,10 +468,26 @@ func (c *Chart) canvas(v *view, hidden *ui.Signal[[]bool], pointer *ui.Signal[po
 		ui.Announce(text, access.Polite)
 		e.StopPropagation()
 	})
-	if tip := c.tooltip(v); tip != nil {
-		el.Child(tip)
-	}
-	return el
+	return el.Child(c.hoverLayer(v, pointer, cursor, focused))
+}
+
+// hoverLayer returns the marks of the pointer and the keyboard position, and
+// the tooltip, on a canvas of their own over the chart. It is its own
+// component, the only one that reads the pointer, so a pointer move draws
+// these few marks again and leaves the chart's drawing as it is.
+func (c *Chart) hoverLayer(v *view, pointer *ui.Signal[pointerAt], cursor *ui.Signal[cursorAt], focused *ui.Signal[bool]) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		hv := *v
+		hv.pointer, hv.cursor, hv.focused = pointer.Get(), cursor.Get(), focused.Get()
+		// The layer is a plain container to assistive technology (no role), so
+		// the chart stays the one image while the tooltip in it is still read.
+		layer := ui.Canvas(func(p *ui.Painter, w, h float32) { c.paintCursor(&hv, p) }).
+			Absolute().Size(ui.Full, ui.Full).Role(access.RoleUnknown)
+		if tip := c.tooltip(&hv); tip != nil {
+			layer.Child(tip)
+		}
+		return layer
+	})
 }
 
 // startCursor returns the keyboard position a chart starts from when it gains focus:

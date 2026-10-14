@@ -85,7 +85,7 @@ func lineRoot(c **Chart) func(*ui.Context) ui.Element {
 		if c != nil {
 			*c = ch
 		}
-		return ui.Div().Child(ch.Element())
+		return ui.Div().Child(ch)
 	}
 }
 
@@ -223,7 +223,7 @@ func TestPieAngles(t *testing.T) {
 	newRig(func(*ui.Context) ui.Element {
 		c = Pie(Series[day]{Name: "Share", Data: []day{{"A", 1, 0}, {"B", 1, 0}, {"C", 2, 0}},
 			Category: func(d day) string { return d.name }, Y: func(d day) float64 { return d.visits }})
-		return ui.Div().Child(c.Element())
+		return ui.Div().Child(c)
 	})
 	g := c.last
 	if len(g.slices) != 3 {
@@ -251,7 +251,7 @@ func TestDonutHole(t *testing.T) {
 		s := Series[day]{Name: "Share", Data: week, Category: func(d day) string { return d.name }, Y: func(d day) float64 { return d.visits }}
 		pie = Pie(s)
 		donut = Donut(s)
-		return ui.Div().Child(pie.Element()).Child(donut.Element())
+		return ui.Div().Child(pie).Child(donut)
 	})
 	if pie.last.inner != 0 {
 		t.Errorf("a pie has an inner radius of %v", pie.last.inner)
@@ -266,7 +266,7 @@ func TestRadarVertices(t *testing.T) {
 	var c *Chart
 	newRig(func(*ui.Context) ui.Element {
 		c = Radar(visits())
-		return ui.Div().Child(c.Element())
+		return ui.Div().Child(c)
 	})
 	g := c.last
 	if g.axes != 7 {
@@ -313,7 +313,7 @@ func TestConfigurationsRender(t *testing.T) {
 	for name, c := range cases {
 		c := c
 		t.Run(name, func(t *testing.T) {
-			r := newRig(func(*ui.Context) ui.Element { return ui.Div().Child(c.Element()) })
+			r := newRig(func(*ui.Context) ui.Element { return ui.Div().Child(c) })
 			r.frame()
 			if !c.last.drawn {
 				t.Errorf("%s was not drawn", name)
@@ -338,16 +338,17 @@ func TestCandlesAndTimeAxis(t *testing.T) {
 		c = Candlestick(CandleSeries[bar]{Name: "Price", Data: bars, Time: func(b bar) time.Time { return b.at },
 			Open: func(b bar) float64 { return b.open }, High: func(b bar) float64 { return b.high },
 			Low: func(b bar) float64 { return b.low }, Close: func(b bar) float64 { return b.closing }})
-		return ui.Div().Child(c.Element())
+		return ui.Div().Child(c)
 	})
 	r.frame()
 	if !c.last.drawn || len(c.last.slots) != 3 {
 		t.Fatalf("drawn %v, %d slots", c.last.drawn, len(c.last.slots))
 	}
-	if got := c.positionLabel(c.last.slots[0]); got != "2026-10-01" {
-		t.Errorf("first slot labeled %q, want 2026-10-01", got)
+	first, last := ui.FormatDate(bars[0].at), ui.FormatDate(bars[2].at)
+	if got := c.positionLabel(c.last.slots[0]); got != first {
+		t.Errorf("first slot labeled %q, want %q", got, first)
 	}
-	if got := c.summary(); !strings.HasPrefix(got, "Candlestick chart, 3 candles, from 2026-10-01 to 2026-10-03") {
+	if got := c.summary(); !strings.HasPrefix(got, "Candlestick chart, 3 candles, from "+first+" to "+last) {
 		t.Errorf("candle summary %q", got)
 	}
 }
@@ -395,7 +396,7 @@ func TestHorizontalBarWalk(t *testing.T) {
 	var c *Chart
 	newRig(func(*ui.Context) ui.Element {
 		c = Bar(visits(), returns()).Horizontal()
-		return ui.Div().Child(c.Element())
+		return ui.Div().Child(c)
 	})
 	next, text := walkFrom(t, c, cursorAt{on: true, series: 0, index: 0}, input.KeyDown)
 	if next.index != 1 || text != "Tuesday, Visits 180" {
@@ -413,7 +414,7 @@ func TestPieWalk(t *testing.T) {
 	newRig(func(*ui.Context) ui.Element {
 		c = Pie(Series[day]{Name: "Visits", Data: week, Category: func(d day) string { return d.name },
 			Y: func(d day) float64 { return d.visits }})
-		return ui.Div().Child(c.Element())
+		return ui.Div().Child(c)
 	})
 	// The week's visits total 1,480, so Tuesday's 180 is 12.2 percent of it.
 	next, text := walkFrom(t, c, cursorAt{on: true, series: 0, index: 0}, input.KeyRight)
@@ -448,7 +449,7 @@ func TestInteractionsEveryKind(t *testing.T) {
 			var c *Chart
 			r := newRig(func(*ui.Context) ui.Element {
 				c = mk()
-				return ui.Div().Child(c.Element())
+				return ui.Div().Child(c)
 			})
 			canvas := r.rt.AccessTree().Find(access.RoleImage, c.summary())
 			if canvas == nil {
@@ -526,7 +527,7 @@ func TestEmptyCharts(t *testing.T) {
 	for name, c := range cases {
 		c := c
 		t.Run(name, func(t *testing.T) {
-			newRig(func(*ui.Context) ui.Element { return ui.Div().Child(c.Element()) })
+			newRig(func(*ui.Context) ui.Element { return ui.Div().Child(c) })
 			if c.summary() == "" {
 				t.Errorf("%s has no summary", name)
 			}

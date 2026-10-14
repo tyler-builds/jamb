@@ -20,8 +20,8 @@ const (
 	slotHighlight  = 0.08 // the opacity of the highlight of a bar's slot, over the text
 )
 
-// paint draws a chart into its canvas for its kind, then the marks of the pointer and the
-// keyboard position over it.
+// paint draws a chart into its canvas for its kind. The marks of the pointer and the
+// keyboard position are drawn over it by the hover layer (see Chart.hoverLayer).
 func (c *Chart) paint(v *view, p *ui.Painter, w, h float32) {
 	switch c.kind {
 	case kindPie, kindDonut:
@@ -33,7 +33,6 @@ func (c *Chart) paint(v *view, p *ui.Painter, w, h float32) {
 	default:
 		c.paintCartesian(v, p, w, h)
 	}
-	c.paintCursor(v, p)
 }
 
 // arrow returns the direction of an arrow key: -1 or +1 along x and along y, and whether
