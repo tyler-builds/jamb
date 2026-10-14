@@ -5,7 +5,9 @@ import "github.com/tyler-builds/jamb/ui"
 // Style is the look of the parts of an Editor. A part's style merges over the built-in
 // defaults, which come from the colors of the theme (Theme.Editor and Theme.Syntax), and
 // then over the Styles of the editor. Box is the frame of the editor: its Background,
-// border, radius and padding. Text is the text: its TextColor and FontSize. Gutter is the
+// border, radius and padding. BoxFocused is the frame while the editor has focus, from a
+// click or the keyboard, as a text field's frame shows it: an Accent border by default.
+// Text is the text: its TextColor and FontSize. Gutter is the
 // column of line numbers and fold markers: its TextColor, FontSize and Background.
 // ActiveLine is the row of the caret, Selection the selected text, Match the other find
 // matches and CurrentMatch the current one; their Background is the fill. Find is the box
@@ -15,6 +17,7 @@ import "github.com/tyler-builds/jamb/ui"
 // here; their sizes and spacing still apply.
 type Style struct {
 	Box          ui.Style
+	BoxFocused   ui.Style
 	Text         ui.Style
 	Gutter       ui.Style
 	ActiveLine   ui.Style
@@ -28,6 +31,7 @@ type Style struct {
 func (s Style) merge(o Style) Style {
 	return Style{
 		Box:          s.Box.Merge(o.Box),
+		BoxFocused:   s.BoxFocused.Merge(o.BoxFocused),
 		Text:         s.Text.Merge(o.Text),
 		Gutter:       s.Gutter.Merge(o.Gutter),
 		ActiveLine:   s.ActiveLine.Merge(o.ActiveLine),
@@ -51,6 +55,7 @@ func editorDefaults(t *ui.Theme) Style {
 	ec := t.Editor
 	return Style{
 		Box:          ui.Style{Background: ec.Background, BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius},
+		BoxFocused:   ui.Style{BorderColor: t.Accent},
 		Text:         ui.Style{TextColor: ec.Foreground, FontSize: t.FontSize},
 		Gutter:       ui.Style{TextColor: ec.LineNumber, FontSize: t.FontSize, Background: ec.Background},
 		ActiveLine:   ui.Style{Background: ec.ActiveLine},
@@ -70,6 +75,7 @@ func (s Style) resolve(ctx *ui.Context) Style {
 	if t.HighContrast {
 		st = ui.Layer(ctx, editorDefaults(t), "built-in default").merge(ui.Layer(ctx, Style{
 			Box:          plainPart(s.Box),
+			BoxFocused:   plainPart(s.BoxFocused),
 			Text:         plainPart(s.Text),
 			Gutter:       plainPart(s.Gutter),
 			ActiveLine:   plainPart(s.ActiveLine),

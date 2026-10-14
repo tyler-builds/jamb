@@ -137,11 +137,13 @@ func (e *Editor) Render(ctx *ui.Context) ui.Element {
 		vs.paint(p, w, h, ps)
 	}).Size(ui.Full, ui.Full).Grow(1).Role(access.RoleTextArea).Label(name)
 	canvas.Cursor(ui.CursorText).KeyContext("CodeEditor").Focusable().FocusHandle(vs.canvasFocus)
-	canvas.FocusVisible(ui.Style{BorderWidth: 2, BorderColor: t.FocusRing})
 	e.wire(canvas, vs)
 	canvas.TextPattern(func() *access.TextInfo { return vs.textAccess(e.readOnly, st.Text.FontSize) }).
 		TextSelect(vs.selectText).TextReveal(vs.revealText)
-	root := ui.Div().Column().Size(e.width, e.height).Style(st.Box)
+	// The frame shows focus whenever the editor has it, as a text field's frame does, and not
+	// only after a key: the text is edited from the keyboard, so a ring that came with the
+	// first key read as the editor taking focus while the user typed.
+	root := ui.Div().Column().Size(e.width, e.height).Style(st.Box).FocusWithin(st.BoxFocused)
 	if vs.bar != barNone {
 		root.Child(vs.findBar(ctx, st, e.readOnly))
 	}
