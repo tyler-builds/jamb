@@ -1116,7 +1116,15 @@ that wants the position kept across runs passes a signal, as the notes app does.
 
 The divider is 1 px wide by default (`Divider`, its `Width` in a horizontal split
 and its `Height` in a vertical one), in a 9 px hit area, so it is easy to grab. The
-grip is a short pill over its middle.
+grip is a short pill over its middle. `Grip` sets when it shows: always
+(`ui.GripShown`, the default), only while the pointer is over the divider or it is
+dragged or focused (`ui.GripOnHover`), or never (`ui.GripHidden`). Without the grip
+the divider is a plain line between the panes, like a border. The dock's dividers
+use `GripOnHover`.
+
+```go
+ui.Split(files, editor).Grip(ui.GripOnHover) // a line, with the grip on hover
+```
 
 - **Pointer.** Dragging the divider moves it. The pointer is captured while the
   button is held, so a drag that leaves the divider still moves it. The cursor is the

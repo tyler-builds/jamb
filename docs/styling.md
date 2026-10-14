@@ -624,7 +624,7 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
   follow the system settings.
 - The Slider has no render slot for the thumb (see above).
 - The Split has no render slot: its panes are the app's own elements, and the divider has no content of its own. Its bar is 1 px wide by default, in a 9 px hit area that the style does not change, so a `Divider` style sets the bar's thickness and not the hit area.
-- The Split's grip is a pill by default, not dots. A `Grip` style with `Clear: ui.ClearBackground` removes it.
+- The Split's grip is a pill by default, not dots. `Split.Grip(ui.GripOnHover)` shows it only while the divider is hovered, dragged or focused, and `ui.GripHidden` never shows it; a `Grip` style with `Clear: ui.ClearBackground` removes its color in every mode.
 - The Dock has no render slot for its tabs or groups: its panels are the app's own content, from `DockPanel.Render`. Its dividers are the `Theme.Split`, and the `Preview` of an edge drop is the strip along that edge of the dock.
 - The Tabs have no render slot for the panel: the panel is the app's own content.
 - The list of a select is at least as wide as the field, whatever the field's width.

@@ -117,6 +117,22 @@ const (
 	SplitSecond                  // the pane on the right, or below
 )
 
+// SplitGrip is when a split's divider shows its grip, the mark over the middle of its bar
+// (the Grip part). The bar itself is always drawn.
+type SplitGrip uint8
+
+const (
+	// GripShown always shows the grip. It is the default.
+	GripShown SplitGrip = iota
+	// GripOnHover shows the grip only while the pointer is over the divider, while it is
+	// dragged, and while it has keyboard focus. Otherwise the divider is the bar alone, a line
+	// between the panes like a border.
+	GripOnHover
+	// GripHidden never shows the grip: the divider is the bar alone. It still changes color
+	// when the pointer is over it (DividerHover), so it can be found.
+	GripHidden
+)
+
 // SplitElement lays out two panes with a divider between them that the user drags,
 // or moves with the keyboard, to give one pane more of the space. The panes are
 // Elements of any kind, so a split can contain another split.
@@ -154,6 +170,7 @@ type SplitElement struct {
 	secondName    string // the accessible name of the second pane, see SecondLabel
 	onChange      func(float64)
 	onRelease     func() // runs when a pointer drag of the divider ends (see dock.go)
+	grip          SplitGrip
 	styles        SplitStyle
 	size          sizing // the split's outer box, from the sizing methods (see Sizing in docs/styling.md)
 }
@@ -251,6 +268,11 @@ func (s *SplitElement) FirstLabel(name string) *SplitElement { s.firstName = nam
 
 // SecondLabel names the second pane for assistive technology. See FirstLabel.
 func (s *SplitElement) SecondLabel(name string) *SplitElement { s.secondName = name; return s }
+
+// Grip sets when the divider shows its grip: always (GripShown, the default), only while
+// the pointer is over the divider or it is dragged or focused (GripOnHover), or never
+// (GripHidden). Without the grip, the divider is a line between the panes.
+func (s *SplitElement) Grip(g SplitGrip) *SplitElement { s.grip = g; return s }
 
 // OnChange runs fn with the new position after the user moves the divider, from the
 // keyboard or the pointer, to a position that differs from the current one. The
@@ -536,8 +558,10 @@ func (s *SplitElement) expand(ctx *Context) Element {
 			} else {
 				hit.Row().Width(Px(splitHit)).Cursor(input.CursorResizeEW)
 			}
-			hit.Child(bar).
-				Child(Div().Absolute().Inset(0).Center().Child(Div().asPart("Split.Grip").Style(st.Grip)))
+			hit.Child(bar)
+			if s.grip == GripShown || s.grip == GripOnHover && (ctx.hovered() || dragging.Get() || ctx.KeyboardFocus()) {
+				hit.Child(Div().Absolute().Inset(0).Center().Child(Div().asPart("Split.Grip").Style(st.Grip)))
+			}
 
 			hit.Role(access.RoleSeparator).Label(name).Focusable()
 			a := hit.access()

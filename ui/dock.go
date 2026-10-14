@@ -688,7 +688,7 @@ func (v *dockView) chain(n DockNode, path []int, k int) Element {
 	}
 	pos := NewSignal(sz[k] / rest)
 	key := fmt.Sprintf("%s/split:%s:%d", v.scope, dockPath(path), k)
-	sp := Split(v.node(n.Children[k], appendPath(path, k)), v.chain(n, path, k+1)).Key(key).Position(pos).
+	sp := Split(v.node(n.Children[k], appendPath(path, k)), v.chain(n, path, k+1)).Key(key).Position(pos).Grip(GripOnHover).
 		MinFirst(Px(dockMinPane)).MinSecond(Px(dockMinPane)).
 		OnChange(func(f float64) { v.resize(path, k, f) })
 	sp.onRelease = v.d.saveNow
