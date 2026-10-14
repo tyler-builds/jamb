@@ -46,6 +46,7 @@ func Components(s *Store) ui.Element {
 				Child(dateTimeSection(ctx, t)).
 				Child(dataGridSection(ctx, t)).
 				Child(chartsSection(ctx, t)).
+				Child(codeEditorSection()).
 				Child(customizingSection()).
 				Child(dialogsSection(ctx, t, s)).
 				Child(section(t, "Images",

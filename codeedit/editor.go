@@ -1,0 +1,432 @@
+package codeedit
+
+import (
+	"time"
+
+	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/codeedit/highlight"
+	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/ui"
+)
+
+// An Editor is a code editor under construction. It is made by New and configured with the
+// methods below, each of which returns the editor so that they chain. An Editor is an
+// element: place it in a tree as it is, and it renders itself. Its size is Full by 300
+// pixels unless Size or Height says otherwise.
+type Editor struct {
+	ui.Composite
+	doc         *Document
+	label       string
+	lineNumbers bool
+	readOnly    bool
+	tabSize     int
+	comment     string
+	width       ui.Length
+	height      ui.Length
+	styles      Style
+	hl          Highlighter
+	lang        highlight.Grammar
+	// view is the state of the editor's latest render, which the tests read.
+	view *viewState
+}
+
+// New returns an editor that shows doc. Line numbers are on, tabs are four columns wide,
+// and the editor is writable with no comment prefix.
+func New(doc *Document) *Editor {
+	return &Editor{doc: doc, lineNumbers: true, tabSize: 4, width: ui.Full, height: ui.Px(300)}
+}
+
+// Key gives the editor a stable identity among its siblings, so its state (the scroll
+// position, the find bar) survives reordering.
+func (e *Editor) Key(k string) *Editor { e.SetKey(k); return e }
+
+// Label sets the name that assistive technology reads for the editor.
+func (e *Editor) Label(s string) *Editor { e.label = s; return e }
+
+// LineNumbers shows or hides the column of line numbers. It is shown by default. The
+// fold markers are always shown.
+func (e *Editor) LineNumbers(on bool) *Editor { e.lineNumbers = on; return e }
+
+// ReadOnly shows the text and lets it be selected, moved through and copied, but not
+// changed.
+func (e *Editor) ReadOnly(on bool) *Editor { e.readOnly = on; return e }
+
+// TabSize sets how many columns a tab stop is, for the display of tabs, for Tab and for
+// the folding of indented lines. It is 4 by default.
+func (e *Editor) TabSize(n int) *Editor {
+	if n < 1 {
+		n = 1
+	}
+	e.tabSize = n
+	return e
+}
+
+// Comment sets the prefix that Comment toggles at the start of each line, such as "// "
+// for Go. With no prefix, the comment command does nothing.
+func (e *Editor) Comment(prefix string) *Editor { e.comment = prefix; return e }
+
+// Size sets the width and the height of the editor.
+func (e *Editor) Size(w, h ui.Length) *Editor { e.width, e.height = w, h; return e }
+
+// Height sets the height of the editor, which is 300 pixels by default.
+func (e *Editor) Height(h ui.Length) *Editor { e.height = h; return e }
+
+// Styles sets the look of the parts of the editor, for this editor only. Set fields win
+// over the defaults. Calling Styles again merges with the earlier values.
+func (e *Editor) Styles(st Style) *Editor {
+	e.styles = e.styles.merge(st)
+	return e
+}
+
+// Highlighter sets the syntax highlighter of the editor, when it is not a session the editor
+// starts itself (see Language). The highlighter must have been made from the document's text,
+// and the editor sends it each later change. A nil highlighter shows plain text.
+func (e *Editor) Highlighter(h Highlighter) *Editor { e.hl = h; return e }
+
+// Language highlights the document with the tree-sitter language l, such as golang.Grammar.
+// The editor starts a highlight session on the document's text, sends it each change, and paints
+// the spans it has. It closes the session when the language or the document changes. A document
+// over the highlight limit is shown without colors, and a nil language shows plain text.
+func (e *Editor) Language(l highlight.Grammar) *Editor { e.lang = l; return e }
+
+// Document returns the document the editor shows.
+func (e *Editor) Document() *Document { return e.doc }
+
+// Render builds the editor. It is called by the UI, and reads the signals of the editor's
+// state, so the editor renders again when the text, the selections or the view change.
+func (e *Editor) Render(ctx *ui.Context) ui.Element {
+	vs := ui.Local(ctx, "codeedit.view", newViewState()).Peek()
+	vs.rev.Get() // the editor renders again when the view changes
+	vs.ctx = ctx
+	if !vs.closeOnDispose {
+		// The session is closed when the editor's component is removed. Registered once per
+		// view state, which lives as long as the component does.
+		vs.closeOnDispose = true
+		ctx.OnDispose(vs.closeSession)
+	}
+	e.view = vs
+	if vs.doc != e.doc {
+		vs.attachDoc(e.doc)
+	}
+	vs.syncSession(ctx, e.lang)
+	var hl Highlighter
+	switch {
+	case e.hl != nil:
+		hl = e.hl
+	case vs.session != nil:
+		hl = vs.session
+	}
+	if vs.hl != hl {
+		// The spans and the viewport belong to the highlighter they came from.
+		vs.hl = hl
+		vs.spans = spanIndex{}
+		vs.vpSet = false
+	}
+	vs.tab = e.tabSize
+	vs.doc.SetTabWidth(e.tabSize)
+	t := ctx.Theme()
+	st := e.styles.resolve(t)
+	name := e.label
+	if name == "" {
+		name = ctx.Strings().CodeEditorLabel
+	}
+	ps := paintSettings{st: st, t: t, numbers: e.lineNumbers, tab: e.tabSize, readOnly: e.readOnly, focused: vs.focused}
+	canvas := ui.Canvas(func(p *ui.Painter, w, h float32) {
+		vs.paint(p, w, h, ps)
+	}).Size(ui.Full, ui.Full).Grow(1).Role(access.RoleTextArea).Label(name)
+	canvas.Cursor(ui.CursorText).KeyContext("CodeEditor").Focusable().FocusHandle(vs.canvasFocus)
+	canvas.FocusVisible(ui.Style{BorderWidth: 2, BorderColor: t.FocusRing})
+	e.wire(canvas, vs)
+	canvas.TextPattern(func() *access.TextInfo { return vs.textAccess(e.readOnly, st.Text.FontSize) }).
+		TextSelect(vs.selectText).TextReveal(vs.revealText)
+	root := ui.Div().Column().Size(e.width, e.height).Style(st.Box)
+	if vs.bar != barNone {
+		root.Child(vs.findBar(ctx, st, e.readOnly))
+	}
+	root.Child(canvas)
+	return root
+}
+
+// wire attaches the pointer, keyboard, text and focus handling to the canvas of the editor.
+func (e *Editor) wire(canvas *ui.DivElement, vs *viewState) {
+	canvas.OnFocus(func() { vs.focused = true; vs.restart = true; vs.touch() })
+	canvas.OnBlur(func() { vs.focused = false; vs.dragging = false; vs.touch() })
+	canvas.OnMouseDown(func(ev *ui.MouseEvent) { vs.mouseDown(ev) })
+	canvas.OnMouseMove(func(ev *ui.MouseEvent) { vs.mouseMove(ev) })
+	canvas.OnMouseUp(func(*ui.MouseEvent) { vs.dragging = false })
+	canvas.OnScroll(func(ev *ui.ScrollEvent) {
+		vs.scroll(ev.DeltaX, ev.DeltaY)
+		ev.StopPropagation()
+	})
+	canvas.OnTextInput(func(s string) {
+		if !e.readOnly {
+			vs.edit(func(d *Document) error { return d.TypeText(s) })
+		}
+	})
+	e.wireIME(canvas, vs)
+	for _, b := range editorActions {
+		fn := b.fn
+		canvas.OnAction(b.action, func() {
+			vs.commitComposition() // a key the editor handles types what is composed first
+			fn(e, vs)
+		})
+	}
+}
+
+// viewState is the state of one editor, kept by the UI for the editor's node: the document
+// it shows and what it has subscribed to, the scroll position, the find bar, and the
+// geometry of the last paint, which the pointer handlers read.
+type viewState struct {
+	doc         *Document
+	cancelDoc   []func()
+	hl          Highlighter
+	rev         *ui.Signal[uint64] // changes when the view should render again
+	ctx         *ui.Context        // the context of the latest render, for the clipboard
+	tab         int
+	focused     bool
+	dragging    bool
+	reveal      bool // the next paint scrolls the primary caret into view
+	scrollX     float32
+	scrollY     float32
+	maxCells    int    // the widest shown row, in cells, from the last paint
+	fontName    string // the name of the monospace face, read by the first paint
+	geo         geometry
+	spans       spanIndex
+	capStyle    []capStyle
+	vpLo        int
+	vpHi        int
+	vpSet       bool
+	bar         barKind
+	query       *ui.Signal[string]
+	repl        *ui.Signal[string]
+	gotoLine    *ui.Signal[string]
+	optCase     *ui.Signal[bool]
+	optWord     *ui.Signal[bool]
+	optRegex    *ui.Signal[bool]
+	finder      *Finder
+	finderKey   finderKey
+	finderErr   bool // the query is an invalid pattern
+	focusBar    bool // the bar takes the keyboard focus when it next renders
+	canvasFocus *ui.FocusHandle
+	model       *editorModel // the Text pattern's model, kept while the text and the layout are the same (see textModel)
+	// comp is what an input method composes at the primary caret, shown but not typed (see ime.go).
+	comp ui.Composition
+	// session is the highlight session started for sessionKey, when Language set one; langErr is
+	// why a session could not be started (highlight.ErrTooLarge, for one).
+	session        *highlight.Session
+	sessionKey     sessionKey
+	langErr        error
+	closeOnDispose bool // closeSession is registered with the component's OnDispose
+
+	// activity is the time of the latest edit, move or click, from which the caret blinks. restart
+	// asks the next paint to set it to that paint's time (see Painter.Now).
+	activity time.Time
+	restart  bool
+}
+
+// sessionKey is what a highlight session was started for: its language, and its document.
+type sessionKey struct {
+	lang highlight.Grammar
+	doc  *Document
+}
+
+// syncSession starts a highlight session for lang on the document, or closes the one it has when
+// lang or the document changed. The session's worker asks for a frame through ctx.Post when it
+// has new spans, so the call is safe from the worker. A failure to start (a document over the
+// size limit, for one) leaves the text uncolored and is kept in langErr.
+func (vs *viewState) syncSession(ctx *ui.Context, lang highlight.Grammar) {
+	key := sessionKey{lang: lang, doc: vs.doc}
+	if key == vs.sessionKey && (lang == nil || vs.session != nil || vs.langErr != nil) {
+		return
+	}
+	vs.closeSession()
+	vs.sessionKey = key
+	vs.langErr = nil
+	if lang == nil {
+		return
+	}
+	rev := vs.rev
+	s, err := highlight.NewSession(lang, []byte(vs.doc.Text()), highlight.Options{
+		Notify: func() { ctx.Post(func() { rev.Set(rev.Peek() + 1) }) },
+	})
+	if err != nil {
+		vs.langErr = err
+		return
+	}
+	vs.session = s
+}
+
+// closeSession closes the highlight session the view started, if it has one. Close waits for the
+// session's worker, which does not wait for the UI, so it is safe on the UI thread.
+func (vs *viewState) closeSession() {
+	if vs.session != nil {
+		_ = vs.session.Close()
+		vs.session = nil
+	}
+}
+
+// geometry is where the last paint put the text, in the canvas's pixels.
+type geometry struct {
+	lineH   float32
+	charW   float32
+	gutterW float32 // the width of the numbers and the fold markers, up to the text
+	textX   float32 // where the text starts, before the horizontal scroll
+	foldX   float32 // the left edge of the fold markers
+	viewW   float32
+	viewH   float32
+	painted bool
+}
+
+// newViewState returns the state of a new editor.
+func newViewState() *viewState {
+	return &viewState{
+		rev:         ui.NewSignal(uint64(0)),
+		query:       ui.NewSignal(""),
+		repl:        ui.NewSignal(""),
+		gotoLine:    ui.NewSignal(""),
+		optCase:     ui.NewSignal(false),
+		optWord:     ui.NewSignal(false),
+		optRegex:    ui.NewSignal(false),
+		tab:         4,
+		canvasFocus: ui.NewFocusHandle(),
+	}
+}
+
+// touch asks the editor to render again.
+func (vs *viewState) touch() { vs.rev.Set(vs.rev.Peek() + 1) }
+
+// attachDoc makes the editor show doc. It cancels the subscriptions to the document it had,
+// and subscribes to its changes: each change renders the editor again, and each edit is
+// sent to the highlighter at once.
+func (vs *viewState) attachDoc(doc *Document) {
+	for _, c := range vs.cancelDoc {
+		c()
+	}
+	vs.doc = doc
+	vs.cancelDoc = []func(){
+		doc.OnChange(vs.touch),
+		doc.OnEdit(func(c Change) {
+			if vs.hl != nil {
+				// The highlighter reports its own errors (see its Err); the edit itself
+				// is never refused, so a keystroke is not held up by the highlighter.
+				_ = vs.hl.Edit(highlight.EditRecord{Start: c.From, OldEnd: c.To, Text: []byte(c.Text)})
+			}
+		}),
+	}
+	vs.dragging = false
+	vs.vpSet = false
+	vs.spans = spanIndex{}
+}
+
+// edit runs fn on the document and asks the editor to show the result: the caret is kept
+// in view. Errors from the document are returned to the caller, so they can be dropped
+// where a key has nothing to do.
+func (vs *viewState) edit(fn func(*Document) error) {
+	_ = fn(vs.doc)
+	vs.reveal = true
+	vs.restart = true
+	vs.touch()
+}
+
+// move runs a caret movement on the document, and scrolls the caret into view.
+func (vs *viewState) move(m Move, extend bool) {
+	vs.doc.Move(m, extend, vs.pageRows())
+	vs.reveal = true
+	vs.restart = true
+	vs.touch()
+}
+
+// pageRows is how many shown rows a page of the editor holds.
+func (vs *viewState) pageRows() int {
+	if vs.geo.lineH <= 0 {
+		return 1
+	}
+	return max(int(vs.geo.viewH/vs.geo.lineH)-1, 1)
+}
+
+// scroll moves the view by dx and dy canvas pixels. The paint clamps the position.
+func (vs *viewState) scroll(dx, dy float32) {
+	vs.scrollX += dx
+	vs.scrollY += dy
+	if vs.scrollX < 0 {
+		vs.scrollX = 0
+	}
+	if vs.scrollY < 0 {
+		vs.scrollY = 0
+	}
+	vs.touch()
+}
+
+// hit returns the row and the byte offset under the canvas point (x, y), from the last paint,
+// and reports whether there was a paint to hit against.
+func (vs *viewState) hit(x, y float32) (row, p int, ok bool) {
+	g := vs.geo
+	if !g.painted || g.lineH <= 0 {
+		return 0, 0, false
+	}
+	vis := int((y + vs.scrollY) / g.lineH)
+	if vis < 0 {
+		vis = 0
+	}
+	row, found := vs.doc.RowAtVisible(vis)
+	if !found {
+		row = vs.doc.RowOf(vs.doc.Len())
+	}
+	line := vs.doc.Line(row)
+	cell := int((x - g.textX + vs.scrollX + g.charW/2) / g.charW)
+	return row, vs.doc.LineStart(row) + colOfCell(line, max(cell, 0), vs.tab), true
+}
+
+// mouseDown handles a press: a fold marker folds or unfolds its row, a line number selects
+// its row, and a press in the text places the caret. Alt adds a caret, Shift extends the
+// primary selection, and a double or triple click selects a word or a row.
+func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
+	if ev.Button != input.ButtonLeft {
+		return
+	}
+	vs.commitComposition() // a click types what is composed first: the layout it hits shows it
+	g := vs.geo
+	row, p, ok := vs.hit(ev.LocalX, ev.LocalY)
+	if !ok {
+		return
+	}
+	vs.restart = true
+	switch {
+	case ev.LocalX >= g.foldX && ev.LocalX < g.textX && vs.doc.opensBlock(row, vs.tab):
+		if !vs.doc.Unfold(row) {
+			vs.doc.Fold(row, vs.tab)
+		}
+	case ev.LocalX < g.textX:
+		vs.doc.SelectRow(row)
+	case ev.Mods.Has(input.ModAlt):
+		vs.doc.AddCaret(p)
+	case ev.Mods.Has(input.ModShift):
+		vs.doc.extendPrimary(p)
+	case ev.Clicks == 2:
+		vs.doc.SelectWord(p)
+	case ev.Clicks >= 3:
+		vs.doc.SelectRow(row)
+	default:
+		vs.doc.SetCaret(p)
+		vs.dragging = true
+	}
+	vs.touch()
+}
+
+// mouseMove extends the primary selection while the button is held.
+func (vs *viewState) mouseMove(ev *ui.MouseEvent) {
+	if !vs.dragging {
+		return
+	}
+	if _, p, ok := vs.hit(ev.LocalX, ev.LocalY); ok && p != vs.doc.Primary().Head {
+		vs.doc.extendPrimary(p)
+		vs.touch()
+	}
+}
+
+// extendPrimary moves the head of the primary selection to p, keeping its anchor.
+func (d *Document) extendPrimary(p int) {
+	sels := append([]Selection(nil), d.sels...)
+	sels[d.primary] = Selection{Anchor: sels[d.primary].Anchor, Head: p}
+	d.setSels(sels, d.primary)
+}

@@ -2897,6 +2897,14 @@ objects, then handles the loss as if the next `Present` had reported
 window. It is the only way to exercise this path without a real driver reset, and
 it does not reset the driver.
 
+## Code editor
+
+The `codeedit` package is a code editor for source files, with undo and redo, several selections,
+find and replace, folding by indentation, and tree-sitter highlighting. It is built with
+`codeedit.New(codeedit.NewDocument(text))`, and its keys are actions that an app binds with
+`rt.AddBindings(codeedit.Bindings()...)`. See [docs/codeedit.md](docs/codeedit.md) for the keys,
+the document, highlighting, the limits and the measured performance.
+
 ## Tools for humans and coding agents
 
 The `jamb` command in `cmd/jamb` has two commands: `jamb dev`, the watch-and-restart
