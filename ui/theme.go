@@ -1,5 +1,7 @@
 package ui
 
+import "maps"
+
 // Theme is a set of semantic colors and metrics used by built-in widgets and
 // available to applications through Context.Theme.
 type Theme struct {
@@ -42,6 +44,13 @@ type Theme struct {
 
 	Radius   float32
 	FontSize float32
+
+	// Syntax is the look of each syntax capture of a code editor, keyed by the
+	// tree-sitter capture name (see SyntaxStyle). Under high contrast it keeps the
+	// same names, with system colors.
+	Syntax map[string]SyntaxStyle
+	// Editor is the colors of a code editor.
+	Editor EditorColors
 
 	// The parts of the built-in widgets, for every widget of that kind in the
 	// app. They merge over the built-in defaults, which are made from the colors
@@ -158,6 +167,8 @@ var darkTheme = &Theme{
 	Scrim:         Hex("#00000099"),
 	Radius:        8,
 	FontSize:      14,
+	Syntax:        darkSyntax,
+	Editor:        darkEditor,
 }
 
 var lightTheme = &Theme{
@@ -187,6 +198,8 @@ var lightTheme = &Theme{
 	Scrim:         Hex("#18181b59"),
 	Radius:        8,
 	FontSize:      14,
+	Syntax:        lightSyntax,
+	Editor:        lightEditor,
 }
 
 // DarkTheme returns the built-in dark theme: a neutral zinc palette with an
@@ -200,8 +213,10 @@ func LightTheme() *Theme { return lightTheme.Clone() }
 // Clone returns a copy of the theme, to change for an app without changing the
 // built-in theme it was copied from. The copy shares the Shadows slices of its
 // part styles, so change a part by assigning a new style to its field, and do
-// not append to or change those slices in place.
+// not append to or change those slices in place. The copy has its own Syntax
+// map.
 func (t *Theme) Clone() *Theme {
 	c := *t
+	c.Syntax = maps.Clone(t.Syntax)
 	return &c
 }

@@ -1888,6 +1888,48 @@ opt-out. Details are in [docs/accessibility.md](docs/accessibility.md#phase-d-wh
 Contrast of the built-in tokens is checked by `ui/contrast_test.go` against the
 WCAG 2 ratios of each pair the built-in widgets use, in both themes.
 
+Predefined themes: `ui.Themes()` lists the built-in Dark and Light themes, then 37
+themes converted from gpui-component (Apache-2.0), in 22 families. `ui.NewTheme(name)`
+returns a new copy of one of them by its exact name, and `info.New()` does the same for
+a `ui.ThemeInfo`. Each theme also has syntax colors for a code editor (`Theme.Syntax`,
+keyed by the tree-sitter capture name) and its editor colors (`Theme.Editor`).
+
+```go
+latte, _ := ui.NewTheme("Catppuccin Latte")
+mocha, _ := ui.NewTheme("Catppuccin Mocha")
+app.Window{LightTheme: latte, DarkTheme: mocha, Root: root} // one family, following Windows
+ctx.SetTheme(mocha)                                          // pins one theme instead
+```
+
+The families, and their variants, are:
+
+- Adventure: Adventure, Adventure Time
+- Alduin: Alduin
+- Asciinema: Asciinema
+- Aurora: Aurora Light
+- Ayu: Ayu Light, Ayu Dark
+- Catppuccin: Catppuccin Latte, Catppuccin Frappe, Catppuccin Macchiato, Catppuccin Mocha
+- Everforest: Everforest Light, Everforest Dark
+- Fahrenheit: Fahrenheit
+- Flexoki: Flexoki Light, Flexoki Dark
+- Gruvbox: Gruvbox Light, Gruvbox Dark
+- Harper: Harper
+- Hybrid: Hybrid Light, Hybrid Dark
+- Jellybeans: Jellybeans
+- Kibble: Kibble
+- macOS Classic: macOS Classic Light, macOS Classic Dark
+- Matrix: Matrix
+- Mellifluous: Mellifluous Light, Mellifluous Dark
+- Molokai: Molokai Light, Molokai Dark
+- Solarized: Solarized Light, Solarized Dark
+- Spaceduck: Spaceduck
+- Tokyo: Tokyo Night, Tokyo Storm, Tokyo Moon
+- Twilight: Twilight
+
+Each converted theme credits its scheme and author in `ThemeInfo`. Some colors are
+moved in lightness so that text meets 4.5:1 and control borders and the focus ring meet 3:1;
+the moves are listed in `third_party/gpui-component-themes/README.md`.
+
 Zoom: Ctrl+= (or Ctrl++, numpad +) zooms in, Ctrl+- zooms out, Ctrl+0
 resets, and Ctrl+mouse wheel zooms. Levels run 50% to 300% (`ui.ZoomLevels`).
 In code: `rt.Zoom()`, `rt.SetZoom(z)`, `rt.ZoomIn()`, `rt.ZoomOut()`,

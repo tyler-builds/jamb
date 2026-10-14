@@ -19,6 +19,10 @@ func Settings(s *Store) ui.Element {
 		if dark.Peek() != t.Dark {
 			dark.Set(t.Dark)
 		}
+		themeName := ui.Local(ctx, "theme", themeOptionName(t))
+		if themeName.Peek() != themeOptionName(t) {
+			themeName.Set(themeOptionName(t))
+		}
 		zoom := ui.Local(ctx, "zoom", float64(ctx.Zoom()))
 		if float32(zoom.Peek()) != ctx.Zoom() {
 			zoom.Set(float64(ctx.Zoom()))
@@ -33,6 +37,14 @@ func Settings(s *Store) ui.Element {
 					ui.Tab[string]{Value: "appearance", Label: "Appearance", Panel: func() ui.Element {
 						return Card(t).Gap(14).
 							Child(SectionTitle(t, "Appearance")).
+							Child(SettingRow(t, "Theme", "Any predefined theme. The dark mode switch picks Dark or Light.",
+								ui.Select(themeName, themeOptions...).Label("Theme").Width(ui.Px(240)).
+									OnChange(func(name string) {
+										if next, ok := demoThemeNamed(name); ok {
+											ctx.SetTheme(next)
+										}
+									}))).
+							Child(ui.Divider()).
 							Child(SettingRow(t, "Dark mode", "Use the dark zinc theme.",
 								ui.Switch("Dark mode", dark).OnChange(func(on bool) {
 									if on {

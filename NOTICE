@@ -13,3 +13,14 @@ these words and phrases from gpui-component (crates/ui/locales/ui.yml):
 
 gpui-component is Copyright Longbridge and is licensed under the Apache License,
 Version 2.0. Its license text is at https://www.apache.org/licenses/LICENSE-2.0.
+
+Third-party software: gpui-component themes
+
+The predefined themes in ui/themes_gen.go are converted from the theme sets of
+gpui-component (https://github.com/longbridge/gpui-component, commit
+f2f0f563292114fecf55fb8ab92a97e14989dbd0), Copyright 2024-2025 Longbridge, licensed
+under the Apache License, Version 2.0. The theme sets are in
+third_party/gpui-component-themes/, with the license text in LICENSE-APACHE there.
+They are converted for jamb: their colors are mapped to jamb's tokens, and some are
+moved in lightness for contrast. Each theme credits the color scheme it is taken
+from, and that scheme's author; see third_party/gpui-component-themes/README.md.

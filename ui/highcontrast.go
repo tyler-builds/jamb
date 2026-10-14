@@ -1,5 +1,7 @@
 package ui
 
+import "strings"
+
 // HighContrastTheme returns the theme that the runtime uses while Windows high
 // contrast is on. It is built from the system colors only: solid colors, no
 // gradients, no shadows and no tints, so that text, focus and control borders
@@ -7,7 +9,8 @@ package ui
 // https://learn.microsoft.com/en-us/windows/apps/design/accessibility/high-contrast-themes).
 // Text is WindowText, and selection and the primary action are Highlight with
 // HighlightText. Status colors are WindowText too, so a status is shown by its
-// text and icon, not by its color. Radius, FontSize and the widget parts (the
+// text and icon, not by its color. Syntax keeps the capture names of base, in
+// WindowText, and keywords in Highlight. Radius, FontSize and the widget parts (the
 // Theme fields for each widget kind, such as Tabs, Button and Toast) are taken
 // from base; the parts keep only their sizes and spacing under high contrast (see
 // plainStyle).
@@ -42,6 +45,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Scrollbar:     c.WindowText,
 		FocusRing:     c.Highlight,
 		Scrim:         c.Window,
+		Syntax:        highContrastSyntax(c, base.Syntax),
 		Radius:        base.Radius,
 		FontSize:      base.FontSize,
 		Tabs:          base.Tabs,
@@ -85,7 +89,30 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Drawer:          base.Drawer,
 		Popover:         base.Popover,
 	}
+	t.Editor = EditorColors{
+		Background:       c.Window,
+		Foreground:       c.WindowText,
+		ActiveLine:       c.Window,
+		LineNumber:       c.GrayText,
+		ActiveLineNumber: c.WindowText,
+		Selection:        c.Highlight,
+	}
 	return t
+}
+
+// highContrastSyntax keeps the capture names and the font styles of syntax, and
+// gives them system colors: keywords take Highlight, and every other capture
+// takes WindowText.
+func highContrastSyntax(c SystemColors, syntax map[string]SyntaxStyle) map[string]SyntaxStyle {
+	out := make(map[string]SyntaxStyle, len(syntax))
+	for name, s := range syntax {
+		col := c.WindowText
+		if strings.HasPrefix(name, "keyword") {
+			col = c.Highlight
+		}
+		out[name] = SyntaxStyle{Color: col, Italic: s.Italic, Bold: s.Bold}
+	}
+	return out
 }
 
 // HighContrastBlack is a representative high contrast scheme: white text on

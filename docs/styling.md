@@ -71,7 +71,8 @@ set the outer size of a widget and win over the theme and `Styles`; the theme an
 To style the parts for a whole app, start the app's theme from a built-in theme,
 and pass it to the app and to every theme switch. `ui.DarkTheme()` and
 `ui.LightTheme()` return a new copy on every call, so the app can change its copy
-freely.
+freely. `ui.NewTheme(name)` returns a copy of any predefined theme by its name, and
+`ui.Themes()` lists them (see "Predefined themes" in the README).
 
 ```go
 // appTheme returns the dark theme of the app: the built-in one, with a 3 px
