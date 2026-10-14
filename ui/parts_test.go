@@ -113,6 +113,8 @@ func drawnBy(part string) string {
 		return "Slider.Thumb"
 	case "Split.DividerHover", "Split.DividerActive", "Split.DividerFocusVisible":
 		return "Split.Divider"
+	case "Dock.TabHover", "Dock.TabSelected", "Dock.TabFocusVisible":
+		return "Dock.Tab"
 	case "Button.RootHover", "Button.RootPressed", "Button.RootDisabled", "Button.RootFocusVisible":
 		return "Button.Root"
 	case "NumberInput.SpinButtonHover", "NumberInput.SpinButtonPressed",
@@ -186,6 +188,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Select", func(t *testing.T) { testSelectParts(t, applied) })
 	t.Run("Slider", func(t *testing.T) { testSliderParts(t, applied) })
 	t.Run("Split", func(t *testing.T) { testSplitParts(t, applied) })
+	t.Run("Dock", func(t *testing.T) { testDockParts(t, applied) })
 	t.Run("TextInput", func(t *testing.T) { testFieldParts(t, "TextInput", applied) })
 	t.Run("TextArea", func(t *testing.T) { testFieldParts(t, "TextArea", applied) })
 	t.Run("NumberInput inline", func(t *testing.T) { testNumberInputParts(t, SpinInline, applied) })

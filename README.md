@@ -1158,6 +1158,97 @@ The demo's Components page has a "Split panes" section with a fraction split, a
 stacked one, a nested one, a collapsible pane and a pixel split with limits. The
 notes app's sidebar is a pixel split, and its width is kept in `settings.json`.
 
+### Docking
+
+`ui.Dock(layout, panels)` shows panels that the user rearranges as in an IDE: a
+panel is dragged over a group to join it as a tab, or to a side of it to make a
+group beside it, or to an edge of the dock; a group can float in a window of its
+own. The layout is a `ui.DockLayout` signal that the app owns, so the arrangement
+is saved with the settings and loaded back.
+
+```go
+var defaultLayout = ui.DockLayout{Root: ui.DockNode{
+	Sizes: []float64{0.25, 0.75},
+	Children: []ui.DockNode{
+		{Panels: []string{"explorer"}, Active: "explorer"},
+		{Vertical: true, Sizes: []float64{0.7, 0.3}, Children: []ui.DockNode{
+			{Panels: []string{"editor"}, Active: "editor"},
+			{Panels: []string{"output"}, Active: "output"},
+		}},
+	},
+}}
+
+panels := map[string]ui.DockPanel{
+	"explorer": {Title: "Explorer", Render: explorer, Closable: true},
+	"editor":   {Title: "Editor", Render: editor},
+	"output":   {Title: "Output", Render: output, Closable: true},
+}
+layout := ui.NewSignal(loadLayout(defaultLayout)) // the saved layout, or the default
+
+ui.Dock(layout, panels).OnChange(func(l ui.DockLayout) { saveLayout(l) }).
+	Floating(app.OpenDockWindow)
+
+// Reset layout, and reopen a panel that was closed:
+layout.Set(ui.DockReset(defaultLayout))
+layout.Set(ui.DockShow(layout.Peek(), "output"))
+```
+
+**The layout model.** A `DockLayout` is a tree of `DockNode`s and a list of
+`DockFloat`s. A node with `Children` is a split: its children sit side by side, or
+one above the other when `Vertical` is set, and `Sizes` holds each child's share of
+the split, which need not sum to 1. A node without children is a tab group: `Panels`
+lists its panels in tab order and `Active` is the one it shows. A floating group is
+a tab group with an `ID`, and the position and size of its window. The layout is a
+value: the functions `DockMove`, `DockClose`, `DockShow`, `DockFocus`, `DockFloatPanel`,
+`DockBack`, `DockMoveSide` and `DockReset` return a new layout and never change their
+argument. They also put the layout in order: an empty group goes, a split with one
+child is replaced by it, and a split inside a split of the same direction is merged
+into it. The layout marshals to JSON with `encoding/json`. A panel ID in a loaded
+layout that the dock does not have is dropped when the dock is shown, and a panel
+that the layout does not hold stays hidden until `DockShow` shows it.
+
+**Dragging.** Drag a tab over a group: the group shows the zone the panel will land
+in, the center to add it as a tab or a side to make a group beside it. Drag a tab to
+one of the four strips along the dock's edges, which appear while a panel is dragged,
+to put the panel along that edge. A drop that would change nothing shows no preview.
+
+**Keyboard.** The tab's menu, opened with the context menu key or Shift+F10, has
+Move left, right, up and down (into the group on that side), Split right and Split
+down, Float or Dock back, and Close panel (for a closable panel). Ctrl+Shift with an
+arrow key moves the focused panel to the group on that side. Left and Right, Home and
+End select the tabs of a group. Ctrl+Tab and Ctrl+Shift+Tab select the next and
+previous panel of a group, and Ctrl+F6 moves focus to the next group. The dividers
+are `Split`s, so they take the arrow keys, Home and End as a split does.
+
+**Floating windows.** `Floating` takes the function that opens a window for a group.
+`app.OpenDockWindow` opens it with `app.Open`, since the `ui` package cannot import
+`app`. A floating window shows its group, and its position and size are recorded in
+the layout when the user closes it. Closing a window, by the user or by the dock, docks
+its panels back into the main window, so no panel is lost with its window. Float and
+Dock back are the commands that move a panel between windows. Set `QuitWhenClosed` on
+the main window, so that closing it closes the floating windows too.
+
+**State.** A panel keeps its state while it stays in its group, including while
+another tab of the group is active. A panel that moves to another group, or to a
+floating window, is built again there, because a component's identity follows its
+place in the tree. Keep the state that must survive a move in signals the app owns.
+
+**Styling.** `ui.DockStyle` is the look of the groups, tabs, panels and the drop
+preview, and `Theme.Dock` sets it for every dock. The dividers take `Theme.Split`.
+The parts are listed in the widget table of docs/styling.md.
+
+**Limits.**
+- A panel is dragged within one window. A release outside the dock does not float the
+  panel: the drag ends with no target, and its end callback has no pointer position.
+  Use Float.
+- Ctrl+F6 moves between groups, not F6, which the toast region uses.
+- Every panel of the layout is built when the dock is shown, not when it is first
+  selected.
+- A split keeps each pane at least 48 logical pixels, and the edge strips are 24
+  logical pixels wide.
+- A floating group has no sides: a panel dropped in it joins its tabs.
+- The floating groups are not shown in a dock without `Floating`.
+
 ### Feedback
 
 Progress bars, busy rings, toasts and badges. They use the theme's colors, follow

@@ -70,6 +70,18 @@ type Strings struct {
 	Increase                  string
 	Decrease                  string
 
+	// The names of a dock's tab strip and of the commands of its tabs' menus.
+	PanelGroup      string
+	MovePanelLeft   string
+	MovePanelRight  string
+	MovePanelUp     string
+	MovePanelDown   string
+	SplitPanelRight string
+	SplitPanelDown  string
+	FloatPanel      string
+	DockPanelBack   string
+	ClosePanel      string
+
 	// Remove names the button that removes a tag, such as "Remove Sales".
 	Remove func(tag string) string
 	// Page is the name of a page button, such as "Page 3". CurrentPage names the page
@@ -170,6 +182,17 @@ func englishStrings() *Strings {
 		Restore:             "Restore",
 		Increase:            "Increase",
 		Decrease:            "Decrease",
+
+		PanelGroup:      "Panels",
+		MovePanelLeft:   "Move left",
+		MovePanelRight:  "Move right",
+		MovePanelUp:     "Move up",
+		MovePanelDown:   "Move down",
+		SplitPanelRight: "Split right",
+		SplitPanelDown:  "Split down",
+		FloatPanel:      "Float",
+		DockPanelBack:   "Dock back",
+		ClosePanel:      "Close panel",
 
 		Remove:      func(tag string) string { return "Remove " + tag },
 		Page:        func(n int) string { return fmt.Sprintf("Page %d", n) },

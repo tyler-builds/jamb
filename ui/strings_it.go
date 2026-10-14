@@ -49,6 +49,15 @@ func italianStrings() *Strings {
 		Increase:             "Aumenta",
 		Decrease:             "Diminuisci",
 
+		PanelGroup:      "Pannelli",
+		MovePanelLeft:   "Sposta a sinistra",
+		MovePanelRight:  "Sposta a destra",
+		MovePanelUp:     "Sposta su",
+		MovePanelDown:   "Sposta giù",
+		SplitPanelRight: "Dividi a destra",
+		SplitPanelDown:  "Dividi in basso",
+		ClosePanel:      "Chiudi pannello",
+
 		Remove:      func(tag string) string { return "Rimuovi " + tag },
 		Page:        func(n int) string { return fmt.Sprintf("Pagina %d", n) },
 		CurrentPage: func(n int) string { return fmt.Sprintf("Pagina %d, pagina corrente", n) },

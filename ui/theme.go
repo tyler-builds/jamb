@@ -68,6 +68,8 @@ type Theme struct {
 	TimePicker TimePickerStyle
 	Slider     SliderStyle
 	Split      SplitStyle
+	// Dock is the look of every dock: its tab groups, tabs, panels and drop preview.
+	Dock DockStyle
 	// Field is the text frame of every TextInput and TextArea, and of every
 	// NumberInput's frame, before the NumberInput parts below.
 	Field       FieldStyle

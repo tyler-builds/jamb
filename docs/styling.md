@@ -41,7 +41,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Border`, `Disabled` and the others), so the defaults follow the theme's colors.
    Some defaults depend on the state of the widget, such as a disabled select.
 2. **The theme.** Set on the `ui.Theme` for every widget of that kind in the app:
-   `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.DateRangePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Field` (the frame of every
+   `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.DateRangePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Dock`, `Theme.Field` (the frame of every
    `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
@@ -529,6 +529,7 @@ parts that the code applies.
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
 | `ColorPicker` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `Swatch`, `Popup`, `Area`, `AreaFocusVisible`, `Thumb`, `Slider`, `Preset`, `PresetFocusVisible` | none | none | done |
 | `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
+| `Dock` | `Group`, `Strip`, `Tab`, `TabHover`, `TabSelected`, `TabFocusVisible`, `Indicator`, `Panel`, `Preview` | none | none | done |
 | `NumberInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |
 | `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
@@ -624,6 +625,7 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
 - The Slider has no render slot for the thumb (see above).
 - The Split has no render slot: its panes are the app's own elements, and the divider has no content of its own. Its bar is 1 px wide by default, in a 9 px hit area that the style does not change, so a `Divider` style sets the bar's thickness and not the hit area.
 - The Split's grip is a pill by default, not dots. A `Grip` style with `Clear: ui.ClearBackground` removes it.
+- The Dock has no render slot for its tabs or groups: its panels are the app's own content, from `DockPanel.Render`. Its dividers are the `Theme.Split`, and the `Preview` of an edge drop is the strip along that edge of the dock.
 - The Tabs have no render slot for the panel: the panel is the app's own content.
 - The list of a select is at least as wide as the field, whatever the field's width.
   Its `Popup` part can set a larger minimum width, and the `Trigger` part can set the
