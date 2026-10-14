@@ -7,7 +7,7 @@ Measured with `scripts/compare-gpui.ps1`, three runs per measurement, in two pas
 ## Summary
 
 - **Startup.** jamb paints its first frame sooner. On a warm launch (the executable has been started before), jamb painted at 266 ms and GPUI at 387 ms. On the first launch of a new copy of the executable, which Windows Defender scans before it runs, jamb painted at 496 ms and GPUI at 611 ms.
-- **Binary size.** jamb's stripped release binary is 7.18 MB. GPUI's release binary is 9.21 MB.
+- **Binary size.** jamb's stripped release binary is 8.41 MB at commit `db8079c` (7.18 MB in the second pass, before the features added since). GPUI's release binary is 9.21 MB, and 15.28 MB for the same app built with gpui-component (see [Binary size, updated](#binary-size-updated)).
 - **Build time.** Incremental builds take 2 s for jamb and 4 s (release) or 6 s (debug) for GPUI. A clean build from an empty cache took about 9 s for jamb, and 138 s (release) or 100 s (debug) for GPUI.
 - **Idle CPU.** jamb used 0.29% of one core while idle and focused (median), with about 185 context switches per second. GPUI used 1.85%, with about 530 per second.
 - **Memory.** GPUI uses slightly less: 75.3 MB private bytes and 52.5 MB working set, against jamb's 78.2 MB and 58.8 MB. jamb uses less GPU memory (13.8 MB dedicated, against 17.5 MB).
@@ -96,6 +96,32 @@ During the second pass, Medium text resolved to Segoe UI Regular, under an inter
 | GPUI, debug (`cargo build`) | 24.39 MB |
 
 GPUI can be built smaller with a size-optimized profile (`opt-level = "z"`, fat LTO, `codegen-units = 1`, `panic = "abort"`, `strip = true`): 4.31 MB in the first pass, at a clean build time of about 238 s. Its runtime figures in that pass were close to the release build's, with a smaller working set (55.4 MB against 60.2 MB). This comparison uses the default release profile, which is what most Rust applications ship.
+
+### Binary size, updated
+
+Measured on 2026-10-14, one build each, on the same machine. The other figures in this document are from the passes above and were not measured again.
+
+| Build | Size |
+|---|---|
+| jamb hello, second pass (`edd737f`) | 7.18 MB |
+| jamb hello, `023e778` (after the clipboard, IME, color emoji, Canvas, SVG and tier-2 widget work) | 7.74 MB |
+| jamb hello, `db8079c` (after the themes, translations, dock, inspector and other tier-3 work) | 8.41 MB |
+| GPUI hello (`gpui` at `cc053a4`, release) | 9.21 MB |
+| gpui-component's `hello_world` example (gpui-component at `f2f0f56`, the same `gpui` revision, release) | 15.28 MB |
+
+All jamb builds are `go build -trimpath -ldflags "-s -w -H windowsgui"`, and both Rust builds are `cargo build --release` with the default profile. gpui-component's `hello_world` is the same kind of app as the others: a centered greeting and a primary button. It shows what linking gpui-component adds to a GPUI app, about 6 MB.
+
+A hello app uses only part of jamb, and the Go linker drops the rest. Larger apps:
+
+| Build | Size |
+|---|---|
+| jamb demo (`examples/demo`: every widget, charts, the code editor with the Go grammar, the dock) | 15.99 MB |
+| jamb notes (`examples/notes`) | 8.80 MB |
+| A gpui-component application on the same machine: a database workbench with a tree-sitter SQL editor, a database driver and TLS | 26.3 MB |
+
+gpui-component's own gallery app was not built: its dependencies were not in the local Cargo cache, and downloading them would have added about 1 GB. The database workbench is not the same app as the jamb demo, and its driver and TLS add to its size, so it is an indication, not a like-for-like comparison.
+
+In the jamb demo, the code editor's part of the binary, by symbol size: wazero, the WebAssembly runtime that runs tree-sitter, about 1.1 MB, plus about 0.2 MB of standard-library packages it brings in; the editor itself about 0.5 MB; and the Go grammar 0.36 MB. Each also adds to Go's runtime tables, which grow with the amount of code. An app that does not import `codeedit` links none of it.
 
 ### Build times (seconds; three runs; dependencies already downloaded)
 

@@ -28,7 +28,7 @@ benchmarks instead.
 | No-op rebuild | 219 ms | |
 | Cold build (empty GOCACHE, compiles the std lib too) | 7.7 s | |
 | Save → new window on screen (`jamb dev`) | **1.05–1.36 s** | |
-| Binary size | Demo 13.6 MB default, **9.9 MB** with `-trimpath -ldflags "-s -w"`; hello 10.1 / 7.2 MB (2026-10-12; see [Startup memory and binary size](#startup-memory-and-binary-size-2026-10-12)) | 5–30 MB ✅ |
+| Binary size | With `-trimpath -ldflags "-s -w"`: demo **16.0 MB**, hello 8.4 MB (2026-10-14; see [docs/comparison-gpui.md](docs/comparison-gpui.md#binary-size-updated)). Earlier: demo 9.9 MB, hello 7.2 MB (2026-10-12; see [Startup memory and binary size](#startup-memory-and-binary-size-2026-10-12)) | 5–30 MB ✅ |
 | Repository size | 487 KB (≈9k lines of Go, including tests) | |
 | Dependencies | `golang.org/x/image` only (plus pieces of `x/text` and `x/sys`); 59 MB in the module cache | |
 | Build cache produced by a cold build | 51 MB (in the shared GOCACHE, not the repo) | |
@@ -120,6 +120,13 @@ three runs each, after 6 s idle):
   crypto module, whose DRBG reserves a 32 MB buffer in every jamb binary. The
   renderer now names cache files with FNV-128, and jamb imports no crypto
   package.
+- 2026-10-14: the single-instance pipe name in `app` had brought the import back
+  with `crypto/sha256`; it now uses FNV-1a, and hello and notes link no crypto
+  package again (`crypto/internal/fips140/drbg.memory` is absent). An app that
+  imports `codeedit` still links it, through wazero, which hashes modules with
+  SHA-256, so such an app carries the 32 MB reservation. jamb cannot remove it
+  with a `replace` directive, since that applies only to jamb's own module and
+  not to the apps built on it.
 
 ### Idle work: animations, occlusion, caret and toasts (2026-10-12)
 

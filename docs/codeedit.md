@@ -212,3 +212,8 @@ highlighting depends on the spans shown and is not included in these figures.
 - Translations: the find bar's messages are translated for Italian and Chinese where the
   translation is certain. The remaining messages are English in every language, as the `ui.Strings`
   packs describe.
+- Binary size and memory: importing `codeedit` links wazero, the WebAssembly runtime that runs
+  tree-sitter (about 1.1 MB of code), and each `github.com/tyler-builds/jamb-grammars` package an app imports adds its
+  grammar (0.15 to 5.5 MB; Go is 0.36 MB). wazero hashes modules with SHA-256, which links Go's
+  FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `codeedit` reports
+  about 32 MB more private bytes than one that does not (see BENCHMARKS.md).
