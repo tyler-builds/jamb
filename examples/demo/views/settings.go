@@ -74,6 +74,9 @@ func Settings(s *Store) ui.Element {
 									s.setTrayIcon(win, on)
 								}))).
 							Child(ui.Divider()).
+							Child(SettingRow(t, "Close to the notification area", "While the icon is shown, closing the window hides it there. The icon's menu shows it again or quits.",
+								ui.Switch("Close to the notification area", s.CloseToTray))).
+							Child(ui.Divider()).
 							Child(SettingRow(t, "Danger zone", "Remove every project from this workspace.",
 								ui.Button("Delete all").Danger().Small().Icon(icons.Trash).OnClick(func() {
 									s.Projects.Set(nil)

@@ -25,8 +25,10 @@ func main() {
 		Chrome: app.ChromeCustom,
 		// Closing the main window quits, even with project windows open.
 		QuitWhenClosed: true,
-		Root:           views.App(store),
-		Theme:          views.DemoDarkTheme,
+		// With the notification area icon on, closing the window hides it (see Settings).
+		CloseToTray: store.CloseToTray,
+		Root:        views.App(store),
+		Theme:       views.DemoDarkTheme,
 		// Keyboard shortcuts for the main window (see views.Bindings).
 		Bindings: views.Bindings(),
 	})

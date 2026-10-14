@@ -2525,18 +2525,27 @@ tray.Remove()            // Show adds the icon again
 
 #### Hide to the tray
 
-`Window.CloseToTray` hides the window when the user closes it, and the app keeps
-running with its tray icon. The window's taskbar button goes with it. OnClose is not
-asked for that close. The window handle's `Close` still closes the window and asks
-`OnClose`, so a tray menu's Quit item closes the windows with `win.Close()`.
+`Window.CloseToTray` is a signal the app owns. While it holds true, the window hides
+when the user closes it, and the app keeps running with its tray icon. The window's
+taskbar button goes with it. Because the app owns the signal, it can offer the choice
+as a setting: bind a `Switch` to it, and the next close follows it. The window hides
+only while one of the app's tray icons is shown; without one the user could not bring
+it back, so it closes as usual. OnClose is not asked for a close that hides. The
+window handle's `Close` still closes the window and asks `OnClose`, so a tray menu's
+Quit item closes the windows with `win.Close()`.
 
 ```go
+closeToTray := ui.NewSignal(settings.CloseToTray) // saved with the app's settings
+
 app.New().Run(app.Window{
     Title:       "Notes",
-    CloseToTray: true,
+    CloseToTray: closeToTray,
     OnClose:     func() bool { return confirmUnsaved() },
     Root:        root,
 })
+
+// In the settings page:
+ui.Switch("Close to the notification area", closeToTray)
 ```
 
 `Show` restores a hidden or minimized window and brings it to the front, which is

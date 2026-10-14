@@ -113,14 +113,16 @@ type Window struct {
 	// too, each without being asked again. By default the app quits when the last
 	// window closes.
 	QuitWhenClosed bool
-	// CloseToTray hides the window when the user closes it, instead of closing it,
-	// and the app keeps running. The window's taskbar button goes with it. Show
-	// (ui.Window's Show) brings the window back, which a tray icon's OnClick does
-	// for a window the user hid. OnClose is not asked while the window hides, and
-	// the window handle's Close still closes the window, asking OnClose as usual.
-	// Without a tray icon that can show the window, the user has no way to show it
-	// again, so keep one.
-	CloseToTray bool
+	// CloseToTray, while it holds true, hides the window when the user closes it,
+	// instead of closing it, and the app keeps running. The window's taskbar button
+	// goes with it. Show (ui.Window's Show) brings the window back, which a tray
+	// icon's OnClick does for a window the user hid. The app owns the signal, so it
+	// can offer the choice as a setting: a Switch bound to the signal takes effect at
+	// the next close. The window hides only while one of the app's tray icons is
+	// shown, since without one the user could not show it again; otherwise it closes
+	// as usual. OnClose is not asked while the window hides, and the window handle's
+	// Close still closes the window, asking OnClose as usual. Nil is false.
+	CloseToTray *ui.Signal[bool]
 }
 
 // Chrome selects who draws a window's title bar.
@@ -659,7 +661,7 @@ func (h *host) OnClose(w platform.Window) bool {
 	}
 	// A CloseToTray window hides for a close the user asks for; the app's own
 	// Close, and the quit of the app, still close it.
-	if h.cfg.CloseToTray && !asked {
+	if closeHides(h.cfg.CloseToTray, shownTrays, asked) {
 		w.Hide()
 		return false
 	}

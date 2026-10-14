@@ -106,3 +106,26 @@ func TestCheckBadge(t *testing.T) {
 		t.Errorf("clearing a badge: %v", err)
 	}
 }
+
+// A close the user asks for hides the window only while CloseToTray holds true and a tray
+// icon is shown; the app's own close always closes.
+func TestCloseHides(t *testing.T) {
+	on, off := ui.NewSignal(true), ui.NewSignal(false)
+	for _, tc := range []struct {
+		name   string
+		sig    *ui.Signal[bool]
+		shown  int
+		asked  bool
+		hidden bool
+	}{
+		{"on, icon shown", on, 1, false, true},
+		{"on, no icon", on, 0, false, false},
+		{"off", off, 1, false, false},
+		{"nil", nil, 1, false, false},
+		{"the app's own close", on, 1, true, false},
+	} {
+		if got := closeHides(tc.sig, tc.shown, tc.asked); got != tc.hidden {
+			t.Errorf("%s: closeHides = %v, want %v", tc.name, got, tc.hidden)
+		}
+	}
+}

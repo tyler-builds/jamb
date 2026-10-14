@@ -67,7 +67,10 @@ type Store struct {
 	// shell.go. tray is the icon, made when TrayIcon is first set.
 	TrayIcon *ui.Signal[bool]
 	Badge    *ui.Signal[bool]
-	tray     *app.Tray
+	// CloseToTray hides the main window to the notification area when it is closed,
+	// while the tray icon is shown (see app.Window.CloseToTray).
+	CloseToTray *ui.Signal[bool]
+	tray        *app.Tray
 	// DropMark is where a dragged project would land: the card it is over and
 	// whether after it. The zero value shows no insertion line.
 	DropMark *ui.Signal[dropMark]
@@ -146,6 +149,7 @@ func NewStore() *Store {
 		Notify:       ui.NewSignal(true),
 		Compact:      ui.NewSignal(false),
 		TrayIcon:     ui.NewSignal(false),
+		CloseToTray:  ui.NewSignal(true),
 		Badge:        ui.NewSignal(false),
 		DropMark:     ui.NewSignal(dropMark{}),
 		EventQuery:   ui.NewSignal(""),

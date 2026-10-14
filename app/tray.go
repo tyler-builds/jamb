@@ -6,6 +6,8 @@ import (
 	"image"
 	"os"
 	"sync/atomic"
+
+	"github.com/tyler-builds/jamb/ui"
 )
 
 // TrayOptions describes a notification area icon; see NewTray.
@@ -82,6 +84,17 @@ type trayIcon interface {
 	Remove()
 }
 
+// shownTrays is the number of the app's tray icons that are shown. It is read and
+// written on the UI thread only.
+var shownTrays int
+
+// closeHides reports whether a close the user asks for hides the window instead:
+// CloseToTray holds true, a tray icon is shown to bring the window back, and the
+// close is not the app's own (asked).
+func closeHides(closeToTray *ui.Signal[bool], shown int, asked bool) bool {
+	return !asked && closeToTray != nil && closeToTray.Peek() && shown > 0
+}
+
 // trayCount numbers the trays: the number is the icon's ID, which is unique in
 // the process. The shell reads IDs as 16-bit values, so the 65535th is the last.
 var trayCount atomic.Uint32
@@ -109,6 +122,7 @@ func (t *Tray) Show() {
 			return
 		}
 		t.native = n
+		shownTrays++
 	})
 }
 
@@ -142,6 +156,7 @@ func (t *Tray) Remove() {
 		if t.native != nil {
 			t.native.Remove()
 			t.native = nil
+			shownTrays--
 		}
 	})
 }
