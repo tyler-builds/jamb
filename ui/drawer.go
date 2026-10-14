@@ -92,15 +92,10 @@ func drawerDefaults(t *Theme, side DrawerSide) DrawerStyle {
 // resolveDrawer returns the look of a drawer: the defaults, merged with the
 // theme's Drawer and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveDrawer(t *Theme, side DrawerSide, inst DrawerStyle) DrawerStyle {
-	st := drawerDefaults(t, side)
-	for _, o := range []DrawerStyle{t.Drawer, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveDrawer(ctx *Context, side DrawerSide, inst DrawerStyle) DrawerStyle {
+	t := ctx.Theme()
+	return layered(ctx, drawerDefaults(t, side), DrawerStyle.merge, DrawerStyle.plain,
+		themeLayer(t.Drawer), instanceLayer(inst))
 }
 
 // Edge placements put a drawer's panel against a side of its anchor, the

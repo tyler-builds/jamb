@@ -231,15 +231,10 @@ func formDefaults(t *Theme) FormStyle {
 // resolveForm returns the look of a form's summary: the defaults, merged with the
 // theme's Form and then the instance's Styles. Under high contrast the two overrides
 // are plain (see plainStyle).
-func resolveForm(t *Theme, inst FormStyle) FormStyle {
-	st := formDefaults(t)
-	for _, o := range []FormStyle{t.Form, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveForm(ctx *Context, inst FormStyle) FormStyle {
+	t := ctx.Theme()
+	return layered(ctx, formDefaults(t), FormStyle.merge, FormStyle.plain,
+		themeLayer(t.Form), instanceLayer(inst))
 }
 
 // FormSummaryElement is the error summary of a form. It is empty until the form is
@@ -273,7 +268,7 @@ func (s *FormSummaryElement) expand(ctx *Context) Element {
 			return nil
 		}
 		t := ctx.Theme()
-		st := resolveForm(t, s.styles)
+		st := resolveForm(ctx, s.styles)
 		key := fmt.Sprintf("form-%d/summary-title", f.id)
 		var items []Element
 		count := 0

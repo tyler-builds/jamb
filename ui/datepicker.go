@@ -133,15 +133,10 @@ func datePickerDefaults(t *Theme, scale float32, disabled bool) DatePickerStyle 
 // theme's DatePicker and then the instance's Styles. The text frame is kept as the
 // overrides give it; the element resolves it over the theme's Field (see resolveField).
 // Under high contrast the overrides are plain (see plainStyle).
-func resolveDatePicker(t *Theme, scale float32, disabled bool, inst DatePickerStyle) DatePickerStyle {
-	st := datePickerDefaults(t, scale, disabled)
-	for _, o := range []DatePickerStyle{t.DatePicker, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveDatePicker(ctx *Context, scale float32, disabled bool, inst DatePickerStyle) DatePickerStyle {
+	t := ctx.Theme()
+	return layered(ctx, datePickerDefaults(t, scale, disabled), DatePickerStyle.merge, DatePickerStyle.plain,
+		themeLayer(t.DatePicker), instanceLayer(inst))
 }
 
 // DatePickerElement is a text field for a day, with a calendar that opens below it. The
@@ -334,7 +329,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
-		st := resolveDatePicker(t, scale, d.disabled, d.styles)
+		st := resolveDatePicker(ctx, scale, d.disabled, d.styles)
 		v := d.value.Get()
 		// The field keeps its own text while the user types. draft is that text, and seen is
 		// the value it was last made from, so that a value set from outside replaces the text.
@@ -509,7 +504,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		}
 		a.invalid, a.required = isInvalid || w.invalid, w.required
 
-		fst := resolveField(t, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, st.Field)
+		fst := resolveField(ctx, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, st.Field)
 		if d.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)

@@ -77,6 +77,7 @@ func textScale(ctx *Context) float32 { return float32(ctx.TextScale()) / 100 }
 // apply writes the sizes over d's style and returns d, for the end of an expand.
 func (z *sizing) apply(d *DivElement) *DivElement {
 	z.applyTo(&d.style)
+	d.style.recordSizing(z.set)
 	d.sized |= z.set
 	return d
 }

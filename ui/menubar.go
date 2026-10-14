@@ -65,15 +65,10 @@ func menuBarDefaults(t *Theme) MenuBarStyle {
 // resolveMenuBar returns the look of a menu bar: the defaults, merged with the
 // theme's MenuBar and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveMenuBar(t *Theme, inst MenuBarStyle) MenuBarStyle {
-	st := menuBarDefaults(t)
-	for _, o := range []MenuBarStyle{t.MenuBar, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveMenuBar(ctx *Context, inst MenuBarStyle) MenuBarStyle {
+	t := ctx.Theme()
+	return layered(ctx, menuBarDefaults(t), MenuBarStyle.merge, MenuBarStyle.plain,
+		themeLayer(t.MenuBar), instanceLayer(inst))
 }
 
 // MenuBarElement is a row of top-level menus. See MenuBar.
@@ -103,7 +98,7 @@ func (mb *MenuBarElement) expand(ctx *Context) Element {
 	menus, styles := mb.menus, mb.styles
 	return Component(func(ctx *Context) Element {
 		rt, t := ctx.rt, ctx.Theme()
-		st := resolveMenuBar(t, styles)
+		st := resolveMenuBar(ctx, styles)
 		open := Local(ctx, "open", -1) // index of the open menu, or -1
 		hl := Local(ctx, "hl", 0)      // the label that has keyboard focus
 		items := Local(ctx, "items", []MenuItem(nil))
@@ -180,7 +175,7 @@ func (mb *MenuBarElement) expand(ctx *Context) Element {
 		var panel *menuView
 		if cur >= 0 {
 			panel = &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: hide,
-				label: menus[cur].Label, st: resolveMenu(t, MenuStyle{}),
+				label: menus[cur].Label, st: resolveMenu(ctx, MenuStyle{}),
 				move: func(dir int) {
 					if at := open.Peek(); at >= 0 {
 						show((at+dir+len(menus))%len(menus), true)

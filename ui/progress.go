@@ -75,15 +75,10 @@ func progressBarDefaults(t *Theme, color Color) ProgressBarStyle {
 // resolveProgressBar returns the look of a progress bar: the defaults, merged with
 // the theme's ProgressBar and then the instance's Styles. Under high contrast the
 // two overrides are plain (see plainStyle).
-func resolveProgressBar(t *Theme, color Color, inst ProgressBarStyle) ProgressBarStyle {
-	st := progressBarDefaults(t, color)
-	for _, o := range []ProgressBarStyle{t.ProgressBar, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveProgressBar(ctx *Context, color Color, inst ProgressBarStyle) ProgressBarStyle {
+	t := ctx.Theme()
+	return layered(ctx, progressBarDefaults(t, color), ProgressBarStyle.merge, ProgressBarStyle.plain,
+		themeLayer(t.ProgressBar), instanceLayer(inst))
 }
 
 // ProgressRingStyle is the look of a progress ring. A part's style merges over
@@ -110,15 +105,10 @@ func (s ProgressRingStyle) plain() ProgressRingStyle {
 // resolveProgressRing returns the look of a progress ring: the theme's
 // ProgressRing, then the instance's Styles, over the built-in ring, which takes
 // no colors of its own. Under high contrast the two overrides are plain.
-func resolveProgressRing(t *Theme, inst ProgressRingStyle) ProgressRingStyle {
-	st := ProgressRingStyle{Ring: Style{NoShrink: true}}
-	for _, o := range []ProgressRingStyle{t.ProgressRing, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveProgressRing(ctx *Context, inst ProgressRingStyle) ProgressRingStyle {
+	t := ctx.Theme()
+	return layered(ctx, ProgressRingStyle{Ring: Style{NoShrink: true}}, ProgressRingStyle.merge, ProgressRingStyle.plain,
+		themeLayer(t.ProgressRing), instanceLayer(inst))
 }
 
 // ProgressBarElement shows how far an operation has got, as a bar. A
@@ -226,8 +216,7 @@ func (p *ProgressBarElement) readout() string {
 }
 
 func (p *ProgressBarElement) expand(ctx *Context) Element {
-	t := ctx.Theme()
-	st := resolveProgressBar(t, p.color, p.styles)
+	st := resolveProgressBar(ctx, p.color, p.styles)
 	strs := ctx.Strings()
 	// The track is drawn as a thin bar. Under high contrast it is an outlined
 	// empty box and the fill is solid Highlight, so the empty part does not read
@@ -325,7 +314,7 @@ const ringDots = 8
 
 func (r *ProgressRingElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
-	st := resolveProgressRing(t, r.styles)
+	st := resolveProgressRing(ctx, r.styles)
 	strs := ctx.Strings()
 	name := r.name
 	if name == "" {

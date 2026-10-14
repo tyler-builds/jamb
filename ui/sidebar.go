@@ -118,15 +118,10 @@ func sidebarDefaults(t *Theme) SidebarStyle {
 // resolveSidebar returns the look of a sidebar: the defaults, merged with the
 // theme's SidebarNav and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveSidebar(t *Theme, inst SidebarStyle) SidebarStyle {
-	st := sidebarDefaults(t)
-	for _, o := range []SidebarStyle{t.SidebarNav, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveSidebar(ctx *Context, inst SidebarStyle) SidebarStyle {
+	t := ctx.Theme()
+	return layered(ctx, sidebarDefaults(t), SidebarStyle.merge, SidebarStyle.plain,
+		themeLayer(t.SidebarNav), instanceLayer(inst))
 }
 
 // SidebarElement is a vertical navigation pane, as the left pane of WinUI's
@@ -233,7 +228,7 @@ func (s *SidebarElement) scope() string {
 func (s *SidebarElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
-		st := resolveSidebar(t, s.styles)
+		st := resolveSidebar(ctx, s.styles)
 		cur := s.selected.Get()
 		collapsed := s.collapsed != nil && s.collapsed.Get()
 		strs := ctx.Strings()

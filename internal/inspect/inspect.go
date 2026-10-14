@@ -14,15 +14,17 @@ type Box struct{ X, Y, W, H float32 }
 // left.
 type Edges struct{ Top, Right, Bottom, Left float32 }
 
-// The sources of a style value, as the inspector names them. A field that a
-// state changes says which state, such as "state: hover".
+// The sources of a style value, as the inspector names them. A value that a
+// state sets says which state, and which layer of the widget it came from, such
+// as "state: hover (theme)".
 const (
-	SourceElement = "element method" // set on an element that is not a widget part
-	SourceWidget  = "widget part"    // set on a widget part: defaults, theme and Styles merged by the widget
-	SourceTheme   = "theme part"     // a widget part whose value equals the theme's value for that part
-	SourceSizing  = "sizing method"  // set by a sizing method of the widget, such as Width
-	SourceEdit    = "live edit"      // set by the inspector, and dropped when the element is rebuilt
-	SourceState   = "state: "        // followed by the state: hover, pressed, focus, focus visible, focus within, drag, drop target
+	SourceDefault  = "built-in default" // a widget's own default for a part
+	SourceTheme    = "theme"            // the theme's style for the part, such as Theme.Checkbox.Box
+	SourceInstance = "instance Styles"  // the Styles of the element, such as Checkbox.Styles
+	SourceElement  = "element method"   // set by a method of the element, after its layers
+	SourceSizing   = "sizing method"    // set by a sizing method of the widget, such as Width
+	SourceEdit     = "live edit"        // set by the inspector, and dropped when the element is rebuilt
+	SourceState    = "state: "          // followed by the state: hover, pressed, focus, focus visible, focus within, drag, drop target
 )
 
 // Element is one element of an inspected window.
@@ -56,11 +58,23 @@ type Element struct {
 }
 
 // Field is one value of a resolved style: its name, its value as text, and the
-// source the value came from (one of the Source constants).
+// source the value came from (one of the Source constants). Layers lists every
+// value the field was set to, lowest first; the last one is the winning value.
 type Field struct {
 	Name   string
 	Value  string
 	Source string
+	Layers []Layer
+}
+
+// Layer is one value that a field was set to: the source of the value, the value
+// as text, whether it is the same value as the layer below it, and whether a
+// layer above it replaces it.
+type Layer struct {
+	Source     string
+	Value      string
+	Same       bool
+	Overridden bool
 }
 
 // Access is the accessibility node of an element: its role and name, its states
@@ -89,7 +103,7 @@ type Target interface {
 	// Element returns one element; false when it no longer exists.
 	Element(id uint64) (Element, bool)
 	// Fields returns the set fields of the element's resolved style, in
-	// declaration order, with their sources.
+	// declaration order, each with its source and the layers that set it.
 	Fields(id uint64) []Field
 	// Access returns the accessibility node of the element.
 	Access(id uint64) Access

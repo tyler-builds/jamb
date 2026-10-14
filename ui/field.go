@@ -92,15 +92,10 @@ func formFieldDefaults(t *Theme) FormFieldStyle {
 // resolveFormField returns the look of a field: the defaults, merged with the
 // theme's FormField and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveFormField(t *Theme, inst FormFieldStyle) FormFieldStyle {
-	st := formFieldDefaults(t)
-	for _, o := range []FormFieldStyle{t.FormField, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveFormField(ctx *Context, inst FormFieldStyle) FormFieldStyle {
+	t := ctx.Theme()
+	return layered(ctx, formFieldDefaults(t), FormFieldStyle.merge, FormFieldStyle.plain,
+		themeLayer(t.FormField), instanceLayer(inst))
 }
 
 // fieldWire is what a Field gives the control it wraps. The control applies it in
@@ -224,7 +219,7 @@ func (f *FieldElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		s := ctx.Strings()
-		st := resolveFormField(t, f.styles)
+		st := resolveFormField(ctx, f.styles)
 		fc, _ := f.control.(formControl)
 		// base prefixes the keys of the label, the help text and the error. A field in
 		// a form is keyed by its form key; a field on its own gets a number of its own.

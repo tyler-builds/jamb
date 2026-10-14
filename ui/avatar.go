@@ -86,15 +86,10 @@ func avatarDefaults(t *Theme, name string, size float32) AvatarStyle {
 // resolveAvatar returns the look of an avatar: the defaults, merged with the
 // theme's Avatar and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveAvatar(t *Theme, name string, size float32, inst AvatarStyle) AvatarStyle {
-	st := avatarDefaults(t, name, size)
-	for _, o := range []AvatarStyle{t.Avatar, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveAvatar(ctx *Context, name string, size float32, inst AvatarStyle) AvatarStyle {
+	t := ctx.Theme()
+	return layered(ctx, avatarDefaults(t, name, size), AvatarStyle.merge, AvatarStyle.plain,
+		themeLayer(t.Avatar), instanceLayer(inst))
 }
 
 // AvatarElement is a circle that stands for a person: the initials of the name in
@@ -141,8 +136,7 @@ func (a *AvatarElement) Styles(st AvatarStyle) *AvatarElement {
 }
 
 func (a *AvatarElement) expand(ctx *Context) Element {
-	t := ctx.Theme()
-	st := resolveAvatar(t, a.name, a.size, a.styles)
+	st := resolveAvatar(ctx, a.name, a.size, a.styles)
 	// The diameter is set after the style, since the circle is always round.
 	d := a.size * textScale(ctx)
 	av := Div().asPart("Avatar.Avatar").Style(st.Avatar).Size(Px(d), Px(d)).Radius(d / 2)

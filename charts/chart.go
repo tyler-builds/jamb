@@ -296,16 +296,19 @@ func chartDefaults(t *ui.Theme) Style {
 
 // resolveStyle returns the look of the parts in the theme t: the defaults, merged with
 // the chart's Styles. Under high contrast the colors are the system colors (see plain).
-func (c *Chart) resolveStyle(t *ui.Theme) Style {
-	st := chartDefaults(t).merge(c.styles)
+func (c *Chart) resolveStyle(ctx *ui.Context) Style {
+	t := ctx.Theme()
+	st := ui.Layer(ctx, chartDefaults(t), "built-in default").merge(ui.Layer(ctx, c.styles, "instance Styles"))
 	if t.HighContrast {
 		st = Style{Chart: plain(st.Chart), Title: plain(st.Title), Axis: plain(st.Axis), Grid: plain(st.Grid),
 			Legend: plain(st.Legend), LegendItem: plain(st.LegendItem), Tooltip: plain(st.Tooltip)}
+		// The grid's border is set field by field, as it was before the inspector: its
+		// records show it as an element method.
 		st.Grid.BorderColor, st.Grid.BorderWidth = t.Text, 1
-		st.Axis.TextColor = t.Text
-		st.LegendItem.TextColor = t.Text
-		st.Tooltip.TextColor = t.Text
-		st.Title.TextColor = t.Text
+		st.Axis = st.Axis.Merge(ui.Layer(ctx, ui.Style{TextColor: t.Text}, "high contrast"))
+		st.LegendItem = st.LegendItem.Merge(ui.Layer(ctx, ui.Style{TextColor: t.Text}, "high contrast"))
+		st.Tooltip = st.Tooltip.Merge(ui.Layer(ctx, ui.Style{TextColor: t.Text}, "high contrast"))
+		st.Title = st.Title.Merge(ui.Layer(ctx, ui.Style{TextColor: t.Text}, "high contrast"))
 	}
 	return st
 }
@@ -388,7 +391,7 @@ func (c *Chart) render(ctx *ui.Context) ui.Element {
 	// The pointer, the keyboard position and the focus are read without
 	// subscribing: they change the hover layer only (see hoverLayer), so moving
 	// the pointer does not draw the chart again.
-	v := &view{c: c, t: t, st: c.resolveStyle(t), hidden: hidden.Get(), pointer: pointer.Peek(),
+	v := &view{c: c, t: t, st: c.resolveStyle(ctx), hidden: hidden.Get(), pointer: pointer.Peek(),
 		cursor: cursor.Peek(), focused: focused.Peek(), geo: geo}
 	build := func(progress float32) ui.Element {
 		v.progress = progress

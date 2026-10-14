@@ -95,15 +95,10 @@ func badgeDefaults(t *Theme, v BadgeVariant, dot bool) BadgeStyle {
 // resolveBadge returns the look of a badge of variant v: the defaults, merged
 // with the theme's Badge, the theme's Badges for the variant, and the instance's
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveBadge(t *Theme, v BadgeVariant, dot bool, inst BadgeStyle) BadgeStyle {
-	st := badgeDefaults(t, v, dot)
-	for _, o := range []BadgeStyle{t.Badge, t.Badges.of(v), inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveBadge(ctx *Context, v BadgeVariant, dot bool, inst BadgeStyle) BadgeStyle {
+	t := ctx.Theme()
+	return layered(ctx, badgeDefaults(t, v, dot), BadgeStyle.merge, BadgeStyle.plain,
+		themeLayer(t.Badge), themeLayer(t.Badges.of(v)), instanceLayer(inst))
 }
 
 // BadgeElement is a small label: a count, a word such as "New", or a dot. A
@@ -217,15 +212,14 @@ func (b *BadgeElement) expand(ctx *Context) Element {
 	if b.hidden() {
 		return nil
 	}
-	t := ctx.Theme()
 	strs := ctx.Strings()
 	if b.kind == badgeDot {
-		st := resolveBadge(t, b.variant, true, b.styles)
+		st := resolveBadge(ctx, b.variant, true, b.styles)
 		d := Div().asPart("Badge.Dot").Style(st.Dot)
 		b.decorate(strs, d)
 		return b.size.apply(d)
 	}
-	st := resolveBadge(t, b.variant, false, b.styles)
+	st := resolveBadge(ctx, b.variant, false, b.styles)
 	pill := Div().asPart("Badge.Badge")
 	if b.leadDot {
 		pill.Style(Style{Gap: 4})

@@ -112,15 +112,10 @@ func toastDefaults(t *Theme, v ToastVariant) ToastStyle {
 // resolveToast returns the look of a toast of variant v: the defaults, merged
 // with the theme's Toast, the theme's Toasts for the variant, and the toast's own
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveToast(t *Theme, v ToastVariant, inst ToastStyle) ToastStyle {
-	st := toastDefaults(t, v)
-	for _, o := range []ToastStyle{t.Toast, t.Toasts.of(v), inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveToast(ctx *Context, v ToastVariant, inst ToastStyle) ToastStyle {
+	t := ctx.Theme()
+	return layered(ctx, toastDefaults(t, v), ToastStyle.merge, ToastStyle.plain,
+		themeLayer(t.Toast), themeLayer(t.Toasts.of(v)), instanceLayer(inst))
 }
 
 // ToastPlacement is where a Toaster shows its stack of toasts.
@@ -434,15 +429,15 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 		region.Right(16).Bottom(16).Align(End)
 	}
 	for _, e := range rt.toasts {
-		region.Child(rt.toastView(strs, t, e))
+		region.Child(rt.toastView(ctx, strs, t, e))
 	}
 	return region
 }
 
 // toastView is one toast in the stack: an icon, the text, an optional action
 // and a close button. It is a group named by its text.
-func (rt *Runtime) toastView(strs *Strings, t *Theme, e *toastEntry) *DivElement {
-	st := resolveToast(t, e.variant, e.styles)
+func (rt *Runtime) toastView(ctx *Context, strs *Strings, t *Theme, e *toastEntry) *DivElement {
+	st := resolveToast(ctx, e.variant, e.styles)
 	ic, _ := toastIcon(t, e.variant)
 	box := Div().asPart("Toast.Container").Key(toastKey(e.id)).Style(st.Container).
 		Enter(Fade().Slide(0, 8), Animation{Duration: 160 * time.Millisecond}).

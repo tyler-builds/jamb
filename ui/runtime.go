@@ -1433,27 +1433,27 @@ func (rt *Runtime) resolveStyle(n *node) Style {
 	e := n.div
 	s := e.style
 	if e.hover != nil && rt.isHovered(n.id) {
-		s = s.Merge(*e.hover)
+		s = s.Merge(rt.inState(*e.hover, "hover"))
 	}
 	if e.pressed != nil && rt.isPressed(n.id) {
-		s = s.Merge(*e.pressed)
+		s = s.Merge(rt.inState(*e.pressed, "pressed"))
 	}
 	if e.focused != nil && rt.focusID == n.id {
-		s = s.Merge(*e.focused)
+		s = s.Merge(rt.inState(*e.focused, "focus"))
 	}
 	if e.focusVisible != nil && rt.focusID == n.id && rt.keyboardModality {
-		s = s.Merge(*e.focusVisible)
+		s = s.Merge(rt.inState(*e.focusVisible, "focus visible"))
 	}
 	if e.focusWithin != nil && rt.focusInside(n.id) {
-		s = s.Merge(*e.focusWithin)
+		s = s.Merge(rt.inState(*e.focusWithin, "focus within"))
 	}
 	if rt.drag.active {
 		if e.dragging != nil && rt.drag.source == n.id {
-			s = s.Merge(*e.dragging)
+			s = s.Merge(rt.inState(*e.dragging, "drag"))
 		}
 		if rt.drag.targetSpec != nil && rt.drag.target == n.id {
 			if over := rt.drag.targetSpec.overStyle(); over != nil {
-				s = s.Merge(*over)
+				s = s.Merge(rt.inState(*over, "drop target"))
 			}
 		}
 	}

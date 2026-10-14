@@ -149,15 +149,10 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 // resolveNumberInput returns the look of a number input: the defaults, merged
 // with the theme's Field, then the theme's NumberInput, then the instance's
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveNumberInput(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool, size controlSize, inst NumberInputStyle) NumberInputStyle {
-	st := numberInputDefaults(t, placement, scale, disabled, spin, size)
-	for _, o := range []NumberInputStyle{{FieldStyle: t.Field}, t.NumberInput, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveNumberInput(ctx *Context, placement SpinPlacement, scale float32, disabled, spin bool, size controlSize, inst NumberInputStyle) NumberInputStyle {
+	t := ctx.Theme()
+	return layered(ctx, numberInputDefaults(t, placement, scale, disabled, spin, size), NumberInputStyle.merge, NumberInputStyle.plain,
+		themeLayer(NumberInputStyle{FieldStyle: t.Field}), themeLayer(t.NumberInput), instanceLayer(inst))
 }
 
 // NumberInputElement is a text field for a number, bound to an int or float64
@@ -330,7 +325,7 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 		t := ctx.Theme()
 		s := ctx.Strings()
 		scale := float32(ctx.TextScale()) / 100
-		st := resolveNumberInput(t, n.placement, scale, n.disabled, n.spin && !n.disabled, n.ctlSize, n.styles)
+		st := resolveNumberInput(ctx, n.placement, scale, n.disabled, n.spin && !n.disabled, n.ctlSize, n.styles)
 		v := n.value.Get()
 		// The field keeps its own text while the user types. draft is that text,
 		// and seen is the value it was last made from, so that a value set from

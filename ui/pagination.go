@@ -76,15 +76,10 @@ func paginationDisabled(t *Theme) Style {
 // resolvePagination returns the look of a pagination control: the defaults, merged
 // with the theme's Pagination and then the instance's Styles. Under high contrast
 // the two overrides are plain (see plainStyle).
-func resolvePagination(t *Theme, inst PaginationStyle) PaginationStyle {
-	st := paginationDefaults(t)
-	for _, o := range []PaginationStyle{t.Pagination, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolvePagination(ctx *Context, inst PaginationStyle) PaginationStyle {
+	t := ctx.Theme()
+	return layered(ctx, paginationDefaults(t), PaginationStyle.merge, PaginationStyle.plain,
+		themeLayer(t.Pagination), instanceLayer(inst))
 }
 
 // pageSlots returns the pages to show of a control over pages pages, in order, with
@@ -217,7 +212,7 @@ func (p *PaginationElement) choose(n int) {
 func (p *PaginationElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		th := ctx.Theme()
-		st := resolvePagination(th, p.styles)
+		st := resolvePagination(ctx, p.styles)
 		s := ctx.Strings()
 		pages := max(p.pages, 1)
 		cur := min(max(p.page.Get(), 1), pages)

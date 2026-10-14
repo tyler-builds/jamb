@@ -101,15 +101,10 @@ func radioGroupDefaults(t *Theme) RadioGroupStyle {
 // resolveRadioGroup returns the look of a radio group: the defaults, merged with
 // the theme's RadioGroup and then the instance's Styles. Under high contrast the
 // two overrides are plain (see plainStyle).
-func resolveRadioGroup(t *Theme, inst RadioGroupStyle) RadioGroupStyle {
-	st := radioGroupDefaults(t)
-	for _, o := range []RadioGroupStyle{t.RadioGroup, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveRadioGroup(ctx *Context, inst RadioGroupStyle) RadioGroupStyle {
+	t := ctx.Theme()
+	return layered(ctx, radioGroupDefaults(t), RadioGroupStyle.merge, RadioGroupStyle.plain,
+		themeLayer(t.RadioGroup), instanceLayer(inst))
 }
 
 // RadioGroupElement is a set of radio buttons, one per option, bound to a value.
@@ -220,13 +215,12 @@ func (r *RadioGroupElement[T]) Styles(st RadioGroupStyle) *RadioGroupElement[T] 
 
 func (r *RadioGroupElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
-		t := ctx.Theme()
 		cur := r.value.Get()
 		// One focus handle per option, kept across renders, so the arrow keys can
 		// move focus to the next option.
 		handles := Local(ctx, "handles", newHandles(len(r.options))).Peek()
 		stop := tabStop(r.options, cur, r.disabled)
-		st := resolveRadioGroup(t, r.styles)
+		st := resolveRadioGroup(ctx, r.styles)
 		// The tab stop is the option a Field gave its handle to, when there is one, and the
 		// arrow keys reach every option by the handle it has.
 		w := r.wire

@@ -104,15 +104,10 @@ func dockDefaults(th *Theme) DockStyle {
 // resolveDock returns the look of a dock: the defaults, merged with the theme's Dock and
 // then the instance's Styles. Under high contrast the two overrides are plain (see
 // plainStyle).
-func resolveDock(th *Theme, inst DockStyle) DockStyle {
-	st := dockDefaults(th)
-	for _, o := range []DockStyle{th.Dock, inst} {
-		if th.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveDock(ctx *Context, inst DockStyle) DockStyle {
+	th := ctx.Theme()
+	return layered(ctx, dockDefaults(th), DockStyle.merge, DockStyle.plain,
+		themeLayer(th.Dock), instanceLayer(inst))
 }
 
 // DockPanel is one panel of a Dock: its title, which names its tab and its tab panel for
@@ -552,7 +547,7 @@ func (d *DockElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		v := &dockView{
 			ctx: ctx, d: d, layout: d.layout, th: ctx.Theme(), strs: ctx.Strings(), scope: d.scope(), key: "main",
-			st:      resolveDock(ctx.Theme(), d.styles),
+			st:      resolveDock(ctx, d.styles),
 			handles: Local(ctx, "handles", map[string]*FocusHandle{}).Peek(),
 			hover:   Local(ctx, "hover", dockHover{}),
 			windows: Local(ctx, "windows", map[string]Window{}).Peek(),
@@ -968,7 +963,7 @@ func (d *DockElement) floatRoot(layout *Signal[DockLayout], id string) func(*Con
 	return func(ctx *Context) Element {
 		v := &dockView{
 			ctx: ctx, d: d, layout: layout, th: ctx.Theme(), strs: ctx.Strings(), scope: d.scope() + "/float:" + id,
-			key: "float:" + id, st: resolveDock(ctx.Theme(), d.styles), float: true,
+			key: "float:" + id, st: resolveDock(ctx, d.styles), float: true,
 			handles: Local(ctx, "handles", map[string]*FocusHandle{}).Peek(),
 			hover:   Local(ctx, "hover", dockHover{}),
 		}

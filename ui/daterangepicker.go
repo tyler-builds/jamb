@@ -108,15 +108,10 @@ func dateRangePickerDefaults(t *Theme, scale float32, disabled bool) DateRangePi
 // resolveDateRangePicker returns the look of a date range picker: the defaults, merged with the
 // theme's DateRangePicker and then the instance's Styles. Under high contrast the overrides are
 // plain (see plainStyle).
-func resolveDateRangePicker(t *Theme, scale float32, disabled bool, inst DateRangePickerStyle) DateRangePickerStyle {
-	st := dateRangePickerDefaults(t, scale, disabled)
-	for _, o := range []DateRangePickerStyle{t.DateRangePicker, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveDateRangePicker(ctx *Context, scale float32, disabled bool, inst DateRangePickerStyle) DateRangePickerStyle {
+	t := ctx.Theme()
+	return layered(ctx, dateRangePickerDefaults(t, scale, disabled), DateRangePickerStyle.merge, DateRangePickerStyle.plain,
+		themeLayer(t.DateRangePicker), instanceLayer(inst))
 }
 
 // DateRangePickerElement is a text field for a range of days, with a calendar that opens below it.
@@ -377,7 +372,7 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
-		rs := resolveDateRangePicker(t, scale, d.disabled, d.styles)
+		rs := resolveDateRangePicker(ctx, scale, d.disabled, d.styles)
 		st := rs.dates()
 		cur := dateRange{start: d.start.Get(), end: d.end.Get()}
 		// The field keeps its own text while the user types. draft is that text, and seen is the
@@ -590,7 +585,7 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 			from, to = orderedSpan(p, day)
 		}
 
-		fst := resolveField(t, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, st.Field)
+		fst := resolveField(ctx, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, st.Field)
 		if d.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)

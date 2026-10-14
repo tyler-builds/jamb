@@ -172,15 +172,10 @@ func buttonDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly bool) 
 // resolveButton returns the look of a button: the defaults of its variant,
 // merged with the theme's Button, the theme's Buttons for the variant, and then
 // the instance's Styles. Under high contrast the overrides are plain.
-func resolveButton(t *Theme, v ButtonVariant, size controlSize, iconOnly bool, inst ButtonStyle) ButtonStyle {
-	st := buttonDefaults(t, v, size, iconOnly)
-	for _, o := range []ButtonStyle{t.Button, t.Buttons.of(v), inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveButton(ctx *Context, v ButtonVariant, size controlSize, iconOnly bool, inst ButtonStyle) ButtonStyle {
+	t := ctx.Theme()
+	return layered(ctx, buttonDefaults(t, v, size, iconOnly), ButtonStyle.merge, ButtonStyle.plain,
+		themeLayer(t.Button), themeLayer(t.Buttons.of(v)), instanceLayer(inst))
 }
 
 // ButtonElement is a themed, clickable button.
@@ -290,7 +285,7 @@ func (b *ButtonElement) Styles(st ButtonStyle) *ButtonElement {
 func (b *ButtonElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	iconSize := buttonIconSize(b.ctlSize)
-	st := resolveButton(t, b.variant, b.ctlSize, b.label == "", b.styles)
+	st := resolveButton(ctx, b.variant, b.ctlSize, b.label == "", b.styles)
 	d := Div().asPart("Button.Root").Style(st.Root)
 	if b.disabled {
 		d.Style(st.RootDisabled).Cursor(CursorNotAllowed)
@@ -476,15 +471,10 @@ func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
 // resolveField returns the look of a text frame with layout lay: the defaults,
 // merged with the theme's Field and then the instance's Styles. Under high
 // contrast the two overrides are plain (see plainStyle).
-func resolveField(t *Theme, lay fieldLayout, inst FieldStyle) FieldStyle {
-	st := fieldDefaults(t, lay)
-	for _, o := range []FieldStyle{t.Field, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveField(ctx *Context, lay fieldLayout, inst FieldStyle) FieldStyle {
+	t := ctx.Theme()
+	return layered(ctx, fieldDefaults(t, lay), FieldStyle.merge, FieldStyle.plain,
+		themeLayer(t.Field), instanceLayer(inst))
 }
 
 // fieldOptions are shared by TextInput, TextArea and NumberInput.
@@ -666,7 +656,7 @@ func (ti *TextInputElement) Validate(rules ...Validator[string]) *TextInputEleme
 
 func (ti *TextInputElement) expand(ctx *Context) Element {
 	lay := fieldLayout{size: ti.ctlSize, disabled: ti.disabled, width: Px(textFieldWidth * textScale(ctx))}
-	st := resolveField(ctx.Theme(), lay, ti.styles)
+	st := resolveField(ctx, lay, ti.styles)
 	return ti.fieldOptions.expand(ctx, st, false, 0)
 }
 
@@ -782,7 +772,7 @@ func (ta *TextAreaElement) Validate(rules ...Validator[string]) *TextAreaElement
 
 func (ta *TextAreaElement) expand(ctx *Context) Element {
 	lay := fieldLayout{multiline: true, disabled: ta.disabled, width: Px(textFieldWidth * textScale(ctx))}
-	st := resolveField(ctx.Theme(), lay, ta.styles)
+	st := resolveField(ctx, lay, ta.styles)
 	return ta.fieldOptions.expand(ctx, st, true, ta.minRows)
 }
 

@@ -113,15 +113,10 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 // resolveTabs returns the look of a tab list: the defaults of v, merged with
 // the theme's Tabs and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveTabs(th *Theme, v TabsVariant, inst TabsStyle) TabsStyle {
-	st := tabsDefaults(th, v)
-	for _, o := range []TabsStyle{th.Tabs, inst} {
-		if th.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveTabs(ctx *Context, v TabsVariant, inst TabsStyle) TabsStyle {
+	th := ctx.Theme()
+	return layered(ctx, tabsDefaults(th, v), TabsStyle.merge, TabsStyle.plain,
+		themeLayer(th.Tabs), instanceLayer(inst))
 }
 
 // TabsElement is a tab list and the panel of the selected tab. The selected tab
@@ -249,7 +244,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 	panels := map[T]*ComponentElement{}
 	return Component(func(ctx *Context) Element {
 		th := ctx.Theme()
-		st := resolveTabs(th, t.variant, t.styles)
+		st := resolveTabs(ctx, t.variant, t.styles)
 		cur := t.selected.Get()
 		opts := make([]Option[T], len(t.tabs))
 		for i, tb := range t.tabs {

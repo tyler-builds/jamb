@@ -3003,14 +3003,38 @@ The inspector shows:
   content size and overflow.
 - **Accessibility**: the role, name, description, value, states and actions of
   the element's node, and the warnings that `JAMB_A11Y_WARN` reports for it.
-- **Style**: each set field of the resolved style, with its source:
-  - `element method`: set on an element that is not a widget part.
-  - `widget part`: set by a widget on one of its parts.
-  - `theme part`: a widget part whose value equals the theme's value for that part.
+- **Style**: each set field of the resolved style, with the layer its value came
+  from, and the values of the layers it overrides. The winning value comes first,
+  and each overridden value follows, marked `overridden`, from the highest layer
+  down:
+
+  ```
+  Radius = 9   (instance Styles)
+    overridden: Radius = 5   (theme)
+    overridden: Radius = 4   (built-in default)
+  ```
+
+  A layer that sets the same value as the layer below it is marked
+  `same value as the layer below`. The sources are:
+  - `built-in default`: the widget's own default for the part.
+  - `theme`: the theme's style for the part, such as `Theme.Checkbox.Box`. This is
+    the theme in effect, a predefined one or the high contrast theme.
+  - `instance Styles`: the `Styles` of the element.
+  - `element method`: set by a method of the element after its layers, such as
+    `Padding`, or by a value the element computes, such as the color of a swatch.
   - `sizing method`: set by a sizing method of the widget, such as `Width`.
-  - `state: hover`, `state: pressed` and the other states: set by the state the
-    element is in.
+  - `state: hover (theme)`, `state: pressed (instance Styles)` and the other
+    states: the style that the state applies, and the layer it came from. The
+    states of the element are `hover`, `pressed`, `focus`, `focus visible`,
+    `focus within`, `drag` and `drop target`; the states of a part that the widget
+    applies are `disabled`, `checked`, `mixed`, `selected`, `invalid`,
+    `highlighted`, `open` and `current`.
   - `live edit`: set by the inspector.
+  - `cleared by <layer>`: the layer cleared the field (see `Clear`).
+
+  A widget that builds a part's style from layers names each layer with
+  `ui.Layer` before it merges the layer, so the inspector can report it. The
+  built-in widgets do this.
 - **Live edits**: choose a style field, enter a value and click **Apply**. The
   value takes effect at once in the window. **Clear edits** drops them, and
   **Copy as Go** copies them to the clipboard as a `ui.Style` literal. An edit
@@ -3029,9 +3053,15 @@ The limits:
   Radius, Corners, Padding, Margin and Gap. Any other field refuses zero, which
   would leave the field as it was. A zero side in four edges keeps the value
   under it, as in `ui.Style.Merge`.
-- The inspector cannot tell a widget part's built-in default from the `Styles`
-  of its instance. Both are reported as `widget part`, and a value that matches
-  the theme is reported as `theme part`, which is a comparison of values.
+- The layers are recorded only while an inspector is attached, and elements built
+  before it attached are rendered again when it does. With no inspector, nothing
+  is recorded.
+- A value that an element method sets to the same value as the layer below it is
+  reported as that layer, because the inspector finds a method's value by
+  comparing it with the last layer's value. A method that sets a field to a
+  different value is reported as `element method`.
+- High contrast overrides that a chart or code editor sets field by field, rather
+  than as a layer, are reported as `element method`.
 - The window refreshes the inspector about four times a second while it draws.
   Each refresh rebuilds the accessibility tree for the selected element, so a
   very large window costs more while the inspector is open.

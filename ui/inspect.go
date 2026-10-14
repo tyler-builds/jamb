@@ -41,6 +41,9 @@ func (h *runtimeHost) Attach(changed func()) {
 	rt := h.rt()
 	if rt.insp == nil {
 		rt.insp = &inspectState{edits: map[uint64]Style{}}
+		// The elements built before the inspector was attached have no records of
+		// their layers (see Layer), so every component is rendered again.
+		rt.hostInvalidateAll()
 	}
 	rt.insp.changed = changed
 }
@@ -123,7 +126,10 @@ func (h *runtimeHost) Element(id uint64) (inspect.Element, bool) {
 }
 
 // Fields returns the set fields of the element's resolved style, in declaration
-// order, each with the source its value came from.
+// order. Each field has the layers that set it, lowest first (see Layers in
+// inspect.Field); the last one is the winning value. A layer that a higher layer
+// replaces is marked overridden, and a layer that sets the value of the layer
+// below it is marked same.
 func (h *runtimeHost) Fields(id uint64) []inspect.Field {
 	rt := h.rt()
 	n := rt.byID[id]
@@ -135,37 +141,31 @@ func (h *runtimeHost) Fields(id uint64) []inspect.Field {
 	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		if !f.IsExported() || v.Field(i).IsZero() {
+		chain := n.style.prov[f.Name]
+		if !f.IsExported() || v.Field(i).IsZero() && len(chain) == 0 {
 			continue
 		}
-		out = append(out, inspect.Field{Name: f.Name, Value: formatStyleValue(v.Field(i)), Source: rt.styleSource(n, f.Name)})
+		cur := formatStyleValue(v.Field(i))
+		layers := make([]inspect.Layer, 0, len(chain)+1)
+		for _, e := range chain {
+			layers = append(layers, inspect.Layer{Source: e.layer, Value: e.value})
+		}
+		if len(chain) == 0 || chain[len(chain)-1].value != cur {
+			// The value was set after its layers, by a method of the element. A
+			// sizing method is named for it when the records did not see it.
+			src := inspect.SourceElement
+			if bit, ok := sizingFields[f.Name]; ok && n.div != nil && n.div.sized&bit != 0 {
+				src = inspect.SourceSizing
+			}
+			layers = append(layers, inspect.Layer{Source: src, Value: cur})
+		}
+		for j := range layers {
+			layers[j].Overridden = j < len(layers)-1
+			layers[j].Same = j > 0 && layers[j].Value == layers[j-1].Value
+		}
+		out = append(out, inspect.Field{Name: f.Name, Value: cur, Source: layers[len(layers)-1].Source, Layers: layers})
 	}
 	return out
-}
-
-// styleSource returns where the value of the field name of n's style came from:
-// a live edit, a state the element is in, a sizing method, or the widget part
-// (or element method) that set it. The layers are the ones resolveStyle merges,
-// so the last layer that sets the field wins, as it does in the style.
-func (rt *Runtime) styleSource(n *node, name string) string {
-	if edit, ok := rt.liveEdit(n.id); ok && !reflect.ValueOf(edit).FieldByName(name).IsZero() {
-		return inspect.SourceEdit
-	}
-	if state := rt.stateSource(n, name); state != "" {
-		return inspect.SourceState + state
-	}
-	if n.div != nil {
-		if bit, ok := sizingFields[name]; ok && n.div.sized&bit != 0 {
-			return inspect.SourceSizing
-		}
-		if n.div.part != "" {
-			if rt.themePartHas(n.div.part, name, n.style) {
-				return inspect.SourceTheme
-			}
-			return inspect.SourceWidget
-		}
-	}
-	return inspect.SourceElement
 }
 
 // sizingFields are the fields that the sizing methods of a widget set, and the
@@ -173,80 +173,6 @@ func (rt *Runtime) styleSource(n *node, name string) string {
 var sizingFields = map[string]sizeSet{
 	"Width": hasWidth, "Height": hasHeight, "MinWidth": hasMinWidth, "MinHeight": hasMinHeight,
 	"MaxWidth": hasMaxWidth, "MaxHeight": hasMaxHeight, "Grow": hasGrow, "ColSpan": hasSpan, "RowSpan": hasSpan,
-}
-
-// stateSource returns the name of the last state of n that sets the field name,
-// in the order resolveStyle merges the states, or "" when no state sets it.
-func (rt *Runtime) stateSource(n *node, name string) string {
-	d := n.div
-	if d == nil {
-		return ""
-	}
-	type layer struct {
-		name  string
-		style *Style
-	}
-	var layers []layer
-	add := func(state string, s *Style) {
-		if s != nil {
-			layers = append(layers, layer{state, s})
-		}
-	}
-	if rt.isHovered(n.id) {
-		add("hover", d.hover)
-	}
-	if rt.isPressed(n.id) {
-		add("pressed", d.pressed)
-	}
-	if rt.focusID == n.id {
-		add("focus", d.focused)
-		if rt.keyboardModality {
-			add("focus visible", d.focusVisible)
-		}
-	}
-	if rt.focusInside(n.id) {
-		add("focus within", d.focusWithin)
-	}
-	if rt.drag.active {
-		if rt.drag.source == n.id {
-			add("drag", d.dragging)
-		}
-		if rt.drag.targetSpec != nil && rt.drag.target == n.id {
-			if over := rt.drag.targetSpec.overStyle(); over != nil {
-				layers = append(layers, layer{"drop target", over})
-			}
-		}
-	}
-	src := ""
-	for _, l := range layers {
-		if !reflect.ValueOf(*l.style).FieldByName(name).IsZero() {
-			src = l.name
-		}
-	}
-	return src
-}
-
-// themePartHas reports whether the field name of the style s equals the same
-// field of the theme's style for the widget part, such as "Checkbox.Box" (the
-// theme's Checkbox.Box). Only a value that the theme sets counts. A part with
-// no theme style of that name never matches.
-func (rt *Runtime) themePartHas(part, name string, s Style) bool {
-	widget, sub, ok := strings.Cut(part, ".")
-	if !ok || rt.theme == nil {
-		return false
-	}
-	w := reflect.ValueOf(rt.theme).Elem().FieldByName(widget)
-	if !w.IsValid() || w.Kind() != reflect.Struct {
-		return false
-	}
-	p := w.FieldByName(sub)
-	if !p.IsValid() || p.Type() != reflect.TypeOf(Style{}) {
-		return false
-	}
-	want := p.Interface().(Style)
-	got := reflect.ValueOf(s).FieldByName(name)
-	tv := reflect.ValueOf(want).FieldByName(name)
-	return !tv.IsZero() && reflect.DeepEqual(tv.Interface(), got.Interface())
 }
 
 // Access returns the accessibility node of the element, with the warnings that
@@ -338,7 +264,7 @@ func (h *runtimeHost) Edit(id uint64, field, value string) error {
 	if err := setEditField(&edit, field, value); err != nil {
 		return err
 	}
-	rt.insp.edits[id] = rt.insp.edits[id].Merge(edit)
+	rt.insp.edits[id] = rt.insp.edits[id].Merge(tagStyle(edit, inspect.SourceEdit))
 	rt.restyleNode(n)
 	return nil
 }

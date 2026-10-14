@@ -414,27 +414,27 @@ func TestMessagesLookAlikeInANumberInputAndAField(t *testing.T) {
 func TestFormPartsResolveInOrder(t *testing.T) {
 	th := DarkTheme().Clone()
 	th.FormField = FormFieldStyle{Label: Style{TextColor: Hex("#111111")}}
-	if got := resolveFormField(th, FormFieldStyle{}).Label.TextColor; got != Hex("#111111") {
+	if got := resolveFormField(layerCtx(th), FormFieldStyle{}).Label.TextColor; got != Hex("#111111") {
 		t.Fatalf("theme label color = %v, want the theme's", got)
 	}
-	if got := resolveFormField(th, FormFieldStyle{Label: Style{TextColor: Hex("#222222")}}).Label.TextColor; got != Hex("#222222") {
+	if got := resolveFormField(layerCtx(th), FormFieldStyle{Label: Style{TextColor: Hex("#222222")}}).Label.TextColor; got != Hex("#222222") {
 		t.Fatalf("instance label color = %v, want the instance's", got)
 	}
-	if got := resolveFormField(th, FormFieldStyle{Label: Style{Clear: ClearTextColor}}).Label.TextColor; !got.IsZero() {
+	if got := resolveFormField(layerCtx(th), FormFieldStyle{Label: Style{Clear: ClearTextColor}}).Label.TextColor; !got.IsZero() {
 		t.Fatalf("a cleared label color = %v, want none", got)
 	}
 }
 
 func TestFormPartsFollowHighContrast(t *testing.T) {
 	hc := HighContrastTheme(HighContrastBlack(), DarkTheme())
-	st := resolveFormField(hc, FormFieldStyle{Label: Style{TextColor: Hex("#222222")}})
+	st := resolveFormField(layerCtx(hc), FormFieldStyle{Label: Style{TextColor: Hex("#222222")}})
 	if st.Label.TextColor != hc.Text {
 		t.Fatalf("a label under high contrast is %v, want the system text color", st.Label.TextColor)
 	}
 	if got := messageIconColor(hc, Style{}); got != hc.Text {
 		t.Fatalf("the error icon under high contrast is %v, want the system text color", got)
 	}
-	if got := resolveForm(hc, FormStyle{Summary: Style{BorderColor: Hex("#333333")}}).Summary.BorderColor; got != hc.Text {
+	if got := resolveForm(layerCtx(hc), FormStyle{Summary: Style{BorderColor: Hex("#333333")}}).Summary.BorderColor; got != hc.Text {
 		t.Fatalf("the summary border under high contrast is %v, want the system text color", got)
 	}
 }

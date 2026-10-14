@@ -132,15 +132,10 @@ func colorPickerSizes(s controlSize, scale float32) ColorPickerStyle {
 // resolveColorPicker returns the look of a color picker: the defaults, merged with the
 // theme's ColorPicker and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveColorPicker(t *Theme, inst ColorPickerStyle) ColorPickerStyle {
-	st := colorPickerDefaults(t)
-	for _, o := range []ColorPickerStyle{t.ColorPicker, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveColorPicker(ctx *Context, inst ColorPickerStyle) ColorPickerStyle {
+	t := ctx.Theme()
+	return layered(ctx, colorPickerDefaults(t), ColorPickerStyle.merge, ColorPickerStyle.plain,
+		themeLayer(t.ColorPicker), instanceLayer(inst))
 }
 
 // ColorPickerElement is a button that shows a color and opens a panel to change it. The
@@ -352,8 +347,8 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 		rt, t := ctx.rt, ctx.Theme()
 		s := ctx.Strings()
 		scale := textScale(ctx)
-		st := colorPickerSizes(c.ctlSize, scale).merge(resolveColorPicker(t, c.styles))
-		sl := resolveSlider(t, false, st.Slider)
+		st := colorPickerSizes(c.ctlSize, scale).merge(resolveColorPicker(ctx, c.styles))
+		sl := resolveSlider(ctx, false, st.Slider)
 		cur := c.value.Get()
 		// hs is the color in hue, saturation and value, kept between changes so that the hue
 		// holds while the saturation or the value is 0. seen is the color the state was made

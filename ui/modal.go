@@ -102,15 +102,10 @@ func modalDefaults(t *Theme) ModalStyle {
 // resolveModal returns the look of a modal: the defaults, merged with the
 // theme's Modal and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveModal(t *Theme, inst ModalStyle) ModalStyle {
-	st := modalDefaults(t)
-	for _, o := range []ModalStyle{t.Modal, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveModal(ctx *Context, inst ModalStyle) ModalStyle {
+	t := ctx.Theme()
+	return layered(ctx, modalDefaults(t), ModalStyle.merge, ModalStyle.plain,
+		themeLayer(t.Modal), instanceLayer(inst))
 }
 
 // Styles sets the look of the parts of the modal, for this instance only. Set
@@ -190,14 +185,13 @@ func (m *ModalElement) CloseOnBackdrop() *ModalElement {
 func (*ModalElement) isElement() {}
 
 func (m *ModalElement) expand(ctx *Context) Element {
-	t := ctx.Theme()
 	part := "Modal"
 	var st ModalStyle
 	if m.drawer {
 		part = "Drawer"
-		st = resolveDrawer(t, m.side, m.styles)
+		st = resolveDrawer(ctx, m.side, m.styles)
 	} else {
-		st = resolveModal(t, m.styles)
+		st = resolveModal(ctx, m.styles)
 	}
 	closeFn := func() {
 		if m.onClose != nil {

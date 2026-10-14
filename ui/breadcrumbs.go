@@ -77,15 +77,10 @@ func breadcrumbsDefaults(t *Theme) BreadcrumbsStyle {
 // resolveBreadcrumbs returns the look of a breadcrumb trail: the defaults, merged
 // with the theme's Breadcrumbs and then the instance's Styles. Under high contrast
 // the two overrides are plain (see plainStyle).
-func resolveBreadcrumbs(t *Theme, inst BreadcrumbsStyle) BreadcrumbsStyle {
-	st := breadcrumbsDefaults(t)
-	for _, o := range []BreadcrumbsStyle{t.Breadcrumbs, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveBreadcrumbs(ctx *Context, inst BreadcrumbsStyle) BreadcrumbsStyle {
+	t := ctx.Theme()
+	return layered(ctx, breadcrumbsDefaults(t), BreadcrumbsStyle.merge, BreadcrumbsStyle.plain,
+		themeLayer(t.Breadcrumbs), instanceLayer(inst))
 }
 
 // crumbSlots returns the locations of a trail of n locations to show, in order,
@@ -177,7 +172,7 @@ func (b *BreadcrumbsElement) keyOf(s string) string {
 
 func (b *BreadcrumbsElement) expand(ctx *Context) Element {
 	th := ctx.Theme()
-	st := resolveBreadcrumbs(th, b.styles)
+	st := resolveBreadcrumbs(ctx, b.styles)
 	strs := ctx.Strings()
 	name := b.name
 	if name == "" {

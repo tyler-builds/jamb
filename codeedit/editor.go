@@ -127,7 +127,7 @@ func (e *Editor) Render(ctx *ui.Context) ui.Element {
 	vs.tab = e.tabSize
 	vs.doc.SetTabWidth(e.tabSize)
 	t := ctx.Theme()
-	st := e.styles.resolve(t)
+	st := e.styles.resolve(ctx)
 	name := e.label
 	if name == "" {
 		name = ctx.Strings().CodeEditorLabel

@@ -96,15 +96,10 @@ func timePickerDefaults(t *Theme, scale float32) TimePickerStyle {
 // resolveTimePicker returns the look of a time picker: the defaults, merged with the
 // theme's TimePicker and then the instance's Styles. Under high contrast the overrides are
 // plain (see plainStyle).
-func resolveTimePicker(t *Theme, scale float32, inst TimePickerStyle) TimePickerStyle {
-	st := timePickerDefaults(t, scale)
-	for _, o := range []TimePickerStyle{t.TimePicker, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveTimePicker(ctx *Context, scale float32, inst TimePickerStyle) TimePickerStyle {
+	t := ctx.Theme()
+	return layered(ctx, timePickerDefaults(t, scale), TimePickerStyle.merge, TimePickerStyle.plain,
+		themeLayer(t.TimePicker), instanceLayer(inst))
 }
 
 // timeList is the state of the open list that the render keeps: the row the keys have
@@ -308,7 +303,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
-		st := resolveTimePicker(t, scale, p.styles)
+		st := resolveTimePicker(ctx, scale, p.styles)
 		v := p.value.Get()
 		draft := Local(ctx, "draft", formatTimeText(v, loc))
 		seen := Local(ctx, "seen", v)
@@ -526,7 +521,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		}
 		a.invalid, a.required = isInvalid || w.invalid, w.required
 
-		fst := resolveField(t, fieldLayout{width: Full, disabled: p.disabled, size: p.ctlSize}, st.Field)
+		fst := resolveField(ctx, fieldLayout{width: Full, disabled: p.disabled, size: p.ctlSize}, st.Field)
 		if p.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)

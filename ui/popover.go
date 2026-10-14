@@ -72,15 +72,10 @@ func popoverDefaults(t *Theme) PopoverStyle {
 		BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius, Shadows: []Shadow{ShadowMd}}}
 }
 
-func resolvePopover(t *Theme, inst PopoverStyle) PopoverStyle {
-	st := popoverDefaults(t)
-	for _, o := range []PopoverStyle{t.Popover, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolvePopover(ctx *Context, inst PopoverStyle) PopoverStyle {
+	t := ctx.Theme()
+	return layered(ctx, popoverDefaults(t), PopoverStyle.merge, PopoverStyle.plain,
+		themeLayer(t.Popover), instanceLayer(inst))
 }
 
 // Styles sets the look of the panel, for this instance only. Set fields win
@@ -93,7 +88,7 @@ func (p *PopoverElement) Styles(st PopoverStyle) *PopoverElement {
 func (p *PopoverElement) expand(ctx *Context) Element {
 	trigger, content, placement, label, styles, onChange := p.trigger, p.content, p.placement, p.label, p.styles, p.onChange
 	return Component(func(ctx *Context) Element {
-		rt, t := ctx.rt, ctx.Theme()
+		rt := ctx.rt
 		open := Local(ctx, "open", false)
 		// entering is set while the panel opens, so its first focus moves on to
 		// the first field or button inside it.
@@ -153,7 +148,7 @@ func (p *PopoverElement) expand(ctx *Context) Element {
 			}
 		}
 		if open.Get() {
-			st := resolvePopover(t, styles)
+			st := resolvePopover(ctx, styles)
 			panel := Div().asPart("Popover.Panel").Overlay(placement).OverlayGap(6).Style(st.Panel).
 				Role(access.RoleDialog).Label(name).
 				// The panel takes focus when it opens, and hands it to its first field

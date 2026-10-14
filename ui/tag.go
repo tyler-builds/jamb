@@ -45,15 +45,9 @@ func tagDefaults(t *Theme) TagStyle {
 // resolveTag returns the look of a tag: the defaults, merged with the theme's Tag
 // and then the instance's Styles. Under high contrast the two overrides are plain
 // (see plainStyle).
-func resolveTag(t *Theme, inst TagStyle) TagStyle {
-	st := tagDefaults(t)
-	for _, o := range []TagStyle{t.Tag, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveTag(ctx *Context, inst TagStyle) TagStyle {
+	t := ctx.Theme()
+	return layered(ctx, tagDefaults(t), TagStyle.merge, TagStyle.plain, themeLayer(t.Tag), instanceLayer(inst))
 }
 
 // TagElement is a small rounded chip with a text, for a label or a filter. A tag
@@ -102,7 +96,7 @@ func (g *TagElement) Styles(st TagStyle) *TagElement {
 }
 
 func (g *TagElement) expand(ctx *Context) Element {
-	st := resolveTag(ctx.Theme(), g.styles)
+	st := resolveTag(ctx, g.styles)
 	strs := ctx.Strings()
 	// The tag is a group named by its text, so it is read as one thing.
 	tag := Div().asPart("Tag.Tag").Style(st.Tag).Role(access.RoleGroup).Label(g.text)

@@ -64,10 +64,11 @@ func editorDefaults(t *ui.Theme) Style {
 // resolve returns the look of the parts in the theme t: the defaults, merged with the
 // editor's Styles. Under high contrast the colors are the system colors, which the theme
 // holds, so the Styles' colors are dropped.
-func (s Style) resolve(t *ui.Theme) Style {
-	st := editorDefaults(t).merge(s)
+func (s Style) resolve(ctx *ui.Context) Style {
+	t := ctx.Theme()
+	st := ui.Layer(ctx, editorDefaults(t), "built-in default").merge(ui.Layer(ctx, s, "instance Styles"))
 	if t.HighContrast {
-		st = editorDefaults(t).merge(Style{
+		st = ui.Layer(ctx, editorDefaults(t), "built-in default").merge(ui.Layer(ctx, Style{
 			Box:          plainPart(s.Box),
 			Text:         plainPart(s.Text),
 			Gutter:       plainPart(s.Gutter),
@@ -76,9 +77,9 @@ func (s Style) resolve(t *ui.Theme) Style {
 			Match:        plainPart(s.Match),
 			CurrentMatch: plainPart(s.CurrentMatch),
 			Find:         plainPart(s.Find),
-		})
-		st.Text.TextColor = t.Editor.Foreground
-		st.Gutter.TextColor = t.Editor.LineNumber
+		}, "instance Styles"))
+		st.Text = st.Text.Merge(ui.Layer(ctx, ui.Style{TextColor: t.Editor.Foreground}, "high contrast"))
+		st.Gutter = st.Gutter.Merge(ui.Layer(ctx, ui.Style{TextColor: t.Editor.LineNumber}, "high contrast"))
 	}
 	return st
 }

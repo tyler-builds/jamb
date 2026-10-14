@@ -124,15 +124,10 @@ func selectDefaults(t *Theme, width float32, disabled bool, size controlSize) Se
 // resolveSelect returns the look of a select: the defaults, merged with the
 // theme's Select and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveSelect(t *Theme, width float32, disabled bool, size controlSize, inst SelectStyle) SelectStyle {
-	st := selectDefaults(t, width, disabled, size)
-	for _, o := range []SelectStyle{t.Select, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveSelect(ctx *Context, width float32, disabled bool, size controlSize, inst SelectStyle) SelectStyle {
+	t := ctx.Theme()
+	return layered(ctx, selectDefaults(t, width, disabled, size), SelectStyle.merge, SelectStyle.plain,
+		themeLayer(t.Select), instanceLayer(inst))
 }
 
 // SelectElement is a drop-down list: a field that shows the chosen option, and
@@ -303,7 +298,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
 		strs := ctx.Strings()
-		st := resolveSelect(t, selectWidth*textScale(ctx), s.disabled, s.ctlSize, s.styles)
+		st := resolveSelect(ctx, selectWidth*textScale(ctx), s.disabled, s.ctlSize, s.styles)
 		cur := s.value.Get()
 		sel := indexOf(s.options, cur)
 		open := Local(ctx, "open", false)

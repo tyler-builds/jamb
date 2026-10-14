@@ -100,15 +100,10 @@ func switchDefaults(t *Theme, on, disabled bool) SwitchStyle {
 // resolveSwitch returns the look of a switch: the defaults for its state, merged
 // with the theme's Switch and then the instance's Styles. Under high contrast the
 // two overrides are plain (see plainStyle).
-func resolveSwitch(t *Theme, on, disabled bool, inst SwitchStyle) SwitchStyle {
-	st := switchDefaults(t, on, disabled)
-	for _, o := range []SwitchStyle{t.Switch, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveSwitch(ctx *Context, on, disabled bool, inst SwitchStyle) SwitchStyle {
+	t := ctx.Theme()
+	return layered(ctx, switchDefaults(t, on, disabled), SwitchStyle.merge, SwitchStyle.plain,
+		themeLayer(t.Switch), instanceLayer(inst))
 }
 
 // SwitchElement is an on/off switch bound to a bool signal. It is drawn as a
@@ -175,9 +170,8 @@ func (s *SwitchElement) Styles(st SwitchStyle) *SwitchElement {
 }
 
 func (s *SwitchElement) expand(ctx *Context) Element {
-	t := ctx.Theme()
 	on := s.on.Get()
-	st := resolveSwitch(t, on, s.disabled, s.styles)
+	st := resolveSwitch(ctx, on, s.disabled, s.styles)
 	d := Div().asPart("Switch.Track").Style(st.Track).
 		Role(access.RoleSwitch).Label(s.label).AccessChecked(on)
 	d.spaceOnly = true // Enter goes on to the modal default button, as on Windows

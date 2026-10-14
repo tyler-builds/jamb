@@ -204,6 +204,10 @@ type Style struct {
 	// The clears are kept when styles are merged, so a style merged in later, such
 	// as an instance's Styles, still clears the defaults it names. See ClearSet.
 	Clear ClearSet
+
+	// prov records which layers set the fields, for the visual inspector. It is
+	// nil unless an inspector is attached (see style_layers.go).
+	prov styleProv
 }
 
 // ClearSet names the fields that a style removes with its Clear field. Each
@@ -252,8 +256,10 @@ func (s Style) cleared(c ClearSet) Style {
 }
 
 // Merge returns s with every set field of o applied on top. The fields that o
-// clears (see Style.Clear) are removed first.
+// clears (see Style.Clear) are removed first. While an inspector is attached,
+// the layers that set the fields are merged with them (see style_layers.go).
 func (s Style) Merge(o Style) Style {
+	sp := s.prov
 	s = s.cleared(o.Clear)
 	s.Clear |= o.Clear
 	if o.Direction != Column {
@@ -351,6 +357,9 @@ func (s Style) Merge(o Style) Style {
 	mergeA(&s.TextAlign, o.TextAlign)
 	if o.Transition != 0 {
 		s.Transition = o.Transition
+	}
+	if sp != nil || o.prov != nil {
+		s.prov = mergeProv(sp, o.prov, s)
 	}
 	return s
 }

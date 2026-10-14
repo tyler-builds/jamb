@@ -146,15 +146,31 @@ func (ins *inspector) accessRows(id uint64) ui.Element {
 	return col
 }
 
-// styleRows lists the set fields of the resolved style, each with its source, in
-// a list that draws only the rows it shows.
+// styleRows lists the set fields of the resolved style. Each field shows its
+// winning value and the layer it came from. The values of the layers that it
+// overrides follow, struck through and marked overridden, lowest layer last. A
+// layer that sets the same value as the layer below it is marked so.
 func (ins *inspector) styleRows(id uint64) ui.Element {
 	fields := ins.tg.Fields(id)
-	list := ui.UniformList(len(fields), func(i int) ui.Element {
-		f := fields[i]
-		return ui.Textf("%s = %s   (%s)", f.Name, f.Value, f.Source)
-	}).Height(ui.Px(220))
-	return ui.Div().Column().Gap(4).Children(ui.Text("Style, set fields only, with the source of each value"), list)
+	col := ui.Div().Column().Gap(6)
+	for _, f := range fields {
+		row := ui.Div().Column().Child(ui.Textf("%s = %s   (%s)", f.Name, f.Value, f.Source))
+		if len(f.Layers) > 0 && f.Layers[len(f.Layers)-1].Same {
+			row.Child(ui.Text("   same value as the layer below"))
+		}
+		for i := len(f.Layers) - 2; i >= 0; i-- {
+			l := f.Layers[i]
+			text := fmt.Sprintf("   overridden: %s = %s   (%s)", f.Name, l.Value, l.Source)
+			if l.Same {
+				text += ", same value as the layer below"
+			}
+			row.Child(ui.Text(text))
+		}
+		col.Child(row)
+	}
+	return ui.Div().Column().Gap(4).Children(
+		ui.Text("Style, set fields only: each value, its layer, and the values it overrides"),
+		ui.Div().Height(ui.Px(260)).ScrollY().Child(col))
 }
 
 // editRow sets one style field of the element, copies the live edits as Go, and

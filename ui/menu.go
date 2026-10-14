@@ -165,15 +165,10 @@ func menuDefaults(t *Theme) MenuStyle {
 // resolveMenu returns the look of a menu: the defaults, merged with the theme's
 // Menu and then the instance's Styles. Under high contrast the two overrides are
 // plain (see plainStyle).
-func resolveMenu(t *Theme, inst MenuStyle) MenuStyle {
-	st := menuDefaults(t)
-	for _, o := range []MenuStyle{t.Menu, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveMenu(ctx *Context, inst MenuStyle) MenuStyle {
+	t := ctx.Theme()
+	return layered(ctx, menuDefaults(t), MenuStyle.merge, MenuStyle.plain,
+		themeLayer(t.Menu), instanceLayer(inst))
 }
 
 // TopMenu is one menu of a MenuBar: the label on the bar, and the function that
@@ -649,7 +644,7 @@ func (dm *DropdownMenuElement) expand(ctx *Context) Element {
 		}
 		if open.Get() {
 			m := &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: closeMenu, label: name,
-				st: resolveMenu(t, styles)}
+				st: resolveMenu(ctx, styles)}
 			d.Child(m.top(4))
 		}
 		return d
@@ -759,7 +754,7 @@ func contextMenuAt(rt *Runtime, c *contextMenu) Element {
 		Component(func(ctx *Context) Element {
 			m := &menuView{ctx: ctx, t: ctx.Theme(), items: c.items,
 				path:  Local(ctx, "path", highlightPath(c.items, c.keyboard)),
-				close: rt.closeContextMenu, label: c.label, st: resolveMenu(ctx.Theme(), MenuStyle{})}
+				close: rt.closeContextMenu, label: c.label, st: resolveMenu(ctx, MenuStyle{})}
 			return m.top(0)
 		}))
 }

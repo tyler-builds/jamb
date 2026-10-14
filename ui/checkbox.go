@@ -129,15 +129,10 @@ func checkboxDefaults(t *Theme, s CheckState, disabled bool) CheckboxStyle {
 // resolveCheckbox returns the look of a check box in state s: the defaults,
 // merged with the theme's Checkbox and then the instance's Styles. Under high
 // contrast the two overrides are plain (see plainStyle).
-func resolveCheckbox(t *Theme, s CheckState, disabled bool, inst CheckboxStyle) CheckboxStyle {
-	st := checkboxDefaults(t, s, disabled)
-	for _, o := range []CheckboxStyle{t.Checkbox, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveCheckbox(ctx *Context, s CheckState, disabled bool, inst CheckboxStyle) CheckboxStyle {
+	t := ctx.Theme()
+	return layered(ctx, checkboxDefaults(t, s, disabled), CheckboxStyle.merge, CheckboxStyle.plain,
+		themeLayer(t.Checkbox), instanceLayer(inst))
 }
 
 // CheckboxElement is a check box with a text label. Space, a click on the box
@@ -254,10 +249,9 @@ func (c *CheckboxElement) Styles(st CheckboxStyle) *CheckboxElement {
 }
 
 func (c *CheckboxElement) expand(ctx *Context) Element {
-	t := ctx.Theme()
 	s := c.state
 	on := s == CheckOn // a mixed box is not checked: its state is the mixed one
-	st := resolveCheckbox(t, s, c.disabled, c.styles)
+	st := resolveCheckbox(ctx, s, c.disabled, c.styles)
 	w := c.wire
 
 	// The box is drawn from the state: a check for on, a dash for mixed and an

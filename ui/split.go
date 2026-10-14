@@ -95,15 +95,10 @@ func splitDefaults(t *Theme, vertical bool) SplitStyle {
 // resolveSplit returns the look of a split: the defaults, merged with the theme's
 // Split and then the instance's Styles. Under high contrast the two overrides are
 // plain (see plainStyle).
-func resolveSplit(t *Theme, vertical bool, inst SplitStyle) SplitStyle {
-	st := splitDefaults(t, vertical)
-	for _, o := range []SplitStyle{t.Split, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveSplit(ctx *Context, vertical bool, inst SplitStyle) SplitStyle {
+	t := ctx.Theme()
+	return layered(ctx, splitDefaults(t, vertical), SplitStyle.merge, SplitStyle.plain,
+		themeLayer(t.Split), instanceLayer(inst))
 }
 
 // SplitOrientation says how the panes of a split are laid out.
@@ -397,9 +392,8 @@ func (s *SplitElement) length(ctx *Context, key string) float64 {
 
 func (s *SplitElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
-		t := ctx.Theme()
 		vert := s.vertical()
-		st := resolveSplit(t, vert, s.styles)
+		st := resolveSplit(ctx, vert, s.styles)
 		pos := s.pos
 		if pos == nil {
 			pos = Local(ctx, "position", 0.5)

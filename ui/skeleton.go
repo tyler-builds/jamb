@@ -52,15 +52,10 @@ func skeletonDefaults(t *Theme, scale float32) SkeletonStyle {
 // resolveSkeleton returns the look of a skeleton: the defaults, merged with the
 // theme's Skeleton and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveSkeleton(t *Theme, scale float32, inst SkeletonStyle) SkeletonStyle {
-	st := skeletonDefaults(t, scale)
-	for _, o := range []SkeletonStyle{t.Skeleton, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveSkeleton(ctx *Context, scale float32, inst SkeletonStyle) SkeletonStyle {
+	t := ctx.Theme()
+	return layered(ctx, skeletonDefaults(t, scale), SkeletonStyle.merge, SkeletonStyle.plain,
+		themeLayer(t.Skeleton), instanceLayer(inst))
 }
 
 // skeletonShape is the form of a skeleton.
@@ -133,7 +128,7 @@ func (s *SkeletonElement) Styles(st SkeletonStyle) *SkeletonElement {
 func (s *SkeletonElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	scale := textScale(ctx)
-	st := resolveSkeleton(t, scale, s.styles)
+	st := resolveSkeleton(ctx, scale, s.styles)
 	if ctx.ReducedMotion() || t.HighContrast {
 		return s.build(st, scale, 1)
 	}

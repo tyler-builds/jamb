@@ -77,15 +77,10 @@ func collapsibleDefaults(t *Theme) CollapsibleStyle {
 // resolveCollapsible returns the look of a collapsible section: the defaults,
 // merged with the theme's Collapsible and then the instance's Styles. Under high
 // contrast the two overrides are plain (see plainStyle).
-func resolveCollapsible(t *Theme, inst CollapsibleStyle) CollapsibleStyle {
-	st := collapsibleDefaults(t)
-	for _, o := range []CollapsibleStyle{t.Collapsible, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveCollapsible(ctx *Context, inst CollapsibleStyle) CollapsibleStyle {
+	t := ctx.Theme()
+	return layered(ctx, collapsibleDefaults(t), CollapsibleStyle.merge, CollapsibleStyle.plain,
+		themeLayer(t.Collapsible), instanceLayer(inst))
 }
 
 // CollapsibleElement is a section with a header row, which opens and closes the
@@ -199,7 +194,7 @@ func (c *CollapsibleElement) set(open bool) {
 func (c *CollapsibleElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	on := c.open.Get()
-	st := resolveCollapsible(t, c.styles)
+	st := resolveCollapsible(ctx, c.styles)
 	chevron := icons.ChevronRight
 	if on {
 		chevron = icons.ChevronDown

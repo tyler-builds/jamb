@@ -292,15 +292,10 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 // resolveDataGrid returns the look of a DataGrid: the defaults, merged with the
 // theme's DataGrid and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveDataGrid(t *Theme, d DataGridDensity, textFactor float32, inst DataGridStyle) DataGridStyle {
-	st := dataGridDefaults(t, d, textFactor)
-	for _, o := range []DataGridStyle{t.DataGrid, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst DataGridStyle) DataGridStyle {
+	t := ctx.Theme()
+	return layered(ctx, dataGridDefaults(t, d, textFactor), DataGridStyle.merge, DataGridStyle.plain,
+		themeLayer(t.DataGrid), instanceLayer(inst))
 }
 
 // DataGridElement is a table of rows and columns, for business data. Only the rows
@@ -506,6 +501,7 @@ type dgOps struct {
 // cursor and the edit, and the actions of the cells (see dgOps).
 type dgRowCtx[T any] struct {
 	t                    *Theme
+	ctx                  *Context // the grid's render, for the layers of the editor's style (see Layer)
 	st                   DataGridStyle
 	sh                   *dgShared[T]
 	rows                 []T
@@ -671,7 +667,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	rt := ctx.rt
 	strs := ctx.Strings()
 	inst := ctx.inst // the grid's own component: a width change rebuilds it
-	st := resolveDataGrid(t, g.density, rt.textFactor, g.styles)
+	st := resolveDataGrid(ctx, g.density, rt.textFactor, g.styles)
 	sh := Local(ctx, "grid", &dgShared[T]{}).Peek()
 	cur := Local(ctx, "cursor", dgCursor{})
 	anchor := Local(ctx, "anchor", "")
@@ -1234,7 +1230,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		return max(nc-1, 0)
 	}
-	rc := dgRowCtx[T]{t: t, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
+	rc := dgRowCtx[T]{t: t, ctx: ctx, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed,
 		click: click, colAt: colAt, activate: activate, ops: ops}
 	list := UniformList(n, func(q int) Element {
@@ -1474,7 +1470,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 // the grid's keys as described in DataGrid, and its frame is invalid while the last
 // save failed. The message of that save is drawn by row, under the cell.
 func (g *DataGridElement[T]) editor(rc dgRowCtx[T], cl DataColumn[T]) Element {
-	fe := resolveField(rc.t, fieldLayout{size: sizeSmall}, rc.st.Editor)
+	fe := resolveField(rc.ctx, fieldLayout{size: sizeSmall}, rc.st.Editor)
 	if rc.ed.err != "" {
 		// The editor has focus while it is invalid, so the invalid frame also takes the
 		// place of the focus frame: the Accent border would hide the danger color.

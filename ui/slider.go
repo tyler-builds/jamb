@@ -99,15 +99,10 @@ func sliderDefaults(t *Theme, disabled bool) SliderStyle {
 // resolveSlider returns the look of a slider: the defaults, merged with the
 // theme's Slider and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveSlider(t *Theme, disabled bool, inst SliderStyle) SliderStyle {
-	st := sliderDefaults(t, disabled)
-	for _, o := range []SliderStyle{t.Slider, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveSlider(ctx *Context, disabled bool, inst SliderStyle) SliderStyle {
+	t := ctx.Theme()
+	return layered(ctx, sliderDefaults(t, disabled), SliderStyle.merge, SliderStyle.plain,
+		themeLayer(t.Slider), instanceLayer(inst))
 }
 
 // sliderMinWidth is the narrowest a slider is by default, in logical pixels.
@@ -236,7 +231,7 @@ func (s *SliderElement) at(e *MouseEvent) float64 {
 func (s *SliderElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
-		st := resolveSlider(t, s.disabled, s.styles)
+		st := resolveSlider(ctx, s.disabled, s.styles)
 		v := s.value.Get()
 		dragging := Local(ctx, "dragging", false)
 		small, large := s.steps()

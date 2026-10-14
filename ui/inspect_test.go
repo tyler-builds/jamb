@@ -24,6 +24,7 @@ func inspRuntime(t *testing.T, theme *Theme, root func(ctx *Context) Element) (*
 		t.Fatal("the runtime's host side does not implement inspect.Target")
 	}
 	tg.Attach(func() {})
+	rt.Frame(time.Now()) // renders the components again, with their layers recorded
 	return rt, tg
 }
 
@@ -143,12 +144,11 @@ func TestInspectStyleSourcesDistinguishStateSizingThemeAndElement(t *testing.T) 
 		t.Fatalf("Width of the button = %+v, ok %v; want 90px from the sizing method", f, ok)
 	}
 
-	// The check box's box: the theme sets the radius, and the instance overrides
-	// it with 9. The instance is not split from the widget's defaults, so it is
-	// reported as the widget part.
+	// The check box's box: the default sets the radius, the theme sets it to 5,
+	// and the instance overrides both with 9.
 	boxID, _ := inspFind(tg, tg.Root(), func(e inspect.Element) bool { return e.Part == "Checkbox.Box" })
-	if f, ok := inspField(tg, boxID, "Radius"); !ok || f.Source != inspect.SourceWidget || f.Value != "9" {
-		t.Fatalf("Radius of the check box = %+v, ok %v; want 9 from the widget part (the instance overrides the theme)", f, ok)
+	if f, ok := inspField(tg, boxID, "Radius"); !ok || f.Source != inspect.SourceInstance || f.Value != "9" {
+		t.Fatalf("Radius of the check box = %+v, ok %v; want 9 from the instance Styles", f, ok)
 	}
 	th2 := DarkTheme()
 	th2.Checkbox.Box = Style{Radius: 5}

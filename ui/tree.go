@@ -100,15 +100,10 @@ func treeDefaults(t *Theme) TreeStyle {
 // resolveTree returns the look of a tree: the defaults, merged with the theme's
 // Tree and then the instance's Styles. Under high contrast the two overrides
 // are plain (see plainStyle).
-func resolveTree(t *Theme, inst TreeStyle) TreeStyle {
-	st := treeDefaults(t)
-	for _, o := range []TreeStyle{t.Tree, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveTree(ctx *Context, inst TreeStyle) TreeStyle {
+	t := ctx.Theme()
+	return layered(ctx, treeDefaults(t), TreeStyle.merge, TreeStyle.plain,
+		themeLayer(t.Tree), instanceLayer(inst))
 }
 
 // TreeElement is a hierarchy of nodes that open and close, shown as a list of the
@@ -281,7 +276,7 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
-		st := resolveTree(t, tv.styles)
+		st := resolveTree(ctx, tv.styles)
 		sel := tv.selected.Get()
 		open := Local(ctx, "open", map[string]bool{})
 		handle := Local(ctx, "handle", NewListHandle()).Peek()

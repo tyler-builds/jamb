@@ -116,15 +116,10 @@ func comboboxDefaults(t *Theme) ComboboxStyle {
 // theme's Combobox and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle). The Field is resolved by the editor, over
 // the theme's Field.
-func resolveCombobox(t *Theme, inst ComboboxStyle) ComboboxStyle {
-	st := comboboxDefaults(t)
-	for _, o := range []ComboboxStyle{t.Combobox, inst} {
-		if t.HighContrast {
-			o = o.plain()
-		}
-		st = st.merge(o)
-	}
-	return st
+func resolveCombobox(ctx *Context, inst ComboboxStyle) ComboboxStyle {
+	t := ctx.Theme()
+	return layered(ctx, comboboxDefaults(t), ComboboxStyle.merge, ComboboxStyle.plain,
+		themeLayer(t.Combobox), instanceLayer(inst))
 }
 
 // comboItems are the suggestions of a query, as the last request returned them.
@@ -369,9 +364,9 @@ func countText(n int, s *Strings) string {
 func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
-		st := resolveCombobox(t, c.styles)
+		st := resolveCombobox(ctx, c.styles)
 		lay := fieldLayout{width: Full, disabled: c.disabled, size: c.ctlSize}
-		fst := resolveField(t, lay, st.Field)
+		fst := resolveField(ctx, lay, st.Field)
 		w := c.wire
 
 		text := c.text.Get()
