@@ -37,3 +37,21 @@ func TestSplitGripModes(t *testing.T) {
 		}
 	}
 }
+
+// The divider's bar runs the divider's whole length in both orientations, so the split
+// draws a line between its panes; the divider centers the bar, so a bar with only a
+// thickness had no length and drew nothing.
+func TestSplitBarRunsTheDividerLength(t *testing.T) {
+	for _, o := range []SplitOrientation{SplitHorizontal, SplitVertical} {
+		r := splitRig(t, func() Element { return Split(Text("Left"), Text("Right")).Orientation(o) })
+		r.frame()
+		bar, hit := r.rt.nodeRect(partNodeOrNil(r.rt, "Split.Divider")), r.rt.nodeRect(handleNode(t, r))
+		thick, length, want := bar.W, bar.H, hit.H
+		if o == SplitVertical {
+			thick, length, want = bar.H, bar.W, hit.W
+		}
+		if thick != 1 || length != want {
+			t.Errorf("orientation %d: the bar is %v thick and %v long, want 1 and %v", o, thick, length, want)
+		}
+	}
+}

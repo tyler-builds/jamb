@@ -27,7 +27,8 @@ const (
 // instance; see docs/styling.md.
 //
 // Divider is the bar drawn in the middle of the divider: its Width is the thickness
-// of a horizontal split's divider, and its Height the thickness of a vertical one.
+// of a horizontal split's divider, and its Height the thickness of a vertical one; it
+// runs the divider's whole length by default.
 // DividerHover is the bar while the pointer is over the divider, DividerActive while
 // the divider is dragged, and DividerFocusVisible while it has keyboard focus. Grip
 // is the mark drawn over the middle of the bar, and Pane is the box of each pane.
@@ -74,9 +75,11 @@ func splitDefaults(t *Theme, vertical bool) SplitStyle {
 	if t.HighContrast {
 		bar, grip = t.Text, t.Text
 	}
-	thick, mark := Style{Width: Px(1)}, Style{Width: Px(4), Height: Px(24)}
+	// The bar is 1 px thick and runs the whole length of the divider: the divider centers it,
+	// so without a length it would have none and draw nothing.
+	thick, mark := Style{Width: Px(1), Height: Full}, Style{Width: Px(4), Height: Px(24)}
 	if vertical {
-		thick, mark = Style{Height: Px(1)}, Style{Width: Px(24), Height: Px(4)}
+		thick, mark = Style{Height: Px(1), Width: Full}, Style{Width: Px(24), Height: Px(4)}
 	}
 	d := SplitStyle{
 		Divider:             thick.Merge(Style{Background: bar}),
