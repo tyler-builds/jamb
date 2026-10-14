@@ -260,19 +260,40 @@ func (p *ProgressBarElement) fill(st ProgressBarStyle) *DivElement {
 	return Div().asPart("ProgressBar.Fill").Style(st.Fill).Height(Full).Width(Percent(f * 100))
 }
 
-// segment is the sliding part of an indeterminate bar. It moves from one end
-// to the other and repeats. With reduced motion it stays in the middle.
+// segment is the sliding part of an indeterminate bar. It enters at the left
+// end, slides across and leaves at the right end, then enters again: at the
+// start and end of each cycle it is wholly outside the track, so the repeat is
+// seamless. With reduced motion it stays in the middle.
 func (p *ProgressBarElement) segment(ctx *Context, st ProgressBarStyle) Element {
-	row := func(x float32) *DivElement {
-		seg := Div().asPart("ProgressBar.Fill").Style(st.Fill).Height(Full).Grow(progressSegment)
+	row := func(start, width float32) *DivElement {
+		seg := Div().asPart("ProgressBar.Fill").Style(st.Fill).Height(Full).Grow(width)
 		return Div().Row().Height(Full).
-			Child(Div().Grow(x)).Child(seg).Child(Div().Grow(1 - x - progressSegment))
+			Child(Div().Grow(start)).Child(seg).Child(Div().Grow(1 - start - width))
 	}
 	if ctx.ReducedMotion() {
-		return row((1 - progressSegment) / 2)
+		return row((1-progressSegment)/2, progressSegment)
 	}
-	return Animate("progress", Animation{Duration: 1400 * time.Millisecond, Repeat: true, Easing: ease.Linear},
-		func(p float32) Element { return row(p * (1 - progressSegment)) })
+	return Animate("progress", Animation{Duration: progressCycle, Repeat: true, Easing: ease.Linear},
+		func(p float32) Element { return row(segmentSpan(p)) })
+}
+
+// progressCycle is how long the segment of an indeterminate bar takes to cross
+// the track, from wholly outside its left end to wholly outside its right end.
+const progressCycle = 2 * time.Second
+
+// segmentSpan returns the part of the track that the segment covers at phase p
+// of a cycle, as a share of the track: where it starts, and how wide it is. The
+// segment's left edge moves from -progressSegment to 1, so it slides in from the
+// left and out to the right; the part outside the track is not drawn, which is
+// what the track's clip would show, rounded ends included, since the visible
+// part ends at the track's own rounded ends.
+func segmentSpan(p float32) (start, width float32) {
+	left := p*(1+progressSegment) - progressSegment
+	lo, hi := max(left, 0), min(left+progressSegment, 1)
+	if hi-lo < 1e-4 { // wholly outside, or a sliver left by rounding
+		return 0, 0
+	}
+	return lo, hi - lo
 }
 
 // ProgressRingElement is a busy indicator: a ring of dots that turns while the
