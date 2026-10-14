@@ -20,6 +20,34 @@ type expander interface {
 	expand(ctx *Context) Element
 }
 
+// Composite makes a type from another package an element. Embed it in the type,
+// and implement Renderer: the type's Render builds it, as a Component's
+// function does. The element keeps its state, and re-renders when the signals
+// its Render reads change. SetKey gives it an identity among its siblings
+// (see DivElement.Key).
+//
+//	type Gauge struct {
+//		ui.Composite
+//		value float64
+//	}
+//
+//	func (g *Gauge) Render(ctx *ui.Context) ui.Element { return ui.Text(fmt.Sprint(g.value)) }
+//
+//	ui.Div().Child(&Gauge{value: 0.4})
+type Composite struct{ key string }
+
+func (Composite) isElement()           {}
+func (c Composite) elementKey() string { return c.key }
+
+// SetKey gives the element an identity among its siblings.
+func (c *Composite) SetKey(k string) { c.key = k }
+
+// Renderer is an element defined in another package (see Composite).
+type Renderer interface {
+	Element
+	Render(ctx *Context) Element
+}
+
 // keyed elements carry an explicit identity among their siblings.
 type keyed interface {
 	elementKey() string

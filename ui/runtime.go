@@ -1182,6 +1182,8 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		return rt.instance(id, e, owner, parent, inh).root
 	case expander:
 		return rt.instance(id, e, owner, parent, inh).root
+	case Renderer:
+		return rt.instance(id, e, owner, parent, inh).root
 	case *DivElement:
 		if e == nil {
 			return nil

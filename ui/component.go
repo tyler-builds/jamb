@@ -110,6 +110,8 @@ func (inst *componentInstance) render() {
 		inst.out = e.fn(ctx)
 	case expander:
 		inst.out = e.expand(ctx)
+	case Renderer:
+		inst.out = e.Render(ctx)
 	}
 	inst.rt.stats.Rendered++
 }
