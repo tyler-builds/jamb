@@ -42,6 +42,8 @@ func feedbackSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 			}))),
 		sample(t, fmt.Sprintf("Toast with Undo: count %d", count.Get()),
 			ui.Button("Increment").Secondary().OnClick(increment)),
+		sample(t, "OS notification, with two buttons",
+			ui.Button("Send OS notification").Secondary().OnClick(func() { sendOSNotification(ctx, s) })),
 		sample(t, "Badges: variants", ui.Div().Row().Wrap().Gap(8).Align(ui.Center).
 			Child(ui.BadgeText("Neutral")).
 			Child(ui.BadgeText("Accent").Variant(ui.BadgeAccent)).

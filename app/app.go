@@ -148,6 +148,8 @@ type App struct {
 	jumpList       *JumpList
 	singleInstance bool
 	onArgs         func(args []string, dir string)
+	// notifyHandler is called for clicks on notifications; see OnNotification.
+	notifyHandler func(NotificationActivation)
 }
 
 // appFont is a font given to App.Font.
@@ -235,6 +237,8 @@ func (a *App) RunE(w Window) error {
 			return err
 		}
 		if owned != nil {
+			// A notification click that started this process is delivered after the window.
+			a.notificationArgs(os.Args[1:])
 			a.serveHandoffs(owned)
 		}
 		return nil

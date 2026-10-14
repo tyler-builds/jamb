@@ -51,6 +51,9 @@ func (a *App) checkIdentity() error {
 	if (a.jumpList != nil || a.singleInstance) && a.appID == "" {
 		return errors.New(`app.App: AppID is required with JumpList and SingleInstance, such as App.AppID("CompanyName.ProductName")`)
 	}
+	if a.notifyHandler != nil && !a.singleInstance {
+		return errors.New("app.App: OnNotification needs SingleInstance, which hands a notification click to the running app instead of a second window")
+	}
 	if a.jumpList != nil {
 		return a.jumpList.check()
 	}
@@ -72,4 +75,5 @@ func (a *App) setIdentity() {
 			fmt.Fprintln(os.Stderr, "jamb: jump list:", err)
 		}
 	}
+	a.setNotifications()
 }

@@ -2611,6 +2611,140 @@ a menu or a taskbar button. These need a person at a Windows desktop:
 - Caret blinking and tooltips after a window is shown again: the caret resumes its
   blink, and a tooltip still appears on hover.
 
+### OS notifications
+
+Windows only. `app.Notify` shows a Windows toast, which the Notification Center
+keeps. It needs an `AppID`, and the app must be running: call it from a window, an
+action, or a goroutine started after `Run`. Without an `AppID` it returns an error.
+
+```go
+app.New().
+    AppID("JambExamples.Notes").
+    SingleInstance(func(args []string, dir string) {}).
+    OnNotification(func(n app.NotificationActivation) {
+        // n.Action is the clicked button's ID, or "" for a click on the body.
+    }).
+    Run(app.Window{...})
+
+err := app.Notify(app.Notification{
+    Title: "Build finished",
+    Body:  "The build finished with 3 warnings.",
+    Image: img, // optional hero image, a banner above the text
+    Actions: []app.NotificationAction{
+        {ID: "open", Label: "Open"},
+        {ID: "dismiss", Label: "Dismiss"},
+    },
+    Tag:  "build", // a later notification with this tag replaces this one
+    Args: "build-42", // returned as n.Args when the notification is clicked
+})
+```
+
+- **Shape.** `Notification` has `Title` (required), `Body`, `Image` (an
+  `image.Image`, shown as a hero banner), `Actions` (at most five buttons, each with
+  a unique `ID` and a `Label`), `Tag` (at most 64 characters), `Args` and `Silent`.
+  `app.RemoveNotification(tag)` removes one notification, and
+  `app.ClearNotifications()` removes the app's notifications from the Notification
+  Center. Both need an `AppID` too.
+- **Errors.** `Notify` returns an error for a notification that cannot be shown:
+  an invalid notification, a registration that fails, or a toast that Windows refuses.
+  A failure that Windows raises after accepting the toast is printed on stderr.
+- **Writing the text.** Windows reads the title and body aloud to screen-reader
+  users. Write them as complete sentences, such as "The build finished with 3
+  warnings.", not as fragments.
+- **Images.** The image is saved as a PNG in the temporary folder, under
+  `jamb-notifications`, named by the digest of its bytes, so the same image is
+  saved once. Windows may delete the folder's files when it cleans the temporary
+  folder, which affects only notifications that are shown again later.
+
+#### What is written, and when
+
+The first `Notify` of a process writes the registration below, for the current user
+only. Nothing is written at import time, and that process does not write it again.
+The paths use the executable that is running, so a moved program needs a new first
+`Notify` (a new process) to point the registration at its new location.
+
+- **Start menu shortcut.** Windows shows a toast from a desktop app only when a
+  Start menu shortcut carries the app's `AppID` as its `System.AppUserModel.ID`, per
+  Microsoft's guidance for desktop apps. `Notify` writes
+  `%APPDATA%\Microsoft\Windows\Start Menu\Programs\<name>.lnk`, where `<name>` is the
+  program's file name without its extension, with characters Windows does not allow
+  removed (`Notes Pro.exe` gives `Notes Pro.lnk`). The shortcut's target is the
+  program's executable. The shortcut appears in the Start menu under Programs.
+- **Protocol, when OnNotification is set.** A click on a notification after the app
+  has closed starts the app through a URI scheme, `jamb-<appid>` in lower case, such
+  as `jamb-jambexamples.notes`. `Notify` writes three values under
+  `HKEY_CURRENT_USER\Software\Classes\jamb-<appid>`: the default value
+  `URL:jamb-<appid>`, the value `URL Protocol` (empty), and the command under
+  `\shell\open\command`, which is `"<exe>" "%1"`.
+- **Packaged (MSIX) apps** write nothing: the package's identity is used. A packaged
+  app that uses `OnNotification` must declare the same protocol in its package
+  manifest. This is not done by `Notify`.
+
+To remove the registration, delete the shortcut and the protocol key:
+
+```bat
+del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Notes Pro.lnk"
+reg delete "HKCU\Software\Classes\jamb-jambexamples.notes" /f
+```
+
+The next `Notify` writes both again. Windows keeps a notification it has shown in the
+Notification Center until the user or `ClearNotifications` removes it.
+
+#### Activation
+
+- **While the app runs.** Windows raises the toast's activated event in the app, which
+  calls the handler on the UI thread with the button's or the body's data. The app
+  keeps the last 32 toasts alive so that the event is delivered for them. A click on
+  an older toast reaches the app through the protocol, as below.
+- **After the app has closed.** The click starts the executable through the protocol,
+  with the click's data as its command-line argument. The new process is the first
+  instance, so it opens its window, and then calls the handler once for that click.
+- **With SingleInstance.** `OnNotification` requires `SingleInstance`, and `Run`
+  returns an error without it. Without it, a click while the app runs would start
+  a second process with a second window. With it, the new process hands the click
+  to the running app, which calls the handler and brings its window forward. The
+  click is not passed to the `SingleInstance` function. Any other command-line
+  arguments of a handed-over launch still go to that function.
+- **Duplicates.** A click that reaches the app by two routes is delivered once: each
+  click carries a random nonce, and the app remembers the last 64 nonces.
+
+The click's data is an URI with the action ID, the tag, the args and the nonce,
+base64-encoded. Any program the user runs can start the protocol with any data, so
+the handler must treat `Action`, `Tag` and `Args` as input from outside the app. The
+data of one click is limited to 512 characters; the action IDs, the tag and the args
+together must fit in that, so keep the args to an ID or a short string.
+
+#### Limits
+
+- Windows allows at most five buttons, and a tag of up to 64 characters.
+- Windows may hide a notification under Focus Assist or Do Not Disturb, or the user
+  may turn the app's notifications off in Settings. `Notify` does not report either.
+- Dismissal is not reported. The toast's dismissed event is not subscribed.
+- A `go run` program's executable is removed when the run ends. The shortcut and
+  the protocol then start a program that no longer exists, so test notifications
+  with a built executable.
+- The shortcut is per user. The installer's Start menu shortcut is a separate entry
+  without the `AppID`, so Windows may show two entries for the app until the
+  installer writes the `AppID` on its shortcut too (see the jump list note above).
+
+#### Hand checks
+
+These cannot be run headless. Check them on Windows 10 and 11 with a built
+executable, and with an installed build:
+
+- A notification appears with its title, body, hero image and both buttons.
+- A click on the body and on each button, while the app runs, calls the handler once,
+  and the window comes forward.
+- A click after the app has closed starts it, and the handler is called once the
+  window is open.
+- A second `Notify` with the same tag replaces the first; `RemoveNotification` removes
+  it, and `ClearNotifications` clears the Notification Center.
+- With `SingleInstance`, a second launch of the app hands over its arguments, and a
+  click reaches the first instance and not a second window.
+- Focus Assist and Do Not Disturb hide the notification as Windows documents.
+- The shortcut and the protocol key appear as described, and the removal commands
+  above remove them.
+
 ### Custom title bars
 
 `app.Window{Chrome: app.ChromeCustom}` removes the operating system's title

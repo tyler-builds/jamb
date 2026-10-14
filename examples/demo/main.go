@@ -9,7 +9,12 @@ import (
 func main() {
 	store := views.NewStore()
 
-	application := app.New()
+	// The AppID names the app to Windows, for its OS notifications and single
+	// instance. A click on a notification reaches the running demo, not a new window.
+	application := app.New().
+		AppID("JambExamples.Demo").
+		SingleInstance(nil).
+		OnNotification(views.NotificationClicked(store))
 	application.Run(app.Window{
 		Title:     "Jamb Demo",
 		Width:     1200,

@@ -144,7 +144,7 @@ func handOff(pipe string) (bool, error) {
 // pipe the first instance owns. Each command line is run on the UI thread by
 // deliverHandoff.
 func (a *App) serveHandoffs(names *instanceNames) {
-	onArgs := a.onArgs
+	onArgs := a.handoffArgs()
 	err := servePipe(*names, func(conn io.ReadWriter) {
 		// A request that cannot be read is refused by serveHandoff, and that is
 		// not a fault of the app.

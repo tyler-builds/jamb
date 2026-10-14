@@ -204,14 +204,20 @@ func newShellLink(t ShellTask) (uintptr, error) {
 // setTitle sets the title of a shell link through its property store, which is
 // how the jump list shows it.
 func setTitle(link uintptr, title string, live *[]*uint16) error {
+	return setStringProperty(link, pkeyTitle, title, live)
+}
+
+// setStringProperty sets a string property of a shell link through its property
+// store. The strings it points to are appended to live.
+func setStringProperty(link uintptr, key propertyKey, value string, live *[]*uint16) error {
 	var store uintptr
 	if err := comCall("QueryInterface", link, iUnknownQueryInterface,
 		uintptr(unsafe.Pointer(&iidPropertyStore)), uintptr(unsafe.Pointer(&store))); err != nil {
 		return err
 	}
 	defer release(store)
-	pv := propVariant{vt: vtLPWSTR, ptr: wide(live, title)}
-	if err := comCall("SetValue", store, psSetValue, uintptr(unsafe.Pointer(&pkeyTitle)), uintptr(unsafe.Pointer(&pv))); err != nil {
+	pv := propVariant{vt: vtLPWSTR, ptr: wide(live, value)}
+	if err := comCall("SetValue", store, psSetValue, uintptr(unsafe.Pointer(&key)), uintptr(unsafe.Pointer(&pv))); err != nil {
 		return err
 	}
 	runtime.KeepAlive(&pv)
