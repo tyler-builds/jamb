@@ -2930,7 +2930,10 @@ On the Projects page:
   Drawing and layout section has a canvas chart that follows the pointer, SVG
   images, selectable text and a form laid out as a grid. Its More widgets section
   has a sidebar, breadcrumbs, pagination, avatars, tags, skeletons, a color
-  picker and a date range picker. Its
+  picker and a date range picker. Its Clipboard images section copies a sample
+  image with transparency for pasting into another program, and pastes images
+  with a button or with Ctrl+V into a text area (`OnPasteImage`), showing them
+  over a checkerboard. Its
   Menus section has a dropdown and a context menu with a submenu; their shortcuts
   come from the demo's bindings.
 - The Components page's **Form controls** section shows each form control in its
