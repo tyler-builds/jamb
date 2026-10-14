@@ -44,3 +44,29 @@ func TestTitleBarButtonsLeavePointerClicksToThePlatform(t *testing.T) {
 		t.Fatalf("invoking Close ran %v, want the user's close (request close)", win.calls)
 	}
 }
+
+// The title-bar buttons are the platform's areas although they have an OnClick for
+// assistive technology, so the platform presses them and Windows can show Snap Layouts
+// over maximize; a control inside a drag area still takes its own input.
+func TestTitleBarButtonAreasAreThePlatforms(t *testing.T) {
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Row().WindowArea(WindowAreaDrag).
+			Child(Button("Search").Key("search")).
+			Child(Div().Grow(1)).
+			Child(TitleBarButtons())
+	})
+	r.rt.SetWindow(&fakeWindow{})
+	r.frame()
+	for key, want := range map[string]WindowArea{
+		"Minimize": WindowAreaMinimize, "Maximize": WindowAreaMaximize, "Close": WindowAreaClose,
+		"search": WindowAreaNone,
+	} {
+		rc, ok := r.rt.Find(key)
+		if !ok {
+			t.Fatalf("no %s", key)
+		}
+		if got := r.rt.hostWindowAreaAt(rc.X+rc.W/2, rc.Y+rc.H/2); got != want {
+			t.Errorf("%s: area %d, want %d", key, got, want)
+		}
+	}
+}

@@ -48,13 +48,20 @@ func (d *DivElement) WindowArea(a WindowArea) *DivElement { d.area = a; return d
 // pixels as for PointerMove, or WindowAreaNone. A point is in an WindowAreaDrag area
 // unless an element above that area on the hit path takes input of its own:
 // one with OnClick, OnMouseDown, focus (which includes text fields) or OnDrag.
-// It uses the hit testing of the last paint, so painted elements only.
+// A title-bar button area is the platform's even when its element has an OnClick,
+// which serves the keyboard and assistive technology: the platform then presses
+// the button (and Windows shows Snap Layouts over maximize), and the runtime
+// leaves the pointer click to it (see nativeCaption). It uses the hit testing of
+// the last paint, so painted elements only.
 func (rt *Runtime) hostWindowAreaAt(x, y float32) WindowArea {
 	x, y = x/rt.zoom, y/rt.zoom
 	for _, n := range rt.hitTest(x, y) {
 		d := n.div
 		if d == nil {
 			continue
+		}
+		if d.area.isButton() {
+			return d.area
 		}
 		if d.interactive() {
 			return WindowAreaNone
