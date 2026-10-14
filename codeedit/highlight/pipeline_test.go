@@ -69,7 +69,7 @@ func pipeline(t *testing.T, lang highlight.Grammar, src []byte, interval float64
 			return // the first publish, before NewSession returns
 		}
 		now := clockMicros()
-		_, v := s.Spans()
+		v := s.Synced()
 		mu.Lock()
 		defer mu.Unlock()
 		for len(latency) < len(pendingAt) && v >= uint64(len(latency)+1) {

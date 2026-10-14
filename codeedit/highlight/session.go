@@ -129,6 +129,7 @@ type Session struct {
 	length    int          // document length, as the typing thread sees it
 	version   uint64       // the number of edits accepted
 	synced    uint64       // the version of the last spans the worker published
+	rev       uint64       // changes whenever spans does: at each accepted edit and each publish
 	spans     []Span       // the spans to paint; replaced, never modified in place
 	queue     []EditRecord // edits the worker has not applied yet; Text is owned here
 	first     bool         // the worker has not parsed the document yet
@@ -221,6 +222,7 @@ func (s *Session) Edit(e EditRecord) error {
 	}
 	e.Text = slices.Clone(e.Text)
 	s.version++
+	s.rev++
 	s.lastEdit = time.Now()
 	s.spans = shift(s.spans, e)
 	s.length += len(e.Text) - (e.OldEnd - e.Start)
@@ -254,13 +256,24 @@ func (s *Session) SetViewport(lo, hi int) error {
 	return nil
 }
 
-// Spans returns the spans to paint and the version they are current for: every
-// edit up to that version is reflected. The slice must not be modified. It is
-// replaced, not changed, so a slice held by the caller stays valid.
+// Spans returns the spans to paint and their revision. The revision changes
+// whenever the spans do: when an edit shifts them, and when the worker publishes
+// new ones, so a caller that keeps an index of the spans rebuilds it when the
+// revision differs. The slice must not be modified. It is replaced, not changed,
+// so a slice held by the caller stays valid.
 func (s *Session) Spans() ([]Span, uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.spans, s.version
+	return s.spans, s.rev
+}
+
+// Synced returns the number of edits that the published spans reflect. Until it
+// reaches the number of edits made, the spans of the latest edits are the earlier
+// spans shifted into place.
+func (s *Session) Synced() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.synced
 }
 
 // CaptureNames returns the capture names of the language's query, indexed by
@@ -419,6 +432,7 @@ func (s *Session) compute(edits []EditRecord, parse, full bool, view [2]int) err
 		}
 		s.spans = spans
 		s.synced = s.version
+		s.rev++
 	}
 	return nil
 }

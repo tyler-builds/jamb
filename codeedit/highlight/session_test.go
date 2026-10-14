@@ -192,11 +192,15 @@ func TestEditValidationAndClose(t *testing.T) {
 	if err := s.Edit(highlight.EditRecord{Start: 3, OldEnd: 1}); err == nil {
 		t.Fatal("Edit accepted a reversed range")
 	}
-	if _, v := s.Spans(); v != 0 {
-		t.Fatalf("rejected edits changed the version to %d", v)
-	}
 	if err := s.Edit(highlight.EditRecord{Start: 0, OldEnd: 0, Text: []byte("// c\n")}); err != nil {
 		t.Fatal(err)
+	}
+	// Only the valid edit counts: the published spans come to reflect one edit.
+	for deadline := time.Now().Add(5 * time.Second); s.Synced() < 1 && time.Now().Before(deadline); {
+		time.Sleep(time.Millisecond)
+	}
+	if n := s.Synced(); n != 1 {
+		t.Fatalf("the spans reflect %d edits, want 1: rejected edits were counted", n)
 	}
 	if err := s.Close(); err != nil {
 		t.Fatal(err)

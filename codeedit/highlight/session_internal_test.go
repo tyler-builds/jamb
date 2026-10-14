@@ -124,7 +124,7 @@ func TestEditShiftsBeforeWorkerAnswers(t *testing.T) {
 	}
 	after, v1 := s.Spans()
 	if v1 != v0+1 {
-		t.Fatalf("version = %d, want %d", v1, v0+1)
+		t.Fatalf("revision = %d, want %d", v1, v0+1)
 	}
 	if want := shift(before, e); !slices.Equal(after, want) {
 		t.Fatalf("spans after edit = %v, want the shifted spans %v", after, want)
@@ -133,9 +133,14 @@ func TestEditShiftsBeforeWorkerAnswers(t *testing.T) {
 	settle(t, s, notify)
 
 	final := append(slices.Clone(text[:31]), append([]byte("xy"), text[31:]...)...)
-	got, _ := s.Spans()
+	got, v2 := s.Spans()
 	if want := freshSpans(t, lang, final); !slices.Equal(got, want) {
 		t.Fatalf("spans after the worker answered differ from a fresh parse:\n got %v\nwant %v", got, want)
+	}
+	// The worker's answer is a new revision with no new edit, so an editor that keeps an
+	// index of the spans by revision rebuilds it and paints the new colors at once.
+	if v2 == v1 {
+		t.Fatalf("the revision stayed %d when the worker published new spans", v1)
 	}
 }
 
