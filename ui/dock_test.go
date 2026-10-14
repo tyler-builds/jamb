@@ -254,6 +254,7 @@ type dockTestWindow struct {
 }
 
 func (f *dockTestWindow) Close()                              { f.closed++ }
+func (f *dockTestWindow) RequestClose()                       { f.closed++ }
 func (f *dockTestWindow) Closed() bool                        { return f.closed > 0 }
 func (f *dockTestWindow) Show()                               {}
 func (f *dockTestWindow) Hide()                               {}

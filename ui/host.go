@@ -54,6 +54,11 @@ func (h *runtimeHost) SetOpenURL(fn func(string) error) { h.rt().services.OpenUR
 // SetMaximized tells the runtime whether the window is maximized.
 func (h *runtimeHost) SetMaximized(on bool) { h.rt().hostSetMaximized(on) }
 
+// SetNativeCaption tells the runtime that the platform runs the pointer clicks of
+// the title-bar button areas, as it does for a window whose title bar the app
+// draws, so the runtime does not run their OnClick for the pointer as well.
+func (h *runtimeHost) SetNativeCaption(on bool) { h.rt().nativeCaption = on }
+
 // OnZoom sets the function called when the zoom changes.
 func (h *runtimeHost) OnZoom(fn func(float32)) { h.rt().hostOnZoom(fn) }
 

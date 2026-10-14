@@ -327,6 +327,7 @@ type Runtime struct {
 
 	services       platformServices
 	windowCtl      Window            // the app's window, see SetWindow
+	nativeCaption  bool              // the platform runs the title-bar buttons' pointer clicks (see WindowArea)
 	clientOrigin   func() (x, y int) // the client area's top-left corner on the screen, in logical pixels (see screenOrigin)
 	maximized      *Signal[bool]     // the window's state, read by Context.Window
 	focused        *Signal[bool]

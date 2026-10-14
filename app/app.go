@@ -478,6 +478,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
 	h.rh.SetImageClipboard(w.ClipboardImage, w.SetClipboardImage, w.HasClipboardImage)
 	h.rh.SetOpenURL(w.OpenURL)
+	h.rh.SetNativeCaption(h.cfg.Chrome == ChromeCustom) // the platform presses the title-bar buttons
 	h.rh.SetCancelComposition(w.CancelComposition)
 	h.rh.SetClientOrigin(func() (int, int) { p := w.ClientOrigin(); return p.X, p.Y })
 	h.rt.SetWindow(h.handle)
@@ -876,6 +877,7 @@ type runtimeHost interface {
 	SetClientOrigin(fn func() (x, y int))
 	Compose(text string, cursor, clauseStart, clauseEnd int)
 	SetMaximized(on bool)
+	SetNativeCaption(on bool)
 	OnZoom(fn func(float32))
 	Invalidate()
 	InvalidateAll()

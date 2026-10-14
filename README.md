@@ -2532,7 +2532,9 @@ as a setting: bind a `Switch` to it, and the next close follows it. The window h
 only while one of the app's tray icons is shown; without one the user could not bring
 it back, so it closes as usual. OnClose is not asked for a close that hides. The
 window handle's `Close` still closes the window and asks `OnClose`, so a tray menu's
-Quit item closes the windows with `win.Close()`.
+Quit item closes the windows with `win.Close()`. A close button that the app draws
+itself calls `ctx.Window().RequestClose()`, which closes as the window's own close
+button does, so `CloseToTray` applies to it; `ui.TitleBarButtons` does this.
 
 ```go
 closeToTray := ui.NewSignal(settings.CloseToTray) // saved with the app's settings

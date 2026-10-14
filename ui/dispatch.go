@@ -415,7 +415,12 @@ func (rt *Runtime) PointerUp(x, y float32, b input.MouseButton, mods input.Modif
 	}
 	for _, n := range path {
 		if n.div != nil && n.div.h.onClick != nil && rt.isPressed(n.id) {
-			n.div.h.onClick()
+			// The platform runs the title-bar buttons of a window whose title bar the
+			// app draws (see nativeCaption); running the handler too would minimize
+			// twice, toggle maximize back, or close as the app instead of the user.
+			if !(rt.nativeCaption && n.div.area.isButton()) {
+				n.div.h.onClick()
+			}
 			break
 		}
 		if n.div != nil && n.div.overlay != 0 {

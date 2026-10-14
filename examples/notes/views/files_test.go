@@ -22,6 +22,7 @@ func (f *fakeWindow) Minimize()                                             {}
 func (f *fakeWindow) ToggleMaximize()                                       {}
 func (f *fakeWindow) Maximized() bool                                       { return false }
 func (f *fakeWindow) Close()                                                {}
+func (f *fakeWindow) RequestClose()                                         {}
 func (f *fakeWindow) SetTitle(string)                                       {}
 func (f *fakeWindow) Focused() bool                                         { return true }
 func (f *fakeWindow) Position() (int, int)                                  { return 0, 0 }

@@ -25,14 +25,23 @@ const (
 	WindowAreaMinimize
 	// WindowAreaMaximize maximizes or restores the window when released over it.
 	WindowAreaMaximize
-	// WindowAreaClose closes the window when released over it.
+	// WindowAreaClose closes the window when released over it, as the user's
+	// close (see Window.RequestClose).
 	WindowAreaClose
 )
+
+// isButton reports whether a is one of the title-bar buttons, whose pointer
+// clicks the platform runs.
+func (a WindowArea) isButton() bool {
+	return a == WindowAreaMinimize || a == WindowAreaMaximize || a == WindowAreaClose
+}
 
 // WindowArea marks d as part of the window's title bar. Elements inside an
 // WindowAreaDrag element are dragged with the window too, unless they take input
 // of their own (see WindowAreaAt): a search box or a button in the title bar
-// stays usable.
+// stays usable. In a window whose title bar the app draws, the platform runs the
+// button areas' actions for the pointer, so an OnClick on such an element runs
+// only for the keyboard and assistive technology, and must do the same thing.
 func (d *DivElement) WindowArea(a WindowArea) *DivElement { d.area = a; return d }
 
 // hostWindowAreaAt returns the title-bar area under (x, y), in device-logical
@@ -78,7 +87,14 @@ type Window interface {
 	// Maximized reports whether the window is maximized. Read inside a
 	// component, it is reactive: the component re-renders when it changes.
 	Maximized() bool
+	// Close closes the window, as the app's own decision: OnClose is asked, and
+	// app.Window's CloseToTray does not apply.
 	Close()
+	// RequestClose asks the window to close as the user's close button does:
+	// OnClose is asked, and with app.Window's CloseToTray the window may hide to
+	// the notification area instead. A close button that the app draws itself
+	// calls it.
+	RequestClose()
 	SetTitle(title string)
 	// Focused reports whether the window has keyboard focus. Read inside a
 	// component, it is reactive.
@@ -146,6 +162,12 @@ func (w windowRef) ToggleMaximize() {
 func (w windowRef) Close() {
 	if c := w.rt.windowCtl; c != nil {
 		c.Close()
+	}
+}
+
+func (w windowRef) RequestClose() {
+	if c := w.rt.windowCtl; c != nil {
+		c.RequestClose()
 	}
 }
 
@@ -299,8 +321,9 @@ func TitleBarButtons() Element {
 				Pressed(Style{Background: t.SurfaceActive, TextColor: t.Text}).
 				WindowArea(area).
 				Child(Icon(ic).Size(10)).
-				// The native hit test does the press, so the click handler only
-				// serves assistive technology, which invokes the button.
+				// The native hit test does the press, and the runtime leaves a
+				// pointer click on the button to it (see nativeCaption), so the
+				// click handler serves the keyboard and assistive technology.
 				Role(access.RoleButton).Label(label).OnClick(func() {
 				switch area {
 				case WindowAreaMinimize:
@@ -308,7 +331,7 @@ func TitleBarButtons() Element {
 				case WindowAreaMaximize:
 					win.ToggleMaximize()
 				case WindowAreaClose:
-					win.Close()
+					win.RequestClose() // the user's close: CloseToTray applies
 				}
 			})
 			// Windows shows its own Snap Layouts flyout over the maximize button, so

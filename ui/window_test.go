@@ -110,6 +110,7 @@ func (f *fakeWindow) Minimize()                           { f.calls = append(f.c
 func (f *fakeWindow) ToggleMaximize()                     { f.calls = append(f.calls, "toggle") }
 func (f *fakeWindow) Maximized() bool                     { return f.maximized }
 func (f *fakeWindow) Close()                              { f.calls = append(f.calls, "close") }
+func (f *fakeWindow) RequestClose()                       { f.calls = append(f.calls, "request close") }
 func (f *fakeWindow) SetTitle(s string)                   { f.calls = append(f.calls, "title:"+s) }
 func (f *fakeWindow) Focused() bool                       { return f.focused }
 func (f *fakeWindow) Focus()                              { f.calls = append(f.calls, "focus") }

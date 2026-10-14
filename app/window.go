@@ -81,6 +81,10 @@ func (w *appWindow) Closed() bool          { return w.closed.Load() }
 // Close closes the window even when it is a CloseToTray window; see host.OnClose.
 func (w *appWindow) Close() { w.do(func(h *host) { h.closeAsked = true; h.win.Close() }) }
 
+// RequestClose closes the window as its close button does: OnClose is asked, and
+// CloseToTray may hide it instead (see ui.Window).
+func (w *appWindow) RequestClose() { w.do(func(h *host) { h.closeAsked = false; h.win.Close() }) }
+
 // Show and Hide implement ui.Window.
 func (w *appWindow) Show() { w.do(func(h *host) { h.win.Restore() }) }
 func (w *appWindow) Hide() { w.do(func(h *host) { h.win.Hide() }) }
