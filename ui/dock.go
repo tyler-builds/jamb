@@ -2,9 +2,12 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
@@ -17,6 +20,18 @@ import (
 const (
 	dockEdgeBand = 24
 	dockMinPane  = 48
+)
+
+// dockQuiet is how long the layout must stay still before OnChange runs for a change that
+// the user makes over time: a divider dragged, or a window moved or resized. dockGrabX and
+// dockGrabY are where a dropped tab lands under the pointer when its panel floats, and
+// dockFloatWidth and dockFloatHeight are the size of a window that a panel floats in.
+const (
+	dockQuiet       = 500 * time.Millisecond
+	dockGrabX       = 24
+	dockGrabY       = 16
+	dockFloatWidth  = 480
+	dockFloatHeight = 360
 )
 
 // DockStyle is the look of each part of a dock. A part's style merges over the built-in
@@ -102,10 +117,13 @@ func resolveDock(th *Theme, inst DockStyle) DockStyle {
 
 // DockPanel is one panel of a Dock: its title, which names its tab and its tab panel for
 // assistive technology, its icon, and Render, which builds its content. The content keeps
-// its state while the panel stays in its group, and while it is not the active tab. A
-// panel that moves to another group, or to a floating window, is built again there, so
-// keep the state the panel needs in signals the app owns. Closable adds a Close command to
-// the panel's menu.
+// its state wherever the panel goes: to another group, split off, dropped on an edge,
+// floated into a window and docked back, or put back by a layout reset. Its components keep
+// their Local state, signals and OnDispose functions, and its text fields keep their text,
+// undo history and selection, its scroll containers their offsets, and the panel keeps the
+// focus when it had it. OnDispose runs only when the panel closes. A panel that moves to
+// another window runs its Render once more there, with its state kept, so the app need not
+// hold that state in its own signals. Closable adds a Close command to the panel's menu.
 type DockPanel struct {
 	Title    string
 	Icon     *icons.Icon
@@ -116,15 +134,18 @@ type DockPanel struct {
 // DockWindow describes the window of a floating group, for the opener that Dock.Floating
 // takes. Root renders the group, Title names the window after its active panel, and X, Y,
 // Width and Height place it. OnClose records the window's position and size in the layout
-// as the window closes. OnClosed docks the group's panels back when the window closes,
-// including when the user closes it, so a panel is never lost with its window. The
-// window's own Root, Title and handlers are passed on to app.Window by app.OpenDockWindow.
+// as the window closes. OnGeometry is called as the user moves or resizes the window, in
+// logical pixels; the layout takes the new place once the window has been still for a
+// moment. OnClosed docks the group's panels back when the window closes, including when
+// the user closes it, so a panel is never lost with its window. The window's own Root,
+// Title and handlers are passed on to app.Window by app.OpenDockWindow.
 type DockWindow struct {
 	Title         string
 	X, Y          int
 	Width, Height int
 	Root          func(ctx *Context) Element
 	OnClose       func() bool
+	OnGeometry    func(x, y, width, height int)
 	OnClosed      func()
 }
 
@@ -138,6 +159,69 @@ type DockElement struct {
 	onChange func(DockLayout)
 	open     func(DockWindow) Window
 	size     sizing // the dock's outer box, from the sizing methods (see Sizing in docs/styling.md)
+
+	shared *dockShared // the state of the layout, which the docks of the layout share (see sharedFor)
+}
+
+// dockShown is a window that shows the dock: the runtime that renders it, and its window. A
+// tab released over the dock in another window asks it whether one of its groups takes the
+// panel.
+type dockShown struct {
+	rt  *Runtime
+	win Window
+}
+
+// dockSaver is the OnChange of a change saved late: pending is set while one waits, and
+// timer is the wait.
+type dockSaver struct {
+	pending bool
+	timer   *timer
+}
+
+// dockShared is the state that the Dock elements of one layout share. A dock that its parent
+// builds again, for the same layout, takes over the panels that the earlier one showed: their
+// instances, which keep their state (see retain.go), and the component of each panel. It also
+// holds the windows that show the dock and a save that waits. panels and version are those of
+// the latest Dock element: a panel renders with the latest Render functions, and a new Dock
+// element makes the panels render again.
+type dockShared struct {
+	layout   *Signal[DockLayout]
+	hub      *retainHub
+	panels   map[string]DockPanel
+	version  *Signal[int]
+	contents map[string]*ComponentElement // the component of each panel, made once (see content)
+	ids      map[string]string            // the panel ID of each content key
+	shown    map[string]dockShown         // the windows that show the dock, by view
+	saving   dockSaver                    // the OnChange of a change saved late (see saveLater)
+}
+
+// dockShares holds the shared state of each layout, by its signal.
+var dockShares = struct {
+	sync.Mutex
+	byLayout map[*Signal[DockLayout]]*dockShared
+}{byLayout: map[*Signal[DockLayout]]*dockShared{}}
+
+// sharedFor returns the state that the Dock elements of the layout share, made the first time.
+func sharedFor(layout *Signal[DockLayout]) *dockShared {
+	dockShares.Lock()
+	defer dockShares.Unlock()
+	s := dockShares.byLayout[layout]
+	if s == nil {
+		s = &dockShared{
+			layout: layout, version: NewSignal(0), contents: map[string]*ComponentElement{},
+			ids: map[string]string{}, shown: map[string]dockShown{},
+		}
+		s.hub = newRetainHub(s.wanted)
+		dockShares.byLayout[layout] = s
+	}
+	return s
+}
+
+// wanted reports whether the layout holds the panel whose content has the key. The hub keeps
+// the instances that it wants, and disposes the others.
+func (s *dockShared) wanted(key string) bool {
+	id, ok := s.ids[key]
+	return ok && s.layout.Peek().Has(id)
 }
 
 // Dock shows the panels of layout, which the app owns, so that the app can save the
@@ -155,14 +239,19 @@ type DockElement struct {
 // panel to the group on that side. Ctrl+Tab and Ctrl+Shift+Tab select the next and
 // previous panel of a group, and Ctrl+F6 moves focus to the next group.
 //
-// OnChange runs after each change the user makes, so the app can save the layout. A dock
-// fills its container, as Split does; give it a size or a grow factor in a column with
-// other children. See the Docking section of the README.
+// OnChange runs after each change the user makes, so the app can save the layout. A
+// divider dragged, or a floating window moved or resized, is saved late: OnChange runs
+// once the layout has been still for half a second, and at the end of a divider drag. A
+// dock fills its container, as Split does; give it a size or a grow factor in a column
+// with other children. See the Docking section of the README.
 func Dock(layout *Signal[DockLayout], panels map[string]DockPanel) *DockElement {
 	if layout == nil {
 		panic("ui.Dock: the layout is nil; make one with ui.NewSignal(ui.DockLayout{...})")
 	}
-	return &DockElement{layout: layout, panels: panels}
+	s := sharedFor(layout)
+	s.panels = panels
+	s.version.Set(s.version.Peek() + 1) // the panels render with these Render functions
+	return &DockElement{layout: layout, panels: panels, shared: s}
 }
 
 func (*DockElement) isElement()           {}
@@ -189,10 +278,12 @@ func (d *DockElement) OnChange(fn func(DockLayout)) *DockElement { d.onChange = 
 // Floating, the floating groups of the layout are not shown, and the panel's Float command
 // is disabled.
 //
-// A floating window shows its group only. Its panels are not dragged across windows: a
-// panel moves to another window with the Float and Dock back commands. Set QuitWhenClosed
-// on the main window of the app, so that closing it closes the floating windows too; their
-// positions are recorded when they close by the user, not when the main window closes.
+// A tab dragged out of its window and released where no dock takes it floats its panel in
+// a window at the pointer. A tab released over a group of another window of the dock moves
+// there. A floating window shows its group, and the Float and Dock back commands move a
+// panel between windows as well. Set QuitWhenClosed on the main window of the app, so that
+// closing it closes the floating windows too; their positions are recorded as they close,
+// and as the user moves them.
 func (d *DockElement) Floating(open func(DockWindow) Window) *DockElement { d.open = open; return d }
 
 // The sizing methods give the dock's outer box a size. A dock fills its container by
@@ -218,6 +309,57 @@ func (d *DockElement) scope() string {
 func (d *DockElement) keep(id string) bool {
 	_, ok := d.panels[id]
 	return ok
+}
+
+// contentKey is the key of the component that renders the panel id. It is the identity of
+// the panel's instance in the retain hub, so it does not change with the panel's place.
+func (d *DockElement) contentKey(id string) string { return d.scope() + "/content:" + id }
+
+// content returns the component that renders the panel id. It is made once, so that the
+// dock renders the same element for a panel wherever the panel is shown, and its instance is
+// kept through its key (see retain.go). It renders the latest Render function of the panel.
+func (d *DockElement) content(id string) *ComponentElement {
+	s := d.shared
+	c := s.contents[id]
+	if c == nil {
+		c = Component(func(*Context) Element {
+			s.version.Get() // a new Dock element for the layout renders the panels again
+			render := s.panels[id].Render
+			if render == nil {
+				return Div()
+			}
+			return render()
+		})
+		key := d.contentKey(id)
+		c.retain = &retainSlot{hub: s.hub, key: key}
+		s.contents[id] = c
+		s.ids[key] = id
+	}
+	return c
+}
+
+// saveLater records a change that the user makes over time, and runs OnChange once the
+// layout has been still for dockQuiet. rt is the runtime whose frames count the wait.
+func (d *DockElement) saveLater(rt *Runtime) {
+	s := &d.shared.saving
+	s.pending = true
+	s.timer.cancel()
+	s.timer = rt.at(rt.now().Add(dockQuiet), d.saveNow)
+}
+
+// saveNow runs OnChange with the layout if a change is waiting to be saved. It runs at the
+// end of a divider drag, when a window closes, and at once for the changes that are not late.
+func (d *DockElement) saveNow() {
+	s := &d.shared.saving
+	s.timer.cancel()
+	s.timer = nil
+	if !s.pending {
+		return
+	}
+	s.pending = false
+	if d.onChange != nil {
+		d.onChange(d.layout.Peek())
+	}
 }
 
 // dockDrag is the payload of a dragged tab: the panel, and the dock it came from, so that
@@ -249,9 +391,9 @@ type dockView struct {
 	th      *Theme
 	strs    *Strings
 	scope   string
-	float   bool                         // the view is the group of a floating window
-	panels  map[string]*ComponentElement // the component of each panel, kept across renders
-	handles map[string]*FocusHandle      // the focus handle of each tab
+	key     string                  // the window the view is in: "main", or "float:" and the group's ID
+	float   bool                    // the view is the group of a floating window
+	handles map[string]*FocusHandle // the focus handle of each tab
 	hover   *Signal[dockHover]
 	hov     dockHover // the hover as this render shows it
 	windows map[string]Window
@@ -279,13 +421,24 @@ func (v *dockView) setHover(h dockHover) {
 
 // record stores a new layout, the way the user changes it, and runs OnChange. The layout
 // is normalized with the panels the dock shows, so a saved layout holds no unknown panel.
-func (v *dockView) record(next DockLayout) {
+func (v *dockView) record(next DockLayout) { v.store(next, false) }
+
+// store sets the layout. A change the user makes over time is saved late (see saveLater);
+// any other runs OnChange at once.
+func (v *dockView) store(next DockLayout, late bool) {
 	next = normalizeLayout(next, v.d.keep)
 	v.layout.Set(next)
-	if v.d.onChange != nil {
-		v.d.onChange(next)
+	if late {
+		v.d.saveLater(v.ctx.rt)
+		return
 	}
+	v.d.shared.saving.pending = true
+	v.d.saveNow()
 }
+
+// accepts reports whether a drag p, which a tab of any view of the dock carries, may be
+// dropped on this view.
+func (v *dockView) accepts(p dockDrag) bool { return p.scope == v.d.scope() }
 
 // norm returns the layout as the dock shows it: normalized with its known panels.
 func (v *dockView) norm(l DockLayout) DockLayout { return normalizeLayout(l.clone(), v.d.keep) }
@@ -396,19 +549,19 @@ func dockPath(path []int) string { return strings.Trim(fmt.Sprint(path), "[]") }
 func appendPath(path []int, k int) []int { return append(slices.Clone(path), k) }
 
 func (d *DockElement) expand(ctx *Context) Element {
-	// panels holds the component of each panel, made by this dock. Rendering the dock again
-	// reuses them, so a change to the layout does not build the panels again.
-	panels := map[string]*ComponentElement{}
 	return Component(func(ctx *Context) Element {
 		v := &dockView{
-			ctx: ctx, d: d, layout: d.layout, th: ctx.Theme(), strs: ctx.Strings(), scope: d.scope(),
-			st: resolveDock(ctx.Theme(), d.styles), panels: panels,
+			ctx: ctx, d: d, layout: d.layout, th: ctx.Theme(), strs: ctx.Strings(), scope: d.scope(), key: "main",
+			st:      resolveDock(ctx.Theme(), d.styles),
 			handles: Local(ctx, "handles", map[string]*FocusHandle{}).Peek(),
 			hover:   Local(ctx, "hover", dockHover{}),
 			windows: Local(ctx, "windows", map[string]Window{}).Peek(),
 		}
 		v.hov = v.hover.Get()
 		v.lay = v.norm(d.layout.Get())
+		d.shared.shown[v.key] = dockShown{rt: ctx.rt, win: ctx.Window()}
+		// A panel the layout no longer holds is closed: its instance is disposed here, once.
+		d.shared.hub.sweep()
 		root := Div().Key(v.scope).Column().Size(Full, Full)
 		root.OnKeyDown(func(e *KeyEvent) {
 			if e.Key != input.KeyF6 || e.Repeat || e.Mods != input.ModCtrl {
@@ -474,6 +627,7 @@ func (v *dockView) chain(n DockNode, path []int, k int) Element {
 	sp := Split(v.node(n.Children[k], appendPath(path, k)), v.chain(n, path, k+1)).Key(key).Position(pos).
 		MinFirst(Px(dockMinPane)).MinSecond(Px(dockMinPane)).
 		OnChange(func(f float64) { v.resize(path, k, f) })
+	sp.onRelease = v.d.saveNow
 	if n.Vertical {
 		sp.Orientation(SplitVertical)
 	}
@@ -496,7 +650,7 @@ func (v *dockView) resize(path []int, k int, f float64) {
 	f = min(max(f, 0.001), 0.999)
 	sz[k] = f * rest / (1 - f)
 	n.Sizes = sz
-	v.record(out)
+	v.store(out, true)
 }
 
 // group returns the element of a tab group: its tab strip, and each panel, which stays
@@ -530,7 +684,7 @@ func (v *dockView) group(g DockNode) Element {
 	return gv.OnDrop(Drop(func(p dockDrag, e *DropEvent) {
 		v.setHover(dockHover{})
 		v.movePanel(p.panel, DockMove(v.norm(v.layout.Peek()), p.panel, anchor, v.zoneOf(e)))
-	}).Accept(func(p dockDrag) bool { return p.scope == v.scope }).
+	}).Accept(v.accepts).
 		Move(func(p dockDrag, e *DropEvent) {
 			zone := v.zoneOf(e)
 			if !v.moves(p.panel, anchor, zone) {
@@ -564,7 +718,7 @@ func (v *dockView) band(side DockZone) *DivElement {
 	return b.OnDrop(Drop(func(p dockDrag, e *DropEvent) {
 		v.setHover(dockHover{})
 		v.movePanel(p.panel, DockMove(v.norm(v.layout.Peek()), p.panel, "", side))
-	}).Accept(func(p dockDrag) bool { return p.scope == v.scope }).
+	}).Accept(v.accepts).
 		Move(func(p dockDrag, e *DropEvent) {
 			v.setHover(dockHover{drag: true, edge: true, zone: side})
 		}).
@@ -590,9 +744,14 @@ func (v *dockView) tab(g DockNode, id string) *DivElement {
 		Role(access.RoleTab).Label(title).AccessSelected(on).Cursor(CursorPointer).
 		Focusable().FocusVisible(v.st.TabFocusVisible).FocusHandle(v.handle(id)).
 		Dragging(source).
-		OnDrag(Drag(dockDrag{scope: v.scope, panel: id}).Preview(func() Element {
+		OnDrag(Drag(dockDrag{scope: v.d.scope(), panel: id}).Preview(func() Element {
 			return Div().Padding(6).Background(v.th.Surface).Border(1, v.th.Border).Child(Text(title))
-		}).End(func(bool) { v.setHover(dockHover{}) })).
+		}).EndAt(func(e DragEnd) {
+			v.setHover(dockHover{})
+			if !e.Dropped && !e.Cancelled {
+				v.releaseOutside(id, e.X, e.Y)
+			}
+		})).
 		OnClick(func() { v.selectPanel(id) }).
 		OnKeyDown(v.tabKeys(g, id)).
 		ContextMenu(v.menu(g, id))
@@ -653,20 +812,9 @@ func (v *dockView) tabKeys(g DockNode, id string) func(*KeyEvent) {
 // mounted while another tab is active, so its state survives the switch.
 func (v *dockView) panel(g DockNode, id string) Element {
 	p := v.d.panels[id]
-	pc := v.panels[id]
-	if pc == nil {
-		render := p.Render
-		pc = Component(func(*Context) Element {
-			if render == nil {
-				return Div()
-			}
-			return render()
-		})
-		v.panels[id] = pc
-	}
 	return Div().asPart("Dock.Panel").Key(v.scope + "/panel:" + id).Column().Grow(1).MinHeight(Px(0)).
 		Role(access.RoleTabPanel).Label(p.Title).Display(g.Active == id).Style(v.st.Panel).
-		LabelledBy(v.tabKey(id)).Child(pc)
+		LabelledBy(v.tabKey(id)).Child(v.d.content(id))
 }
 
 // menu returns the context menu of the tab of the panel id, built when it opens. The items
@@ -713,7 +861,36 @@ func (v *dockView) menu(g DockNode, id string) func() []MenuItem {
 // the main window.
 func (v *dockView) floatPanel(id string) {
 	x, y := v.ctx.Window().Position()
-	v.movePanel(id, DockFloatPanel(v.norm(v.layout.Peek()), id, x+48, y+48, 480, 360))
+	v.movePanel(id, DockFloatPanel(v.norm(v.layout.Peek()), id, x+48, y+48, dockFloatWidth, dockFloatHeight))
+}
+
+// releaseOutside handles a tab of the panel id that was dragged and released with no target
+// under the pointer in its own window. (x, y) is the pointer on the screen, in logical
+// pixels. A dock in another window takes the panel when one of its groups is under the
+// pointer. Otherwise the panel floats in a window that has its top-left corner by the
+// pointer, so that the tab ends under it; the app keeps that window on its monitor.
+func (v *dockView) releaseOutside(id string, x, y float32) {
+	payload := dockDrag{scope: v.d.scope(), panel: id}
+	for key, s := range v.d.shared.shown {
+		if key == v.key || s.win == nil || s.win.Closed() {
+			continue
+		}
+		wx, wy := s.rt.screenOrigin()
+		ww, wh := s.win.Size()
+		lx, ly := x-wx, y-wy
+		if lx < 0 || ly < 0 || lx >= float32(ww) || ly >= float32(wh) {
+			continue
+		}
+		if s.rt.dropAt(lx, ly, payload) {
+			return
+		}
+	}
+	if v.d.open == nil {
+		return // a dock without an opener does not float panels
+	}
+	left := int(math.Round(float64(x))) - dockGrabX
+	top := int(math.Round(float64(y))) - dockGrabY
+	v.movePanel(id, DockFloatPanel(v.norm(v.layout.Peek()), id, left, top, dockFloatWidth, dockFloatHeight))
 }
 
 // syncWindows opens a window for each floating group that has none, and closes the window
@@ -750,15 +927,21 @@ func (d *DockElement) floatWindow(v *dockView, f DockFloat) DockWindow {
 		Title: title, X: f.X, Y: f.Y, Width: f.Width, Height: f.Height,
 		Root: d.floatRoot(v.layout, id),
 		OnClose: func() bool {
-			if w := v.windows[id]; w != nil {
+			if w := v.windows[id]; w != nil && floatByID(v.layout.Peek(), id) != nil {
 				x, y := w.Position()
 				width, height := w.Size()
 				v.record(dockSetFloatBounds(v.layout.Peek(), id, x, y, width, height))
 			}
 			return true
 		},
+		OnGeometry: func(x, y, width, height int) {
+			if floatByID(v.layout.Peek(), id) != nil {
+				v.store(dockSetFloatBounds(v.layout.Peek(), id, x, y, width, height), true)
+			}
+		},
 		OnClosed: func() {
 			delete(v.windows, id)
+			delete(d.shared.shown, "float:"+id)
 			l := v.layout.Peek()
 			fl := floatByID(l, id)
 			if fl == nil {
@@ -779,17 +962,17 @@ func (d *DockElement) floatWindow(v *dockView, f DockFloat) DockWindow {
 }
 
 // floatRoot returns the content of the window of the floating group id: the group, with
-// its tabs and panels. The panels are built by the window's own runtime, so they keep their
-// state only within it.
+// its tabs and panels. The window's runtime builds the panels, and takes their instances
+// from the dock's hub, so a panel keeps its state as it moves into the window (see retain.go).
 func (d *DockElement) floatRoot(layout *Signal[DockLayout], id string) func(*Context) Element {
-	panels := map[string]*ComponentElement{}
 	return func(ctx *Context) Element {
 		v := &dockView{
 			ctx: ctx, d: d, layout: layout, th: ctx.Theme(), strs: ctx.Strings(), scope: d.scope() + "/float:" + id,
-			st: resolveDock(ctx.Theme(), d.styles), panels: panels, float: true,
+			key: "float:" + id, st: resolveDock(ctx.Theme(), d.styles), float: true,
 			handles: Local(ctx, "handles", map[string]*FocusHandle{}).Peek(),
 			hover:   Local(ctx, "hover", dockHover{}),
 		}
+		d.shared.shown[v.key] = dockShown{rt: ctx.rt, win: ctx.Window()}
 		v.hov = v.hover.Get()
 		v.lay = v.norm(layout.Get())
 		f := floatByID(v.lay, id)

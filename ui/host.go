@@ -44,6 +44,10 @@ func (h *runtimeHost) Compose(text string, cursor, clauseStart, clauseEnd int) {
 	h.rt().hostCompose(composition{text: text, cursor: cursor, clauseStart: clauseStart, clauseEnd: clauseEnd})
 }
 
+// SetClientOrigin connects the platform's client area origin on the screen, which a drag
+// released outside the window is placed by (see screenOrigin).
+func (h *runtimeHost) SetClientOrigin(fn func() (x, y int)) { h.rt().clientOrigin = fn }
+
 // SetOpenURL connects the platform's way to open a URL (see Context.OpenURL).
 func (h *runtimeHost) SetOpenURL(fn func(string) error) { h.rt().services.OpenURL = fn }
 
@@ -59,6 +63,10 @@ func (h *runtimeHost) InvalidateAll() { h.rt().hostInvalidateAll() }
 
 // PointerLeave reports that the pointer left the window.
 func (h *runtimeHost) PointerLeave() { h.rt().hostPointerLeave() }
+
+// FlushTimers runs the timers that are pending now, so that a window that is closing
+// saves what it has not yet saved (see Runtime.at).
+func (h *runtimeHost) FlushTimers() { h.rt().runTimers(time.Time{}, true) }
 
 // WindowFocus reports that the window gained or lost focus.
 func (h *runtimeHost) WindowFocus(focused bool) { h.rt().hostWindowFocus(focused) }

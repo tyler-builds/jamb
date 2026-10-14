@@ -99,6 +99,14 @@ type Window struct {
 	// OnClosed is called on the UI thread after the window has closed, or
 	// after Open failed to open it.
 	OnClosed func()
+	// OnGeometry is called on the UI thread as the window is moved, resized or
+	// given another scale, with its position and content size in logical pixels,
+	// as X, Y, Width and Height are. It is called for each step of a move or a
+	// resize, so an app that saves the geometry should wait until it is still.
+	OnGeometry func(x, y, width, height int)
+	// keepOnScreen moves the window in from the edges of its monitor when it opens
+	// at X and Y (see OpenDockWindow).
+	keepOnScreen bool
 	// QuitWhenClosed quits the app when this window closes, even while other
 	// windows are open. Before it closes, the OnClose of every other window is
 	// asked; if one returns false, nothing closes. Then the other windows close
@@ -321,6 +329,7 @@ func openWindow(cfg Window, handle *appWindow) (*host, error) {
 	}
 	if opts.Frame.W == 0 {
 		opts.Origin = origin(cfg)
+		opts.KeepOnScreen = cfg.keepOnScreen
 	}
 	h.darkFrame = opts.Dark
 	if _, err := openPlatform(opts, h); err != nil {
@@ -452,6 +461,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rh.SetImageClipboard(w.ClipboardImage, w.SetClipboardImage, w.HasClipboardImage)
 	h.rh.SetOpenURL(w.OpenURL)
 	h.rh.SetCancelComposition(w.CancelComposition)
+	h.rh.SetClientOrigin(func() (int, int) { p := w.ClientOrigin(); return p.X, p.Y })
 	h.rt.SetWindow(h.handle)
 	h.rt.SetAccessWarnings(h.dev.a11yWarn)
 	h.applySettings()
@@ -541,8 +551,10 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 	case platform.EventResize, platform.EventScaleChanged:
 		h.updateViewport(w)
 		h.saveGeometry(w)
+		h.reportGeometry(w)
 	case platform.EventMoved:
 		h.saveGeometry(w)
+		h.reportGeometry(w)
 	case platform.EventSettingsChanged:
 		h.applySettings()
 	case platform.EventWindowState:
@@ -602,12 +614,28 @@ func (h *host) saveGeometry(w platform.Window) {
 	}
 }
 
+// reportGeometry gives the window's position and content size, in logical pixels, to the
+// app's OnGeometry, if it has one.
+func (h *host) reportGeometry(w platform.Window) {
+	if h.cfg.OnGeometry == nil {
+		return
+	}
+	f, s := w.Frame(), w.Scale()
+	cw, ch := w.Size()
+	h.cfg.OnGeometry(int(float32(f.X)/s+0.5), int(float32(f.Y)/s+0.5),
+		int(float32(cw)/s+0.5), int(float32(ch)/s+0.5))
+}
+
 // OnClose implements platform.Handler.
 // OnClose implements platform.Handler. A QuitWhenClosed window asks the OnClose
 // of every other open window first. If one of them keeps its window open, the
 // whole close is cancelled, this window included. Otherwise the other windows
 // close too, without being asked again.
 func (h *host) OnClose(w platform.Window) bool {
+	// What the window saves late is saved now, before the app asks or quits.
+	if h.rh != nil {
+		h.rh.FlushTimers()
+	}
 	if application.quitting {
 		return true
 	}
@@ -817,6 +845,7 @@ type runtimeHost interface {
 	SetImageClipboard(get func() (image.Image, bool), set func(image.Image), has func() bool)
 	SetOpenURL(fn func(string) error)
 	SetCancelComposition(fn func())
+	SetClientOrigin(fn func() (x, y int))
 	Compose(text string, cursor, clauseStart, clauseEnd int)
 	SetMaximized(on bool)
 	OnZoom(fn func(float32))
@@ -828,6 +857,7 @@ type runtimeHost interface {
 	HasMenuBar() bool
 	TextInputRect() (scene.Rect, bool)
 	WindowAreaAt(x, y float32) ui.WindowArea
+	FlushTimers()
 }
 
 func hostOf(rt *ui.Runtime) runtimeHost { return uihost.Of(rt).(runtimeHost) }

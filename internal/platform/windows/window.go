@@ -263,7 +263,11 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 		w.dpi = win32.GetDpiForWindow(hwnd)
 	case opts.Origin != nil:
 		o := opts.Origin
-		win32.SetWindowPos(hwnd, int32(scaleInt(o.X, dpi)), int32(scaleInt(o.Y, dpi)), ww, wh, win32.SWP_NOZORDER|win32.SWP_NOACTIVATE)
+		x, y := int32(scaleInt(o.X, dpi)), int32(scaleInt(o.Y, dpi))
+		if opts.KeepOnScreen {
+			x, y = keepOnScreen(x, y, ww, wh, win32.WorkAreaAt(x, y))
+		}
+		win32.SetWindowPos(hwnd, x, y, ww, wh, win32.SWP_NOZORDER|win32.SWP_NOACTIVATE)
 	default:
 		work := win32.WorkArea(hwnd)
 		x := work.Left + (work.Right-work.Left-ww)/2
@@ -322,6 +326,16 @@ func (w *window) outerSize(width, height int, dpi uint32) (int32, int32) {
 
 func scaleInt(v int, dpi uint32) int { return (v*int(dpi) + 48) / 96 }
 
+// keepOnScreen returns the top-left corner of a window of w by h physical pixels that is
+// placed at (x, y), moved in so that it lies within the work area. The right and bottom
+// edges are fitted first, so a window larger than the area is put at the area's top-left
+// corner.
+func keepOnScreen(x, y, w, h int32, work win32.RECT) (int32, int32) {
+	x = max(min(x, work.Right-w), work.Left)
+	y = max(min(y, work.Bottom-h), work.Top)
+	return x, y
+}
+
 func (w *window) updateSize() {
 	r := win32.GetClientRect(w.hwnd)
 	w.width, w.height = int(r.Right-r.Left), int(r.Bottom-r.Top)
@@ -334,6 +348,14 @@ func (w *window) SetTitle(t string) { win32.SetWindowText(w.hwnd, t) }
 func (w *window) Frame() platform.Rect {
 	r := win32.GetWindowRect(w.hwnd)
 	return platform.Rect{X: int(r.Left), Y: int(r.Top), W: int(r.Right - r.Left), H: int(r.Bottom - r.Top)}
+}
+
+// ClientOrigin implements platform.Window.
+func (w *window) ClientOrigin() platform.Point {
+	p := win32.POINT{}
+	win32.ClientToScreen(w.hwnd, &p)
+	s := w.Scale()
+	return platform.Point{X: int(float32(p.X)/s + 0.5), Y: int(float32(p.Y)/s + 0.5)}
 }
 func (w *window) Show()  { win32.ShowWindow(w.hwnd, win32.SW_SHOW) }
 func (w *window) Close() { win32.PostMessage(w.hwnd, win32.WM_CLOSE, 0, 0) }

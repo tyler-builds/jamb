@@ -31,6 +31,18 @@ type DragSpec struct {
 	payload any
 	preview func() Element
 	end     func(dropped bool)
+	endAt   func(DragEnd)
+}
+
+// DragEnd says how a drag ended, for DragSpec.EndAt. Dropped is set when a target took the
+// payload, and Cancelled when Escape or the window losing focus ended the drag. Otherwise
+// the button was released with no target under the pointer, and X and Y are the pointer's
+// position on the screen in logical pixels, which may lie outside the window. They are zero
+// when the drag was cancelled.
+type DragEnd struct {
+	Dropped   bool
+	Cancelled bool
+	X, Y      float32
 }
 
 // Drag makes a payload of type T that an element can be dragged with. Drop
@@ -49,6 +61,10 @@ func (s *DragSpec) Preview(fn func() Element) *DragSpec { s.preview = fn; return
 // End runs fn after the drag ends. dropped is true when a target took the
 // payload, and false when the drag was cancelled or released over nothing.
 func (s *DragSpec) End(fn func(dropped bool)) *DragSpec { s.end = fn; return s }
+
+// EndAt is like End, and also reports where the drag ended, on the screen (see DragEnd).
+// Use it to float a panel where the user let go of it.
+func (s *DragSpec) EndAt(fn func(DragEnd)) *DragSpec { s.endAt = fn; return s }
 
 // OnDrag makes the element a drag source. The drag starts once the pointer
 // moves 4 px with the primary button held; a press that does not move is a
@@ -288,22 +304,24 @@ func (rt *Runtime) finishDrag(x, y float32, mods input.Modifiers) {
 		t.drop(rt.drag.payload, rt.dropEvent(rt.drag.target, x, y, mods))
 		dropped = true
 	}
-	rt.endDrag(dropped)
+	rt.endDrag(dropped, false)
 }
 
 // cancelDrag ends a drag without a drop (Escape, the window losing focus), or
 // forgets a press that has not become a drag.
 func (rt *Runtime) cancelDrag() {
 	if rt.drag.active {
-		rt.endDrag(false)
+		rt.endDrag(false, true)
 		return
 	}
 	rt.drag = dragState{}
 }
 
 // endDrag ends the active drag: the target hears Leave, the source and target
-// restyle, the preview goes, hover resumes, and the source's End runs.
-func (rt *Runtime) endDrag(dropped bool) {
+// restyle, the preview goes, hover resumes, and the source's End runs. A release
+// is reported with the pointer's screen position, which the window's position
+// turns into; a cancelled drag has none.
+func (rt *Runtime) endDrag(dropped, cancelled bool) {
 	d := rt.drag
 	if d.targetSpec != nil {
 		d.targetSpec.leave()
@@ -320,6 +338,43 @@ func (rt *Runtime) endDrag(dropped bool) {
 	if d.spec.end != nil {
 		d.spec.end(dropped)
 	}
+	if d.spec.endAt != nil {
+		e := DragEnd{Dropped: dropped, Cancelled: cancelled}
+		if !cancelled {
+			ox, oy := rt.screenOrigin()
+			e.X, e.Y = d.x+ox, d.y+oy
+		}
+		d.spec.endAt(e)
+	}
+}
+
+// screenOrigin returns the top-left corner of the window's client area on the screen, in
+// logical pixels. The host gives it (see SetClientOrigin); without a host, the window's own
+// position stands in for it, and a runtime with no window is at the origin.
+func (rt *Runtime) screenOrigin() (x, y float32) {
+	if rt.clientOrigin != nil {
+		ox, oy := rt.clientOrigin()
+		return float32(ox), float32(oy)
+	}
+	if c := rt.windowCtl; c != nil {
+		ox, oy := c.Position()
+		return float32(ox), float32(oy)
+	}
+	return 0, 0
+}
+
+// dropAt delivers a payload released at (x, y), in this window's logical pixels, to the
+// target under the pointer that accepts it, as a drop from another window. It reports
+// whether a target took it.
+func (rt *Runtime) dropAt(x, y float32, payload any) bool {
+	id, t := rt.dropTargetAt(x, y, payload)
+	if t == nil {
+		return false
+	}
+	t.drop(payload, rt.dropEvent(id, x, y, 0))
+	rt.needPaint = true
+	rt.requestFrame()
+	return true
 }
 
 // showPreview builds the drag's preview. It is a component of its own, with

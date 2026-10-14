@@ -14,8 +14,9 @@ import (
 // re-renders. Otherwise its previous output — and the realized, laid-out
 // nodes built from it — are kept as they are.
 type ComponentElement struct {
-	fn  func(ctx *Context) Element
-	key string
+	fn     func(ctx *Context) Element
+	key    string
+	retain *retainSlot // set for a retained component (see retain.go)
 }
 
 // Component wraps a render function as a re-render boundary:
@@ -61,6 +62,11 @@ type componentInstance struct {
 	disposed   bool
 	// disposers are the functions registered with Context.OnDispose, run once when disposed.
 	disposers []func()
+	// retain is set when the instance is retained (see retain.go). parked is set while it
+	// is in no runtime's tree, and refocus is the node that had focus when it was parked.
+	retain  *retainSlot
+	parked  bool
+	refocus uint64
 
 	// watchesFocus is set when the last render asked whether its element is
 	// focused; a focus change then re-renders it.

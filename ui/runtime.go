@@ -298,6 +298,7 @@ type Runtime struct {
 	wake                  func()
 	warn                  func(string)
 	lastFrame             time.Time
+	timers                []*timer // functions due at a time, run by Frame (see at)
 
 	mouseX, mouseY float32
 	mouseIn        bool
@@ -324,8 +325,9 @@ type Runtime struct {
 	restyled int // restyles since the last frame (they happen during input handling)
 
 	services       platformServices
-	windowCtl      Window        // the app's window, see SetWindow
-	maximized      *Signal[bool] // the window's state, read by Context.Window
+	windowCtl      Window            // the app's window, see SetWindow
+	clientOrigin   func() (x, y int) // the client area's top-left corner on the screen, in logical pixels (see screenOrigin)
+	maximized      *Signal[bool]     // the window's state, read by Context.Window
 	focused        *Signal[bool]
 	memClipboard   string      // used when no platform clipboard is wired in
 	memImage       image.Image // the image on that clipboard
@@ -731,6 +733,7 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 		rt.needPaint = true
 	}
 	rt.expirePending(now)
+	rt.runTimers(now, false)
 	rt.tickToasts(now)
 	rt.wakeToasts(now)
 	if rt.tipCandidate != 0 && rt.tipShown != rt.tipCandidate && rt.tipCandidate != rt.tipDismissed && !now.Before(rt.tipAt) {
@@ -889,6 +892,10 @@ func typeTag(e Element) uint64 {
 // childID derives a child's identity from its parent, its type and either
 // its key or (when unkeyed) its position among its siblings.
 func childID(parent uint64, index int, e Element) uint64 {
+	if c, ok := e.(*ComponentElement); ok && c.retain != nil {
+		// A retained component answers to its key wherever it is built (see retain.go).
+		return mix(hashString(c.retain.key), 0x7e7a)
+	}
 	if k, ok := e.(keyed); ok {
 		if key := k.elementKey(); key != "" {
 			return mix(mix(parent, hashString(key)|1<<63), typeTag(e))
@@ -947,8 +954,8 @@ func (rt *Runtime) rebuildDirty() {
 	// which clears their dirty flags so they are skipped below.
 	sort.SliceStable(queue, func(i, j int) bool { return queue[i].depth < queue[j].depth })
 	for _, inst := range queue {
-		if inst.disposed || !inst.dirty.Load() {
-			continue
+		if inst.disposed || inst.parked || inst.rt != rt || !inst.dirty.Load() {
+			continue // parked, or moved to another runtime, since it was queued (see retain.go)
 		}
 		rt.rerender(inst)
 	}
@@ -1044,8 +1051,13 @@ func (rt *Runtime) renderInstance(inst *componentInstance) {
 		inst.root.key = k.elementKey() // keep answering to the component's key after re-renders
 	}
 	for _, c := range oldChildren {
-		if c.gen != rt.gen || c.parent != inst {
-			rt.disposeInstance(c)
+		switch {
+		case c.rt != rt:
+			// Taken by another runtime (see retain.go): it is no longer this one's.
+		case c.retain != nil && c.gen == rt.gen && c.parent != inst:
+			// Claimed this build by another owner, so it is alive.
+		case c.gen != rt.gen || c.parent != inst:
+			rt.retireChild(c)
 		}
 	}
 	rt.retire(oldRoot)
@@ -1074,8 +1086,8 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	if n == nil {
 		return
 	}
-	if b := n.boundary; b != nil && b.root == n && !b.disposed && b.gen == rt.gen && n.gen != rt.gen {
-		return // a reused instance's subtree, now part of the new tree
+	if b := n.boundary; b != nil && b.root == n && !b.disposed && (b.rt != rt || b.gen == rt.gen && n.gen != rt.gen) {
+		return // a reused instance's subtree, now part of the new tree, or one taken by another runtime
 	}
 	leaving := rt.byID[n.id] == n
 	if leaving {
@@ -1121,8 +1133,17 @@ func (rt *Runtime) disposeInstance(inst *componentInstance) {
 		delete(rt.instances, inst.id)
 		delete(rt.states, inst.id)
 	}
+	if r := inst.retain; r != nil && r.hub.live[r.key] == inst {
+		delete(r.hub.live, r.key)
+	}
+	if inst.parked {
+		// Parked nodes are in no build any more, so nothing else forgets their states.
+		forNodes(inst.root, func(n *node) { delete(rt.states, n.id) })
+	}
 	for _, c := range inst.children {
-		rt.disposeInstance(c)
+		if c.parent == inst { // a retained child that another owner claimed is not disposed (see retain.go)
+			rt.disposeInstance(c)
+		}
 	}
 }
 
@@ -1146,9 +1167,22 @@ func (rt *Runtime) newNode(kind nodeKind, id uint64, parent *node, owner *compon
 func (rt *Runtime) instance(id uint64, el Element, owner *componentInstance, parent *node, inh textStyle) *componentInstance {
 	inst := rt.instances[id]
 	if inst == nil || inst.disposed {
-		inst = &componentInstance{rt: rt, id: id}
-		inst.dirty.Store(true)
-		rt.instances[id] = inst
+		var slot *retainSlot
+		if c, ok := el.(*ComponentElement); ok {
+			slot = c.retain
+		}
+		if slot != nil {
+			inst = slot.hub.claim(rt, slot.key, parent)
+		}
+		if inst == nil {
+			inst = &componentInstance{rt: rt, id: id}
+			inst.dirty.Store(true)
+			rt.instances[id] = inst
+			if slot != nil {
+				slot.hub.live[slot.key] = inst
+				inst.retain = slot
+			}
+		}
 	}
 	inst.gen = rt.gen
 	inst.parent = owner
@@ -1157,7 +1191,9 @@ func (rt *Runtime) instance(id uint64, el Element, owner *componentInstance, par
 		inst.depth = owner.depth + 1
 		owner.children = append(owner.children, inst)
 	}
-	inst.parentNode = parent
+	if inst.parentNode != parent {
+		inst.reparent(parent)
+	}
 	if inst.el != el {
 		inst.el = el
 		inst.dirty.Store(true)
@@ -1170,6 +1206,7 @@ func (rt *Runtime) instance(id uint64, el Element, owner *componentInstance, par
 	// Reuse: re-attach the retained subtree and pass down inherited text
 	// style if it changed.
 	inst.root.parent = parent
+	inst.keepOutput(rt.gen)
 	if inst.inh != inh {
 		rt.applyInherited(inst.root, inh)
 	}

@@ -158,6 +158,7 @@ type SplitElement struct {
 	firstName     string // the accessible name of the first pane, see FirstLabel
 	secondName    string // the accessible name of the second pane, see SecondLabel
 	onChange      func(float64)
+	onRelease     func() // runs when a pointer drag of the divider ends (see dock.go)
 	styles        SplitStyle
 	size          sizing // the split's outer box, from the sizing methods (see Sizing in docs/styling.md)
 }
@@ -600,7 +601,12 @@ func (s *SplitElement) expand(ctx *Context) Element {
 					d := drag.Peek()
 					setFirst(d.p+(axis(e)-d.at), s.length(ctx, key))
 				}).
-				OnMouseUp(func(*MouseEvent) { dragging.Set(false) }).
+				OnMouseUp(func(*MouseEvent) {
+					dragging.Set(false)
+					if s.onRelease != nil {
+						s.onRelease()
+					}
+				}).
 				CapturePointer().
 				OnDoubleClick(toggle)
 			return hit

@@ -42,6 +42,10 @@ type WindowOptions struct {
 	// logical screen position instead of centering it. It is ignored when
 	// Frame is set.
 	Origin *Point
+	// KeepOnScreen moves a window that opens at Origin in from the edges of the monitor it
+	// lands on, so that it fits in that monitor's work area. Only Windows does this; other
+	// platforms place the window at Origin.
+	KeepOnScreen bool
 	// CustomTitleBar removes the operating system's title bar. The app draws
 	// its own, marks the parts that drag or press with the handler's
 	// TitleBarHandler, and the window keeps its native resize borders, snap
@@ -118,6 +122,9 @@ type Window interface {
 	SetTitle(title string)
 	// Frame returns the outer window rectangle in physical screen pixels.
 	Frame() Rect
+	// ClientOrigin returns the top-left corner of the client area on the screen, in
+	// logical pixels. A client point (x, y) of the window is at this origin plus (x, y).
+	ClientOrigin() Point
 	SetCursor(c input.Cursor)
 	// Show makes the window visible. Adapters create windows hidden so the
 	// first frame can be rendered before anything appears on screen.

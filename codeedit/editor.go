@@ -1,6 +1,7 @@
 package codeedit
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
@@ -98,6 +99,7 @@ func (e *Editor) Render(ctx *ui.Context) ui.Element {
 	vs := ui.Local(ctx, "codeedit.view", newViewState()).Peek()
 	vs.rev.Get() // the editor renders again when the view changes
 	vs.ctx = ctx
+	vs.latest.Store(ctx)
 	if !vs.closeOnDispose {
 		// The session is closed when the editor's component is removed. Registered once per
 		// view state, which lives as long as the component does.
@@ -108,7 +110,7 @@ func (e *Editor) Render(ctx *ui.Context) ui.Element {
 	if vs.doc != e.doc {
 		vs.attachDoc(e.doc)
 	}
-	vs.syncSession(ctx, e.lang)
+	vs.syncSession(e.lang)
 	var hl Highlighter
 	switch {
 	case e.hl != nil:
@@ -180,8 +182,9 @@ type viewState struct {
 	doc         *Document
 	cancelDoc   []func()
 	hl          Highlighter
-	rev         *ui.Signal[uint64] // changes when the view should render again
-	ctx         *ui.Context        // the context of the latest render, for the clipboard
+	rev         *ui.Signal[uint64]         // changes when the view should render again
+	ctx         *ui.Context                // the context of the latest render, for the clipboard
+	latest      atomic.Pointer[ui.Context] // the same, for the highlight worker, which posts to it from its goroutine
 	tab         int
 	focused     bool
 	dragging    bool
@@ -234,7 +237,7 @@ type sessionKey struct {
 // lang or the document changed. The session's worker asks for a frame through ctx.Post when it
 // has new spans, so the call is safe from the worker. A failure to start (a document over the
 // size limit, for one) leaves the text uncolored and is kept in langErr.
-func (vs *viewState) syncSession(ctx *ui.Context, lang highlight.Grammar) {
+func (vs *viewState) syncSession(lang highlight.Grammar) {
 	key := sessionKey{lang: lang, doc: vs.doc}
 	if key == vs.sessionKey && (lang == nil || vs.session != nil || vs.langErr != nil) {
 		return
@@ -246,8 +249,14 @@ func (vs *viewState) syncSession(ctx *ui.Context, lang highlight.Grammar) {
 		return
 	}
 	rev := vs.rev
+	// The session outlives the render that started it, and the window may have changed since
+	// (see ui.Dock), so the notice goes to the context of the latest render.
 	s, err := highlight.NewSession(lang, []byte(vs.doc.Text()), highlight.Options{
-		Notify: func() { ctx.Post(func() { rev.Set(rev.Peek() + 1) }) },
+		Notify: func() {
+			if c := vs.latest.Load(); c != nil {
+				c.Post(func() { rev.Set(rev.Peek() + 1) })
+			}
+		},
 	})
 	if err != nil {
 		vs.langErr = err

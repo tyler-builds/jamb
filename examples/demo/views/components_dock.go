@@ -36,7 +36,16 @@ func dockSection() ui.Element {
 				return ui.Div().Column().Padding(12).Child(ui.TextArea(text).Label("Note text").Grow(1))
 			}},
 			"notes": {Title: "Notes", Closable: true, Render: func() ui.Element {
-				return ui.Div().Column().Padding(12).Child(panelText(t, "Dock a tab onto an edge of the section."))
+				// The count and the line keep their values as the panel moves, floats and docks back.
+				return ui.Component(func(ctx *ui.Context) ui.Element {
+					count := ui.Local(ctx, "count", 0)
+					line := ui.Local(ctx, "line", "")
+					return ui.Div().Column().Gap(8).Padding(12).
+						Child(panelText(t, "Dock a tab onto an edge of the section.")).
+						Child(ui.TextInput(line).Label("Line")).
+						Child(ui.Button("Count").Secondary().OnClick(func() { count.Set(count.Peek() + 1) })).
+						Child(ui.Textf("Count: %d", count.Get()).TextColor(t.TextMuted))
+				})
 			}},
 			"output": {Title: "Output", Closable: true, Render: func() ui.Element {
 				return ui.Div().Column().Padding(12).Gap(4).
@@ -45,7 +54,7 @@ func dockSection() ui.Element {
 		}
 		return Card(t).Gap(14).
 			Child(SectionTitle(t, "Docking")).
-			Child(ui.Text("Drag a tab over a group to join it, to a side of it, or to an edge of the section. The tab menu moves, splits, floats and closes panels. Ctrl+Shift with an arrow key moves a panel to the group on that side.").FontSize(12).TextColor(t.TextMuted)).
+			Child(ui.Text("Drag a tab over a group to join it, to a side of it, or to an edge of the section. Drop a tab outside the section to float its panel in a window of its own. The tab menu moves, splits, floats and closes panels. Ctrl+Shift with an arrow key moves a panel to the group on that side.").FontSize(12).TextColor(t.TextMuted)).
 			Child(ui.Div().Width(ui.Px(560)).Height(ui.Px(360)).
 				Child(ui.Dock(layout, panels).Floating(app.OpenDockWindow))).
 			Child(ui.Button("Reset layout").Secondary().OnClick(func() { layout.Set(ui.DockReset(dockDefault)) }))

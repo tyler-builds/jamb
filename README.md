@@ -1222,25 +1222,43 @@ are `Split`s, so they take the arrow keys, Home and End as a split does.
 
 **Floating windows.** `Floating` takes the function that opens a window for a group.
 `app.OpenDockWindow` opens it with `app.Open`, since the `ui` package cannot import
-`app`. A floating window shows its group, and its position and size are recorded in
-the layout when the user closes it. Closing a window, by the user or by the dock, docks
-its panels back into the main window, so no panel is lost with its window. Float and
-Dock back are the commands that move a panel between windows. Set `QuitWhenClosed` on
-the main window, so that closing it closes the floating windows too.
+`app`. A tab released outside the dock, where no group of any dock window takes it,
+floats its panel in a window whose top-left corner is by the pointer, kept on its
+monitor. A tab released over a group of another window of the dock moves into that
+group, so panels move between windows by dragging as well as with Float and Dock
+back. A floating window shows its group. Its position and size are recorded in the
+layout as the user moves and resizes it: the layout takes the new place at once, and
+`OnChange` runs once the window has been still for half a second, or at once when the
+window closes. Closing a window, by the user or by the dock, docks its panels back
+into the main window, so no panel is lost with its window. Set `QuitWhenClosed` on
+the main window, so that closing it closes the floating windows too, and their
+positions are saved as they close.
 
-**State.** A panel keeps its state while it stays in its group, including while
-another tab of the group is active. A panel that moves to another group, or to a
-floating window, is built again there, because a component's identity follows its
-place in the tree. Keep the state that must survive a move in signals the app owns.
+**State.** A panel keeps its state wherever it goes: to another group, split off,
+dropped on an edge, floated into a window and docked back, or put back by a layout
+reset. Its components keep their `Local` state, their signals and their `OnDispose`
+functions. Its text fields keep their text, undo history and selection, its scroll
+containers their offsets, and it keeps the focus when it had it. `OnDispose` runs
+only when the panel closes: with `DockClose`, or when a layout no longer holds the
+panel. A panel that moves to another window renders once more there, with its state
+kept. A dock that its parent builds again for the same layout keeps its panels the
+same way. A signal that a panel reads still re-renders it, in whichever window it is
+in. The state is kept by the panel's place in the dock, not by its place in the tree,
+so give two docks in one window different `Key`s and keep one layout signal per dock.
+The layout itself is a signal the app owns: save it in `OnChange`, which also runs
+once a divider has been dragged and let go.
 
 **Styling.** `ui.DockStyle` is the look of the groups, tabs, panels and the drop
 preview, and `Theme.Dock` sets it for every dock. The dividers take `Theme.Split`.
 The parts are listed in the widget table of docs/styling.md.
 
 **Limits.**
-- A panel is dragged within one window. A release outside the dock does not float the
-  panel: the drag ends with no target, and its end callback has no pointer position.
-  Use Float.
+- A new floating window opens with its top-left corner 24 by 16 logical pixels up and
+  left of the pointer. With the native title bar, which lies above the tabs, the tab
+  lands a little below the pointer's line; drop it again to move it.
+- A drop on another window shows no preview before the release. It is found by each
+  window's content area under the pointer, so where two floating windows overlap at
+  the release point, the drop goes to one of them.
 - Ctrl+F6 moves between groups, not F6, which the toast region uses.
 - Every panel of the layout is built when the dock is shown, not when it is first
   selected.
@@ -2247,6 +2265,9 @@ from another goroutine waits for the UI thread to answer it.
   `OnClosed` runs.
 - `X` and `Y` place a window in logical screen pixels. Left at zero, the
   first window is centered and a later one is cascaded 32 px from the last.
+- `OnGeometry` is called on the UI thread as the window moves, resizes or changes
+  its scale, with its position and content size in logical pixels. It is called
+  for each step of a move, so save from it only once the window is still.
 - Each window has its own runtime, so its own theme, zoom, focus, key
   bindings and keymap file. The windows share the UI thread, the text system
   and the GPU device. A second window creates a swap chain, not a device.

@@ -74,6 +74,7 @@ var (
 	procSetWindowPlacement            = user32.NewProc("SetWindowPlacement")
 	procGetKeyState                   = user32.NewProc("GetKeyState")
 	procMonitorFromWindow             = user32.NewProc("MonitorFromWindow")
+	procMonitorFromPoint              = user32.NewProc("MonitorFromPoint")
 	procGetMonitorInfoW               = user32.NewProc("GetMonitorInfoW")
 	procValidateRect                  = user32.NewProc("ValidateRect")
 	procGetWindowRect                 = user32.NewProc("GetWindowRect")
@@ -502,6 +503,18 @@ func MonitorRect(hwnd uintptr) RECT {
 // WorkArea returns the work area of the monitor nearest to hwnd.
 func WorkArea(hwnd uintptr) RECT {
 	mon, _, _ := procMonitorFromWindow.Call(hwnd, MONITOR_DEFAULTTONEAREST)
+	mi := MONITORINFO{}
+	mi.CbSize = uint32(unsafe.Sizeof(mi))
+	procGetMonitorInfoW.Call(mon, uintptr(unsafe.Pointer(&mi)))
+	return mi.RcWork
+}
+
+// WorkAreaAt returns the work area of the monitor nearest to the point (x, y) of the screen,
+// in physical pixels.
+func WorkAreaAt(x, y int32) RECT {
+	// POINT is passed by value, as one 64-bit argument: x in the low half, y in the high.
+	pt := uintptr(uint32(x)) | uintptr(uint32(y))<<32
+	mon, _, _ := procMonitorFromPoint.Call(pt, MONITOR_DEFAULTTONEAREST)
 	mi := MONITORINFO{}
 	mi.CbSize = uint32(unsafe.Sizeof(mi))
 	procGetMonitorInfoW.Call(mon, uintptr(unsafe.Pointer(&mi)))
