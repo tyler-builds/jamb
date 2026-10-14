@@ -79,3 +79,14 @@ func TestGUIDMemory(t *testing.T) {
 		t.Errorf("guidMemory = % x; want % x", got, want)
 	}
 }
+
+// The icon asks for the standard tooltip: under NOTIFYICON_VERSION_4 the shell shows the tip
+// text only when NIF_SHOWTIP is set as well as NIF_TIP.
+func TestTrayDataShowsTheTooltip(t *testing.T) {
+	ic := &TrayIcon{}
+	ic.opts.Tooltip = "Jamb Demo"
+	nid := ic.data()
+	if want := uint32(win32.NIF_TIP | win32.NIF_SHOWTIP); nid.UFlags&want != want {
+		t.Errorf("flags %#x lack NIF_TIP|NIF_SHOWTIP", nid.UFlags)
+	}
+}

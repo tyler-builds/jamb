@@ -51,6 +51,7 @@ const (
 	NIF_ICON    = 0x00000002
 	NIF_TIP     = 0x00000004
 	NIF_GUID    = 0x00000020
+	NIF_SHOWTIP = 0x00000080 // with NOTIFYICON_VERSION_4, the standard tooltip shows only with this flag
 
 	MF_STRING    = 0x00000000
 	MF_GRAYED    = 0x00000001

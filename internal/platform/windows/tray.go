@@ -193,7 +193,7 @@ func (t *TrayIcon) data() win32.NOTIFYICONDATAW {
 		CbSize:           uint32(unsafe.Sizeof(win32.NOTIFYICONDATAW{})),
 		HWnd:             trayHost.hwnd,
 		UID:              t.opts.ID,
-		UFlags:           win32.NIF_MESSAGE | win32.NIF_ICON | win32.NIF_TIP,
+		UFlags:           win32.NIF_MESSAGE | win32.NIF_ICON | win32.NIF_TIP | win32.NIF_SHOWTIP,
 		UCallbackMessage: trayMsg,
 		HIcon:            t.icon,
 		SzTip:            tipUnits(t.opts.Tooltip),
