@@ -288,6 +288,25 @@ const (
 	// offsets in Text. The text the input method confirms arrives afterwards,
 	// or in the same message, as an EventTextInput.
 	EventComposition
+	// EventGesture is sent for a pinch of a touchpad or touchscreen, as the
+	// operating system's gesture recognizer reports it. Phase says where the
+	// gesture is, Scale, PanX and PanY say what changed since the previous
+	// event of the gesture, and X and Y give its center (see GesturePhase).
+	EventGesture
+)
+
+// GesturePhase says where a gesture is, for an EventGesture.
+type GesturePhase uint8
+
+const (
+	// GestureBegin starts a gesture. It carries no change.
+	GestureBegin GesturePhase = iota
+	// GestureUpdate carries the change since the previous event of the gesture.
+	GestureUpdate
+	// GestureEnd ends a gesture, once the fingers have lifted and any inertia
+	// has run out, or when a new gesture interrupts the inertia. It carries no
+	// change.
+	GestureEnd
 )
 
 // Event is a flat, allocation-free event record. Which fields are meaningful
@@ -318,4 +337,14 @@ type Event struct {
 	// Cursor, ClauseStart and ClauseEnd are byte offsets in Text of an
 	// EventComposition.
 	Cursor, ClauseStart, ClauseEnd int
+
+	// Phase, Scale, PanX, PanY and Inertia describe an EventGesture. Scale is
+	// the multiplicative change of the zoom since the previous event, 1 when
+	// there is none. PanX and PanY are the translation since the previous
+	// event, in physical pixels. Inertia is set while the gesture continues
+	// after the fingers have lifted.
+	Phase      GesturePhase
+	Scale      float32
+	PanX, PanY float32
+	Inertia    bool
 }

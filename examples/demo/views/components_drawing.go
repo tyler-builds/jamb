@@ -33,7 +33,7 @@ var checkSVG = ui.MustSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" width=
 // drawingSection shows Canvas, SVG, selectable text and grid layout.
 func drawingSection(t *ui.Theme) ui.Element {
 	return section(t, "Drawing and layout",
-		sample(t, "Canvas: a chart that follows the pointer", visitsChart(t)),
+		sample(t, "Canvas: a chart that follows the pointer and zooms with a pinch", visitsChart(t)),
 		sample(t, "SVG: an illustration, and an icon in the text color",
 			ui.Div().Row().Gap(16).Align(ui.Center).
 				Child(ui.SVG(logoSVG).Alt("A landscape with a sun and a mountain")).
@@ -50,17 +50,23 @@ func drawingSection(t *ui.Theme) ui.Element {
 const chartInset = 18
 
 // visitsChart is a canvas line chart with a filled area, axis labels and a
-// readout of the day under the pointer.
+// readout of the day under the pointer. A pinch zooms the days about the middle
+// of the chart, from 100% to 400%; the chart keeps the pinch, so the window does
+// not zoom over it.
 func visitsChart(t *ui.Theme) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		hover := ui.Local(ctx, "hover", -1)
-		h := hover.Get()
+		zoom := ui.Local(ctx, "zoom", float32(1))
+		h, z := hover.Get(), zoom.Get()
 		accent, muted, grid := t.Accent, t.TextMuted, t.Border
 		return ui.Canvas(func(p *ui.Painter, w, ht float32) {
 			const left, bottom, top = chartInset, 22, 10
 			plotH := ht - bottom - top
-			x := func(i int) float32 { return left + float32(i)*(w-2*left)/float32(len(visits)-1) }
+			// x is the position of day i: the days are spread about the middle by the zoom.
+			x := func(i int) float32 { return w/2 + (left+float32(i)*(w-2*left)/float32(len(visits)-1)-w/2)*z }
 			y := func(v float32) float32 { return top + plotH - v/320*plotH }
+			p.Save()
+			p.Clip(ui.NewPath().MoveTo(left, top).LineTo(w-left, top).LineTo(w-left, top+plotH).LineTo(left, top+plotH).Close())
 			for _, v := range []float32{100, 200, 300} {
 				p.Stroke(ui.NewPath().MoveTo(left, y(v)).LineTo(w-left, y(v)),
 					ui.StrokeStyle{Width: 1, Color: grid, Dash: []float32{3, 3}})
@@ -77,22 +83,31 @@ func visitsChart(t *ui.Theme) ui.Element {
 			p.Fill(area, ui.LinearPaint(0, top, 0, top+plotH,
 				ui.ColorStop{At: 0, Color: accent.Alpha(0.35)}, ui.ColorStop{At: 1, Color: accent.Alpha(0)}))
 			p.Stroke(line, ui.StrokeStyle{Width: 2, Color: accent, Join: ui.JoinRound, Cap: ui.CapRound})
+			if h >= 0 {
+				p.Fill(ui.NewPath().Circle(x(h), y(visits[h]), 4.5), accent)
+			}
+			p.Restore()
 			for i, d := range weekdays {
 				p.Text(x(i), ht-2, d, ui.TextStyle{Size: 11, Color: muted, Align: ui.Center, VAlign: ui.End})
 			}
 			if h >= 0 {
-				p.Fill(ui.NewPath().Circle(x(h), y(visits[h]), 4.5), accent)
 				p.Text(x(h), y(visits[h])-8, fmt.Sprintf("%.0f", visits[h]),
 					ui.TextStyle{Size: 12, Weight: ui.FontSemibold, Align: ui.Center, VAlign: ui.End})
 			}
 		}).Size(ui.Px(360), ui.Px(150)).
 			Label("Visits this week, from 120 on Monday to 280 on Sunday, highest on Saturday at 300").
 			OnMouseMove(func(e *ui.MouseEvent) {
+				// The inverse of day: the pointer's position in the unzoomed chart.
 				step := (e.Width - 2*chartInset) / float32(len(visits)-1)
-				i := int(math.Round(float64((e.LocalX - chartInset) / step)))
+				unzoomed := (e.LocalX-e.Width/2)/z + e.Width/2
+				i := int(math.Round(float64((unzoomed - chartInset) / step)))
 				hover.Set(min(max(i, 0), len(visits)-1))
 			}).
-			OnMouseLeave(func() { hover.Set(-1) })
+			OnMouseLeave(func() { hover.Set(-1) }).
+			OnPinch(func(e *ui.PinchEvent) {
+				zoom.Set(min(max(zoom.Get()*e.Scale, 1), 4))
+				e.StopPropagation()
+			})
 	})
 }
 

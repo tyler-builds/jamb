@@ -537,6 +537,8 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 		h.rt.PointerUp(x, y, e.Button, e.Mods)
 	case platform.EventScroll:
 		h.rt.Scroll(x, y, e.DeltaX, e.DeltaY, e.Precise, e.Mods)
+	case platform.EventGesture:
+		h.rt.Pinch(x, y, gesturePhase(e.Phase), e.Scale, e.PanX/s, e.PanY/s, e.Inertia, e.Mods)
 	case platform.EventKeyDown:
 		h.rt.KeyDown(e.Key, e.Mods, e.Repeat)
 	case platform.EventKeyUp:
@@ -556,6 +558,17 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 	if h.rt.NeedsFrame() {
 		w.Wake()
 	}
+}
+
+// gesturePhase maps the phase of a platform gesture to the one the UI runtime uses.
+func gesturePhase(p platform.GesturePhase) ui.GesturePhase {
+	switch p {
+	case platform.GestureUpdate:
+		return ui.GestureUpdate
+	case platform.GestureEnd:
+		return ui.GestureEnd
+	}
+	return ui.GestureBegin
 }
 
 // saveGeometry remembers the first window's position and size for the next run.

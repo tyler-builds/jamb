@@ -266,6 +266,7 @@ type Runtime struct {
 	zoomKeys             bool
 	onZoom               func(float32)
 	wheelZoom            float32 // accumulated Ctrl+wheel delta
+	pinchZoom            float32 // scale of a pinch that no element handled, not yet zoomed by a step (see Pinch)
 
 	// Dirty components, appended from any goroutine.
 	dirtyMu  sync.Mutex

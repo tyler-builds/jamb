@@ -184,7 +184,7 @@ ui.Div()                       // flex container; children stack vertically by d
   .Exit(ui.Fade(), ui.Animation{Duration: 90 * time.Millisecond})               // ghost while leaving
   .When(cond, func(d *ui.DivElement) { ... })            // conditional styling
   .OnClick(fn).OnDoubleClick(fn).OnMouseEnter(fn).OnMouseLeave(fn)
-  .OnMouseDown(func(e *ui.MouseEvent){}).OnScroll(...).OnKeyDown(...).OnTextInput(...)
+  .OnMouseDown(func(e *ui.MouseEvent){}).OnScroll(...).OnPinch(...).OnKeyDown(...).OnTextInput(...)
   .Overlay(ui.BelowStart).OverlayGap(4)    // Below|Above Start|Center|End, Right|Left Start|Center|End, OverCenter;
                                // float next to the parent: never clipped, drawn on top,
                                // hit first; flips to the other side if it doesn't fit
@@ -1948,6 +1948,51 @@ Errors explain what failed and how to fix it. For example, `ui.Hex("#12")`
 panics with `ui.Hex("#12"): expected #rgb, #rrggbb or #rrggbbaa`, and a
 missing Root says to set `app.Window.Root`.
 
+### Gestures
+
+A mouse wheel and a touchpad's two-finger scroll arrive as scroll events, which
+`OnScroll` and the built-in scrolling of containers handle, as before. A pinch
+(zoom) gesture of a touchpad, or two fingers on a touchscreen, arrives as a
+`PinchEvent` from the system's gesture recognizer, DirectManipulation.
+
+- `OnPinch(func(e *ui.PinchEvent))` on any element receives the pinch whose
+  center is over it. The deepest element under the center gets it first, then its
+  ancestors, until one calls `e.StopPropagation()`.
+- `e.Phase` is `ui.GestureBegin`, `ui.GestureUpdate` or `ui.GestureEnd`. An update
+  carries what changed since the previous event: `e.Scale` multiplies the scale
+  (1 means no change), and `e.PanX` and `e.PanY` move the content in logical
+  pixels. `e.X`, `e.Y` give the center in the window, and `e.LocalX`, `e.LocalY`
+  in the element.
+- `e.Inertia` is set while the gesture continues after the fingers lift. Under
+  reduced motion its changes are left out, and the gesture still begins and ends.
+- A pinch that no element stops zooms the window in the same steps as Ctrl+= and
+  Ctrl+-, when the zoom shortcuts are on (`rt.SetZoomShortcuts`). A pinch that an
+  element stops leaves the zoom alone.
+
+```go
+ui.Canvas(draw).OnPinch(func(e *ui.PinchEvent) {
+	zoom.Set(min(max(zoom.Get()*e.Scale, 1), 4))
+	e.StopPropagation() // the chart zooms, the window does not
+})
+```
+
+The window takes pinch gestures from DirectManipulation, which is set up for
+scaling alone. Pan stays with the wheel messages that a
+touchpad already sends, because DirectManipulation's pan would scroll twice.
+On a touchscreen, DirectManipulation is not given pan either, because a single
+finger is a mouse drag there and would be taken from it. Two-finger pan on a
+touchscreen is therefore not reported. While a DirectManipulation pinch runs, the
+window drops the Ctrl+wheel messages that Windows sends for the same touchpad
+pinch, so that the zoom happens once.
+
+What has been verified: the routing, the zoom steps, the zoom shortcuts, reduced
+motion and the gesture arithmetic are covered by headless tests (`ui/pinch_test.go`,
+`internal/platform/windows/directmanip_test.go`), and the DirectManipulation class
+and update manager are checked against the system. What has not: the gestures on
+real hardware. They need a precision touchpad and a touchscreen, and the gesture
+behaviour (inertia, the Ctrl+wheel that a pinch sends, whether two-finger scroll
+still reaches the wheel) is to be confirmed by hand.
+
 ### Data grids
 
 `ui.DataGrid` shows rows and columns of business data. Like `UniformList`, it builds only the rows in view, so a grid of 100,000 rows costs what its visible rows cost. Its header stays at the top as the rows scroll, and the header scrolls with the rows when the columns are wider than the grid.
@@ -3115,7 +3160,8 @@ On the Projects page:
   mark), a Status submenu with radio items, and a disabled Archive item.
 - The Components page (Ctrl+4) shows the controls, overlays, gradients, rounded
   clipping, per-side borders, motion and focus styles, one section each. Its
-  Drawing and layout section has a canvas chart that follows the pointer, SVG
+  Drawing and layout section has a canvas chart that follows the pointer and zooms
+  with a pinch, SVG
   images, selectable text and a form laid out as a grid. Its More widgets section
   has a sidebar, breadcrumbs, pagination, avatars, tags, skeletons, a color
   picker and a date range picker. Its Clipboard images section copies a sample

@@ -459,6 +459,59 @@ func (rt *Runtime) Scroll(x, y, dx, dy float32, precise bool, mods input.Modifie
 	}
 }
 
+// pinchStep is the scale of one zoom step taken for a pinch that no element
+// handled: 10%, the step from 100% to 110% in ZoomLevels.
+const pinchStep = 1.1
+
+// Pinch handles a pinch gesture of a touchpad or touchscreen, whose center is at
+// (x, y) in device-logical pixels. Like Scroll, it goes to the deepest element
+// under the center that has OnPinch, then to its ancestors, until one stops it.
+// A pinch that nothing stops zooms the window, one zoom step per pinchStep of
+// scale, when the zoom shortcuts are on. With reduced motion the change of an
+// inertia event is left out, and the gesture still begins and ends. The platform
+// calls this (see PinchEvent for the fields); tests and scripts may call it too.
+func (rt *Runtime) Pinch(x, y float32, phase GesturePhase, scale, panX, panY float32, inertia bool, mods input.Modifiers) {
+	x, y = x/rt.zoom, y/rt.zoom
+	rt.mouseX, rt.mouseY, rt.mouseIn = x, y, true
+	if inertia && rt.sys.ReducedMotion {
+		scale, panX, panY = 1, 0, 0
+	}
+	e := &PinchEvent{Scale: scale, PanX: panX, PanY: panY, Phase: phase, Inertia: inertia, X: x, Y: y, Mods: mods}
+	for _, n := range rt.hitTest(x, y) {
+		if n.div != nil && n.div.h.onPinch != nil {
+			r := rt.nodeRect(n)
+			e.LocalX, e.LocalY = x-r.X, y-r.Y
+			n.div.h.onPinch(e)
+			if e.stopped {
+				return
+			}
+		}
+	}
+	if !rt.zoomKeys {
+		return
+	}
+	switch phase {
+	case GestureBegin:
+		rt.pinchZoom = 1
+	case GestureEnd:
+		rt.pinchZoom = 0
+	case GestureUpdate:
+		if !(rt.pinchZoom > 0) {
+			rt.pinchZoom = 1
+		}
+		// The scale is clamped, so that a bad value cannot take many steps at once.
+		rt.pinchZoom *= min(max(scale, 0.25), 4)
+		for rt.pinchZoom >= pinchStep {
+			rt.pinchZoom /= pinchStep
+			rt.ZoomIn()
+		}
+		for rt.pinchZoom <= 1/pinchStep {
+			rt.pinchZoom *= pinchStep
+			rt.ZoomOut()
+		}
+	}
+}
+
 // focusPath returns the focused node and its ancestors, or just the root.
 func (rt *Runtime) focusPath() []*node {
 	var path []*node

@@ -35,6 +35,7 @@ type handlers struct {
 	onMouseEnter   func()
 	onMouseLeave   func()
 	onScroll       func(*ScrollEvent)
+	onPinch        func(*PinchEvent)
 	onKeyDown      func(*KeyEvent)
 	onKeyUp        func(*KeyEvent)
 	onTextInput    func(string)
@@ -486,6 +487,11 @@ func (d *DivElement) OnMouseMove(fn func(*MouseEvent)) *DivElement { d.h.onMouse
 func (d *DivElement) OnMouseEnter(fn func()) *DivElement           { d.h.onMouseEnter = fn; return d }
 func (d *DivElement) OnMouseLeave(fn func()) *DivElement           { d.h.onMouseLeave = fn; return d }
 func (d *DivElement) OnScroll(fn func(*ScrollEvent)) *DivElement   { d.h.onScroll = fn; return d }
+
+// OnPinch receives the pinch gestures of a touchpad or touchscreen whose center
+// is over the element (see PinchEvent). A handler that stops the event keeps the
+// window from zooming, as it keeps the window from scrolling for OnScroll.
+func (d *DivElement) OnPinch(fn func(*PinchEvent)) *DivElement { d.h.onPinch = fn; return d }
 
 // OnKeyDown receives key presses while this element or a descendant has focus
 // (or, on the root element, when nothing has focus).

@@ -68,6 +68,9 @@ type window struct {
 	// is nil until the window first answers UI Automation.
 	uiaRoot   uintptr
 	uiaBridge *access.Bridge
+	// dm is the window's DirectManipulation state, nil when the system has none
+	// (see directmanip.go).
+	dm *directManipulation
 }
 
 // The state of the UI thread, shared by all windows of the process.
@@ -275,6 +278,7 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 		return nil, err
 	}
 	w.ready = true
+	w.dm = newDirectManipulation(w)
 	// Render the first frame before showing to avoid a blank/white flash.
 	w.frameWanted = h.OnFrame(w)
 	w.Show()
@@ -520,6 +524,10 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		w.Wake()
 		return 0
 
+	case dmPointerHitTest:
+		// A touchpad or touchscreen contact: DirectManipulation takes it for its gestures.
+		w.dm.hitTest(uint32(win32.LOWORD(wp)))
+
 	case win32.WM_TIMER:
 		if wp == wakeTimerID {
 			w.onTimer()
@@ -527,6 +535,10 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		}
 		if wp == modalTimerID {
 			pumpFrames()
+			return 0
+		}
+		if wp == dmTimerID {
+			w.onDMTimer()
 			return 0
 		}
 
@@ -719,6 +731,10 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		return 0
 
 	case win32.WM_MOUSEWHEEL, win32.WM_MOUSEHWHEEL:
+		if msg == win32.WM_MOUSEWHEEL && w.dm.pinching() && currentMods().Has(input.ModCtrl) {
+			// The Ctrl+wheel that a touchpad sends for a pinch: the pinch arrives as a gesture.
+			return 0
+		}
 		sx, sy := win32.PointFromLParam(lp)
 		p := win32.POINT{X: sx, Y: sy}
 		win32.ScreenToClient(hwnd, &p)
@@ -809,6 +825,8 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 
 	case win32.WM_DESTROY:
 		delete(windows, hwnd)
+		w.dm.destroy()
+		w.dm = nil
 		w.endAccess()
 		if w.ready {
 			w.ready = false
