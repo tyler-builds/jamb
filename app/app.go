@@ -125,6 +125,11 @@ const (
 // the UI thread, the text system and the GPU device.
 type App struct {
 	fonts []appFont
+	// The identity settings; see AppID, JumpList and SingleInstance.
+	appID          string
+	jumpList       *JumpList
+	singleInstance bool
+	onArgs         func(args []string, dir string)
 }
 
 // appFont is a font given to App.Font.
@@ -157,7 +162,9 @@ func (a *App) Font(family string, weight ui.FontWeight, data []byte) *App {
 
 // Run opens the window and blocks until the app quits: when the last window
 // closes, or when a QuitWhenClosed window closes. On failure it prints the
-// error and exits with status 1. Use RunE to handle errors yourself.
+// error and exits with status 1. Use RunE to handle errors yourself. A later
+// launch of a SingleInstance app returns at once, without a window, after its
+// command line has been handed to the running app.
 func (a *App) Run(w Window) {
 	if err := a.RunE(w); err != nil {
 		fmt.Fprintln(os.Stderr, "jamb:", err)
@@ -170,7 +177,19 @@ func (a *App) RunE(w Window) error {
 	if w.Root == nil {
 		return fmt.Errorf("app.Window.Root is nil; set it to a func(*ui.Context) ui.Element that returns your UI")
 	}
+	if err := a.checkIdentity(); err != nil {
+		return err
+	}
 	w = withDefaults(w)
+	// A later launch of a single instance app returns here, with its command line
+	// handed over, before any device or font is made.
+	var owned *instanceNames
+	if a.singleInstance {
+		var handed bool
+		if owned, handed = a.joinInstance(); handed {
+			return nil
+		}
+	}
 	application.dev = loadDevOptions()
 	application.gpu.adapter = gpuAdapter
 	prepareDevice()
@@ -182,8 +201,14 @@ func (a *App) RunE(w Window) error {
 	go func() { ready <- loadText(fonts, size) }()
 	defer endUI() // a read that waits for the UI thread stops waiting
 	return runPlatform(func() error {
-		_, err := openWindow(w, nil)
-		return err
+		a.setIdentity()
+		if _, err := openWindow(w, nil); err != nil {
+			return err
+		}
+		if owned != nil {
+			a.serveHandoffs(owned)
+		}
+		return nil
 	})
 }
 

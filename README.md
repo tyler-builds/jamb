@@ -2086,6 +2086,109 @@ window cover its monitor without a frame, and puts it back where it was;
 `Fullscreen()` reports which. A headless runtime (in tests) has no window, so the
 actions do nothing, and `Size()` is the viewport's.
 
+### Jump lists and single instance
+
+Windows only; the framework has no window adapter for other platforms yet, so
+these settings have no effect there. The settings are set on the `App`, before `Run`:
+
+```go
+app.New().
+    AppID("JambExamples.Notes").
+    JumpList(&app.JumpList{
+        Tasks:  []app.JumpTask{{Title: "New note", Args: "--new-note"}},
+        Recent: true,
+    }).
+    SingleInstance(func(args []string, dir string) {
+        // A second launch of the app handed over args, such as "--new-note".
+    }).
+    Run(app.Window{...})
+
+// Where the app opens or saves a file:
+app.AddRecentDocument(path)
+```
+
+- **`AppID`** is the Application User Model ID. Windows uses it to group the
+  app's windows on the taskbar, and to key its jump list, its Recent documents
+  and the name of its single instance. Use a stable identifier in the form
+  `CompanyName.ProductName`, such as `JambExamples.Notes`. It may contain letters,
+  digits, `.`, `-` and `_`, must start with a letter or digit, and is at most 128
+  characters. The app sets it at startup, before its first window. It is required
+  with `JumpList` or `SingleInstance`.
+- **`JumpList`** lists the app's own tasks in its taskbar menu, and the Recent
+  category when `Recent` is set. The framework adds no tasks. A task has a
+  `Title`, which is required, and `Args`, the command line after the executable,
+  passed as one string, so quote an argument with spaces as a shell would. Each
+  task starts the app's executable, so test tasks with a built executable (see
+  [Jump list and packaging](#jump-list-and-packaging)).
+- **`AddRecentDocument`** adds a file to the Recent category. Call it for each file
+  the app opens or saves. A relative path is made absolute first.
+- **`SingleInstance`** makes the app one process per user and session. A second
+  launch hands its command line to the running app and exits with status 0,
+  without a window. The running app calls `onArgs` on its UI thread with the
+  arguments after the program name, and the second launch's working directory,
+  so `filepath.Join(dir, arg)` resolves a relative path. Its first window is
+  brought to the front first. A `JumpList` task is an ordinary launch, and it
+  reaches the running app only when `SingleInstance` is set. If the hand-off fails,
+  the second launch runs on its own, as a separate process.
+
+`SingleInstance` and `JumpList` are independent. Either one may be set without the
+other, and a jump list never turns single instance on.
+
+The notes example uses all four: its "New note" task makes a note in the running
+window, and files it imports are added to the Recent documents.
+
+#### Separate processes or one process
+
+Without `SingleInstance`, a task or a second launch starts a new process. With it,
+the running process receives the command line. The choice changes what the app is
+built from:
+
+| | Separate processes (default) | One process (`SingleInstance`) |
+|---|---|---|
+| A jump list task | Starts a process with its own windows, runtime and state. | Runs in the running app, in `onArgs`. |
+| More windows | Each process has its own. The processes do not know about each other. | Opened with `app.Open` in the one process. |
+| Shared state | Files, a database or other IPC must carry it between processes. | Ordinary variables and signals. |
+| A crash | Ends one process; the others keep running. | Ends every window. |
+| Quit | Each process quits when its last window closes. | The process quits when its last window closes. |
+| Cost of a launch | A full startup. | A hand-off of a few milliseconds, or a new process if the hand-off fails. |
+
+Use `SingleInstance` when the app is one document or one workspace, and a second
+launch should act in it. Leave it off when each launch is independent.
+
+#### How the hand-off works
+
+The first launch creates a named mutex, `Local\jamb-<AppID>`, local to the session.
+A later launch that finds the mutex taken connects to a named pipe,
+`\\.\pipe\jamb-<AppID>-<digest>`, and writes its command line. The digest covers
+the user's SID and the session, so two users, or two sessions of one user, never
+share a pipe. The pipe grants access only to that user, so another user cannot
+send arguments to the app. The request is a four-byte length and a JSON object with
+the protocol version, the working directory and the arguments; the answer is one
+byte. A launch that cannot reach the running app within a few seconds, or that the
+app refuses, runs on its own. The mutex is released when the process exits, so a
+crashed app does not block later launches.
+
+#### Jump list and packaging
+
+- **`go run`.** `go run` builds the program in a temporary folder, so a task's
+  executable disappears when the run ends, and the task fails. Test jump lists and
+  single instance with a built executable (`go build`), or with an installed
+  build. Two `go run` runs with the same `AppID` also share one instance.
+- **Zip and installer.** The app sets its `AppID` at startup, which is enough for
+  the taskbar and the jump list. The `jamb package` installer does not yet put the
+  same ID on its Start menu shortcut, which needs the `System.AppUserModel.ID`
+  property. NSIS's `CreateShortcut` cannot set it. Until that is added, Windows
+  may not group the app's taskbar button with its Start menu entry.
+- **MSIX.** A packaged app has an identity from its package, and Windows keys the
+  jump list and Recent documents by the package's ID, `<PackageFamilyName>!App`.
+  `AppID` is not used for those in a packaged process, so the jump list works
+  only under the package ID. `AppID` still names the single instance.
+- Use `identityName` from `jamb.json` as the `AppID`, so that a future shortcut and
+  the app agree.
+
+Windows may show only the first few tasks of a jump list, and it keeps the Recent
+category's list itself.
+
 ### Custom title bars
 
 `app.Window{Chrome: app.ChromeCustom}` removes the operating system's title

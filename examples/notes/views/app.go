@@ -57,20 +57,24 @@ type App struct {
 	paletteActions []*ui.Action    // the commands listed when the palette opened
 	paletteFocus   *ui.FocusHandle // what had focus when the palette opened
 	list           *ui.ListHandle  // the sidebar's note list, scrolled to the selection
+	onImport       func(path string)
 }
 
 // DefaultSidebarWidth is the width of the sidebar, in logical pixels, when the app
 // has not kept another.
 const DefaultSidebarWidth = 300
 
-// Layout is the window's layout, which the app keeps across runs. Sidebar holds the
-// width of the sidebar in logical pixels, which the divider between the sidebar and
-// the editor moves. A Layout with no Sidebar uses DefaultSidebarWidth.
-// OnSidebarChange, if set, runs each time the divider moves the sidebar, so the
-// app can save the width.
+// Layout is the window's layout, which the app keeps across runs, and the hooks
+// the app gives the window. Sidebar holds the width of the sidebar in logical
+// pixels, which the divider between the sidebar and the editor moves. A Layout
+// with no Sidebar uses DefaultSidebarWidth. OnSidebarChange, if set, runs each time
+// the divider moves the sidebar, so the app can save the width. OnImport, if set,
+// runs with the path of each file that is imported, so the app can add it to the
+// Recent documents.
 type Layout struct {
 	Sidebar         *ui.Signal[float64]
 	OnSidebarChange func(width float64)
+	OnImport        func(path string)
 }
 
 // Root returns the window's render function, with the default layout.
@@ -92,6 +96,7 @@ func RootWith(s *store.Store, layout Layout) func(*ui.Context) ui.Element {
 		paletteQuery: ui.NewSignal(""),
 		paletteSel:   ui.NewSignal(0),
 		list:         ui.NewListHandle(),
+		onImport:     layout.OnImport,
 	}
 	return func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
@@ -151,6 +156,9 @@ func (a *App) importFiles(files ui.Files, _ *ui.DropEvent) {
 		if n := importFile(a.s, path); n != nil {
 			last = n
 			imported++
+			if a.onImport != nil {
+				a.onImport(path)
+			}
 		} else {
 			skipped++
 		}
