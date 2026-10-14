@@ -190,7 +190,7 @@ from `Theme.Editor` and `Theme.Syntax`, and then over `Styles`:
 | Part | What it is |
 |---|---|
 | `Box` | The frame: background, border, radius and padding. |
-| `BoxFocused` | The frame while the editor has focus, from a click or the keyboard, as a text field's frame shows it. An `Accent` border by default. |
+| `BoxFocused` | The frame while the editor has focus. Unset by default: as in code editors, the caret shows focus and the frame does not change. Under high contrast it is a border of the system's Highlight color. |
 | `Text` | The text: `TextColor`, `FontSize`. |
 | `Gutter` | The line numbers and fold markers: `TextColor`, `FontSize`, `Background`. |
 | `ActiveLine` | The rows of the carets. |

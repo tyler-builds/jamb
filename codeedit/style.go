@@ -5,8 +5,10 @@ import "github.com/tyler-builds/jamb/ui"
 // Style is the look of the parts of an Editor. A part's style merges over the built-in
 // defaults, which come from the colors of the theme (Theme.Editor and Theme.Syntax), and
 // then over the Styles of the editor. Box is the frame of the editor: its Background,
-// border, radius and padding. BoxFocused is the frame while the editor has focus, from a
-// click or the keyboard, as a text field's frame shows it: an Accent border by default.
+// border, radius and padding. BoxFocused is the frame while the editor has focus. By default
+// it is unset, as in code editors, where the caret shows focus: the frame does not change.
+// Under high contrast it is a border of the Highlight color, so focus shows in the frame as
+// well.
 // Text is the text: its TextColor and FontSize. Gutter is the
 // column of line numbers and fold markers: its TextColor, FontSize and Background.
 // ActiveLine is the row of the caret, Selection the selected text, Match the other find
@@ -53,9 +55,13 @@ func plainPart(s ui.Style) ui.Style {
 // editorDefaults returns the built-in look of the parts, from the colors of t.
 func editorDefaults(t *ui.Theme) Style {
 	ec := t.Editor
+	var focused ui.Style // the caret shows focus; the frame does not change
+	if t.HighContrast {
+		focused = ui.Style{BorderColor: t.Accent} // the Highlight color of the system
+	}
 	return Style{
 		Box:          ui.Style{Background: ec.Background, BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius},
-		BoxFocused:   ui.Style{BorderColor: t.Accent},
+		BoxFocused:   focused,
 		Text:         ui.Style{TextColor: ec.Foreground, FontSize: t.FontSize},
 		Gutter:       ui.Style{TextColor: ec.LineNumber, FontSize: t.FontSize, Background: ec.Background},
 		ActiveLine:   ui.Style{Background: ec.ActiveLine},
