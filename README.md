@@ -2345,7 +2345,11 @@ app.AddRecentDocument(path)
   `Title`, which is required, and `Args`, the command line after the executable,
   passed as one string, so quote an argument with spaces as a shell would. Each
   task starts the app's executable, so test tasks with a built executable (see
-  [Jump list and packaging](#jump-list-and-packaging)).
+  [Jump list and packaging](#jump-list-and-packaging)). Build it with
+  `-ldflags "-H windowsgui"`, as `jamb package` does: an executable built without
+  it, such as the one `go run` makes, is a console program, and Windows opens a
+  console window for each launch before the program runs, so a task shows a console
+  for a moment.
 - **`AddRecentDocument`** adds a file to the Recent category. Call it for each file
   the app opens or saves. A relative path is made absolute first.
 - **`SingleInstance`** makes the app one process per user and session. A second
