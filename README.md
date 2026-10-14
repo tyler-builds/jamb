@@ -1248,6 +1248,15 @@ so give two docks in one window different `Key`s and keep one layout signal per 
 The layout itself is a signal the app owns: save it in `OnChange`, which also runs
 once a divider has been dragged and let go.
 
+The dock's kept state lives while the layout is shown: while at least one `Dock` for
+it is mounted, or one of its floating windows is open, in any window of the app. Hiding
+a dock (unmounting all of its `Dock` elements) disposes its panels, so their
+`OnDispose` functions run once, as a component's do when it is removed. The state is
+released at the end of the frame in which the last of them goes, so a dock that the same
+frame mounts again keeps its panels. A release first runs a pending `OnChange`, and then
+the state is dropped. A layout whose floating windows are all closed and whose docks are
+all hidden holds no state.
+
 **Styling.** `ui.DockStyle` is the look of the groups, tabs, panels and the drop
 preview, and `Theme.Dock` sets it for every dock. The dividers take `Theme.Split`.
 The parts are listed in the widget table of docs/styling.md.

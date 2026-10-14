@@ -171,6 +171,7 @@ type dockShown struct {
 type dockSaver struct {
 	pending bool
 	timer   *timer
+	dock    *DockElement // the dock whose OnChange the save runs
 }
 
 // dockShared is the state that the Dock elements of one layout share. A dock that its parent
@@ -179,6 +180,11 @@ type dockSaver struct {
 // holds the windows that show the dock and a save that waits. panels and version are those of
 // the latest Dock element: a panel renders with the latest Render functions, and a new Dock
 // element makes the panels render again.
+//
+// The state lives while something shows the layout: mounts counts the mounted Dock elements
+// and the floating windows that are open, in any runtime (see attach). When the count falls to
+// zero, the state is released at the next frame of rt, unless a dock mounted again first (see
+// release).
 type dockShared struct {
 	layout   *Signal[DockLayout]
 	hub      *retainHub
@@ -188,9 +194,13 @@ type dockShared struct {
 	ids      map[string]string            // the panel ID of each content key
 	shown    map[string]dockShown         // the windows that show the dock, by view
 	saving   dockSaver                    // the OnChange of a change saved late (see saveLater)
+	mounts   int                          // the mounted Dock elements and open floating windows
+	rt       *Runtime                     // the runtime whose frame releases the state
+	released bool                         // the state was released; a Dock that mounts again takes a new one
 }
 
-// dockShares holds the shared state of each layout, by its signal.
+// dockShares holds the shared state of each layout, by its signal. An entry is there while the
+// layout is shown (see dockShared.mounts).
 var dockShares = struct {
 	sync.Mutex
 	byLayout map[*Signal[DockLayout]]*dockShared
@@ -210,6 +220,46 @@ func sharedFor(layout *Signal[DockLayout]) *dockShared {
 		dockShares.byLayout[layout] = s
 	}
 	return s
+}
+
+// attach counts one more mounted Dock element or open floating window of the layout. rt is
+// the runtime whose frame releases the state when the count falls to zero.
+func (s *dockShared) attach(rt *Runtime) {
+	s.mounts++
+	s.rt = rt
+}
+
+// detach counts one less. When none is left, the state is released at the next frame, so
+// that a dock which the same frame mounts again keeps its panels.
+func (s *dockShared) detach() {
+	s.mounts--
+	if s.mounts == 0 && s.rt != nil {
+		s.rt.Post(s.releaseUnused)
+	}
+}
+
+// releaseUnused releases the state if nothing mounts it at this frame.
+func (s *dockShared) releaseUnused() {
+	if s.mounts == 0 && !s.released {
+		s.release()
+	}
+}
+
+// release ends the state of the layout: the debounced OnChange waiting to run is flushed, the
+// entry is removed from dockShares, and every panel instance the hub holds, parked or claimed,
+// is disposed, so that its OnDispose runs once. Its timers are cancelled by the flush.
+func (s *dockShared) release() {
+	if s.saving.dock != nil {
+		s.saving.dock.saveNow() // runs OnChange if a save waits, and cancels its timer
+	}
+	dockShares.Lock()
+	if dockShares.byLayout[s.layout] == s {
+		delete(dockShares.byLayout, s.layout)
+	}
+	dockShares.Unlock()
+	s.released = true
+	s.hub.keep = func(string) bool { return false }
+	s.hub.sweep()
 }
 
 // wanted reports whether the layout holds the panel whose content has the key. The hub keeps
@@ -247,6 +297,14 @@ func Dock(layout *Signal[DockLayout], panels map[string]DockPanel) *DockElement 
 	s.panels = panels
 	s.version.Set(s.version.Peek() + 1) // the panels render with these Render functions
 	return &DockElement{layout: layout, panels: panels, shared: s}
+}
+
+// reopen gives a Dock element that was built before its layout's state was released a new
+// state, with the panels the element holds.
+func (d *DockElement) reopen() {
+	d.shared = sharedFor(d.layout)
+	d.shared.panels = d.panels
+	d.shared.version.Set(d.shared.version.Peek() + 1)
 }
 
 func (*DockElement) isElement()           {}
@@ -338,6 +396,7 @@ func (d *DockElement) content(id string) *ComponentElement {
 func (d *DockElement) saveLater(rt *Runtime) {
 	s := &d.shared.saving
 	s.pending = true
+	s.dock = d
 	s.timer.cancel()
 	s.timer = rt.at(rt.now().Add(dockQuiet), d.saveNow)
 }
@@ -545,6 +604,16 @@ func appendPath(path []int, k int) []int { return append(slices.Clone(path), k) 
 
 func (d *DockElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
+		if d.shared.released {
+			d.reopen()
+		}
+		// The dock counts as mounted from its first render until its component is disposed.
+		if mounted := Local(ctx, "mounted", false); !mounted.Peek() {
+			mounted.Set(true)
+			s := d.shared
+			s.attach(ctx.rt)
+			ctx.OnDispose(s.detach)
+		}
 		v := &dockView{
 			ctx: ctx, d: d, layout: d.layout, th: ctx.Theme(), strs: ctx.Strings(), scope: d.scope(), key: "main",
 			st:      resolveDock(ctx, d.styles),
@@ -904,6 +973,7 @@ func (d *DockElement) syncWindows(v *dockView) {
 	}
 	for _, f := range cur.Floating {
 		if v.windows[f.ID] == nil {
+			d.shared.attach(v.ctx.rt) // detached when the window closes (see floatWindow)
 			v.windows[f.ID] = d.open(d.floatWindow(v, f))
 		}
 	}
@@ -918,6 +988,8 @@ func (d *DockElement) floatWindow(v *dockView, f DockFloat) DockWindow {
 	if p, ok := d.panels[f.Group.Active]; ok {
 		title = p.Title
 	}
+	s := d.shared
+	open := true // the window counts as attached until it closes
 	return DockWindow{
 		Title: title, X: f.X, Y: f.Y, Width: f.Width, Height: f.Height,
 		Root: d.floatRoot(v.layout, id),
@@ -935,6 +1007,10 @@ func (d *DockElement) floatWindow(v *dockView, f DockFloat) DockWindow {
 			}
 		},
 		OnClosed: func() {
+			if open {
+				open = false
+				s.detach()
+			}
 			delete(v.windows, id)
 			delete(d.shared.shown, "float:"+id)
 			l := v.layout.Peek()
