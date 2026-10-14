@@ -229,6 +229,10 @@ func (rt *Runtime) mouseEvent(n *node, x, y float32) *MouseEvent {
 func (rt *Runtime) PointerMove(x, y float32, mods input.Modifiers) {
 	x, y = x/rt.zoom, y/rt.zoom
 	rt.mouseX, rt.mouseY, rt.mouseIn = x, y, true
+	if rt.picking() {
+		rt.pickMove(x, y)
+		return
+	}
 	if rt.sbDrag.active {
 		rt.scrollbarDrag(x, y)
 		return
@@ -275,6 +279,10 @@ func (rt *Runtime) hostPointerLeave() {
 func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mods input.Modifiers) {
 	x, y = x/rt.zoom, y/rt.zoom
 	rt.mouseX, rt.mouseY, rt.mouseIn = x, y, true
+	if rt.picking() {
+		rt.pickPress(x, y)
+		return
+	}
 	rt.setKeyboardModality(false)
 	rt.pointerFocus, rt.altArmed = rt.focusID, false
 	rt.updateHover()
@@ -343,6 +351,9 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 func (rt *Runtime) PointerUp(x, y float32, b input.MouseButton, mods input.Modifiers) {
 	x, y = x/rt.zoom, y/rt.zoom
 	rt.mouseX, rt.mouseY = x, y
+	if rt.picking() {
+		return // the press was the pick; its release is not the app's
+	}
 	if rt.sbDrag.active && b == input.ButtonLeft {
 		rt.sbDrag.active = false
 		rt.needPaint = true
@@ -583,6 +594,10 @@ func (rt *Runtime) KeyDown(k input.Key, mods input.Modifiers, repeat bool) {
 	}
 	if rt.drag.active && k == input.KeyEscape {
 		rt.cancelDrag() // Escape cancels a drag before any binding sees it
+		return
+	}
+	if rt.picking() && k == input.KeyEscape {
+		rt.endPick() // Escape ends the inspector's pick mode (see inspect.go)
 		return
 	}
 	if k == input.KeyEscape {

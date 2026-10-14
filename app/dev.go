@@ -31,6 +31,9 @@ import (
 //	JAMB_A11Y_WARN=1    warn about accessibility problems, such as an unlabeled
 //	                    button or an image without Alt. Also on under JAMB_TRACE=1
 //	                    and `jamb dev`.
+//	JAMB_INSPECT=1      open the visual inspector (see inspect.go) for the first
+//	                    window at start; Ctrl+Shift+I opens it under `jamb dev`
+//	                    and in an app that sets App.DevTools
 //
 // Settings overrides, for testing only. The real Windows settings are used in
 // normal use, and each variable below replaces the matching setting for this
@@ -83,6 +86,7 @@ type devOptions struct {
 	geometry   string
 	devStarted int64 // unix nanos when the dev runner noticed a change
 	a11yWarn   bool  // development warnings about accessibility (see ui.Runtime.SetAccessWarnings)
+	inspect    bool  // JAMB_INSPECT=1: the inspector opens for the first window
 	// The settings overrides (see the package comment): highContrast is the
 	// variable's value, textScale is a percent (0 when unset), reducedMotion
 	// the variable's value.
@@ -103,6 +107,7 @@ func loadDevOptions() devOptions {
 		highContrast:  os.Getenv("JAMB_HIGH_CONTRAST"),
 		reducedMotion: os.Getenv("JAMB_REDUCED_MOTION"),
 		dark:          os.Getenv("JAMB_DARK"),
+		inspect:       os.Getenv("JAMB_INSPECT") == "1",
 	}
 	if v, err := strconv.Atoi(os.Getenv("JAMB_TEXT_SCALE")); err == nil && v > 0 {
 		d.textScale = min(max(v, 100), 225)
@@ -168,6 +173,10 @@ func (d devOptions) saveGeometry(r platform.Rect) {
 		_ = os.WriteFile(d.geometry, fmt.Appendf(nil, "%d %d %d %d", r.X, r.Y, r.W, r.H), 0o644)
 	}
 }
+
+// inspectOn reports whether the visual inspector may be opened: under the dev
+// runner, or when JAMB_INSPECT=1 asks for it.
+func (d devOptions) inspectOn() bool { return d.inspect || d.devStarted > 0 }
 
 // reportReady tells the dev runner how long a change took to reach the screen.
 func (d devOptions) reportReady() {

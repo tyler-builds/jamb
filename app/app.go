@@ -125,6 +125,8 @@ const (
 // the UI thread, the text system and the GPU device.
 type App struct {
 	fonts []appFont
+	// devTools turns the visual inspector on for every window; see DevTools.
+	devTools bool
 	// The identity settings; see AppID, JumpList and SingleInstance.
 	appID          string
 	jumpList       *JumpList
@@ -160,6 +162,16 @@ func (a *App) Font(family string, weight ui.FontWeight, data []byte) *App {
 	return a
 }
 
+// DevTools turns the visual inspector on in a release build as well, for every
+// window: Ctrl+Shift+I opens an inspector window for the window that has the
+// focus, and closes it again. The inspector is on by default under `jamb dev`
+// and with JAMB_INSPECT=1, and it shows the elements, styles, accessibility and
+// frame timings of a window; see the README, "Tools for humans and coding agents".
+func (a *App) DevTools(on bool) *App {
+	a.devTools = on
+	return a
+}
+
 // Run opens the window and blocks until the app quits: when the last window
 // closes, or when a QuitWhenClosed window closes. On failure it prints the
 // error and exits with status 1. Use RunE to handle errors yourself. A later
@@ -191,6 +203,7 @@ func (a *App) RunE(w Window) error {
 		}
 	}
 	application.dev = loadDevOptions()
+	application.devTools = a.devTools
 	application.gpu.adapter = gpuAdapter
 	prepareDevice()
 	// Parse fonts and warm the shaper while the first window and GPU device
@@ -253,6 +266,7 @@ var application struct {
 	script    *script      // JAMB_SCRIPT, which drives the windows
 	quitting  bool         // a QuitWhenClosed window is closing all windows
 	gpu       gpuRecovery  // the shared GPU device, while it is lost; see recovery.go
+	devTools  bool         // the visual inspector may open (see App.DevTools and inspect.go)
 }
 
 func withDefaults(w Window) Window {
@@ -294,7 +308,8 @@ func openWindow(cfg Window, handle *appWindow) (*host, error) {
 	if handle == nil {
 		handle = &appWindow{}
 	}
-	h := &host{cfg: cfg, handle: handle, primary: application.opened == 0, dev: application.dev, openedAt: time.Now()}
+	h := &host{cfg: cfg, handle: handle, primary: application.opened == 0, dev: application.dev, openedAt: time.Now(),
+		devTools: application.devTools || application.dev.inspectOn()}
 	application.opened++
 	opts := platform.WindowOptions{
 		Title: cfg.Title, Width: cfg.Width, Height: cfg.Height,
@@ -371,6 +386,12 @@ type host struct {
 	primary  bool       // the first window of the process: it saves its geometry
 	dev      devOptions
 	openedAt time.Time
+	// devTools is whether Ctrl+Shift+I opens the inspector of this window; insp
+	// is the inspector while one is open, and inspected is set on an inspector's
+	// own window (see inspect.go).
+	devTools  bool
+	insp      *inspector
+	inspected *host
 
 	win platform.Window
 	rt  *ui.Runtime
@@ -459,6 +480,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	}
 	h.handle.host = h
 	application.windows = append(application.windows, h)
+	h.startInspector()
 	return nil
 }
 
@@ -540,7 +562,9 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 	case platform.EventGesture:
 		h.rt.Pinch(x, y, gesturePhase(e.Phase), e.Scale, e.PanX/s, e.PanY/s, e.Inertia, e.Mods)
 	case platform.EventKeyDown:
-		h.rt.KeyDown(e.Key, e.Mods, e.Repeat)
+		if !h.inspectKey(e.Key, e.Mods) {
+			h.rt.KeyDown(e.Key, e.Mods, e.Repeat)
+		}
 	case platform.EventKeyUp:
 		h.rt.KeyUp(e.Key, e.Mods)
 	case platform.EventTextInput:
@@ -661,6 +685,9 @@ func (h *host) OnFrame(w platform.Window) bool {
 		h.stress.begin(h, h.dev.stressSecs)
 	}
 	sc := h.rt.Frame(frameStart)
+	if h.insp != nil {
+		h.insp.frame(h.rt, frameStart)
+	}
 	// Tell the OS where the caret is, for input-method (IME) windows.
 	var ime platform.Rect
 	if r, ok := h.rh.TextInputRect(); ok {
@@ -750,6 +777,12 @@ func (h *host) OnDestroy(w platform.Window) {
 	if h.stopWatch != nil {
 		h.stopWatch()
 		h.stopWatch = nil
+	}
+	if ins := h.insp; ins != nil {
+		// The inspected window is going: its inspector closes with it, after this
+		// window's destruction has finished.
+		h.insp = nil
+		postUI(ins.win.Close)
 	}
 	application.windows = slices.DeleteFunc(application.windows, func(o *host) bool { return o == h })
 	h.handle.closed.Store(true)

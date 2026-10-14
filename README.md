@@ -2817,6 +2817,7 @@ These environment variables work with any jamb app, with no code changes:
 |---|---|
 | `JAMB_TRACE=1` | Prints startup timings, per-frame build/layout/paint cost, and frames per second of activity, so you can confirm the app is idle. Also turns on the accessibility warnings (see [Accessibility](#accessibility)). |
 | `JAMB_A11Y_WARN=1` | Prints accessibility warnings: an interactive element with no name, and an image without `Alt`. Each is reported once. On by default under `jamb dev`. |
+| `JAMB_INSPECT=1` | Opens the visual inspector for the first window at start. The inspector is also on under `jamb dev`, where Ctrl+Shift+I opens it (see [Visual inspector](#visual-inspector)). |
 | `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `type TEXT` types everything after the one space that follows `type`, spaces included. `devicelost` simulates a GPU device loss; see [GPU device loss](#gpu-device-loss). `a11ydump PATH` writes the accessibility tree as text (see [Accessibility](#accessibility)). |
 | `JAMB_STRESS=rebuild\|paint` | Measures sustained frame cost, allocation and GC, prints the results, then exits. |
 | `JAMB_VSYNC=0` | Turns off vsync, for throughput tests. |
@@ -2851,6 +2852,72 @@ The headless tools are:
 See `ui/runtime_test.go`, `ui/editor_test.go`,
 `examples/demo/views/dump_test.go` and `examples/notes/views/views_test.go` (the notes app
 driven headlessly: Ctrl+N, typing, search, saving).
+
+### Visual inspector
+
+The visual inspector is a window of its own that shows the elements of another
+window. Like the browser's developer tools, it shows the element tree, the
+style and layout of the selected element, and where each style value came
+from. It never changes the layout of the window it inspects.
+
+It is on in three cases:
+
+- Under `jamb dev`: press Ctrl+Shift+I in the window.
+- With `JAMB_INSPECT=1`: it opens for the first window at start.
+- In an app that calls `App.DevTools(true)`, so that Ctrl+Shift+I works in a
+  release build as well. Without that call, a release build has no inspector.
+
+Ctrl+Shift+I opens the inspector of the focused window, or closes it again.
+The shortcut is taken before the window's own key bindings.
+
+The inspector shows:
+
+- **The element tree**: each element's kind, key, widget part (such as
+  `Checkbox.Box`), its text, the component whose output it is, and its role and
+  name in the accessibility tree. Click
+  **Pick an element**, then click an element in the window. The press selects
+  it and is not passed to the element; Escape ends picking without a selection.
+  While picking, the element under the pointer is outlined. A selected element
+  stays outlined in the window.
+- **Layout**: the border box in window coordinates, padding, margin, border,
+  content size and overflow.
+- **Accessibility**: the role, name, description, value, states and actions of
+  the element's node, and the warnings that `JAMB_A11Y_WARN` reports for it.
+- **Style**: each set field of the resolved style, with its source:
+  - `element method`: set on an element that is not a widget part.
+  - `widget part`: set by a widget on one of its parts.
+  - `theme part`: a widget part whose value equals the theme's value for that part.
+  - `sizing method`: set by a sizing method of the widget, such as `Width`.
+  - `state: hover`, `state: pressed` and the other states: set by the state the
+    element is in.
+  - `live edit`: set by the inspector.
+- **Live edits**: choose a style field, enter a value and click **Apply**. The
+  value takes effect at once in the window. **Clear edits** drops them, and
+  **Copy as Go** copies them to the clipboard as a `ui.Style` literal. An edit
+  lasts until its element is built again, such as when its component renders.
+- **Frames**: the build, layout and paint time of the last frame, the number of
+  nodes, rendered components, quads and glyphs, the average and peak over the
+  last 120 frames, and a line of the CPU time per frame.
+
+The limits:
+
+- Live edits apply to divs only: a text, icon, image or editor is shown but not
+  edited. The edit values are a color (`#rrggbb` or `#rrggbbaa`), a length (a
+  number of pixels, `50%`, or `2fr`), a number, one or four numbers for edges and
+  corners, `true`, or text. A width or height cannot be `auto` in an edit.
+- A zero value clears the field only for Background, TextColor, BorderWidth,
+  Radius, Corners, Padding, Margin and Gap. Any other field refuses zero, which
+  would leave the field as it was. A zero side in four edges keeps the value
+  under it, as in `ui.Style.Merge`.
+- The inspector cannot tell a widget part's built-in default from the `Styles`
+  of its instance. Both are reported as `widget part`, and a value that matches
+  the theme is reported as `theme part`, which is a comparison of values.
+- The window refreshes the inspector about four times a second while it draws.
+  Each refresh rebuilds the accessibility tree for the selected element, so a
+  very large window costs more while the inspector is open.
+- Nothing is written to the code. Copy the literal into the application yourself.
+- The inspector is a development tool. Its labels are in English, and they are
+  not translated with `ui.Strings`.
 
 ### Accessibility checks
 

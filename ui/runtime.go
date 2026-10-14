@@ -400,6 +400,10 @@ type Runtime struct {
 	// the tree is first asked for, so a runtime without assistive technology
 	// keeps none of it.
 	acc *accessState
+	// insp is the visual inspector's state while an inspector is attached to the
+	// window (see inspect.go). It is nil otherwise, so a window without one pays
+	// a nil check.
+	insp *inspectState
 }
 
 // platformServices are platform capabilities the runtime uses when available. The
@@ -1112,6 +1116,9 @@ func (rt *Runtime) disposeInstance(inst *componentInstance) {
 func (rt *Runtime) newNode(kind nodeKind, id uint64, parent *node, owner *componentInstance) *node {
 	n := &node{rt: rt, kind: kind, id: id, parent: parent, owner: owner, gen: rt.gen}
 	n.fresh = rt.byID[id] == nil // a new element, not a rebuild of an existing one
+	if rt.insp != nil {
+		delete(rt.insp.edits, id) // a live edit lasts until its element is built again
+	}
 	if n.fresh {
 		rt.dropGhost(id)
 	}
@@ -1400,6 +1407,9 @@ func (rt *Runtime) resolveStyle(n *node) Style {
 			}
 		}
 	}
+	if edit, ok := rt.liveEdit(n.id); ok {
+		s = s.Merge(edit) // the inspector's edit is the last layer (see inspect.go)
+	}
 	return s
 }
 
@@ -1473,9 +1483,16 @@ func (rt *Runtime) restyle(id uint64) {
 	}
 	d := n.div
 	if d.hover == nil && d.pressed == nil && d.focused == nil && d.focusWithin == nil && d.focusVisible == nil &&
-		d.dragging == nil && len(d.drops) == 0 {
+		d.dragging == nil && len(d.drops) == 0 && !rt.hasLiveEdit(id) {
 		return
 	}
+	rt.restyleNode(n)
+}
+
+// restyleNode resolves the style of the div n again, with its state and its live
+// edit, and lays it out again if the layout style changed.
+func (rt *Runtime) restyleNode(n *node) {
+	d := n.div
 	s := rt.resolveStyle(n)
 	n.style = s
 	rt.restyled++

@@ -103,6 +103,7 @@ type DivElement struct {
 	matchAnchor  bool // set by a Select's list: at least as wide as the field it opens from
 	tooltip      string
 	part         string          // the widget part this element draws, see asPart
+	sized        sizeSet         // the sizes a sizing method gave the element, for the inspector (see sizing.apply)
 	keyContext   string          // the KeyContext spec, as given
 	keyCtx       keyCtx          // its parsed entries, for BindIn bindings
 	actions      []actionHandler // see OnAction

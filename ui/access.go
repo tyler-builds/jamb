@@ -509,6 +509,13 @@ type accessRelation struct {
 // buildAccess builds the tree from the runtime's nodes and the targets of its
 // actions. It warns about elements that need a name, when warnings are on.
 func (rt *Runtime) buildAccess() (*access.Tree, map[access.ID]accessTarget) {
+	t, targets, _ := rt.buildAccessIssues()
+	return t, targets
+}
+
+// buildAccessIssues is buildAccess, and it also returns the issues found while
+// building each node (see accessWarning).
+func (rt *Runtime) buildAccessIssues() (*access.Tree, map[access.ID]accessTarget, map[access.ID]string) {
 	b := &accessBuilder{rt: rt, byID: map[access.ID]*access.Node{}, targets: map[access.ID]accessTarget{},
 		keys: map[string]access.ID{}, issues: map[access.ID]string{}}
 	b.focus = b.focusTarget()
@@ -533,7 +540,7 @@ func (rt *Runtime) buildAccess() (*access.Tree, map[access.ID]accessTarget) {
 	if rt.acc != nil && rt.acc.warn {
 		t.Walk(func(n *access.Node) bool { rt.warnNode(n, t, b.issues[n.ID]); return true })
 	}
-	return t, b.targets
+	return t, b.targets, b.issues
 }
 
 // resolve returns the IDs of the elements with the keys. A key that no exposed
@@ -1098,6 +1105,14 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 // a problem recorded while the element was built (issue, when not empty). Each
 // element is reported once.
 func (rt *Runtime) warnNode(an *access.Node, t *access.Tree, issue string) {
+	if msg := accessWarning(an, t, issue); msg != "" {
+		rt.warnOnce(an.ID, msg)
+	}
+}
+
+// accessWarning returns the accessibility warning for the node an, given the
+// issue the builder found for it, or "" when there is none.
+func accessWarning(an *access.Node, t *access.Tree, issue string) string {
 	var msg string
 	switch {
 	case issue != "":
@@ -1109,12 +1124,12 @@ func (rt *Runtime) warnNode(an *access.Node, t *access.Tree, issue string) {
 	case an.States.Has(access.StateSelectable) && !inSelectionContainer(t, an):
 		msg = fmt.Sprintf("%s is a selection item outside a selection container; call SelectionContainer on the group that holds it", an.Role)
 	default:
-		return
+		return ""
 	}
 	if an.Key != "" {
 		msg += fmt.Sprintf(" (key %q)", an.Key)
 	}
-	rt.warnOnce(an.ID, msg)
+	return msg
 }
 
 // warnOnce reports msg as the accessibility warning for the element id, unless

@@ -26,6 +26,7 @@ func (rt *Runtime) paint(dt float32) {
 	rt.paintGhosts(dt)
 	rt.paintOverlays(view, dt)
 	rt.paintDrag(view, dt)
+	rt.paintInspect(view)
 	rt.revealTabFocus()
 	rt.revealRowsNow()
 }
