@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/tyler-builds/jamb/internal/notifyscheme"
 	"github.com/tyler-builds/jamb/internal/platform/windows"
 )
 
@@ -89,7 +90,7 @@ func notifyNow(s *notifySettings, n Notification) error {
 	if err != nil {
 		return err
 	}
-	scheme := activationScheme(s.appID)
+	scheme := notifyscheme.Activation(s.appID)
 	protocol := s.handler != nil
 
 	bodyURI, err := encodeActivation(scheme, activationData{Tag: n.Tag, Args: n.Args, Nonce: nonce})
@@ -117,20 +118,14 @@ func notifyNow(s *notifySettings, n Notification) error {
 	}
 	xmlDoc := toastXML(content)
 
-	var plan notifyPlan
 	appID := s.appID
 	if s.packaged {
 		// A packaged app has the identity of its package, and needs no registration.
 		appID = ""
-	} else {
-		plan, err = currentNotifyPlan(s.appID, protocol)
-		if err != nil {
-			return err
-		}
 	}
 	return onUI(func() error {
 		if !s.packaged {
-			if err := register(plan); err != nil {
+			if err := register(s.appID, protocol); err != nil {
 				return err
 			}
 		}
@@ -141,45 +136,58 @@ func notifyNow(s *notifySettings, n Notification) error {
 	})
 }
 
-// currentNotifyPlan returns the registration of this program: the executable's path
-// and the user's Start menu Programs folder.
-func currentNotifyPlan(appID string, protocol bool) (notifyPlan, error) {
-	exe, err := os.Executable()
-	if err != nil {
-		return notifyPlan{}, fmt.Errorf("app.Notify: %w", err)
-	}
-	config, err := os.UserConfigDir()
-	if err != nil {
-		return notifyPlan{}, fmt.Errorf("app.Notify: %w", err)
-	}
-	programs := filepath.Join(config, "Microsoft", "Windows", "Start Menu", "Programs")
-	return planNotifyRegistration(appID, exe, programs, protocol), nil
-}
-
-// registered is the last registration written by this process. It is only used on
-// the UI thread.
+// registered is the registration that this process has written, as a key of the AppID,
+// the executable and whether the protocol is registered. It is only used on the UI
+// thread.
 var registered string
 
-// register writes the registration of plan, unless this process has written it
-// already. The shortcut is written first, because Windows matches a toast to the
+// register writes the registration of the program, unless this process has written it
+// already. It runs on the UI thread, which has COM for the shortcut calls. The shortcuts
+// are looked for before any is written: a shortcut that already points at the program
+// gets the AppID, or is kept, rather than a second shortcut being created (see
+// chooseShortcut). The shortcut is settled first, because Windows matches a toast to the
 // shortcut that carries its AppID.
-func register(p notifyPlan) error {
-	key := fmt.Sprintf("%v", p)
+func register(appID string, protocol bool) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("app.Notify: %w", err)
+	}
+	key := fmt.Sprintf("%s\x00%s\x00%t", appID, exe, protocol)
 	if key == registered {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(p.Shortcut), 0o755); err != nil {
+	programs, err := userPrograms()
+	if err != nil {
 		return fmt.Errorf("app.Notify: %w", err)
 	}
-	if err := windows.WriteShortcut(p.Shortcut, p.Target, p.AppID); err != nil {
-		return fmt.Errorf("app.Notify: writing the Start menu shortcut %s: %w", p.Shortcut, err)
+	p := planNotifyRegistration(appID, exe, programs, findShortcuts(startMenuRoots(programs)), protocol)
+	if err := writeRegistration(p); err != nil {
+		return err
+	}
+	registered = key
+	return nil
+}
+
+// writeRegistration writes the plan: the shortcut, then the protocol values.
+func writeRegistration(p notifyPlan) error {
+	switch p.Action {
+	case shortcutCreate:
+		if err := os.MkdirAll(filepath.Dir(p.Shortcut), 0o755); err != nil {
+			return fmt.Errorf("app.Notify: %w", err)
+		}
+		if err := windows.WriteShortcut(p.Shortcut, p.Target, p.AppID); err != nil {
+			return fmt.Errorf("app.Notify: writing the Start menu shortcut %s: %w", p.Shortcut, err)
+		}
+	case shortcutStamp:
+		if err := windows.SetShortcutAppID(p.Shortcut, p.AppID); err != nil {
+			return fmt.Errorf("app.Notify: setting the AppID on the Start menu shortcut %s: %w", p.Shortcut, err)
+		}
 	}
 	for _, v := range p.Values {
 		if err := windows.SetCurrentUserString(v.Key, v.Name, v.Value); err != nil {
 			return fmt.Errorf("app.Notify: registering %s: %w", v.Key, err)
 		}
 	}
-	registered = key
 	return nil
 }
 
@@ -204,7 +212,7 @@ func onUI(fn func() error) error {
 func (a *App) setNotifications() {
 	s := &notifySettings{appID: a.appID, handler: a.notifyHandler, packaged: windows.PackagedProcess()}
 	if a.appID != "" {
-		s.scheme = activationScheme(a.appID)
+		s.scheme = notifyscheme.Activation(a.appID)
 	}
 	notifyCurrent.Store(s)
 	windows.SetToastCallbacks(

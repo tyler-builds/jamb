@@ -32,14 +32,19 @@ const (
 	// KDC_RECENT, the Recent category of KNOWNDESTCATEGORY.
 	kdcRecent = 2
 
-	// IShellLinkW.
+	// IShellLinkW. GetPath is 3, after QueryInterface, AddRef and Release at 0 to 2 and
+	// before GetIDList at 4; the zig MinGW headers in shobjidl.h (IShellLinkWVtbl) give
+	// the same order, with SetPath at 20.
+	slGetPath             = 3
 	slSetDescription      = 7
 	slSetArguments        = 11
 	slSetIconLocation     = 17
 	slSetPath             = 20
 	slSetWorkingDirectory = 9
 
-	// IPropertyStore.
+	// IPropertyStore. GetValue is 5, after GetCount at 3 and GetAt at 4; the zig MinGW
+	// headers in propsys.h (IPropertyStoreVtbl) give the same order.
+	psGetValue = 5
 	psSetValue = 6
 	psCommit   = 7
 

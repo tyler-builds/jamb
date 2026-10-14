@@ -44,6 +44,10 @@ type installerFields struct {
 	Icon          string
 	OutFile       string
 	UninstallKey  string
+	AppID         string // the app's AppID, which is identityName
+	Stamp         bool   // the executable takes the internal flag that stamps its shortcut (see stampFlag)
+	Scheme        string // the URI scheme of the app's notifications, from protocolScheme
+	ShortcutName  string // the file name, without .lnk, of the shortcut that jamb may write
 	EstimatedSize int64
 }
 
@@ -116,6 +120,10 @@ func buildInstaller(makensis, dir, out, appDir, exe string, cfg *config, icon im
 		size += n
 	}
 
+	scheme, err := protocolScheme(cfg.IdentityName)
+	if err != nil {
+		return err
+	}
 	iconPath := filepath.Join(dir, "installer.ico")
 	if err := writeICO(iconPath, icon); err != nil {
 		return err
@@ -133,6 +141,10 @@ func buildInstaller(makensis, dir, out, appDir, exe string, cfg *config, icon im
 		Icon:          iconPath,
 		OutFile:       out,
 		UninstallKey:  `Software\Microsoft\Windows\CurrentVersion\Uninstall\` + cfg.IdentityName,
+		AppID:         cfg.IdentityName,
+		Stamp:         takesStampFlag(exe),
+		Scheme:        scheme,
+		ShortcutName:  cfg.Name,
 		EstimatedSize: (size + 1023) / 1024,
 	})
 	if err != nil {
@@ -153,4 +165,16 @@ func fileSize(path string) (int64, error) {
 		return 0, err
 	}
 	return info.Size(), nil
+}
+
+// stampFlag is the internal flag with which a jamb app sets the AppID on its own Start
+// menu shortcut and exits (see app/shortcut_windows.go).
+const stampFlag = "--jamb-stamp-shortcut"
+
+// takesStampFlag reports whether the executable at path knows stampFlag: an app built
+// with a jamb that predates the flag would open its window when the installer runs it,
+// so the installer runs it only when the flag's text is in the executable.
+func takesStampFlag(path string) bool {
+	data, err := os.ReadFile(path)
+	return err == nil && bytes.Contains(data, []byte(stampFlag))
 }

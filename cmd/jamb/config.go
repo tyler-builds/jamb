@@ -18,23 +18,39 @@ import (
 const configFile = "jamb.json"
 
 // config is the content of jamb.json. Every field is required except
-// copyright. The Packaging section of the README describes each one.
+// copyright and notificationProtocol. The Packaging section of the README describes each
+// one.
 type config struct {
-	Name             string `json:"name"`
-	DisplayName      string `json:"displayName"`
-	Description      string `json:"description"`
-	Version          string `json:"version"`
-	Publisher        string `json:"publisher"`
-	PublisherSubject string `json:"publisherSubject"`
-	IdentityName     string `json:"identityName"`
-	Copyright        string `json:"copyright"`
-	Icon             string `json:"icon"`
+	Name                 string `json:"name"`
+	DisplayName          string `json:"displayName"`
+	Description          string `json:"description"`
+	Version              string `json:"version"`
+	Publisher            string `json:"publisher"`
+	PublisherSubject     string `json:"publisherSubject"`
+	IdentityName         string `json:"identityName"`
+	Copyright            string `json:"copyright"`
+	Icon                 string `json:"icon"`
+	NotificationProtocol bool   `json:"notificationProtocol"`
 }
 
 var (
 	exeNamePattern      = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,63}$`)
 	identityNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]{1,48}[A-Za-z0-9]$`)
+	// uriSchemePattern is the grammar of a URI scheme in RFC 3986.
+	uriSchemePattern = regexp.MustCompile(`^[a-z][a-z0-9+.-]*$`)
 )
+
+// protocolScheme returns the URI scheme that a click on the app's notifications starts
+// the app with. identityName is the app's AppID, and the scheme is derived by the same
+// function the app uses, so the packager and the app agree on the name. The result is
+// checked against the grammar of a URI scheme.
+func protocolScheme(identityName string) (string, error) {
+	s := activationScheme(identityName)
+	if !uriSchemePattern.MatchString(s) {
+		return "", fmt.Errorf("the protocol %q derived from identityName is not a valid URI scheme", s)
+	}
+	return s, nil
+}
 
 // loadConfig reads and validates jamb.json in dir. Every problem is reported
 // together, so one run shows them all.

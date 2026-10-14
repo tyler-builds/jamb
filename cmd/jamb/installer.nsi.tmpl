@@ -55,6 +55,13 @@ Section "{{nsis .DisplayName}}" SecMain
   CreateDirectory "$SMPROGRAMS\{{nsis .DisplayName}}"
   CreateShortcut "$SMPROGRAMS\{{nsis .DisplayName}}\{{nsis .DisplayName}}.lnk" "$INSTDIR\{{nsis .Executable}}"
   CreateShortcut "$SMPROGRAMS\{{nsis .DisplayName}}\Uninstall {{nsis .DisplayName}}.lnk" "$INSTDIR\uninstall.exe"
+  ; NSIS cannot set the shortcut's AppID, which Windows needs to match the app's
+  ; notifications to it. The program sets it on this shortcut, and exits, when it is run
+  ; with the internal flag. A failure here is not fatal: the program sets the AppID itself
+  ; on its first notification.
+{{- if .Stamp}}
+  ExecWait "$\"$INSTDIR\{{nsis .Executable}}$\" --jamb-stamp-shortcut {{nsis .AppID}}"
+{{- end}}
 
   WriteRegStr HKCU "{{nsis .UninstallKey}}" "DisplayName" "{{nsis .DisplayName}}"
   WriteRegStr HKCU "{{nsis .UninstallKey}}" "DisplayVersion" "{{nsis .Version}}"
@@ -81,6 +88,8 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\{{nsis .DisplayName}}\{{nsis .DisplayName}}.lnk"
   Delete "$SMPROGRAMS\{{nsis .DisplayName}}\Uninstall {{nsis .DisplayName}}.lnk"
   RMDir "$SMPROGRAMS\{{nsis .DisplayName}}"
+  ; The shortcut that the program writes for its notifications, if it ran and wrote one.
+  Delete "$SMPROGRAMS\{{nsis .ShortcutName}}.lnk"
 
   Delete "$INSTDIR\{{nsis .Executable}}"
   {{- range .Files}}
@@ -90,4 +99,6 @@ Section "Uninstall"
   RMDir "$INSTDIR"
 
   DeleteRegKey HKCU "{{nsis .UninstallKey}}"
+  ; The protocol that a click on a notification starts the app through.
+  DeleteRegKey HKCU "Software\Classes\{{nsis .Scheme}}"
 SectionEnd

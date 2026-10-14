@@ -19,6 +19,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"unicode/utf8"
+
+	"github.com/tyler-builds/jamb/internal/notifyscheme"
 )
 
 // Notification is an operating system notification: a Windows toast, shown in the
@@ -128,24 +130,6 @@ func (n Notification) check() error {
 		return errors.New("app.Notify: Image is empty")
 	}
 	return nil
-}
-
-// activationScheme returns the URI scheme that a click on the app's notifications
-// starts the app with, such as "jamb-company.product". The scheme is registered for
-// the user when the first notification is shown, and it is derived from the AppID,
-// whose characters it keeps, lower-cased; a '_' becomes '-'.
-func activationScheme(appID string) string {
-	var b strings.Builder
-	b.WriteString("jamb-")
-	for _, c := range strings.ToLower(appID) {
-		switch {
-		case c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '.', c == '-':
-			b.WriteRune(c)
-		default:
-			b.WriteByte('-')
-		}
-	}
-	return b.String()
 }
 
 // activationData is what a click carries back: the button, the tag, the args and a
@@ -274,7 +258,7 @@ func (a *App) notificationArgs(args []string) (rest []string, found bool) {
 	if a.notifyHandler == nil || a.appID == "" {
 		return args, false
 	}
-	raw, rest, found := splitActivation(activationScheme(a.appID), args)
+	raw, rest, found := splitActivation(notifyscheme.Activation(a.appID), args)
 	if found {
 		postUI(func() { deliverActivation(raw) })
 	}
@@ -462,33 +446,110 @@ type regValue struct {
 	Value string
 }
 
-// notifyPlan is what the first notification of a process registers for the user: a
-// Start menu shortcut that carries the AppID, and, when the app has an OnNotification
-// handler, the protocol that a click starts the app through.
+// shortcutCandidate is a Start menu shortcut found in the Programs folders, with what
+// the registration needs to know about it.
+type shortcutCandidate struct {
+	Path     string // full path of the .lnk file
+	Target   string // the program the shortcut starts
+	AppID    string // its System.AppUserModel.ID, empty when it has none
+	Writable bool   // whether the file can be written, so that the AppID can be set on it
+}
+
+// shortcutAction is what the registration does with the program's Start menu shortcut.
+type shortcutAction int
+
+const (
+	// shortcutKeep: a shortcut to the program already carries the AppID, so nothing is
+	// written.
+	shortcutKeep shortcutAction = iota
+	// shortcutStamp: the AppID is set on an existing shortcut.
+	shortcutStamp
+	// shortcutCreate: the program's own shortcut is written.
+	shortcutCreate
+)
+
+// chooseShortcut returns what the registration does with the Start menu shortcut of
+// the program exe, and the shortcut's path. found holds the shortcuts in the Programs
+// folders, in search order: the per-user folder first, then the all-users one. created
+// is the path of the shortcut that would be written. Only a shortcut whose target is
+// exe counts, and the rules are these:
+//
+//   - a shortcut that already carries appID is kept, whether or not it is writable,
+//     because nothing needs writing;
+//   - otherwise the first writable shortcut has appID set on it;
+//   - otherwise the shortcut at created is written, so that a shortcut that cannot be
+//     changed does not stop the registration.
+//
+// It is pure, so the rules are tested without the Start menu.
+func chooseShortcut(appID, exe, created string, found []shortcutCandidate) (shortcutAction, string) {
+	stamp := ""
+	for _, c := range found {
+		if !samePath(c.Target, exe) {
+			continue
+		}
+		if c.AppID == appID {
+			return shortcutKeep, c.Path
+		}
+		if c.Writable && stamp == "" {
+			stamp = c.Path
+		}
+	}
+	if stamp != "" {
+		return shortcutStamp, stamp
+	}
+	return shortcutCreate, created
+}
+
+// samePath reports whether a and b name the same file: both are made absolute and
+// cleaned, and compared without case, as Windows file names are.
+func samePath(a, b string) bool {
+	return normalPath(a) == normalPath(b)
+}
+
+// normalPath returns the absolute, cleaned form of p in lower case. An empty path stays
+// empty, rather than becoming the working directory.
+func normalPath(p string) string {
+	if p == "" {
+		return ""
+	}
+	if abs, err := filepath.Abs(p); err == nil {
+		p = abs
+	}
+	return strings.ToLower(filepath.Clean(p))
+}
+
+// notifyPlan is what the first notification of a process registers for the user: the
+// AppID on the program's Start menu shortcut, which is set on an existing shortcut or
+// created, and, when the app has an OnNotification handler, the protocol that a click
+// starts the app through.
 type notifyPlan struct {
-	Shortcut string // full path of the .lnk file
+	Action   shortcutAction
+	Shortcut string // full path of the .lnk file that is kept, stamped or created
 	Target   string // the program the shortcut starts
 	AppID    string
 	Values   []regValue
 }
 
-// planNotifyRegistration returns what registration writes for the program exe, with
-// the Start menu's Programs folder programs. It writes nothing; the tests use it to
-// check the registration without touching the registry or the Start menu.
+// planNotifyRegistration returns what registration does for the program exe, with the
+// Start menu's per-user Programs folder programs and the shortcuts found in the Programs
+// folders (see chooseShortcut). It writes nothing; the tests use it to check the
+// registration without touching the registry or the Start menu.
 //
 // The protocol is registered as HKCU\Software\Classes\<scheme>, with its URL Protocol
 // value, and its command under \shell\open\command, which runs the program with the
 // URI as its only argument.
-func planNotifyRegistration(appID, exe, programs string, protocol bool) notifyPlan {
+func planNotifyRegistration(appID, exe, programs string, found []shortcutCandidate, protocol bool) notifyPlan {
+	action, path := chooseShortcut(appID, exe, filepath.Join(programs, shortcutName(exe, appID)+".lnk"), found)
 	p := notifyPlan{
-		Shortcut: filepath.Join(programs, shortcutName(exe, appID)+".lnk"),
+		Action:   action,
+		Shortcut: path,
 		Target:   exe,
 		AppID:    appID,
 	}
 	if !protocol {
 		return p
 	}
-	scheme := activationScheme(appID)
+	scheme := notifyscheme.Activation(appID)
 	key := `Software\Classes\` + scheme
 	p.Values = []regValue{
 		{Key: key, Name: "", Value: "URL:" + scheme},

@@ -113,3 +113,31 @@ func TestLoadConfig(t *testing.T) {
 		t.Errorf("all problems at once: err = %v", err)
 	}
 }
+
+func TestNotificationProtocol(t *testing.T) {
+	for in, want := range map[string]string{
+		"JambExamples.Demo": "jamb-jambexamples.demo",
+		"Example.Notes2":    "jamb-example.notes2",
+	} {
+		got, err := protocolScheme(in)
+		if err != nil || got != want {
+			t.Errorf("protocolScheme(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+
+	// The setting is optional, and it is read from jamb.json.
+	dir := t.TempDir()
+	body := `{"name":"jamb-demo","displayName":"Jamb Demo","description":"A demo.","version":"0.1.0",
+		"publisher":"Jamb Examples","publisherSubject":"CN=Jamb Examples","identityName":"JambExamples.Demo",
+		"icon":"icon.png","notificationProtocol":true}`
+	if err := os.WriteFile(filepath.Join(dir, configFile), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := loadConfig(dir)
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	if !c.NotificationProtocol {
+		t.Error("notificationProtocol is not read from jamb.json")
+	}
+}

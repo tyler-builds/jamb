@@ -56,8 +56,20 @@ const (
 	tfGetErrorCode = inspectableMethod
 	// IActivationFactory.
 	afActivateInstance = inspectableMethod
-	// IPersistFile: IPersist's GetClassID is 3, so IsDirty is 4, Load 5 and Save 6.
+	// IPersistFile: IPersist's GetClassID is 3, so IsDirty is 4, Load 5 and Save 6. The
+	// zig MinGW headers in objidl.h (IPersistFileVtbl) give the same order.
+	pfLoad = 5
 	pfSave = 6
+
+	// The modes that IPersistFile::Load opens a shortcut with: STGM_READ, and
+	// STGM_READWRITE for a shortcut that is then saved.
+	stgmRead      = 0x0
+	stgmReadWrite = 0x2
+
+	// shortcutPathChars is the room for a shortcut's target path, in UTF-16 characters.
+	shortcutPathChars = 1024
+	// findDataWSize is the size of WIN32_FIND_DATAW, which GetPath fills in (minwinbase.h).
+	findDataWSize = 592
 
 	// eNoInterface is E_NOINTERFACE.
 	eNoInterface = 0x80004002
@@ -468,6 +480,97 @@ func WriteShortcut(path, target, appID string) error {
 	defer release(pf)
 	// The second argument of Save is TRUE, which saves the file at the path given.
 	return comCall("Save", pf, pfSave, wide(&live, path), 1)
+}
+
+// InitializeCOM initializes COM on the calling thread, for code that runs before the UI
+// thread exists, such as the installer's shortcut stamp. The UI thread gets it from its
+// window.
+func InitializeCOM() { win32.OleInitialize() }
+
+// ReadShortcut returns the target path and the Application User Model ID of the shortcut
+// at path. The ID is empty when the shortcut has none. The shortcut is loaded but not
+// resolved, so a target that is missing or on an unavailable drive does not delay the read.
+func ReadShortcut(path string) (target, appID string, err error) {
+	var live []*uint16
+	defer func() { runtime.KeepAlive(live) }()
+	link, pf, err := loadShortcut(path, stgmRead, &live)
+	if err != nil {
+		return "", "", err
+	}
+	defer release(pf)
+	defer release(link)
+	buf := make([]uint16, shortcutPathChars)
+	var fd [findDataWSize]byte
+	if err := comCall("GetPath", link, slGetPath, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), uintptr(unsafe.Pointer(&fd[0])), 0); err != nil {
+		return "", "", err
+	}
+	n := 0
+	for n < len(buf) && buf[n] != 0 {
+		n++
+	}
+	appID, err = shortcutAppID(link)
+	if err != nil {
+		return "", "", err
+	}
+	return syscall.UTF16ToString(buf[:n]), appID, nil
+}
+
+// SetShortcutAppID sets the Application User Model ID of the existing shortcut at path to
+// appID. The shortcut is loaded and saved, so its target and its other settings are kept.
+func SetShortcutAppID(path, appID string) error {
+	var live []*uint16
+	defer func() { runtime.KeepAlive(live) }()
+	link, pf, err := loadShortcut(path, stgmReadWrite, &live)
+	if err != nil {
+		return err
+	}
+	defer release(pf)
+	defer release(link)
+	if err := setStringProperty(link, pkeyAppUserModelID, appID, &live); err != nil {
+		return err
+	}
+	return comCall("Save", pf, pfSave, wide(&live, path), 1)
+}
+
+// loadShortcut returns the shell link loaded from the file at path, opened with the mode,
+// and its IPersistFile. The caller releases both.
+func loadShortcut(path string, mode uintptr, live *[]*uint16) (link, pf uintptr, err error) {
+	link, err = createCOM("IShellLinkW", &clsidShellLink, &iidShellLinkW)
+	if err != nil {
+		return 0, 0, err
+	}
+	pf, err = queryInterface("IPersistFile", link, &iidPersistFile)
+	if err != nil {
+		release(link)
+		return 0, 0, err
+	}
+	if err := comCall("Load", pf, pfLoad, wide(live, path), mode); err != nil {
+		release(pf)
+		release(link)
+		return 0, 0, err
+	}
+	return link, pf, nil
+}
+
+// shortcutAppID returns the System.AppUserModel.ID property of the loaded shell link, or
+// empty when the link has none.
+func shortcutAppID(link uintptr) (string, error) {
+	var store uintptr
+	if err := comCall("QueryInterface", link, iUnknownQueryInterface,
+		uintptr(unsafe.Pointer(&iidPropertyStore)), uintptr(unsafe.Pointer(&store))); err != nil {
+		return "", err
+	}
+	defer release(store)
+	var pv propVariant
+	if err := comCall("GetValue", store, psGetValue, uintptr(unsafe.Pointer(&pkeyAppUserModelID)), uintptr(unsafe.Pointer(&pv))); err != nil {
+		return "", err
+	}
+	if pv.vt != vtLPWSTR || pv.ptr == 0 {
+		return "", nil
+	}
+	id := wideString(pv.ptr)
+	win32.CoTaskMemFree(pv.ptr)
+	return id, nil
 }
 
 // SetCurrentUserString sets the REG_SZ value name of the key subkey under

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -198,17 +199,6 @@ func TestNotificationCheck(t *testing.T) {
 	}
 }
 
-func TestActivationScheme(t *testing.T) {
-	for in, want := range map[string]string{
-		"JambExamples.Notes": "jamb-jambexamples.notes",
-		"My_App-1":           "jamb-my-app-1",
-	} {
-		if got := activationScheme(in); got != want {
-			t.Errorf("activationScheme(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
 func TestActivationRoundTrip(t *testing.T) {
 	const scheme = "jamb-jambexamples.notes"
 	cases := []activationData{
@@ -323,15 +313,20 @@ func TestPlanNotifyRegistrationWritesNothing(t *testing.T) {
 	programs := filepath.Join(`C:\Users\x\AppData\Roaming`, "Microsoft", "Windows", "Start Menu", "Programs")
 	exe := `C:\Apps\Notes Pro.exe`
 
-	plain := planNotifyRegistration("JambExamples.Notes", exe, programs, false)
-	if plain.Shortcut != filepath.Join(programs, "Notes Pro.lnk") || plain.AppID != "JambExamples.Notes" || plain.Target != exe {
+	plain := planNotifyRegistration("JambExamples.Notes", exe, programs, nil, false)
+	if plain.Action != shortcutCreate || plain.Shortcut != filepath.Join(programs, "Notes Pro.lnk") || plain.AppID != "JambExamples.Notes" || plain.Target != exe {
 		t.Errorf("plan = %+v", plain)
 	}
 	if len(plain.Values) != 0 {
 		t.Errorf("without a protocol the plan writes %d values, want none", len(plain.Values))
 	}
+	existing := []shortcutCandidate{{Path: filepath.Join(programs, "Notes Pro.lnk"), Target: exe, Writable: true}}
+	stamp := planNotifyRegistration("JambExamples.Notes", exe, programs, existing, false)
+	if stamp.Action != shortcutStamp || stamp.Shortcut != existing[0].Path {
+		t.Errorf("a writable shortcut to the program: plan = %+v; want it stamped", stamp)
+	}
 
-	proto := planNotifyRegistration("JambExamples.Notes", exe, programs, true)
+	proto := planNotifyRegistration("JambExamples.Notes", exe, programs, nil, true)
 	if len(proto.Values) != 3 {
 		t.Fatalf("protocol plan has %d values, want 3", len(proto.Values))
 	}
@@ -364,6 +359,81 @@ func TestShortcutName(t *testing.T) {
 	for exe, want := range tests {
 		if got := shortcutName(exe, "JambExamples.Notes"); got != want {
 			t.Errorf("shortcutName(%q) = %q, want %q", exe, got, want)
+		}
+	}
+}
+
+// TestChooseShortcut checks the rules of chooseShortcut. The paths are Windows paths, as
+// the registration uses them, so the test runs on Windows only.
+func TestChooseShortcut(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the paths are Windows paths")
+	}
+	const appID = "JambExamples.Notes"
+	exe := `C:\Apps\Notes Pro.exe`
+	created := `C:\Users\x\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Notes Pro.lnk`
+	userLnk := created
+	allLnk := `C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Notes Pro\Notes Pro.lnk`
+	tests := []struct {
+		name   string
+		found  []shortcutCandidate
+		action shortcutAction
+		path   string
+	}{
+		{"none found creates", nil, shortcutCreate, created},
+		{"found writable without the AppID is stamped",
+			[]shortcutCandidate{{Path: allLnk, Target: exe, Writable: true}}, shortcutStamp, allLnk},
+		{"found writable with the AppID is kept",
+			[]shortcutCandidate{{Path: userLnk, Target: exe, AppID: appID, Writable: true}}, shortcutKeep, userLnk},
+		{"found not writable without the AppID falls back to creating",
+			[]shortcutCandidate{{Path: allLnk, Target: exe}}, shortcutCreate, created},
+		{"found not writable with the AppID is kept, since nothing needs writing",
+			[]shortcutCandidate{{Path: allLnk, Target: exe, AppID: appID}}, shortcutKeep, allLnk},
+		{"another executable's shortcut is ignored",
+			[]shortcutCandidate{{Path: userLnk, Target: `C:\Apps\Other.exe`, Writable: true}}, shortcutCreate, created},
+		{"a shortcut with another AppID is stamped",
+			[]shortcutCandidate{{Path: userLnk, Target: exe, AppID: "Other.App", Writable: true}}, shortcutStamp, userLnk},
+		{"the first writable shortcut is stamped, per-user before all-users",
+			[]shortcutCandidate{{Path: userLnk, Target: exe, Writable: true}, {Path: allLnk, Target: exe, Writable: true}}, shortcutStamp, userLnk},
+		{"an unwritable shortcut is passed over for a writable one",
+			[]shortcutCandidate{{Path: allLnk, Target: exe}, {Path: userLnk, Target: exe, Writable: true}}, shortcutStamp, userLnk},
+		{"a kept shortcut wins over an earlier one to stamp",
+			[]shortcutCandidate{{Path: userLnk, Target: exe, Writable: true}, {Path: allLnk, Target: exe, AppID: appID}}, shortcutKeep, allLnk},
+		{"the target's path is normalized",
+			[]shortcutCandidate{{Path: userLnk, Target: `c:/apps/NOTES PRO.exe`, AppID: appID}}, shortcutKeep, userLnk},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			action, path := chooseShortcut(appID, exe, created, tt.found)
+			if action != tt.action || path != tt.path {
+				t.Errorf("chooseShortcut = %d, %q; want %d, %q", action, path, tt.action, tt.path)
+			}
+		})
+	}
+}
+
+func TestSamePath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the paths are Windows paths")
+	}
+	same := [][2]string{
+		{`C:\Apps\Notes Pro.exe`, `c:\apps\notes pro.exe`},
+		{`C:\Apps\Notes Pro.exe`, `C:/Apps/Notes Pro.exe`},
+		{`C:\Apps\x\..\Notes Pro.exe`, `C:\Apps\Notes Pro.exe`},
+	}
+	for _, p := range same {
+		if !samePath(p[0], p[1]) {
+			t.Errorf("samePath(%q, %q) = false; want true", p[0], p[1])
+		}
+	}
+	different := [][2]string{
+		{`C:\Apps\Notes Pro.exe`, `C:\Apps\Notes.exe`},
+		{`C:\Apps\a.exe`, `D:\Apps\a.exe`},
+		{`C:\Apps\a.exe`, ""},
+	}
+	for _, p := range different {
+		if samePath(p[0], p[1]) {
+			t.Errorf("samePath(%q, %q) = true; want false", p[0], p[1])
 		}
 	}
 }

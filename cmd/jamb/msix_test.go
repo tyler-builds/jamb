@@ -67,6 +67,34 @@ func TestAppxManifest(t *testing.T) {
 	}
 }
 
+func TestAppxManifestProtocolOnlyWhenSet(t *testing.T) {
+	cfg := validConfig()
+	off, err := appxManifest(&cfg, "0.1.0.0", "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(off), "windows.protocol") {
+		t.Error("the manifest declares a protocol without notificationProtocol")
+	}
+
+	cfg.NotificationProtocol = true
+	data, err := appxManifest(&cfg, "0.1.0.0", "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes := parseXML(t, data)
+	ext := findNode(t, nodes, "Extension")
+	if ext.space != nsUAP || ext.attrs["Category"] != "windows.protocol" {
+		t.Errorf("Extension = %v in namespace %q; want uap windows.protocol", ext.attrs, ext.space)
+	}
+	if p := findNode(t, nodes, "Protocol"); p.space != nsUAP || p.attrs["Name"] != "jamb-jambexamples.demo" {
+		t.Errorf("Protocol = %v in namespace %q; want the scheme of identityName", p.attrs, p.space)
+	}
+	if app := findNode(t, nodes, "Application"); app.attrs["Executable"] != "jamb-demo.exe" {
+		t.Errorf("Application = %v; the protocol must not change the application", app.attrs)
+	}
+}
+
 func TestAppxManifestArm64(t *testing.T) {
 	cfg := validConfig()
 	data, err := appxManifest(&cfg, "0.1.0.0", "arm64")

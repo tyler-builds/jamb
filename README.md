@@ -2440,16 +2440,19 @@ crashed app does not block later launches.
   single instance with a built executable (`go build`), or with an installed
   build. Two `go run` runs with the same `AppID` also share one instance.
 - **Zip and installer.** The app sets its `AppID` at startup, which is enough for
-  the taskbar and the jump list. The `jamb package` installer does not yet put the
-  same ID on its Start menu shortcut, which needs the `System.AppUserModel.ID`
-  property. NSIS's `CreateShortcut` cannot set it. Until that is added, Windows
-  may not group the app's taskbar button with its Start menu entry.
+  the taskbar and the jump list. Windows groups the taskbar button with a Start menu
+  entry only when that shortcut carries the `AppID`. NSIS's `CreateShortcut` cannot
+  set the `System.AppUserModel.ID` property, so the `jamb package` installer runs the
+  installed program once with an internal flag, which sets the ID on the installer's
+  shortcut and exits (see [Installer](#installer)). A zip install has no such
+  shortcut; the app sets the ID on its own shortcut at its first `Notify`.
 - **MSIX.** A packaged app has an identity from its package, and Windows keys the
   jump list and Recent documents by the package's ID, `<PackageFamilyName>!App`.
   `AppID` is not used for those in a packaged process, so the jump list works
   only under the package ID. `AppID` still names the single instance.
-- Use `identityName` from `jamb.json` as the `AppID`, so that a future shortcut and
-  the app agree.
+- Use `identityName` from `jamb.json` as the `AppID`. The installer, the MSIX
+  manifest and the app then agree on the shortcut's ID and on the notification
+  protocol, which is `jamb-` and the `AppID` in lower case.
 
 Windows may show only the first few tasks of a jump list, and it keeps the Recent
 category's list itself.
@@ -2676,11 +2679,25 @@ The paths use the executable that is running, so a moved program needs a new fir
 
 - **Start menu shortcut.** Windows shows a toast from a desktop app only when a
   Start menu shortcut carries the app's `AppID` as its `System.AppUserModel.ID`, per
-  Microsoft's guidance for desktop apps. `Notify` writes
-  `%APPDATA%\Microsoft\Windows\Start Menu\Programs\<name>.lnk`, where `<name>` is the
-  program's file name without its extension, with characters Windows does not allow
-  removed (`Notes Pro.exe` gives `Notes Pro.lnk`). The shortcut's target is the
-  program's executable. The shortcut appears in the Start menu under Programs.
+  Microsoft's guidance for desktop apps. Before it writes one, `Notify` looks for
+  shortcuts to the running program: every `.lnk` in the user's
+  `%APPDATA%\Microsoft\Windows\Start Menu\Programs` folder and in the all-users
+  `%ProgramData%\Microsoft\Windows\Start Menu\Programs` folder, including their
+  subfolders, whose target is the same executable (paths are compared in full, without
+  case). Then:
+  - a shortcut that already carries the `AppID` is used as it is, and nothing is written;
+  - otherwise the first shortcut that can be written has the `AppID` set on it, and its
+    other settings are kept;
+  - otherwise `Notify` writes
+    `%APPDATA%\Microsoft\Windows\Start Menu\Programs\<name>.lnk`, where `<name>` is the
+    program's file name without its extension, with characters Windows does not allow
+    removed (`Notes Pro.exe` gives `Notes Pro.lnk`). A shortcut that cannot be written,
+    such as one in the all-users folder without rights, is left alone, and the per-user
+    shortcut is written instead.
+
+  So a program has one Start menu entry for notifications: the installer's shortcut
+  when the installer made one, or this one. The shortcut's target is the program's
+  executable.
 - **Protocol, when OnNotification is set.** A click on a notification after the app
   has closed starts the app through a URI scheme, `jamb-<appid>` in lower case, such
   as `jamb-jambexamples.notes`. `Notify` writes three values under
@@ -2689,17 +2706,19 @@ The paths use the executable that is running, so a moved program needs a new fir
   `\shell\open\command`, which is `"<exe>" "%1"`.
 - **Packaged (MSIX) apps** write nothing: the package's identity is used. A packaged
   app that uses `OnNotification` must declare the same protocol in its package
-  manifest. This is not done by `Notify`.
+  manifest. `jamb package --msix` does this when `notificationProtocol` is `true` in
+  `jamb.json` (see [jamb.json](#jambjson)).
 
-To remove the registration, delete the shortcut and the protocol key:
+To remove the registration by hand, delete the shortcut and the protocol key:
 
 ```bat
 del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Notes Pro.lnk"
 reg delete "HKCU\Software\Classes\jamb-jambexamples.notes" /f
 ```
 
-The next `Notify` writes both again. Windows keeps a notification it has shown in the
-Notification Center until the user or `ClearNotifications` removes it.
+The next `Notify` writes the registration again. The installer removes both on
+uninstall (see [Installer](#installer)). Windows keeps a notification it has shown in
+the Notification Center until the user or `ClearNotifications` removes it.
 
 #### Activation
 
@@ -2734,9 +2753,9 @@ together must fit in that, so keep the args to an ID or a short string.
 - A `go run` program's executable is removed when the run ends. The shortcut and
   the protocol then start a program that no longer exists, so test notifications
   with a built executable.
-- The shortcut is per user. The installer's Start menu shortcut is a separate entry
-  without the `AppID`, so Windows may show two entries for the app until the
-  installer writes the `AppID` on its shortcut too (see the jump list note above).
+- The shortcut is per user. An all-users shortcut is given the `AppID` only when the
+  user can write it. Otherwise the per-user shortcut is written, and Windows may show
+  two entries for the app.
 
 #### Hand checks
 
@@ -2755,6 +2774,12 @@ executable, and with an installed build:
 - Focus Assist and Do Not Disturb hide the notification as Windows documents.
 - The shortcut and the protocol key appear as described, and the removal commands
   above remove them.
+- After a `setup.exe` install, the app's Start menu folder has one entry for the app,
+  and a notification from the installed build shows without a second entry appearing.
+- After an uninstall, the installed files, the Start menu entries, the protocol key
+  `HKCU\Software\Classes\jamb-<identityName>` and the per-user `<name>.lnk` are gone.
+- With `notificationProtocol` set, a click on a notification from a packaged (MSIX)
+  build starts the packaged app after it has closed, and the handler is called once.
 
 ### Custom title bars
 
@@ -3517,8 +3542,9 @@ succeeded, so a failed signature leaves no partly signed set.
 
 ### jamb.json
 
-Every field is required except `copyright`. An unknown field is an error, so a
-misspelled name stops the build, and every problem is reported in one message.
+Every field is required except `copyright` and `notificationProtocol`. An unknown
+field is an error, so a misspelled name stops the build, and every problem is reported
+in one message.
 
 | Field | Meaning |
 |---|---|
@@ -3530,6 +3556,7 @@ misspelled name stops the build, and every problem is reported in one message.
 | `publisherSubject` | The subject of the signing certificate, starting with `CN=`, such as `CN=Example`. The MSIX publisher must equal the certificate's subject exactly, so for a certificate from a certificate authority copy the whole subject. For the Store, use the publisher value that Partner Center shows for the app. |
 | `identityName` | The package identity: 3 to 50 characters of letters, digits, `.` and `-`, starting and ending with a letter or digit. Windows uses it to identify the app, and the installer uses it as its registry key, so it must stay the same across versions that should upgrade one another. For the Store, use the identity name that Partner Center shows for the app. |
 | `copyright` | Optional. Shown as the legal copyright in file properties and the installer. |
+| `notificationProtocol` | Optional, `true` or `false`; the default is `false`. With `true`, the MSIX manifest declares the app's notification protocol, `jamb-` and `identityName` in lower case, as a `windows.protocol` extension. A click on a notification then starts the packaged app after it has closed. The app must use the same `AppID`, which is `identityName`, and `OnNotification`. It has no effect on the zip or the installer. |
 | `icon` | A square PNG, at least 48 px, relative to the app directory. 256 px or larger is recommended, and packaging warns below that. It becomes the executable's icon, the installer's icon and the MSIX logos. |
 
 File associations and extra capabilities are not supported yet. The manifest
@@ -3585,12 +3612,21 @@ from a script that jamb generates from `jamb.json`. The installer:
   update the app without elevation. A machine-wide Program Files installer is not
   generated; that would need its own script and an administrator prompt.
 - adds a Start menu folder with the app and an uninstaller shortcut;
+- sets the `AppID` (`identityName`) on the app's Start menu shortcut. The installer runs
+  the installed program once with the internal flag `--jamb-stamp-shortcut <AppID>`,
+  which sets the ID on the shortcut that carries the program's target, and exits without
+  opening a window. The flag is internal and is not part of the API. A failure is not
+  fatal: the program sets the ID itself at its first `Notify`. An app built by a jamb
+  version without the flag would open its window instead, so rebuild such an app with
+  `jamb package`;
 - offers a desktop shortcut as an optional component, off by default;
 - registers the app in Apps & features under `identityName`, with the display
   name, version, publisher, description, icon and estimated size;
-- uninstalls cleanly: it removes the installed files, the shortcuts and the
-  registry entry. It leaves data the app wrote elsewhere, such as under AppData,
-  in place.
+- uninstalls cleanly: it removes the installed files, the shortcuts, the registry
+  entry, the notification protocol key `HKCU\Software\Classes\jamb-<identityName>`,
+  and the program's own notification shortcut `<name>.lnk` in the user's Start menu
+  Programs folder, if the program wrote one. It leaves data the app wrote elsewhere,
+  such as under AppData, in place.
 
 Close the app before installing or uninstalling it. Silent installs use `/S`, and
 `/D=PATH` (last on the command line) chooses another folder.

@@ -11,7 +11,9 @@ import (
 
 // appxManifestTemplate is AppxManifest.xml for a full-trust desktop app: the
 // Windows.FullTrustApplication entry point, the runFullTrust capability, and
-// the logos that Start and the taskbar use. Values are escaped with html.
+// the logos that Start and the taskbar use. With notificationProtocol set, it also
+// declares the app's protocol, so that a click on a notification can start the
+// packaged app. Values are escaped with html.
 //
 // The package layout is the app's executable at the root, AppxManifest.xml
 // beside it, and the logos under Assets.
@@ -36,6 +38,13 @@ var appxManifestTemplate = template.Must(template.New("AppxManifest.xml").Parse(
   <Applications>
     <Application Id="App" Executable="{{.Executable | html}}" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements DisplayName="{{.DisplayName | html}}" Description="{{.Description | html}}" BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" />
+      {{- if .Protocol}}
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="{{.Protocol | html}}" />
+        </uap:Extension>
+      </Extensions>
+      {{- end}}
     </Application>
   </Applications>
   <Capabilities>
@@ -54,11 +63,20 @@ type appxFields struct {
 	Publisher        string
 	Description      string
 	Executable       string
+	Protocol         string // the protocol the app declares; empty for none
 }
 
 // appxManifest returns AppxManifest.xml for the app. winVersion is the
 // four-part version from windowsVersion, and arch is amd64 or arm64.
 func appxManifest(cfg *config, winVersion, arch string) ([]byte, error) {
+	protocol := ""
+	if cfg.NotificationProtocol {
+		s, err := protocolScheme(cfg.IdentityName)
+		if err != nil {
+			return nil, err
+		}
+		protocol = s
+	}
 	var buf bytes.Buffer
 	err := appxManifestTemplate.Execute(&buf, appxFields{
 		IdentityName:     cfg.IdentityName,
@@ -69,6 +87,7 @@ func appxManifest(cfg *config, winVersion, arch string) ([]byte, error) {
 		Publisher:        cfg.Publisher,
 		Description:      cfg.Description,
 		Executable:       cfg.Name + ".exe",
+		Protocol:         protocol,
 	})
 	if err != nil {
 		return nil, err

@@ -28,6 +28,10 @@ func sampleInstallerFields() installerFields {
 		Icon:          `C:\build\installer.ico`,
 		OutFile:       `C:\dist\jamb-demo-0.1.0-windows-amd64-setup.exe`,
 		UninstallKey:  `Software\Microsoft\Windows\CurrentVersion\Uninstall\JambExamples.Demo`,
+		AppID:         cfg.IdentityName,
+		Stamp:         true,
+		Scheme:        "jamb-jambexamples.demo",
+		ShortcutName:  cfg.Name,
 		EstimatedSize: 12,
 	}
 }
@@ -69,10 +73,18 @@ func TestInstallerScriptIsWellFormed(t *testing.T) {
 		`VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright 2026 The jamb Authors"`,
 		`Delete "$INSTDIR\LICENSE"`,
 		`File "C:\app\LICENSE"`,
+		`ExecWait "$\"$INSTDIR\jamb-demo.exe$\" --jamb-stamp-shortcut JambExamples.Demo"`,
+		`Delete "$SMPROGRAMS\jamb-demo.lnk"`,
+		`DeleteRegKey HKCU "Software\Classes\jamb-jambexamples.demo"`,
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("script lacks %s", want)
 		}
+	}
+	// The AppID is stamped on the shortcut after the installer creates it.
+	created := strings.Index(script, `CreateShortcut "$SMPROGRAMS\Jamb Demo\Jamb Demo.lnk"`)
+	if stamped := strings.Index(script, "--jamb-stamp-shortcut"); created < 0 || stamped < created {
+		t.Error("the AppID is stamped before the Start menu shortcut is created")
 	}
 	if strings.Contains(script, "HKLM") || strings.Contains(script, "RequestExecutionLevel admin") {
 		t.Error("the per-user installer refers to HKLM or asks for administrator rights")
@@ -186,4 +198,29 @@ func TestInstallerCompilesWithMakensis(t *testing.T) {
 		t.Fatalf("setup.exe is not a PE file: %v", err)
 	}
 	f.Close()
+}
+
+// The installer runs the app to stamp its shortcut only when the app knows the flag: an app
+// built with a jamb before the flag would open its window during the install.
+func TestInstallerStampsOnlyAnAppThatTakesTheFlag(t *testing.T) {
+	f := sampleInstallerFields()
+	f.Stamp = false
+	data, err := installerScript(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), stampFlag) {
+		t.Error("the installer runs the stamp step for an app that does not take the flag")
+	}
+	dir := t.TempDir()
+	with, without := filepath.Join(dir, "with.exe"), filepath.Join(dir, "without.exe")
+	if err := os.WriteFile(with, []byte("MZ\x00"+stampFlag+"\x00"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(without, []byte("MZ\x00an older app\x00"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !takesStampFlag(with) || takesStampFlag(without) || takesStampFlag(filepath.Join(dir, "missing.exe")) {
+		t.Error("takesStampFlag does not tell an app that takes the flag from one that does not")
+	}
 }
