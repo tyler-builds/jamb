@@ -2935,6 +2935,16 @@ find and replace, folding by indentation, and tree-sitter highlighting. It is bu
 `rt.AddBindings(codeedit.Bindings()...)`. See [docs/codeedit.md](docs/codeedit.md) for the keys,
 the document, highlighting, the limits and the measured performance.
 
+The grammars for highlighting are in their own module,
+[github.com/tyler-builds/jamb-grammars](https://github.com/tyler-builds/jamb-grammars), one package
+per language, so jamb itself carries none of them:
+
+```go
+import "github.com/tyler-builds/jamb-grammars/golang"
+
+codeedit.New(doc).Language(golang.Grammar)
+```
+
 Highlighting runs tree-sitter in WebAssembly through wazero, which adds about 1.1 MB to an app's
 binary, plus each grammar it imports (Go is 0.36 MB). wazero uses Go's SHA-256, which links Go's
 FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `codeedit` uses about

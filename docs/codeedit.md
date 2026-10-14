@@ -103,12 +103,23 @@ end of its header. Folds follow the text when lines are inserted above them.
 
 ## Highlighting
 
-Highlighting uses the tree-sitter session in `codeedit/highlight`. The language packages
-`github.com/tyler-builds/jamb-grammars/...` each provide a `highlight.Grammar`:
+Highlighting uses the tree-sitter session in `codeedit/highlight`. The grammars are in their own
+module, [github.com/tyler-builds/jamb-grammars](https://github.com/tyler-builds/jamb-grammars), with
+one package per language (`golang`, `python`, `typescript` and others), each providing a
+`highlight.Grammar`:
 
 ```go
+import "github.com/tyler-builds/jamb-grammars/golang"
+
 codeedit.New(doc).Language(golang.Grammar)
 ```
+
+A grammar is a WebAssembly module: the tree-sitter runtime, the grammar, and a shim that the
+editor calls. `highlight.ABI` is the version of that interface, and each grammar reports the
+version it was built with; a grammar of another version is refused with an error that names both,
+so jamb and jamb-grammars must be versions that match. `highlight.NewGrammar` makes a
+`highlight.Grammar` from a module built with jamb-grammars' build command, for a language it does
+not include.
 
 `Language` starts a session on the document's text when the editor first renders. The session is
 closed when the language or the document changes, and when the editor's component is disposed (the
@@ -213,7 +224,7 @@ highlighting depends on the spans shown and is not included in these figures.
   translation is certain. The remaining messages are English in every language, as the `ui.Strings`
   packs describe.
 - Binary size and memory: importing `codeedit` links wazero, the WebAssembly runtime that runs
-  tree-sitter (about 1.1 MB of code), and each `github.com/tyler-builds/jamb-grammars` package an app imports adds its
+  tree-sitter (about 1.1 MB of code), and each jamb-grammars package an app imports adds its
   grammar (0.15 to 5.5 MB; Go is 0.36 MB). wazero hashes modules with SHA-256, which links Go's
   FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `codeedit` reports
   about 32 MB more private bytes than one that does not (see BENCHMARKS.md).
