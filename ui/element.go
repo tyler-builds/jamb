@@ -89,6 +89,7 @@ type DivElement struct {
 	children     []Element
 	key          string
 	focusable    bool
+	keepFocus    bool // a press inside leaves focus where it is (see KeepFocus)
 	tabIndex     int  // see TabIndex
 	noTabStop    bool // see TabStop
 	tabSkip      bool // the focusable elements inside are left out of the Tab order (see DataGrid)
@@ -584,6 +585,13 @@ func (d *DivElement) OnBlur(fn func()) *DivElement  { d.h.onBlur = fn; d.focusab
 
 // Focusable lets the element take keyboard focus when clicked or tabbed to.
 func (d *DivElement) Focusable() *DivElement { d.focusable = true; return d }
+
+// KeepFocus makes a press inside the element leave focus where it is, as the list of a
+// combo box does: the press does not blur the text field that owns the list, so the field
+// keeps its caret and its list stays open while the click picks a row. A focusable element
+// inside it still takes focus when it is pressed. It is the press half of a browser's
+// preventDefault on mousedown; the element's own handlers still run.
+func (d *DivElement) KeepFocus() *DivElement { d.keepFocus = true; return d }
 
 // TabIndex sets where the element sits in the Tab order and implies Focusable.
 // Elements with a positive index come first, in ascending order (ties in tree

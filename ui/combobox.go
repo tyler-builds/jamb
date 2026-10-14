@@ -127,6 +127,7 @@ type comboItems[T comparable] struct {
 	query  string
 	opts   []Option[T]
 	failed bool // the request for query failed: there are no opts, and the error row shows
+	done   bool // the suggestions of query arrived; the zero value has asked for nothing yet
 }
 
 // comboState is what a combobox keeps between renders, on the UI thread: the
@@ -424,7 +425,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 				return
 			}
 			loading.Set(false)
-			items.Set(comboItems[T]{query: q, opts: opts, failed: failed})
+			items.Set(comboItems[T]{query: q, opts: opts, failed: failed, done: true})
 			if hl.Peek() >= len(opts) {
 				hl.Set(-1)
 			}
@@ -524,7 +525,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 			if utf8.RuneCountInString(cur) < c.minChars {
 				return false
 			}
-			if items.Peek().query != cur || loading.Peek() {
+			if it := items.Peek(); !it.done || it.query != cur || loading.Peek() {
 				s.inputSeq++ // a pending debounced request is now stale
 				run(cur)
 			}
@@ -753,6 +754,7 @@ func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], 
 		MaxHeight(Px(maxH)).ScrollY().
 		OnClickOutside(shut).
 		OnClick(func() {}). // a press on the list's padding must not reach the field
+		KeepFocus().        // a press in the list leaves the text focused, so the list stays open for the click
 		OnMouseDown(func(*MouseEvent) { ret.Focus() })
 	panel.matchAnchor = true // at least as wide as the field, whatever its width
 	if loading {

@@ -867,7 +867,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 	case f.borderless && f.disabled:
 		box = Div().Row().Align(Start).Gap(8)
 	case f.borderless:
-		box = Div().Row().Align(Start).Gap(8).Cursor(CursorText).
+		box = Div().Row().Align(Start).Gap(8).Cursor(CursorText).KeepFocus().
 			OnMouseDown(func(*MouseEvent) { h.Focus() })
 	case f.disabled:
 		// A disabled field takes no pointer input, so it has no hover state.
@@ -875,12 +875,13 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 	case f.readOnly:
 		// A read-only field is not edited, so it has no hover state either.
 		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).Style(st.FrameReadOnly).
-			FocusWithin(st.FrameFocusWithin).
+			FocusWithin(st.FrameFocusWithin).KeepFocus().
 			OnMouseDown(func(*MouseEvent) { h.Focus() })
 	default:
-		// Clicks on the frame (padding, icon) still focus the text.
+		// Clicks on the frame (padding, icon) still focus the text. The press itself leaves
+		// focus alone (KeepFocus), so a focused field is not blurred and focused again.
 		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).
-			Hover(st.FrameHover).FocusWithin(st.FrameFocusWithin).
+			Hover(st.FrameHover).FocusWithin(st.FrameFocusWithin).KeepFocus().
 			OnMouseDown(func(*MouseEvent) { h.Focus() })
 	}
 	box.Tooltip(f.tooltip)

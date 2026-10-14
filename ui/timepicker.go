@@ -587,7 +587,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		})
 
 		if open.Get() {
-			root.Child(p.list(st, scale, times, hl.Get(), v, ls, move, choose, shut, ret, name, s))
+			root.Child(p.list(st, scale, times, hl.Get(), v, ls, func(i int) { hl.Set(i) }, choose, shut, ret, name, s))
 		}
 		return p.size.apply(root)
 	})
@@ -627,7 +627,7 @@ func nextTimeIndex(times []int, m, dir int) int {
 // text. reveal is the row (plus one, zero for none) that the keys moved to, and it is
 // scrolled into view once.
 func (p *TimePickerElement) list(st TimePickerStyle, scale float32, times []int, hl int, v time.Time,
-	ls *timeList, move func(int), choose func(int), shut func(), ret *FocusHandle, name string, s *Strings) Element {
+	ls *timeList, hover func(int), choose func(int), shut func(), ret *FocusHandle, name string, s *Strings) Element {
 	loc := currentLocale()
 	if name == "" {
 		name = s.Times
@@ -641,6 +641,7 @@ func (p *TimePickerElement) list(st TimePickerStyle, scale float32, times []int,
 		MaxHeight(Px(maxH)).ScrollY().
 		OnClickOutside(shut).
 		OnClick(func() {}).
+		KeepFocus(). // a press in the list leaves the field focused, so the list stays open for the click
 		OnMouseDown(func(*MouseEvent) { ret.Focus() })
 	panel.matchAnchor = true
 	selected := -1
@@ -673,7 +674,9 @@ func (p *TimePickerElement) list(st TimePickerStyle, scale float32, times []int,
 			Child(Text(label).NoWrap())
 		row.revealRow = reveal == i+1
 		row.access().highlighted = hi
-		row.OnMouseEnter(func() { move(i) }).OnClick(func() { choose(i) })
+		// The pointer highlights the row it is over without scrolling the list: a scroll
+		// would move the rows under the pointer between its press and its release.
+		row.OnMouseEnter(func() { hover(i) }).OnClick(func() { choose(i) })
 		panel.Child(row)
 	}
 	return panel

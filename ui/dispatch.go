@@ -308,14 +308,25 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 		rt.notePress(path, x, y)
 		rt.pressSeg = rt.segmentAt(path, x, y)
 		rt.setPressed(rt.hoverIDs)
-		focus := uint64(0)
+		// The press focuses the innermost focusable element, or nothing; inside a
+		// KeepFocus element that is not itself focusable, it leaves focus as it is.
+		focus, keep := uint64(0), false
 		for _, n := range path {
-			if n.div != nil && n.div.focusable {
+			if n.div == nil {
+				continue
+			}
+			if n.div.focusable {
 				focus = n.id
 				break
 			}
+			if n.div.keepFocus {
+				keep = true
+				break
+			}
 		}
-		rt.setFocus(focus)
+		if !keep {
+			rt.setFocus(focus)
+		}
 		for _, n := range path {
 			if n.div != nil && n.div.capture {
 				rt.captureID = n.id
