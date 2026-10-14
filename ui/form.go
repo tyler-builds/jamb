@@ -42,6 +42,7 @@ type Form struct {
 	onSubmit  func() error
 	onAsync   func() <-chan error
 	post      func(func()) // runs a function on the UI thread, set by the form's fields
+	strings   *Strings     // the window's text, set by the form's fields (see messages)
 }
 
 // formEntry is a field of a form, as it was last built.
@@ -105,7 +106,7 @@ func (f *Form) Submit() {
 		if bad[0].focus != nil {
 			bad[0].focus.Focus()
 		}
-		Announce(attention(len(bad)), access.Assertive)
+		Announce(f.messages().FieldsNeedAttention(len(bad)), access.Assertive)
 		return
 	}
 	switch {
@@ -162,13 +163,13 @@ func (f *Form) fail(msg string) {
 	Announce(msg, access.Assertive)
 }
 
-// attention is the message for n fields that need attention, as the summary's title
-// and the announcement say it.
-func attention(n int) string {
-	if n == 1 {
-		return "1 field needs attention."
+// messages returns the window's text that the form's fields and summary gave it, or the
+// English text before any of them has been built.
+func (f *Form) messages() *Strings {
+	if f.strings != nil {
+		return f.strings
 	}
-	return fmt.Sprintf("%d fields need attention.", n)
+	return englishStrings()
 }
 
 // FormStyle is the look of each part of a form's error summary. A part's style
@@ -266,6 +267,8 @@ func (s *FormSummaryElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		f := s.form
 		f.post = ctx.Post
+		strs := ctx.Strings()
+		f.strings = strs
 		if !f.submitted.Get() {
 			return nil
 		}
@@ -296,9 +299,9 @@ func (s *FormSummaryElement) expand(ctx *Context) Element {
 		if len(items) == 0 {
 			return nil
 		}
-		title := "The form could not be submitted."
+		title := strs.FormSubmitFailed
 		if count > 0 {
-			title = attention(count)
+			title = strs.FieldsNeedAttention(count)
 		}
 		head := Div().asPart("Form.SummaryTitle").Style(st.SummaryTitle).
 			Child(Icon(icons.Alert).Size(16).Color(messageIconColor(t, st.Summary))).

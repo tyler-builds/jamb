@@ -385,7 +385,8 @@ type ToasterElement struct {
 }
 
 // Toaster creates the stack of toasts. Its region is focusable with F6, as
-// Windows' notification regions are, and it is named "Notifications".
+// Windows' notification regions are, and it is named with the Notifications text of
+// the window's Strings.
 func Toaster() *ToasterElement { return &ToasterElement{} }
 
 func (*ToasterElement) isElement()            {}
@@ -412,10 +413,11 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 		return nil
 	}
 	t := ctx.Theme()
+	strs := ctx.Strings()
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	rt.toastRegion = expandedID(ctx.id)
 	region := Div().Key("jamb.toasts").Absolute().Column().Gap(8).
-		Role(access.RoleGroup).Label("Notifications").
+		Role(access.RoleGroup).Label(strs.Notifications).
 		Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
 		OnKeyDown(func(e *KeyEvent) {
 			if e.Key == input.KeyEscape && e.Mods == 0 {
@@ -432,14 +434,14 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 		region.Right(16).Bottom(16).Align(End)
 	}
 	for _, e := range rt.toasts {
-		region.Child(rt.toastView(t, e))
+		region.Child(rt.toastView(strs, t, e))
 	}
 	return region
 }
 
 // toastView is one toast in the stack: an icon, the text, an optional action
 // and a close button. It is a group named by its text.
-func (rt *Runtime) toastView(t *Theme, e *toastEntry) *DivElement {
+func (rt *Runtime) toastView(strs *Strings, t *Theme, e *toastEntry) *DivElement {
 	st := resolveToast(t, e.variant, e.styles)
 	ic, _ := toastIcon(t, e.variant)
 	box := Div().asPart("Toast.Container").Key(toastKey(e.id)).Style(st.Container).
@@ -465,7 +467,7 @@ func (rt *Runtime) toastView(t *Theme, e *toastEntry) *DivElement {
 		})))
 	}
 	box.Child(Div().asPart("Toast.Close").Style(st.Close).Child(
-		IconButton(icons.X).Label("Dismiss notification").Ghost().OnClick(func() { rt.closeToast(e) })))
+		IconButton(icons.X).Label(strs.DismissNotification).Ghost().OnClick(func() { rt.closeToast(e) })))
 	return box
 }
 

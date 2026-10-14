@@ -669,6 +669,7 @@ func autoFitWidth[T any](rt *Runtime, sh *dgShared[T], rows []T, cols []DataColu
 func (g *DataGridElement[T]) build(ctx *Context) Element {
 	t := ctx.Theme()
 	rt := ctx.rt
+	strs := ctx.Strings()
 	inst := ctx.inst // the grid's own component: a width change rebuilds it
 	st := resolveDataGrid(t, g.density, rt.textFactor, g.styles)
 	sh := Local(ctx, "grid", &dgShared[T]{}).Peek()
@@ -1312,19 +1313,19 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		rt.animating = true
 	}
 	list.header = g.headerRow(st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
-		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) })
+		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) }, strs)
 
 	root := g.size.apply(Div().Column().Style(g.style)).Child(list)
 	if n == 0 {
 		msg := g.empty
 		if msg == nil {
-			msg = Text("No rows")
+			msg = Text(strs.NoRows)
 		}
 		root.Child(Div().asPart("DataGrid.Empty").Absolute().Top(rowH).Left(0).Right(0).Style(st.Empty).Child(msg))
 	}
 	if g.loading {
 		root.Child(Div().Absolute().Top(0).Right(0).Bottom(0).Left(0).Column().Align(Center).Justify(Center).
-			Child(ProgressRing().Label("Loading")))
+			Child(ProgressRing().Label(strs.Loading)))
 	}
 	return root
 }
@@ -1535,7 +1536,7 @@ func dgControls(n *node, out []*node) []*node {
 // list keeps it at the top of its viewport, and it scrolls with the columns.
 func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows []T, cols []DataColumn[T], cw []float32,
 	width float32, sorted SortState, sortCol, col int, onHeader, hasFocus, highContrast bool,
-	sortBy func(i int), setWidth func(i int, v float32), fit func(i int) float32) *DivElement {
+	sortBy func(i int), setWidth func(i int, v float32), fit func(i int) float32, strs *Strings) *DivElement {
 	h := Div().asPart("DataGrid.Header").Style(st.Header).Absolute().Top(0).Left(0).Width(Px(width))
 	for c, cl := range cols {
 		sortable := cl.Compare != nil
@@ -1543,9 +1544,9 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 		name := cl.Header
 		status := ""
 		if isSorted {
-			status = "sorted ascending"
+			status = strs.SortedAscending
 			if sorted.Desc {
-				status = "sorted descending"
+				status = strs.SortedDescending
 			}
 			name += ", " + status
 		}

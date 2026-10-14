@@ -302,6 +302,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
+		strs := ctx.Strings()
 		st := resolveSelect(t, selectWidth*textScale(ctx), s.disabled, s.ctlSize, s.styles)
 		cur := s.value.Get()
 		sel := indexOf(s.options, cur)
@@ -487,7 +488,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		if open.Get() {
 			field.Child(s.list(st, t, sel, hl.Get(), shut, choose, func(r rune) int {
 				return search(r, hl.Peek())
-			}, func(i int) { hl.Set(i) }))
+			}, func(i int) { hl.Set(i) }, strs))
 		}
 		return s.size.apply(field)
 	})
@@ -497,10 +498,10 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 // Its rows are list items, the chosen one is selected, and the highlighted one
 // is the row that has focus.
 func (s *SelectElement[T]) list(st SelectStyle, t *Theme, sel, hl int, shut func(bool), choose func(int),
-	search func(rune) int, highlight func(int)) Element {
+	search func(rune) int, highlight func(int), strs *Strings) Element {
 	name := s.name
 	if name == "" {
-		name = "Options"
+		name = strs.Options
 	}
 	keys := func(e *KeyEvent) {
 		if e.Mods&(input.ModCtrl|input.ModAlt|input.ModSuper) != 0 {

@@ -125,6 +125,11 @@ type Context struct {
 // Theme returns the active theme.
 func (c *Context) Theme() *Theme { return c.rt.theme }
 
+// Strings returns the text the built-in controls show and announce, as set with
+// Runtime.SetStrings or app.Window.Strings. Read it while rendering, and let a
+// closure that runs later use the value it captured.
+func (c *Context) Strings() *Strings { return c.rt.strings }
+
 // HighContrast reports whether Windows high contrast is on, and the theme is
 // then the high contrast one (see HighContrastTheme). Use it to pick solid
 // colors for content that does not take its colors from the theme.

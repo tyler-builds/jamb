@@ -139,7 +139,7 @@ func (b *BreadcrumbsElement) elementKey() string { return b.key }
 func (b *BreadcrumbsElement) Key(k string) *BreadcrumbsElement { b.key = k; return b }
 
 // Label names the trail for assistive technology, such as "Folder path". It
-// defaults to "Breadcrumb".
+// defaults to the Breadcrumb text of the window's Strings.
 func (b *BreadcrumbsElement) Label(name string) *BreadcrumbsElement { b.name = name; return b }
 
 // MaxItems collapses a trail longer than n locations: the first location and the
@@ -178,9 +178,10 @@ func (b *BreadcrumbsElement) keyOf(s string) string {
 func (b *BreadcrumbsElement) expand(ctx *Context) Element {
 	th := ctx.Theme()
 	st := resolveBreadcrumbs(th, b.styles)
+	strs := ctx.Strings()
 	name := b.name
 	if name == "" {
-		name = "Breadcrumb"
+		name = strs.Breadcrumb
 	}
 	bar := b.size.apply(Div().asPart("Breadcrumbs.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().Style(st.Bar))
 	slots := crumbSlots(len(b.items), b.limit)
@@ -191,7 +192,7 @@ func (b *BreadcrumbsElement) expand(ctx *Context) Element {
 		}
 		if s < 0 {
 			// The hidden locations lie between the first location and the next slot.
-			bar.Child(b.overflow(st, b.items[slots[k-1]+1:slots[k+1]]))
+			bar.Child(b.overflow(strs, st, b.items[slots[k-1]+1:slots[k+1]]))
 			continue
 		}
 		bar.Child(b.crumb(th, st, s))
@@ -230,12 +231,12 @@ func crumbContent(d *DivElement, c Crumb) *DivElement {
 
 // overflow returns the "..." button that opens a menu of the hidden locations. A
 // hidden location without an OnClick is listed as disabled.
-func (b *BreadcrumbsElement) overflow(st BreadcrumbsStyle, hidden []Crumb) *DivElement {
+func (b *BreadcrumbsElement) overflow(strs *Strings, st BreadcrumbsStyle, hidden []Crumb) *DivElement {
 	items := make([]MenuItem, len(hidden))
 	for i, c := range hidden {
 		items[i] = MenuItem{Label: c.Label, Icon: c.Icon, OnClick: c.OnClick, Disabled: c.OnClick == nil}
 	}
-	menu := DropdownMenu(Button("...").Ghost().Small().Label("Show hidden locations"),
+	menu := DropdownMenu(Button("...").Ghost().Small().Label(strs.ShowHiddenLocations),
 		func() []MenuItem { return items })
 	return Div().asPart("Breadcrumbs.Overflow").Style(st.Overflow).Child(menu.Key(b.keyOf("overflow")))
 }

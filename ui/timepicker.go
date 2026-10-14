@@ -293,10 +293,10 @@ func (p *TimePickerElement) times() []int {
 
 // refusal returns the message that says why the clock of t cannot be chosen, or "" when it
 // can.
-func (p *TimePickerElement) refusal(m int, loc *dateLocale) string {
+func (p *TimePickerElement) refusal(m int, loc *dateLocale, s *Strings) string {
 	lo, hi := p.bounds()
 	if m < lo || m > hi {
-		return "Enter a time from " + formatClock(clockAt(lo), loc) + " to " + formatClock(clockAt(hi), loc) + "."
+		return s.TimeFromTo(formatClock(clockAt(lo), loc), formatClock(clockAt(hi), loc))
 	}
 	return ""
 }
@@ -305,6 +305,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
+		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
 		st := resolveTimePicker(t, scale, p.styles)
@@ -374,11 +375,11 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 			}
 			c, ok := parseClock(text, loc)
 			if !ok {
-				msg.Set("Enter a time such as " + formatClock(clock{hour: 9, minute: 30}, loc) + ".")
+				msg.Set(s.TimeExample(formatClock(clock{hour: 9, minute: 30}, loc)))
 				invalid.Set(true)
 				return false
 			}
-			if why := p.refusal(c.minutes(), loc); why != "" {
+			if why := p.refusal(c.minutes(), loc, s); why != "" {
 				msg.Set(why)
 				invalid.Set(true)
 				return false
@@ -538,7 +539,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		// The button is the trailing element of the frame, and it is not a Tab stop: Alt+Down
 		// and F4 open the list from the field.
 		button := Div().asPart("TimePicker.Button").Style(st.Button).Role(access.RoleButton).
-			Label("Show times").Cursor(CursorPointer).
+			Label(s.ShowTimes).Cursor(CursorPointer).
 			OnClick(func() {
 				if open.Peek() {
 					shut()
@@ -591,7 +592,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		})
 
 		if open.Get() {
-			root.Child(p.list(st, scale, times, hl.Get(), v, ls, move, choose, shut, ret, name))
+			root.Child(p.list(st, scale, times, hl.Get(), v, ls, move, choose, shut, ret, name, s))
 		}
 		return p.size.apply(root)
 	})
@@ -631,10 +632,10 @@ func nextTimeIndex(times []int, m, dir int) int {
 // text. reveal is the row (plus one, zero for none) that the keys moved to, and it is
 // scrolled into view once.
 func (p *TimePickerElement) list(st TimePickerStyle, scale float32, times []int, hl int, v time.Time,
-	ls *timeList, move func(int), choose func(int), shut func(), ret *FocusHandle, name string) Element {
+	ls *timeList, move func(int), choose func(int), shut func(), ret *FocusHandle, name string, s *Strings) Element {
 	loc := currentLocale()
 	if name == "" {
-		name = "Times"
+		name = s.Times
 	}
 	reveal := ls.reveal
 	ls.reveal = 0

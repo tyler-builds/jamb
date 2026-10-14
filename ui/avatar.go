@@ -110,8 +110,8 @@ type AvatarElement struct {
 }
 
 // Avatar creates an avatar of name, a circle of 32 logical pixels with the
-// initials of the name (see Size). An empty name is named "Avatar" for assistive
-// technology.
+// initials of the name (see Size). An empty name is named with the Avatar text of
+// the window's Strings for assistive technology.
 func Avatar(name string) *AvatarElement { return &AvatarElement{name: name, size: 32} }
 
 func (*AvatarElement) isElement()           {}
@@ -158,7 +158,7 @@ func (a *AvatarElement) expand(ctx *Context) Element {
 	}
 	name := a.name
 	if name == "" {
-		name = "Avatar"
+		name = ctx.Strings().Avatar
 	}
 	return av.Role(access.RoleImage).Label(name)
 }

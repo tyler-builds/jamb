@@ -141,7 +141,8 @@ func resolveSidebar(t *Theme, inst SidebarStyle) SidebarStyle {
 // click selects an item and gives it the focus.
 //
 // Assistive technology reads the pane as a group named by its Label (by default
-// "Navigation"), the items as the items of a list, and the headings as headings.
+// the Navigation text of the window's Strings), the items as the items of a list,
+// and the headings as headings.
 // The selected item reports the selected state and a disabled one the disabled
 // state. An item with a badge is named with its count, as in "Inbox, 4".
 //
@@ -175,7 +176,7 @@ func (s *SidebarElement) elementKey() string { return s.key }
 func (s *SidebarElement) Key(k string) *SidebarElement { s.key = k; return s }
 
 // Label names the pane for assistive technology, such as "Main navigation". The
-// default is "Navigation".
+// default is the Navigation text of the window's Strings.
 func (s *SidebarElement) Label(name string) *SidebarElement { s.name = name; return s }
 
 // OnChange runs fn with the key of the item after the user selects it, by a click,
@@ -197,8 +198,9 @@ func (s *SidebarElement) Styles(st SidebarStyle) *SidebarElement {
 func (s *SidebarElement) Collapsed(c *Signal[bool]) *SidebarElement { s.collapsed = c; return s }
 
 // Toggle adds a menu button at the top of the sidebar that flips the signal given
-// to Collapsed. It is named "Collapse navigation" while the sidebar is expanded and
-// "Expand navigation" while it is collapsed, and reports the expanded state. It
+// to Collapsed. It is named with the CollapseNavigation text of the window's Strings
+// while the sidebar is expanded, and with the ExpandNavigation text while it is
+// collapsed, and it reports the expanded state. It
 // has no effect without Collapsed.
 func (s *SidebarElement) Toggle() *SidebarElement { s.toggle = true; return s }
 
@@ -234,9 +236,10 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 		st := resolveSidebar(t, s.styles)
 		cur := s.selected.Get()
 		collapsed := s.collapsed != nil && s.collapsed.Get()
+		strs := ctx.Strings()
 		name := s.name
 		if name == "" {
-			name = "Navigation"
+			name = strs.Navigation
 		}
 		scope := s.scope()
 		// opts are the items as options. A heading is an option that cannot be
@@ -301,7 +304,7 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 				}
 			} else if it.Badge > 0 {
 				// The count is not drawn when collapsed, but the name keeps it.
-				row.access().badge = Badge(it.Badge).accName()
+				row.access().badge = Badge(it.Badge)
 			}
 			if it.Disabled {
 				row.access().disabled = true
@@ -369,9 +372,9 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 			s.size.apply(pane)
 		}
 		if s.toggle && s.collapsed != nil {
-			label := "Collapse navigation"
+			label := strs.CollapseNavigation
 			if collapsed {
-				label = "Expand navigation"
+				label = strs.ExpandNavigation
 			}
 			c := s.collapsed
 			pane.Child(Div().asPart("Sidebar.Toggle").Key(scope + "/toggle").Style(st.Toggle).

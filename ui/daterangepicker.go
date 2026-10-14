@@ -352,20 +352,20 @@ func rangeExample(l *dateLocale) string {
 
 // enabled reports whether day can be chosen as an end of the range: it is in the range of Min and
 // Max, and DisableDays does not rule it out.
-func (d *DateRangePickerElement) enabled(day time.Time) bool {
-	return d.refusal(day, currentLocale()) == ""
+func (d *DateRangePickerElement) enabled(day time.Time, s *Strings) bool {
+	return d.refusal(day, currentLocale(), s) == ""
 }
 
 // refusal returns the message that says why day cannot be chosen, or "" when it can.
-func (d *DateRangePickerElement) refusal(day time.Time, loc *dateLocale) string {
+func (d *DateRangePickerElement) refusal(day time.Time, loc *dateLocale, s *Strings) string {
 	day = dayOf(day)
 	switch {
 	case !d.min.IsZero() && day.Before(dayOf(d.min)):
-		return "Enter a date on or after " + formatDate(d.min, loc) + "."
+		return s.DateOnOrAfter(formatDate(d.min, loc))
 	case !d.max.IsZero() && day.After(dayOf(d.max)):
-		return "Enter a date on or before " + formatDate(d.max, loc) + "."
+		return s.DateOnOrBefore(formatDate(d.max, loc))
 	case d.disableDays != nil && d.disableDays(day):
-		return "That date cannot be chosen."
+		return s.DateNotAllowed
 	}
 	return ""
 }
@@ -374,6 +374,7 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
+		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
 		rs := resolveDateRangePicker(t, scale, d.disabled, d.styles)
@@ -437,20 +438,20 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 			}
 			first, last, ok := splitRange(text)
 			if !ok {
-				return fail("Enter a range such as " + rangeExample(loc) + ".")
+				return fail(s.RangeExample(rangeExample(loc)))
 			}
 			a, okA := parseDate(first, loc, rt.now())
 			b, okB := parseDate(last, loc, rt.now())
 			if !okA || !okB {
-				return fail("Enter a range such as " + rangeExample(loc) + ".")
+				return fail(s.RangeExample(rangeExample(loc)))
 			}
 			if b.Before(a) {
 				a, b = b, a
 			}
-			if why := d.refusal(a, loc); why != "" {
+			if why := d.refusal(a, loc, s); why != "" {
 				return fail(why)
 			}
-			if why := d.refusal(b, loc); why != "" {
+			if why := d.refusal(b, loc, s); why != "" {
 				return fail(why)
 			}
 			set(dateRange{start: a, end: b})
@@ -507,13 +508,13 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 		// pick chooses day. The first day chosen is the start, and the calendar stays open; the
 		// second is the end, and it closes the calendar. A day that cannot be chosen is ignored.
 		pick := func(day time.Time) {
-			if !d.enabled(day) {
+			if !d.enabled(day, s) {
 				return
 			}
 			p := pending.Peek()
 			if p.IsZero() {
 				pending.Set(day)
-				Announce("Start of range chosen. Choose the end of the range.", access.Polite)
+				Announce(s.RangeStartChosen, access.Polite)
 				return
 			}
 			a, b := p, day
@@ -583,7 +584,7 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 			if day.IsZero() {
 				day = focus.Get()
 			}
-			if !d.enabled(day) {
+			if !d.enabled(day, s) {
 				day = time.Time{}
 			}
 			from, to = orderedSpan(p, day)
@@ -602,7 +603,7 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 		// The calendar button is the trailing element of the frame. It is not a Tab stop: the keys
 		// Alt+Down and F4 open the calendar from the field.
 		button := Div().asPart("DateRangePicker.CalendarButton").Style(st.CalendarButton).
-			Role(access.RoleButton).Label("Choose dates").Cursor(CursorPointer).
+			Role(access.RoleButton).Label(s.ChooseDates).Cursor(CursorPointer).
 			OnClick(openCal).Child(Icon(icons.Calendar).Size(16 * scale))
 
 		var describedBy []string
@@ -639,10 +640,11 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 		})
 
 		if open.Get() {
+			enabled := func(day time.Time) bool { return d.enabled(day, s) }
 			root.Child(calendarPanel(calendarView{st: st, widget: "DateRangePicker", loc: loc, scale: scale,
 				from: from, to: to, inRange: rs.DayInRange, focus: focus.Get(), today: dayOf(rt.now()),
-				name: name, fallback: "Date range", move: moveTo, pick: pick, keys: keys, shut: shut,
-				enabled: d.enabled, hover: hovered, firstSet: d.firstSet, firstDay: d.firstDay}))
+				name: name, fallback: s.DateRangeField, move: moveTo, pick: pick, keys: keys, shut: shut,
+				enabled: enabled, hover: hovered, firstSet: d.firstSet, firstDay: d.firstDay}, s))
 		}
 		return d.size.apply(root)
 	})

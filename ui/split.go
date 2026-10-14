@@ -246,7 +246,7 @@ func (s *SplitElement) MaxSecond(l Length) *SplitElement {
 }
 
 // Label names the divider for assistive technology, such as "Resize sidebar". The
-// default is "Resize panes".
+// default is the Resize panes text of the window's Strings.
 func (s *SplitElement) Label(name string) *SplitElement { s.name = name; return s }
 
 // FirstLabel names the first pane for assistive technology, such as "Notes". A pane
@@ -418,7 +418,7 @@ func (s *SplitElement) expand(ctx *Context) Element {
 		}
 		name := s.name
 		if name == "" {
-			name = "Resize panes"
+			name = ctx.Strings().ResizePanes
 		}
 		// The layout comes after the render, and while a render builds the tree it finds
 		// no layout for the split yet. The last measured length is kept. A split that has

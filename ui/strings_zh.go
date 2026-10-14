@@ -1,0 +1,209 @@
+package ui
+
+import "fmt"
+
+// The Chinese packs translate the short words and phrases of the controls. Some of
+// them are the words of gpui-component (Apache-2.0, see NOTICE), and the others are
+// short standard terms. The messages with values that depend on the context, and the
+// sentences, stay English (see Strings).
+
+// chineseMainlandStrings is the Simplified Chinese pack, zh-CN.
+func chineseMainlandStrings() *Strings {
+	return &Strings{
+		Avatar:               "头像",
+		Breadcrumb:           "面包屑",
+		Pagination:           "分页",
+		Navigation:           "导航",
+		Options:              "选项",
+		Suggestions:          "建议",
+		Times:                "时间",
+		Actions:              "操作",
+		Color:                "颜色",
+		Progress:             "进度",
+		Loading:              "加载中",
+		Notifications:        "通知",
+		ResizePanes:          "调整窗格大小",
+		DateField:            "日期",
+		DateRangeField:       "日期范围",
+		LoadingEllipsis:      "加载中…",
+		LoadingSuggestions:   "正在加载建议",
+		SaturationBrightness: "饱和度和亮度",
+		SaturationBrightnessValue: func(saturation, brightness int) string {
+			return fmt.Sprintf("饱和度 %d%%，亮度 %d%%", saturation, brightness)
+		},
+		Hue:                 "色相",
+		Opacity:             "不透明度",
+		Hex:                 "十六进制",
+		ChooseDate:          "选择日期",
+		ChooseDates:         "选择日期范围",
+		ShowTimes:           "显示时间",
+		ShowHiddenLocations: "显示隐藏的位置",
+		CollapseNavigation:  "收起导航",
+		ExpandNavigation:    "展开导航",
+		DismissNotification: "关闭通知",
+		PreviousPage:        "上一页",
+		NextPage:            "下一页",
+		PreviousYear:        "上一年",
+		PreviousMonth:       "上个月",
+		NextMonth:           "下个月",
+		NextYear:            "下一年",
+		Close:               "关闭",
+		Minimize:            "最小化",
+		Maximize:            "最大化",
+		Restore:             "还原",
+		Increase:            "增加",
+		Decrease:            "减少",
+
+		Remove:      func(tag string) string { return "移除 " + tag },
+		Page:        func(n int) string { return fmt.Sprintf("第 %d 页", n) },
+		CurrentPage: func(n int) string { return fmt.Sprintf("第 %d 页，当前页", n) },
+		PageOf:      func(page, pages int) string { return fmt.Sprintf("第 %d 页，共 %d 页", page, pages) },
+
+		Today:        "今天",
+		StartOfRange: "范围开始",
+		EndOfRange:   "范围结束",
+		InRange:      "范围内",
+
+		NoResults:               "暂无数据",
+		NoRows:                  "暂无数据",
+		CouldNotLoadSuggestions: "无法加载建议",
+		SuggestionCount:         func(n int) string { return fmt.Sprintf("%d 条建议", n) },
+		SortedAscending:         "已升序排序",
+		SortedDescending:        "已降序排序",
+
+		Required: "此字段为必填项。",
+	}
+}
+
+// chineseTaiwanStrings is the Traditional Chinese pack for Taiwan, zh-TW.
+func chineseTaiwanStrings() *Strings {
+	return &Strings{
+		Avatar:               "大頭貼",
+		Breadcrumb:           "導覽路徑",
+		Pagination:           "分頁",
+		Navigation:           "導覽",
+		Options:              "選項",
+		Suggestions:          "建議",
+		Times:                "時間",
+		Actions:              "操作",
+		Color:                "顏色",
+		Progress:             "進度",
+		Loading:              "載入中",
+		Notifications:        "通知",
+		ResizePanes:          "調整窗格大小",
+		DateField:            "日期",
+		DateRangeField:       "日期範圍",
+		LoadingEllipsis:      "載入中…",
+		LoadingSuggestions:   "正在載入建議",
+		SaturationBrightness: "飽和度與亮度",
+		SaturationBrightnessValue: func(saturation, brightness int) string {
+			return fmt.Sprintf("飽和度 %d%%，亮度 %d%%", saturation, brightness)
+		},
+		Hue:                 "色相",
+		Opacity:             "不透明度",
+		Hex:                 "十六進位",
+		ChooseDate:          "選取日期",
+		ChooseDates:         "選取日期範圍",
+		ShowTimes:           "顯示時間",
+		ShowHiddenLocations: "顯示隱藏的位置",
+		CollapseNavigation:  "收合導覽",
+		ExpandNavigation:    "展開導覽",
+		DismissNotification: "關閉通知",
+		PreviousPage:        "上一頁",
+		NextPage:            "下一頁",
+		PreviousYear:        "上一年",
+		PreviousMonth:       "上個月",
+		NextMonth:           "下個月",
+		NextYear:            "下一年",
+		Close:               "關閉",
+		Minimize:            "最小化",
+		Maximize:            "最大化",
+		Restore:             "還原",
+		Increase:            "增加",
+		Decrease:            "減少",
+
+		Remove:      func(tag string) string { return "移除 " + tag },
+		Page:        func(n int) string { return fmt.Sprintf("第 %d 頁", n) },
+		CurrentPage: func(n int) string { return fmt.Sprintf("第 %d 頁，目前頁", n) },
+		PageOf:      func(page, pages int) string { return fmt.Sprintf("第 %d 頁，共 %d 頁", page, pages) },
+
+		Today:        "今天",
+		StartOfRange: "範圍開始",
+		EndOfRange:   "範圍結束",
+		InRange:      "範圍內",
+
+		NoResults:               "沒有結果",
+		NoRows:                  "暫無資料",
+		CouldNotLoadSuggestions: "無法載入建議",
+		SuggestionCount:         func(n int) string { return fmt.Sprintf("%d 條建議", n) },
+
+		Required: "此欄位為必填。",
+	}
+}
+
+// chineseHongKongStrings is the Traditional Chinese pack for Hong Kong and Macao,
+// zh-HK. Its words follow the Hong Kong usage, which differs from Taiwan's for some
+// of the controls.
+func chineseHongKongStrings() *Strings {
+	return &Strings{
+		Avatar:               "頭像",
+		Breadcrumb:           "麵包屑",
+		Pagination:           "分頁",
+		Navigation:           "導航",
+		Options:              "選項",
+		Suggestions:          "建議",
+		Times:                "時間",
+		Actions:              "操作",
+		Color:                "顏色",
+		Progress:             "進度",
+		Loading:              "載入中",
+		Notifications:        "通知",
+		ResizePanes:          "調整窗格大小",
+		DateField:            "日期",
+		DateRangeField:       "日期範圍",
+		LoadingEllipsis:      "載入中…",
+		LoadingSuggestions:   "正在載入建議",
+		SaturationBrightness: "飽和度及亮度",
+		SaturationBrightnessValue: func(saturation, brightness int) string {
+			return fmt.Sprintf("飽和度 %d%%，亮度 %d%%", saturation, brightness)
+		},
+		Hue:                 "色相",
+		Opacity:             "不透明度",
+		Hex:                 "十六進位",
+		ChooseDate:          "選擇日期",
+		ChooseDates:         "選擇日期範圍",
+		ShowTimes:           "顯示時間",
+		ShowHiddenLocations: "顯示隱藏的位置",
+		CollapseNavigation:  "收起導航",
+		ExpandNavigation:    "展開導航",
+		DismissNotification: "關閉通知",
+		PreviousPage:        "上一頁",
+		NextPage:            "下一頁",
+		PreviousYear:        "上一年",
+		PreviousMonth:       "上個月",
+		NextMonth:           "下個月",
+		NextYear:            "下一年",
+		Close:               "關閉",
+		Minimize:            "最小化",
+		Maximize:            "最大化",
+		Restore:             "還原",
+		Increase:            "增加",
+		Decrease:            "減少",
+
+		Remove:      func(tag string) string { return "移除 " + tag },
+		Page:        func(n int) string { return fmt.Sprintf("第 %d 頁", n) },
+		CurrentPage: func(n int) string { return fmt.Sprintf("第 %d 頁，現時頁", n) },
+		PageOf:      func(page, pages int) string { return fmt.Sprintf("第 %d 頁，共 %d 頁", page, pages) },
+
+		Today:        "今日",
+		StartOfRange: "範圍開始",
+		EndOfRange:   "範圍結束",
+		InRange:      "範圍內",
+
+		NoResults:               "暫無數據",
+		NoRows:                  "暫無數據",
+		CouldNotLoadSuggestions: "無法載入建議",
+
+		Required: "此欄位為必填。",
+	}
+}

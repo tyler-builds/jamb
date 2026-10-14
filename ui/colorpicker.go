@@ -350,6 +350,7 @@ func thumbFraction(pos, length, thumb float64) float64 {
 func (c *ColorPickerElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		rt, t := ctx.rt, ctx.Theme()
+		s := ctx.Strings()
 		scale := textScale(ctx)
 		st := colorPickerSizes(c.ctlSize, scale).merge(resolveColorPicker(t, c.styles))
 		sl := resolveSlider(t, false, st.Slider)
@@ -447,7 +448,7 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 
 		name := c.name
 		if name == "" {
-			name = "Color"
+			name = s.Color
 		}
 		hex := formatHex(cur, c.alpha)
 		trig := Div().asPart("ColorPicker.Trigger").Style(st.Trigger).Hover(st.TriggerHover).
@@ -542,8 +543,8 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 				Child(Div().Row().Height(Px(th)).Child(Div().Grow(fx)).Child(thumb).Child(Div().Grow(1 - fx))).
 				Child(Div().Grow(1 - fy)))
 			ra := area.access()
-			area.Role(access.RoleSlider).Label("Saturation and brightness")
-			ra.value = fmt.Sprintf("Saturation %.0f%%, brightness %.0f%%", now.s*100, now.v*100)
+			area.Role(access.RoleSlider).Label(s.SaturationBrightness)
+			ra.value = s.SaturationBrightnessValue(int(math.Round(now.s*100)), int(math.Round(now.v*100)))
 			panel.Child(area)
 
 			// The hue slider: the Slider's track and thumb over a rail of six gradient
@@ -600,7 +601,7 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 					e.StopPropagation()
 					setHue(hs.Peek().h + d)
 				})
-			hueTrack.Role(access.RoleSlider).Label("Hue")
+			hueTrack.Role(access.RoleSlider).Label(s.Hue)
 			ha := hueTrack.access()
 			ha.rng = &access.Range{Value: now.h, Min: 0, Max: 360, SmallChange: 1, LargeChange: 10}
 			ha.setRange = setHue
@@ -617,7 +618,7 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 				if !t.HighContrast {
 					ops.Rail = Style{Gradient: LinearGradient(90, now.color(0), now.color(1))}
 				}
-				opacity := Slider(alphaPct, 0, 100, 1).Label("Opacity").Key(c.partKey("opacity")).
+				opacity := Slider(alphaPct, 0, 100, 1).Label(s.Opacity).Key(c.partKey("opacity")).
 					Format(func(v float64) string { return fmt.Sprintf("%.0f%%", v) }).
 					OnChange(func(float64) {
 						next := hs.Peek()
@@ -631,7 +632,7 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 			if c.alpha {
 				placeholder = "#RRGGBBAA"
 			}
-			hexField := TextInput(draft).Label("Hex").Placeholder(placeholder).Width(Full).Key(c.partKey("hex"))
+			hexField := TextInput(draft).Label(s.Hex).Placeholder(placeholder).Width(Full).Key(c.partKey("hex"))
 			hexField.OnSubmit(func(string) { commitHex() })
 			hexField.onBlur = func() {
 				if draft.Peek() != formatHex(c.value.Peek(), c.alpha) {

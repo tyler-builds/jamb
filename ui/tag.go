@@ -103,6 +103,7 @@ func (g *TagElement) Styles(st TagStyle) *TagElement {
 
 func (g *TagElement) expand(ctx *Context) Element {
 	st := resolveTag(ctx.Theme(), g.styles)
+	strs := ctx.Strings()
 	// The tag is a group named by its text, so it is read as one thing.
 	tag := Div().asPart("Tag.Tag").Style(st.Tag).Role(access.RoleGroup).Label(g.text)
 	if g.icon != nil {
@@ -111,7 +112,7 @@ func (g *TagElement) expand(ctx *Context) Element {
 	tag.Child(Div().asPart("Tag.Label").Style(st.Label).Child(Text(g.text).Truncate()))
 	if g.onRemove != nil {
 		tag.Child(Div().asPart("Tag.Remove").Style(st.Remove).Child(
-			IconButton(icons.X).Label("Remove " + g.text).Small().Ghost().OnClick(g.onRemove)))
+			IconButton(icons.X).Label(strs.Remove(g.text)).Small().Ghost().OnClick(g.onRemove)))
 	}
 	return g.size.apply(tag)
 }

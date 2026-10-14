@@ -54,11 +54,11 @@ func TestValidatorsReportTheirMessages(t *testing.T) {
 		err  error
 		want string // "" when the value is valid
 	}{
-		{"required text, blank", Required[string]()("  "), msgRequired},
+		{"required text, blank", Required[string]()("  "), englishStrings().Required},
 		{"required text", Required[string]()("a"), ""},
-		{"required check box, off", Required[bool]()(false), msgRequired},
+		{"required check box, off", Required[bool]()(false), englishStrings().Required},
 		{"required check box, on", Required[bool]()(true), ""},
-		{"required number, zero", Required[int]()(0), msgRequired},
+		{"required number, zero", Required[int]()(0), englishStrings().Required},
 		{"required number", Required[int]()(3), ""},
 		{"min length, empty passes", MinLength(3)(""), ""},
 		{"min length, short", MinLength(3)("ab"), "Enter at least 3 characters."},
@@ -91,7 +91,7 @@ func TestValidatorsReportTheirMessages(t *testing.T) {
 func TestFirstFailingValidatorWins(t *testing.T) {
 	rules := []Validator[string]{MinLength(5), Required[string]()}
 	// The empty text passes MinLength, so Required is the one that reports it.
-	if err := firstError("", rules); err == nil || err.Error() != msgRequired {
+	if err := firstError("", rules); err == nil || err.Error() != englishStrings().Required {
 		t.Fatalf("firstError(\"\") = %v, want the required message", err)
 	}
 	if err := firstError("ab", rules); err == nil || err.Error() != "Enter at least 5 characters." {
@@ -145,17 +145,17 @@ func TestFieldShowsItsErrorOnlyAfterTheUserEditsAndLeaves(t *testing.T) {
 			Child(Field("Name", TextInput(name).Key("name").Validate(Required[string]()))).
 			Child(Button("Other").Key("other"))
 	})
-	if hasName(r, msgRequired) {
+	if hasName(r, englishStrings().Required) {
 		t.Fatal("an error shows before the user has touched the field")
 	}
 	r.focusKey(t, "name")
 	r.typeText("a")
 	r.press(input.KeyBackspace, 0)
-	if hasName(r, msgRequired) {
+	if hasName(r, englishStrings().Required) {
 		t.Fatal("an error shows while the field still has focus")
 	}
 	r.focusKey(t, "other")
-	if !hasName(r, msgRequired) {
+	if !hasName(r, englishStrings().Required) {
 		t.Fatal("no error after the user edited the field and left it")
 	}
 	if !r.stateOf(t, access.RoleTextField, "Name").States.Has(access.StateInvalid) {
@@ -172,7 +172,7 @@ func TestFieldDoesNotShowAnErrorForAFieldTheUserOnlyVisited(t *testing.T) {
 	})
 	r.focusKey(t, "name")
 	r.focusKey(t, "other")
-	if hasName(r, msgRequired) {
+	if hasName(r, englishStrings().Required) {
 		t.Fatal("an error shows for a field that was only visited")
 	}
 }
@@ -227,7 +227,7 @@ func TestSubmitFocusesTheFirstInvalidFieldAndAnnouncesTheCount(t *testing.T) {
 	if !hasName(r, "2 fields need attention.") {
 		t.Fatal("the summary does not show the count")
 	}
-	if !hasName(r, "Name: "+msgRequired) || !hasName(r, "Description: "+msgRequired) {
+	if !hasName(r, "Name: "+englishStrings().Required) || !hasName(r, "Description: "+englishStrings().Required) {
 		t.Fatal("the summary does not list each error")
 	}
 }
@@ -257,7 +257,7 @@ func TestSubmitRunsTheFormWhenItIsValid(t *testing.T) {
 	if saved != 1 {
 		t.Fatalf("saved %d times, want once", saved)
 	}
-	if hasName(r, msgRequired) || !form.submitted.Peek() {
+	if hasName(r, englishStrings().Required) || !form.submitted.Peek() {
 		t.Fatal("a valid submit should record that the form was submitted and show no error")
 	}
 }
@@ -350,12 +350,12 @@ func TestResetClearsTheSubmittedState(t *testing.T) {
 	form := NewForm().OnSubmit(func() error { return nil })
 	r := formRig(t, form, name, desc)
 	r.clickKey(t, "create")
-	if !hasName(r, msgRequired) {
+	if !hasName(r, englishStrings().Required) {
 		t.Fatal("no error after a failed submit")
 	}
 	form.Reset()
 	r.frame()
-	if hasName(r, msgRequired) || hasName(r, "2 fields need attention.") {
+	if hasName(r, englishStrings().Required) || hasName(r, "2 fields need attention.") {
 		t.Fatal("errors are still shown after Reset")
 	}
 }

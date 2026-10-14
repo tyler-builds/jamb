@@ -56,6 +56,12 @@ type Window struct {
 	Theme      *ui.Theme
 	LightTheme *ui.Theme
 	DarkTheme  *ui.Theme
+	// Strings is the text that the built-in controls show and announce. Without it,
+	// the window uses the display language of Windows (see ui.SystemStrings), and
+	// English where that language has no translation or cannot be read. Give
+	// ui.StringsFor(tag) to choose a language, or start from ui.EnglishStrings() and
+	// set the messages to change. A field left empty shows English (see ui.Strings).
+	Strings *ui.Strings
 	// Root renders the whole window. It is a component: it re-runs when a
 	// signal it reads changes.
 	Root func(ctx *ui.Context) ui.Element
@@ -231,6 +237,9 @@ func withDefaults(w Window) Window {
 	if w.Height <= 0 {
 		w.Height = 720
 	}
+	if w.Strings == nil {
+		w.Strings = ui.SystemStrings()
+	}
 	if w.Theme == nil {
 		if w.LightTheme == nil {
 			w.LightTheme = ui.LightTheme()
@@ -386,6 +395,7 @@ func (h *host) OnCreate(w platform.Window) error {
 		h.dev.tracef("fonts ready (waited %v after the renderer)", time.Since(t1))
 	}
 	h.rt = ui.NewRuntime(h.cfg.Root, h.cfg.themeFor(false), ts)
+	h.rt.SetStrings(h.cfg.Strings)
 	if h.cfg.Theme == nil {
 		// applySettings, below, picks the one the system's app mode asks for.
 		h.rt.SetThemes(h.cfg.LightTheme, h.cfg.DarkTheme)

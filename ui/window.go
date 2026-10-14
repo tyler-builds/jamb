@@ -245,12 +245,14 @@ func TitleBarButtons() Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		win := ctx.Window()
-		maximize, maximizeLabel := icons.Maximize, "Maximize"
+		strs := ctx.Strings()
+		maximize, maximizeKey, maximizeLabel := icons.Maximize, "Maximize", strs.Maximize
 		if win.Maximized() {
-			maximize, maximizeLabel = icons.Restore, "Restore"
+			maximize, maximizeKey, maximizeLabel = icons.Restore, "Restore", strs.Restore
 		}
-		button := func(ic *icons.Icon, area WindowArea, label string) *DivElement {
-			d := Div().Key(label).Width(Px(46)).Height(Px(32)).Center().
+		// key is the identity of the button, which stays English; label is its text.
+		button := func(ic *icons.Icon, area WindowArea, key, label string) *DivElement {
+			d := Div().Key(key).Width(Px(46)).Height(Px(32)).Center().
 				TextColor(t.TextMuted).Transition(120 * time.Millisecond).
 				Hover(Style{Background: t.SurfaceHover, TextColor: t.Text}).
 				Pressed(Style{Background: t.SurfaceActive, TextColor: t.Text}).
@@ -275,12 +277,12 @@ func TitleBarButtons() Element {
 			}
 			return d
 		}
-		closeButton := button(icons.X, WindowAreaClose, "Close").
+		closeButton := button(icons.X, WindowAreaClose, "Close", strs.Close).
 			Hover(Style{Background: Hex("#e81123"), TextColor: Hex("#ffffff")}).
 			Pressed(Style{Background: Hex("#f1707a"), TextColor: Hex("#ffffff")})
 		return Div().Row().Height(Px(32)).
-			Child(button(icons.Minimize, WindowAreaMinimize, "Minimize")).
-			Child(button(maximize, WindowAreaMaximize, maximizeLabel)).
+			Child(button(icons.Minimize, WindowAreaMinimize, "Minimize", strs.Minimize)).
+			Child(button(maximize, WindowAreaMaximize, maximizeKey, maximizeLabel)).
 			Child(closeButton)
 	})
 }

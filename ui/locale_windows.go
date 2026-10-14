@@ -12,9 +12,10 @@ import (
 // them: GetLocaleInfoEx for the patterns and the clock, and GetDateFormatEx for the
 // names of the days and the months, so that they are in the user's language.
 var (
-	kernel32Locale      = syscall.NewLazyDLL("kernel32.dll")
-	procGetLocaleInfoEx = kernel32Locale.NewProc("GetLocaleInfoEx")
-	procGetDateFormatEx = kernel32Locale.NewProc("GetDateFormatEx")
+	kernel32Locale                  = syscall.NewLazyDLL("kernel32.dll")
+	procGetLocaleInfoEx             = kernel32Locale.NewProc("GetLocaleInfoEx")
+	procGetDateFormatEx             = kernel32Locale.NewProc("GetDateFormatEx")
+	procGetUserPreferredUILanguages = kernel32Locale.NewProc("GetUserPreferredUILanguages")
 )
 
 // The LOCALE_* and DATE_* values from winnls.h. A null locale name is the user's
@@ -28,9 +29,30 @@ const (
 	lcFirstDayOfWeek  = 0x100C // LOCALE_IFIRSTDAYOFWEEK: 0 is Monday, 6 is Sunday
 	lcReturnNumber    = 0x20000000
 	dateLongDate      = 0x0002 // DATE_LONGDATE
+	muiLanguageName   = 0x0008 // MUI_LANGUAGE_NAME: the languages as tags such as "it-IT"
 	localeBufferChars = 80
 	dateBufferChars   = 128
 )
+
+// systemLanguage returns the first of the user's preferred UI languages, which is the
+// display language of Windows, as a tag such as "it-IT" or "zh-TW". It is "" when the
+// languages cannot be read. The UI language is not the region format, which the date
+// and time settings above follow.
+func systemLanguage() string {
+	var n, size uint32
+	// The first call, with no buffer, sets the size of the list in characters.
+	procGetUserPreferredUILanguages.Call(muiLanguageName, uintptr(unsafe.Pointer(&n)), 0, uintptr(unsafe.Pointer(&size)))
+	if size == 0 {
+		return ""
+	}
+	buf := make([]uint16, size)
+	ok, _, _ := procGetUserPreferredUILanguages.Call(muiLanguageName, uintptr(unsafe.Pointer(&n)),
+		uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)))
+	if ok == 0 {
+		return ""
+	}
+	return syscall.UTF16ToString(buf) // the list is null separated; the first is the preferred one
+}
 
 // systemTime is the SYSTEMTIME structure that GetDateFormatEx takes.
 type systemTime struct {

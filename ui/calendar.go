@@ -125,7 +125,7 @@ func calendarKeys(e *KeyEvent, f time.Time, first time.Weekday, move, pick func(
 // opens, and the day the keys have reached is its highlighted cell, which the screen reader reads.
 // The navigation buttons are for a pointer; the keys are PageUp and PageDown for a month, and Shift
 // with them for a year.
-func calendarPanel(c calendarView) Element {
+func calendarPanel(c calendarView, s *Strings) Element {
 	first := c.loc.firstDay
 	if c.firstSet {
 		first = c.firstDay
@@ -162,11 +162,11 @@ func calendarPanel(c calendarView) Element {
 		return b
 	}
 	header := Div().Row().Align(Center).Gap(4 * c.scale).
-		Child(nav("Previous year", nil, "«", addMonths(focus, -12))).
-		Child(nav("Previous month", icons.ChevronLeft, "", addMonths(focus, -1))).
+		Child(nav(s.PreviousYear, nil, "«", addMonths(focus, -12))).
+		Child(nav(s.PreviousMonth, icons.ChevronLeft, "", addMonths(focus, -1))).
 		Child(Div().asPart(c.widget + ".Header").Style(st.Header).Child(Text(c.loc.monthYear(focus)).NoWrap())).
-		Child(nav("Next month", icons.ChevronRight, "", addMonths(focus, 1))).
-		Child(nav("Next year", nil, "»", addMonths(focus, 12)))
+		Child(nav(s.NextMonth, icons.ChevronRight, "", addMonths(focus, 1))).
+		Child(nav(s.NextYear, nil, "»", addMonths(focus, 12)))
 	panel.Child(header)
 
 	// The weekday names are header items of the grid, which the grid is given by its
@@ -185,7 +185,7 @@ func calendarPanel(c calendarView) Element {
 		week := Div().Row().Gap(2 * c.scale).Label(c.loc.longDate(grid[r][0]))
 		week.listItem(r+1, 6)
 		for col := range 7 {
-			week.Child(calendarDay(c, grid[r][col], r+1, col+1))
+			week.Child(calendarDay(c, s, grid[r][col], r+1, col+1))
 		}
 		panel.Child(week)
 	}
@@ -196,7 +196,7 @@ func calendarPanel(c calendarView) Element {
 // 1-based). It is a data item of the grid, named by the long date of the day. It is selected when the
 // day is the chosen one, or the start or the end of a range. A day between the ends of a range is
 // drawn with the look of the band, and a day that cannot be chosen is disabled.
-func calendarDay(c calendarView, day time.Time, row, col int) *DivElement {
+func calendarDay(c calendarView, s *Strings, day time.Time, row, col int) *DivElement {
 	st := c.st
 	start := !c.from.IsZero() && sameDay(day, c.from)
 	end := !c.to.IsZero() && sameDay(day, c.to)
@@ -215,17 +215,17 @@ func calendarDay(c calendarView, day time.Time, row, col int) *DivElement {
 	var notes []string
 	if sameDay(day, c.today) {
 		cell.Style(st.DayToday)
-		notes = append(notes, "Today")
+		notes = append(notes, s.Today)
 	}
 	if start {
-		notes = append(notes, "Start of range")
+		notes = append(notes, s.StartOfRange)
 	}
 	if end {
-		notes = append(notes, "End of range")
+		notes = append(notes, s.EndOfRange)
 	}
 	if between {
 		cell.Style(c.inRange)
-		notes = append(notes, "In range")
+		notes = append(notes, s.InRange)
 	}
 	if len(notes) > 0 {
 		cell.Description(strings.Join(notes, ", "))

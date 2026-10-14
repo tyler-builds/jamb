@@ -1,2 +1,15 @@
 jamb
 Copyright 2026 The jamb Authors
+
+Third-party notice: gpui-component
+
+The translations of the built-in text in ui/strings_zh.go and ui/strings_it.go reuse
+these words and phrases from gpui-component (crates/ui/locales/ui.yml):
+
+  zh-CN: 上一页, 下一页, 色相, 选择日期, 暂无数据, 关闭
+  zh-TW: 上一頁, 下一頁, 色相, 選取日期, 沒有結果, 關閉
+  zh-HK: 上一頁, 下一頁, 色相, 選擇日期, 暫無數據, 關閉
+  it:    Tonalità, Nessun risultato, Chiudi
+
+gpui-component is Copyright Longbridge and is licensed under the Apache License,
+Version 2.0. Its license text is at https://www.apache.org/licenses/LICENSE-2.0.

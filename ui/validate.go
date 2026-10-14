@@ -24,8 +24,26 @@ import (
 //   - Custom for any value, from a function of your own.
 type Validator[T any] func(v T) error
 
-// Messages of the built-in validators.
-const msgRequired = "This field is required."
+// messageError is the error of a built-in validator. Its text is read from the
+// Strings of the window that shows it, so that it follows the window's language. Its
+// Error method gives the English text.
+type messageError struct{ text func(s *Strings) string }
+
+// Error returns the English text of the message.
+func (e *messageError) Error() string { return e.text(englishStrings()) }
+
+// errorText returns the text that err shows in a window with the Strings s: the text
+// of a built-in validator's message in s, and the text of any other error as it is.
+func errorText(err error, s *Strings) string {
+	var m *messageError
+	if errors.As(err, &m) {
+		return m.text(s)
+	}
+	return err.Error()
+}
+
+// requiredError is the message of Required.
+var requiredError = &messageError{text: func(s *Strings) string { return s.Required }}
 
 // Required rejects the zero value of T: the empty text, zero, false and the zero
 // option. A text value is trimmed first, so spaces alone are empty. A number does
@@ -35,13 +53,13 @@ func Required[T comparable]() Validator[T] {
 	return func(v T) error {
 		if s, ok := any(v).(string); ok {
 			if strings.TrimSpace(s) == "" {
-				return errors.New(msgRequired)
+				return requiredError
 			}
 			return nil
 		}
 		var zero T
 		if v == zero {
-			return errors.New(msgRequired)
+			return requiredError
 		}
 		return nil
 	}
@@ -52,7 +70,7 @@ func Required[T comparable]() Validator[T] {
 func MinLength(n int) Validator[string] {
 	return func(s string) error {
 		if s != "" && utf8.RuneCountInString(s) < n {
-			return fmt.Errorf("Enter at least %d characters.", n)
+			return &messageError{text: func(t *Strings) string { return t.MinLength(n) }}
 		}
 		return nil
 	}
@@ -62,7 +80,7 @@ func MinLength(n int) Validator[string] {
 func MaxLength(n int) Validator[string] {
 	return func(s string) error {
 		if utf8.RuneCountInString(s) > n {
-			return fmt.Errorf("Enter no more than %d characters.", n)
+			return &messageError{text: func(t *Strings) string { return t.MaxLength(n) }}
 		}
 		return nil
 	}
@@ -83,7 +101,7 @@ func Pattern(re *regexp.Regexp, msg string) Validator[string] {
 func Range[T int | float64](lo, hi T) Validator[T] {
 	return func(v T) error {
 		if v < lo || v > hi {
-			return fmt.Errorf("Enter a value from %v to %v.", lo, hi)
+			return &messageError{text: func(t *Strings) string { return t.ValueRange(fmt.Sprint(lo), fmt.Sprint(hi)) }}
 		}
 		return nil
 	}

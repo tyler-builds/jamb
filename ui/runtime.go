@@ -233,8 +233,9 @@ type FrameStats struct {
 type Runtime struct {
 	rootEl   *ComponentElement
 	rootInst *componentInstance
-	theme    *Theme // the effective theme: the app's, or the high contrast one
-	appTheme *Theme // the theme the app set with SetTheme
+	theme    *Theme   // the effective theme: the app's, or the high contrast one
+	appTheme *Theme   // the theme the app set with SetTheme
+	strings  *Strings // the text the built-in controls show, complete (see SetStrings)
 	// imageDue is when the next frame of a drawn animated image is due; a
 	// frame at or after it repaints (see imageTexture).
 	imageDue time.Time
@@ -492,6 +493,7 @@ func NewRuntime(root func(ctx *Context) Element, theme *Theme, ts *text.System) 
 		rootEl:     Component(root),
 		theme:      theme,
 		appTheme:   theme,
+		strings:    englishStrings(),
 		sys:        SystemSettings{TextScale: 100, CaretBlink: defaultCaretBlink, CaretWidth: 1},
 		textFactor: 1,
 		toastVer:   NewSignal(0),
@@ -654,6 +656,14 @@ func (rt *Runtime) SetTheme(t *Theme) {
 func (rt *Runtime) SetThemes(light, dark *Theme) {
 	rt.themes = &[2]*Theme{light, dark}
 	rt.applyTheme()
+	rt.hostInvalidateAll()
+}
+
+// SetStrings sets the text the built-in controls show and announce, and re-renders all
+// components. Fields that s leaves empty show the English text (see Strings). A nil s
+// is English. A new runtime is English until SetStrings is called.
+func (rt *Runtime) SetStrings(s *Strings) {
+	rt.strings = completeStrings(s)
 	rt.hostInvalidateAll()
 }
 

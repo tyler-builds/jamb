@@ -20,8 +20,8 @@ import (
 // the element constructors and the public methods below, and nil otherwise.
 type accessInfo struct {
 	role        access.Role
-	name        string // an explicit label; wins over the text the element contains
-	badge       string // the name of an attached badge, added to the name (see Badged)
+	name        string        // an explicit label; wins over the text the element contains
+	badge       *BadgeElement // an attached badge, named in the owner's name when the tree is built (see Badged)
 	description string
 	hidden      bool
 	disabled    bool
@@ -792,14 +792,19 @@ func absorbsText(r access.Role) bool {
 // then its tooltip.
 func (b *accessBuilder) name(n *node, absorbs bool) string {
 	s := b.ownName(n, absorbs)
-	if n.div.acc == nil || n.div.acc.badge == "" {
+	if n.div.acc == nil || n.div.acc.badge == nil {
 		return s
 	}
-	// An attached badge adds to the name, as in "Projects, 6 items".
-	if s == "" {
-		return n.div.acc.badge
+	// An attached badge adds to the name, as in "Projects, 6 items". It is named in the
+	// window's language here, so the name follows the Strings of the runtime.
+	badge := n.div.acc.badge.accName(b.rt.strings)
+	switch {
+	case badge == "":
+		return s
+	case s == "":
+		return badge
 	}
-	return s + ", " + n.div.acc.badge
+	return s + ", " + badge
 }
 
 // ownName is the name of an exposed div before any attached badge is added.

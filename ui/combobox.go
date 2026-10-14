@@ -19,12 +19,6 @@ const comboboxMaxVisible = 8
 // before their count is announced, so that typing does not announce each one.
 const comboboxAnnounceDelay = 300 * time.Millisecond
 
-// comboboxEmpty is the text of the empty slot when there are no suggestions.
-const comboboxEmpty = "No results"
-
-// comboboxErrorText is the text of the error row when the suggestions could not be found.
-const comboboxErrorText = "Couldn't load suggestions"
-
 // comboboxRowHeight is the height of a suggestion row at the Text size of 100 percent, in
 // logical pixels (its MinHeight). The list is at most MaxVisible rows high.
 const comboboxRowHeight = 28
@@ -220,8 +214,7 @@ func (c *ComboboxElement[T]) Large() *ComboboxElement[T] {
 // Free text is allowed by default. AllowFree(false) makes the field choose only from
 // its suggestions (see AllowFree).
 func Combobox[T comparable](text *Signal[string], suggest func(query string) []Option[T]) *ComboboxElement[T] {
-	return &ComboboxElement[T]{text: text, suggest: suggest, free: true, maxVisible: comboboxMaxVisible,
-		empty: comboboxEmpty, errorText: comboboxErrorText}
+	return &ComboboxElement[T]{text: text, suggest: suggest, free: true, maxVisible: comboboxMaxVisible}
 }
 
 // formCheck and formWire make a combobox a formControl (see Field).
@@ -366,14 +359,11 @@ func (c *ComboboxElement[T]) Styles(st ComboboxStyle) *ComboboxElement[T] {
 }
 
 // countText is the text announced for n suggestions.
-func countText(n int) string {
-	switch n {
-	case 0:
-		return comboboxEmpty
-	case 1:
-		return "1 suggestion"
+func countText(n int, s *Strings) string {
+	if n == 0 {
+		return s.NoResults
 	}
-	return fmt.Sprintf("%d suggestions", n)
+	return s.SuggestionCount(n)
 }
 
 func (c *ComboboxElement[T]) expand(ctx *Context) Element {
@@ -385,6 +375,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 		w := c.wire
 
 		text := c.text.Get()
+		strs := ctx.Strings()
 		s := Local(ctx, "state", &comboState[T]{}).Peek()
 		items := Local(ctx, "items", comboItems[T]{})
 		open := Local(ctx, "open", false)
@@ -426,7 +417,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 			time.AfterFunc(comboboxAnnounceDelay, func() {
 				post(func() {
 					if s.announceSeq == seq {
-						Announce(countText(n), access.Polite)
+						Announce(countText(n, strs), access.Polite)
 					}
 				})
 			})
@@ -444,7 +435,11 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 			}
 			switch {
 			case failed && open.Peek():
-				Announce(c.errorText, access.Polite)
+				errText := c.errorText
+				if errText == "" {
+					errText = strs.CouldNotLoadSuggestions
+				}
+				Announce(errText, access.Polite)
 			case open.Peek():
 				announce(len(opts))
 			}
@@ -577,9 +572,9 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 			// wonder where the text went. An empty text is reverted without a message.
 			msg := ""
 			if cur != "" {
-				msg = "Not in the list; cleared"
+				msg = strs.NotInList
 				if s.picked != nil {
-					msg = "Not in the list; reverted to " + s.picked.Label
+					msg = strs.NotInListReverted(s.picked.Label)
 				}
 			}
 			if s.picked != nil {
@@ -735,7 +730,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 			s.revealIdx = 0
 			maxH := float32(c.maxVisible)*comboboxRowHeight*textScale(ctx) + 8
 			root.Child(c.popup(t, st, vis, query, hl.Get(), reveal, loading.Get(), items.Get().failed,
-				c.errorText, maxH, s.picked, pick, shut, func(i int) { hl.Set(i) }, ret))
+				c.errorText, maxH, s.picked, pick, shut, func(i int) { hl.Set(i) }, ret, strs))
 		}
 		return c.size.apply(root)
 	})
@@ -750,10 +745,10 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 // empty slot.
 func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], query string, hl, reveal int,
 	loading, failed bool, errorText string, maxH float32, picked *Option[T], pick func(Option[T]), shut func(),
-	highlight func(int), ret *FocusHandle) Element {
+	highlight func(int), ret *FocusHandle, strs *Strings) Element {
 	name := c.name
 	if name == "" {
-		name = "Suggestions"
+		name = strs.Suggestions
 	}
 	panel := Div().asPart("Combobox.Popup").Key("jamb.listbox").Column().Style(st.Popup).
 		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
@@ -767,15 +762,22 @@ func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], 
 	panel.matchAnchor = true // at least as wide as the field, whatever its width
 	if loading {
 		panel.Child(Div().asPart("Combobox.Loading").Style(st.Loading).
-			Child(ProgressRing().Size(RingSmall).Label("Loading suggestions")))
+			Child(ProgressRing().Size(RingSmall).Label(strs.LoadingSuggestions)))
 	}
 	switch {
 	case failed && !loading:
+		if errorText == "" {
+			errorText = strs.CouldNotLoadSuggestions
+		}
 		panel.Child(Div().asPart("Combobox.Error").Style(st.Error).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Error))).
 			Child(Text(errorText).NoWrap()))
 	case len(vis) == 0 && !loading:
-		panel.Child(Div().asPart("Combobox.Empty").Style(st.Empty).Child(Text(c.empty).NoWrap()))
+		empty := c.empty
+		if empty == "" {
+			empty = strs.NoResults
+		}
+		panel.Child(Div().asPart("Combobox.Empty").Style(st.Empty).Child(Text(empty).NoWrap()))
 	}
 	hlStyle := Highlight{Color: st.Match.TextColor, Background: st.Match.Background, Underline: t.HighContrast}
 	for i, o := range vis {

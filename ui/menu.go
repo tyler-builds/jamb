@@ -718,7 +718,7 @@ func (rt *Runtime) openContextMenu(n *node, x, y float32, keyboard bool) {
 		return
 	}
 	rt.menuOpened()
-	rt.ctxMenu = &contextMenu{id: n.id, x: x, y: y, items: items, keyboard: keyboard, label: menuLabel(n)}
+	rt.ctxMenu = &contextMenu{id: n.id, x: x, y: y, items: items, keyboard: keyboard, label: menuLabel(n, rt.strings)}
 	if n.owner != nil {
 		n.owner.invalidate()
 	}
@@ -765,12 +765,12 @@ func contextMenuAt(rt *Runtime, c *contextMenu) Element {
 }
 
 // menuLabel is the name of a context menu: the name of the element it hangs
-// from, or "Actions" when that element has none. A menu must have a name, since
-// it takes keyboard focus.
-func menuLabel(n *node) string {
+// from, or the Actions name when that element has none. A menu must have a name,
+// since it takes keyboard focus.
+func menuLabel(n *node, strs *Strings) string {
 	role, ok := accessRole(n)
 	if s := (&accessBuilder{}).name(n, ok && absorbsText(role)); s != "" {
 		return s
 	}
-	return "Actions"
+	return strs.Actions
 }

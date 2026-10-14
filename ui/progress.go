@@ -150,7 +150,8 @@ func (p *ProgressBarElement) elementKey() string { return p.key }
 func (p *ProgressBarElement) Key(k string) *ProgressBarElement { p.key = k; return p }
 
 // Label names the bar for assistive technology, such as "Upload". Without it
-// the bar is named "Progress", or "Loading…" when it is indeterminate.
+// the bar is named with the Progress text of the window's Strings, or with its
+// Loading… text when it is indeterminate.
 func (p *ProgressBarElement) Label(name string) *ProgressBarElement { p.name = name; return p }
 
 // Indeterminate makes the bar show work of unknown length, such as
@@ -227,6 +228,7 @@ func (p *ProgressBarElement) readout() string {
 func (p *ProgressBarElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	st := resolveProgressBar(t, p.color, p.styles)
+	strs := ctx.Strings()
 	// The track is drawn as a thin bar. Under high contrast it is an outlined
 	// empty box and the fill is solid Highlight, so the empty part does not read
 	// as filled, as the demo's bars do.
@@ -238,12 +240,12 @@ func (p *ProgressBarElement) expand(ctx *Context) Element {
 	a.readOnly = true
 	if p.indeterminate {
 		if name == "" {
-			name = "Loading…"
+			name = strs.LoadingEllipsis
 		}
 		track.Child(p.segment(ctx, st))
 	} else {
 		if name == "" {
-			name = "Progress"
+			name = strs.Progress
 		}
 		// The value is read-only: the range has no setter, so no SetValue action.
 		a.rng = &access.Range{Value: p.clamped(), Min: min(p.lo, p.hi), Max: max(p.lo, p.hi)}
@@ -286,7 +288,8 @@ func (p *ProgressBarElement) segment(ctx *Context, st ProgressBarStyle) Element 
 
 // ProgressRingElement is a busy indicator: a ring of dots that turns while the
 // app waits for something. It has no value, so it says only that work is
-// under way. It is named "Loading…" unless Label gives another name.
+// under way. It is named with the LoadingEllipsis text of the window's Strings
+// unless Label gives another name.
 type ProgressRingElement struct {
 	size   float32
 	name   string
@@ -323,9 +326,10 @@ const ringDots = 8
 func (r *ProgressRingElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	st := resolveProgressRing(t, r.styles)
+	strs := ctx.Strings()
 	name := r.name
 	if name == "" {
-		name = "Loading…"
+		name = strs.LoadingEllipsis
 	}
 	// ring is the box of the indicator. It is one node with the busy role, and
 	// its dots are not exposed.

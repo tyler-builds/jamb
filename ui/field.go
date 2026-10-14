@@ -223,6 +223,7 @@ func (f *FieldElement) Styles(st FormFieldStyle) *FieldElement {
 func (f *FieldElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
+		s := ctx.Strings()
 		st := resolveFormField(t, f.styles)
 		fc, _ := f.control.(formControl)
 		// base prefixes the keys of the label, the help text and the error. A field in
@@ -260,7 +261,7 @@ func (f *FieldElement) expand(ctx *Context) Element {
 		shown := f.err
 		if shown == "" {
 			if err := check(); err != nil && (touched.Get() || (f.form != nil && f.form.submitted.Get())) {
-				shown = err.Error()
+				shown = errorText(err, s)
 			}
 		}
 		if f.form != nil {
@@ -269,11 +270,12 @@ func (f *FieldElement) expand(ctx *Context) Element {
 					return f.err
 				}
 				if err := check(); err != nil {
-					return err.Error()
+					return errorText(err, s)
 				}
 				return ""
 			}})
 			f.form.post = ctx.Post
+			f.form.strings = s
 		}
 
 		labelKey, helpKey, errKey := base+"/label", base+"/help", base+"/error"

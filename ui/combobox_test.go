@@ -959,12 +959,47 @@ func TestComboboxAsyncErrorShowsErrorRow(t *testing.T) {
 	}
 }
 
-// The default error text is the one the brief names.
+// The default error text is empty, and the error row shows the text of the window's
+// Strings, so that it follows the language: English first, then Italian.
 func TestComboboxDefaultErrorText(t *testing.T) {
 	c := Combobox[string](NewSignal(""), nil)
-	if c.errorText != "Couldn't load suggestions" {
-		t.Fatalf("default error text %q", c.errorText)
+	if c.errorText != "" {
+		t.Fatalf("default error text %q, want empty so the row uses the Strings", c.errorText)
 	}
+	var mu sync.Mutex
+	pending := map[string]chan error{}
+	text := NewSignal("")
+	cr := &comboRig{text: text}
+	cr.accessRig = newAccessRig(func(ctx *Context) Element {
+		return Div().Column().Child(Combobox[string](text, nil).Key("fruit").Label("Fruit").
+			SuggestAsync(func(c context.Context, q string) ([]Option[string], error) {
+				ch := make(chan error, 1)
+				mu.Lock()
+				pending[q] = ch
+				mu.Unlock()
+				return nil, <-ch
+			}))
+	})
+	cr.listen()
+	cr.focusCombo(t)
+	cr.typeText("k")
+	cr.wait(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return pending["k"] != nil
+	})
+	mu.Lock()
+	pending["k"] <- errors.New("offline")
+	mu.Unlock()
+	cr.wait(t, func() bool { return partNodeOrNil(cr.rt, "Combobox.Error") != nil })
+	if got := nodeText(partNodeOrNil(cr.rt, "Combobox.Error")); got != "Couldn't load suggestions" {
+		t.Fatalf("English error row says %q", got)
+	}
+	cr.rt.SetStrings(StringsFor("it"))
+	cr.wait(t, func() bool {
+		n := partNodeOrNil(cr.rt, "Combobox.Error")
+		return n != nil && nodeText(n) == "Impossibile caricare i suggerimenti"
+	})
 }
 
 // A restricted field says what it reverted or cleared, aloud and on the field.

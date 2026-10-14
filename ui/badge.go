@@ -176,13 +176,13 @@ func (b *BadgeElement) Styles(st BadgeStyle) *BadgeElement {
 }
 
 // label is the text drawn in the badge. A dot draws none.
-func (b *BadgeElement) label() string {
+func (b *BadgeElement) label(strs *Strings) string {
 	switch b.kind {
 	case badgeText:
 		return b.text
 	case badgeCount:
 		if b.count > b.max {
-			return fmt.Sprintf("%d+", b.max)
+			return strs.BadgeOverflow(b.max)
 		}
 		return fmt.Sprint(b.count)
 	}
@@ -191,21 +191,21 @@ func (b *BadgeElement) label() string {
 
 // accName is what the badge adds to the name of its owner, such as "6 items".
 // It is empty for a dot and for a count of zero.
-func (b *BadgeElement) accName() string {
+func (b *BadgeElement) accName(strs *Strings) string {
 	if b.kind == badgeDot || b.hidden() {
 		return ""
 	}
 	if b.kind == badgeCount && b.count > b.max {
 		// The number is "99+" in the badge, and the owner says the real count.
 		if b.noun != "" {
-			return fmt.Sprintf("more than %d %s", b.max, b.noun)
+			return strs.BadgeMoreThanNoun(b.max, b.noun)
 		}
-		return fmt.Sprintf("more than %d", b.max)
+		return strs.BadgeMoreThan(b.max)
 	}
 	if b.noun != "" {
-		return b.label() + " " + b.noun
+		return b.label(strs) + " " + b.noun
 	}
-	return b.label()
+	return b.label(strs)
 }
 
 // hidden reports whether the badge draws nothing: a count of zero.
@@ -218,10 +218,11 @@ func (b *BadgeElement) expand(ctx *Context) Element {
 		return nil
 	}
 	t := ctx.Theme()
+	strs := ctx.Strings()
 	if b.kind == badgeDot {
 		st := resolveBadge(t, b.variant, true, b.styles)
 		d := Div().asPart("Badge.Dot").Style(st.Dot)
-		b.decorate(d)
+		b.decorate(strs, d)
 		return b.size.apply(d)
 	}
 	st := resolveBadge(t, b.variant, false, b.styles)
@@ -230,24 +231,24 @@ func (b *BadgeElement) expand(ctx *Context) Element {
 		pill.Style(Style{Gap: 4})
 	}
 	pill.Style(st.Badge)
-	label := Div().asPart("Badge.Label").Style(st.Label).Child(Text(b.label()).NoWrap())
+	label := Div().asPart("Badge.Label").Style(st.Label).Child(Text(b.label(strs)).NoWrap())
 	if b.leadDot {
 		pill.Child(Div().asPart("Badge.Dot").AccessHidden().Style(st.Dot))
 	}
 	pill.Child(label)
-	b.decorate(pill)
+	b.decorate(strs, pill)
 	return b.size.apply(pill)
 }
 
 // decorate sets the access settings of a badge. A badge that belongs to an
 // owner is hidden: the owner names itself with the badge's text. A badge that
 // stands alone is a group named by its text, so it is read as one thing.
-func (b *BadgeElement) decorate(d *DivElement) {
+func (b *BadgeElement) decorate(strs *Strings, d *DivElement) {
 	if b.attached {
 		d.AccessHidden()
 		return
 	}
-	if name := b.accName(); name != "" {
+	if name := b.accName(strs); name != "" {
 		d.Role(access.RoleGroup).Label(name)
 	}
 }
@@ -287,8 +288,6 @@ func badgeDark(t *Theme) Color {
 // Badge API in the README.
 func (d *DivElement) Badged(b *BadgeElement) *DivElement {
 	b.attached = true
-	if name := b.accName(); name != "" {
-		d.access().badge = name
-	}
+	d.access().badge = b
 	return d.Child(b)
 }

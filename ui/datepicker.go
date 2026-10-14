@@ -309,20 +309,20 @@ func (d *DatePickerElement) Styles(st DatePickerStyle) *DatePickerElement {
 
 // enabled reports whether day can be chosen: it is in the range of Min and Max, and
 // DisableDays does not rule it out.
-func (d *DatePickerElement) enabled(day time.Time) bool {
-	return d.refusal(day, currentLocale()) == ""
+func (d *DatePickerElement) enabled(day time.Time, s *Strings) bool {
+	return d.refusal(day, currentLocale(), s) == ""
 }
 
 // refusal returns the message that says why day cannot be chosen, or "" when it can.
-func (d *DatePickerElement) refusal(day time.Time, loc *dateLocale) string {
+func (d *DatePickerElement) refusal(day time.Time, loc *dateLocale, s *Strings) string {
 	day = dayOf(day)
 	switch {
 	case !d.min.IsZero() && day.Before(dayOf(d.min)):
-		return "Enter a date on or after " + formatDate(d.min, loc) + "."
+		return s.DateOnOrAfter(formatDate(d.min, loc))
 	case !d.max.IsZero() && day.After(dayOf(d.max)):
-		return "Enter a date on or before " + formatDate(d.max, loc) + "."
+		return s.DateOnOrBefore(formatDate(d.max, loc))
 	case d.disableDays != nil && d.disableDays(day):
-		return "That date cannot be chosen."
+		return s.DateNotAllowed
 	}
 	return ""
 }
@@ -331,6 +331,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
+		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
 		st := resolveDatePicker(t, scale, d.disabled, d.styles)
@@ -383,11 +384,11 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 			}
 			day, ok := parseDate(text, loc, rt.now())
 			if !ok {
-				msg.Set("Enter a date such as " + dateExample(loc) + ".")
+				msg.Set(s.DateExample(dateExample(loc)))
 				invalid.Set(true)
 				return false
 			}
-			if why := d.refusal(day, loc); why != "" {
+			if why := d.refusal(day, loc, s); why != "" {
 				msg.Set(why)
 				invalid.Set(true)
 				return false
@@ -449,7 +450,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		}
 		// pick chooses day and closes the calendar. A day that cannot be chosen is ignored.
 		pick := func(day time.Time) {
-			if !d.enabled(day) {
+			if !d.enabled(day, s) {
 				return
 			}
 			set(withClock(day, clockOf(d.value.Peek())))
@@ -521,7 +522,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		// The calendar button is the trailing element of the frame. It is not a Tab stop: the
 		// keys Alt+Down and F4 open the calendar from the field.
 		button := Div().asPart("DatePicker.CalendarButton").Style(st.CalendarButton).
-			Role(access.RoleButton).Label("Choose date").Cursor(CursorPointer).
+			Role(access.RoleButton).Label(s.ChooseDate).Cursor(CursorPointer).
 			OnClick(openCal).Child(Icon(icons.Calendar).Size(16 * scale))
 
 		var describedBy []string
@@ -556,9 +557,10 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		})
 
 		if open.Get() {
+			enabled := func(day time.Time) bool { return d.enabled(day, s) }
 			root.Child(calendarPanel(calendarView{st: st, widget: "DatePicker", loc: loc, scale: scale, value: v,
-				focus: focus.Get(), today: dayOf(rt.now()), name: name, fallback: "Date", move: moveTo, pick: pick,
-				keys: keys, shut: shut, enabled: d.enabled, firstSet: d.firstSet, firstDay: d.firstDay}))
+				focus: focus.Get(), today: dayOf(rt.now()), name: name, fallback: s.DateField, move: moveTo, pick: pick,
+				keys: keys, shut: shut, enabled: enabled, firstSet: d.firstSet, firstDay: d.firstDay}, s))
 		}
 		return d.size.apply(root)
 	})

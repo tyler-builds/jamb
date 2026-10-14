@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -329,6 +328,7 @@ func (n *NumberInputElement[T]) Styles(st NumberInputStyle) *NumberInputElement[
 func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
+		s := ctx.Strings()
 		scale := float32(ctx.TextScale()) / 100
 		st := resolveNumberInput(t, n.placement, scale, n.disabled, n.spin && !n.disabled, n.ctlSize, n.styles)
 		v := n.value.Get()
@@ -447,15 +447,15 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 		// Stacked buttons are the frame's trailing element, inside its right edge. Inline
 		// buttons are laid over the frame's edges, after the text (see spinButtons).
 		if n.spin && n.placement == SpinStacked {
-			fo.trailing = n.stackedSpin(st, frame, v, step, scale)
+			fo.trailing = n.stackedSpin(st, frame, v, step, scale, s)
 		} else if n.spin {
-			fo.overlays = n.inlineSpin(st, frame, v, step, scale)
+			fo.overlays = n.inlineSpin(st, frame, v, step, scale, s)
 		}
 		row.Child(fo.expand(ctx, st.FieldStyle, false, 0))
 		root.Child(row)
 		// The message is always in the tree, after the row, and shown while the text is
 		// invalid, so that the field keeps its place among its siblings.
-		msg := fmt.Sprintf("Enter a number from %s to %s.", n.format(n.lo), n.format(n.hi))
+		msg := s.NumberRange(n.format(n.lo), n.format(n.hi))
 		root.Child(Div().asPart("NumberInput.Message").Style(st.Message).Display(isInvalid).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
 			Child(Text(msg).Key(errKey)))
@@ -468,10 +468,10 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 // for assistive technology, is in the Tab order while enabled, and steps the value
 // by one step when it is clicked. A button is disabled at the end of the range it
 // would step past.
-func (n *NumberInputElement[T]) stackedSpin(st NumberInputStyle, frame Style, v T, step func(int), scale float32) *DivElement {
+func (n *NumberInputElement[T]) stackedSpin(st NumberInputStyle, frame Style, v T, step func(int), scale float32, s *Strings) *DivElement {
 	gap := spinGap * scale
-	down := n.spinButton(st, frame, -1, "Decrease", icons.ChevronDown, 12*scale, gap, v <= n.lo, step)
-	up := n.spinButton(st, frame, 1, "Increase", icons.ChevronUp, 12*scale, gap, v >= n.hi, step)
+	down := n.spinButton(st, frame, -1, s.Decrease, icons.ChevronDown, 12*scale, gap, v <= n.lo, step)
+	up := n.spinButton(st, frame, 1, s.Increase, icons.ChevronUp, 12*scale, gap, v >= n.hi, step)
 	col := st.SpinButtons
 	// The column fills the frame inside its border, so the field is as high as the
 	// other fields: the frame's height is its outer height, border included. The
@@ -486,10 +486,10 @@ func (n *NumberInputElement[T]) stackedSpin(st NumberInputStyle, frame Style, v 
 // edge and the increase button at its right, each laid over the edge, inside the
 // border. They come after the text in the tree, so the Tab order is the text, then
 // the decrease and the increase button.
-func (n *NumberInputElement[T]) inlineSpin(st NumberInputStyle, frame Style, v T, step func(int), scale float32) []Element {
+func (n *NumberInputElement[T]) inlineSpin(st NumberInputStyle, frame Style, v T, step func(int), scale float32, s *Strings) []Element {
 	gap := spinGap * scale
-	down := n.spinButton(st, frame, -1, "Decrease", icons.Minus, 14*scale, gap, v <= n.lo, step)
-	up := n.spinButton(st, frame, 1, "Increase", icons.Plus, 14*scale, gap, v >= n.hi, step)
+	down := n.spinButton(st, frame, -1, s.Decrease, icons.Minus, 14*scale, gap, v <= n.lo, step)
+	up := n.spinButton(st, frame, 1, s.Increase, icons.Plus, 14*scale, gap, v >= n.hi, step)
 	return []Element{down, up}
 }
 

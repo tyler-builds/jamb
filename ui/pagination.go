@@ -162,7 +162,7 @@ func (p *PaginationElement) elementKey() string { return p.key }
 func (p *PaginationElement) Key(k string) *PaginationElement { p.key = k; return p }
 
 // Label names the control for assistive technology, such as "Search results pages".
-// It defaults to "Pagination".
+// It defaults to the Pagination text of the window's Strings.
 func (p *PaginationElement) Label(name string) *PaginationElement { p.name = name; return p }
 
 // Siblings sets how many pages are shown on each side of the current page. The
@@ -218,43 +218,44 @@ func (p *PaginationElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		th := ctx.Theme()
 		st := resolvePagination(th, p.styles)
+		s := ctx.Strings()
 		pages := max(p.pages, 1)
 		cur := min(max(p.page.Get(), 1), pages)
 		name := p.name
 		if name == "" {
-			name = "Pagination"
+			name = s.Pagination
 		}
 		bar := p.size.apply(Div().asPart("Pagination.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().Style(st.Bar))
-		bar.Child(p.nav(th, st, "previous", "Previous page", icons.ChevronLeft, cur-1, cur > 1))
+		bar.Child(p.nav(th, st, "previous", s.PreviousPage, icons.ChevronLeft, cur-1, cur > 1))
 		if p.compact {
-			bar.Child(Text(fmt.Sprintf("Page %d of %d", cur, pages)).NoWrap())
+			bar.Child(Text(s.PageOf(cur, pages)).NoWrap())
 		} else {
 			for _, n := range pageSlots(cur, pages, p.siblings) {
 				if n == 0 {
 					bar.Child(Div().asPart("Pagination.Ellipsis").AccessHidden().Style(st.Ellipsis).Child(Text("...").NoWrap()))
 					continue
 				}
-				bar.Child(p.cell(th, st, n, cur))
+				bar.Child(p.cell(s, th, st, n, cur))
 			}
 		}
-		bar.Child(p.nav(th, st, "next", "Next page", icons.ChevronRight, cur+1, cur < pages))
+		bar.Child(p.nav(th, st, "next", s.NextPage, icons.ChevronRight, cur+1, cur < pages))
 		return bar
 	})
 }
 
 // cell returns the button of page n. The current page, cur, is drawn filled and is
 // not a button: it is named as the current page and is selected in the group.
-func (p *PaginationElement) cell(th *Theme, st PaginationStyle, n, cur int) *DivElement {
+func (p *PaginationElement) cell(s *Strings, th *Theme, st PaginationStyle, n, cur int) *DivElement {
 	key := p.scope() + fmt.Sprintf("/page:%d", n)
 	label := fmt.Sprint(n)
 	if n == cur {
 		return Div().asPart("Pagination.Page").Key(key).Style(st.Page.Merge(st.PageCurrent)).
-			Role(access.RoleStaticText).Label(fmt.Sprintf("Page %d, current page", n)).AccessSelected(true).
+			Role(access.RoleStaticText).Label(s.CurrentPage(n)).AccessSelected(true).
 			Child(Text(label).NoWrap())
 	}
 	ring := Shadow{Spread: 2, Color: th.FocusRing}
 	return Div().asPart("Pagination.Page").Key(key).Style(st.Page).
-		Role(access.RoleButton).Label(fmt.Sprintf("Page %d", n)).Hover(st.PageHover).
+		Role(access.RoleButton).Label(s.Page(n)).Hover(st.PageHover).
 		Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
 		OnClick(func() { p.choose(n) }).Child(Text(label).NoWrap())
 }
