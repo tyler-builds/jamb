@@ -379,6 +379,13 @@ with `OnMouseMove` and the others, whose `LocalX` and `LocalY` are canvas
 coordinates when it has no padding or border, and add children to lay elements
 over the drawing. Assistive technology sees an image named by `Label`.
 
+### Charts
+
+The `charts` package builds line, area, bar, scatter, pie and donut, radar, candlestick
+and Sankey charts on the canvas, with tooltips, a keyboard walk that announces each
+point, legend toggles, a data table for the exact values, and downsampling for large
+series. See [docs/charts.md](docs/charts.md).
+
 ### SVG images
 
 `ui.SVG(src)` draws an SVG file, sharp at any size, scale and zoom:
