@@ -3,8 +3,6 @@
 package windows
 
 import (
-	"crypto/sha1"
-	"encoding/binary"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -86,31 +84,6 @@ var (
 // its target's notifications and taskbar button use the application ID.
 var pkeyAppUserModelID = propertyKey{guid{0x9F4C2855, 0x9F79, 0x4B39, [8]byte{0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3}}, 5}
 
-// pinterfaceNamespace is the namespace of the parameterized interface IDs of the
-// Windows Runtime, 11F47AD5-7B73-42C0-ABAE-878B1E16ADEE, in its byte order.
-var pinterfaceNamespace = [16]byte{0x11, 0xF4, 0x7A, 0xD5, 0x7B, 0x73, 0x42, 0xC0, 0xAB, 0xAE, 0x87, 0x8B, 0x1E, 0x16, 0xAD, 0xEE}
-
-// pinterfaceGUID returns the IID of a parameterized interface or delegate from its
-// signature, as the Windows Runtime defines it: a version 5 UUID over the namespace
-// and the signature's bytes. The cppwinrt base.h computes it the same way
-// (generate_guid), and the tests check it against a known IID.
-func pinterfaceGUID(signature string) guid {
-	h := sha1.New()
-	h.Write(pinterfaceNamespace[:])
-	h.Write([]byte(signature))
-	sum := h.Sum(nil)
-	var b [16]byte
-	copy(b[:], sum)
-	b[6] = b[6]&0x0F | 0x50 // version 5
-	b[8] = b[8]&0x3F | 0x80 // RFC 4122 variant
-	var g guid
-	g.Data1 = binary.BigEndian.Uint32(b[0:4])
-	g.Data2 = binary.BigEndian.Uint16(b[4:6])
-	g.Data3 = binary.BigEndian.Uint16(b[6:8])
-	copy(g.Data4[:], b[8:16])
-	return g
-}
-
 // The event handlers are TypedEventHandler delegates: Activated is called with the
 // toast and an IInspectable, and Failed with the toast and IToastFailedEventArgs.
 // The IIDs are the parameterized IIDs of those delegates, computed from the
@@ -125,9 +98,16 @@ const (
 	eventFailed
 )
 
+// eventIIDs are the IIDs of the two delegates, written out so that the package links no
+// crypto package (whose import would add the 32 MB buffer of Go's FIPS module to every
+// app; see BENCHMARKS.md). TestEventIIDsMatchTheirSignatures computes them from the
+// signatures, as the Windows Runtime does: TypedEventHandler<ToastNotification, Object>
+// is AB54DE2D-97D9-5528-B6AD-105AFE156530, which Windows documents, and
+// TypedEventHandler<ToastNotification, ToastFailedEventArgs> is
+// 062A90FB-319A-5920-83AF-01D5F464765C.
 var eventIIDs = [2]guid{
-	pinterfaceGUID("pinterface({9de1c534-6ae1-11e0-84e1-18a905bcc53f};" + toastSignature + ";cinterface(IInspectable))"),
-	pinterfaceGUID("pinterface({9de1c534-6ae1-11e0-84e1-18a905bcc53f};" + toastSignature + ";{35176862-cfd4-44f8-ad64-f500fd896c3b})"),
+	{0xAB54DE2D, 0x97D9, 0x5528, [8]byte{0xB6, 0xAD, 0x10, 0x5A, 0xFE, 0x15, 0x65, 0x30}},
+	{0x062A90FB, 0x319A, 0x5920, [8]byte{0x83, 0xAF, 0x01, 0xD5, 0xF4, 0x64, 0x76, 0x5C}},
 }
 
 // Each delegate has one object, made once and kept for the life of the process: the

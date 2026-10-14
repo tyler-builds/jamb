@@ -8,9 +8,6 @@ import (
 	"github.com/tyler-builds/jamb/ui"
 )
 
-// The namespace of the DNS names in RFC 4122.
-var namespaceDNS = [16]byte{0x6b, 0xa7, 0xb8, 0x10, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8}
-
 // formatUUID writes a UUID in the 8-4-4-4-12 form.
 func formatUUID(u [16]byte) string {
 	const hex = "0123456789abcdef"
@@ -25,24 +22,19 @@ func formatUUID(u [16]byte) string {
 	return b.String()
 }
 
-// TestUUIDV5 checks the name-based UUID against a known value: the version 5 UUID
-// of "python.org" in the DNS namespace, as the Python documentation gives it.
-func TestUUIDV5(t *testing.T) {
-	got := uuidV5(namespaceDNS, "python.org")
-	if s := formatUUID(got); s != "886313e1-3b8a-5372-9b90-0c9aee199e5d" {
-		t.Errorf("uuidV5 = %s; want 886313e1-3b8a-5372-9b90-0c9aee199e5d", s)
-	}
-}
-
-// TestTrayGUID checks that the identity of a tray icon is stable across runs, that
-// it is a version 5 UUID, and that it differs by app and by icon.
+// TestTrayGUID checks that the identity of a tray icon is stable across runs (Windows
+// keeps the user's choice to show an icon by it, so it must never change), that it is a
+// version 8 UUID of the RFC 9562 variant, and that it differs by app and by icon.
 func TestTrayGUID(t *testing.T) {
 	a := trayGUID("JambExamples.Notes", 1)
 	if b := trayGUID("JambExamples.Notes", 1); a != b {
 		t.Errorf("trayGUID changed between calls: %s and %s", formatUUID(a), formatUUID(b))
 	}
-	if a[6]>>4 != 5 || a[8]>>6 != 2 {
-		t.Errorf("trayGUID %s is not a version 5 UUID of the RFC 4122 variant", formatUUID(a))
+	if a[6]>>4 != 8 || a[8]>>6 != 2 {
+		t.Errorf("trayGUID %s is not a version 8 UUID of the RFC 9562 variant", formatUUID(a))
+	}
+	if got, want := formatUUID(a), "8545fe0d-06a4-82d8-b916-ab2dc4790a39"; got != want {
+		t.Errorf("trayGUID(JambExamples.Notes, 1) = %s, want %s: a changed identity loses the users' choices", got, want)
 	}
 	for name, other := range map[string][16]byte{
 		"another icon of the app": trayGUID("JambExamples.Notes", 2),

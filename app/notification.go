@@ -2,17 +2,17 @@ package app
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"image"
 	"image/png"
 	"io"
+	"math/rand/v2"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -316,13 +316,12 @@ func deliverActivation(raw string) {
 	s.handler(NotificationActivation{Action: d.Action, Tag: d.Tag, Args: d.Args})
 }
 
-// newNonce returns a random 16-character hexadecimal nonce.
+// newNonce returns a random 16-character hexadecimal nonce. It tells one click from
+// another, so that a click delivered twice is handled once; it is not a secret, so it
+// comes from math/rand/v2 and the package links no crypto package (whose import would
+// add the 32 MB buffer of Go's FIPS module to every app).
 func newNonce() (string, error) {
-	var b [8]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b[:]), nil
+	return fmt.Sprintf("%016x", rand.Uint64()), nil
 }
 
 // toastAction is a button of a toast: its label and the arguments a click gives back.
@@ -388,10 +387,13 @@ func xmlText(s string) string {
 }
 
 // notificationImagePath returns the file that holds a hero image with the PNG data
-// in dir: a file named by the SHA-256 digest of the data.
+// in dir: a file named by the 128-bit FNV-1a hash of the data. Two images that collide
+// would share a file, which only shows the wrong banner, so a non-cryptographic hash
+// serves.
 func notificationImagePath(dir string, data []byte) string {
-	sum := sha256.Sum256(data)
-	return filepath.Join(dir, hex.EncodeToString(sum[:])+".png")
+	h := fnv.New128a()
+	h.Write(data)
+	return filepath.Join(dir, hex.EncodeToString(h.Sum(nil))+".png")
 }
 
 // writeNotificationImage saves img as a PNG in dir, unless the same image is already

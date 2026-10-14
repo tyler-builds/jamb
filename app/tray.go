@@ -1,8 +1,8 @@
 package app
 
 import (
-	"crypto/sha1"
 	"fmt"
+	"hash/fnv"
 	"image"
 	"os"
 	"sync/atomic"
@@ -150,23 +150,19 @@ func (t *Tray) Remove() {
 // for jamb. It must not change, or the icons lose the user's choices.
 var trayGUIDNamespace = [16]byte{0x6f, 0x4a, 0x2c, 0x9e, 0x3b, 0x1d, 0x4e, 0x7a, 0x8c, 0x5f, 0x0b, 0x2d, 0x9a, 0x61, 0x7e, 0x34}
 
-// trayGUID returns the identity of tray icon id of the app with appID, in the
-// byte order of an RFC 4122 UUID: a name-based UUID of version 5 of the name
-// "jamb:tray:" + appID + ":" + id, in trayGUIDNamespace. The same app and the
-// same icon give the same GUID in every run.
+// trayGUID returns the identity of tray icon id of the app with appID, in the byte
+// order of an RFC 9562 UUID: the 128-bit FNV-1a hash of the namespace and the name
+// "jamb:tray:" + appID + ":" + id, marked as a version 8 (custom) UUID. The same app
+// and the same icon give the same GUID in every run. It is not a cryptographic hash,
+// which the identity does not need, so the package links no crypto package (whose
+// import would add the 32 MB buffer of Go's FIPS module to every app).
 func trayGUID(appID string, id uint32) [16]byte {
-	return uuidV5(trayGUIDNamespace, fmt.Sprintf("jamb:tray:%s:%d", appID, id))
-}
-
-// uuidV5 returns the name-based UUID of version 5 of name in the namespace ns, as
-// RFC 4122 section 4.3 defines it.
-func uuidV5(ns [16]byte, name string) [16]byte {
-	h := sha1.New()
-	h.Write(ns[:])
-	h.Write([]byte(name))
+	h := fnv.New128a()
+	h.Write(trayGUIDNamespace[:])
+	fmt.Fprintf(h, "jamb:tray:%s:%d", appID, id)
 	var u [16]byte
 	copy(u[:], h.Sum(nil))
-	u[6] = u[6]&0x0f | 0x50 // version 5
-	u[8] = u[8]&0x3f | 0x80 // the RFC 4122 variant
+	u[6] = u[6]&0x0f | 0x80 // version 8, custom
+	u[8] = u[8]&0x3f | 0x80 // the RFC 9562 variant
 	return u
 }
