@@ -24,3 +24,10 @@ third_party/gpui-component-themes/, with the license text in LICENSE-APACHE ther
 They are converted for jamb: their colors are mapped to jamb's tokens, and some are
 moved in lightness for contrast. Each theme credits the color scheme it is taken
 from, and that scheme's author; see third_party/gpui-component-themes/README.md.
+
+Third-party software: wazero
+
+The runtime that executes the code editor's grammar modules
+(github.com/tyler-builds/jamb-grammars, which carries the notices of the
+tree-sitter runtime and grammars) is github.com/tetratelabs/wazero v1.12.0,
+licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
