@@ -1,6 +1,7 @@
 package views
 
 import (
+	"image"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,6 +32,10 @@ func (f *fakeWindow) SetFullscreen(bool)                                    {}
 func (f *fakeWindow) Fullscreen() bool                                      { return false }
 func (f *fakeWindow) Focus()                                                {}
 func (f *fakeWindow) Closed() bool                                          { return false }
+func (f *fakeWindow) Show()                                                 {}
+func (f *fakeWindow) Hide()                                                 {}
+func (f *fakeWindow) SetTaskbarProgress(ui.TaskbarProgress)                 {}
+func (f *fakeWindow) SetTaskbarBadge(image.Image, string)                   {}
 func (f *fakeWindow) MessageBox(dialog.MessageOptions, func(dialog.Button)) {}
 
 func (f *fakeWindow) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {

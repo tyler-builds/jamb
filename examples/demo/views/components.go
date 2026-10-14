@@ -63,7 +63,8 @@ func Components(s *Store) ui.Element {
 				Child(clipSection(t)).
 				Child(motionSection(t)).
 				Child(focusSection(t)).
-				Child(feedbackSection(ctx, t, s)))
+				Child(feedbackSection(ctx, t, s)).
+				Child(shellSection(ctx, s)))
 	})
 }
 

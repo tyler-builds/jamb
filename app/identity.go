@@ -61,6 +61,7 @@ func (a *App) checkIdentity() error {
 // UI thread before the first window is created, because Windows reads the ID when
 // the window appears. A failure is printed, and the app runs without the feature.
 func (a *App) setIdentity() {
+	application.appID = a.appID
 	if a.appID != "" {
 		if err := setAppID(a.appID); err != nil {
 			fmt.Fprintln(os.Stderr, "jamb: AppID:", err)

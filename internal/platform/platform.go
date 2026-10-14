@@ -189,7 +189,39 @@ type Window interface {
 	// ShowMessageBox opens a message box owned by this window, and calls done
 	// on the UI thread with the button chosen when it closes.
 	ShowMessageBox(o dialog.MessageOptions, done func(dialog.Button))
+
+	// Hide hides the window and its taskbar button, and Restore shows it again
+	// and brings it to the front.
+	Hide()
+	Restore()
+	// Visible reports whether the window is on screen: not hidden, and not
+	// minimized. A window that is not visible draws nothing and schedules no
+	// timed wake-ups (see Handler.OnFrame and WakeAt).
+	Visible() bool
+	// SetTaskbarProgress sets the progress bar of the window's taskbar button.
+	// value is from 0 to 1; TaskbarIndeterminate ignores it.
+	SetTaskbarProgress(state TaskbarState, value float32)
+	// SetTaskbarOverlay sets the badge drawn over the taskbar button's icon, or
+	// removes it when img is nil. description is what assistive technology reads.
+	// It returns an error when the icon cannot be made.
+	SetTaskbarOverlay(img image.Image, description string) error
 }
+
+// TaskbarState is the state of a taskbar button's progress bar.
+type TaskbarState uint8
+
+const (
+	// TaskbarNone shows no progress bar.
+	TaskbarNone TaskbarState = iota
+	// TaskbarNormal shows progress up to the value.
+	TaskbarNormal
+	// TaskbarIndeterminate shows that work is going on, without a value.
+	TaskbarIndeterminate
+	// TaskbarPaused shows progress up to the value, in the paused color.
+	TaskbarPaused
+	// TaskbarError shows progress up to the value, in the error color.
+	TaskbarError
+)
 
 // Handler receives everything the adapter produces. All methods are called on
 // the adapter's UI thread.

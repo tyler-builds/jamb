@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tyler-builds/jamb/app"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -62,6 +63,11 @@ type Store struct {
 	Deploys  *ui.Signal[int]
 	Notify   *ui.Signal[bool]
 	Compact  *ui.Signal[bool]
+	// TrayIcon shows the notification area icon, and Badge the taskbar badge; see
+	// shell.go. tray is the icon, made when TrayIcon is first set.
+	TrayIcon *ui.Signal[bool]
+	Badge    *ui.Signal[bool]
+	tray     *app.Tray
 	// DropMark is where a dragged project would land: the card it is over and
 	// whether after it. The zero value shows no insertion line.
 	DropMark *ui.Signal[dropMark]
@@ -139,6 +145,8 @@ func NewStore() *Store {
 		Deploys:      ui.NewSignal(12),
 		Notify:       ui.NewSignal(true),
 		Compact:      ui.NewSignal(false),
+		TrayIcon:     ui.NewSignal(false),
+		Badge:        ui.NewSignal(false),
 		DropMark:     ui.NewSignal(dropMark{}),
 		EventQuery:   ui.NewSignal(""),
 		Expanded:     ui.NewSignal(map[int]bool{}),

@@ -30,6 +30,9 @@ func (w *window) SetClipboard(text string) {
 // WakeAt implements platform.Window with a single Win32 timer that always
 // targets the earliest requested time.
 func (w *window) WakeAt(t time.Time) {
+	if !wakeTimerWanted(w.Visible()) {
+		return
+	}
 	if !w.wakeAt.IsZero() && !t.Before(w.wakeAt) {
 		return
 	}
@@ -38,8 +41,19 @@ func (w *window) WakeAt(t time.Time) {
 	win32.SetTimer(w.hwnd, wakeTimerID, uint32(max(ms, 1)))
 }
 
+// wakeTimerWanted reports whether a timed wake-up is scheduled, which is only for
+// a window that is shown. A hidden or minimized window draws nothing, so its
+// blinks and tips wait: when it is shown, it draws a frame from the current state,
+// and the wake-ups its content still needs are requested again then.
+func wakeTimerWanted(shown bool) bool { return shown }
+
 // onTimer runs on WM_TIMER.
 func (w *window) onTimer() {
+	if !wakeTimerWanted(w.Visible()) {
+		win32.KillTimer(w.hwnd, wakeTimerID)
+		w.wakeAt = time.Time{}
+		return
+	}
 	if w.wakeAt.IsZero() {
 		win32.KillTimer(w.hwnd, wakeTimerID)
 		return

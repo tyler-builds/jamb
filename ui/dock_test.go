@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"math"
 	"testing"
 
@@ -252,10 +253,14 @@ type dockTestWindow struct {
 	x, y, w, h int
 }
 
-func (f *dockTestWindow) Close()               { f.closed++ }
-func (f *dockTestWindow) Closed() bool         { return f.closed > 0 }
-func (f *dockTestWindow) Position() (int, int) { return f.x, f.y }
-func (f *dockTestWindow) Size() (int, int)     { return f.w, f.h }
+func (f *dockTestWindow) Close()                              { f.closed++ }
+func (f *dockTestWindow) Closed() bool                        { return f.closed > 0 }
+func (f *dockTestWindow) Show()                               {}
+func (f *dockTestWindow) Hide()                               {}
+func (f *dockTestWindow) SetTaskbarProgress(TaskbarProgress)  {}
+func (f *dockTestWindow) SetTaskbarBadge(image.Image, string) {}
+func (f *dockTestWindow) Position() (int, int)                { return f.x, f.y }
+func (f *dockTestWindow) Size() (int, int)                    { return f.w, f.h }
 
 // TestDockFloatingGroupOpensAndClosesItsWindow checks that the dock asks its opener for a
 // window for each floating group, closes it when the group docks back, and that a window

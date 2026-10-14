@@ -1,6 +1,7 @@
 package views
 
 import (
+	"image"
 	"strings"
 	"testing"
 	"time"
@@ -103,5 +104,9 @@ type openWindow struct {
 	focused bool
 }
 
-func (w *openWindow) Closed() bool { return false }
-func (w *openWindow) Focus()       { w.focused = true }
+func (w *openWindow) Closed() bool                          { return false }
+func (w *openWindow) Show()                                 {}
+func (w *openWindow) Hide()                                 {}
+func (w *openWindow) SetTaskbarProgress(ui.TaskbarProgress) {}
+func (w *openWindow) SetTaskbarBadge(image.Image, string)   {}
+func (w *openWindow) Focus()                                { w.focused = true }

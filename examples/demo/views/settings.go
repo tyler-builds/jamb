@@ -13,6 +13,7 @@ import (
 func Settings(s *Store) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
+		win := ctx.Window()
 		// The theme and the zoom can also change from the menus and the keys, so the
 		// local signals of the switch and the slider are brought up to date here.
 		dark := ui.Local(ctx, "dark", t.Dark)
@@ -67,6 +68,11 @@ func Settings(s *Store) ui.Element {
 							Child(SectionTitle(t, "Notifications")).
 							Child(SettingRow(t, "Desktop notifications", "Show a notification when a build finishes.",
 								ui.Switch("Desktop notifications", s.Notify))).
+							Child(ui.Divider()).
+							Child(SettingRow(t, "Notification area icon", "Show an icon in the notification area, with a menu that shows the window or quits.",
+								ui.Switch("Notification area icon", s.TrayIcon).OnChange(func(on bool) {
+									s.setTrayIcon(win, on)
+								}))).
 							Child(ui.Divider()).
 							Child(SettingRow(t, "Danger zone", "Remove every project from this workspace.",
 								ui.Button("Delete all").Danger().Small().Icon(icons.Trash).OnClick(func() {

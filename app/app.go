@@ -113,6 +113,14 @@ type Window struct {
 	// too, each without being asked again. By default the app quits when the last
 	// window closes.
 	QuitWhenClosed bool
+	// CloseToTray hides the window when the user closes it, instead of closing it,
+	// and the app keeps running. The window's taskbar button goes with it. Show
+	// (ui.Window's Show) brings the window back, which a tray icon's OnClick does
+	// for a window the user hid. OnClose is not asked while the window hides, and
+	// the window handle's Close still closes the window, asking OnClose as usual.
+	// Without a tray icon that can show the window, the user has no way to show it
+	// again, so keep one.
+	CloseToTray bool
 }
 
 // Chrome selects who draws a window's title bar.
@@ -273,6 +281,7 @@ var application struct {
 	opened    int          // windows opened so far
 	script    *script      // JAMB_SCRIPT, which drives the windows
 	quitting  bool         // a QuitWhenClosed window is closing all windows
+	appID     string       // the AppID, which names the tray icons' identity (see Tray)
 	gpu       gpuRecovery  // the shared GPU device, while it is lost; see recovery.go
 	devTools  bool         // the visual inspector may open (see App.DevTools and inspect.go)
 }
@@ -401,6 +410,9 @@ type host struct {
 	devTools  bool
 	insp      *inspector
 	inspected *host
+	// closeAsked is set by the window handle's Close, so a CloseToTray window
+	// closes rather than hides; OnClose clears it.
+	closeAsked bool
 
 	win platform.Window
 	rt  *ui.Runtime
@@ -636,8 +648,16 @@ func (h *host) OnClose(w platform.Window) bool {
 	if h.rh != nil {
 		h.rh.FlushTimers()
 	}
+	asked := h.closeAsked
+	h.closeAsked = false
 	if application.quitting {
 		return true
+	}
+	// A CloseToTray window hides for a close the user asks for; the app's own
+	// Close, and the quit of the app, still close it.
+	if h.cfg.CloseToTray && !asked {
+		w.Hide()
+		return false
 	}
 	if h.cfg.QuitWhenClosed {
 		for _, o := range application.windows {
@@ -695,8 +715,10 @@ func (h *host) TitleArea(w platform.Window, x, y float32) platform.TitleArea {
 // OnFrame implements platform.Handler.
 func (h *host) OnFrame(w platform.Window) bool {
 	width, height := w.Size()
-	if width <= 0 || height <= 0 {
-		return false // minimized
+	if !drawWanted(w.Visible(), width, height) {
+		// Hidden or minimized: nothing is drawn, and no animation runs. Showing the
+		// window wakes it, and its first frame then reads the current state.
+		return false
 	}
 	h.updateViewport(w)
 	// The native title bar follows the theme: the app may switch it, or the

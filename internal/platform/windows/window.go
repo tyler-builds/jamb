@@ -71,6 +71,10 @@ type window struct {
 	// dm is the window's DirectManipulation state, nil when the system has none
 	// (see directmanip.go).
 	dm *directManipulation
+	// taskbar is the state shown on the window's taskbar button, and taskbarBtn
+	// the button while the taskbar has made one (see taskbar.go).
+	taskbar    taskbarState
+	taskbarBtn *comTaskbarButton
 }
 
 // The state of the UI thread, shared by all windows of the process.
@@ -117,6 +121,10 @@ func Run(start func() error) error {
 	var msg win32.MSG
 	win32.PeekMessage(&msg)
 	uiThread.Store(win32.GetCurrentThreadID())
+	// The notification area icons and the taskbar buttons are removed and released
+	// when the loop ends, on this thread, which made them.
+	defer shutdownTray()
+	taskbarButtonMsg = win32.RegisterWindowMessage("TaskbarButtonCreated")
 
 	if err := start(); err != nil {
 		return err
@@ -360,6 +368,33 @@ func (w *window) ClientOrigin() platform.Point {
 func (w *window) Show()  { win32.ShowWindow(w.hwnd, win32.SW_SHOW) }
 func (w *window) Close() { win32.PostMessage(w.hwnd, win32.WM_CLOSE, 0, 0) }
 
+// Hide implements platform.Window. The window's taskbar button goes with it, and
+// a timed wake-up that is still pending is dropped, as a hidden window draws
+// nothing (see Visible).
+func (w *window) Hide() {
+	w.frameWanted = false
+	win32.KillTimer(w.hwnd, wakeTimerID)
+	w.wakeAt = time.Time{}
+	win32.ShowWindow(w.hwnd, win32.SW_HIDE)
+}
+
+// Visible implements platform.Window.
+func (w *window) Visible() bool {
+	return shownState(win32.IsWindowVisible(w.hwnd), win32.IsIconic(w.hwnd))
+}
+
+// shownState reports whether a window is on screen, from its WS_VISIBLE style and
+// whether it is minimized: a minimized window keeps the style, but shows nothing.
+func shownState(visible, minimized bool) bool { return visible && !minimized }
+
+// Restore implements platform.Window: it shows the window and brings it to the
+// front, restoring it first when it is minimized.
+func (w *window) Restore() {
+	win32.ShowWindow(w.hwnd, win32.SW_SHOW)
+	w.Focus()
+	w.Wake()
+}
+
 // Minimize implements platform.Window.
 func (w *window) Minimize() { win32.ShowWindow(w.hwnd, win32.SW_MINIMIZE) }
 
@@ -536,6 +571,10 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	}
 	if w == nil {
 		return win32.DefWindowProc(hwnd, msg, wp, lp)
+	}
+	if msg != 0 && msg == taskbarButtonMsg {
+		w.taskbarButtonCreated()
+		return 0
 	}
 	switch msg {
 	case msgWake:
@@ -849,6 +888,7 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		delete(windows, hwnd)
 		w.dm.destroy()
 		w.dm = nil
+		w.destroyTaskbar()
 		w.endAccess()
 		if w.ready {
 			w.ready = false

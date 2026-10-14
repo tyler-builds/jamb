@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
@@ -106,6 +107,19 @@ type Window interface {
 	// PickFolder shows the system's folder dialog, owned by this window. done
 	// runs as for OpenFiles.
 	PickFolder(o dialog.FileOptions, done func(dialog.FileResult))
+	// Show shows a window that is hidden or minimized, and brings it to the front.
+	// Hide hides the window and its taskbar button, and the app keeps running; a
+	// hidden window draws nothing until Show. These are Windows operations, and
+	// see also app.Window.CloseToTray.
+	Show()
+	Hide()
+	// SetTaskbarProgress sets the progress bar of the window's taskbar button.
+	SetTaskbarProgress(p TaskbarProgress)
+	// SetTaskbarBadge sets the badge drawn over the taskbar button's icon, or
+	// removes it when img is nil. The badge is drawn at the small icon size. Its
+	// description is what assistive technology reads, such as "3 unread", and it
+	// is required with an image: without one, the badge is not set.
+	SetTaskbarBadge(img image.Image, description string)
 	// MessageBox shows a message box, owned by this window, and runs done with
 	// the button chosen.
 	MessageBox(o dialog.MessageOptions, done func(dialog.Button))
@@ -146,6 +160,33 @@ func (w windowRef) Maximized() bool { return w.rt.maximized.Get() }
 func (w windowRef) Focus() {
 	if c := w.rt.windowCtl; c != nil {
 		c.Focus()
+	}
+}
+
+// The visibility and taskbar calls go to the app's controls. A headless runtime
+// has no window, so they do nothing.
+
+func (w windowRef) Show() {
+	if c := w.rt.windowCtl; c != nil {
+		c.Show()
+	}
+}
+
+func (w windowRef) Hide() {
+	if c := w.rt.windowCtl; c != nil {
+		c.Hide()
+	}
+}
+
+func (w windowRef) SetTaskbarProgress(p TaskbarProgress) {
+	if c := w.rt.windowCtl; c != nil {
+		c.SetTaskbarProgress(p)
+	}
+}
+
+func (w windowRef) SetTaskbarBadge(img image.Image, description string) {
+	if c := w.rt.windowCtl; c != nil {
+		c.SetTaskbarBadge(img, description)
 	}
 }
 

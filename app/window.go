@@ -74,10 +74,16 @@ func read[T any](w *appWindow, zero T, fn func(h *host) T) T {
 
 func (w *appWindow) Minimize()             { w.do(func(h *host) { h.win.Minimize() }) }
 func (w *appWindow) ToggleMaximize()       { w.do(func(h *host) { h.win.ToggleMaximize() }) }
-func (w *appWindow) Close()                { w.do(func(h *host) { h.win.Close() }) }
 func (w *appWindow) Focus()                { w.do(func(h *host) { h.win.Focus() }) }
 func (w *appWindow) SetTitle(title string) { w.do(func(h *host) { h.win.SetTitle(title) }) }
 func (w *appWindow) Closed() bool          { return w.closed.Load() }
+
+// Close closes the window even when it is a CloseToTray window; see host.OnClose.
+func (w *appWindow) Close() { w.do(func(h *host) { h.closeAsked = true; h.win.Close() }) }
+
+// Show and Hide implement ui.Window.
+func (w *appWindow) Show() { w.do(func(h *host) { h.win.Restore() }) }
+func (w *appWindow) Hide() { w.do(func(h *host) { h.win.Hide() }) }
 
 func (w *appWindow) Maximized() bool {
 	return read(w, false, func(h *host) bool { return h.win.Maximized() })

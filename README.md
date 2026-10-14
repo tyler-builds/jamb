@@ -2454,6 +2454,163 @@ crashed app does not block later launches.
 Windows may show only the first few tasks of a jump list, and it keeps the Recent
 category's list itself.
 
+### Notification area, taskbar progress and badges
+
+Windows only. The tray icon and the taskbar calls are Windows features, and the
+framework has no window adapter for other platforms yet.
+
+#### The notification area icon
+
+A tray icon is made with `app.NewTray` and added with `Show`. Its methods are safe
+from any goroutine: they run on the UI thread in call order, so a call made before
+`Run` waits for the app to start. The icon needs no window; the first `Show` makes
+a hidden window that receives the icon's messages.
+
+```go
+var win ui.Window // the window, from app.Open or ctx.Window()
+
+show := win.Show
+tray := app.NewTray(app.TrayOptions{
+    Icon:          notesIcon, // an image.Image, such as a PNG the app embeds; nil is the executable's icon
+    Tooltip:       "Notes",
+    OnClick:       show,
+    OnDoubleClick: show,
+    Menu: func() []app.TrayItem {
+        return []app.TrayItem{
+            {Label: "Show window", OnClick: show},
+            {Label: "Autosave", Checked: autosave.Get(), OnClick: toggleAutosave},
+            app.TraySeparator(),
+            {Label: "Quit", OnClick: func() { win.Close() }},
+        }
+    },
+})
+tray.Show()
+
+tray.SetTooltip("2 notes unsaved")
+tray.SetIcon(otherImage) // nil returns to the executable's icon
+tray.Remove()            // Show adds the icon again
+```
+
+- **Icon.** The image is drawn at the small icon size of the DPI of the tray
+  window, and drawn again when the DPI changes. Nil uses the executable's own icon,
+  which `jamb package` embeds as resource 1, or the standard application icon when
+  the executable has none.
+- **Menu.** A native popup menu, so it follows the system theme and assistive
+  technology reads it as any system menu. `Menu` runs on the UI thread each time the
+  menu opens, so checked items show the current state. A label is literal text: `&`
+  is not an access key. `Disabled` shows an item that cannot be chosen, `Checked`
+  shows a check mark, and an item with a `Submenu` opens it instead of running
+  `OnClick`.
+- **Mouse and keyboard.** A click runs `OnClick`. A double click runs `OnClick` for
+  its first click, as Windows reports both clicks, and then `OnDoubleClick`. An app
+  that wants different actions for the two should make `OnClick` idempotent, or rely
+  on `OnDoubleClick` alone and leave `OnClick` nil. A right click, the context menu
+  key and Shift+F10 open the menu. Enter and Space, on the focused icon, run
+  `OnClick`.
+- **Identity.** With `AppID`, Windows is given a GUID, derived with UUID version 5
+  from a fixed jamb namespace, the `AppID` and the icon's place in the order of
+  `NewTray` calls. Windows keeps the user's choice to show or hide the icon by that
+  GUID, so the choice survives restarts. Keep the order of `NewTray` calls the same
+  from run to run. Windows also ties the GUID to the executable's path: an executable
+  that moved is added by its ID instead, and the user's choice does not carry over.
+  Without `AppID`, the icon is identified by its ID alone.
+- **Explorer restarts.** The icons are added again when the taskbar is made anew,
+  and the taskbar state of each window is set again with it.
+- **Exit.** The icons are removed when `Run` returns, including when a
+  `QuitWhenClosed` window closes the app. A process that ends without `Run`
+  returning, such as through `os.Exit`, leaves its icons to Windows, which may keep
+  one until the pointer passes over it.
+- **Limits.** Each icon has an ID of at most 65535. The tooltip shows at most 127
+  UTF-16 units. The icon shows no balloon notifications.
+
+#### Hide to the tray
+
+`Window.CloseToTray` hides the window when the user closes it, and the app keeps
+running with its tray icon. The window's taskbar button goes with it. OnClose is not
+asked for that close. The window handle's `Close` still closes the window and asks
+`OnClose`, so a tray menu's Quit item closes the windows with `win.Close()`.
+
+```go
+app.New().Run(app.Window{
+    Title:       "Notes",
+    CloseToTray: true,
+    OnClose:     func() bool { return confirmUnsaved() },
+    Root:        root,
+})
+```
+
+`Show` restores a hidden or minimized window and brings it to the front, which is
+what a tray click does. `Hide` hides the window and its taskbar button. Both are
+methods of `ui.Window`, so `ctx.Window().Show()` and `ctx.Window().Hide()` work from
+any handle. Windows may refuse to bring a window to the front from the background. A
+click on the tray icon normally allows it; check that on Windows (see below). Keep a
+tray icon while a window can be hidden: without one, the user has no way to show the
+window again.
+
+A hidden or minimized window draws nothing, and its animations stop: an indeterminate
+progress bar in a hidden window costs no CPU. Showing the window draws one frame from
+its current state, and the animations resume.
+
+#### Taskbar progress and badges
+
+`ui.Window` has the taskbar operations, so the handle from `ctx.Window()` or
+`app.Open` calls them directly. They are Windows operations.
+
+```go
+win := ctx.Window()
+win.SetTaskbarProgress(ui.TaskbarProgress{State: ui.TaskbarNormal, Value: 0.4})
+win.SetTaskbarBadge(badgeImage, "Attention needed")
+win.SetTaskbarBadge(nil, "") // removes the badge
+```
+
+- **States.** `ui.TaskbarNone` shows no bar, and it is the state of a new window.
+  `ui.TaskbarNormal` shows progress up to `Value`. `ui.TaskbarIndeterminate` shows that
+  work is going on, without a value. `ui.TaskbarPaused` and `ui.TaskbarError` show
+  progress up to `Value`, in the paused and error colors. `Value` is clamped to 0
+  through 1, and NaN is 0.
+- **Badge.** The badge is drawn over the taskbar button's icon at the small icon
+  size, so keep the image simple. A badge needs a description, which assistive
+  technology reads, such as "3 unread". Without one, the badge is not set and a
+  message is printed to stderr. Passing nil removes the badge.
+- **Timing.** A call made before the taskbar button exists is kept, and applied when
+  the button is made. The taskbar makes the button again when the window is shown
+  again or when Explorer restarts, and the window's state is applied each time. A
+  hidden window has no taskbar button, so it shows nothing.
+
+#### Limits and scope
+
+- The taskbar progress and badge show on the window's taskbar button only. The tray
+  icon has no progress bar or badge of its own.
+
+#### Checks by hand
+
+The headless tests cover the menu model, the GUID derivation, the progress and
+badge logic, the taskbar call order and the icon sizes. They do not create an icon,
+a menu or a taskbar button. These need a person at a Windows desktop:
+
+- A left click, a double click, and a right click on the icon, each with the mouse.
+- The keyboard: move focus to the icon in the notification area, then Enter or
+  Space, the context menu key, and Shift+F10. Each of the menu's items, checked and
+  disabled, with the keyboard.
+- The menu follows the light and dark system themes.
+- Explorer restart (for example, end and restart `explorer.exe`): the icon comes back,
+  and the taskbar progress and badge are shown again.
+- A DPI change: move the window to a monitor with another scale, and change the
+  scale in the display settings. The icon stays sharp at the taskbar's size.
+- Hide to tray and restore: close the window with its close button, restore it from
+  the tray with a click and from the menu, and check that it comes to the front when
+  the app is not in the foreground.
+- Taskbar progress in each state (normal, indeterminate, paused, error, none), and the
+  badge, set and removed, while the window has its taskbar button.
+- The icon is gone after the app quits, through `QuitWhenClosed` and through the
+  tray's Quit item.
+- Idle CPU with a window hidden by `CloseToTray` or `Hide` while an indeterminate
+  progress bar or a progress ring runs: the process's CPU time over 60 seconds should
+  be near zero, as it is for a minimized window (see BENCHMARKS.md, "Idle work"). Then
+  show the window: it draws at once, and the animation resumes.
+- Caret blinking and tooltips after a window is shown again: the caret resumes its
+  blink, and a tooltip still appears on hover.
+
 ### Custom title bars
 
 `app.Window{Chrome: app.ChromeCustom}` removes the operating system's title
