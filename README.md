@@ -1729,7 +1729,10 @@ rather than panicking.
 **Text fields.** A `TextInput` has the context `Editor mode=single_line`, and a
 `TextArea` has `Editor mode=full`. Their keys are actions, bound by
 `ui.DefaultBindings()`, which `ui.NewRuntime` adds first, so a binding of the
-app's at the same depth wins. The actions are in the `actions` package:
+app's at the same depth wins. A package that defines a widget outside `ui` adds
+its keys to those defaults with `ui.RegisterDefaultBindings` in its `init`, as
+`codeedit` does, so they work without the app binding them. The actions are in
+the `actions` package:
 `actions.MoveLeft`, `MoveRight`,
 `MoveWordLeft`, `MoveWordRight`, `SelectLeft`, `SelectRight`, `SelectWordLeft`,
 `SelectWordRight`, `MoveUp`, `MoveDown`, `SelectUp`, `SelectDown`, `PageUp`,
@@ -2931,8 +2934,8 @@ it does not reset the driver.
 
 The `codeedit` package is a code editor for source files, with undo and redo, several selections,
 find and replace, folding by indentation, and tree-sitter highlighting. It is built with
-`codeedit.New(codeedit.NewDocument(text))`, and its keys are actions that an app binds with
-`rt.AddBindings(codeedit.Bindings()...)`. See [docs/codeedit.md](docs/codeedit.md) for the keys,
+`codeedit.New(codeedit.NewDocument(text))`. Its keys are actions with default bindings, so they
+work without setup, and an app can rebind them. See [docs/codeedit.md](docs/codeedit.md) for the keys,
 the document, highlighting, the limits and the measured performance.
 
 The grammars for highlighting are in their own module,

@@ -11,7 +11,6 @@ import (
 // their punctuation bindings, as the labels that KeysFor shows for them.
 func TestPunctuationBindingsAreInTheBindings(t *testing.T) {
 	rt := ui.NewRuntime(func(*ui.Context) ui.Element { return ui.Div() }, ui.DarkTheme(), nil)
-	rt.AddBindings(Bindings()...)
 	for _, tc := range []struct {
 		a    *ui.Action
 		want string

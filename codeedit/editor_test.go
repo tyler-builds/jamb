@@ -34,7 +34,6 @@ func newHarness(t testing.TB, text string, opts ...func(*Editor) *Editor) *harne
 	rt := ui.NewRuntime(root, ui.DarkTheme(), nil)
 	rt.SetViewport(800, 600, 1)
 	rt.SetSystemSettings(ui.SystemSettings{ReducedMotion: true})
-	rt.AddBindings(Bindings()...)
 	h := &harness{t: t, rt: rt, ed: ed, doc: doc, now: time.Unix(1_000_000, 0)}
 	h.frame()
 	r, ok := rt.Find("wrap")

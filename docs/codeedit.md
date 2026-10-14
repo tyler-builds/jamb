@@ -17,10 +17,13 @@ ui.Div().Child(codeedit.New(doc).
     Height(ui.Px(400)))
 ```
 
-Add the editor's keys to the runtime once, with the other bindings:
+The editor's keys work without any setup: the package registers them as default bindings of
+every window (`ui.RegisterDefaultBindings`). An app's own bindings win over them, so it can bind
+a command to another key, or turn a key off:
 
 ```go
-rt.AddBindings(codeedit.Bindings()...)
+rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+k", codeedit.CmdFind))
+rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+d", ui.Unbind(codeedit.CmdAddNextOccurrence)))
 ```
 
 `New` returns an element. Its options chain: `Key`, `Label`, `LineNumbers`, `ReadOnly`,

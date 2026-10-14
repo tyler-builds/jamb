@@ -8,10 +8,12 @@ import (
 
 // The commands of the editor are actions, so that key bindings and menus can run them, and
 // an app can bind them to other keys or turn them off. Bindings maps the usual keys to them,
-// in the "CodeEditor" key context that the editor sets. Movement and typing commands are
-// hidden from a command palette, as the ui's text field actions are; the others are listed.
+// in the "CodeEditor" key context that the editor sets, and the package registers them as
+// default bindings (ui.RegisterDefaultBindings), so the keys work in every window without the
+// app binding them. Movement and typing commands are hidden from a command palette, as the
+// ui's text field actions are; the others are listed. An app binds other keys, or turns one
+// off, with its own bindings, which win over the defaults:
 //
-//	rt.AddBindings(codeedit.Bindings()...)
 //	rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+k", codeedit.CmdFind))
 //	rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+z", ui.Unbind(codeedit.CmdUndo)))
 var (
@@ -154,10 +156,14 @@ func buildActions() []editorAction {
 	return out
 }
 
+// The editor's keys are default bindings of every runtime.
+func init() { ui.RegisterDefaultBindings(Bindings()...) }
+
 // Bindings returns the key bindings of the editor's commands, in the "CodeEditor" context
-// that the editor's canvas sets. An app adds them with rt.AddBindings. The punctuation keys
-// name the key position as the US layout prints it (see ui.Bind), so ctrl+shift+[ is the
-// key that is [ on the US layout.
+// that the editor's canvas sets. They are registered as default bindings, so an app need not
+// add them; it can list them, as a keyboard help does. The punctuation keys name the key
+// position as the US layout prints it (see ui.Bind), so ctrl+shift+[ is the key that is [ on
+// the US layout.
 func Bindings() []ui.Binding {
 	b := func(keys string, a *ui.Action) ui.Binding { return ui.BindIn("CodeEditor", keys, a) }
 	return []ui.Binding{

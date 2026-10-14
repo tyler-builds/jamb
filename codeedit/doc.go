@@ -8,8 +8,8 @@
 //	doc := codeedit.NewDocument(source)
 //	ui.Div().Child(codeedit.New(doc).Label("main.go").Language(golang.Grammar))
 //
-// The keys are actions (see Bindings and the Cmd actions), which an app binds with
-// rt.AddBindings(codeedit.Bindings()...). Several editors may show one Document: the
+// The keys are actions (see Bindings and the Cmd actions) with default bindings, so they
+// work without setup, and an app can bind them to other keys. Several editors may show one Document: the
 // selections and the folds belong to the Document, and the scrolling to each editor.
 //
 // Highlighting uses tree-sitter. The highlight package holds the Session, which parses in a

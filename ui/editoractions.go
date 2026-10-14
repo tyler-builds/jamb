@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"slices"
+	"sync"
+
 	"github.com/tyler-builds/jamb/input"
 )
 
@@ -115,11 +118,38 @@ func EditorActions() []*Action {
 	return out
 }
 
+// registeredBindings are the default bindings that packages outside ui add with
+// RegisterDefaultBindings, in the order they were registered.
+var (
+	registeredMu       sync.Mutex
+	registeredBindings []Binding
+)
+
+// RegisterDefaultBindings adds bs to the bindings that every runtime starts with
+// (see DefaultBindings). It is for packages that define widgets outside ui, such
+// as codeedit, so that their keys work without the app binding them: call it from
+// the package's init. An app's own bindings still win at the same depth, so the
+// app can bind other keys or turn a key off with Unbind.
+func RegisterDefaultBindings(bs ...Binding) {
+	registeredMu.Lock()
+	defer registeredMu.Unlock()
+	registeredBindings = append(registeredBindings, bs...)
+}
+
 // DefaultBindings are the key bindings every runtime starts with: the keys of
-// text fields. NewRuntime adds them first, so an app's binding at the same
-// depth wins. In a palette, for example, BindIn("Palette > Editor", "up", ...)
-// beats the field's own Up.
+// text fields, then the bindings registered with RegisterDefaultBindings.
+// NewRuntime adds them first, so an app's binding at the same depth wins. In a
+// palette, for example, BindIn("Palette > Editor", "up", ...) beats the field's
+// own Up.
 func DefaultBindings() []Binding {
+	registeredMu.Lock()
+	extra := slices.Clone(registeredBindings)
+	registeredMu.Unlock()
+	return append(builtinBindings(), extra...)
+}
+
+// builtinBindings are the default bindings of the ui package's own widgets.
+func builtinBindings() []Binding {
 	return append([]Binding{
 		BindIn("Editor", "left", moveLeft),
 		BindIn("Editor", "right", moveRight),
