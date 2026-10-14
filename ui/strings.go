@@ -84,6 +84,9 @@ type Strings struct {
 
 	// Remove names the button that removes a tag, such as "Remove Sales".
 	Remove func(tag string) string
+	// ResizeBetween names the divider between two panes that have labels, such as "Resize Sidebar and
+	// Editor" (see Split.Label).
+	ResizeBetween func(first, second string) string
 	// Page is the name of a page button, such as "Page 3". CurrentPage names the page
 	// that is shown, and PageOf is the text of a compact pagination, such as "Page 3 of 9".
 	Page        func(n int) string
@@ -214,10 +217,11 @@ func englishStrings() *Strings {
 		DockPanelBack:   "Dock back",
 		ClosePanel:      "Close panel",
 
-		Remove:      func(tag string) string { return "Remove " + tag },
-		Page:        func(n int) string { return fmt.Sprintf("Page %d", n) },
-		CurrentPage: func(n int) string { return fmt.Sprintf("Page %d, current page", n) },
-		PageOf:      func(page, pages int) string { return fmt.Sprintf("Page %d of %d", page, pages) },
+		Remove:        func(tag string) string { return "Remove " + tag },
+		ResizeBetween: func(first, second string) string { return "Resize " + first + " and " + second },
+		Page:          func(n int) string { return fmt.Sprintf("Page %d", n) },
+		CurrentPage:   func(n int) string { return fmt.Sprintf("Page %d, current page", n) },
+		PageOf:        func(page, pages int) string { return fmt.Sprintf("Page %d of %d", page, pages) },
 
 		Today:        "Today",
 		StartOfRange: "Start of range",

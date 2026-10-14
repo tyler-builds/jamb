@@ -65,10 +65,11 @@ func chineseMainlandStrings() *Strings {
 		DockPanelBack:   "重新停靠",
 		ClosePanel:      "关闭面板",
 
-		Remove:      func(tag string) string { return "移除 " + tag },
-		Page:        func(n int) string { return fmt.Sprintf("第 %d 页", n) },
-		CurrentPage: func(n int) string { return fmt.Sprintf("第 %d 页，当前页", n) },
-		PageOf:      func(page, pages int) string { return fmt.Sprintf("第 %d 页，共 %d 页", page, pages) },
+		Remove:        func(tag string) string { return "移除 " + tag },
+		ResizeBetween: func(first, second string) string { return "调整 " + first + " 和 " + second + " 的大小" },
+		Page:          func(n int) string { return fmt.Sprintf("第 %d 页", n) },
+		CurrentPage:   func(n int) string { return fmt.Sprintf("第 %d 页，当前页", n) },
+		PageOf:        func(page, pages int) string { return fmt.Sprintf("第 %d 页，共 %d 页", page, pages) },
 
 		Today:        "今天",
 		StartOfRange: "范围开始",
@@ -155,10 +156,11 @@ func chineseTaiwanStrings() *Strings {
 		DockPanelBack:   "重新停駐",
 		ClosePanel:      "關閉面板",
 
-		Remove:      func(tag string) string { return "移除 " + tag },
-		Page:        func(n int) string { return fmt.Sprintf("第 %d 頁", n) },
-		CurrentPage: func(n int) string { return fmt.Sprintf("第 %d 頁，目前頁", n) },
-		PageOf:      func(page, pages int) string { return fmt.Sprintf("第 %d 頁，共 %d 頁", page, pages) },
+		Remove:        func(tag string) string { return "移除 " + tag },
+		ResizeBetween: func(first, second string) string { return "調整 " + first + " 和 " + second + " 的大小" },
+		Page:          func(n int) string { return fmt.Sprintf("第 %d 頁", n) },
+		CurrentPage:   func(n int) string { return fmt.Sprintf("第 %d 頁，目前頁", n) },
+		PageOf:        func(page, pages int) string { return fmt.Sprintf("第 %d 頁，共 %d 頁", page, pages) },
 
 		Today:        "今天",
 		StartOfRange: "範圍開始",
@@ -245,10 +247,11 @@ func chineseHongKongStrings() *Strings {
 		DockPanelBack:   "重新停駐",
 		ClosePanel:      "關閉面板",
 
-		Remove:      func(tag string) string { return "移除 " + tag },
-		Page:        func(n int) string { return fmt.Sprintf("第 %d 頁", n) },
-		CurrentPage: func(n int) string { return fmt.Sprintf("第 %d 頁，現時頁", n) },
-		PageOf:      func(page, pages int) string { return fmt.Sprintf("第 %d 頁，共 %d 頁", page, pages) },
+		Remove:        func(tag string) string { return "移除 " + tag },
+		ResizeBetween: func(first, second string) string { return "調整 " + first + " 和 " + second + " 的大小" },
+		Page:          func(n int) string { return fmt.Sprintf("第 %d 頁", n) },
+		CurrentPage:   func(n int) string { return fmt.Sprintf("第 %d 頁，現時頁", n) },
+		PageOf:        func(page, pages int) string { return fmt.Sprintf("第 %d 頁，共 %d 頁", page, pages) },
 
 		Today:        "今日",
 		StartOfRange: "範圍開始",

@@ -83,10 +83,9 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) { r.clickKey(t, "grp/b") }},
 		{name: "Split", animates: false,
 			root: func(open *Signal[bool]) func(*Context) Element {
-				pos := NewSignal(0.4)
 				collapsed := NewSignal(false)
 				return func(ctx *Context) Element {
-					return Split(Div(), Div()).Position(pos).Collapsible(SplitFirst).Collapsed(collapsed)
+					return Split(Pane(Div()).Size(Percent(40)).Collapsed(collapsed), Pane(Div()))
 				}
 			},
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) {

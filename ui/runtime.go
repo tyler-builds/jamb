@@ -281,19 +281,20 @@ type Runtime struct {
 	posted []func()
 
 	needLayout, needPaint bool
-	animating             bool                            // something animates: the next frame must come
-	looping               bool                            // a repeating Animate runs: the next frame must come, but it never ends
-	animInsts             []*componentInstance            // Animate instances that were running; re-rendered by the next Frame
-	pausedAnims           map[*componentInstance]struct{} // running Animate instances the last paint did not draw (see settleAnims)
-	graceAnims            map[*componentInstance]struct{} // Animate instances the last paint did not draw, given one more render first
-	listStale             bool                            // a UniformList must rebuild its rows before the frame ends
-	toasts                []*toastEntry                   // the stack of toasts, oldest first (see Context.Toast)
-	toastNext             uint64                          // the ID of the last toast made
-	toastVer              *Signal[int]                    // changes when the stack changes; the Toaster renders it
-	toastAt               time.Time                       // when the toasts last ran their time
-	toastMax              int                             // how many toasts show at once (0: the default)
-	toastRegion           uint64                          // the node ID of the toast region, 0 when none is shown
-	toastReturn           uint64                          // the focus before the toast region took it (F6)
+	animating             bool                               // something animates: the next frame must come
+	looping               bool                               // a repeating Animate runs: the next frame must come, but it never ends
+	animInsts             []*componentInstance               // Animate instances that were running; re-rendered by the next Frame
+	pausedAnims           map[*componentInstance]struct{}    // running Animate instances the last paint did not draw (see settleAnims)
+	graceAnims            map[*componentInstance]struct{}    // Animate instances the last paint did not draw, given one more render first
+	listStale             bool                               // a UniformList must rebuild its rows before the frame ends
+	splitWatches          map[*componentInstance]*splitWatch // the splits that size their panes from their length (see splitsResized)
+	toasts                []*toastEntry                      // the stack of toasts, oldest first (see Context.Toast)
+	toastNext             uint64                             // the ID of the last toast made
+	toastVer              *Signal[int]                       // changes when the stack changes; the Toaster renders it
+	toastAt               time.Time                          // when the toasts last ran their time
+	toastMax              int                                // how many toasts show at once (0: the default)
+	toastRegion           uint64                             // the node ID of the toast region, 0 when none is shown
+	toastReturn           uint64                             // the focus before the toast region took it (F6)
 	scrolled              bool
 	wake                  func()
 	warn                  func(string)
@@ -764,6 +765,14 @@ func (rt *Runtime) Frame(now time.Time) *scene.Scene {
 	rt.pendingHandles = slices.DeleteFunc(rt.pendingHandles, func(h *FocusHandle) bool { return !h.pending })
 	relayout := rt.needLayout
 	if rt.needLayout {
+		rt.layout()
+	}
+	// A split sizes its panes from its own length, so one whose length changed in this layout
+	// renders again before the frame is painted (see splitsResized).
+	for i := 0; i < 2 && relayout && rt.splitsResized(); i++ {
+		if rt.hasDirty.Load() {
+			rt.buildDirty()
+		}
 		rt.layout()
 	}
 	rt.layoutPreview()

@@ -15,7 +15,7 @@ func TestSplitGripModes(t *testing.T) {
 		{"hidden", GripHidden, false, false},
 	} {
 		r := splitRig(t, func() Element {
-			return Split(Text("Left"), Text("Right")).Grip(tc.grip)
+			return Split(Pane(Text("Left")), Pane(Text("Right"))).Grip(tc.grip)
 		})
 		r.frame()
 		if got := partNodeOrNil(r.rt, "Split.Grip") != nil; got != tc.idle {
@@ -43,7 +43,7 @@ func TestSplitGripModes(t *testing.T) {
 // thickness had no length and drew nothing.
 func TestSplitBarRunsTheDividerLength(t *testing.T) {
 	for _, o := range []SplitOrientation{SplitHorizontal, SplitVertical} {
-		r := splitRig(t, func() Element { return Split(Text("Left"), Text("Right")).Orientation(o) })
+		r := splitRig(t, func() Element { return Split(Pane(Text("Left")), Pane(Text("Right"))).Orientation(o) })
 		r.frame()
 		bar, hit := r.rt.nodeRect(partNodeOrNil(r.rt, "Split.Divider")), r.rt.nodeRect(handleNode(t, r))
 		thick, length, want := bar.W, bar.H, hit.H

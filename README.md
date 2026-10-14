@@ -1082,89 +1082,124 @@ ui.Sidebar(page, // *ui.Signal[string]: the selected item's key
 
 ### Split panes
 
-`ui.Split(first, second)` lays out two panes with a divider between them that the
-user drags, or moves with the keys, to give one pane more of the space. The panes
-are any elements, so a split can hold another split. Its look is
-`ui.SplitStyle` (the divider, its hover, drag and focus states, the grip and the
-panes; see the Styling section), and its sizing methods are the same as the other
-widgets'.
+`ui.Split(panes...)` lays out panes side by side, with a divider between each two that
+the user drags, or moves with the keys, to give one pane more of the space. Each pane is
+made with `ui.Pane(content)` and takes a size, or it fills the space the sized panes
+leave. Add `Orientation(ui.SplitVertical)` to stack the panes. The contents are any
+elements, so a split can hold another split. Its look is `ui.SplitStyle` (the divider,
+its hover, drag and focus states, the grip and the panes; see the Styling section), and
+its sizing methods are the same as the other widgets'.
 
 ```go
-pos := ui.NewSignal(0.35)            // the first pane's share of the split, from 0 to 1
-ui.Split(list, details).Position(pos).Label("Resize list").
-	FirstLabel("List").SecondLabel("Details").
-	MinFirst(ui.Px(120)).MinSecond(ui.Px(160)).OnChange(func(v float64) { save(v) })
-
-width := ui.NewSignal(300.0)         // the first pane's width in logical pixels
-ui.Split(sidebar, editor).PixelPosition(width).MinFirst(ui.Px(200)).MaxFirst(ui.Px(480))
-
-ui.Split(top, bottom).Orientation(ui.SplitVertical).Position(split)    // stacked
-ui.Split(files, editor).Collapsible(ui.SplitFirst).Collapsed(collapsed) // Enter collapses
+ui.Split(
+	ui.Pane(sidebar).Size(ui.Px(200)).Min(ui.Px(150)).Max(ui.Percent(40)),
+	ui.Pane(editor).Min(ui.Px(300)), // no Size: fills what is left
+	ui.Pane(inspector).Size(ui.Percent(20)).Min(ui.Px(180)),
+).Orientation(ui.SplitHorizontal)
 ```
 
-**The position is a signal the app owns**, so it can be saved and restored. The
-default is a fraction: the first pane's share of the split's length, from 0 to 1.
-The panes keep their proportions when the window is resized. `PixelPosition` holds
-the first pane's size in logical pixels instead, and the second pane takes the rest
-of the space when the window is resized. The limits (`MinFirst`, `MaxFirst`,
-`MinSecond`, `MaxSecond`) take `ui.Px` lengths only, since they are compared with the
-split's size in pixels; a percentage panics. The divider keeps to the limits while
-it moves, and a fraction split keeps the limits as the layout does.
+**Sizes** are `ui.Px` (logical pixels) or `ui.Percent`. A percentage is of the length the
+panes have, which is the split's length less the 9 px of each divider. `Min` and `Max`
+take either unit as well. Any other length (`ui.Auto`, `ui.Fr`) panics, as a programming
+error. When `Min` is larger than `Max`, `Min` wins.
 
-With no `Position` the split keeps its position itself, starting at one half. An app
-that wants the position kept across runs passes a signal, as the notes app does.
+- **Layout.** Sized panes take their size, clamped to their limits. The fill panes share
+  the rest equally, or in proportion to the weights that a drag between two of them sets.
+  Each fill pane stays within its own limits.
+- **Window resize.** A pixel pane keeps its pixels, a percentage pane keeps its share, and
+  a fill pane takes the change.
+- **Too little space.** When the sized panes need more than the length, the fill panes go
+  to their `Min` first, then the sized panes shrink toward theirs, in proportion to how far
+  each is above its `Min`. Content that still does not fit is clipped.
+- **Too much space.** When no pane can take the space that is left over, the last visible
+  pane is drawn with it. Its stored size does not change, so the space is only a display
+  of the last pane.
 
-The divider is 1 px wide by default (`Divider`, its `Width` in a horizontal split
-and its `Height` in a vertical one), in a 9 px hit area, so it is easy to grab. The
-grip is a short pill over its middle. `Grip` sets when it shows: always
-(`ui.GripShown`, the default), only while the pointer is over the divider or it is
-dragged or focused (`ui.GripOnHover`), or never (`ui.GripHidden`). Without the grip
-the divider is a plain line between the panes, like a border. The dock's dividers
-use `GripOnHover`.
+**Dragging** a divider moves space between the two panes beside it, each in its own unit,
+and stops when either pane reaches a limit. The fill panes share what the sized panes leave,
+in proportion to their weights. So a drag that changes a sized pane changes every fill pane,
+each in proportion to its weight. A drag between two fill panes moves space only between
+those two: their weights change, and their sum stays the same. A drag between two sized
+panes moves space only between those two.
+
+**The sizes can be saved.** `SizeSignal` gives the split a signal that the app owns. The
+split sets it as the user drags or uses the keys, and reads it on every render, so the app
+can also set it. The signal holds `ui.Px` or `ui.Percent` lengths, and each pane keeps the
+unit it has.
+
+```go
+sidebarSize := ui.NewSignal(ui.Px(200)) // holds ui.Px or ui.Percent
+ui.Split(
+	ui.Pane(sidebar).SizeSignal(sidebarSize).Min(ui.Px(150)),
+	ui.Pane(editor),
+).OnChange(func() { save(sidebarSize.Peek()) })
+```
+
+`OnChange` runs after the user changes a size, from the keyboard or the pointer, and only
+when a size actually changes. It does not run for a collapse.
+
+**Collapse.** A pane marked `Collapsible` collapses to zero size, and restores its previous
+size. `Collapsed` stores the state in a signal the app owns, and also makes the pane
+collapsible. Without it the split keeps the state itself.
+
+```go
+collapsed := ui.NewSignal(false)
+ui.Pane(files).Size(ui.Percent(30)).Collapsible().Collapsed(collapsed) // Enter collapses
+```
+
+The divider that collapses a pane is the one between it and the nearest fill pane, on the
+pane's side of the split. With no fill pane, the divider after the pane collapses it, and
+the last pane collapses through the divider before it. A divider collapses one pane. While
+a pane is collapsed, its divider and the divider beside it do not move.
+
+**Identity.** `Key` gives a pane an identity among the panes of its split, so its content
+keeps its state when panes are added, removed or reordered. The keys of one split's panes
+must differ. A pane without a key is known by its position.
+
+The divider is 1 px wide by default (`Divider`, its `Width` in a horizontal split and its
+`Height` in a vertical one), in a 9 px hit area, so it is easy to grab. The grip is a short
+pill over its middle. `Grip` on the split sets when it shows: always (`ui.GripShown`, the
+default), only while the pointer is over the divider or it is dragged or focused
+(`ui.GripOnHover`), or never (`ui.GripHidden`). Without the grip the divider is a plain
+line between the panes, like a border. The dock's dividers use `GripOnHover`.
 
 ```go
 ui.Split(files, editor).Grip(ui.GripOnHover) // a line, with the grip on hover
 ```
 
-- **Pointer.** Dragging the divider moves it. The pointer is captured while the
-  button is held, so a drag that leaves the divider still moves it. The cursor is the
-  horizontal or vertical resize cursor. A double-click collapses or restores a
-  collapsible pane.
-- **Keyboard.** The divider is one Tab stop. Left and Right move it in a horizontal
-  split, and Up and Down in a vertical one, by 5 percent of the split or 10 logical
-  pixels. Shift with an arrow moves it by 10 percent or 50 logical pixels. Home and
-  End go to its limits. Enter collapses or restores the collapsible pane. A
-  collapsed split does not move with the keys or the pointer until it is restored.
-  The keys follow the window splitter pattern of the WAI-ARIA Authoring Practices
-  (https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/), which makes Enter the
-  toggle of the primary pane; the Home and End keys are the pattern's optional ones.
-  Shift and the Page keys are not part of the pattern, so Shift with an arrow is the
-  larger step.
-- **Collapse.** `Collapsible(p)` names the pane that collapses, and `Collapsed`
-  holds the state. A collapsed pane is hidden, with its content kept in the tree, so
-  its state survives the collapse. The other pane takes the whole split. The position
-  is not changed by a collapse, so restoring the pane brings back its previous size.
-- **Accessibility.** The divider is a focusable element with the Separator role, a
-  name (`Label`, by default "Resize panes") and the RangeValue pattern: the value is
-  the position in the units of the signal, and the minimum and maximum are the limits
-  the divider can move between. A change of the position is a change of the Range
-  value, which the accessibility tree publishes as a property change. Assistive
-  technology can set the value. Each pane is a group named by `FirstLabel` and
-  `SecondLabel`, when they are given. Microsoft has no splitter control type, so the
-  divider uses Separator, which the Windows Separator control type defines
-  (https://technet.microsoft.com/en-us/ee671643(v=vs.71)).
-  The control type that a splitter exposes in other frameworks was not verified
-  for this release.
-- **Layout.** A split fills its container by default, in both directions. In a
-  column with other children, give it a `Height` or a `Grow` so it has room. The
-  split learns its length from the layout of the frame before, so its range is
-  correct from the frame after its first layout. A window resize does not render
-  the split, so its range minimum and maximum follow its next render. The value does
-  not change with the resize in either mode.
+- **Pointer.** Dragging the divider moves it. The pointer is captured while the button is
+  held, so a drag that leaves the divider still moves it. The cursor is the horizontal or
+  vertical resize cursor. A double-click collapses or restores the pane that the divider
+  collapses.
+- **Keyboard.** The divider is one Tab stop. Left and Right move it in a horizontal split,
+  and Up and Down in a vertical one. A step is 10 logical pixels, or 5 percent of the
+  length, for the pane that the divider resizes; Shift makes it 50 pixels or 10 percent.
+  Home and End move the divider to its limits, and Enter collapses or restores the pane
+  that the divider collapses. The keys follow the window splitter pattern of the WAI-ARIA
+  Authoring Practices (https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/), which
+  makes Enter the toggle of the collapsible pane; Home and End are the pattern's optional
+  keys. Shift with an arrow is the larger step, as the pattern does not define one.
+- **Accessibility.** Each divider is a focusable element with the Separator role. It is named by
+  `Label` on the split when that is given. Otherwise, when both panes beside it have a
+  `Label`, it is named after them, such as "Resize Sidebar and Editor"; any other divider
+  is "Resize panes". It has the RangeValue pattern. Its
+  value is the size of the pane it resizes, in that pane's unit, and its minimum and
+  maximum are the least and the greatest sizes that pane can take at this divider. The
+  small and large changes are the arrow and Shift steps. A change of the size is a change
+  of the Range value, which the accessibility tree publishes as a property change, and
+  assistive technology can set the value. A pane with a `Label` is a group with that name.
+  Microsoft has no splitter control type, so the divider uses Separator, which the Windows
+  Separator control type defines
+  (https://technet.microsoft.com/en-us/ee671643(v=vs.71)). The control type that a splitter
+  exposes in other frameworks was not verified for this release.
+- **Layout.** A split fills its container by default, in both directions. In a column with
+  other children, give it a `Height` or a `Grow` so it has room. The split measures its
+  length after each layout, and a split whose length changed renders again in the same
+  frame, so its panes always match the length it has.
 
-The demo's Components page has a "Split panes" section with a fraction split, a
-stacked one, a nested one, a collapsible pane and a pixel split with limits. The
-notes app's sidebar is a pixel split, and its width is kept in `settings.json`.
+The demo's Components page has a "Split panes" section with samples of a fraction split,
+a stacked split, a nested split, a collapsible pane, a pixel pane with limits, and three
+panes.
 
 ### Docking
 

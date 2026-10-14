@@ -671,26 +671,23 @@ func (v *dockView) node(n DockNode, path []int) Element {
 	if !n.isSplit() {
 		return v.group(n)
 	}
-	return v.chain(n, path, 0)
+	return v.split(n, path)
 }
 
-// chain returns the split of the children of n from index k on. Each divider is a Split of
-// one child and the children after it, so it moves the share of that child against the
-// rest, and the children are nested as deep as they are many.
-func (v *dockView) chain(n DockNode, path []int, k int) Element {
-	if k == len(n.Children)-1 {
-		return v.node(n.Children[k], appendPath(path, k))
-	}
+// split returns the split of the children of the split node n at path: one pane per child, sized
+// by its share, so a divider moves the space between the two children beside it. The sizes are
+// the panes' sizes, which the split sets as the user moves the dividers.
+func (v *dockView) split(n DockNode, path []int) Element {
 	sz := shares(n.Sizes, len(n.Children))
-	rest := 0.0
-	for _, s := range sz[k:] {
-		rest += s
+	panes := make([]*PaneElement, len(n.Children))
+	sigs := make([]*Signal[Length], len(n.Children))
+	for k, c := range n.Children {
+		childPath := appendPath(path, k)
+		sigs[k] = NewSignal(Percent(float32(sz[k] * 100)))
+		panes[k] = Pane(v.node(c, childPath)).Key(dockChildKey(c, childPath)).SizeSignal(sigs[k]).Min(Px(dockMinPane))
 	}
-	pos := NewSignal(sz[k] / rest)
-	key := fmt.Sprintf("%s/split:%s:%d", v.scope, dockPath(path), k)
-	sp := Split(v.node(n.Children[k], appendPath(path, k)), v.chain(n, path, k+1)).Key(key).Position(pos).Grip(GripOnHover).
-		MinFirst(Px(dockMinPane)).MinSecond(Px(dockMinPane)).
-		OnChange(func(f float64) { v.resize(path, k, f) })
+	key := fmt.Sprintf("%s/split:%s", v.scope, dockPath(path))
+	sp := Split(panes...).Key(key).Grip(GripOnHover).OnChange(func() { v.resize(path, sigs) })
 	sp.onRelease = v.d.saveNow
 	if n.Vertical {
 		sp.Orientation(SplitVertical)
@@ -698,21 +695,27 @@ func (v *dockView) chain(n DockNode, path []int, k int) Element {
 	return sp
 }
 
-// resize sets the share of child k of the split at path, so that the divider after it is
-// at the fraction f of the split's length from the divider's start.
-func (v *dockView) resize(path []int, k int, f float64) {
+// dockChildKey returns the key of the pane of child c at path: the first panel of a group, or the
+// path of a split, so that a pane keeps its identity when the children around it change.
+func dockChildKey(c DockNode, path []int) string {
+	if !c.isSplit() && len(c.Panels) > 0 {
+		return "panel:" + c.Panels[0]
+	}
+	return "split:" + dockPath(path)
+}
+
+// resize stores the shares of the children of the split at path, from the sizes of its panes. The
+// shares are fractions of the split's length less its dividers, and each is kept above zero.
+func (v *dockView) resize(path []int, sigs []*Signal[Length]) {
 	out := v.norm(v.layout.Peek())
 	n := dockNodeAt(&out.Root, path)
-	if n == nil || !n.isSplit() || k+1 >= len(n.Children) {
+	if n == nil || !n.isSplit() || len(n.Children) != len(sigs) {
 		return
 	}
-	sz := shares(n.Sizes, len(n.Children))
-	rest := 0.0
-	for _, s := range sz[k+1:] {
-		rest += s
+	sz := make([]float64, len(sigs))
+	for k, sig := range sigs {
+		sz[k] = max(float64(sig.Peek().Value)/100, 0.001)
 	}
-	f = min(max(f, 0.001), 0.999)
-	sz[k] = f * rest / (1 - f)
 	n.Sizes = sz
 	v.store(out, true)
 }

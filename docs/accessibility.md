@@ -1913,9 +1913,10 @@ Phase M adds `ui.DatePicker` and `ui.TimePicker`, and the Calendar control type 
 
 `ui.Split` is in place on Windows. Its divider is a focusable element in the access
 tree with the Separator role (`access.RoleSeparator`), the name given by `Label`
-(by default "Resize panes"), and a Range: the value is the position in the units of
-the position signal, and the minimum and maximum are the limits the divider can move
-between. The Windows Separator control type has no pattern of its own, and the
+(by default "Resize panes"), and a Range: the value is the size of the pane the divider
+resizes, in that pane's unit (pixels, or percent of the length the panes have), and the
+minimum and maximum are the least and the greatest sizes that pane can take at the
+divider. The Windows Separator control type has no pattern of its own, and the
 RangeValue pattern is the one that carries the value; the Microsoft reference is the
 Separator control type page (https://technet.microsoft.com/en-us/ee671643(v=vs.71)).
 The keys follow the WAI-ARIA window splitter pattern
@@ -1923,8 +1924,8 @@ The keys follow the WAI-ARIA window splitter pattern
 the primary pane and Home and End are optional.
 
 Checked on the platform side: the RangeValue set goes to the same
-`ActionSetRangeValue` the sliders use, and a change of the position is a change of
-the Range, so it is published as a RangeValue property change. The unit tests read
+`ActionSetRangeValue` the sliders use, and a change of the size is a change of the
+Range, so it is published as a RangeValue property change. The unit tests read
 the access tree and the published updates, and the notes app's test sets the value
 through the access bridge.
 

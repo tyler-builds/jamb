@@ -58,10 +58,11 @@ func italianStrings() *Strings {
 		SplitPanelDown:  "Dividi in basso",
 		ClosePanel:      "Chiudi pannello",
 
-		Remove:      func(tag string) string { return "Rimuovi " + tag },
-		Page:        func(n int) string { return fmt.Sprintf("Pagina %d", n) },
-		CurrentPage: func(n int) string { return fmt.Sprintf("Pagina %d, pagina corrente", n) },
-		PageOf:      func(page, pages int) string { return fmt.Sprintf("Pagina %d di %d", page, pages) },
+		Remove:        func(tag string) string { return "Rimuovi " + tag },
+		ResizeBetween: func(first, second string) string { return "Ridimensiona " + first + " e " + second },
+		Page:          func(n int) string { return fmt.Sprintf("Pagina %d", n) },
+		CurrentPage:   func(n int) string { return fmt.Sprintf("Pagina %d, pagina corrente", n) },
+		PageOf:        func(page, pages int) string { return fmt.Sprintf("Pagina %d di %d", page, pages) },
 
 		Today:        "Oggi",
 		StartOfRange: "Inizio intervallo",

@@ -86,6 +86,8 @@ func RootWith(s *store.Store, layout Layout) func(*ui.Context) ui.Element {
 	if sidebar == nil {
 		sidebar = ui.NewSignal(float64(DefaultSidebarWidth))
 	}
+	// The split owns the sidebar's size as a pixel length; OnChange copies it to sidebar.
+	sidebarSize := ui.NewSignal(ui.Px(float32(sidebar.Peek())))
 	a := &App{
 		s:            s,
 		search:       ui.NewFocusHandle(),
@@ -115,14 +117,16 @@ func RootWith(s *store.Store, layout Layout) func(*ui.Context) ui.Element {
 			OnDrop(ui.Drop(a.importFiles)).
 			Child(a.menuBar(ctx)).
 			// The sidebar and the editor share the window; the divider moves the sidebar's width.
-			Child(ui.Split(a.sidebar(), a.editorPane()).PixelPosition(sidebar).
-				MinFirst(ui.Px(200)).MaxFirst(ui.Px(480)).MinSecond(ui.Px(320)).
-				Label("Resize sidebar").FirstLabel("Notes").SecondLabel("Editor").
-				OnChange(func(w float64) {
-					if layout.OnSidebarChange != nil {
-						layout.OnSidebarChange(w)
-					}
-				})).
+			Child(ui.Split(
+				ui.Pane(a.sidebar()).Label("Notes").SizeSignal(sidebarSize).Min(ui.Px(200)).Max(ui.Px(480)),
+				ui.Pane(a.editorPane()).Label("Editor").Min(ui.Px(320)),
+			).Label("Resize sidebar").OnChange(func() {
+				w := float64(sidebarSize.Peek().Value)
+				sidebar.Set(w)
+				if layout.OnSidebarChange != nil {
+					layout.OnSidebarChange(w)
+				}
+			})).
 			Child(a.palette())
 	}
 }

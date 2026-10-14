@@ -2,7 +2,9 @@ package ui
 
 import (
 	"fmt"
+	"maps"
 	"math"
+	"strconv"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
@@ -14,12 +16,12 @@ import (
 // the divider is easy to grab even when the bar is a pixel wide.
 const splitHit = 9
 
-// The keyboard moves the divider by a small step, and by a large one with Shift. A
-// fraction split moves in fractions of its length, and a pixel split in logical
-// pixels.
+// The keyboard moves a divider by a small step, and by a large one with Shift. A step
+// is in logical pixels when the pane it resizes is a pixel pane (or a fill pane), and
+// in percent of the length available to the panes when it is a percentage pane.
 const (
-	splitStepFraction, splitLargeFraction = 0.05, 0.1
-	splitStepPx, splitLargePx             = 10, 50
+	splitStepPx, splitLargePx           = 10, 50
+	splitStepPercent, splitLargePercent = 5, 10
 )
 
 // SplitStyle is the look of each part of a split. A part's style merges over the
@@ -112,14 +114,6 @@ const (
 	SplitVertical                           // the panes are stacked, one above the other
 )
 
-// SplitPane names one of the two panes of a split.
-type SplitPane uint8
-
-const (
-	SplitFirst  SplitPane = iota // the pane on the left, or on top
-	SplitSecond                  // the pane on the right, or below
-)
-
 // SplitGrip is when a split's divider shows its grip, the mark over the middle of its bar
 // (the Grip part). The bar itself is always drawn.
 type SplitGrip uint8
@@ -136,53 +130,169 @@ const (
 	GripHidden
 )
 
-// SplitElement lays out two panes with a divider between them that the user drags,
-// or moves with the keyboard, to give one pane more of the space. The panes are
-// Elements of any kind, so a split can contain another split.
-//
-// The position is a signal the app owns, so it can be saved and restored. By
-// default it is a fraction: the first pane's share of the split's length, from 0 to
-// 1, so the panes keep their proportions when the window is resized. PixelPosition
-// holds the first pane's size in logical pixels instead, and the second pane takes
-// the rest when the window is resized. The limits MinFirst, MaxFirst, MinSecond and
-// MaxSecond are logical pixels, and the divider keeps to them while it moves.
-//
-// The divider is one focusable element with the window splitter role of the
-// Accessibility Programmatic Guidelines
-// (https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/). Its value is the
-// position, in the units of the signal, with the limits it can move between. The
-// keys are the arrows (Left and Right in a horizontal split, Up and Down in a
-// vertical one), with Shift for a larger step, Home and End for the limits, and
-// Enter to collapse or restore a pane (see Collapsible). A double-click on the
-// divider does the same as Enter.
-type SplitElement struct {
-	first, second Element
-	key           string
-	orient        SplitOrientation
-	pos           *Signal[float64] // nil: a Local of the split holds the position
-	pixels        bool             // pos holds the first pane's size in pixels, not a fraction
-	collapsed     *Signal[bool]    // nil: a Local of the split holds the state
-	collapsible   bool
-	collapsePane  SplitPane
-	minFirst      float64
-	maxFirst      float64
-	minSecond     float64
-	maxSecond     float64
-	name          string // the accessible name of the divider, see Label
-	firstName     string // the accessible name of the first pane, see FirstLabel
-	secondName    string // the accessible name of the second pane, see SecondLabel
-	onChange      func(float64)
-	onRelease     func() // runs when a pointer drag of the divider ends (see dock.go)
-	grip          SplitGrip
-	styles        SplitStyle
-	size          sizing // the split's outer box, from the sizing methods (see Sizing in docs/styling.md)
+// PaneElement is one pane of a split, made by Pane and given to Split.
+type PaneElement struct {
+	content     Element
+	key         string
+	size        Length          // the starting size, when sized is set (see Size)
+	sized       bool            // the pane has a size, from Size or SizeSignal; otherwise it fills
+	sig         *Signal[Length] // the size the app owns (see SizeSignal); nil: the split keeps it
+	min, max    Length          // the limits, in pixels or percent; max is Auto when there is none
+	collapsible bool            // the pane can be collapsed (see Collapsible)
+	collapsed   *Signal[bool]   // the collapse state the app owns (see Collapsed); nil: the split keeps it
+	name        string          // the accessible name of the pane's group, see Label
 }
 
-// Split creates a split of first and second, with the divider in the middle of
-// the space, until a position is given (see Position). The split fills its
-// container by default (see Width).
-func Split(first, second Element) *SplitElement {
-	return &SplitElement{first: first, second: second, maxFirst: math.Inf(1), maxSecond: math.Inf(1)}
+// Pane makes a pane of a split that shows content. The pane takes a size with Size or
+// SizeSignal, and a pane with neither fills the space that the sized panes leave; see
+// Split.
+func Pane(content Element) *PaneElement {
+	return &PaneElement{content: content, min: Px(0), max: Auto}
+}
+
+// Size sets the pane's starting size, in ui.Px or ui.Percent. A percentage is of the length
+// the panes have, which is the split's length less its dividers. The split keeps the size as
+// the user moves the dividers, in the same unit. The starting size applies when the pane first
+// appears, and is ignored when the pane has a SizeSignal.
+func (p *PaneElement) Size(l Length) *PaneElement {
+	p.size, p.sized = splitLength("Size", l), true
+	return p
+}
+
+// SizeSignal stores the pane's size in v, and sets it when the user moves a divider beside the
+// pane, so the app can save the size and restore it. The signal holds ui.Px or ui.Percent
+// lengths: a divider keeps the unit of the pane, and a pixel pane keeps its pixels when the
+// window is resized. The split reads the signal, so the app can also change the size.
+func (p *PaneElement) SizeSignal(v *Signal[Length]) *PaneElement {
+	if v == nil {
+		panic("ui.Pane.SizeSignal: the signal is nil; make one with ui.NewSignal(ui.Px(200))")
+	}
+	p.sig, p.sized = v, true
+	return p
+}
+
+// Min sets the least size of the pane, in ui.Px or ui.Percent. A divider stops before the pane
+// goes below it.
+func (p *PaneElement) Min(l Length) *PaneElement {
+	p.min = splitLength("Min", l)
+	return p
+}
+
+// Max sets the most size of the pane, in ui.Px or ui.Percent. A divider stops before the pane
+// goes past it. When Min and Max contradict each other, Min wins.
+func (p *PaneElement) Max(l Length) *PaneElement {
+	p.max = splitLength("Max", l)
+	return p
+}
+
+// Collapsible lets the user collapse the pane to zero size, with Enter or a double-click on the
+// divider that collapses it, and restore it the same way. The divider is the one between the
+// pane and the split's nearest fill pane, on that side; with no fill pane, the divider after the
+// pane, or before it for the last pane. A divider collapses one pane, and the first one in order
+// keeps it when two would share it. A collapsed pane keeps its size, and its divider and the
+// divider beside it do not move while it is collapsed. The state is kept by the split unless
+// Collapsed is given.
+func (p *PaneElement) Collapsible() *PaneElement {
+	p.collapsible = true
+	return p
+}
+
+// Collapsed stores in v whether the pane is collapsed, so the app can save the state, and makes
+// the pane collapsible (see Collapsible). A collapsed pane is hidden, and its content stays in
+// the tree, so its state survives the collapse.
+func (p *PaneElement) Collapsed(v *Signal[bool]) *PaneElement {
+	p.collapsed, p.collapsible = v, true
+	return p
+}
+
+// Label names the pane's group for assistive technology, such as "Notes". A pane without a name
+// is not a group in the accessibility tree.
+func (p *PaneElement) Label(name string) *PaneElement {
+	p.name = name
+	return p
+}
+
+// Key gives the pane an identity among the panes of its split, so its content keeps its state
+// when panes are added, removed or reordered. The keys of a split's panes must differ. A pane
+// without a key is known by its index.
+func (p *PaneElement) Key(k string) *PaneElement {
+	p.key = k
+	return p
+}
+
+// identity returns the pane's identity among the panes of its split: its key, or its index,
+// written so that it cannot be taken for a key.
+func (p *PaneElement) identity(i int) string {
+	if p.key != "" {
+		return p.key
+	}
+	return "#" + strconv.Itoa(i)
+}
+
+// splitLength returns l, which must be a pixel or a percentage length for the method named
+// method; a split's sizes and limits take no other kind.
+func splitLength(method string, l Length) Length {
+	if l.Unit != layout.UnitPx && l.Unit != layout.UnitPercent {
+		panic("ui.Pane." + method + ": the length must be a pixel or percentage length, such as ui.Px(200) or ui.Percent(20)")
+	}
+	return l
+}
+
+// SplitElement lays out panes side by side, or stacked, with a divider between each two
+// neighbours. The user drags a divider, or moves it with the keyboard, to give one pane
+// more of the space. The panes are Elements of any kind, so a split can contain another
+// split.
+//
+// A pane with a Size keeps it as the user moves the dividers, in its own unit: a pixel pane
+// keeps its pixels, and a percentage pane keeps its share of the length the panes have, which is
+// the split's length less its dividers. A pane with neither a Size nor a SizeSignal fills the
+// space that the sized panes leave, in proportion to their weights (equal by default). So a drag
+// that changes a sized pane changes every fill pane, each in proportion to its weight. A drag
+// between two fill panes moves space only between those two: their weights change, and their sum
+// stays the same. A drag between two sized panes moves space only between those two, each in its
+// own unit and within its limits, and stops when either reaches a limit. A divider beside a
+// collapsed pane does not move.
+//
+// The layout is resolved at the split's length (see resolvePanes). A pixel pane keeps its size
+// when the window is resized, a percentage pane scales with it, and a fill pane takes the
+// change. When no pane can take the space that is left over, the last visible pane is drawn
+// with it, and its stored size does not change.
+//
+// Each divider is one focusable element with the window splitter role of the Accessibility
+// Programmatic Guidelines (https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/). Its value
+// is the size of the pane it resizes, in that pane's unit, with the least and the greatest size
+// that pane can take. The arrow keys move it along the split (Left and Right, or Up and Down in
+// a vertical split), Shift for a larger step, and Home and End to the limits. Enter collapses or
+// restores the pane that the divider collapses (see Pane.Collapsible), and a double-click on the
+// divider does the same.
+type SplitElement struct {
+	panes     []*PaneElement
+	key       string
+	orient    SplitOrientation
+	name      string // the accessible name of the dividers, see Label
+	onChange  func()
+	onRelease func() // runs when a pointer drag of a divider ends (see dock.go)
+	grip      SplitGrip
+	styles    SplitStyle
+	size      sizing // the split's outer box, from the sizing methods (see Sizing in docs/styling.md)
+}
+
+// Split lays out panes in order, with a divider between each two. One pane renders alone, with
+// no divider, and no pane renders an empty box of the split's size. The panes need distinct
+// keys (see Pane.Key), and the split fills its container by default (see Width).
+func Split(panes ...*PaneElement) *SplitElement {
+	seen := make(map[string]bool, len(panes))
+	for i, p := range panes {
+		if p == nil {
+			panic(fmt.Sprintf("ui.Split: pane %d is nil; make it with ui.Pane", i))
+		}
+		id := p.identity(i)
+		if seen[id] {
+			panic(fmt.Sprintf("ui.Split: two panes have the key %q; the keys of a split's panes must differ", id))
+		}
+		seen[id] = true
+	}
+	return &SplitElement{panes: panes}
 }
 
 func (*SplitElement) isElement()           {}
@@ -195,92 +305,20 @@ func (s *SplitElement) Key(k string) *SplitElement { s.key = k; return s }
 // default) or are stacked (SplitVertical).
 func (s *SplitElement) Orientation(o SplitOrientation) *SplitElement { s.orient = o; return s }
 
-// Position stores the first pane's share of the split's length in v, from 0 to 1,
-// and sets it when the user moves the divider. The app owns the signal, so it can
-// save the position and restore it. Without a signal the split keeps its position
-// itself, starting at one half.
-func (s *SplitElement) Position(v *Signal[float64]) *SplitElement {
-	s.pos, s.pixels = v, false
-	return s
-}
-
-// PixelPosition stores the first pane's size in logical pixels in v, along the
-// split's orientation, and sets it when the user moves the divider. While the
-// window is resized the first pane keeps its size and the second takes the change.
-func (s *SplitElement) PixelPosition(v *Signal[float64]) *SplitElement {
-	s.pos, s.pixels = v, true
-	return s
-}
-
-// Collapsed stores in v whether the pane named by Collapsible is collapsed. The app
-// owns the signal, so it can save the state. A collapsed pane is hidden, and its
-// content stays in the tree (see Display), so its state survives the collapse. The
-// position is kept while the pane is collapsed, so restoring it brings back the
-// previous size.
-func (s *SplitElement) Collapsed(v *Signal[bool]) *SplitElement { s.collapsed = v; return s }
-
-// Collapsible lets the user collapse the pane p to zero size, by a double-click on
-// the divider or Enter on it, and restore it the same way. While a pane is
-// collapsed the divider does not move, and its keys and drag wait for the restore.
-// See Collapsed for the state.
-func (s *SplitElement) Collapsible(p SplitPane) *SplitElement {
-	s.collapsible, s.collapsePane = true, p
-	return s
-}
-
-// splitPx returns the logical pixels of l. The limits of a split are compared with
-// its size in pixels, so they take Px lengths only.
-func splitPx(method string, l Length) float64 {
-	if l.Unit != layout.UnitPx {
-		panic("ui.Split." + method + ": the limit is a pixel length, such as ui.Px(200)")
-	}
-	return float64(l.Value)
-}
-
-// MinFirst is the least space the first pane can have, in logical pixels.
-func (s *SplitElement) MinFirst(l Length) *SplitElement {
-	s.minFirst = splitPx("MinFirst", l)
-	return s
-}
-
-// MaxFirst is the most space the first pane can have, in logical pixels.
-func (s *SplitElement) MaxFirst(l Length) *SplitElement {
-	s.maxFirst = splitPx("MaxFirst", l)
-	return s
-}
-
-// MinSecond is the least space the second pane can have, in logical pixels.
-func (s *SplitElement) MinSecond(l Length) *SplitElement {
-	s.minSecond = splitPx("MinSecond", l)
-	return s
-}
-
-// MaxSecond is the most space the second pane can have, in logical pixels.
-func (s *SplitElement) MaxSecond(l Length) *SplitElement {
-	s.maxSecond = splitPx("MaxSecond", l)
-	return s
-}
-
-// Label names the divider for assistive technology, such as "Resize sidebar". The
-// default is the Resize panes text of the window's Strings.
+// Label names every divider of the split for assistive technology, such as "Resize sidebar". Without
+// it, a divider whose two panes both have a Pane.Label is named after them, such as "Resize Sidebar
+// and Editor", and any other divider is named with the Resize panes text of the window's Strings.
 func (s *SplitElement) Label(name string) *SplitElement { s.name = name; return s }
-
-// FirstLabel names the first pane for assistive technology, such as "Notes". A pane
-// without a name is not a group in the accessibility tree.
-func (s *SplitElement) FirstLabel(name string) *SplitElement { s.firstName = name; return s }
-
-// SecondLabel names the second pane for assistive technology. See FirstLabel.
-func (s *SplitElement) SecondLabel(name string) *SplitElement { s.secondName = name; return s }
 
 // Grip sets when the divider shows its grip: always (GripShown, the default), only while
 // the pointer is over the divider or it is dragged or focused (GripOnHover), or never
 // (GripHidden). Without the grip, the divider is a line between the panes.
 func (s *SplitElement) Grip(g SplitGrip) *SplitElement { s.grip = g; return s }
 
-// OnChange runs fn with the new position after the user moves the divider, from the
-// keyboard or the pointer, to a position that differs from the current one. The
-// signal is set first.
-func (s *SplitElement) OnChange(fn func(float64)) *SplitElement { s.onChange = fn; return s }
+// OnChange runs fn after the user changes the size of a pane, from the keyboard or the pointer,
+// and only when a size actually changes. The sizes are set first (see Pane.SizeSignal). Collapsing
+// or restoring a pane is not a size change, so it does not run fn.
+func (s *SplitElement) OnChange(fn func()) *SplitElement { s.onChange = fn; return s }
 
 // The sizing methods give the split's outer box a size. A split fills its container
 // by default; see Sizing in docs/styling.md.
@@ -301,345 +339,622 @@ func (s *SplitElement) Styles(st SplitStyle) *SplitElement {
 	return s
 }
 
-// splitDrag is the state of a drag: the pointer's position along the split when the
-// drag began, and the first pane's size then, in logical pixels.
-type splitDrag struct {
-	at float64
-	p  float64
-}
-
-// splitState is the state of a split as its panes and its divider show it.
-type splitState struct {
-	shown        float64 // the position the panes show: the position within its limits, or the collapsed end
-	lo, hi       float64 // the least and the greatest value the divider can have
-	small, large float64 // the steps of the arrow keys, and of Shift with them
-	hiddenFirst  bool    // the first pane is collapsed
-	hiddenSecond bool    // the second pane is collapsed
-}
-
 // vertical reports whether the split stacks its panes.
 func (s *SplitElement) vertical() bool { return s.orient == SplitVertical }
 
-// steps returns the arrow step and the Shift step, in the units of the position.
-func (s *SplitElement) steps() (small, large float64) {
-	if s.pixels {
-		return splitStepPx, splitLargePx
-	}
-	return splitStepFraction, splitLargeFraction
-}
-
-// bounds returns the least and the greatest size of the first pane, in logical
-// pixels, in a split of total pixels: the limits of both panes, and the divider's
-// hit area between them. The greatest is never less than the least.
-func (s *SplitElement) bounds(total float64) (lo, hi float64) {
-	avail := total - splitHit
-	lo = max(s.minFirst, avail-s.maxSecond, 0)
-	hi = min(s.maxFirst, avail-s.minSecond)
-	return lo, max(hi, lo)
-}
-
-// toPx returns the first pane's size in logical pixels for the position v, in a
-// split of total pixels.
-func (s *SplitElement) toPx(v, total float64) float64 {
-	if s.pixels {
-		return v
-	}
-	return v * total
-}
-
-// fromPx returns the position for the first pane's size p in logical pixels, in a
-// split of total pixels. A split with no length has no fraction, so it is 0.
-func (s *SplitElement) fromPx(p, total float64) float64 {
-	if s.pixels {
-		return p
-	}
-	if total <= 0 {
-		return 0
-	}
-	return p / total
-}
-
-// values returns the least and the greatest position, in the units of the signal.
-// Before the split has been laid out a fraction has the whole range.
-func (s *SplitElement) values(total float64) (lo, hi float64) {
-	if !s.pixels && total <= 0 {
-		return 0, 1
-	}
-	lo, hi = s.bounds(total)
-	if !s.pixels {
-		lo, hi = lo/total, hi/total
-	}
-	return lo, hi
-}
-
-// state returns the state of the split from its position, its collapse state and
-// the length it was last measured at. It reads the signals, so a component that
-// calls it renders again when they change.
-func (s *SplitElement) state(pos *Signal[float64], collapsed *Signal[bool], total float64) splitState {
-	var st splitState
-	st.hiddenFirst = s.collapsible && collapsed.Get() && s.collapsePane == SplitFirst
-	st.hiddenSecond = s.collapsible && collapsed.Get() && s.collapsePane == SplitSecond
-	st.small, st.large = s.steps()
-	lo, hi := s.values(total)
-	v := pos.Get()
-	st.shown = v
-	switch {
-	case st.hiddenFirst:
-		st.shown = s.fromPx(0, total)
-	case st.hiddenSecond:
-		st.shown = 0
-		if total > 0 {
-			st.shown = s.fromPx(total-splitHit, total)
+// collapseDivider returns the index of the divider that collapses pane i, or -1 when the split has
+// no divider for it. The divider is the one between the pane and the nearest fill pane, on that
+// fill pane's side; on a tie the later fill pane is the one. With no fill pane the last pane takes
+// the remainder, so the divider after a pane collapses it, and the last pane collapses through the
+// divider before it.
+func (s *SplitElement) collapseDivider(i int) int {
+	n := len(s.panes)
+	dist := func(f int) int {
+		if f > i {
+			return f - i
 		}
-	case total > 0:
-		st.shown = min(max(v, lo), hi)
+		return i - f
 	}
-	st.lo, st.hi = lo, hi
-	if st.hiddenFirst || st.hiddenSecond {
-		// A collapsed divider has a single value, so it cannot move.
-		st.lo, st.hi = st.shown, st.shown
+	near := -1
+	for f, p := range s.panes {
+		if f == i || p.sized {
+			continue
+		}
+		if near < 0 || dist(f) < dist(near) || dist(f) == dist(near) && f > i {
+			near = f
+		}
 	}
-	return st
+	switch {
+	case near > i:
+		return i
+	case near >= 0:
+		return i - 1
+	case i < n-1:
+		return i
+	case n > 1:
+		return n - 2
+	}
+	return -1
 }
 
-// length returns the split's length along its orientation, from the last layout.
-// It is 0 before the split is laid out.
-func (s *SplitElement) length(ctx *Context, key string) float64 {
-	r, ok := ctx.rt.Find(key)
-	if !ok {
+// collapseOwner returns the pane that divider d collapses, or -1 when it collapses none: the first
+// collapsible pane, in order, whose collapseDivider is d.
+func (s *SplitElement) collapseOwner(d int) int {
+	for i, p := range s.panes {
+		if p.collapsible && s.collapseDivider(i) == d {
+			return i
+		}
+	}
+	return -1
+}
+
+// paneMemo is the state the split keeps for a pane whose state the app does not own: its size, its
+// fill weight and whether it is collapsed. The split keeps it by the pane's identity.
+type paneMemo struct {
+	size      Length
+	weight    float64
+	collapsed bool
+}
+
+// splitDrag is a drag of a divider: the divider, the pointer's position along the split when the
+// drag began, the sizes of its two panes then in logical pixels, and the change last applied.
+type splitDrag struct {
+	on     bool
+	d      int
+	at     float64
+	sa, sb float64
+	last   float64
+}
+
+// paneView is a pane as a render sees it: its configuration with the size, weight and collapse state
+// the app or the split holds for it, and its limits at the split's length.
+type paneView struct {
+	pane      *PaneElement
+	sized     bool
+	size      Length
+	weight    float64
+	collapsed bool
+	lo, hi    float64 // the limits in logical pixels; hi is +Inf when there is no most
+}
+
+// percent reports whether the pane's size is a percentage.
+func (v paneView) percent() bool { return v.sized && v.size.Unit == layout.UnitPercent }
+
+// splitModel is the state of a split's panes at its length: each pane's view, and the sizes the
+// layout gives them (see resolvePanes). Its base sizes are the ones a move changes; shown sizes
+// are what is drawn.
+type splitModel struct {
+	measured    bool // the split has a length: it has been laid out
+	avail       float64
+	views       []paneView
+	base, shown []float64
+}
+
+// inert reports whether divider d cannot move: a collapsed pane is on either side of it.
+func (m splitModel) inert(d int) bool { return m.views[d].collapsed || m.views[d+1].collapsed }
+
+// driver returns the pane that divider d resizes for an arrow key moving it in direction dir (-1 for
+// Left and Up, 1 for Right and Down), and for its accessibility value (dir 1). It is the sized pane of
+// the two when only one is sized. When both are sized, it is the pane the key enlarges: the before
+// pane for a key that moves the divider forward, and the after pane for one that moves it back.
+// When both fill, it is the before pane.
+func (m splitModel) driver(d, dir int) int {
+	a, b := m.views[d], m.views[d+1]
+	switch {
+	case a.sized && !b.sized:
+		return d
+	case b.sized && !a.sized:
+		return d + 1
+	case a.sized && b.sized && dir < 0:
+		return d + 1
+	}
+	return d
+}
+
+// pairRange returns how far the before pane of divider d can move, in logical pixels, from the sizes
+// sa and sb of its two panes: the least and the greatest change that keeps both within their limits.
+func (m splitModel) pairRange(d int, sa, sb float64) (dmin, dmax float64) {
+	a, b := m.views[d], m.views[d+1]
+	dmin = max(a.lo-sa, sb-b.hi)
+	dmax = min(a.hi-sa, sb-b.lo)
+	if dmin > dmax {
+		return 0, 0
+	}
+	return dmin, dmax
+}
+
+// toUnit returns the logical pixels px of pane v in the pane's unit: pixels, or percent of the length
+// available to the panes.
+func (m splitModel) toUnit(v paneView, px float64) float64 {
+	if !v.percent() {
+		return px
+	}
+	if m.avail <= 0 {
 		return 0
 	}
-	if s.vertical() {
-		return float64(r.H)
+	return px / m.avail * 100
+}
+
+// fromUnit returns x in the unit of pane v as logical pixels; see toUnit.
+func (m splitModel) fromUnit(v paneView, x float64) float64 {
+	if !v.percent() {
+		return x
 	}
-	return float64(r.W)
+	return x / 100 * m.avail
+}
+
+// step returns the size of an arrow step of pane v, large with Shift, in logical pixels and in the
+// pane's unit.
+func (m splitModel) step(v paneView, large bool) (px, unit float64) {
+	if v.percent() {
+		unit = splitStepPercent
+		if large {
+			unit = splitLargePercent
+		}
+		return m.fromUnit(v, unit), unit
+	}
+	unit = splitStepPx
+	if large {
+		unit = splitLargePx
+	}
+	return unit, unit
+}
+
+// rangeOf returns the accessibility value of divider d, which is the size of the pane it resizes
+// (see driver) in that pane's unit, the least and the greatest size that pane can take, and the
+// small and large steps.
+func (m splitModel) rangeOf(d int) (value, lo, hi, small, large float64) {
+	if !m.measured {
+		return 0, 0, 0, 0, 0
+	}
+	drv := m.driver(d, 1)
+	sa, sb := m.base[d], m.base[d+1]
+	dmin, dmax := m.pairRange(d, sa, sb)
+	v := m.views[drv]
+	if drv == d {
+		value, lo, hi = sa, sa+dmin, sa+dmax
+	} else {
+		value, lo, hi = sb, sb-dmax, sb-dmin
+	}
+	_, small = m.step(v, false)
+	_, large = m.step(v, true)
+	return m.toUnit(v, value), m.toUnit(v, lo), m.toUnit(v, hi), small, large
+}
+
+// splitRender is the state of one render of a split, which its dividers share: the split, the key
+// and orientation of its box, the accessible name of its dividers, and the signals that hold its
+// length, the state of its panes and the drag.
+type splitRender struct {
+	s      *SplitElement
+	key    string
+	vert   bool
+	length *Signal[float64]
+	memo   *Signal[map[string]paneMemo]
+	drag   *Signal[splitDrag]
+}
+
+// model returns the state of the panes at a split length of total logical pixels. Before the split
+// has been laid out, total is 0 and the model is not measured.
+func (r *splitRender) model(total float64) splitModel {
+	panes := r.s.panes
+	m := splitModel{
+		measured: total > 0,
+		avail:    max(total-float64(max(len(panes)-1, 0))*splitHit, 0),
+		views:    make([]paneView, len(panes)),
+	}
+	mem := r.memo.Get()
+	ins := make([]paneIn, len(panes))
+	for i, p := range panes {
+		e, ok := mem[p.identity(i)]
+		if !ok {
+			e = paneMemo{size: p.size, weight: 1}
+		}
+		v := paneView{pane: p, sized: p.sized, size: e.size, weight: e.weight, collapsed: p.collapsible && e.collapsed}
+		if p.sig != nil {
+			v.size = p.sig.Get()
+		}
+		if p.collapsed != nil {
+			v.collapsed = p.collapsible && p.collapsed.Get()
+		}
+		if v.sized && v.size.Unit != layout.UnitPx && v.size.Unit != layout.UnitPercent {
+			panic("ui.Pane: the length in the SizeSignal must be a pixel or percentage length, such as ui.Px(200)")
+		}
+		v.lo, v.hi = paneLimits(p, m.avail)
+		m.views[i] = v
+		ins[i] = paneIn{sized: v.sized, size: v.size, lo: v.lo, hi: v.hi, weight: v.weight, hidden: v.collapsed}
+	}
+	m.base, m.shown = resolvePanes(ins, m.avail)
+	return m
+}
+
+// write stores the state of pane i of the model m, with f applied to it.
+func (r *splitRender) write(m splitModel, i int, f func(*paneMemo)) {
+	v := m.views[i]
+	e := paneMemo{size: v.size, weight: v.weight, collapsed: v.collapsed}
+	f(&e)
+	mem := maps.Clone(r.memo.Peek())
+	if mem == nil {
+		mem = map[string]paneMemo{}
+	}
+	mem[v.pane.identity(i)] = e
+	r.memo.Set(mem)
+}
+
+// setSize sets the size of sized pane i to px logical pixels, in the pane's unit.
+func (r *splitRender) setSize(m splitModel, i int, px float64) {
+	v := m.views[i]
+	px = max(px, 0)
+	l := Px(float32(px))
+	if v.percent() {
+		l = Percent(float32(m.toUnit(v, px)))
+	}
+	if v.pane.sig != nil {
+		v.pane.sig.Set(l)
+		return
+	}
+	r.write(m, i, func(e *paneMemo) { e.size = l })
+}
+
+// setPair sets the sizes of the two panes of divider d after its before pane moves by delta logical
+// pixels from the sizes sa and sb that the move starts from. A fill pane beside a sized one takes what
+// the sized one gives up, through the layout; two fill panes keep their sum of weights, and take the
+// new ratio of their sizes.
+func (r *splitRender) setPair(m splitModel, d int, sa, sb, delta float64) {
+	a, b := m.views[d], m.views[d+1]
+	switch {
+	case a.sized && b.sized:
+		r.setSize(m, d, sa+delta)
+		r.setSize(m, d+1, sb-delta)
+	case a.sized:
+		r.setSize(m, d, sa+delta)
+	case b.sized:
+		r.setSize(m, d+1, sb-delta)
+	default:
+		wa, wb := max(a.weight, 0), max(b.weight, 0)
+		sum := wa + wb
+		if sum == 0 {
+			wa, wb, sum = 1, 1, 2
+		}
+		if pair := sa + sb; pair > 0 {
+			wa = sum * max(sa+delta, 0) / pair
+			wb = sum - wa
+		}
+		r.write(m, d, func(e *paneMemo) { e.weight = wa })
+		r.write(m, d+1, func(e *paneMemo) { e.weight = wb })
+	}
+}
+
+// changed runs OnChange after a size changed.
+func (r *splitRender) changed() {
+	if r.s.onChange != nil {
+		r.s.onChange()
+	}
+}
+
+// move moves divider d by delta logical pixels of its before pane, from the sizes the panes have now,
+// and stops it at the limits of the two panes. It runs OnChange if a size changed.
+func (r *splitRender) move(d int, delta float64) {
+	m := r.model(r.length.Peek())
+	if !m.measured || m.inert(d) {
+		return
+	}
+	sa, sb := m.base[d], m.base[d+1]
+	dmin, dmax := m.pairRange(d, sa, sb)
+	delta = min(max(delta, dmin), dmax)
+	if delta == 0 {
+		return
+	}
+	r.setPair(m, d, sa, sb, delta)
+	r.changed()
+}
+
+// nudge moves divider d by one arrow step in direction dir (-1 or 1), by the step of the pane it
+// resizes (see driver), large with Shift.
+func (r *splitRender) nudge(d, dir int, large bool) {
+	m := r.model(r.length.Peek())
+	if !m.measured || m.inert(d) {
+		return
+	}
+	px, _ := m.step(m.views[m.driver(d, dir)], large)
+	r.move(d, float64(dir)*px)
+}
+
+// dragTo moves the divider that is being dragged to the pointer's position along the split, pos. The
+// move is set from the sizes the drag began with, so the divider follows the pointer and stops at the
+// limits. It runs OnChange when the position changes.
+func (r *splitRender) dragTo(d int, pos float64) {
+	dr := r.drag.Peek()
+	if !dr.on || dr.d != d {
+		return
+	}
+	m := r.model(r.length.Peek())
+	if !m.measured {
+		return
+	}
+	dmin, dmax := m.pairRange(d, dr.sa, dr.sb)
+	delta := min(max(pos-dr.at, dmin), dmax)
+	if delta == dr.last {
+		return
+	}
+	dr.last = delta
+	r.drag.Set(dr)
+	r.setPair(m, d, dr.sa, dr.sb, delta)
+	r.changed()
+}
+
+// setValue moves divider d so that the pane it resizes has the size x, in that pane's unit, within the
+// limits.
+func (r *splitRender) setValue(d int, x float64) {
+	m := r.model(r.length.Peek())
+	if !m.measured || m.inert(d) {
+		return
+	}
+	drv := m.driver(d, 1)
+	px := m.fromUnit(m.views[drv], x)
+	if drv == d {
+		r.move(d, px-m.base[d])
+	} else {
+		r.move(d, m.base[d+1]-px)
+	}
+}
+
+// toggle collapses or restores the pane that divider d collapses (see collapseOwner).
+func (r *splitRender) toggle(d int) {
+	i := r.s.collapseOwner(d)
+	if i < 0 {
+		return
+	}
+	m := r.model(r.length.Peek())
+	v := m.views[i]
+	if v.pane.collapsed != nil {
+		v.pane.collapsed.Set(!v.collapsed)
+		return
+	}
+	r.write(m, i, func(e *paneMemo) { e.collapsed = !v.collapsed })
+}
+
+// sizePane sets the box of pane i of the model m: its size from the layout, or hidden when collapsed.
+// Before the split has a length, the panes share it equally, and the layout corrects them once the
+// length is known.
+func (r *splitRender) sizePane(d *DivElement, m splitModel, i int) {
+	if m.views[i].collapsed {
+		d.Display(false)
+		return
+	}
+	if !m.measured {
+		d.Grow(1).Basis(Px(0))
+		return
+	}
+	l := Px(float32(m.shown[i]))
+	if r.vert {
+		d.Height(l)
+	} else {
+		d.Width(l)
+	}
+	d.Shrink(0).MinWidth(Px(0)).MinHeight(Px(0))
+}
+
+// handle returns divider d, between panes d and d+1: its focusable hit area, which holds the bar and
+// the grip. The hit area is the window splitter, with its value and steps.
+func (r *splitRender) handle(st SplitStyle, d int) Element {
+	return Component(func(ctx *Context) Element {
+		m := r.model(r.length.Get())
+		dr := r.drag.Get()
+		dragged := dr.on && dr.d == d
+		bar := Div().asPart("Split.Divider").Style(st.Divider)
+		switch {
+		case dragged:
+			bar.Style(st.DividerActive)
+		case ctx.hovered():
+			bar.Style(st.DividerHover)
+		}
+		if ctx.KeyboardFocus() {
+			bar.Style(st.DividerFocusVisible)
+		}
+		hit := Div().asPart("Split.Handle").Shrink(0).Center()
+		if r.vert {
+			hit.Column().Height(Px(splitHit)).Cursor(input.CursorResizeNS)
+		} else {
+			hit.Row().Width(Px(splitHit)).Cursor(input.CursorResizeEW)
+		}
+		hit.Child(bar)
+		if r.s.grip == GripShown || r.s.grip == GripOnHover && (ctx.hovered() || dragged || ctx.KeyboardFocus()) {
+			hit.Child(Div().Absolute().Inset(0).Center().Child(Div().asPart("Split.Grip").Style(st.Grip)))
+		}
+		hit.Role(access.RoleSeparator).Label(r.dividerName(ctx, d)).Focusable()
+		value, lo, hi, small, large := m.rangeOf(d)
+		a := hit.access()
+		a.rng = &access.Range{Value: value, Min: lo, Max: hi, SmallChange: small, LargeChange: large}
+		a.setRange = func(x float64) { r.setValue(d, x) }
+		hit.OnKeyDown(func(e *KeyEvent) {
+			if e.Mods&^input.ModShift != 0 {
+				return
+			}
+			shift := e.Mods&input.ModShift != 0
+			back, forward := input.KeyLeft, input.KeyRight
+			if r.vert {
+				back, forward = input.KeyUp, input.KeyDown
+			}
+			switch e.Key {
+			case input.KeyEnter:
+				if r.s.collapseOwner(d) < 0 {
+					return
+				}
+				r.toggle(d)
+			case back:
+				r.nudge(d, -1, shift)
+			case forward:
+				r.nudge(d, 1, shift)
+			case input.KeyHome:
+				r.move(d, math.Inf(-1))
+			case input.KeyEnd:
+				r.move(d, math.Inf(1))
+			default:
+				return
+			}
+			e.StopPropagation()
+		})
+		hit.OnMouseDown(func(e *MouseEvent) {
+			if e.Button != input.ButtonLeft {
+				return
+			}
+			m := r.model(r.length.Peek())
+			if !m.measured || m.inert(d) {
+				return
+			}
+			r.drag.Set(splitDrag{on: true, d: d, at: r.axis(e), sa: m.base[d], sb: m.base[d+1]})
+		}).
+			OnMouseMove(func(e *MouseEvent) { r.dragTo(d, r.axis(e)) }).
+			OnMouseUp(func(*MouseEvent) {
+				if r.drag.Peek().on {
+					r.drag.Set(splitDrag{})
+				}
+				if r.s.onRelease != nil {
+					r.s.onRelease()
+				}
+			}).
+			CapturePointer().
+			OnDoubleClick(func() { r.toggle(d) })
+		return hit
+	})
+}
+
+// dividerName returns the accessible name of divider d. The split's Label names every divider. Without
+// it, a divider whose two panes both have a Label is named after them, as "Resize" followed by the two
+// names (see Strings.ResizeBetween); any other divider is the window's Resize panes text.
+func (r *splitRender) dividerName(ctx *Context, d int) string {
+	if r.s.name != "" {
+		return r.s.name
+	}
+	strs := ctx.Strings()
+	first, second := r.s.panes[d].name, r.s.panes[d+1].name
+	if first != "" && second != "" {
+		return strs.ResizeBetween(first, second)
+	}
+	return strs.ResizePanes
+}
+
+// axis returns the pointer's position along the split.
+func (r *splitRender) axis(e *MouseEvent) float64 {
+	if r.vert {
+		return float64(e.Y)
+	}
+	return float64(e.X)
+}
+
+// watchSplit records that the split rendered at a length of total logical pixels along its
+// orientation, so that a change of its length renders it again (see splitsResized).
+func (rt *Runtime) watchSplit(inst *componentInstance, key string, vert bool, total float64) {
+	if rt.splitWatches == nil {
+		rt.splitWatches = map[*componentInstance]*splitWatch{}
+	}
+	w := rt.splitWatches[inst]
+	if w == nil {
+		w = &splitWatch{}
+		rt.splitWatches[inst] = w
+	}
+	w.key, w.vert, w.seen = key, vert, total
+}
+
+// splitWatch is a split that sizes its panes from its own length. See Runtime.splitsResized. node is
+// the split's box as the last check found it, so the check does not search the tree again.
+type splitWatch struct {
+	key  string
+	vert bool
+	seen float64 // the length the split last rendered at
+	node *node
+}
+
+// splitAxis returns the length of the split with key along its orientation, from the last layout. It
+// is zero before the split has been laid out.
+func (rt *Runtime) splitAxis(key string, vert bool) float64 {
+	if n := rt.findKey(rt.tree, key); n != nil {
+		return axisLength(n, vert)
+	}
+	return 0
+}
+
+// axisLength returns the length of the node n along the orientation, from its layout.
+func axisLength(n *node, vert bool) float64 {
+	if vert {
+		return float64(n.lay.H)
+	}
+	return float64(n.lay.W)
+}
+
+// splitsResized reports whether a split's length changed in the last layout. Such a split is
+// marked for a render, which sizes its panes to the length it has now, before the frame is painted.
+// The box of each split is kept, and it is looked up again only when it is no longer live (the
+// node left the tree, or was built again) or its key changed, so a check costs one map read per
+// split. A split that is not in the tree, such as one parked by a retained panel, is searched for
+// on each check until it is back.
+func (rt *Runtime) splitsResized() bool {
+	changed := false
+	for inst, w := range rt.splitWatches {
+		if inst.disposed {
+			delete(rt.splitWatches, inst)
+			continue
+		}
+		if w.node == nil || rt.byID[w.node.id] != w.node || w.node.key != w.key {
+			w.node = rt.findKey(rt.tree, w.key)
+		}
+		if w.node == nil {
+			continue
+		}
+		if axisLength(w.node, w.vert) != w.seen {
+			inst.invalidate()
+			changed = true
+		}
+	}
+	return changed
 }
 
 func (s *SplitElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		vert := s.vertical()
 		st := resolveSplit(ctx, vert, s.styles)
-		pos := s.pos
-		if pos == nil {
-			pos = Local(ctx, "position", 0.5)
-		}
-		collapsed := s.collapsed
-		if collapsed == nil {
-			collapsed = Local(ctx, "collapsed", false)
-		}
-		dragging := Local(ctx, "dragging", false)
-		drag := Local(ctx, "drag", splitDrag{})
-
-		// The split finds its own rectangle by key, which is its component's id
-		// unless the app gave it a key. The layout of the last frame gives its length.
 		key := s.key
 		if key == "" {
 			key = fmt.Sprintf("split:%x", ctx.id)
 		}
-		name := s.name
-		if name == "" {
-			name = ctx.Strings().ResizePanes
+		r := &splitRender{
+			s:      s,
+			key:    key,
+			vert:   vert,
+			length: Local(ctx, "length", 0.0),
+			memo:   Local(ctx, "memo", map[string]paneMemo(nil)),
+			drag:   Local(ctx, "drag", splitDrag{}),
 		}
-		// The layout comes after the render, and while a render builds the tree it finds
-		// no layout for the split yet. The last measured length is kept. A split that has
-		// not been laid out asks again once the frame has been, and a new length renders
-		// the split again, so the range it reports is the current one. A window resize
-		// does not render the split, so its range follows the next render.
-		known := Local(ctx, "length", 0.0)
-		if measured := s.length(ctx, key); measured > 0 && measured != known.Peek() {
-			known.Set(measured)
-			ctx.Invalidate()
-		} else if measured == 0 && known.Peek() == 0 {
-			ctx.Post(func() {
-				if m := s.length(ctx, key); m > 0 && known.Peek() == 0 {
-					known.Set(m)
-					ctx.Invalidate()
-				}
-			})
+		// The split finds its own box by key, and its length is the last layout's. The
+		// layout comes after the render, so a split that has not been laid out yet renders
+		// with no length, and the runtime renders it again once its length is known.
+		total := ctx.rt.splitAxis(key, vert)
+		if total != r.length.Peek() {
+			r.length.Set(total)
 		}
-		total := known.Get()
-		ss := s.state(pos, collapsed, total)
-		// isCollapsed reports whether the collapsible pane is collapsed, from the signal now.
-		isCollapsed := func() bool { return s.collapsible && collapsed.Peek() }
-
-		// setFirst moves the first pane to p logical pixels, within the limits, and
-		// stores the position it gives. Nothing moves before the split has a length.
-		setFirst := func(p float64, total float64) {
-			if total <= 0 || isCollapsed() {
-				return
-			}
-			lo, hi := s.bounds(total)
-			nv := s.fromPx(min(max(p, lo), hi), total)
-			if nv == pos.Peek() {
-				return
-			}
-			pos.Set(nv)
-			if s.onChange != nil {
-				s.onChange(nv)
-			}
+		ctx.rt.watchSplit(ctx.inst, key, vert, total)
+		if len(s.panes) == 0 {
+			return s.size.apply(Div())
 		}
-		// move moves the divider by delta, in the units of the position.
-		move := func(delta float64) {
-			total := s.length(ctx, key)
-			setFirst(s.toPx(pos.Peek(), total)+s.toPx(delta, total), total)
-		}
-		toggle := func() {
-			if s.collapsible {
-				collapsed.Set(!collapsed.Peek())
-			}
-		}
-		// axis returns the pointer's position along the split.
-		axis := func(e *MouseEvent) float64 {
-			if vert {
-				return float64(e.Y)
-			}
-			return float64(e.X)
-		}
-
-		// The panes. The first is sized by the position, as a percentage of the split
-		// in a fraction split and in pixels otherwise. The second takes the rest.
-		first := Div().asPart("Split.Pane").Column().Style(st.Pane)
-		second := Div().asPart("Split.Pane").Column().Style(st.Pane)
-		setMain := func(d *DivElement, size Length, lo, hi float64) {
-			maxL := Auto
-			if !math.IsInf(hi, 1) {
-				maxL = Px(float32(hi))
-			}
-			if vert {
-				d.Height(size).MinHeight(Px(float32(lo))).MaxHeight(maxL)
-			} else {
-				d.Width(size).MinWidth(Px(float32(lo))).MaxWidth(maxL)
-			}
-		}
-		fill := func(d *DivElement) { d.Grow(1).Basis(Px(0)) }
-		switch {
-		case ss.hiddenFirst:
-			first.Display(false)
-			setMain(second, Auto, s.minSecond, s.maxSecond)
-			fill(second)
-		case ss.hiddenSecond:
-			second.Display(false)
-			setMain(first, Auto, s.minFirst, s.maxFirst)
-			fill(first)
-		default:
-			size := Px(float32(s.toPx(ss.shown, total)))
-			if !s.pixels {
-				size = Percent(float32(ss.shown * 100))
-			}
-			setMain(first, size, s.minFirst, s.maxFirst)
-			setMain(second, Auto, s.minSecond, s.maxSecond)
-			fill(second)
-		}
-		first.Child(s.first)
-		second.Child(s.second)
-		if s.firstName != "" {
-			first.Role(access.RoleGroup).Label(s.firstName)
-		}
-		if s.secondName != "" {
-			second.Role(access.RoleGroup).Label(s.secondName)
-		}
-
-		// The divider is a component of its own, so that it re-renders when its pointer or
-		// focus state changes, and when the split's state does: it reads the same signals as
-		// the split. Its focusable element is the hit area; the bar and the grip are drawn
-		// over it. It does not take its state from the split's render, which would be
-		// captured once and kept while the divider is reused.
-		handle := Component(func(ctx *Context) Element {
-			ds := s.state(pos, collapsed, known.Get())
-			bar := Div().asPart("Split.Divider").Style(st.Divider)
-			if dragging.Get() {
-				bar.Style(st.DividerActive)
-			} else if ctx.hovered() {
-				bar.Style(st.DividerHover)
-			}
-			if ctx.KeyboardFocus() {
-				bar.Style(st.DividerFocusVisible)
-			}
-			hit := Div().asPart("Split.Handle").Shrink(0).Center()
-			if vert {
-				hit.Column().Height(Px(splitHit)).Cursor(input.CursorResizeNS)
-			} else {
-				hit.Row().Width(Px(splitHit)).Cursor(input.CursorResizeEW)
-			}
-			hit.Child(bar)
-			if s.grip == GripShown || s.grip == GripOnHover && (ctx.hovered() || dragging.Get() || ctx.KeyboardFocus()) {
-				hit.Child(Div().Absolute().Inset(0).Center().Child(Div().asPart("Split.Grip").Style(st.Grip)))
-			}
-
-			hit.Role(access.RoleSeparator).Label(name).Focusable()
-			a := hit.access()
-			a.rng = &access.Range{Value: ds.shown, Min: ds.lo, Max: ds.hi, SmallChange: ds.small, LargeChange: ds.large}
-			a.setRange = func(x float64) {
-				if isCollapsed() {
-					return
-				}
-				total := s.length(ctx, key)
-				setFirst(s.toPx(x, total), total)
-			}
-			hit.OnKeyDown(func(e *KeyEvent) {
-				if e.Mods&^input.ModShift != 0 {
-					return
-				}
-				step := ds.small
-				if e.Mods&input.ModShift != 0 {
-					step = ds.large
-				}
-				back, forward := input.KeyLeft, input.KeyRight
-				if vert {
-					back, forward = input.KeyUp, input.KeyDown
-				}
-				switch e.Key {
-				case input.KeyEnter:
-					if !s.collapsible {
-						return
-					}
-					toggle()
-				case back:
-					move(-step)
-				case forward:
-					move(step)
-				case input.KeyHome:
-					setFirst(math.Inf(-1), s.length(ctx, key))
-				case input.KeyEnd:
-					setFirst(math.Inf(1), s.length(ctx, key))
-				default:
-					return
-				}
-				e.StopPropagation()
-			})
-			hit.OnMouseDown(func(e *MouseEvent) {
-				if e.Button != input.ButtonLeft || isCollapsed() {
-					return
-				}
-				total := s.length(ctx, key)
-				dragging.Set(true)
-				drag.Set(splitDrag{at: axis(e), p: s.toPx(pos.Peek(), total)})
-			}).
-				OnMouseMove(func(e *MouseEvent) {
-					if !dragging.Peek() {
-						return
-					}
-					d := drag.Peek()
-					setFirst(d.p+(axis(e)-d.at), s.length(ctx, key))
-				}).
-				OnMouseUp(func(*MouseEvent) {
-					dragging.Set(false)
-					if s.onRelease != nil {
-						s.onRelease()
-					}
-				}).
-				CapturePointer().
-				OnDoubleClick(toggle)
-			return hit
-		})
-
-		root := Div().Key(key).Size(Full, Full)
+		m := r.model(total)
+		root := Div().Key(key).Size(Full, Full).ClipContent()
 		if vert {
 			root.Column()
 		} else {
 			root.Row()
 		}
-		root.Child(first).Child(handle).Child(second)
+		for i, p := range s.panes {
+			pane := Div().Key(key + "/pane:" + p.identity(i)).asPart("Split.Pane").Column().Style(st.Pane)
+			r.sizePane(pane, m, i)
+			pane.Child(p.content)
+			if p.name != "" {
+				pane.Role(access.RoleGroup).Label(p.name)
+			}
+			root.Child(pane)
+			if i < len(s.panes)-1 {
+				root.Child(r.handle(st, i))
+			}
+		}
 		return s.size.apply(root)
 	})
 }

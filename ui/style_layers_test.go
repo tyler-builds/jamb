@@ -123,7 +123,7 @@ var layerBuilders = []layerBuilder{
 	{"Slider", func(th *Theme) any { return &th.Slider },
 		func(st any) Element { return partSlider(NewSignal(0.5), st.(SliderStyle)) }},
 	{"Split", func(th *Theme) any { return &th.Split },
-		func(st any) Element { return partSplit(NewSignal(0.5), st.(SplitStyle)) }},
+		func(st any) Element { return partSplit(st.(SplitStyle)) }},
 	{"Dock", func(th *Theme) any { return &th.Dock },
 		func(st any) Element {
 			layout := DockLayout{Root: DockNode{Sizes: []float64{0.5, 0.5}, Children: []DockNode{

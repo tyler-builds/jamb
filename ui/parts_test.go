@@ -451,8 +451,8 @@ func testSelectParts(t *testing.T, applied map[string]bool) {
 }
 
 // partSplit is a split of two panes with the instance style st.
-func partSplit(pos *Signal[float64], st SplitStyle) Element {
-	return Div().Column().Child(Split(Div(), Div()).Position(pos).Styles(st))
+func partSplit(st SplitStyle) Element {
+	return Div().Column().Child(Split(Pane(Div()), Pane(Div())).Styles(st))
 }
 
 func testSplitParts(t *testing.T, applied map[string]bool) {
@@ -477,13 +477,12 @@ func testSplitParts(t *testing.T, applied map[string]bool) {
 		t.Run(c.part, func(t *testing.T) {
 			var st SplitStyle
 			c.set(&st, Style{Background: markBG})
-			pos := NewSignal(0.5)
-			r := newAccessRig(func(ctx *Context) Element { return partSplit(pos, st) })
+			r := newAccessRig(func(ctx *Context) Element { return partSplit(st) })
 			if c.act != nil {
 				c.act(t, r)
 			}
 			if c.part == "Split.Pane" {
-				wantBackground(t, panesByX(t, r)[0], c.part, markBG)
+				wantBackground(t, splitParts(r, "Split.Pane", false)[0], c.part, markBG)
 				return
 			}
 			wantBackground(t, partNode(t, r.rt, drawnBy(c.part), ""), c.part, markBG)

@@ -94,8 +94,9 @@ func TestDockRendersGroupsSplitsAndTabs(t *testing.T) {
 	if len(sep) != 1 || sep[0].Name != "Resize panes" {
 		t.Fatalf("separators %v, want one divider named Resize panes", sep)
 	}
-	if rg := sep[0].Range; rg == nil || math.Abs(rg.Value-0.5) > 0.01 {
-		t.Errorf("divider value %v, want the share 0.5", rg)
+	// The panes are percentage panes, so the divider's value is the first pane's share in percent.
+	if rg := sep[0].Range; rg == nil || math.Abs(rg.Value-50) > 0.01 {
+		t.Errorf("divider value %v, want the share 50 percent", rg)
 	}
 }
 
