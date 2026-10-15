@@ -167,6 +167,11 @@ type Theme struct {
 	// ColorPicker is the look of every color picker: its trigger, its panel and the
 	// sliders of the panel.
 	ColorPicker ColorPickerStyle
+
+	// styles is the values that SetThemeStyle stores, keyed by their type (see
+	// themeStyleKey). The map is never changed in place: SetThemeStyle stores a new
+	// one, so copies of the theme can share it.
+	styles map[any]any
 }
 
 // darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme
@@ -246,7 +251,8 @@ func LightTheme() *Theme { return lightTheme.Clone() }
 // built-in theme it was copied from. The copy shares the Shadows slices of its
 // part styles, so change a part by assigning a new style to its field, and do
 // not append to or change those slices in place. The copy has its own Syntax
-// map.
+// map. It has the styles that SetThemeStyle stored on t; setting one on the copy
+// does not change t, nor the other way round.
 func (t *Theme) Clone() *Theme {
 	c := *t
 	c.Syntax = maps.Clone(t.Syntax)

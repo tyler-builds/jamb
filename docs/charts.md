@@ -144,10 +144,21 @@ reduced motion setting the chart is drawn in full at once.
 
 ## Parts
 
-The parts of a chart are set with `Chart.Styles(charts.Style{...})`. A part's style
-merges over the built-in defaults, then over the chart's `Styles`. Under high
-contrast the colors are the system colors, whatever is set; sizes, spacing and
-fonts still apply.
+The parts of a chart are set with `Chart.Styles(charts.Style{...})`, or for every
+chart of a theme with `ui.SetThemeStyle(theme, charts.Style{...})` (see
+[Styles of other widgets on a theme](theming.md#styles-of-other-widgets-on-a-theme)).
+A part's style merges over the built-in defaults, then over the theme's
+`charts.Style`, then over the chart's `Styles`, field by field. Under high contrast
+the colors are the system colors, whatever the theme or the chart sets; sizes,
+spacing and fonts still apply. The inspector names the layers "built-in default",
+"theme", "instance Styles" and "high contrast".
+
+```go
+for _, t := range []*ui.Theme{light, dark} { // set it on each theme the window uses
+	ui.SetThemeStyle(t, charts.Style{Title: ui.Style{FontSize: 18}, Axis: ui.Style{FontSize: 13}})
+}
+chart.Styles(charts.Style{Title: ui.Style{FontSize: 20}}) // this chart: 20, axis 13
+```
 
 | Part | Applies to | Notes |
 | --- | --- | --- |

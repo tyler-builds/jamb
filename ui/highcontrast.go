@@ -13,7 +13,8 @@ import "strings"
 // WindowText, and keywords in Highlight. Radius, FontSize and the widget parts (the
 // Theme fields for each widget kind, such as Tabs, Button and Toast) are taken
 // from base; the parts keep only their sizes and spacing under high contrast (see
-// plainStyle).
+// plainStyle). So are the styles that SetThemeStyle stored on base, which widgets
+// read the same way: sizes and spacing, with the system colors.
 func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 	if c.isZero() {
 		c = HighContrastBlack()
@@ -89,6 +90,8 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		ColorPicker:     base.ColorPicker,
 		Drawer:          base.Drawer,
 		Popover:         base.Popover,
+
+		styles: base.styles, // never changed in place (see SetThemeStyle)
 	}
 	t.CodeEditor = CodeEditorColors{
 		Background:       c.Window,

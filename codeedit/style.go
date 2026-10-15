@@ -3,8 +3,9 @@ package codeedit
 import "github.com/tyler-builds/jamb/ui"
 
 // Style is the look of the parts of an Editor. A part's style merges over the built-in
-// defaults, which come from the colors of the theme (Theme.CodeEditor and Theme.Syntax), and
-// then over the Styles of the editor. Box is the frame of the editor: its Background,
+// defaults, which come from the colors of the theme (Theme.CodeEditor and Theme.Syntax), then
+// over the Style that the theme holds for every editor (set with ui.SetThemeStyle), and then
+// over the Styles of the editor. Box is the frame of the editor: its Background,
 // border, radius and padding. BoxFocused is the frame while the editor has focus. By default
 // it is unset, as in code editors, where the caret shows focus: the frame does not change.
 // Under high contrast it is a border of the Highlight color, so focus shows in the frame as
@@ -16,7 +17,7 @@ import "github.com/tyler-builds/jamb/ui"
 // of the find and replace bar.
 //
 // Under high contrast the colors of these parts are the system colors, whatever is set
-// here; their sizes and spacing still apply.
+// here or in the theme; their sizes and spacing still apply.
 type Style struct {
 	// Box is the frame of the editor and its background.
 	Box ui.Style
@@ -81,24 +82,35 @@ func editorDefaults(t *ui.Theme) Style {
 	}
 }
 
+// plain returns s with each part without its colors (see plainPart).
+func (s Style) plain() Style {
+	return Style{
+		Box:          plainPart(s.Box),
+		BoxFocused:   plainPart(s.BoxFocused),
+		Text:         plainPart(s.Text),
+		Gutter:       plainPart(s.Gutter),
+		ActiveLine:   plainPart(s.ActiveLine),
+		Selection:    plainPart(s.Selection),
+		Match:        plainPart(s.Match),
+		CurrentMatch: plainPart(s.CurrentMatch),
+		Find:         plainPart(s.Find),
+	}
+}
+
 // resolve returns the look of the parts in the theme t: the defaults, merged with the
-// editor's Styles. Under high contrast the colors are the system colors, which the theme
-// holds, so the Styles' colors are dropped.
+// theme's codeedit.Style (see ui.ThemeStyle), then with the editor's Styles. Under high
+// contrast the colors are the system colors, which the theme holds, so the colors of the
+// theme's style and of the Styles are dropped.
 func (s Style) resolve(ctx *ui.Context) Style {
 	t := ctx.Theme()
-	st := ui.StyleLayer(ctx, editorDefaults(t), "built-in default").merge(ui.StyleLayer(ctx, s, "instance Styles"))
+	themed, _ := ui.ThemeStyle[Style](t)
 	if t.HighContrast {
-		st = ui.StyleLayer(ctx, editorDefaults(t), "built-in default").merge(ui.StyleLayer(ctx, Style{
-			Box:          plainPart(s.Box),
-			BoxFocused:   plainPart(s.BoxFocused),
-			Text:         plainPart(s.Text),
-			Gutter:       plainPart(s.Gutter),
-			ActiveLine:   plainPart(s.ActiveLine),
-			Selection:    plainPart(s.Selection),
-			Match:        plainPart(s.Match),
-			CurrentMatch: plainPart(s.CurrentMatch),
-			Find:         plainPart(s.Find),
-		}, "instance Styles"))
+		themed, s = themed.plain(), s.plain()
+	}
+	st := ui.StyleLayer(ctx, editorDefaults(t), "built-in default").
+		merge(ui.StyleLayer(ctx, themed, "theme")).
+		merge(ui.StyleLayer(ctx, s, "instance Styles"))
+	if t.HighContrast {
 		st.Text = st.Text.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.CodeEditor.Foreground}, "high contrast"))
 		st.Gutter = st.Gutter.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.CodeEditor.LineNumber}, "high contrast"))
 	}

@@ -53,8 +53,9 @@
 // Parts (see Style) are the chart box (Chart), the title (Title), the axis labels
 // and titles (Axis), the grid lines (Grid), the legend row (Legend), each legend
 // item (LegendItem) and the tooltip box (Tooltip). A part's style merges over
-// the built-in defaults, and under high contrast its colors are the system
-// colors (see docs/charts.md).
+// the built-in defaults, then over the theme's Style for every chart (see
+// ui.SetThemeStyle), then over the chart's Styles, and under high contrast its
+// colors are the system colors (see docs/charts.md).
 //
 // The package does not inspect the data it is given. Labels, summaries and the
 // table are written from the values, names and positions that the app supplies, as
@@ -262,14 +263,15 @@ func (c *Chart) Grow(f float32) *Chart { c.size.setGrow(f); return c }
 func (c *Chart) GridSpan(cols, rows int) *Chart { c.size.setSpan(cols, rows); return c }
 
 // Styles sets the look of the parts of the chart, for this chart only. Set fields win
-// over the defaults. Calling Styles again merges with the earlier values.
+// over the theme's Style and the defaults. Calling Styles again merges with the earlier values.
 func (c *Chart) Styles(st Style) *Chart {
 	c.styles = c.styles.merge(st)
 	return c
 }
 
 // Style is the look of the parts of a chart. A part's style merges over the built-in
-// defaults, then over the Styles of the chart. Chart is the box around the title, the
+// defaults, then over the Style that the theme holds for every chart (set with
+// ui.SetThemeStyle), then over the Styles of the chart. Chart is the box around the title, the
 // canvas and the legend: its Background, border, radius and padding. Title is the
 // title text. Axis is the text of the axis labels and titles: its TextColor and
 // FontSize. Grid is the grid lines: its BorderColor is their color and its BorderWidth
@@ -278,7 +280,7 @@ func (c *Chart) Styles(st Style) *Chart {
 // tooltip: its Background, border, shadow, padding and text color.
 //
 // Under high contrast the colors of these parts are the system colors, whatever is set
-// here; their sizes, spacing and fonts still apply.
+// here or in the theme; their sizes, spacing and fonts still apply.
 type Style struct {
 	// Chart is the style of the whole chart.
 	Chart ui.Style
@@ -332,10 +334,14 @@ func chartDefaults(t *ui.Theme) Style {
 }
 
 // resolveStyle returns the look of the parts in the theme t: the defaults, merged with
-// the chart's Styles. Under high contrast the colors are the system colors (see plain).
+// the theme's charts.Style (see ui.ThemeStyle), then with the chart's Styles. Under high
+// contrast the colors are the system colors (see plain).
 func (c *Chart) resolveStyle(ctx *ui.Context) Style {
 	t := ctx.Theme()
-	st := ui.StyleLayer(ctx, chartDefaults(t), "built-in default").merge(ui.StyleLayer(ctx, c.styles, "instance Styles"))
+	themed, _ := ui.ThemeStyle[Style](t)
+	st := ui.StyleLayer(ctx, chartDefaults(t), "built-in default").
+		merge(ui.StyleLayer(ctx, themed, "theme")).
+		merge(ui.StyleLayer(ctx, c.styles, "instance Styles"))
 	if t.HighContrast {
 		st = Style{Chart: plain(st.Chart), Title: plain(st.Title), Axis: plain(st.Axis), Grid: plain(st.Grid),
 			Legend: plain(st.Legend), LegendItem: plain(st.LegendItem), Tooltip: plain(st.Tooltip)}

@@ -101,7 +101,7 @@ func (e *EditorElement) GridSpan(cols, rows int) *EditorElement {
 }
 
 // Styles sets the look of the parts of the editor, for this editor only. Set fields win
-// over the defaults. Calling Styles again merges with the earlier values.
+// over the theme's Style and the defaults. Calling Styles again merges with the earlier values.
 func (e *EditorElement) Styles(st Style) *EditorElement {
 	e.styles = e.styles.merge(st)
 	return e
