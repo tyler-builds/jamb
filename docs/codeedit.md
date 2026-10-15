@@ -1,5 +1,29 @@
 # Code editor
 
+## Code editor
+
+The `codeedit` package is a code editor for source files, with undo and redo, several selections,
+find and replace, folding by indentation, and tree-sitter highlighting. It is built with
+`codeedit.Editor(codeedit.NewDocument(text))`. Its keys are actions with default bindings, so they
+work without setup, and an app can rebind them. The sections below cover the keys,
+the document, highlighting, the limits and the measured performance.
+
+The grammars for highlighting are in their own module,
+[github.com/tyler-builds/jamb-grammars](https://github.com/tyler-builds/jamb-grammars), one package
+per language, so jamb itself carries none of them:
+
+```go
+import "github.com/tyler-builds/jamb-grammars/golang"
+
+codeedit.Editor(doc).Language(golang.Grammar)
+```
+
+Highlighting runs tree-sitter in WebAssembly through wazero, which adds about 1.1 MB to an app's
+binary, plus each grammar it imports (Go is 0.36 MB). wazero uses Go's SHA-256, which links Go's
+FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `codeedit` uses about
+32 MB more private memory than one that does not (see BENCHMARKS.md). Apps that do not import
+`codeedit` link none of this.
+
 The `codeedit` package is a code editor for source files: a multi-line text area with a
 line-indexed buffer, undo and redo, several selections, find and replace, folding by
 indentation, tree-sitter syntax highlighting, input-method composition, and an accessibility

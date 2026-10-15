@@ -17,12 +17,12 @@ draws the part with that style merged over its built-in look. A part's name is p
 of the typed style struct, so autocomplete and the documentation list every part.
 
 Every built-in widget with a look of its own has parts. The table of widgets and
-their parts is at the end of this document, and each widget's README section names
+their parts is at the end of this document, and each widget's section in the topic docs names
 its style struct.
 
 The parts are plain `ui.Style` values, so every field of `ui.Style` works in a part:
 size, padding, margin, background, border, radius, shadow, opacity, text color, font
-size and weight, transition. See the Style section of the README for the list.
+size and weight, transition. See [Styling](theming.md#styling) for the list.
 
 ```go
 tabs := ui.Tabs(view, tabs...).Styles(ui.TabsStyle{
@@ -72,7 +72,7 @@ To style the parts for a whole app, start the app's theme from a built-in theme,
 and pass it to the app and to every theme switch. `ui.DarkTheme()` and
 `ui.LightTheme()` return a new copy on every call, so the app can change its copy
 freely. `ui.NewTheme(name)` returns a copy of any predefined theme by its name, and
-`ui.Themes()` lists them (see "Predefined themes" in the README).
+`ui.Themes()` lists them (see [Predefined themes](theming.md#predefined-themes)).
 
 ```go
 // appTheme returns the dark theme of the app: the built-in one, with a 3 px
@@ -273,7 +273,7 @@ ui.TextInput(query).Icon(icons.Search).Trailing(clearButton).Styles(ui.FieldStyl
   `TextColor` when it sets one, and in `Danger` otherwise (the text color under high
   contrast). The message's text takes the same color.
 - A text field, text area or number input with an error from a `Field` (see the
-  README, Forms) draws `FrameInvalid` over its frame, and it keeps that frame while
+  [Forms](widgets-forms.md#forms)) draws `FrameInvalid` over its frame, and it keeps that frame while
   it has focus, so the danger color is not hidden by the focus color. The error
   itself is a field part (`FormField.Error`), which has the same look as the number
   field's `Message`: both take `messageStyle` in the code.
@@ -290,7 +290,7 @@ Every built-in widget that has a box of its own takes the same sizing methods:
 `MaxWidth`, `MaxHeight`, `Grow` and `GridSpan`. The lengths are `ui.Px`, `ui.Percent`,
 `ui.Full` (100 percent) and `ui.Auto`. `Grow` takes a share of the free space of a row
 or a column, as a `Div` does, and `GridSpan(cols, rows)` covers more cells of a grid
-(see Grid layout in the README). In a grid cell a widget fills the cell in place of
+(see [Grid layout](layout.md#grid-layout)). In a grid cell a widget fills the cell in place of
 its default width; a width set with `Width` is kept. The methods size the widget's outer box: the frame of a text
 field or a number input, the trigger of a select, the track of a slider and the bar
 of a progress bar (its readout included), the control of a check box, the group of
@@ -353,8 +353,8 @@ method for the size of a widget, and the theme for the size of every widget of a
 
 Text fields may shrink in a row to room for six digits, and no further: a fixed width
 is their ceiling, not their floor, so a field in a narrow row does not collapse to a
-letter's width. A `MinWidth` replaces that minimum, as the README's "Shrinking and
-minimum sizes" describes. A progress bar or slider in a container with no width of its
+letter's width. A `MinWidth` replaces that minimum, as the "Shrinking and
+minimum sizes" section of [layout.md](layout.md#shrinking-and-minimum-sizes) describes. A progress bar or slider in a container with no width of its
 own is at least its default minimum, and `MinWidth` replaces that too.
 
 ## Render slots
@@ -490,7 +490,7 @@ A new widget that has parts follows the same pattern as `Tabs`, `Select`, `Slide
 6. **Test it.** Add the part to the table in `TestEveryPartIsApplied`: set a distinctive style on
    the part, put its state in effect, and assert that the style reaches the node. Add the
    widget to the precedence and high-contrast tests.
-7. **Document it.** Add the widget's parts to the table below and to the README section
+7. **Document it.** Add the widget's parts to the table below and to its section in the topic docs
    for the widget.
 
 ## Naming conventions
@@ -661,3 +661,12 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
 Where a look changed under high contrast on purpose, the change is in the guardrails
 above: the selected text of a text field and the highlighted row of a menu are the
 Highlight color with HighlightText on it.
+
+## Reusable styles
+
+Reusable styles are ordinary values. Zero-valued fields mean "unset":
+
+```go
+var Card = ui.Style{Padding: ui.All(16), Radius: 12, Background: ui.Hex("#18181b")}
+ui.Div().Style(Card)
+```

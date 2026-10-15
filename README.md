@@ -2113,7 +2113,7 @@ gradients or shadows. Icons take the text color, and a focus ring stays. The app
 keeps its own theme: `ctx.AppTheme()` (or `rt.AppTheme()`) is what `SetTheme` set,
 and `ctx.Theme().HighContrast` or `ctx.HighContrast()` tells the app that the
 high contrast theme is in use, for content that picks its own colors. There is no
-opt-out. Details are in [docs/accessibility.md](docs/accessibility.md#phase-d-what-changed-from-this-design).
+opt-out. Details are in [docs/accessibility.md](docs/accessibility-design-phases-d-e.md#phase-d-what-changed-from-this-design).
 
 Contrast of the built-in tokens is checked by `ui/contrast_test.go` against the
 WCAG 2 ratios of each pair the built-in widgets use, in both themes.
@@ -3162,7 +3162,7 @@ The controls, with no app code, once their roles and states are set:
   each visual line. Text and selection changes raise events. The system caret
   follows the insertion point, so screen magnifiers track typing. The points
   and the word rules are described in
-  [docs/accessibility.md](docs/accessibility.md#phase-c-what-changed-from-this-design).
+  [docs/accessibility.md](docs/accessibility-design-phases-b-c.md#phase-c-what-changed-from-this-design).
 - A scroll container reports its position and its visible part, and can be
   scrolled and scrolled to a percent. A row or control inside one can be
   scrolled into view.
