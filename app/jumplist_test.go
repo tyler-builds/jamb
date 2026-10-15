@@ -74,3 +74,26 @@ func TestCheckIdentity(t *testing.T) {
 		}
 	}
 }
+
+// jamb package runs the built app with the flag alone and reads the answer; cmd/jamb's
+// TestParseAppID parses the same lines, since it keeps its own copy of the marker.
+func TestPrintAppID(t *testing.T) {
+	for name, tc := range map[string]struct {
+		args   []string
+		appID  string
+		want   string
+		answer bool
+	}{
+		"flag":               {[]string{"app.exe", "--jamb-print-appid"}, "JambExamples.Notes", "jamb-appid:JambExamples.Notes\n", true},
+		"flag, no AppID":     {[]string{"app.exe", "--jamb-print-appid"}, "", "jamb-appid:\n", true},
+		"no arguments":       {[]string{"app.exe"}, "JambExamples.Notes", "", false},
+		"other argument":     {[]string{"app.exe", "notes.txt"}, "JambExamples.Notes", "", false},
+		"flag with argument": {[]string{"app.exe", "--jamb-print-appid", "x"}, "JambExamples.Notes", "", false},
+		"flag not first":     {[]string{"app.exe", "x", "--jamb-print-appid"}, "JambExamples.Notes", "", false},
+	} {
+		var out strings.Builder
+		if got := printAppID(tc.args, tc.appID, &out); got != tc.answer || out.String() != tc.want {
+			t.Errorf("%s: printAppID = %v, %q; want %v, %q", name, got, out.String(), tc.answer, tc.want)
+		}
+	}
+}

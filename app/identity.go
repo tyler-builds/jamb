@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -21,6 +22,29 @@ const maxAppIDLen = 128
 func (a *App) AppID(id string) *App {
 	a.appID = id
 	return a
+}
+
+// printAppIDFlag is a hidden command-line flag for jamb package, which runs the app it
+// has built with the flag alone and compares the answer with identityName in jamb.json.
+// RunE answers it first, before any window, tray icon, single-instance lock, registry
+// key or device: it writes appIDMarker and the AppID on one line to stdout and exits
+// with status 0. Applications do not use the flag, and it is not part of the API.
+const printAppIDFlag = "--jamb-print-appid"
+
+// appIDMarker starts the line that answers printAppIDFlag, so that jamb package can tell
+// the answer from other output, and from an app that did not understand the flag. An app
+// without an AppID answers with the marker alone.
+const appIDMarker = "jamb-appid:"
+
+// printAppID answers printAppIDFlag when args, a program's command line, is the flag
+// alone: it writes the answer for appID to w and reports true. Otherwise it writes
+// nothing and reports false.
+func printAppID(args []string, appID string, w io.Writer) bool {
+	if len(args) != 2 || args[1] != printAppIDFlag {
+		return false
+	}
+	fmt.Fprintln(w, appIDMarker+appID)
+	return true
 }
 
 // validAppID reports whether id is a usable Application User Model ID.

@@ -213,6 +213,10 @@ func (a *App) Run(w Window) {
 
 // RunE is Run returning an error instead of exiting. Call it once per process.
 func (a *App) RunE(w Window) error {
+	// jamb package asks for the AppID before anything starts (see printAppIDFlag).
+	if printAppID(os.Args, a.appID, os.Stdout) {
+		os.Exit(0)
+	}
 	if w.Root == nil {
 		return fmt.Errorf("app.Window.Root is nil; set it to a func(*ui.Context) ui.Element that returns your UI")
 	}
