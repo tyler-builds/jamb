@@ -3,6 +3,7 @@
 package windows
 
 import (
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -48,6 +49,9 @@ func (h *queueHandler) post(w platform.Window, fn func()) {
 // runs its own message loop, as a dialog does. A function posted to the window
 // from another goroutine must still run while that loop is open, on a frame.
 func TestPostRunsDuringNativeMenuLoop(t *testing.T) {
+	if os.Getenv("JAMB_LIVE_TESTS") != "1" {
+		t.Skip("opens a real window and its system menu; set JAMB_LIVE_TESTS=1 to run it")
+	}
 	h := &queueHandler{}
 	var inLoop atomic.Bool
 	ran := make(chan bool, 1)      // whether the posted function ran while the loop was open

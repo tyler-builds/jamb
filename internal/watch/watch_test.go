@@ -29,19 +29,26 @@ func TestWatchReportsWrite(t *testing.T) {
 func TestWatchDebouncesBursts(t *testing.T) {
 	dir := t.TempDir()
 	var n atomic.Int32
-	stop, err := Watch(dir, 100*time.Millisecond, func() { n.Add(1) })
+	const debounce = 400 * time.Millisecond
+	stop, err := Watch(dir, debounce, func() { n.Add(1) })
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stop()
 	path := filepath.Join(dir, "keymap.json")
+	start := time.Now()
 	for i := range 5 {
 		if err := os.WriteFile(path, []byte{byte('0' + i)}, 0o644); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	time.Sleep(600 * time.Millisecond)
+	// On a loaded machine the sleeps can stretch; a burst longer than the debounce is
+	// rightly two bursts, so the test judges only a burst that fit in it.
+	if d := time.Since(start); d > debounce/2 {
+		t.Skipf("the writes took %v, too long to be one burst for a %v debounce", d, debounce)
+	}
+	time.Sleep(3 * debounce)
 	if got := n.Load(); got != 1 {
 		t.Errorf("%d calls for one burst of writes, want 1", got)
 	}
