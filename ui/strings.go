@@ -348,6 +348,23 @@ type Strings struct {
 	ChartLow string
 	// ChartClose is the closing value of a candle, in its tooltip and its table.
 	ChartClose string
+
+	// The words of the Markdown view (package markdown). MarkdownImage names an image
+	// that has no alternative text.
+	MarkdownImage string
+	// MarkdownImageNotShown is the text of the placeholder of an image that is not
+	// shown, from its alternative text, such as "Image not shown: Build status". The
+	// alternative text may be empty.
+	MarkdownImageNotShown func(alt string) string
+	// MarkdownTask names the check box of a task whose item has no text.
+	MarkdownTask string
+	// MarkdownTable names a table from its size, such as "Table, 3 columns, 4 rows".
+	MarkdownTable func(columns, rows int) string
+	// MarkdownCode names a code block from the language of its fence, such as
+	// "Code, go". The language may be empty.
+	MarkdownCode func(language string) string
+	// MarkdownFootnotes names the list of footnotes at the end of a document.
+	MarkdownFootnotes string
 }
 
 // englishStrings returns the English text. It is shared by the fallbacks, so its
@@ -547,6 +564,25 @@ func englishStrings() *Strings {
 		ChartHigh:         "High",
 		ChartLow:          "Low",
 		ChartClose:        "Close",
+
+		MarkdownImage: "Image",
+		MarkdownImageNotShown: func(alt string) string {
+			if alt == "" {
+				return "Image not shown"
+			}
+			return "Image not shown: " + alt
+		},
+		MarkdownTask: "Task",
+		MarkdownTable: func(columns, rows int) string {
+			return "Table, " + englishCount(columns, "column", "columns") + ", " + englishCount(rows, "row", "rows")
+		},
+		MarkdownCode: func(language string) string {
+			if language == "" {
+				return "Code"
+			}
+			return "Code, " + language
+		},
+		MarkdownFootnotes: "Footnotes",
 	}
 }
 
