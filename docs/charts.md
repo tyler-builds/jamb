@@ -100,7 +100,12 @@ A chart is an image named by its summary, made from its data, for example:
 `Label` replaces the summary. `charts.DataTable(chart)` shows the same data in a
 `ui.DataGrid`, with a column for each series, so a screen reader reads the exact
 values. It shows every series, including hidden ones. The app can show it in
-place of the chart, as the demo's Charts section does.
+place of the chart, as the demo's Charts section does. The table takes a `Key`
+and the same sizing methods as the chart:
+
+```go
+ui.Div().Column().Child(chart).Child(charts.DataTable(chart).Key("table").Height(ui.Px(240)))
+```
 
 ## Colors and high contrast
 

@@ -217,6 +217,22 @@ func TestDataTable(t *testing.T) {
 	accesstest.Find(t, r.rt.AccessTree(), access.RoleDataGrid, "Data table: "+c.summary())
 }
 
+// The data table takes a Key and the sizing methods, and is still a ui.Element for the
+// callers that store it as one.
+func TestDataTableKeyAndSize(t *testing.T) {
+	c := Line(visits(), returns())
+	var el ui.Element = DataTable(c)
+	_ = el
+	r := newRig(func(*ui.Context) ui.Element {
+		return ui.Div().Row().Width(ui.Px(600)).
+			Child(DataTable(c).Key("table").Height(ui.Px(200)).MaxWidth(ui.Px(300)))
+	})
+	rc := accesstest.Find(t, r.rt.AccessTree(), access.RoleDataGrid, "Data table: "+c.summary()).Bounds
+	if rc.H != 200 || rc.W != 300 {
+		t.Errorf("the table is %v by %v, want 300 by 200", rc.W, rc.H)
+	}
+}
+
 // A pie's slices sweep the full circle, in proportion to their values, from the top.
 func TestPieAngles(t *testing.T) {
 	var c *Chart

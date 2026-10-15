@@ -21,22 +21,79 @@ type tableRow struct {
 // column for each series (a candlestick has its four values); a pie has a row for each slice,
 // with its value and share; and a Sankey diagram has a row for each link.
 //
-//	ui.Div().Column().Child(chart).Child(charts.DataTable(chart))
-func DataTable(c *Chart) ui.Element {
-	return ui.Component(func(ctx *ui.Context) ui.Element {
-		header, rows := c.table()
-		cols := make([]ui.DataColumn[tableRow], len(header))
-		for i, h := range header {
-			cols[i] = ui.DataColumn[tableRow]{
-				Header: h,
-				Key:    "column" + strconv.Itoa(i),
-				Width:  160,
-				Text:   func(r tableRow) string { return r.cells[i] },
-			}
+//	ui.Div().Column().Child(chart).Child(charts.DataTable(chart).Key("table").Height(ui.Px(240)))
+func DataTable(c *Chart) *DataTableElement { return &DataTableElement{c: c} }
+
+// DataTableElement is the table of a chart's data, made by DataTable and configured with the
+// methods below, each of which returns the table so that they chain. It is a ui.Element, so it
+// is placed in a tree as it is. Its size is the ui.DataGrid's default unless the sizing methods
+// say otherwise.
+type DataTableElement struct {
+	ui.Composite
+	c    *Chart
+	size sizes // see Width
+}
+
+// Key gives the table a stable identity among its siblings, so the state of its grid
+// survives reordering.
+func (t *DataTableElement) Key(k string) *DataTableElement { t.SetKey(k); return t }
+
+// The sizing methods give the table's grid a size, as they do for a ui.DataGrid. See
+// Sizing in docs/styling.md.
+func (t *DataTableElement) Width(l ui.Length) *DataTableElement { t.size.setWidth(l); return t }
+
+// Height sets the height of the table.
+func (t *DataTableElement) Height(l ui.Length) *DataTableElement { t.size.setHeight(l); return t }
+
+// MinWidth sets the smallest width of the table.
+func (t *DataTableElement) MinWidth(l ui.Length) *DataTableElement {
+	t.size.setMinWidth(l)
+	return t
+}
+
+// MinHeight sets the smallest height of the table.
+func (t *DataTableElement) MinHeight(l ui.Length) *DataTableElement {
+	t.size.setMinHeight(l)
+	return t
+}
+
+// MaxWidth sets the largest width of the table.
+func (t *DataTableElement) MaxWidth(l ui.Length) *DataTableElement {
+	t.size.setMaxWidth(l)
+	return t
+}
+
+// MaxHeight sets the largest height of the table.
+func (t *DataTableElement) MaxHeight(l ui.Length) *DataTableElement {
+	t.size.setMaxHeight(l)
+	return t
+}
+
+// Grow makes the table take a share of the free space on its parent's main axis.
+func (t *DataTableElement) Grow(f float32) *DataTableElement { t.size.setGrow(f); return t }
+
+// GridSpan sets how many columns and rows the table covers in its parent's grid.
+func (t *DataTableElement) GridSpan(cols, rows int) *DataTableElement {
+	t.size.setSpan(cols, rows)
+	return t
+}
+
+// Render builds the table, a ui.DataGrid of the chart's data. It is called by the UI.
+func (t *DataTableElement) Render(ctx *ui.Context) ui.Element {
+	c := t.c
+	header, rows := c.table()
+	cols := make([]ui.DataColumn[tableRow], len(header))
+	for i, h := range header {
+		cols[i] = ui.DataColumn[tableRow]{
+			Header: h,
+			Key:    "column" + strconv.Itoa(i),
+			Width:  160,
+			Text:   func(r tableRow) string { return r.cells[i] },
 		}
-		return ui.DataGrid(rows, func(r tableRow) string { return r.key }, cols...).
-			Label("Data table: " + c.summary())
-	})
+	}
+	grid := ui.DataGrid(rows, func(r tableRow) string { return r.key }, cols...).
+		Label("Data table: " + c.summary())
+	return applySizes(t.size, grid)
 }
 
 // table returns the header and the rows of the chart's data, with every series.
