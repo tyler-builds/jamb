@@ -12,7 +12,7 @@ import (
 // allow: a larger text size takes more width for the same words.
 func TestPagesFitMinimumWindowWidth(t *testing.T) {
 	for _, scale := range []int{100, 150, 225} {
-		for _, page := range []Page{PageDashboard, PageProjects, PageActivity, PageComponents, PageSettings} {
+		for _, page := range []Page{PageDashboard, PageProjects, PageActivity, PageComponents, PageSettings, PageMarkdown} {
 			s := NewStore()
 			s.Page.Set(page)
 			rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)

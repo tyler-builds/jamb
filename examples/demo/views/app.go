@@ -24,6 +24,7 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			OnAction(GoActivity, goTo(PageActivity)).
 			OnAction(GoComponents, goTo(PageComponents)).
 			OnAction(GoSettings, goTo(PageSettings)).
+			OnAction(GoMarkdown, goTo(PageMarkdown)).
 			OnAction(FocusSearch, s.Search.Focus).
 			OnAction(ToggleTheme, func() {
 				if ctx.Theme().Dark {
@@ -90,6 +91,7 @@ func Sidebar(s *Store) ui.Element {
 			Child(nav(PageProjects, icons.Folder, "Projects", count, GoProjects)).
 			Child(nav(PageActivity, icons.Activity, "Activity", 0, GoActivity)).
 			Child(nav(PageComponents, icons.Layers, "Components", 0, GoComponents)).
+			Child(nav(PageMarkdown, icons.File, "Markdown", 0, GoMarkdown)).
 			Child(sectionLabel(t, "Workspace")).
 			Child(nav(PageSettings, icons.Settings, "Settings", 0, GoSettings)).
 			Child(ui.Spacer()).
@@ -195,6 +197,8 @@ func Main(s *Store) ui.Element {
 			content = Components(s)
 		case PageSettings:
 			content = Settings(s)
+		case PageMarkdown:
+			content = Markdown()
 		}
 		// MinWidth 0: the main column fits the window instead of forcing it wider.
 		return ui.Div().Grow(1).MinWidth(ui.Px(0)).Height(ui.Full).
@@ -207,7 +211,7 @@ func Main(s *Store) ui.Element {
 
 var pageTitles = map[Page]string{
 	PageDashboard: "Dashboard", PageProjects: "Projects", PageActivity: "Activity",
-	PageComponents: "Components", PageSettings: "Settings",
+	PageComponents: "Components", PageSettings: "Settings", PageMarkdown: "Markdown",
 }
 
 // titleBar is the 32 px strip at the top of a window with a custom title bar: an

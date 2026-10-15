@@ -27,12 +27,12 @@ func TestDemoAccessibility(t *testing.T) {
 	}
 	frame()
 
-	for _, p := range []Page{PageDashboard, PageProjects, PageActivity, PageComponents, PageSettings} {
+	for _, p := range []Page{PageDashboard, PageProjects, PageActivity, PageComponents, PageSettings, PageMarkdown} {
 		s.Page.Set(p)
 		frame()
 		frame()
 		tr := rt.AccessTree()
-		for _, nav := range []string{"Dashboard", "Activity", "Components", "Settings"} {
+		for _, nav := range []string{"Dashboard", "Activity", "Components", "Settings", "Markdown"} {
 			accesstest.Find(t, tr, access.RoleButton, nav)
 		}
 		// The Projects item names its project count, as a badge on the item does.
