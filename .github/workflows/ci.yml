@@ -9,9 +9,10 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels its older run; every commit on main keeps its own.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Each module is checked on its own, as a user's build sees it.
