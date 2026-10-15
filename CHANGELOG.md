@@ -7,6 +7,37 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Added
+
+- `Window.Visible()` reports whether a window is shown, and `Tray.Shown()` whether a tray icon is
+  in the notification area. `ui.Window` gains the method; fakes that embed `ui.NopWindow` get it.
+- `PinchEvent` carries the handler element's `Width` and `Height`, as `MouseEvent` does.
+- `ColorPicker` takes `Disabled`, `FocusHandle`, `LabelledBy` and `Tooltip`, with a
+  `TriggerDisabled` style part.
+- `DateRangePicker.Validate`, with rules on the new `ui.DateRange` type; a range picker in a `Field`
+  shows and announces its error as `DatePicker` does.
+- `Tooltip` on `Pagination`, `Breadcrumbs`, `Sidebar`, `Tag` and `Avatar`.
+- `SVG` takes `Opacity`, `Fit` and `Radius`, as `Image` does. Without `Fit`, an SVG still follows its
+  own `preserveAspectRatio`.
+- Charts and the code editor take `Width`, `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow`
+  and `GridSpan`.
+- `Series.Color` sets a series' color, and `CandleSeries.Rising` and `Falling` the candles' colors.
+  High contrast ignores them, and pies and Sankey diagrams keep the palette.
+- The words and summaries that charts show and announce are `ui.Strings` fields (`Chart...`), so an
+  app can translate them. The built-in packs leave them English.
+
+### Changed
+
+- `charts.DataTable` returns a `*DataTableElement`, which has `Key` and the sizing methods. Code that
+  stores the result as a `ui.Element` still compiles.
+- Chart summaries use the singular for a count of one ("1 link", "1 slice").
+- The code editor's `Size`, `Width` and `Height` win over a width or height in its `Box` style, as
+  the sizes of the `ui` widgets and charts do. The `Box` style still wins over the default size.
+
+### Fixed
+
+- The tray icon docs named the wrong UUID version for the icon's GUID.
+
 ## [0.1.0] - 2026-10-15
 
 jamb is a small, declarative, GPU-rendered desktop UI framework written in plain Go, licensed under
