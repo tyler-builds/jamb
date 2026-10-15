@@ -23,7 +23,9 @@ These environment variables work with any jamb app, with no code changes:
 error when the script is loaded. `idle` waits for `rt.Settled()`, which ignores
 repeating animations, so a screen with a spinner does not hold the script.
 
-The headless tools are:
+For tests of an app, the `ui/uitest` package wraps these headless tools with a
+clock, a clipboard and failure messages of its own; see
+[Testing your app](testing.md#testing-your-app). The headless tools are:
 
 - `ui.NewRuntime(root, theme, nil)` plus `rt.Frame(time.Now())` runs the
   whole pipeline without a window.
@@ -33,6 +35,9 @@ The headless tools are:
   - `rt.Press(input.KeyN, input.ModCtrl)` presses a key.
 - `rt.Find(key)` returns an element's rectangle. A component's or text
   field's key belongs to what it renders.
+- `rt.StyleOf(key)` returns how the latest frame drew an element: its fill,
+  border, text color, opacity and focus ring, with state styles and
+  transitions applied (`ui.DrawnStyle`).
 - `rt.Dump(os.Stdout, depth)` prints the laid-out tree, with keys and text
   field contents. It found layout bugs during development.
 - `rt.ContentWidth()` checks that nothing overflows at the minimum window size.
@@ -43,7 +48,8 @@ The headless tools are:
 
 See `ui/runtime_test.go`, `ui/editor_test.go`,
 `examples/demo/views/dump_test.go` and `examples/notes/views/views_test.go` (the notes app
-driven headlessly: Ctrl+N, typing, search, saving).
+driven headlessly: Ctrl+N, typing, search, saving), and
+`examples/notes/views/keyboard_test.go` for the same with `ui/uitest`.
 
 ## Visual inspector
 

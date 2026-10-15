@@ -41,6 +41,7 @@ jamb to an app; the other pages cover one topic each.
 
 ## Tools and reference
 
+- [Testing your app](testing.md): headless UI tests with `ui/uitest`, which find elements, act on them, and read their text, states and drawn style.
 - [Tools for humans and coding agents](tools.md): `jamb dev`, the visual inspector, environment variables, tracing, scripted runs, headless testing, and accessibility checks.
 - [Packaging](packaging.md): `jamb package`, `jamb.json`, the installer, MSIX, signing, and the licenses of what your app ships.
 - [Architecture and internals](architecture.md): the repository layout, the architecture and frame pipeline, and GPU device loss.
