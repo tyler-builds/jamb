@@ -25,6 +25,19 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   High contrast ignores them, and pies and Sankey diagrams keep the palette.
 - The words and summaries that charts show and announce are `ui.Strings` fields (`Chart...`), so an
   app can translate them. The built-in packs leave them English.
+- `ui.SetThemeStyle` and `ui.ThemeStyle` hold the style of any widget type on a `Theme`, so charts,
+  the code editor and widgets outside `ui` can be styled app-wide. A chart's or editor's style is the
+  built-in default, then the theme's, then the instance's `Styles`; under high contrast their colors
+  are ignored.
+- `Document.Version()` in `codeedit` is a tracked read: a component that shows it re-renders when the
+  document changes, with no subscription by hand.
+- `ui/uitest` drives a UI in headless tests: find elements by key, name or role, click, type and press
+  keys, step time, use an in-process clipboard, and read text, accessibility states and the drawn
+  style. `Runtime.StyleOf` reports how the latest paint drew an element. The guide is
+  [docs/testing.md](docs/testing.md).
+- `jamb package` checks that the app's `App.AppID` matches `identityName` in jamb.json, and stops an
+  installer or MSIX build when they differ. It runs the built app with an internal flag, and skips
+  the check with a warning when the app can't run on this machine or predates the flag.
 
 ### Changed
 
