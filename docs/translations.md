@@ -38,6 +38,12 @@ language until an app sets them. The summary is built from whole clauses, such a
 Sunday", so a language sets its own order, punctuation and plurals. The values in
 them (numbers, dates, series names) come from the chart's data and its `Format`.
 
+The words that the Markdown view (package `markdown`) adds to a document are the
+`Markdown…` fields: the name of an image without alternative text, the placeholder
+of an image that is not shown, the name of a task's check box, and the names of
+tables, code blocks and the list of footnotes. They are English in every language
+until an app sets them too. The text of the document itself is the app's.
+
 To change a message, start from `ui.EnglishStrings()` and set the fields you need.
 Each message with values is a function, so each language can set its own word order
 and plurals. A field that is empty or nil shows the English text. Use
