@@ -7,7 +7,7 @@ Measured with `scripts/compare-gpui.ps1`, three runs per measurement, in two pas
 ## Summary
 
 - **Startup.** jamb paints its first frame sooner. On a warm launch (the executable has been started before), jamb painted at 266 ms and GPUI at 387 ms. On the first launch of a new copy of the executable, which Windows Defender scans before it runs, jamb painted at 496 ms and GPUI at 611 ms.
-- **Binary size.** jamb's stripped release binary is 8.41 MB at commit `b5bdfda` (7.18 MB in the second pass, before the features added since). GPUI's release binary is 9.21 MB, and 15.28 MB for the same app built with gpui-component (see [Binary size, updated](#binary-size-updated)).
+- **Binary size.** jamb's stripped release binary is 8.41 MB at commit `f13b6c5` (7.18 MB in the second pass, before the features added since). GPUI's release binary is 9.21 MB, and 15.28 MB for the same app built with gpui-component (see [Binary size, updated](#binary-size-updated)).
 - **Build time.** Incremental builds take 2 s for jamb and 4 s (release) or 6 s (debug) for GPUI. A clean build from an empty cache took about 9 s for jamb, and 138 s (release) or 100 s (debug) for GPUI.
 - **Idle CPU.** jamb used 0.29% of one core while idle and focused (median), with about 185 context switches per second. GPUI used 1.85%, with about 530 per second.
 - **Memory.** GPUI uses slightly less: 75.3 MB private bytes and 52.5 MB working set, against jamb's 78.2 MB and 58.8 MB. jamb uses less GPU memory (13.8 MB dedicated, against 17.5 MB).
@@ -41,8 +41,8 @@ The measurements come from two passes of the script on the same machine.
 
 | Pass | jamb code | What it measured |
 |---|---|---|
-| First | Commit `dde267d` plus the then-uncommitted `examples/hello` | Clean build times, build output sizes, GPUI's size-profile binary (footnote below), pointer movement and resizing |
-| Second | Commit `bc31345` | Everything else: project size, binary sizes, incremental builds, startup, idle CPU, memory and GPU memory, the screenshots |
+| First | Commit `db7d858` plus the then-uncommitted `examples/hello` | Clean build times, build output sizes, GPUI's size-profile binary (footnote below), pointer movement and resizing |
+| Second | Commit `06e5936` | Everything else: project size, binary sizes, incremental builds, startup, idle CPU, memory and GPU memory, the screenshots |
 
 The second pass ran with `-SkipInteraction`, because the pointer and resize phases move the real cursor. Between the passes, jamb's startup memory, binary size and font matching changed (see [Changes between the passes](#changes-between-the-passes)). None of those changes touch the input or resize path, so the first pass's interaction figures are kept, labeled as such.
 
@@ -103,9 +103,9 @@ Measured on 2026-10-14, one build each, on the same machine. The other figures i
 
 | Build | Size |
 |---|---|
-| jamb hello, second pass (`bc31345`) | 7.18 MB |
-| jamb hello, `92aa770` (after the clipboard, IME, color emoji, Canvas, SVG and tier-2 widget work) | 7.74 MB |
-| jamb hello, `b5bdfda` (after the themes, translations, dock, inspector and other tier-3 work) | 8.41 MB |
+| jamb hello, second pass (`06e5936`) | 7.18 MB |
+| jamb hello, `ff9b98a` (after the clipboard, IME, color emoji, Canvas, SVG and tier-2 widget work) | 7.74 MB |
+| jamb hello, `f13b6c5` (after the themes, translations, dock, inspector and other tier-3 work) | 8.41 MB |
 | GPUI hello (`gpui` at `cc053a4`, release) | 9.21 MB |
 | gpui-component's `hello_world` example (gpui-component at `f2f0f56`, the same `gpui` revision, release) | 15.28 MB |
 

@@ -9,8 +9,7 @@ The expected results say what the screen reader should speak. Its wording
 depends on its version and settings, so match the meaning (the name, the role,
 the state), not the exact words. Record any difference.
 
-Whether an app meets a standard such as Section 508 or WCAG depends on the app
-and on the contract.
+Whether an app meets a standard such as Section 508 or WCAG depends on the app.
 
 ## Before you start
 
