@@ -81,7 +81,8 @@ func (t *DataTableElement) GridSpan(cols, rows int) *DataTableElement {
 // Render builds the table, a ui.DataGrid of the chart's data. It is called by the UI.
 func (t *DataTableElement) Render(ctx *ui.Context) ui.Element {
 	c := t.c
-	header, rows := c.table()
+	s := ctx.Strings()
+	header, rows := c.table(s)
 	cols := make([]ui.DataColumn[tableRow], len(header))
 	for i, h := range header {
 		cols[i] = ui.DataColumn[tableRow]{
@@ -92,15 +93,16 @@ func (t *DataTableElement) Render(ctx *ui.Context) ui.Element {
 		}
 	}
 	grid := ui.DataGrid(rows, func(r tableRow) string { return r.key }, cols...).
-		Label("Data table: " + c.summary())
+		Label(s.ChartDataTable(c.summary(s)))
 	return applySizes(t.size, grid)
 }
 
-// table returns the header and the rows of the chart's data, with every series.
-func (c *Chart) table() ([]string, []tableRow) {
+// table returns the header and the rows of the chart's data, with every series, with the
+// headers of s.
+func (c *Chart) table(s *ui.Strings) ([]string, []tableRow) {
 	switch c.kind {
 	case kindSankey:
-		header := []string{"From", "To", "Value"}
+		header := []string{s.ChartFrom, s.ChartTo, s.ChartValue}
 		rows := make([]tableRow, len(c.sk.links))
 		for i, e := range c.sk.links {
 			rows[i] = tableRow{key: strconv.Itoa(i), cells: []string{c.sk.nodes[e.from].name, c.sk.nodes[e.to].name, c.valueText(e.value)}}
@@ -120,12 +122,12 @@ func (c *Chart) table() ([]string, []tableRow) {
 			}
 			rows[i] = tableRow{key: strconv.Itoa(i), cells: []string{c.xLabel(p), c.valueText(p.y), share}}
 		}
-		return []string{"Slice", "Value", "Share"}, rows
+		return []string{s.ChartSlice, s.ChartValue, s.ChartShare}, rows
 	}
 
-	header := []string{c.positionHeader()}
+	header := []string{c.positionHeader(s)}
 	if c.kind == kindCandle {
-		header = append(header, "Open", "High", "Low", "Close")
+		header = append(header, s.ChartOpen, s.ChartHigh, s.ChartLow, s.ChartClose)
 		pts := c.ds.series[0].pts
 		rows := make([]tableRow, len(pts))
 		for i, p := range pts {
@@ -135,7 +137,7 @@ func (c *Chart) table() ([]string, []tableRow) {
 		return header, rows
 	}
 	for k := range c.ds.series {
-		header = append(header, c.itemName(k))
+		header = append(header, c.itemName(s, k))
 	}
 	all := allIndices(len(c.ds.series))
 	slots := c.ds.slots(all)
@@ -155,16 +157,16 @@ func (c *Chart) table() ([]string, []tableRow) {
 }
 
 // positionHeader returns the name of the column of positions in the table: the position
-// axis's label when it has one, else the kind of the positions.
-func (c *Chart) positionHeader() string {
+// axis's label when it has one, else the kind of the positions, in s.
+func (c *Chart) positionHeader(s *ui.Strings) string {
 	if c.xa.Label != "" {
 		return c.xa.Label
 	}
 	switch c.ds.x {
 	case xTime:
-		return "Date"
+		return s.ChartDate
 	case xCategory:
-		return "Category"
+		return s.ChartCategory
 	}
-	return "Position"
+	return s.ChartPosition
 }

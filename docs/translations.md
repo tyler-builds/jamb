@@ -28,6 +28,16 @@ Sales". The longer sentences, such as the date and range messages, are English i
 every language. A field that a pack leaves empty is English, so a partial pack is
 never incomplete.
 
+The words of the charts (package `charts`) are the `Chart…` fields: the names of the
+chart types, the summary that names a chart for assistive technology, the
+announcements of the keyboard walk, the lines of the tooltips, the legend's name and
+the headers of `DataTable`. No pack translates them, so they are English in every
+language until an app sets them. The summary is built from whole clauses, such as
+`ChartSeriesSummary` ("Line chart, 2 series, 7 points each") and
+`ChartPositionRange`, which takes the summary so far and adds "from Monday to
+Sunday", so a language sets its own order, punctuation and plurals. The values in
+them (numbers, dates, series names) come from the chart's data and its `Format`.
+
 To change a message, start from `ui.EnglishStrings()` and set the fields you need.
 Each message with values is a function, so each language can set its own word order
 and plurals. A field that is empty or nil shows the English text. Use

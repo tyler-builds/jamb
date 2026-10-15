@@ -1,8 +1,6 @@
 package charts
 
 import (
-	"strconv"
-
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -16,7 +14,7 @@ func (c *Chart) legendRow(v *view, hidden *ui.Signal[[]bool], cursor *ui.Signal[
 	if c.legend != LegendTop && c.legend != LegendBottom || c.items() == 0 {
 		return nil
 	}
-	row := ui.Div().Role(access.RoleGroup).Label("Legend").Row().Style(v.st.Legend)
+	row := ui.Div().Role(access.RoleGroup).Label(v.s.ChartLegend).Row().Style(v.st.Legend)
 	for i := 0; i < c.items(); i++ {
 		row.Child(c.legendItem(v, hidden, cursor, i))
 	}
@@ -29,7 +27,7 @@ func (c *Chart) legendColumn(v *view, hidden *ui.Signal[[]bool], cursor *ui.Sign
 	if c.legend != LegendRight || c.items() == 0 {
 		return nil
 	}
-	col := ui.Div().Role(access.RoleGroup).Label("Legend").Column().Style(v.st.Legend)
+	col := ui.Div().Role(access.RoleGroup).Label(v.s.ChartLegend).Column().Style(v.st.Legend)
 	for i := 0; i < c.items(); i++ {
 		col.Child(c.legendItem(v, hidden, cursor, i))
 	}
@@ -40,7 +38,7 @@ func (c *Chart) legendColumn(v *view, hidden *ui.Signal[[]bool], cursor *ui.Sign
 // is whether the series or slice is shown, and a click shows or hides it. A hidden
 // item is faded, and its text keeps its weight.
 func (c *Chart) legendItem(v *view, hidden *ui.Signal[[]bool], cursor *ui.Signal[cursorAt], i int) ui.Element {
-	name := c.itemName(i)
+	name := c.itemName(v.s, i)
 	on := !v.isHidden(i)
 	item := ui.Div().Role(access.RoleButton).Label(name).AccessChecked(on).Focusable().
 		Style(v.st.LegendItem).Row().Align(ui.Center).Child(c.swatch(v, i)).Child(ui.Text(name).NoWrap())
@@ -93,15 +91,16 @@ func (c *Chart) swatch(v *view, i int) ui.Element {
 }
 
 // itemName returns the name of legend item i: the name of its series, or for a
-// pie the label of its slice. A series without a name is "Series" and its number.
-func (c *Chart) itemName(i int) string {
+// pie the label of its slice. A series without a name is named by its number, with
+// the ChartSeriesNumber of s, as "Series 2".
+func (c *Chart) itemName(s *ui.Strings, i int) string {
 	if c.kind == kindPie || c.kind == kindDonut {
 		return c.xLabel(c.ds.series[0].pts[i])
 	}
 	if name := c.ds.series[i].name; name != "" {
 		return name
 	}
-	return "Series " + strconv.Itoa(i+1)
+	return s.ChartSeriesNumber(i + 1)
 }
 
 // toggled returns the hidden flags of n items with item i's flag flipped. The

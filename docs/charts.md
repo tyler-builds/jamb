@@ -97,6 +97,11 @@ A chart is an image named by its summary, made from its data, for example:
 
 > Line chart, 2 series, 7 points each, from Monday to Sunday; Visits from 120 to 300, Returns from 10 to 40
 
+The words of the summary, the announcements, the tooltips, the legend and the
+table come from the window's `ui.Strings` (`ctx.Strings()`), in the `Chart…`
+fields, so an app can translate them (see [docs/translations.md](translations.md)).
+They are English in every built-in pack.
+
 `Label` replaces the summary. `charts.DataTable(chart)` shows the same data in a
 `ui.DataGrid`, with a column for each series, so a screen reader reads the exact
 values. It shows every series, including hidden ones. The app can show it in

@@ -32,7 +32,9 @@
 // type, its series, their ranges, as in "Line chart, 2 series, 7 points each,
 // from Monday to Sunday; Visits from 120 to 300". Label replaces the name. The
 // same data is available as a table with DataTable, whose cells read exact
-// values.
+// values. The words of the summary, the announcements, the tooltips, the legend
+// and the table are the Chart fields of the window's ui.Strings, so an app can
+// translate them.
 //
 // Lines and areas are downsampled before they are drawn, with
 // Largest-Triangle-Three-Buckets to about two points per pixel, so a series of
@@ -352,6 +354,7 @@ func (c *Chart) resolveStyle(ctx *ui.Context) Style {
 type view struct {
 	c        *Chart
 	t        *ui.Theme
+	s        *ui.Strings
 	st       Style
 	hidden   []bool
 	pointer  pointerAt
@@ -424,7 +427,7 @@ func (c *Chart) render(ctx *ui.Context) ui.Element {
 	// The pointer, the keyboard position and the focus are read without
 	// subscribing: they change the hover layer only (see hoverLayer), so moving
 	// the pointer does not draw the chart again.
-	v := &view{c: c, t: t, st: c.resolveStyle(ctx), hidden: hidden.Get(), pointer: pointer.Peek(),
+	v := &view{c: c, t: t, s: ctx.Strings(), st: c.resolveStyle(ctx), hidden: hidden.Get(), pointer: pointer.Peek(),
 		cursor: cursor.Peek(), focused: focused.Peek(), geo: geo}
 	build := func(progress float32) ui.Element {
 		v.progress = progress
@@ -466,7 +469,7 @@ func (c *Chart) column(v *view, hidden *ui.Signal[[]bool], pointer *ui.Signal[po
 func (c *Chart) canvas(v *view, hidden *ui.Signal[[]bool], pointer *ui.Signal[pointerAt], cursor *ui.Signal[cursorAt], focused *ui.Signal[bool]) *ui.DivElement {
 	name := c.name
 	if name == "" {
-		name = c.summary()
+		name = c.summary(v.s)
 	}
 	el := ui.Canvas(func(p *ui.Painter, w, h float32) {
 		c.paint(v, p, w, h)
