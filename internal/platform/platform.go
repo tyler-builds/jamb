@@ -198,6 +198,9 @@ type Window interface {
 	// minimized. A window that is not visible draws nothing and schedules no
 	// timed wake-ups (see Handler.OnFrame and WakeAt).
 	Visible() bool
+	// Shown reports whether the window is shown: not hidden by Hide, and shown
+	// since it was created. Unlike Visible, a minimized window is shown.
+	Shown() bool
 	// SetTaskbarProgress sets the progress bar of the window's taskbar button.
 	// value is from 0 to 1; TaskbarIndeterminate ignores it.
 	SetTaskbarProgress(state TaskbarState, value float32)

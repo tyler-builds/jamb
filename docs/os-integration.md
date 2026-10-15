@@ -181,7 +181,12 @@ tray.Hide()              // Show adds the icon again
   that moved is added by its ID instead, and the user's choice does not carry over.
   Without `AppID`, the icon is identified by its ID alone.
 - **Explorer restarts.** The icons are added again when the taskbar is made anew,
-  and the taskbar state of each window is set again with it.
+  and the taskbar state of each window is set again with it. `Shown` stays true
+  for an icon that was shown.
+- **Shown.** `Shown` reports whether the icon is in the notification area: after
+  `Show` added it, and before `Hide`. Like the other methods it runs on the UI
+  thread after the calls made before it, so from another goroutine it waits for the
+  UI thread to answer.
 - **Exit.** The icons are removed when `Run` returns, including when a
   `QuitWhenClosed` window closes the app. A process that ends without `Run`
   returning, such as through `os.Exit`, leaves its icons to Windows, which may keep
@@ -219,7 +224,9 @@ ui.Switch("Close to the notification area", closeToTray)
 `Show` restores a hidden or minimized window and brings it to the front, which is
 what a tray click does. `Hide` hides the window and its taskbar button. Both are
 methods of `ui.Window`, so `ctx.Window().Show()` and `ctx.Window().Hide()` work from
-any handle. Windows may refuse to bring a window to the front from the background. A
+any handle. `Visible()` reports whether the window is shown, whichever way it was
+shown or hidden: by `Show` or `Hide`, by a `CloseToTray` close, or by a tray click
+that calls `Show`. A minimized window is visible; a window that has closed is not. Windows may refuse to bring a window to the front from the background. A
 click on the tray icon normally allows it; check that on Windows (see below). Keep a
 tray icon while a window can be hidden: without one, the user has no way to show the
 window again.

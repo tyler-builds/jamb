@@ -79,8 +79,11 @@ Inside a component, `ctx.Window()` controls its window: `Focus()`, `Minimize()`,
 the window's place and content size in logical pixels, as `app.Window` takes them
 (a maximized or fullscreen window is restored first). `SetFullscreen(on)` makes the
 window cover its monitor without a frame, and puts it back where it was;
-`Fullscreen()` reports which. A headless runtime (in tests) has no window, so the
-actions do nothing, and `Size()` is the viewport's.
+`Fullscreen()` reports which. `Show()` and `Hide()` show and hide the window and its
+taskbar button, and `Visible()` reports whether it is shown: it has opened, is not
+hidden by `Hide` or by a `CloseToTray` close, and has not closed. A minimized window
+is visible. A headless runtime (in tests) has no window, so the actions do nothing,
+`Size()` is the viewport's, and `Visible()` is true.
 
 ## Custom title bars
 

@@ -380,8 +380,14 @@ func (w *window) Hide() {
 
 // Visible implements platform.Window.
 func (w *window) Visible() bool {
-	return shownState(win32.IsWindowVisible(w.hwnd), win32.IsIconic(w.hwnd))
+	return shownState(w.Shown(), win32.IsIconic(w.hwnd))
 }
+
+// Shown implements platform.Window. It reads the WS_VISIBLE style rather than
+// a flag that Show and Hide keep, as more than those can show a hidden window:
+// Minimize, ToggleMaximize, Focus and leaving fullscreen can too. A destroyed
+// window has no style, and is not shown.
+func (w *window) Shown() bool { return win32.IsWindowVisible(w.hwnd) }
 
 // shownState reports whether a window is on screen, from its WS_VISIBLE style and
 // whether it is minimized: a minimized window keeps the style, but shows nothing.

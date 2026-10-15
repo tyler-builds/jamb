@@ -18,7 +18,7 @@ func TestAppWindowWithoutAWindow(t *testing.T) {
 		if x, y := w.Position(); x != 0 || y != 0 {
 			t.Errorf("position %d,%d of a missing window", x, y)
 		}
-		if w.Maximized() || w.Fullscreen() || w.Closed() {
+		if w.Maximized() || w.Fullscreen() || w.Visible() || w.Closed() {
 			t.Error("a window that was never opened reports a state")
 		}
 	}()

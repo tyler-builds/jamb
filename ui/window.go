@@ -145,6 +145,10 @@ type Window interface {
 	Show()
 	// Hide hides the window and its taskbar button; see Show.
 	Hide()
+	// Visible reports whether the window is shown: it has opened, is not hidden
+	// (by Hide, or by a close with app.Window.CloseToTray), and has not closed. A
+	// minimized window is visible.
+	Visible() bool
 	// SetTaskbarProgress sets the progress bar of the window's taskbar button.
 	SetTaskbarProgress(p TaskbarProgress)
 	// SetTaskbarBadge sets the badge drawn over the taskbar button's icon, or
@@ -158,7 +162,7 @@ type Window interface {
 }
 
 // NopWindow is a Window whose methods do nothing and return zero values; Closed,
-// Focused, Maximized and Fullscreen report false. A test fake embeds it and
+// Focused, Maximized, Fullscreen and Visible report false. A test fake embeds it and
 // overrides the methods that it records or answers, so the fake keeps compiling
 // when Window gains methods.
 type NopWindow struct{}
@@ -224,6 +228,9 @@ func (NopWindow) Show() {}
 
 // Hide does nothing.
 func (NopWindow) Hide() {}
+
+// Visible returns false.
+func (NopWindow) Visible() bool { return false }
 
 // SetTaskbarProgress does nothing.
 func (NopWindow) SetTaskbarProgress(TaskbarProgress) {}
@@ -291,6 +298,15 @@ func (w windowRef) Hide() {
 	if c := w.rt.windowCtl; c != nil {
 		c.Hide()
 	}
+}
+
+// Visible reports true without an app window: a headless runtime draws for as
+// long as it is used, as Closed reports false.
+func (w windowRef) Visible() bool {
+	if c := w.rt.windowCtl; c != nil {
+		return c.Visible()
+	}
+	return true
 }
 
 func (w windowRef) SetTaskbarProgress(p TaskbarProgress) {
