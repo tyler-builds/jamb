@@ -13,7 +13,7 @@ import (
 // which replaces the composition. A read-only editor shows no composition.
 
 // wireIME connects the canvas to the input method (see ui.DivElement.IME).
-func (e *Editor) wireIME(canvas *ui.DivElement, vs *viewState) {
+func (e *EditorElement) wireIME(canvas *ui.DivElement, vs *viewState) {
 	canvas.IME(ui.IME{
 		Update: func(c ui.Composition) {
 			if e.readOnly {

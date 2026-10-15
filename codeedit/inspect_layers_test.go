@@ -12,7 +12,7 @@ import (
 // TestEditorStyleLayersAreNamed checks that the editor's box reports the radius that its
 // Styles set, with the built-in default's radius overridden below it.
 func TestEditorStyleLayersAreNamed(t *testing.T) {
-	ed := New(NewDocument("func main() {}")).Key("code").Styles(Style{Box: ui.Style{Radius: 2}})
+	ed := Editor(NewDocument("func main() {}")).Key("code").Styles(Style{Box: ui.Style{Radius: 2}})
 	rt := ui.NewRuntime(func(ctx *ui.Context) ui.Element { return ui.Div().Child(ed) }, ui.DarkTheme(), nil)
 	rt.SetViewport(800, 600, 1)
 	rt.Frame(time.Now())

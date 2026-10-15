@@ -3307,7 +3307,7 @@ it does not reset the driver.
 
 The `codeedit` package is a code editor for source files, with undo and redo, several selections,
 find and replace, folding by indentation, and tree-sitter highlighting. It is built with
-`codeedit.New(codeedit.NewDocument(text))`. Its keys are actions with default bindings, so they
+`codeedit.Editor(codeedit.NewDocument(text))`. Its keys are actions with default bindings, so they
 work without setup, and an app can rebind them. See [docs/codeedit.md](docs/codeedit.md) for the keys,
 the document, highlighting, the limits and the measured performance.
 
@@ -3318,7 +3318,7 @@ per language, so jamb itself carries none of them:
 ```go
 import "github.com/tyler-builds/jamb-grammars/golang"
 
-codeedit.New(doc).Language(golang.Grammar)
+codeedit.Editor(doc).Language(golang.Grammar)
 ```
 
 Highlighting runs tree-sitter in WebAssembly through wazero, which adds about 1.1 MB to an app's

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tyler-builds/jamb/codeedit/highlight"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -65,7 +66,7 @@ func TestBackspaceDeletesEmptyPair(t *testing.T) {
 func TestNewlineKeepsIndentAndSplitsBrackets(t *testing.T) {
 	d, _ := newTestDoc("func f() {")
 	d.SetCaret(len(d.Text()))
-	if err := d.Newline(4); err != nil {
+	if err := d.Newline(); err != nil {
 		t.Fatal(err)
 	}
 	if d.Text() != "func f() {\n    " {
@@ -74,7 +75,7 @@ func TestNewlineKeepsIndentAndSplitsBrackets(t *testing.T) {
 	d2, _ := newTestDoc("\tx := 1")
 	d2.SetCaret(len("\tx := 1"))
 	// The new line keeps the indent of its line.
-	if err := d2.Newline(4); err != nil {
+	if err := d2.Newline(); err != nil {
 		t.Fatal(err)
 	}
 	if d2.Text() != "\tx := 1\n\t" {
@@ -82,7 +83,7 @@ func TestNewlineKeepsIndentAndSplitsBrackets(t *testing.T) {
 	}
 	d3, _ := newTestDoc("{}")
 	d3.SetCaret(1)
-	if err := d3.Newline(4); err != nil {
+	if err := d3.Newline(); err != nil {
 		t.Fatal(err)
 	}
 	if d3.Text() != "{\n    \n}" || d3.Caret() != len("{\n    ") {
@@ -148,13 +149,13 @@ func TestSelectWord(t *testing.T) {
 func TestIndentAndOutdentRows(t *testing.T) {
 	d, _ := newTestDoc("a\nb\nc")
 	d.SetSelections(Selection{Anchor: 0, Head: 3})
-	if err := d.Indent(4); err != nil {
+	if err := d.Indent(); err != nil {
 		t.Fatal(err)
 	}
 	if d.Text() != "    a\n    b\nc" {
 		t.Fatalf("indent of two rows = %q", d.Text())
 	}
-	if err := d.Outdent(4); err != nil {
+	if err := d.Outdent(); err != nil {
 		t.Fatal(err)
 	}
 	if d.Text() != "a\nb\nc" {
@@ -165,7 +166,7 @@ func TestIndentAndOutdentRows(t *testing.T) {
 func TestCaretIndentInsertsToTabStop(t *testing.T) {
 	d, _ := newTestDoc("ab")
 	d.SetCaret(1)
-	if err := d.Indent(4); err != nil {
+	if err := d.Indent(); err != nil {
 		t.Fatal(err)
 	}
 	if d.Text() != "a   b" {
@@ -299,10 +300,10 @@ func TestReplaceAllIsOneStep(t *testing.T) {
 // rows skip them, that the caret does not stop in them, and that unfolding brings them back.
 func TestFoldHidesRowsAndSkipsThem(t *testing.T) {
 	d, _ := newTestDoc("func a() {\n\tone\n\ttwo\n}\nnext")
-	if !d.FoldableRow(0, 4) || d.FoldableRow(4, 4) {
+	if !d.FoldableRow(0) || d.FoldableRow(4) {
 		t.Fatal("row 0 should be foldable and row 4 should not")
 	}
-	if !d.Fold(0, 4) {
+	if !d.Fold(0) {
 		t.Fatal("Fold(0) did nothing")
 	}
 	if got := d.VisibleRows(); got != 3 {
@@ -331,7 +332,7 @@ func TestFoldHidesRowsAndSkipsThem(t *testing.T) {
 // it does.
 func TestFoldFollowsEdits(t *testing.T) {
 	d, _ := newTestDoc("x\nfunc a() {\n\tone\n}")
-	d.Fold(1, 4)
+	d.Fold(1)
 	if err := d.Replace(0, 0, "new line\n"); err != nil {
 		t.Fatal(err)
 	}
@@ -373,7 +374,7 @@ func TestCaptureStylesUseClosestName(t *testing.T) {
 
 // TestSpanIndexLaterSpansWin checks which span paints where spans overlap.
 func TestSpanIndexLaterSpansWin(t *testing.T) {
-	spans := []Span{{Start: 0, End: 10, Capture: 0}, {Start: 4, End: 6, Capture: 1}}
+	spans := []highlight.Span{{Start: 0, End: 10, Capture: 0}, {Start: 4, End: 6, Capture: 1}}
 	var x spanIndex
 	x.build(spans, 1)
 	got := x.around(0, 10)
@@ -401,7 +402,7 @@ func TestCommandsOnEmptyDocument(t *testing.T) {
 		t.Fatal("an empty document changed")
 	}
 	// Tab on an empty line inserts the indent, as it does anywhere a caret has no selection.
-	if err := d.Indent(4); err != nil {
+	if err := d.Indent(); err != nil {
 		t.Fatal(err)
 	}
 	if d.Text() != "    " {

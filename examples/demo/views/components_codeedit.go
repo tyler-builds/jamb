@@ -31,7 +31,7 @@ func codeEditorSection() ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
 		doc := ui.Local(ctx, "codeedit.doc", codeedit.NewDocument(codeEditorSample)).Peek()
-		ed := codeedit.New(doc).Label("Sample Go file").Language(golang.Grammar).Comment("// ").Height(ui.Px(260))
+		ed := codeedit.Editor(doc).Label("Sample Go file").Language(golang.Grammar).CommentPrefix("// ").Height(ui.Px(260))
 		return section(t, "Code editor", ed)
 	})
 }

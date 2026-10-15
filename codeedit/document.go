@@ -36,7 +36,7 @@ type Document struct {
 	primary int         // the index of the primary selection in sels
 	goal    int         // the cell a run of vertical moves keeps, when goalOK
 	goalOK  bool
-	tab     int    // the width of a tab stop in cells, for the cells of the vertical moves (see SetTabWidth)
+	tab     int    // the width of a tab stop in cells, for the cells of the vertical moves (see SetTabSize)
 	folds   []fold // sorted by start, never nested
 	undo    []state
 	redo    []state
@@ -119,10 +119,10 @@ func NewDocument(text string) *Document {
 	return d
 }
 
-// SetTabWidth sets the width of a tab stop, in cells, that the commands use. A vertical move
+// SetTabSize sets the width of a tab stop, in cells, that the commands use. A vertical move
 // keeps its column in cells, as the editor shows them, so the tab stops decide where the caret
 // lands after a tab. The editor sets it from its TabSize. A width below 1 is 1. It is 4 by default.
-func (d *Document) SetTabWidth(n int) {
+func (d *Document) SetTabSize(n int) {
 	d.tab = max(n, 1)
 }
 

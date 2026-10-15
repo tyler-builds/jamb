@@ -54,13 +54,13 @@ func (d *Document) foldEnd(row int, tab int) int {
 
 // Fold hides the lines indented under row, and reports whether it folded any.
 // The row must be visible and must have lines under it that are indented past
-// it. Folds that the new one covers are removed. tab is the width of a tab in
-// columns, for the comparison of indentation.
-func (d *Document) Fold(row, tab int) bool {
+// it. Folds that the new one covers are removed. The width of a tab stop is the document's
+// (see SetTabSize), for the comparison of indentation.
+func (d *Document) Fold(row int) bool {
 	if row < 0 || row+1 >= d.LineCount() || d.hiddenRow(row) {
 		return false
 	}
-	last := d.foldEnd(row, tab)
+	last := d.foldEnd(row, d.tab)
 	if last == row {
 		return false
 	}
@@ -117,9 +117,9 @@ func (d *Document) Folded(row int) bool {
 }
 
 // FoldableRow reports whether row has lines under it that are indented past it,
-// and so can be folded. tab is the width of a tab, as Fold takes it.
-func (d *Document) FoldableRow(row, tab int) bool {
-	return row+1 < d.LineCount() && !d.hiddenRow(row) && d.foldEnd(row, tab) > row
+// and so can be folded. The width of a tab is the document's (see SetTabSize).
+func (d *Document) FoldableRow(row int) bool {
+	return row+1 < d.LineCount() && !d.hiddenRow(row) && d.foldEnd(row, d.tab) > row
 }
 
 // hiddenRow reports whether row is hidden by a fold.

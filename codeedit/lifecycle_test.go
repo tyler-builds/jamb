@@ -17,7 +17,7 @@ func TestRemovingTheEditorClosesItsSession(t *testing.T) {
 		t.Skip("compiles the Go grammar")
 	}
 	doc := NewDocument("package main\n")
-	ed := New(doc).Language(golang.Grammar)
+	ed := Editor(doc).Language(golang.Grammar)
 	shown := ui.NewSignal(true)
 	root := func(ctx *ui.Context) ui.Element {
 		if !shown.Get() {

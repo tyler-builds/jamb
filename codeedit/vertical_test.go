@@ -14,7 +14,7 @@ func TestVerticalMoveKeepsTheScreenCellAcrossATab(t *testing.T) {
 
 	// With tab stops of 8, the same caret is at cell 8, which is the end of the shorter row.
 	d = NewDocument("ab\tx\nabcdefgh")
-	d.SetTabWidth(8)
+	d.SetTabSize(8)
 	d.SetCaret(3)
 	d.Move(MoveDown, false, 1)
 	if got := d.Caret(); got != len("ab\tx\nabcdefgh") {

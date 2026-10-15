@@ -171,7 +171,7 @@ func TestLargeDocumentQueriesDoNotCopyTheText(t *testing.T) {
 func TestModelFollowsFoldedRows(t *testing.T) {
 	h := newHarness(t, "func a() {\n\tx\n\ty\n}\nfunc b() {}\n")
 	activateAccess(h)
-	h.doc.Fold(0, 4)
+	h.doc.Fold(0)
 	c := accessField(t, h).Text.Content
 	lineAt := func(row int) access.TextLine {
 		ln, _ := c.Line(h.doc.LineStart(row))

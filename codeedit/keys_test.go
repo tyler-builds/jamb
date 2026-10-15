@@ -28,7 +28,7 @@ func TestPunctuationBindingsAreInTheBindings(t *testing.T) {
 // TestPunctuationKeysRunTheCommands checks that the keys reach the commands in the editor, not only
 // that the bindings exist.
 func TestPunctuationKeysRunTheCommands(t *testing.T) {
-	h := newHarness(t, "x := 1", func(e *Editor) *Editor { return e.Comment("// ") })
+	h := newHarness(t, "x := 1", func(e *EditorElement) *EditorElement { return e.CommentPrefix("// ") })
 	h.doc.SetCaret(0)
 	h.key(input.KeySlash, input.ModCtrl)
 	if h.doc.Text() != "// x := 1" {

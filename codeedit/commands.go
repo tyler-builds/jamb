@@ -426,10 +426,10 @@ func pairsHere(next, prev rune, quote bool, c byte) bool {
 // Newline replaces each selection with a line feed and the indentation of its line. After
 // an opening bracket the new line is indented one more tab stop, and a closer typed
 // next goes on a line of its own, below the caret, at the indentation of its line.
-func (d *Document) Newline(tab int) error {
+func (d *Document) Newline() error {
 	t := d.text.Snapshot()
 	plans := make([]plan, len(d.sels))
-	unit := strings.Repeat(" ", max(tab, 1))
+	unit := strings.Repeat(" ", max(d.tab, 1))
 	for i, sel := range d.sels {
 		from, to := sel.Range()
 		row := t.PointAt(from).Row
@@ -655,10 +655,11 @@ func (d *Document) rowsOf() []int {
 }
 
 // Indent indents the rows of the selections by one tab stop, or, for a caret on one line,
-// inserts spaces to the next tab stop. tab is the width of a tab stop. It is a
-// multi-line command: each row gets its indent, and the selections move with the text.
-func (d *Document) Indent(tab int) error {
-	tab = max(tab, 1)
+// inserts spaces to the next tab stop. The width of a tab stop is the document's (see
+// SetTabSize). It is a multi-line command: each row gets its indent, and the selections
+// move with the text.
+func (d *Document) Indent() error {
+	tab := max(d.tab, 1)
 	if len(d.sels) == 1 && d.sels[0].Empty() {
 		p := d.sels[0].Head
 		col := d.lineRuneCol(p)
@@ -673,9 +674,9 @@ func (d *Document) Indent(tab int) error {
 }
 
 // Outdent removes one tab stop of indentation from the rows of the selections: one tab, or
-// up to tab spaces.
-func (d *Document) Outdent(tab int) error {
-	tab = max(tab, 1)
+// up to a tab stop of spaces.
+func (d *Document) Outdent() error {
+	tab := max(d.tab, 1)
 	var changes []Change
 	for _, r := range d.rowsOf() {
 		line := d.Line(r)

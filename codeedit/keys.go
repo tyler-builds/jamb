@@ -71,12 +71,12 @@ var (
 // editorAction is one command and what it does to the editor it runs in.
 type editorAction struct {
 	action *ui.Action
-	fn     func(e *Editor, vs *viewState)
+	fn     func(e *EditorElement, vs *viewState)
 }
 
 // writable runs fn only when the editor is writable.
-func writable(fn func(e *Editor, vs *viewState)) func(e *Editor, vs *viewState) {
-	return func(e *Editor, vs *viewState) {
+func writable(fn func(e *EditorElement, vs *viewState)) func(e *EditorElement, vs *viewState) {
+	return func(e *EditorElement, vs *viewState) {
 		if !e.readOnly {
 			fn(e, vs)
 		}
@@ -84,15 +84,15 @@ func writable(fn func(e *Editor, vs *viewState)) func(e *Editor, vs *viewState) 
 }
 
 // doEdit runs an edit of the document, for a writable editor.
-func doEdit(fn func(d *Document, tab int) error) func(e *Editor, vs *viewState) {
-	return writable(func(e *Editor, vs *viewState) {
-		vs.edit(func(d *Document) error { return fn(d, vs.tab) })
+func doEdit(fn func(d *Document) error) func(e *EditorElement, vs *viewState) {
+	return writable(func(e *EditorElement, vs *viewState) {
+		vs.edit(func(d *Document) error { return fn(d) })
 	})
 }
 
 // moveCmd runs the movement m, with or without extending the selection.
-func moveCmd(m Move, extend bool) func(e *Editor, vs *viewState) {
-	return func(e *Editor, vs *viewState) { vs.move(m, extend) }
+func moveCmd(m Move, extend bool) func(e *EditorElement, vs *viewState) {
+	return func(e *EditorElement, vs *viewState) { vs.move(m, extend) }
 }
 
 // editorActions says what each command does. buildEditor's canvas gets an OnAction handler
@@ -125,33 +125,36 @@ func buildActions() []editorAction {
 		{CmdSelectDocEnd, moveCmd(MoveDocEnd, true)},
 		{CmdSelectPageUp, moveCmd(MovePageUp, true)},
 		{CmdSelectPageDown, moveCmd(MovePageDown, true)},
-		{CmdSelectAll, func(e *Editor, vs *viewState) { vs.doc.SelectAll(); vs.restart = true; vs.touch() }},
-		{CmdCollapse, func(e *Editor, vs *viewState) { vs.doc.Collapse(); vs.touch() }},
-		{CmdDeleteBack, doEdit(func(d *Document, _ int) error { return d.DeleteBackward() })},
-		{CmdDeleteForward, doEdit(func(d *Document, _ int) error { return d.DeleteForward() })},
-		{CmdDeleteWordBack, doEdit(func(d *Document, _ int) error { return d.DeleteWordBackward() })},
-		{CmdDeleteWordForward, doEdit(func(d *Document, _ int) error { return d.DeleteWordForward() })},
-		{CmdNewline, doEdit(func(d *Document, tab int) error { return d.Newline(tab) })},
-		{CmdIndent, doEdit(func(d *Document, tab int) error { return d.Indent(tab) })},
-		{CmdOutdent, doEdit(func(d *Document, tab int) error { return d.Outdent(tab) })},
-		{CmdUndo, writable(func(e *Editor, vs *viewState) { vs.undoRedo(false) })},
-		{CmdRedo, writable(func(e *Editor, vs *viewState) { vs.undoRedo(true) })},
-		{CmdCopy, func(e *Editor, vs *viewState) { vs.copy() }},
-		{CmdCut, writable(func(e *Editor, vs *viewState) { vs.copy(); vs.edit(func(d *Document) error { return d.Paste("") }) })},
-		{CmdPaste, writable(func(e *Editor, vs *viewState) { vs.paste() })},
-		{CmdComment, writable(func(e *Editor, vs *viewState) {
+		{CmdSelectAll, func(e *EditorElement, vs *viewState) { vs.doc.SelectAll(); vs.restart = true; vs.touch() }},
+		{CmdCollapse, func(e *EditorElement, vs *viewState) { vs.doc.Collapse(); vs.touch() }},
+		{CmdDeleteBack, doEdit(func(d *Document) error { return d.DeleteBackward() })},
+		{CmdDeleteForward, doEdit(func(d *Document) error { return d.DeleteForward() })},
+		{CmdDeleteWordBack, doEdit(func(d *Document) error { return d.DeleteWordBackward() })},
+		{CmdDeleteWordForward, doEdit(func(d *Document) error { return d.DeleteWordForward() })},
+		{CmdNewline, doEdit(func(d *Document) error { return d.Newline() })},
+		{CmdIndent, doEdit(func(d *Document) error { return d.Indent() })},
+		{CmdOutdent, doEdit(func(d *Document) error { return d.Outdent() })},
+		{CmdUndo, writable(func(e *EditorElement, vs *viewState) { vs.undoRedo(false) })},
+		{CmdRedo, writable(func(e *EditorElement, vs *viewState) { vs.undoRedo(true) })},
+		{CmdCopy, func(e *EditorElement, vs *viewState) { vs.copy() }},
+		{CmdCut, writable(func(e *EditorElement, vs *viewState) {
+			vs.copy()
+			vs.edit(func(d *Document) error { return d.Paste("") })
+		})},
+		{CmdPaste, writable(func(e *EditorElement, vs *viewState) { vs.paste() })},
+		{CmdComment, writable(func(e *EditorElement, vs *viewState) {
 			vs.edit(func(d *Document) error { return d.ToggleComment(e.comment) })
 		})},
-		{CmdAddNextOccurrence, func(e *Editor, vs *viewState) { vs.doc.AddNextOccurrence(); vs.reveal = true; vs.touch() }},
-		{CmdAddCaretAbove, func(e *Editor, vs *viewState) { vs.doc.AddCaretVertical(-1); vs.reveal = true; vs.touch() }},
-		{CmdAddCaretBelow, func(e *Editor, vs *viewState) { vs.doc.AddCaretVertical(1); vs.reveal = true; vs.touch() }},
-		{CmdFind, func(e *Editor, vs *viewState) { vs.openBar(barFind) }},
-		{CmdReplace, writable(func(e *Editor, vs *viewState) { vs.openBar(barReplace) })},
-		{CmdFindNext, func(e *Editor, vs *viewState) { vs.findStep(true) }},
-		{CmdFindPrevious, func(e *Editor, vs *viewState) { vs.findStep(false) }},
-		{CmdGoToLine, func(e *Editor, vs *viewState) { vs.openBar(barGoto) }},
-		{CmdFold, func(e *Editor, vs *viewState) { vs.doc.Fold(vs.doc.RowOf(vs.doc.Caret()), vs.tab); vs.touch() }},
-		{CmdUnfold, func(e *Editor, vs *viewState) { vs.doc.Unfold(vs.doc.RowOf(vs.doc.Caret())); vs.touch() }},
+		{CmdAddNextOccurrence, func(e *EditorElement, vs *viewState) { vs.doc.AddNextOccurrence(); vs.reveal = true; vs.touch() }},
+		{CmdAddCaretAbove, func(e *EditorElement, vs *viewState) { vs.doc.AddCaretVertical(-1); vs.reveal = true; vs.touch() }},
+		{CmdAddCaretBelow, func(e *EditorElement, vs *viewState) { vs.doc.AddCaretVertical(1); vs.reveal = true; vs.touch() }},
+		{CmdFind, func(e *EditorElement, vs *viewState) { vs.openBar(barFind) }},
+		{CmdReplace, writable(func(e *EditorElement, vs *viewState) { vs.openBar(barReplace) })},
+		{CmdFindNext, func(e *EditorElement, vs *viewState) { vs.findStep(true) }},
+		{CmdFindPrevious, func(e *EditorElement, vs *viewState) { vs.findStep(false) }},
+		{CmdGoToLine, func(e *EditorElement, vs *viewState) { vs.openBar(barGoto) }},
+		{CmdFold, func(e *EditorElement, vs *viewState) { vs.doc.Fold(vs.doc.RowOf(vs.doc.Caret())); vs.touch() }},
+		{CmdUnfold, func(e *EditorElement, vs *viewState) { vs.doc.Unfold(vs.doc.RowOf(vs.doc.Caret())); vs.touch() }},
 	}
 	return out
 }

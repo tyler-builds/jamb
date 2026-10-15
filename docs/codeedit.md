@@ -9,10 +9,10 @@ Text pattern. It is pure Go, and renders on the Canvas of the `ui` package.
 
 ```go
 doc := codeedit.NewDocument(source)
-ui.Div().Child(codeedit.New(doc).
+ui.Div().Child(codeedit.Editor(doc).
     Label("main.go").
     Language(golang.Grammar).
-    Comment("// ").
+    CommentPrefix("// ").
     TabSize(4).
     Height(ui.Px(400)))
 ```
@@ -26,8 +26,8 @@ rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+k", codeedit.CmdFind))
 rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+d", ui.Unbind(codeedit.CmdAddNextOccurrence)))
 ```
 
-`New` returns an element. Its options chain: `Key`, `Label`, `LineNumbers`, `ReadOnly`,
-`TabSize` (4 by default), `Comment`, `Size`, `Height`, `Styles`, `Language` and `Highlighter`.
+`Editor` returns an element. Its options chain: `Key`, `Label`, `LineNumbers`, `ReadOnly`,
+`TabSize` (4 by default), `CommentPrefix`, `Size`, `Height`, `Styles`, `Language` and `Highlighter`.
 Word wrap is not offered (see Limits).
 
 ## Document
@@ -43,7 +43,7 @@ own scroll position.
 | `Edit(changes...)`, `Replace(from, to, s)` | Change the text as one undo step. Ranges are bytes and must start and end on character boundaries. |
 | `Undo()`, `Redo()`, `CanUndo()`, `CanRedo()` | The history. Typing and deleting within a second of the same kind form one step. |
 | `Selections()`, `SetSelections(...)`, `Primary()`, `Caret()` | The selections; the last one set is the primary. |
-| `SetTabWidth(n)` | The width of a tab stop, for the commands that depend on columns. The editor sets it from `TabSize`. |
+| `SetTabSize(n)` | The width of a tab stop, for the commands that depend on columns. The editor sets it from `TabSize`. |
 | `OnChange(fn)`, `OnEdit(fn)`, `Version()` | Listen to changes. `OnEdit` reports each replaced byte range, last part first. |
 
 Positions are byte offsets. Selections move with the text: a caret before an insertion moves
@@ -67,7 +67,7 @@ value, so an app can rebind it with `ui.BindIn("CodeEditor", keys, action)` or t
 | Backspace, Delete, Ctrl+Backspace, Ctrl+Delete | Delete. Backspace between an empty pair deletes both. |
 | Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z | Undo and redo. |
 | Ctrl+C, Ctrl+X, Ctrl+V | Copy, cut and paste through the UI clipboard. With several selections and as many lines in the clipboard, each selection takes one line. |
-| Ctrl+/ | Toggle the line comment prefix set with `Comment`. |
+| Ctrl+/ | Toggle the line comment prefix set with `CommentPrefix`. |
 | Ctrl+Shift+[ | Fold the row of the caret. |
 | Ctrl+Shift+] | Unfold the row of the caret. |
 | Ctrl+D | Select the word at the caret, then add the next occurrence of the selection. |
@@ -114,7 +114,7 @@ one package per language (`golang`, `python`, `typescript` and others), each pro
 ```go
 import "github.com/tyler-builds/jamb-grammars/golang"
 
-codeedit.New(doc).Language(golang.Grammar)
+codeedit.Editor(doc).Language(golang.Grammar)
 ```
 
 A grammar is a WebAssembly module: the tree-sitter runtime, the grammar, and a shim that the
@@ -198,7 +198,7 @@ from `Theme.CodeEditor` and `Theme.Syntax`, and then over `Styles`:
 | `Match`, `CurrentMatch` | The find matches. |
 | `Find` | The find and replace bar. |
 
-Under high contrast the colors are the system colors (the theme's `Editor` colors), whatever is set
+Under high contrast the colors are the system colors (the theme's `CodeEditor` colors), whatever is set
 in `Styles`; sizes and spacing still apply.
 
 ## Performance

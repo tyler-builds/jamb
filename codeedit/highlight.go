@@ -7,13 +7,8 @@ import (
 	"github.com/tyler-builds/jamb/ui"
 )
 
-// A Span colors the bytes [Start, End) of the text with the capture at index Capture of the
-// highlighter's CaptureNames. Where spans overlap, the later one in the list wins. It is the
-// highlight package's Span.
-type Span = highlight.Span
-
-// A Highlighter gives an Editor its syntax colors. It is satisfied by *highlight.Session. The
-// Editor sends it each change of the text as it is made, and paints with the spans it has.
+// A Highlighter gives an editor its syntax colors. It is satisfied by *highlight.Session. The
+// editor sends it each change of the text as it is made, and paints with the spans it has.
 //
 // The contract, which the session keeps:
 //   - Edit is called on the UI thread for each change, with the bytes it replaces, and returns
@@ -21,8 +16,8 @@ type Span = highlight.Span
 //     never waits for a parse.
 //   - SetViewport tells the highlighter which bytes are shown, so that it parses those first.
 //   - Spans returns the spans as they are now, and a version that changes when they do. The
-//     Editor draws whatever it has.
-//   - CaptureNames returns the names that Span.Capture indexes.
+//     The editor draws whatever it has.
+//   - CaptureNames returns the names that highlight.Span.Capture indexes.
 type Highlighter interface {
 	Edit(e highlight.EditRecord) error
 	SetViewport(lo, hi int) error
@@ -36,13 +31,13 @@ type Highlighter interface {
 type spanIndex struct {
 	ver    uint64
 	ok     bool
-	list   []Span
+	list   []highlight.Span
 	order  []int // the index in the highlighter's list of each sorted span
 	maxLen int   // the longest span, so a search can start early enough
 }
 
 // build sorts the spans, which is done again only when their version changes.
-func (x *spanIndex) build(spans []Span, ver uint64) {
+func (x *spanIndex) build(spans []highlight.Span, ver uint64) {
 	if x.ok && x.ver == ver {
 		return
 	}

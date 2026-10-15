@@ -16,17 +16,17 @@ import (
 type harness struct {
 	t   testing.TB
 	rt  *ui.Runtime
-	ed  *Editor
+	ed  *EditorElement
 	doc *Document
 	now time.Time
 }
 
 // newHarness returns a harness that shows a new document of text in an editor, which is
 // configured by opts.
-func newHarness(t testing.TB, text string, opts ...func(*Editor) *Editor) *harness {
+func newHarness(t testing.TB, text string, opts ...func(*EditorElement) *EditorElement) *harness {
 	t.Helper()
 	doc := NewDocument(text)
-	ed := New(doc).Label("Source").Size(ui.Px(480), ui.Px(300))
+	ed := Editor(doc).Label("Source").Size(ui.Px(480), ui.Px(300))
 	for _, o := range opts {
 		ed = o(ed)
 	}
@@ -167,7 +167,7 @@ func TestClipboardRoundTrip(t *testing.T) {
 }
 
 func TestReadOnlyRefusesChanges(t *testing.T) {
-	h := newHarness(t, "fixed", func(e *Editor) *Editor { return e.ReadOnly(true) })
+	h := newHarness(t, "fixed", func(e *EditorElement) *EditorElement { return e.ReadOnly(true) })
 	h.doc.SetCaret(0)
 	h.typeText("x")
 	h.key(input.KeyDelete, 0)
@@ -279,7 +279,7 @@ func TestFoldAndUnfoldCommands(t *testing.T) {
 }
 
 func TestToggleCommentCommand(t *testing.T) {
-	h := newHarness(t, "x := 1", func(e *Editor) *Editor { return e.Comment("// ") })
+	h := newHarness(t, "x := 1", func(e *EditorElement) *EditorElement { return e.CommentPrefix("// ") })
 	h.doc.SetCaret(0)
 	h.rt.Dispatch(CmdComment)
 	if h.doc.Text() != "// x := 1" {
@@ -289,8 +289,8 @@ func TestToggleCommentCommand(t *testing.T) {
 
 func TestTwoEditorsShareOneDocument(t *testing.T) {
 	doc := NewDocument("shared")
-	a := New(doc)
-	b := New(doc)
+	a := Editor(doc)
+	b := Editor(doc)
 	root := func(ctx *ui.Context) ui.Element {
 		return ui.Div().Column().Child(ui.Div().Key("a").Child(a)).Child(ui.Div().Key("b").Child(b))
 	}
@@ -312,7 +312,7 @@ func TestTwoEditorsShareOneDocument(t *testing.T) {
 type fakeHighlighter struct {
 	edits    [][3]any
 	viewport [2]int
-	spans    []Span
+	spans    []highlight.Span
 	ver      uint64
 	names    []string
 	closed   bool
@@ -328,7 +328,7 @@ func (f *fakeHighlighter) SetViewport(lo, hi int) error {
 	return nil
 }
 
-func (f *fakeHighlighter) Spans() ([]Span, uint64) { return f.spans, f.ver }
+func (f *fakeHighlighter) Spans() ([]highlight.Span, uint64) { return f.spans, f.ver }
 
 func (f *fakeHighlighter) CaptureNames() []string { return f.names }
 
@@ -340,8 +340,8 @@ func (f *fakeHighlighter) Close() error {
 // TestHighlighterFollowsEditsAndViewport checks that each change reaches the highlighter with the
 // byte range it replaced, and that the viewport is the bytes of the rows shown.
 func TestHighlighterFollowsEditsAndViewport(t *testing.T) {
-	fake := &fakeHighlighter{names: []string{"keyword"}, spans: []Span{{Start: 0, End: 2, Capture: 0}}, ver: 1}
-	h := newHarness(t, "if x", func(e *Editor) *Editor { return e.Highlighter(fake) })
+	fake := &fakeHighlighter{names: []string{"keyword"}, spans: []highlight.Span{{Start: 0, End: 2, Capture: 0}}, ver: 1}
+	h := newHarness(t, "if x", func(e *EditorElement) *EditorElement { return e.Highlighter(fake) })
 	h.doc.SetCaret(0)
 	h.frame()
 	if fake.viewport[1] != len("if x") {
@@ -366,7 +366,7 @@ func TestHighlighterFollowsEditsAndViewport(t *testing.T) {
 // by their closest name.
 func TestSyntaxStylesMapCaptures(t *testing.T) {
 	fake := &fakeHighlighter{names: []string{"string.escape.go", "unknown"}, ver: 1}
-	h := newHarness(t, "x", func(e *Editor) *Editor { return e.Highlighter(fake) })
+	h := newHarness(t, "x", func(e *EditorElement) *EditorElement { return e.Highlighter(fake) })
 	h.frame()
 	cs := h.ed.view.capStyle
 	if len(cs) != 2 || !cs[0].ok || cs[1].ok {

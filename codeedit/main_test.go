@@ -29,7 +29,7 @@ func TestLanguageHighlightsWithRealSession(t *testing.T) {
 	if testing.Short() {
 		t.Skip("compiles the Go grammar")
 	}
-	h := newHarness(t, "package main\n\nfunc main() {}\n", func(e *Editor) *Editor {
+	h := newHarness(t, "package main\n\nfunc main() {}\n", func(e *EditorElement) *EditorElement {
 		return e.Language(golang.Grammar)
 	})
 	deadline := time.Now().Add(30 * time.Second)

@@ -10,11 +10,11 @@ import (
 	"github.com/tyler-builds/jamb/ui"
 )
 
-// An Editor is a code editor under construction. It is made by New and configured with the
-// methods below, each of which returns the editor so that they chain. An Editor is an
+// An EditorElement is a code editor under construction. It is made by Editor and configured with the
+// methods below, each of which returns the editor so that they chain. An EditorElement is an
 // element: place it in a tree as it is, and it renders itself. Its size is Full by 300
 // pixels unless Size or Height says otherwise.
-type Editor struct {
+type EditorElement struct {
 	ui.Composite
 	doc         *Document
 	label       string
@@ -31,30 +31,30 @@ type Editor struct {
 	view *viewState
 }
 
-// New returns an editor that shows doc. Line numbers are on, tabs are four columns wide,
+// Editor returns an editor that shows doc. Line numbers are on, tabs are four columns wide,
 // and the editor is writable with no comment prefix.
-func New(doc *Document) *Editor {
-	return &Editor{doc: doc, lineNumbers: true, tabSize: 4, width: ui.Full, height: ui.Px(300)}
+func Editor(doc *Document) *EditorElement {
+	return &EditorElement{doc: doc, lineNumbers: true, tabSize: 4, width: ui.Full, height: ui.Px(300)}
 }
 
 // Key gives the editor a stable identity among its siblings, so its state (the scroll
 // position, the find bar) survives reordering.
-func (e *Editor) Key(k string) *Editor { e.SetKey(k); return e }
+func (e *EditorElement) Key(k string) *EditorElement { e.SetKey(k); return e }
 
 // Label sets the name that assistive technology reads for the editor.
-func (e *Editor) Label(s string) *Editor { e.label = s; return e }
+func (e *EditorElement) Label(s string) *EditorElement { e.label = s; return e }
 
 // LineNumbers shows or hides the column of line numbers. It is shown by default. The
 // fold markers are always shown.
-func (e *Editor) LineNumbers(on bool) *Editor { e.lineNumbers = on; return e }
+func (e *EditorElement) LineNumbers(on bool) *EditorElement { e.lineNumbers = on; return e }
 
 // ReadOnly shows the text and lets it be selected, moved through and copied, but not
 // changed.
-func (e *Editor) ReadOnly(on bool) *Editor { e.readOnly = on; return e }
+func (e *EditorElement) ReadOnly(on bool) *EditorElement { e.readOnly = on; return e }
 
 // TabSize sets how many columns a tab stop is, for the display of tabs, for Tab and for
 // the folding of indented lines. It is 4 by default.
-func (e *Editor) TabSize(n int) *Editor {
+func (e *EditorElement) TabSize(n int) *EditorElement {
 	if n < 1 {
 		n = 1
 	}
@@ -62,19 +62,19 @@ func (e *Editor) TabSize(n int) *Editor {
 	return e
 }
 
-// Comment sets the prefix that Comment toggles at the start of each line, such as "// "
-// for Go. With no prefix, the comment command does nothing.
-func (e *Editor) Comment(prefix string) *Editor { e.comment = prefix; return e }
+// CommentPrefix sets the prefix that the comment command toggles at the start of each
+// line, such as "// " for Go. With no prefix, the comment command does nothing.
+func (e *EditorElement) CommentPrefix(prefix string) *EditorElement { e.comment = prefix; return e }
 
 // Size sets the width and the height of the editor.
-func (e *Editor) Size(w, h ui.Length) *Editor { e.width, e.height = w, h; return e }
+func (e *EditorElement) Size(w, h ui.Length) *EditorElement { e.width, e.height = w, h; return e }
 
 // Height sets the height of the editor, which is 300 pixels by default.
-func (e *Editor) Height(h ui.Length) *Editor { e.height = h; return e }
+func (e *EditorElement) Height(h ui.Length) *EditorElement { e.height = h; return e }
 
 // Styles sets the look of the parts of the editor, for this editor only. Set fields win
 // over the defaults. Calling Styles again merges with the earlier values.
-func (e *Editor) Styles(st Style) *Editor {
+func (e *EditorElement) Styles(st Style) *EditorElement {
 	e.styles = e.styles.merge(st)
 	return e
 }
@@ -82,20 +82,20 @@ func (e *Editor) Styles(st Style) *Editor {
 // Highlighter sets the syntax highlighter of the editor, when it is not a session the editor
 // starts itself (see Language). The highlighter must have been made from the document's text,
 // and the editor sends it each later change. A nil highlighter shows plain text.
-func (e *Editor) Highlighter(h Highlighter) *Editor { e.hl = h; return e }
+func (e *EditorElement) Highlighter(h Highlighter) *EditorElement { e.hl = h; return e }
 
 // Language highlights the document with the tree-sitter language l, such as golang.Grammar.
 // The editor starts a highlight session on the document's text, sends it each change, and paints
 // the spans it has. It closes the session when the language or the document changes. A document
 // over the highlight limit is shown without colors, and a nil language shows plain text.
-func (e *Editor) Language(l highlight.Grammar) *Editor { e.lang = l; return e }
+func (e *EditorElement) Language(l highlight.Grammar) *EditorElement { e.lang = l; return e }
 
 // Document returns the document the editor shows.
-func (e *Editor) Document() *Document { return e.doc }
+func (e *EditorElement) Document() *Document { return e.doc }
 
 // Render builds the editor. It is called by the UI, and reads the signals of the editor's
 // state, so the editor renders again when the text, the selections or the view change.
-func (e *Editor) Render(ctx *ui.Context) ui.Element {
+func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	vs := ui.Local(ctx, "codeedit.view", newViewState()).Peek()
 	vs.rev.Get() // the editor renders again when the view changes
 	vs.ctx = ctx
@@ -125,7 +125,7 @@ func (e *Editor) Render(ctx *ui.Context) ui.Element {
 		vs.vpSet = false
 	}
 	vs.tab = e.tabSize
-	vs.doc.SetTabWidth(e.tabSize)
+	vs.doc.SetTabSize(e.tabSize)
 	t := ctx.Theme()
 	st := e.styles.resolve(ctx)
 	name := e.label
@@ -155,7 +155,7 @@ func (e *Editor) Render(ctx *ui.Context) ui.Element {
 }
 
 // wire attaches the pointer, keyboard, text and focus handling to the canvas of the editor.
-func (e *Editor) wire(canvas *ui.DivElement, vs *viewState) {
+func (e *EditorElement) wire(canvas *ui.DivElement, vs *viewState) {
 	canvas.OnFocus(func() { vs.focused = true; vs.restart = true; vs.touch() })
 	canvas.OnBlur(func() { vs.focused = false; vs.dragging = false; vs.touch() })
 	canvas.OnMouseDown(func(ev *ui.MouseEvent) { vs.mouseDown(ev) })
@@ -408,7 +408,7 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 	switch {
 	case ev.LocalX >= g.foldX && ev.LocalX < g.textX && vs.doc.opensBlock(row, vs.tab):
 		if !vs.doc.Unfold(row) {
-			vs.doc.Fold(row, vs.tab)
+			vs.doc.Fold(row)
 		}
 	case ev.LocalX < g.textX:
 		vs.doc.SelectRow(row)

@@ -117,7 +117,7 @@ func TestCompositionCommittedByClick(t *testing.T) {
 
 // A read-only editor shows no composition.
 func TestReadOnlyEditorShowsNoComposition(t *testing.T) {
-	h := newHarness(t, "ab", func(e *Editor) *Editor { return e.ReadOnly(true) })
+	h := newHarness(t, "ab", func(e *EditorElement) *EditorElement { return e.ReadOnly(true) })
 	h.doc.SetCaret(1)
 	h.frame()
 	h.compose("か", 3, 0, 0)
