@@ -37,6 +37,66 @@ Results against the performance targets are in [BENCHMARKS.md](BENCHMARKS.md):
 
 **Compared with GPUI:** [docs/comparison-gpui.md](docs/comparison-gpui.md) measures the same hello-world app built with jamb and with GPUI (Zed's Rust UI framework): project size, binary size, build times, startup, idle CPU and memory.
 
+## Using jamb in your app
+
+The module is `github.com/tyler-builds/jamb`, and the first release is `v0.1.0`. The repository is
+private for now, so Go must fetch it directly rather than through the public module proxy, and git
+must be able to clone it:
+
+```
+go env -w GOPRIVATE=github.com/tyler-builds/*
+go get github.com/tyler-builds/jamb@v0.1.0
+```
+
+A minimal `main.go` is a window with a greeting and a button that counts its clicks:
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/tyler-builds/jamb/app"
+	"github.com/tyler-builds/jamb/ui"
+)
+
+func main() {
+	clicks := ui.NewSignal(0)
+
+	app.New().Run(app.Window{
+		Title:  "Hello",
+		Width:  800,
+		Height: 600,
+		// Root is a component, so it runs again whenever clicks changes.
+		Root: func(ctx *ui.Context) ui.Element {
+			return ui.Div().Column().Center().Gap(24).
+				Child(ui.Text("Hello, world!").FontSize(24)).
+				Child(ui.Button(fmt.Sprintf("Clicked %d times", clicks.Get())).
+					OnClick(func() { clicks.Update(func(n int) int { return n + 1 }) }))
+		},
+	})
+}
+```
+
+Start with the [API guide](#api-guide). The `jamb` command is its own module, tagged `cmd/jamb/v0.1.0`
+for the same release, and it is installed with:
+
+```
+go install github.com/tyler-builds/jamb/cmd/jamb@v0.1.0
+```
+
+- `jamb dev ./myapp` rebuilds and restarts the app on each save, keeping its window position (see
+  [Tools for humans and coding agents](#tools-for-humans-and-coding-agents)).
+- `jamb package` builds the Windows zip, installer and MSIX (see [Packaging](#packaging)).
+
+An app that uses `codeedit` also needs the grammars module, which is tagged `v0.1.0` too:
+
+```
+go get github.com/tyler-builds/jamb-grammars@v0.1.0
+```
+
+See [Code editor](#code-editor) for the grammars and what `codeedit` adds to a binary.
+
 ## Repository layout
 
 ```
