@@ -356,7 +356,8 @@ A mouse wheel and a touchpad's two-finger scroll arrive as scroll events, which
   carries what changed since the previous event: `e.Scale` multiplies the scale
   (1 means no change), and `e.PanX` and `e.PanY` move the content in logical
   pixels. `e.X`, `e.Y` give the center in the window, and `e.LocalX`, `e.LocalY`
-  in the element.
+  in the element. `e.Width`, `e.Height` are the element's size, as in a
+  `MouseEvent`.
 - `e.Inertia` is set while the gesture continues after the fingers lift. Under
   reduced motion its changes are left out, and the gesture still begins and ends.
 - A pinch that no element stops zooms the window in the same steps as Ctrl+= and

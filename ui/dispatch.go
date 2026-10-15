@@ -508,6 +508,7 @@ func (rt *Runtime) Pinch(x, y float32, phase GesturePhase, scale, panX, panY flo
 		if n.div != nil && n.div.h.onPinch != nil {
 			r := rt.nodeRect(n)
 			e.LocalX, e.LocalY = x-r.X, y-r.Y
+			e.Width, e.Height = r.W, r.H
 			n.div.h.onPinch(e)
 			if e.stopped {
 				return

@@ -54,6 +54,21 @@ func TestPinchLocalCoordinates(t *testing.T) {
 	}
 }
 
+// TestPinchElementSize checks that each handler sees the size of the element it
+// runs on, as a MouseEvent does: the inner element first, then the outer one,
+// which is the root and fills the window.
+func TestPinchElementSize(t *testing.T) {
+	type size struct{ w, h float32 }
+	var got []size
+	record := func(e *PinchEvent) { got = append(got, size{e.Width, e.Height}) }
+	rt := newTestRuntime(pinchTree(record, record), 300, 200, 1)
+	frame(rt)
+	rt.Pinch(70, 40, GestureUpdate, 1.05, 0, 0, false, 0)
+	if len(got) != 2 || got[0] != (size{100, 40}) || got[1] != (size{300, 200}) {
+		t.Errorf("sizes = %v, want [{100 40} {300 200}] (the inner element, then the outer one, which fills the window)", got)
+	}
+}
+
 // TestPinchZoomsWhenUnhandled checks that a pinch no element handles zooms the
 // window in the same steps as Ctrl+= and Ctrl+-.
 func TestPinchZoomsWhenUnhandled(t *testing.T) {
