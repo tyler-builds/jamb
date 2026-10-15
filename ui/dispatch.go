@@ -929,7 +929,7 @@ func (rt *Runtime) setFocus(id uint64) {
 			return
 		}
 	}
-	rt.focusID = id
+	rt.focusID, rt.focusLink = id, 0
 	if n := rt.byID[id]; n != nil && n.div != nil && n.div.h.onFocus != nil {
 		n.div.h.onFocus()
 	}
@@ -951,18 +951,39 @@ func (rt *Runtime) setFocus(id uint64) {
 	rt.requestFrame()
 }
 
-// tabOrder lists the elements Tab moves through, as HTML and GPUI order them:
+// tabPlace is a place that Tab stops at: an element, and for a link in rich text
+// 1 + the index of its segment (0 for the element itself).
+type tabPlace struct {
+	id   uint64
+	link int
+}
+
+// tabOrder lists the elements of the tab stops, in order (see tabStops). A
+// rich text with several links is listed once for each.
+func (rt *Runtime) tabOrder() []uint64 {
+	stops := rt.tabStops()
+	ids := make([]uint64, len(stops))
+	for i, s := range stops {
+		ids[i] = s.id
+	}
+	return ids
+}
+
+// tabStops lists the places Tab moves through, as HTML and GPUI order them:
 // positive TabIndex values first in ascending order (ties in tree order), then
 // the rest in tree order. Elements with a negative TabIndex or TabStop(false)
-// are left out, though they stay focusable by click or handle. One walk of the
-// tree; only the positive indexes are sorted.
-func (rt *Runtime) tabOrder() []uint64 {
+// are left out, though they stay focusable by click or handle. Each link of a
+// rich text (a segment with OnClick, such as a Link) is a stop of its own, in
+// the order of the text, as links are in a web page; the segments of one link
+// made by LinkSegs are one stop. One walk of the tree; only the positive indexes
+// are sorted.
+func (rt *Runtime) tabStops() []tabPlace {
 	type indexed struct {
 		index int
 		id    uint64
 	}
 	var first []indexed
-	var rest []uint64
+	var rest []tabPlace
 	var walk func(n *node)
 	walk = func(n *node) {
 		if n.flags&flagNoDisplay != 0 {
@@ -975,7 +996,14 @@ func (rt *Runtime) tabOrder() []uint64 {
 			if d.tabIndex > 0 {
 				first = append(first, indexed{d.tabIndex, n.id})
 			} else {
-				rest = append(rest, n.id)
+				rest = append(rest, tabPlace{id: n.id})
+			}
+		}
+		if n.kind == kindText && n.rich != nil {
+			for i := range n.rich.segs {
+				if linkStart(n.rich.segs, i) {
+					rest = append(rest, tabPlace{n.id, i + 1})
+				}
 			}
 		}
 		for _, c := range n.children {
@@ -994,38 +1022,63 @@ func (rt *Runtime) tabOrder() []uint64 {
 		return rest
 	}
 	slices.SortStableFunc(first, func(a, b indexed) int { return cmp.Compare(a.index, b.index) })
-	ids := make([]uint64, 0, len(first)+len(rest))
+	stops := make([]tabPlace, 0, len(first)+len(rest))
 	for _, f := range first {
-		ids = append(ids, f.id)
+		stops = append(stops, tabPlace{id: f.id})
 	}
-	return append(ids, rest...)
+	return append(stops, rest...)
 }
 
-// cycleFocus moves focus to the next (or, with back, the previous) element of
-// the tab order, wrapping around, and reveals it.
+// cycleFocus moves focus to the next (or, with back, the previous) stop of the
+// tab order, wrapping around, and reveals it.
 func (rt *Runtime) cycleFocus(back bool) {
-	ids := rt.tabOrder()
-	if len(ids) == 0 {
+	stops := rt.tabStops()
+	if len(stops) == 0 {
 		return
 	}
 	i := -1
-	for j, id := range ids {
-		if id == rt.focusID {
+	for j, s := range stops {
+		if s == (tabPlace{rt.focusID, rt.focusLink}) {
 			i = j
 		}
 	}
 	if back {
 		i--
 		if i < 0 {
-			i = len(ids) - 1
+			i = len(stops) - 1
 		}
 	} else {
-		i = (i + 1) % len(ids)
+		i = (i + 1) % len(stops)
 	}
-	rt.setFocus(ids[i])
+	rt.focusStop(stops[i])
 	rt.revealFocus = true
 	rt.needPaint = true
 	rt.requestFrame()
+}
+
+// focusStop gives keyboard focus to a tab stop: its element, and the link of
+// its rich text when the stop is one.
+func (rt *Runtime) focusStop(s tabPlace) {
+	rt.setFocus(s.id)
+	if rt.focusID == s.id && rt.focusLink != s.link {
+		rt.focusLink = s.link
+		rt.markAccess()
+		rt.needPaint = true
+		rt.requestFrame()
+	}
+}
+
+// focusedLink returns the link of rich text that has keyboard focus, or nil
+// when focus is not on a link: the first segment of the link.
+func (rt *Runtime) focusedLink() *Segment {
+	n := rt.byID[rt.focusID]
+	if rt.focusLink == 0 || n == nil || n.rich == nil || rt.focusLink > len(n.rich.segs) {
+		return nil
+	}
+	if g := &n.rich.segs[rt.focusLink-1]; g.onClick != nil {
+		return g
+	}
+	return nil
 }
 
 // revealTabFocus scrolls the focused element into view after Tab moved focus
@@ -1056,9 +1109,18 @@ func (rt *Runtime) revealRowsNow() {
 
 // activateFocused runs the OnClick of the focused element, as Enter or Space
 // does for a focused button, unless the element is spaceOnly and the key is
-// Enter. It reports whether it ran one. Text fields are not elements with
+// Enter, or of the focused link of a rich text, for Enter. It reports whether
+// it ran one. Text fields are not elements with
 // OnClick, so their keys are left to typing.
 func (rt *Runtime) activateFocused(k input.Key) bool {
+	if g := rt.focusedLink(); g != nil {
+		// A link follows Enter, as in a web page; Space is left to the element.
+		if k != input.KeyEnter {
+			return false
+		}
+		g.onClick()
+		return true
+	}
 	n := rt.byID[rt.focusID]
 	if n == nil || n.kind != kindDiv || n.div == nil || n.div.h.onClick == nil {
 		return false
