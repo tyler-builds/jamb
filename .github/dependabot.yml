@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories:
+      - "/"
+      - "/cmd/jamb"
+      - "/examples/demo"
+      - "/examples/hello"
+      - "/examples/notes"
+    schedule:
+      interval: weekly
+    ignore:
+      # The examples use the jamb in the repository through a replace directive.
+      - dependency-name: github.com/tyler-builds/jamb
+    groups:
+      go-modules:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci

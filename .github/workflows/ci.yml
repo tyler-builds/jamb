@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Each module is checked on its own, as a user's build sees it.
+  GOWORK: "off"
+  MODULES: ". cmd/jamb examples/demo examples/hello examples/notes"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: Format, vet, tidy, vulnerabilities
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+          cache-dependency-path: "**/go.sum"
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "Not gofmt'ed:"; echo "$out"; exit 1; fi
+      - name: go vet
+        run: for m in $MODULES; do (cd "$m" && go vet ./...); done
+      - name: go mod tidy
+        run: for m in $MODULES; do (cd "$m" && go mod tidy -diff); done
+      - name: govulncheck
+        run: for m in $MODULES; do (cd "$m" && go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...); done
+
+  test:
+    name: Tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+          cache-dependency-path: "**/go.sum"
+      - name: go test
+        run: for m in $MODULES; do (cd "$m" && go test -count=1 ./...); done
+
+  race:
+    name: Tests with the race detector
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+          cache-dependency-path: "**/go.sum"
+      - name: go test -race
+        run: |
+          gcc --version | head -1
+          go test -race -count=1 ./...
+
+  # The runner is a throwaway desktop with the WARP software rasterizer, so the
+  # tests behind JAMB_LIVE_TESTS, which open windows, can run here. Allowed to
+  # fail while they prove steady on hosted runners.
+  live:
+    name: Window tests (WARP)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    env:
+      JAMB_LIVE_TESTS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+          cache-dependency-path: "**/go.sum"
+      - name: go test with JAMB_LIVE_TESTS
+        run: go test -count=1 -timeout 10m ./...
+
+  cross:
+    name: Cross-builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+          cache-dependency-path: "**/go.sum"
+      - name: go build
+        run: |
+          for target in windows/amd64 windows/arm64 linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            echo "== $target"
+            for m in $MODULES; do
+              (cd "$m" && GOOS=${target%/*} GOARCH=${target#*/} go build ./...)
+            done
+          done
