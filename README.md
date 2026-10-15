@@ -4235,6 +4235,8 @@ jamb is licensed under the Apache License, Version 2.0; see [LICENSE](LICENSE) a
 A binary built with jamb also contains third-party code. When you distribute the binary, include the
 notices of that code with it. Every app built with jamb contains:
 
+- The Go runtime and standard library, as every Go program does, licensed under the BSD 3-Clause
+  License. Include the `LICENSE` file of your Go installation (`go env GOROOT`).
 - `github.com/go-text/typesetting`, licensed under the Unlicense or the BSD 3-Clause License (SPDX
   `Unlicense OR BSD-3-Clause`). Include its `LICENSE` file, which holds both texts.
 - `golang.org/x/image`, licensed under the BSD 3-Clause License. It includes the Go Regular font, which

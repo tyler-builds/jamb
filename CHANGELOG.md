@@ -8,10 +8,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 ## [0.1.0] - unreleased
 
 jamb is a small, declarative, GPU-rendered desktop UI framework written in plain Go, licensed under
-the Apache License, Version 2.0. Windows is the first platform: windows use Win32, and rendering uses Direct3D 11. The framework uses
-no Electron, WebView, HTML/CSS, JavaScript, Node, Rust or cgo. An app is a tree of elements built in
-render functions, and state lives in signals. This is the first release, and the API may
-change before 1.0.
+the Apache License, Version 2.0. Windows is the first platform: windows use Win32, and rendering
+uses Direct3D 11. The framework uses no Electron, WebView, HTML/CSS, JavaScript, Node, Rust or cgo.
+An app is a tree of elements built in render functions, and state lives in signals. This is the
+first release, and the API may change before 1.0.
 
 ### Added
 
