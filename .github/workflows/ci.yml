@@ -95,7 +95,8 @@ jobs:
           check-latest: true
           cache-dependency-path: "**/go.sum"
       - name: go test with JAMB_LIVE_TESTS
-        run: go test -count=1 -timeout 10m ./...
+        # -v lists each test, so the log shows that the gated ones ran.
+        run: go test -count=1 -v -timeout 10m ./...
 
   cross:
     name: Cross-builds
