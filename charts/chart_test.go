@@ -534,3 +534,35 @@ func TestEmptyCharts(t *testing.T) {
 		})
 	}
 }
+
+// The sizing methods size the chart's box as they size a widget of the ui package: Grow
+// takes the free space of a row, MaxWidth caps the width, MinHeight raises the height,
+// and GridSpan covers the columns of a grid.
+func TestSizingMethods(t *testing.T) {
+	r := newRig(func(*ui.Context) ui.Element {
+		return ui.Div().Column().
+			Child(ui.Div().Row().Width(ui.Px(600)).
+				Child(Line(visits()).Width(ui.Px(100)).Grow(1).Key("grow")).
+				Child(ui.Div().Width(ui.Px(100)).Height(ui.Px(10)))).
+			Child(ui.Div().Row().Width(ui.Px(600)).
+				Child(Line(visits()).MaxWidth(ui.Px(250)).Height(ui.Px(100)).MinHeight(ui.Px(140)).Key("capped"))).
+			Child(ui.Div().Grid(ui.Fr(1), ui.Fr(1)).Width(ui.Px(600)).
+				Child(Line(visits()).Width(ui.Auto).GridSpan(2, 1).Height(ui.Px(150)).Key("span")))
+	})
+	find := func(key string) ui.Rect {
+		rc, ok := r.rt.Find(key)
+		if !ok {
+			t.Fatalf("no element with key %q", key)
+		}
+		return rc
+	}
+	if grow := find("grow"); grow.W != 500 {
+		t.Errorf("a growing chart beside 100 pixels in a row of 600 is %v wide, want 500", grow.W)
+	}
+	if capped := find("capped"); capped.W != 250 || capped.H != 140 {
+		t.Errorf("the capped chart is %v by %v, want 250 by 140", capped.W, capped.H)
+	}
+	if span := find("span"); span.W != 600 {
+		t.Errorf("a chart spanning two columns of 600 pixels is %v wide", span.W)
+	}
+}

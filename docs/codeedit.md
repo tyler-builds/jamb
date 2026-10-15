@@ -46,7 +46,9 @@ rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+d", ui.Unbind(codeedit.CmdAddNextOc
 ```
 
 `Editor` returns an element. Its options chain: `Key`, `Label`, `LineNumbers`, `ReadOnly`,
-`TabSize` (4 by default), `CommentPrefix`, `Size`, `Height`, `Styles`, `Language` and `Highlighter`.
+`TabSize` (4 by default), `CommentPrefix`, `Size`, the sizing methods (`Width`, `Height`,
+`MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow` and `GridSpan`, as on the `ui` widgets;
+Full by 300 pixels by default), `Styles`, `Language` and `Highlighter`.
 Word wrap is not offered (see Limits).
 
 ## Document

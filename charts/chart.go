@@ -89,7 +89,8 @@ const (
 // Chart is a chart under construction. It is made by one of the constructors (Line, Bar,
 // and the others) and configured with the methods below, each of which returns the chart
 // so that they chain. A chart is a ui.Element, so it is placed in a tree as it is. Its
-// size is Full by 300 pixels unless Size or Height says otherwise.
+// size is Full by 300 pixels unless the sizing methods (Size, Width, Height and the
+// others) say otherwise.
 type Chart struct {
 	ui.Composite
 	kind   kind
@@ -103,8 +104,7 @@ type Chart struct {
 	horiz  bool
 	smooth bool
 	format func(float64) string
-	width  ui.Length
-	height ui.Length
+	size   sizes // see Width
 	styles Style
 	// last is the geometry of the chart's latest render, which the tests read.
 	last *geometry
@@ -112,7 +112,10 @@ type Chart struct {
 
 // newChart returns a chart of kind k over the data ds. Its element renders the chart.
 func newChart(k kind, ds dataset) *Chart {
-	return &Chart{kind: k, ds: ds, legend: LegendBottom, width: ui.Full, height: ui.Px(300)}
+	c := &Chart{kind: k, ds: ds, legend: LegendBottom}
+	c.size.setWidth(ui.Full)
+	c.size.setHeight(ui.Px(300))
+	return c
 }
 
 // Render builds the chart. A chart is an element: place it in a tree with
@@ -226,10 +229,33 @@ func (c *Chart) Smooth() *Chart { c.smooth = true; return c }
 func (c *Chart) Format(f func(float64) string) *Chart { c.format = f; return c }
 
 // Size sets the width and the height of the chart. The width is Full by default.
-func (c *Chart) Size(w, h ui.Length) *Chart { c.width, c.height = w, h; return c }
+func (c *Chart) Size(w, h ui.Length) *Chart { c.size.setWidth(w); c.size.setHeight(h); return c }
+
+// The sizing methods give the chart's box a size, as they do for the widgets of the ui
+// package, and win over the Chart part of Styles. The chart is Full wide by default.
+// See Sizing in docs/styling.md.
+func (c *Chart) Width(l ui.Length) *Chart { c.size.setWidth(l); return c }
 
 // Height sets the height of the chart, which is 300 pixels by default.
-func (c *Chart) Height(h ui.Length) *Chart { c.height = h; return c }
+func (c *Chart) Height(h ui.Length) *Chart { c.size.setHeight(h); return c }
+
+// MinWidth sets the smallest width of the chart.
+func (c *Chart) MinWidth(l ui.Length) *Chart { c.size.setMinWidth(l); return c }
+
+// MinHeight sets the smallest height of the chart.
+func (c *Chart) MinHeight(l ui.Length) *Chart { c.size.setMinHeight(l); return c }
+
+// MaxWidth sets the largest width of the chart.
+func (c *Chart) MaxWidth(l ui.Length) *Chart { c.size.setMaxWidth(l); return c }
+
+// MaxHeight sets the largest height of the chart.
+func (c *Chart) MaxHeight(l ui.Length) *Chart { c.size.setMaxHeight(l); return c }
+
+// Grow makes the chart take a share of the free space on its parent's main axis.
+func (c *Chart) Grow(f float32) *Chart { c.size.setGrow(f); return c }
+
+// GridSpan sets how many columns and rows the chart covers in its parent's grid.
+func (c *Chart) GridSpan(cols, rows int) *Chart { c.size.setSpan(cols, rows); return c }
 
 // Styles sets the look of the parts of the chart, for this chart only. Set fields win
 // over the defaults. Calling Styles again merges with the earlier values.
@@ -412,11 +438,11 @@ func (c *Chart) render(ctx *ui.Context) ui.Element {
 
 // column lays out the parts of a chart in a column: its title, its legend above or
 // below, and the canvas with the legend beside it when the legend is on the right.
-// The chart's Size is that of the column.
+// The chart's sizes are those of the column.
 func (c *Chart) column(v *view, hidden *ui.Signal[[]bool], pointer *ui.Signal[pointerAt], cursor *ui.Signal[cursorAt], focused *ui.Signal[bool]) ui.Element {
 	canvas := c.canvas(v, hidden, pointer, cursor, focused)
 	legend := c.legendRow(v, hidden, cursor)
-	col := ui.Div().Style(v.st.Chart).Size(c.width, c.height)
+	col := applySizes(c.size, ui.Div().Style(v.st.Chart))
 	if c.title != "" {
 		col.Child(ui.Text(c.title).Style(v.st.Title).NoWrap())
 	}
