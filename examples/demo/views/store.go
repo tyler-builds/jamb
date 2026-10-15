@@ -22,6 +22,7 @@ const (
 	PageActivity
 	PageComponents
 	PageSettings
+	PageMarkdown
 )
 
 // Status is a project's state.

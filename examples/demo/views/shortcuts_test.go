@@ -19,11 +19,12 @@ func shortcutRig(s *Store) *ui.Runtime {
 	return rt
 }
 
-// Ctrl+1 to Ctrl+5 switch to the pages in the sidebar's order.
+// Ctrl+1 to Ctrl+6 switch to the pages: Ctrl+1 to Ctrl+5 in the sidebar's order,
+// and Ctrl+6 to the Markdown page, which came later.
 func TestShortcutsSwitchPages(t *testing.T) {
 	s := NewStore()
 	rt := shortcutRig(s)
-	pages := []Page{PageDashboard, PageProjects, PageActivity, PageComponents, PageSettings}
+	pages := []Page{PageDashboard, PageProjects, PageActivity, PageComponents, PageSettings, PageMarkdown}
 	for i, want := range pages {
 		rt.Press(input.Key1+input.Key(i), input.ModCtrl)
 		if got := s.Page.Get(); got != want {

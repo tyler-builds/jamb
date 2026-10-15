@@ -10,6 +10,7 @@ var (
 	GoActivity   = ui.NewAction("nav.activity", "Go to Activity")
 	GoComponents = ui.NewAction("nav.components", "Go to Components")
 	GoSettings   = ui.NewAction("nav.settings", "Go to Settings")
+	GoMarkdown   = ui.NewAction("nav.markdown", "Go to Markdown")
 	FocusSearch  = ui.NewAction("search.focus", "Search projects")
 	ToggleTheme  = ui.NewAction("theme.toggle", "Toggle theme")
 )
@@ -22,6 +23,7 @@ func Bindings() []ui.Binding {
 		ui.Bind("ctrl+3", GoActivity),
 		ui.Bind("ctrl+4", GoComponents),
 		ui.Bind("ctrl+5", GoSettings),
+		ui.Bind("ctrl+6", GoMarkdown),
 		ui.Bind("ctrl+k", FocusSearch),
 		ui.Bind("ctrl+shift+l", ToggleTheme),
 	}
@@ -31,7 +33,7 @@ func Bindings() []ui.Binding {
 // they show there. The window's own list (AvailableActions) is not used: it
 // only sees the actions on the focus path, which a page does not have while
 // it renders.
-var shortcutActions = []*ui.Action{GoDashboard, GoProjects, GoActivity, GoComponents, GoSettings, FocusSearch, ToggleTheme}
+var shortcutActions = []*ui.Action{GoDashboard, GoProjects, GoActivity, GoComponents, GoSettings, GoMarkdown, FocusSearch, ToggleTheme}
 
 // tip is label with the keys of a, for a tooltip: "Projects (Ctrl+2)". It is
 // just the label when a has no binding.

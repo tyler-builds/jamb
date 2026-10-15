@@ -49,6 +49,7 @@ func TestSidebarNavigatesByKeyboard(t *testing.T) {
 
 	rt.Press(input.KeyTab, 0) // Activity
 	rt.Press(input.KeyTab, 0) // Components
+	rt.Press(input.KeyTab, 0) // Markdown
 	rt.Press(input.KeyTab, 0) // Settings
 	rt.Press(input.KeySpace, 0)
 	if s.Page.Get() != PageSettings {
