@@ -31,3 +31,10 @@ The runtime that executes the code editor's grammar modules
 (github.com/tyler-builds/jamb-grammars, which carries the notices of the
 tree-sitter runtime and grammars) is github.com/tetratelabs/wazero v1.12.0,
 licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+
+Third-party software: goldmark
+
+The Markdown parser of the markdown package is github.com/yuin/goldmark v1.8.6,
+Copyright (c) 2019 Yusuke Inuzuka, licensed under the MIT License
+(https://github.com/yuin/goldmark/blob/master/LICENSE). Only apps that import the
+markdown package contain it.

@@ -296,6 +296,14 @@ An app that imports `codeedit` also contains:
   grammars it embeds are licensed under the MIT License. Include its `LICENSE` and `NOTICE` files, which
   hold the MIT notices.
 
+An app that imports `markdown` also contains:
+
+- `github.com/yuin/goldmark`, the Markdown parser, licensed under the MIT License. Include its `LICENSE`
+  file.
+
+An app that imports `markdown/mdcode` contains what an app that imports `codeedit` does, as above, since
+it uses the code editor's highlighting.
+
 jamb's own `NOTICE` file also covers material from gpui-component (Apache License, Version 2.0) that is
 compiled into jamb, so include it with the app.
 
