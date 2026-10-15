@@ -80,6 +80,39 @@ func TestLists(t *testing.T) {
 	}
 }
 
+// Each item of a list has its position in its own list, the number of items of that
+// list, and its level: 1 at the top, 2 in a list nested in an item, and so on. A
+// task is an item with a position too, and its check box keeps its state; the
+// footnotes are numbered the same way.
+func TestListPositionsAndLevels(t *testing.T) {
+	u := show(t, func() *ViewElement {
+		return View("- one\n- two\n  1. two a\n  2. two b\n     - [x] done\n     - [ ] to do\n     - [ ] later\n- three\n\n" +
+			"5. five\n6. six\n\nA note[^n] and another[^m].\n\n[^n]: First.\n[^m]: Second.\n")
+	})
+	var got []string
+	for _, it := range nodes(u, access.RoleListItem) {
+		got = append(got, fmt.Sprintf("%d/%d L%d", it.PosInSet, it.SetSize, it.Level))
+	}
+	want := []string{
+		"1/3 L1", "2/3 L1", // one, two
+		"1/2 L2", "2/2 L2", // two a, two b
+		"1/3 L3", "2/3 L3", "3/3 L3", // the tasks
+		"3/3 L1",           // three
+		"1/2 L1", "2/2 L1", // five, six: positions in the list, whatever its numbers
+		"1/2 L0", "2/2 L0", // the footnotes
+	}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("items\n%s\nwant\n%s", strings.Join(got, " "), strings.Join(want, " "))
+	}
+	done := u.ByRole(access.RoleCheckBox, "done").Node()
+	if !done.States.Has(access.StateChecked) {
+		t.Error("the done task's check box is not checked")
+	}
+	if p := u.Tree().Node(done.Parent); p == nil || p.Role != access.RoleListItem || p.PosInSet != 1 || p.SetSize != 3 || p.Level != 3 {
+		t.Errorf("the done task's check box is under %+v, want the item 1 of 3 at level 3", p)
+	}
+}
+
 // A table is a data grid of the rows of its body, described by its size as drawn. Its
 // header cells are header items of their columns, and the other cells data items at
 // their row and column, named by their text; a short row is filled out with empty

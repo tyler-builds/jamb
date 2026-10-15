@@ -195,7 +195,8 @@ func (b *builder) toFootnote(i int) func() {
 }
 
 // list returns a list: a column of items, each with its bullet, its number or its
-// task's check box before its blocks.
+// task's check box before its blocks. Assistive technology reads each item with its
+// position in the list ("2 of 5") and its level, 1 for a list that is not nested.
 func (b *builder) list(n *ast.List) ui.Element {
 	gap := b.st.List.Gap
 	if !n.IsTight {
@@ -203,8 +204,9 @@ func (b *builder) list(n *ast.List) ui.Element {
 	}
 	box := ui.Div().Role(access.RoleList).Style(b.st.List).Gap(gap)
 	b.depth++
-	num := n.Start
+	num, pos, total := n.Start, 0, n.ChildCount()
 	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		pos++
 		var marker ui.Element
 		if checked, ok := taskOf(c); ok {
 			marker = b.taskBox(c, checked)
@@ -215,7 +217,8 @@ func (b *builder) list(n *ast.List) ui.Element {
 			marker = ui.Div().AccessHidden().Child(ui.Text(bullet(b.depth)).Style(b.st.ListMarker))
 		}
 		num++
-		box.Child(ui.Div().Role(access.RoleListItem).Row().Align(ui.Start).Gap(6).
+		box.Child(ui.Div().Role(access.RoleListItem).AccessPosition(pos, total).AccessLevel(b.depth).
+			Row().Align(ui.Start).Gap(6).
 			Child(marker).
 			Child(ui.Div().Grow(1).MinWidth(ui.Px(0)).Gap(gap).Children(b.blocks(c)...)))
 	}
@@ -289,18 +292,20 @@ func (b *builder) html(n *ast.HTMLBlock) ui.Element {
 }
 
 // footnotes returns the footnotes at the end of the document: a rule, then a list of
-// the notes by number. A reference to a note moves focus to it, which scrolls it
-// into view.
+// the notes by number, each with its position in the list. A reference to a note
+// moves focus to it, which scrolls it into view.
 func (b *builder) footnotes(n *east.FootnoteList) ui.Element {
 	list := ui.Div().Role(access.RoleList).Label(b.s.MarkdownFootnotes).Style(b.st.List)
+	var notes []*east.Footnote
 	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
-		note, ok := c.(*east.Footnote)
-		if !ok {
-			continue
+		if note, ok := c.(*east.Footnote); ok {
+			notes = append(notes, note)
 		}
+	}
+	for i, note := range notes {
 		h := ui.NewFocusHandle()
 		b.notes[note.Index] = h
-		list.Child(ui.Div().Role(access.RoleListItem).Row().Align(ui.Start).Gap(6).
+		list.Child(ui.Div().Role(access.RoleListItem).AccessPosition(i+1, len(notes)).Row().Align(ui.Start).Gap(6).
 			Focusable().TabStop(false).FocusHandle(h).
 			Child(ui.Text(strconv.Itoa(note.Index) + ".").Style(b.st.ListMarker)).
 			Child(ui.Div().Grow(1).MinWidth(ui.Px(0)).Gap(b.st.List.Gap).Children(b.blocks(note)...)))

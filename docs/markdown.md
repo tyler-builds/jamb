@@ -45,19 +45,28 @@ and no part of `codeedit`.
 | `*em*`, `**strong**`, `~~strike~~`, `` `code` `` | italic, bold, struck and monospace segments of the paragraph's text | part of the text |
 | Hard line break (two spaces or `\` at the end of a line) | a line break in the text | |
 | Link, reference link, autolink, `www.` link | link segments: the `Link` color, underlined under the pointer; a link whose text mixes styles is still one link (see `ui.LinkSegs`) | a link named by its whole text, one Tab stop, which Enter follows |
-| Bullet and ordered list, nested | a column of items with bullets or numbers (from the list's start number) | a list of list items |
-| Task list item, `- [x]` | an item with a check box | a check box, checked or not, named by the task's text |
+| Bullet and ordered list, nested | a column of items with bullets or numbers (from the list's start number) | a list of list items, each with its position ("2 of 5") and its level (see Lists below) |
+| Task list item, `- [x]` | an item with a check box | a list item with its position and level, holding a check box, checked or not, named by the task's text |
 | Block quote, nested | a box with a line on its left | its blocks |
 | Thematic break, `---` | a rule | a separator |
 | Fenced or indented code block | monospace text that does not wrap, in a box that scrolls sideways | a group named "Code, go" (from the fence) with the code |
 | Table | a grid, with the header row in bold and each column aligned as its delimiter row says | a table of rows and columns (see Tables below) |
 | Image | the image at its size, at most as wide as the view | an image named by its alternative text |
 | Footnote reference, `[^1]` | a link `[1]` to the note | a link |
-| Footnotes | a rule and a numbered list at the end | a list named "Footnotes" |
+| Footnotes | a rule and a numbered list at the end | a list named "Footnotes", each note with its position |
 | HTML block or inline HTML | the HTML as it is written, as text | text |
 
 A tight list spaces its items by the `List` part's gap; a loose list (with blank
 lines between its items) spaces them as the document spaces its blocks.
+
+### Lists
+
+Each item of a list reports its position in its own list and the number of items in
+it, so a screen reader says "2 of 5" as it moves through the items, and its level: 1
+for a list that is not nested, 2 for a list inside an item of it, and so on. The
+position counts the items, whatever number an ordered list starts at; the item's
+number stays part of its text. A task is a list item with its position and level,
+and its check box is a check box inside it, with its checked state.
 
 ### Tables
 
@@ -310,7 +319,6 @@ parses only the code blocks that changed.
 
 - Selection is per block: a drag selects within one paragraph, heading, cell or
   code block, not across blocks.
-- List items do not report their position in the list ("2 of 5").
 - An image keeps its height when the view is narrower than the image, and is
   letterboxed in its box. Image titles are not shown.
 - An image inside a paragraph splits the paragraph's text at the image.
