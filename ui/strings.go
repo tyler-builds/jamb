@@ -358,8 +358,6 @@ type Strings struct {
 	MarkdownImageNotShown func(alt string) string
 	// MarkdownTask names the check box of a task whose item has no text.
 	MarkdownTask string
-	// MarkdownTable names a table from its size, such as "Table, 3 columns, 4 rows".
-	MarkdownTable func(columns, rows int) string
 	// MarkdownCode names a code block from the language of its fence, such as
 	// "Code, go". The language may be empty.
 	MarkdownCode func(language string) string
@@ -573,9 +571,6 @@ func englishStrings() *Strings {
 			return "Image not shown: " + alt
 		},
 		MarkdownTask: "Task",
-		MarkdownTable: func(columns, rows int) string {
-			return "Table, " + englishCount(columns, "column", "columns") + ", " + englishCount(rows, "row", "rows")
-		},
 		MarkdownCode: func(language string) string {
 			if language == "" {
 				return "Code"

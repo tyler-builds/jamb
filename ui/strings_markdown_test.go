@@ -24,7 +24,6 @@ func TestMarkdownStringsAreEnglishInEveryPack(t *testing.T) {
 	}
 	s := StringsFor("it")
 	for _, c := range []struct{ got, want string }{
-		{s.MarkdownTable(1, 4), "Table, 1 column, 4 rows"},
 		{s.MarkdownImageNotShown(""), "Image not shown"},
 		{s.MarkdownImageNotShown("Build status"), "Image not shown: Build status"},
 		{s.MarkdownCode("go"), "Code, go"},
