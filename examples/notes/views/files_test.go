@@ -1,7 +1,6 @@
 package views
 
 import (
-	"image"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,31 +12,14 @@ import (
 // fakeWindow stands in for the app's window. It records each dialog the notes
 // app opens, and keeps the callback, which a test answers.
 type fakeWindow struct {
+	ui.NopWindow
 	kinds []string
 	files []dialog.FileOptions
 	done  func(dialog.FileResult)
 }
 
-func (f *fakeWindow) Minimize()                                             {}
-func (f *fakeWindow) ToggleMaximize()                                       {}
-func (f *fakeWindow) Maximized() bool                                       { return false }
-func (f *fakeWindow) Close()                                                {}
-func (f *fakeWindow) RequestClose()                                         {}
-func (f *fakeWindow) SetTitle(string)                                       {}
-func (f *fakeWindow) Focused() bool                                         { return true }
-func (f *fakeWindow) Position() (int, int)                                  { return 0, 0 }
-func (f *fakeWindow) Size() (int, int)                                      { return 800, 600 }
-func (f *fakeWindow) SetPosition(int, int)                                  {}
-func (f *fakeWindow) SetSize(int, int)                                      {}
-func (f *fakeWindow) SetFullscreen(bool)                                    {}
-func (f *fakeWindow) Fullscreen() bool                                      { return false }
-func (f *fakeWindow) Focus()                                                {}
-func (f *fakeWindow) Closed() bool                                          { return false }
-func (f *fakeWindow) Show()                                                 {}
-func (f *fakeWindow) Hide()                                                 {}
-func (f *fakeWindow) SetTaskbarProgress(ui.TaskbarProgress)                 {}
-func (f *fakeWindow) SetTaskbarBadge(image.Image, string)                   {}
-func (f *fakeWindow) MessageBox(dialog.MessageOptions, func(dialog.Button)) {}
+func (f *fakeWindow) Focused() bool    { return true }
+func (f *fakeWindow) Size() (int, int) { return 800, 600 }
 
 func (f *fakeWindow) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
 	f.record("open", o, done)

@@ -59,6 +59,7 @@ const ABI = 1
 // for that grammar. The packages of github.com/tyler-builds/jamb-grammars provide
 // them, such as golang.Grammar, and NewGrammar makes one from a module of your
 // own. Grammars are compared by identity, so an implementation should be a pointer.
+// Methods may be added to Grammar in later versions.
 type Grammar interface {
 	Name() string  // a short name for diagnostics, such as "go"
 	Wasm() []byte  // the module

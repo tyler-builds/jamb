@@ -1,7 +1,6 @@
 package views
 
 import (
-	"image"
 	"strings"
 	"testing"
 	"time"
@@ -97,16 +96,11 @@ func TestOpenProjectFocusesItsOpenWindow(t *testing.T) {
 	}
 }
 
-// openWindow is an open window that records Focus. Its other methods are not
-// called by the test.
+// openWindow is an open window that records Focus. Its other methods do nothing (see
+// ui.NopWindow).
 type openWindow struct {
-	ui.Window
+	ui.NopWindow
 	focused bool
 }
 
-func (w *openWindow) Closed() bool                          { return false }
-func (w *openWindow) Show()                                 {}
-func (w *openWindow) Hide()                                 {}
-func (w *openWindow) SetTaskbarProgress(ui.TaskbarProgress) {}
-func (w *openWindow) SetTaskbarBadge(image.Image, string)   {}
-func (w *openWindow) Focus()                                { w.focused = true }
+func (w *openWindow) Focus() { w.focused = true }

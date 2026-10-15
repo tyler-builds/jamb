@@ -16,8 +16,10 @@ import (
 //     never waits for a parse.
 //   - SetViewport tells the highlighter which bytes are shown, so that it parses those first.
 //   - Spans returns the spans as they are now, and a version that changes when they do. The
-//     The editor draws whatever it has.
+//     editor draws whatever it has.
 //   - CaptureNames returns the names that highlight.Span.Capture indexes.
+//
+// Methods may be added to Highlighter in later versions.
 type Highlighter interface {
 	Edit(e highlight.EditRecord) error
 	SetViewport(lo, hi int) error

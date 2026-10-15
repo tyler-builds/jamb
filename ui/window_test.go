@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"image"
 	"testing"
 	"time"
 
@@ -96,6 +95,7 @@ func TestWindowAreaOnlyPaintedElements(t *testing.T) {
 
 // fakeWindow records the actions a title bar performs on its window.
 type fakeWindow struct {
+	NopWindow
 	maximized, focused, fullscreen bool
 	calls                          []string
 	// The dialogs are recorded in calls; their callbacks are kept, so a test
@@ -106,21 +106,16 @@ type fakeWindow struct {
 	msgDone  func(dialog.Button)
 }
 
-func (f *fakeWindow) Minimize()                           { f.calls = append(f.calls, "minimize") }
-func (f *fakeWindow) ToggleMaximize()                     { f.calls = append(f.calls, "toggle") }
-func (f *fakeWindow) Maximized() bool                     { return f.maximized }
-func (f *fakeWindow) Close()                              { f.calls = append(f.calls, "close") }
-func (f *fakeWindow) RequestClose()                       { f.calls = append(f.calls, "request close") }
-func (f *fakeWindow) SetTitle(s string)                   { f.calls = append(f.calls, "title:"+s) }
-func (f *fakeWindow) Focused() bool                       { return f.focused }
-func (f *fakeWindow) Focus()                              { f.calls = append(f.calls, "focus") }
-func (f *fakeWindow) Closed() bool                        { return false }
-func (f *fakeWindow) Show()                               {}
-func (f *fakeWindow) Hide()                               {}
-func (f *fakeWindow) SetTaskbarProgress(TaskbarProgress)  {}
-func (f *fakeWindow) SetTaskbarBadge(image.Image, string) {}
-func (f *fakeWindow) Position() (int, int)                { return 10, 20 }
-func (f *fakeWindow) Size() (int, int)                    { return 640, 480 }
+func (f *fakeWindow) Minimize()            { f.calls = append(f.calls, "minimize") }
+func (f *fakeWindow) ToggleMaximize()      { f.calls = append(f.calls, "toggle") }
+func (f *fakeWindow) Maximized() bool      { return f.maximized }
+func (f *fakeWindow) Close()               { f.calls = append(f.calls, "close") }
+func (f *fakeWindow) RequestClose()        { f.calls = append(f.calls, "request close") }
+func (f *fakeWindow) SetTitle(s string)    { f.calls = append(f.calls, "title:"+s) }
+func (f *fakeWindow) Focused() bool        { return f.focused }
+func (f *fakeWindow) Focus()               { f.calls = append(f.calls, "focus") }
+func (f *fakeWindow) Position() (int, int) { return 10, 20 }
+func (f *fakeWindow) Size() (int, int)     { return 640, 480 }
 func (f *fakeWindow) SetPosition(x, y int) {
 	f.calls = append(f.calls, fmt.Sprintf("move:%d,%d", x, y))
 }

@@ -50,6 +50,7 @@ type TextLine struct {
 // text with a limit, rather than for the whole text, so that a large text need
 // not be copied for a query. TextContent is the model of a text that is held in
 // memory; the codeedit package has one over a rope.
+// Methods may be added to TextModel in later versions.
 type TextModel interface {
 	// Len returns the last point, the end of the text.
 	Len() int

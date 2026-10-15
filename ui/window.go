@@ -83,7 +83,9 @@ func (d *DivElement) interactive() bool {
 // (Context.Window), or one opened with app.Open. Its methods may be called from
 // any goroutine. An action runs on the UI thread: at once when it is called
 // there, else in call order with the other posted work. A read from another
-// goroutine waits for the UI thread to answer it.
+// goroutine waits for the UI thread to answer it. Methods may be added to Window
+// in later versions, so an implementation should embed NopWindow, which has every
+// method of Window.
 type Window interface {
 	Minimize()
 	ToggleMaximize()
@@ -147,6 +149,39 @@ type Window interface {
 	// the button chosen.
 	MessageBox(o dialog.MessageOptions, done func(dialog.Button))
 }
+
+// NopWindow is a Window whose methods do nothing and return zero values; Closed,
+// Focused, Maximized and Fullscreen report false. A test fake embeds it and
+// overrides the methods that it records or answers, so the fake keeps compiling
+// when Window gains methods.
+type NopWindow struct{}
+
+var _ Window = NopWindow{}
+
+func (NopWindow) Minimize()       {}
+func (NopWindow) ToggleMaximize() {}
+func (NopWindow) Maximized() bool { return false }
+func (NopWindow) Focus()          {}
+func (NopWindow) Closed() bool    { return false }
+func (NopWindow) Close()          {}
+func (NopWindow) RequestClose()   {}
+func (NopWindow) SetTitle(string) {}
+func (NopWindow) Focused() bool   { return false }
+
+func (NopWindow) Position() (x, y int)                                   { return 0, 0 }
+func (NopWindow) Size() (width, height int)                              { return 0, 0 }
+func (NopWindow) SetPosition(x, y int)                                   {}
+func (NopWindow) SetSize(width, height int)                              {}
+func (NopWindow) SetFullscreen(on bool)                                  {}
+func (NopWindow) Fullscreen() bool                                       { return false }
+func (NopWindow) OpenFiles(dialog.FileOptions, func(dialog.FileResult))  {}
+func (NopWindow) SaveFile(dialog.FileOptions, func(dialog.FileResult))   {}
+func (NopWindow) PickFolder(dialog.FileOptions, func(dialog.FileResult)) {}
+func (NopWindow) Show()                                                  {}
+func (NopWindow) Hide()                                                  {}
+func (NopWindow) SetTaskbarProgress(TaskbarProgress)                     {}
+func (NopWindow) SetTaskbarBadge(image.Image, string)                    {}
+func (NopWindow) MessageBox(dialog.MessageOptions, func(dialog.Button))  {}
 
 // windowRef is what Context.Window returns. Its actions go to the app's
 // controls (a headless runtime has none, so they do nothing). Maximized and
