@@ -90,32 +90,63 @@ func initGridVtbls(qi, ar, rl uintptr) {
 	}
 }
 
-// gridCell returns the built cell at row and column (both 0-based) of the grid, or
-// nil. A row is found by its position in the set, which is its 1-based row.
-func gridCell(t *access.Tree, grid *access.Node, row, col int) *access.Node {
-	for _, rid := range grid.Children {
-		r := t.Node(rid)
-		if r == nil || r.PosInSet != row+1 {
+// gridWalk calls fn for each node under the grid, in tree order, until fn returns
+// false. It does not go into a grid inside the grid, whose cells are its own. The
+// cells and header items may be children of the grid or of rows, or deeper.
+func gridWalk(t *access.Tree, grid *access.Node, fn func(*access.Node) bool) bool {
+	for _, id := range grid.Children {
+		n := t.Node(id)
+		if n == nil {
 			continue
 		}
-		for _, cid := range r.Children {
-			if cell := t.Node(cid); cell != nil && cell.GridColumn == col+1 {
-				return cell
-			}
+		if !fn(n) {
+			return false
+		}
+		if n.Role != access.RoleDataGrid && n.Role != access.RoleCalendar && !gridWalk(t, n, fn) {
+			return false
 		}
 	}
-	return nil
+	return true
+}
+
+// gridCell returns the built cell at row and column (both 0-based) of the grid, or
+// nil: the data item at that 1-based grid position.
+func gridCell(t *access.Tree, grid *access.Node, row, col int) *access.Node {
+	var cell *access.Node
+	gridWalk(t, grid, func(n *access.Node) bool {
+		if n.Role == access.RoleDataItem && n.GridRow == row+1 && n.GridColumn == col+1 {
+			cell = n
+		}
+		return cell == nil
+	})
+	return cell
 }
 
 // gridHeaders returns the header items of the grid, in column order.
 func gridHeaders(t *access.Tree, grid *access.Node) []*access.Node {
 	var hs []*access.Node
-	for _, id := range grid.Children {
-		if h := t.Node(id); h != nil && h.Role == access.RoleHeaderItem {
-			hs = append(hs, h)
+	gridWalk(t, grid, func(n *access.Node) bool {
+		if n.Role == access.RoleHeaderItem {
+			hs = append(hs, n)
+		}
+		return true
+	})
+	return hs
+}
+
+// columnHeader returns the header item of the 1-based column col of the grid, or nil:
+// the one with that GridColumn, or else the col-th header item when it has none.
+func columnHeader(t *access.Tree, grid *access.Node, col int) *access.Node {
+	hs := gridHeaders(t, grid)
+	for _, h := range hs {
+		if h.GridColumn == col {
+			return h
 		}
 	}
-	return hs
+	if col >= 1 && col <= len(hs) && hs[col-1].GridColumn == 0 {
+		return hs[col-1]
+	}
+	return nil
 }
 
 // gridOf returns the data grid that holds node n, which is a cell or a row, or nil.
@@ -275,10 +306,9 @@ func uiaTableItemColumnHeaderItems(this, out uintptr) uintptr {
 		putPtr(out, providerArray(c, nil))
 		return hrOK
 	}
-	hs := gridHeaders(t, g)
 	var mine []*access.Node
-	if col := n.GridColumn - 1; col >= 0 && col < len(hs) {
-		mine = hs[col : col+1]
+	if h := columnHeader(t, g, n.GridColumn); h != nil {
+		mine = []*access.Node{h}
 	}
 	putPtr(out, providerArray(c, mine))
 	return hrOK

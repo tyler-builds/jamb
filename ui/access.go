@@ -174,6 +174,69 @@ func (d *DivElement) DescribedBy(keys ...string) *DivElement {
 // It does not change how the element is drawn.
 func (d *DivElement) AccessHidden() *DivElement { d.access().hidden = true; return d }
 
+// AccessGrid gives a table its shape: rows rows and cols columns, which assistive
+// technology reports and moves through by row and column (the Grid and Table patterns
+// of UI Automation). rows counts the rows of data, not the header row, as a DataGrid
+// does: a table with a header and three rows of data has 3 rows. The cells are the
+// elements under it with AccessCell, and its column headers the header items under it.
+//
+// It applies to an element with the role access.RoleDataGrid or access.RoleCalendar.
+// On another role the shape is not reported, and the development warnings say so.
+// AccessGrid panics when rows or cols is negative.
+func (d *DivElement) AccessGrid(rows, cols int) *DivElement {
+	if rows < 0 || cols < 0 {
+		panic(fmt.Sprintf("ui.AccessGrid(%d, %d): the rows and columns must not be negative", rows, cols))
+	}
+	a := d.access()
+	a.gridRows, a.gridCols = rows, cols
+	return d
+}
+
+// AccessCell gives a cell of a table (see AccessGrid) its row and column, both counted
+// from 1. Assistive technology reports them, and finds the cell by them. The cell's name
+// is its text, unless it has a Label.
+//
+// It applies to an element with the role access.RoleDataItem, a cell of the data, or
+// access.RoleHeaderItem, the header of the column col. The header row is not one of
+// the table's rows, so a header item's row is not reported: pass 0. A data item in
+// row 0 has no position, and a cell of another role reports none; the development
+// warnings report both. AccessCell panics when row is negative or col is less than 1.
+func (d *DivElement) AccessCell(row, col int) *DivElement {
+	if row < 0 || col < 1 {
+		panic(fmt.Sprintf("ui.AccessCell(%d, %d): the row must not be negative and the column must be 1 or more", row, col))
+	}
+	a := d.access()
+	a.gridRow, a.gridCol = row, col
+	return d
+}
+
+// AccessPosition places the element in a set of items, such as an item of a list:
+// it is the pos-th of size items, which assistive technology reports as "2 of 5". It
+// applies to the item of any role, most often access.RoleListItem, and also tree
+// items, menu items, tabs and radio buttons. The rows of a UniformList or ListOf get
+// their position from the list, which replaces this one. AccessPosition panics unless
+// 1 <= pos <= size.
+func (d *DivElement) AccessPosition(pos, size int) *DivElement {
+	if pos < 1 || pos > size {
+		panic(fmt.Sprintf("ui.AccessPosition(%d, %d): the position must be 1 to the size", pos, size))
+	}
+	a := d.access()
+	a.setPos, a.setSize = pos, size
+	return d
+}
+
+// AccessLevel gives the element its nesting depth, 1 for the top: the depth of an item
+// of a nested list, a tree item or a menu item, which assistive technology reports as
+// "level 2". It applies to the item of any role. AccessLevel panics when level is less
+// than 1.
+func (d *DivElement) AccessLevel(level int) *DivElement {
+	if level < 1 {
+		panic(fmt.Sprintf("ui.AccessLevel(%d): the level must be 1 or more", level))
+	}
+	d.access().level = level
+	return d
+}
+
 // listItem marks the element as the pos-th of size items in a list, so that
 // assistive technology can say "40 of 10,000" for a row of a virtualized list.
 func (d *DivElement) listItem(pos, size int) *DivElement {
@@ -677,8 +740,7 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 		an.Heading = d.acc.heading
 		an.Value = d.acc.value
 		an.Range = d.acc.rng
-		an.GridRows, an.GridColumns = d.acc.gridRows, d.acc.gridCols
-		an.GridRow, an.GridColumn = d.acc.gridRow, d.acc.gridCol
+		b.gridPlace(an, d.acc, role)
 		an.ItemStatus = d.acc.status
 	}
 	if d.acc != nil && d.acc.text != nil {
@@ -710,6 +772,30 @@ func (b *accessBuilder) checkState(an *access.Node, a *accessInfo, role access.R
 		return
 	}
 	b.issue(an.ID, fmt.Sprintf("%s has no checked state; call Checked on the element", role))
+}
+
+// gridPlace sets the shape of a grid and the position of a cell (see AccessGrid and
+// AccessCell) on the roles they apply to, and records an issue when they are set on
+// another role, or a data item has no row.
+func (b *accessBuilder) gridPlace(an *access.Node, a *accessInfo, role access.Role) {
+	switch {
+	case role == access.RoleDataGrid || role == access.RoleCalendar:
+		an.GridRows, an.GridColumns = a.gridRows, a.gridCols
+	case a.gridRows > 0 || a.gridCols > 0:
+		b.issue(an.ID, fmt.Sprintf("AccessGrid applies to a data grid or a calendar, not a %s; the shape is not reported", role))
+	}
+	switch {
+	case a.gridCol == 0:
+	case role == access.RoleDataItem:
+		an.GridRow, an.GridColumn = a.gridRow, a.gridCol
+		if a.gridRow == 0 {
+			b.issue(an.ID, "data item has row 0 in AccessCell; the rows of a grid are counted from 1")
+		}
+	case role == access.RoleHeaderItem:
+		an.GridColumn = a.gridCol // the header row is not one of the grid's rows
+	default:
+		b.issue(an.ID, fmt.Sprintf("AccessCell applies to a data item or a header item, not a %s; the position is not reported", role))
+	}
 }
 
 // relate records the LabelledBy and DescribedBy keys of an element, to resolve
