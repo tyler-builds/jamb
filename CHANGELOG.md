@@ -17,6 +17,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `Styles`. The guide is [docs/markdown.md](docs/markdown.md).
 - `markdown/mdcode` colors fenced code blocks with the code editor's tree-sitter grammars. It is a
   separate package, so an app that does not import it links neither the editor nor wazero.
+- Markdown tables are data grids that screen readers navigate by row and column, with the header row
+  as their column headers, and list items report their position ("2 of 5") and level.
+- `AccessGrid`, `AccessCell`, `AccessPosition` and `AccessLevel` on `Div` let any element describe a
+  table, a cell, or an item's place in a set and its nesting level to assistive technology.
 - `ui.LinkSegs` makes one link of several styled segments.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.
