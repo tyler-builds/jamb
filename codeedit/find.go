@@ -15,8 +15,8 @@ type FindOptions struct {
 	Regex     bool
 }
 
-// A Match is a range of the text that a Finder found, in bytes. Groups holds the
-// submatch offsets of a regular expression, as regexp reports them, for Replace.
+// A Match is a range of the text that a Finder found, in bytes. For a regular
+// expression it also keeps the submatches, which Replace expands with $1 or ${name}.
 type Match struct {
 	From, To int
 	groups   []int

@@ -24,7 +24,7 @@ type TextUnit uint8
 const (
 	UnitCharacter TextUnit = iota // a grapheme cluster
 	UnitFormat                    // a run of text with the same formatting; a plain text has one
-	UnitWord                      // a word unit: a word, or punctuation, with the spaces after it (text.WordStarts)
+	UnitWord                      // a word unit: a word, or punctuation, with the spaces after it, by the Windows word rule
 	UnitLine                      // a visual line, with the line break that ends it
 	UnitParagraph                 // a paragraph, with the line break that ends it
 	UnitPage                      // a page; a text field's one page is its whole text
@@ -90,7 +90,7 @@ type TextContent struct {
 	X      []float32  // for each point, the x of the caret in layout units, on the line the point belongs to
 	Lines  []TextLine // the visual lines, in order; there is always one
 	Paras  []int      // the first point of each paragraph, in order
-	Words  []int      // the first point of each word unit, in order (see text.WordStarts)
+	Words  []int      // the first point of each word unit, in order, by the Windows word rule
 }
 
 // Len returns the number of grapheme clusters in the text. The last point is
@@ -197,7 +197,7 @@ func (c *TextContent) endOf(starts []int, i int) int {
 
 // Next returns the point one unit after p, or the end of the text when there is
 // none. A word unit moves to the start of the next word unit, as Ctrl+Right does on
-// Windows (see text.WordStarts).
+// Windows.
 func (c *TextContent) Next(u TextUnit, p int) int {
 	n := c.Len()
 	if p >= n {
@@ -397,7 +397,7 @@ func (r TextRange) Expand(u TextUnit) TextRange {
 //     result is a whole unit.
 //   - A move that cannot happen at all leaves the range unchanged.
 //
-// A word unit (see text.WordStarts) moves like a line: a degenerate range moves to the
+// A word unit moves like a line: a degenerate range moves to the
 // start of the nth unit after it, which is where Ctrl+Right stops; a backward move goes
 // to the start of the unit before it, which is where Ctrl+Left stops. A non-degenerate
 // range starts at the start of its unit and moves from there.

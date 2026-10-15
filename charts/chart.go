@@ -88,7 +88,7 @@ const (
 
 // Chart is a chart under construction. It is made by one of the constructors (Line, Bar,
 // and the others) and configured with the methods below, each of which returns the chart
-// so that they chain. Element returns the chart as a ui.Element to place in a tree. Its
+// so that they chain. A chart is a ui.Element, so it is placed in a tree as it is. Its
 // size is Full by 300 pixels unless Size or Height says otherwise.
 type Chart struct {
 	ui.Composite

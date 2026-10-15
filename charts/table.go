@@ -21,7 +21,7 @@ type tableRow struct {
 // column for each series (a candlestick has its four values); a pie has a row for each slice,
 // with its value and share; and a Sankey diagram has a row for each link.
 //
-//	ui.Div().Column().Child(chart).Child(charts.DataTable(chart).Key("visits-data"))
+//	ui.Div().Column().Child(chart).Child(charts.DataTable(chart))
 func DataTable(c *Chart) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		header, rows := c.table()

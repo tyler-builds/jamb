@@ -4,7 +4,7 @@ package charts
 // count, and its grid lines. The zero value is an automatic axis. Fix either end of
 // the range with Min and Max, which return the axis so that they chain:
 //
-//	charts.YAxis(charts.Axis{Label: "Visits", Format: formatCount}.Min(0).Max(400))
+//	chart.YAxis(charts.Axis{Label: "Visits", Format: formatCount}.Min(0).Max(400))
 type Axis struct {
 	// Label is the title of the axis, drawn beside its labels.
 	Label string

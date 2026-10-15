@@ -92,9 +92,9 @@ type Window struct {
 	// Both zero centers the first window, and cascades a later one 32 pixels
 	// from the last window opened.
 	X, Y int
-	// OnClose is called when the window is asked to close, by the user, by
-	// WindowHandle.Close or by the app. Return false to keep the window open,
-	// for example to ask about unsaved changes first.
+	// OnClose is called when the window is asked to close, by the user, by Close on
+	// the ui.Window that Open returns, or by the app. Return false to keep the window
+	// open, for example to ask about unsaved changes first.
 	OnClose func() bool
 	// OnClosed is called on the UI thread after the window has closed, or
 	// after Open failed to open it.
