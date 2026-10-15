@@ -119,8 +119,9 @@ type BreadcrumbsElement struct {
 	key   string
 	name  string // the accessible name of the trail, see Label
 	// styles is the look of this trail's parts, set by Styles.
-	styles BreadcrumbsStyle
-	size   sizing // the trail's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	styles  BreadcrumbsStyle
+	size    sizing // the trail's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	tooltip string // see Tooltip
 }
 
 // Breadcrumbs creates a trail over items, shown left to right, with the last item
@@ -139,6 +140,10 @@ func (b *BreadcrumbsElement) Key(k string) *BreadcrumbsElement { b.key = k; retu
 // Label names the trail for assistive technology, such as "Folder path". It
 // defaults to the Breadcrumb text of the window's Strings.
 func (b *BreadcrumbsElement) Label(name string) *BreadcrumbsElement { b.name = name; return b }
+
+// Tooltip shows s below the trail after the pointer rests on it. Assistive
+// technology reads it as the trail's description, unless it has another.
+func (b *BreadcrumbsElement) Tooltip(s string) *BreadcrumbsElement { b.tooltip = s; return b }
 
 // MaxItems collapses a trail longer than n locations: the first location and the
 // last n-1 are shown, with a "..." button between them. The button opens a menu of
@@ -187,7 +192,8 @@ func (b *BreadcrumbsElement) expand(ctx *Context) Element {
 	if name == "" {
 		name = strs.Breadcrumb
 	}
-	bar := b.size.apply(Div().asPart("Breadcrumbs.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().Style(st.Bar))
+	bar := b.size.apply(Div().asPart("Breadcrumbs.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().Style(st.Bar).
+		Tooltip(b.tooltip))
 	slots := crumbSlots(len(b.items), b.limit)
 	for k, s := range slots {
 		if k > 0 {

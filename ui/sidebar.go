@@ -159,6 +159,7 @@ type SidebarElement struct {
 	header    Element       // see Header
 	footer    Element       // see Footer
 	size      sizing        // the expanded width, from the sizing methods (see Sizing in docs/styling.md)
+	tooltip   string        // see Tooltip
 }
 
 // Sidebar creates a navigation pane of items, with the item whose key equals
@@ -177,6 +178,11 @@ func (s *SidebarElement) Key(k string) *SidebarElement { s.key = k; return s }
 // Label names the pane for assistive technology, such as "Main navigation". The
 // default is the Navigation text of the window's Strings.
 func (s *SidebarElement) Label(name string) *SidebarElement { s.name = name; return s }
+
+// Tooltip shows s below the pane after the pointer rests on it; an item of a
+// collapsed sidebar shows its own label instead. Assistive technology reads it as
+// the pane's description, unless it has another.
+func (s *SidebarElement) Tooltip(text string) *SidebarElement { s.tooltip = text; return s }
 
 // OnChange runs fn with the key of the item after the user selects it, by a click,
 // Enter or Space. The signal is set first.
@@ -369,7 +375,7 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 		}
 
 		pane := Div().asPart("Sidebar.Pane").Key(scope).Column().Role(access.RoleGroup).Label(name).
-			Style(Style{Width: Px(sidebarWidth * textScale(ctx))}).Style(st.Pane)
+			Style(Style{Width: Px(sidebarWidth * textScale(ctx))}).Style(st.Pane).Tooltip(s.tooltip)
 		if collapsed {
 			w := Px(sidebarCollapsedWidth)
 			pane.Style(Style{Width: w, MinWidth: w, MaxWidth: w})

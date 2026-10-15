@@ -102,6 +102,7 @@ type AvatarElement struct {
 	accessHidden bool
 	key          string
 	styles       AvatarStyle
+	tooltip      string // see Tooltip
 }
 
 // Avatar creates an avatar of name, a circle of 32 logical pixels with the
@@ -122,6 +123,11 @@ func (a *AvatarElement) Image(src *ImageSource) *AvatarElement { a.src = src; re
 // initials grow with the Text size, as the text in a control does.
 func (a *AvatarElement) Size(px float32) *AvatarElement { a.size = px; return a }
 
+// Tooltip shows s below the avatar after the pointer rests on it, such as the name
+// of the person in full. Assistive technology reads it as the avatar's description,
+// unless it is the avatar's name.
+func (a *AvatarElement) Tooltip(s string) *AvatarElement { a.tooltip = s; return a }
+
 // AccessHidden leaves the avatar out of the accessibility tree. Use it for an avatar
 // that stands beside the name of the person it shows, since the name is read
 // already.
@@ -139,7 +145,7 @@ func (a *AvatarElement) expand(ctx *Context) Element {
 	st := resolveAvatar(ctx, a.name, a.size, a.styles)
 	// The diameter is set after the style, since the circle is always round.
 	d := a.size * textScale(ctx)
-	av := Div().asPart("Avatar.Avatar").Style(st.Avatar).Size(Px(d), Px(d)).Radius(d / 2)
+	av := Div().asPart("Avatar.Avatar").Style(st.Avatar).Size(Px(d), Px(d)).Radius(d / 2).Tooltip(a.tooltip)
 	if a.src != nil {
 		// The image is hidden: the circle is the one image, and it carries the name.
 		av.Child(Div().AccessHidden().Child(Image(a.src).Size(Px(d), Px(d)).Radius(d / 2)))
