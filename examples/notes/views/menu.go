@@ -47,6 +47,7 @@ func (a *App) menuBar(ctx *ui.Context) ui.Element {
 			ui.TopMenu{Label: "View", Items: func() []ui.MenuItem {
 				return []ui.MenuItem{
 					{Action: ToggleTheme},
+					{Action: TogglePreview},
 					ui.MenuSeparator(),
 					{Action: ZoomIn},
 					{Action: ZoomOut},

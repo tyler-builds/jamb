@@ -82,7 +82,7 @@ func TestMenuBarShowsShortcuts(t *testing.T) {
 func TestViewMenuZoom(t *testing.T) {
 	r := newRig(t)
 	r.clickKey("jamb.menubar.2")
-	r.clickKey("jamb.menu.0.2") // Zoom in
+	r.clickKey("jamb.menu.0.3") // Zoom in
 	if z := r.rt.Zoom(); z != 1.1 {
 		t.Fatalf("zoom after Zoom in = %v, want 1.1", z)
 	}

@@ -11,7 +11,9 @@ var (
 	NextNote    = ui.NewAction("notes.next", "Next note")
 	TogglePin   = ui.NewAction("notes.pin", "Pin or unpin note")
 	ToggleTheme = ui.NewAction("notes.theme", "Toggle theme")
-	Palette     = ui.NewAction("notes.palette", "Command palette").Hide()
+	// TogglePreview shows or hides the Markdown preview beside the editor.
+	TogglePreview = ui.NewAction("notes.preview", "Toggle Markdown preview")
+	Palette       = ui.NewAction("notes.palette", "Command palette").Hide()
 	// The zoom keys are the framework's built-in ones; these actions name them so
 	// the View menu can show them, and they step the zoom as those keys do.
 	ZoomIn    = ui.NewAction("notes.zoom-in", "Zoom in")
@@ -29,7 +31,7 @@ var (
 // keymap file can name them.
 func Actions() []*ui.Action {
 	return []*ui.Action{
-		NewNote, Search, PrevNote, NextNote, TogglePin, ToggleTheme, Palette,
+		NewNote, Search, PrevNote, NextNote, TogglePin, ToggleTheme, TogglePreview, Palette,
 		ZoomIn, ZoomOut, ZoomReset,
 		PaletteUp, PaletteDown, PaletteRun, PaletteClose,
 	}
@@ -44,6 +46,7 @@ func Bindings() []ui.Binding {
 		ui.Bind("alt+down", NextNote),
 		ui.Bind("ctrl+shift+p", Palette),
 		ui.Bind("ctrl+k ctrl+t", ToggleTheme),
+		ui.Bind("ctrl+shift+v", TogglePreview), // as in VS Code
 		ui.Bind("ctrl+=", ZoomIn),
 		ui.Bind("ctrl+-", ZoomOut),
 		ui.Bind("ctrl+0", ZoomReset),
