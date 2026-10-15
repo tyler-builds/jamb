@@ -53,6 +53,6 @@ func ExampleDataTable() {
 		Time: func(v Visit) time.Time { return v.Day },
 		Y:    func(v Visit) float64 { return float64(v.Count) },
 	})
-	view := ui.Div().Column().Child(chart).Child(charts.DataTable(chart))
+	view := ui.Div().Column().Child(chart).Child(charts.DataTable(chart).Key("table").Height(ui.Px(240)))
 	_ = view
 }
