@@ -2354,7 +2354,7 @@ these settings have no effect there. The settings are set on the `App`, before `
 ```go
 app.New().
     AppID("JambExamples.Notes").
-    JumpList(&app.JumpList{
+    JumpList(app.JumpList{
         Tasks:  []app.JumpTask{{Title: "New note", Args: "--new-note"}},
         Recent: true,
     }).
@@ -2490,7 +2490,7 @@ tray.Show()
 
 tray.SetTooltip("2 notes unsaved")
 tray.SetIcon(otherImage) // nil returns to the executable's icon
-tray.Remove()            // Show adds the icon again
+tray.Hide()              // Show adds the icon again
 ```
 
 - **Icon.** The image is drawn at the small icon size of the DPI of the tray

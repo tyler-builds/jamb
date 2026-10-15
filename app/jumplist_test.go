@@ -43,18 +43,18 @@ func TestParseIcon(t *testing.T) {
 }
 
 func TestJumpListCheck(t *testing.T) {
-	ok := &JumpList{Tasks: []JumpTask{{Title: "New note"}}}
+	ok := JumpList{Tasks: []JumpTask{{Title: "New note"}}}
 	if err := ok.check(); err != nil {
 		t.Errorf("check = %v; want nil", err)
 	}
-	bad := &JumpList{Tasks: []JumpTask{{Title: "New note"}, {Title: "  "}}}
+	bad := JumpList{Tasks: []JumpTask{{Title: "New note"}, {Title: "  "}}}
 	if err := bad.check(); err == nil || !strings.Contains(err.Error(), "task 2") {
 		t.Errorf("check = %v; want an error naming task 2", err)
 	}
 }
 
 func TestCheckIdentity(t *testing.T) {
-	list := &JumpList{Tasks: []JumpTask{{Title: "New note"}}}
+	list := JumpList{Tasks: []JumpTask{{Title: "New note"}}}
 	for name, tc := range map[string]struct {
 		app     *App
 		wantErr bool
@@ -66,7 +66,7 @@ func TestCheckIdentity(t *testing.T) {
 		"ID alone":               {New().AppID("JambExamples.Notes"), false},
 		"ID and jump list":       {New().AppID("JambExamples.Notes").JumpList(list), false},
 		"ID and single instance": {New().AppID("JambExamples.Notes").SingleInstance(nil), false},
-		"untitled task":          {New().AppID("JambExamples.Notes").JumpList(&JumpList{Tasks: []JumpTask{{}}}), true},
+		"untitled task":          {New().AppID("JambExamples.Notes").JumpList(JumpList{Tasks: []JumpTask{{}}}), true},
 	} {
 		err := tc.app.checkIdentity()
 		if (err != nil) != tc.wantErr {

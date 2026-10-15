@@ -54,7 +54,7 @@ func applyBadge(win ui.Window, on bool) {
 func (s *Store) setTrayIcon(win ui.Window, on bool) {
 	if !on {
 		if s.tray != nil {
-			s.tray.Remove()
+			s.tray.Hide()
 		}
 		win.Show()
 		return

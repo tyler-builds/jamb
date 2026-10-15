@@ -47,8 +47,8 @@ type JumpTask struct {
 // needs an AppID. Each task starts the program's executable, and a program run
 // with go run has an executable that is removed when the run ends, so its tasks
 // stop working then. See the README's Jump lists and single instance section.
-func (a *App) JumpList(j *JumpList) *App {
-	a.jumpList = j
+func (a *App) JumpList(j JumpList) *App {
+	a.jumpList = &j
 	return a
 }
 

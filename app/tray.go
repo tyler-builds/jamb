@@ -33,8 +33,11 @@ type TrayOptions struct {
 	Menu func() []TrayItem
 }
 
-// TrayItem is an item of a tray menu. Its OnClick runs on the UI thread after the
-// menu closes, when the user chooses the item. A separator is made by TraySeparator.
+// TrayItem is an item of a tray menu. A tray menu is Windows' native menu, so it is a
+// subset of what the menus of ui can show: an item has a label, a disabled state, a check
+// mark and a submenu, but no icon, shortcut or action. Its OnClick runs on the UI thread
+// after the menu closes, when the user chooses the item. A separator is made by
+// TraySeparator.
 type TrayItem struct {
 	Label string
 	// Disabled shows the item, but it cannot be chosen.
@@ -149,9 +152,9 @@ func (t *Tray) SetIcon(img image.Image) {
 	})
 }
 
-// Remove takes the icon out of the notification area, and Show adds it again. An
+// Hide takes the icon out of the notification area, and Show adds it again. An
 // app's icons are also removed when the app quits. It is safe from any goroutine.
-func (t *Tray) Remove() {
+func (t *Tray) Hide() {
 	postUI(func() {
 		if t.native != nil {
 			t.native.Remove()

@@ -66,7 +66,7 @@ func main() {
 				s.Create()
 			}
 		}).
-		JumpList(&app.JumpList{
+		JumpList(app.JumpList{
 			Tasks:  []app.JumpTask{{Title: "New note", Args: newNoteArg, Description: "Create an empty note"}},
 			Recent: true,
 		}).
