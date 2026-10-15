@@ -148,8 +148,7 @@ func calendarPanel(c calendarView, s *Strings) Element {
 	if c.hover != nil {
 		panel.OnMouseLeave(func() { c.hover(time.Time{}) })
 	}
-	pa := panel.access()
-	pa.gridRows, pa.gridCols = 6, 7
+	panel.AccessGrid(6, 7)
 	focus := c.focus
 	nav := func(label string, glyph *icons.Icon, text string, step time.Time) *DivElement {
 		b := Div().asPart(c.widget + ".NavButton").Style(st.NavButton).Role(access.RoleButton).Label(label).
@@ -206,8 +205,7 @@ func calendarDay(c calendarView, s *Strings, day time.Time, row, col int) *DivEl
 	cell := Div().asPart(c.widget + ".Day").Style(st.Day).Role(access.RoleDataItem).
 		Label(c.loc.longDate(day)).Child(Text(fmt.Sprintf("%d", day.Day())).NoWrap())
 	a := cell.access()
-	a.gridRow, a.gridCol = row, col
-	cell.AccessSelected(on)
+	cell.AccessCell(row, col).AccessSelected(on)
 	if day.Month() != c.focus.Month() || day.Year() != c.focus.Year() {
 		cell.Style(st.DayOutsideMonth)
 	}

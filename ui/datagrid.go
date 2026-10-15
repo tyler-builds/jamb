@@ -1300,9 +1300,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if g.name != "" {
 			el.Label(g.name)
 		}
-		a := el.access()
-		a.gridRows, a.gridCols = n, nc
-		a.multiSelect = g.mode == SelectionMultiple
+		el.AccessGrid(n, nc)
+		el.access().multiSelect = g.mode == SelectionMultiple
 	}
 	list.before = func(nd *node) {
 		sh.viewH = nd.lay.H
@@ -1423,9 +1422,8 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		}
 		cell := Div().asPart("DataGrid.Cell").Style(st.Cell).
 			Style(Style{Basis: Px(xs[c+1] - xs[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
-		cell.Role(access.RoleDataItem).Label(s)
+		cell.Role(access.RoleDataItem).Label(s).AccessCell(q+1, c+1)
 		a := cell.access()
-		a.gridRow, a.gridCol = q+1, c+1
 		if !onHeader && q == cursorPos && c == cursorCol {
 			a.highlighted = true
 			if hasFocus {
