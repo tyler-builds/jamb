@@ -216,11 +216,11 @@ type StrokeStyle struct {
 	DashOffset float32
 }
 
-// TextStyle is how Painter.Text draws text.
-type TextStyle struct {
-	Size   float32 // 0 means the theme's text size
-	Color  Color   // zero means the inherited text color (see Painter.TextColor)
-	Weight FontWeight
+// TextFormat is how Painter.Text draws text.
+type TextFormat struct {
+	FontSize float32 // 0 means the theme's text size
+	Color    Color   // zero means the inherited text color (see Painter.TextColor)
+	Weight   FontWeight
 	// Mono sets the text in the monospace family, as code is set.
 	Mono bool
 	// Italic draws the text in the italic face of its family. A family with no
@@ -296,7 +296,7 @@ func (p *Painter) Alpha(a float32) { p.c.SetAlpha(a) }
 // Text draws s at x, y, aligned against it as st says, over the shapes. It is
 // one line; a line break starts another. Its position follows the transform;
 // the text is not scaled or rotated.
-func (p *Painter) Text(x, y float32, s string, st TextStyle) {
+func (p *Painter) Text(x, y float32, s string, st TextFormat) {
 	l := p.layout(s, st)
 	pt := p.c.Matrix().Apply(vector.Point{X: x, Y: y})
 	x, y = pt.X/p.k, pt.Y/p.k
@@ -310,19 +310,19 @@ func (p *Painter) Text(x, y float32, s string, st TextStyle) {
 }
 
 // MeasureText returns the size of s drawn with st, to place labels.
-func (p *Painter) MeasureText(s string, st TextStyle) (w, h float32) {
+func (p *Painter) MeasureText(s string, st TextFormat) (w, h float32) {
 	l := p.layout(s, st)
 	return l.Width, l.Height
 }
 
-func (p *Painter) layout(s string, st TextStyle) *text.Layout {
+func (p *Painter) layout(s string, st TextFormat) *text.Layout {
 	return p.rt.text.Layout(s, p.textStyle(st), float32(math.Inf(1)))
 }
 
 // textStyle returns the text style that st draws with: its family, weight, italic and size, with the
 // theme's text size and the Text size setting applied.
-func (p *Painter) textStyle(st TextStyle) text.Style {
-	ts := text.Style{Size: st.Size, Weight: st.Weight, Italic: st.Italic, NoWrap: true}
+func (p *Painter) textStyle(st TextFormat) text.Style {
+	ts := text.Style{Size: st.FontSize, Weight: st.Weight, Italic: st.Italic, NoWrap: true}
 	if st.Mono {
 		ts.Family = text.FamilyMono
 	}
@@ -339,7 +339,7 @@ func (p *Painter) textStyle(st TextStyle) text.Style {
 // FontName returns the name that the platform knows the font of st by, such as "Consolas" for a
 // Mono text on Windows. It is "" when the font declares no name. The name is for assistive
 // technology and the inspector; drawing does not use it.
-func (p *Painter) FontName(st TextStyle) string {
+func (p *Painter) FontName(st TextFormat) string {
 	return p.rt.text.FaceName(p.textStyle(st))
 }
 

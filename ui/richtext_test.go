@@ -15,7 +15,7 @@ import (
 // paintNow repaints the tree and returns the scene.
 func paintNow(rt *Runtime) *scene.Scene {
 	rt.needPaint = true
-	return rt.Frame(time.Now())
+	return rt.frame(time.Now())
 }
 
 // richNode returns the rich text node with key.

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/internal/scene"
+	"github.com/tyler-builds/jamb/internal/uihost"
 	"github.com/tyler-builds/jamb/ui"
 
 	"github.com/tyler-builds/jamb/examples/notes/store"
@@ -43,6 +45,12 @@ func openStore(t *testing.T, path string) (*store.Store, error) {
 }
 
 func (r *rig) frame() { r.rt.Frame(time.Now()) }
+
+// frameScene brings rt up to date and returns the scene it draws, for the tests
+// that read the quads of a frame.
+func frameScene(rt *ui.Runtime, now time.Time) *scene.Scene {
+	return uihost.Of(rt).(interface{ Frame(time.Time) *scene.Scene }).Frame(now)
+}
 
 func (r *rig) key(k input.Key, mods input.Modifiers) {
 	r.rt.KeyDown(k, mods, false)

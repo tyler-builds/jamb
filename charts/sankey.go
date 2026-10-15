@@ -215,7 +215,7 @@ func (c *Chart) paintSankey(v *view, p *ui.Painter, w, h float32) {
 	size := axisFont(v.st)
 	margin := 0.0
 	for _, n := range s.nodes {
-		wd, _ := p.MeasureText(n.name, ui.TextStyle{Size: size})
+		wd, _ := p.MeasureText(n.name, ui.TextFormat{FontSize: size})
 		margin = math.Max(margin, float64(wd))
 	}
 	pad := margin + edgePad + 4
@@ -239,7 +239,7 @@ func (c *Chart) paintSankey(v *view, p *ui.Painter, w, h float32) {
 		}
 		p.FillRect(float32(n.x), float32(n.y), sankeyNodeW, float32(math.Max(n.h, 1)), color)
 		p.Text(float32(n.x+sankeyNodeW+6), float32(n.y+n.h/2), n.name,
-			ui.TextStyle{Size: size, Color: v.st.Axis.TextColor, Align: ui.Start, VAlign: ui.Center})
+			ui.TextFormat{FontSize: size, Color: v.st.Axis.TextColor, Align: ui.Start, VAlign: ui.Center})
 	}
 	p.Restore()
 }

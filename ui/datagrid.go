@@ -501,7 +501,7 @@ type dgOps struct {
 // cursor and the edit, and the actions of the cells (see dgOps).
 type dgRowCtx[T any] struct {
 	t                    *Theme
-	ctx                  *Context // the grid's render, for the layers of the editor's style (see Layer)
+	ctx                  *Context // the grid's render, for the layers of the editor's style (see StyleLayer)
 	st                   DataGridStyle
 	sh                   *dgShared[T]
 	rows                 []T

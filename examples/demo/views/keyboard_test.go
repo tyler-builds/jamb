@@ -6,8 +6,15 @@ import (
 
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/scene"
+	"github.com/tyler-builds/jamb/internal/uihost"
 	"github.com/tyler-builds/jamb/ui"
 )
+
+// frameScene brings rt up to date and returns the scene it draws, for the tests
+// that read the quads of a frame.
+func frameScene(rt *ui.Runtime, now time.Time) *scene.Scene {
+	return uihost.Of(rt).(interface{ Frame(time.Time) *scene.Scene }).Frame(now)
+}
 
 // focusRings counts the focus-ring quads (hollow borders in the theme's
 // FocusRing color) in a frame.
@@ -31,7 +38,7 @@ func TestSidebarNavigatesByKeyboard(t *testing.T) {
 	rt.Frame(time.Now())
 
 	rt.Press(input.KeyTab, 0) // Dashboard, the first item
-	if n := focusRings(rt.Frame(time.Now())); n != 1 {
+	if n := focusRings(frameScene(rt, time.Now())); n != 1 {
 		t.Errorf("after Tab: %d focus rings, want 1", n)
 	}
 	rt.Press(input.KeyTab, 0) // Projects
@@ -51,7 +58,7 @@ func TestSidebarNavigatesByKeyboard(t *testing.T) {
 	if err := rt.ClickKey("nav-Dashboard"); err != nil {
 		t.Fatal(err)
 	}
-	if n := focusRings(rt.Frame(time.Now())); n != 0 {
+	if n := focusRings(frameScene(rt, time.Now())); n != 0 {
 		t.Errorf("after a click: %d focus rings, want 0", n)
 	}
 	if s.Page.Get() != PageDashboard {

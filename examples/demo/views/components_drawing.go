@@ -88,11 +88,11 @@ func visitsChart(t *ui.Theme) ui.Element {
 			}
 			p.Restore()
 			for i, d := range weekdays {
-				p.Text(x(i), ht-2, d, ui.TextStyle{Size: 11, Color: muted, Align: ui.Center, VAlign: ui.End})
+				p.Text(x(i), ht-2, d, ui.TextFormat{FontSize: 11, Color: muted, Align: ui.Center, VAlign: ui.End})
 			}
 			if h >= 0 {
 				p.Text(x(h), y(visits[h])-8, fmt.Sprintf("%.0f", visits[h]),
-					ui.TextStyle{Size: 12, Weight: ui.FontSemibold, Align: ui.Center, VAlign: ui.End})
+					ui.TextFormat{FontSize: 12, Weight: ui.FontSemibold, Align: ui.Center, VAlign: ui.End})
 			}
 		}).Size(ui.Px(360), ui.Px(150)).
 			Label("Visits this week, from 120 on Monday to 280 on Sunday, highest on Saturday at 300").

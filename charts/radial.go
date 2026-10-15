@@ -57,8 +57,8 @@ func (c *Chart) paintPie(v *view, p *ui.Painter, w, h float32) {
 		a = b
 	}
 	if c.kind == kindDonut && total > 0 && v.progress >= 1 {
-		p.Text(float32(g.cx), float32(g.cy), c.valueLabel(total), ui.TextStyle{
-			Size: axisFont(v.st) + 4, Color: v.t.Text, Align: ui.Center, VAlign: ui.Center})
+		p.Text(float32(g.cx), float32(g.cy), c.valueLabel(total), ui.TextFormat{
+			FontSize: axisFont(v.st) + 4, Color: v.t.Text, Align: ui.Center, VAlign: ui.Center})
 	}
 }
 
@@ -154,7 +154,7 @@ func (c *Chart) paintRadar(v *view, p *ui.Painter, w, h float32) {
 		case sn < -0.2:
 			valign = ui.End
 		}
-		p.Text(float32(lx), float32(ly), c.positionLabel(s), ui.TextStyle{Size: size,
+		p.Text(float32(lx), float32(ly), c.positionLabel(s), ui.TextFormat{FontSize: size,
 			Color: v.st.Axis.TextColor, Align: align, VAlign: valign})
 	}
 

@@ -741,7 +741,7 @@ func (h *host) OnFrame(w platform.Window) bool {
 	if h.stress != nil {
 		h.stress.begin(h, h.dev.stressSecs)
 	}
-	sc := h.rt.Frame(frameStart)
+	sc := h.rh.Frame(frameStart)
 	if h.insp != nil {
 		h.insp.frame(h.rt, frameStart)
 	}
@@ -869,6 +869,7 @@ func (h *host) FrameWaitable() uintptr {
 // runtimeHost is the window host's side of a ui.Runtime: the methods that only
 // app calls, which ui keeps out of its public API (see internal/uihost).
 type runtimeHost interface {
+	Frame(now time.Time) *scene.Scene
 	SetWakeFunc(fn func())
 	SetServices(clipboard func() (string, bool), setClipboard func(string), wakeAt func(time.Time))
 	SetImageClipboard(get func() (image.Image, bool), set func(image.Image), has func() bool)

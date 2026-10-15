@@ -62,7 +62,7 @@ func containsTab(s string) bool {
 func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	doc := vs.doc
 	st := ps.st
-	ts := ui.TextStyle{Size: st.Text.FontSize, Mono: true}
+	ts := ui.TextFormat{FontSize: st.Text.FontSize, Mono: true}
 	charW, lineH := p.MeasureText("0", ts)
 	if charW <= 0 || lineH <= 0 {
 		return
@@ -161,7 +161,7 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	}
 	vs.maxCells = maxCells
 	gutterFg := st.Gutter.TextColor
-	nts := ui.TextStyle{Size: st.Gutter.FontSize, Mono: true, Color: gutterFg, Align: ui.End}
+	nts := ui.TextFormat{FontSize: st.Gutter.FontSize, Mono: true, Color: gutterFg, Align: ui.End}
 	for vi := first; vi < last; vi++ {
 		row, ok := doc.RowAtVisible(vi)
 		if !ok {
@@ -235,7 +235,7 @@ func matchesOnRow(matches []Match, ls, le int) []int {
 
 // drawLine draws the text of the row line, which starts at byte ls, at tx, with its rows
 // at y. The spans of the highlighter color the runs; a run with no span takes fg.
-func (vs *viewState) drawLine(p *ui.Painter, ts ui.TextStyle, line string, ls int, tx, y, charW float32, tab int, fg ui.Color) {
+func (vs *viewState) drawLine(p *ui.Painter, ts ui.TextFormat, line string, ls int, tx, y, charW float32, tab int, fg ui.Color) {
 	ts.Color = fg
 	if vs.hl == nil || vs.spans.list == nil {
 		p.Text(tx, y, expandRun(line, 0, tab), ts)
@@ -270,7 +270,7 @@ func (vs *viewState) drawLine(p *ui.Painter, ts ui.TextStyle, line string, ls in
 // composition is underlined with a thin line, and the clause being converted with a thick one.
 // The row takes no syntax colors, since the spans of the highlighter do not follow the text
 // inserted into it.
-func (vs *viewState) drawComposition(p *ui.Painter, ts ui.TextStyle, shown string, at int, tx, y, charW, lineH float32, tab int, fg ui.Color) {
+func (vs *viewState) drawComposition(p *ui.Painter, ts ui.TextFormat, shown string, at int, tx, y, charW, lineH float32, tab int, fg ui.Color) {
 	ts.Color = fg
 	p.Text(tx, y, expandRun(shown, 0, tab), ts)
 	underline := func(from, to int, h float32) {
@@ -288,7 +288,7 @@ func (vs *viewState) drawComposition(p *ui.Painter, ts ui.TextStyle, shown strin
 // segmentStyle returns the text style of the run [a, b) of the row that starts at byte ls, given
 // the spans idx that cover the row. The capture of the last span that covers the run sets its
 // color, weight and slant; a run with no style takes ts, with fg as its color.
-func (vs *viewState) segmentStyle(ts ui.TextStyle, fg ui.Color, idx []int, ls, a, b int) ui.TextStyle {
+func (vs *viewState) segmentStyle(ts ui.TextFormat, fg ui.Color, idx []int, ls, a, b int) ui.TextFormat {
 	seg := ts
 	seg.Color = fg
 	for _, k := range idx {
@@ -326,7 +326,7 @@ func (vs *viewState) drawFoldMarker(p *ui.Painter, row int, foldX, foldW, y, lin
 
 // drawBrackets outlines the bracket at the primary caret and the one that pairs with it, when
 // the caret is at a bracket and there is one caret.
-func (vs *viewState) drawBrackets(p *ui.Painter, ts ui.TextStyle, tx, charW, lineH float32, first, last, tab int, st Style) {
+func (vs *viewState) drawBrackets(p *ui.Painter, ts ui.TextFormat, tx, charW, lineH float32, first, last, tab int, st Style) {
 	doc := vs.doc
 	if len(doc.sels) != 1 || st.CurrentMatch.Background.IsZero() {
 		return

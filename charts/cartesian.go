@@ -248,7 +248,7 @@ func (c *Chart) valueTicks(m cartModel, n int) (ticks []float64, lo, hi float64)
 // measureLabels returns the width of the widest label, the height of a line of text,
 // and the width of each label, at the size of the axis labels.
 func measureLabels(p *ui.Painter, labels []string, size float32) (widest, lineH float32, widths []float32) {
-	st := ui.TextStyle{Size: size}
+	st := ui.TextFormat{FontSize: size}
 	widths = make([]float32, len(labels))
 	for i, s := range labels {
 		w, h := p.MeasureText(s, st)
@@ -487,19 +487,19 @@ func (c *Chart) paintAxes(v *view, p *ui.Painter, L cartLayout) {
 	for i, t := range L.valTicks {
 		if L.vert {
 			p.Text(x0-axisGap, float32(L.val.at(t)), L.valLabels[i],
-				ui.TextStyle{Size: size, Color: text, Align: ui.End, VAlign: ui.Center})
+				ui.TextFormat{FontSize: size, Color: text, Align: ui.End, VAlign: ui.Center})
 		} else {
 			p.Text(float32(L.val.at(t)), y1+axisGap, L.valLabels[i],
-				ui.TextStyle{Size: size, Color: text, Align: ui.Center, VAlign: ui.Start})
+				ui.TextFormat{FontSize: size, Color: text, Align: ui.Center, VAlign: ui.Start})
 		}
 	}
 	for i, t := range L.posTicks {
 		if L.vert {
 			p.Text(float32(L.pos.at(t)), y1+axisGap, L.posLabels[i],
-				ui.TextStyle{Size: size, Color: text, Align: ui.Center, VAlign: ui.Start})
+				ui.TextFormat{FontSize: size, Color: text, Align: ui.Center, VAlign: ui.Start})
 		} else {
 			p.Text(x0-axisGap, float32(L.pos.at(t)), L.posLabels[i],
-				ui.TextStyle{Size: size, Color: text, Align: ui.End, VAlign: ui.Center})
+				ui.TextFormat{FontSize: size, Color: text, Align: ui.End, VAlign: ui.Center})
 		}
 	}
 
@@ -507,17 +507,17 @@ func (c *Chart) paintAxes(v *view, p *ui.Painter, L cartLayout) {
 	valueTitle, posTitle := c.ya.Label, c.xa.Label
 	if L.vert {
 		if valueTitle != "" {
-			p.Text(x0, 2, valueTitle, ui.TextStyle{Size: size, Color: text, Align: ui.Start, VAlign: ui.Start})
+			p.Text(x0, 2, valueTitle, ui.TextFormat{FontSize: size, Color: text, Align: ui.Start, VAlign: ui.Start})
 		}
 		if posTitle != "" {
-			p.Text((x0+x1)/2, h-2, posTitle, ui.TextStyle{Size: size, Color: text, Align: ui.Center, VAlign: ui.End})
+			p.Text((x0+x1)/2, h-2, posTitle, ui.TextFormat{FontSize: size, Color: text, Align: ui.Center, VAlign: ui.End})
 		}
 	} else {
 		if valueTitle != "" {
-			p.Text((x0+x1)/2, h-2, valueTitle, ui.TextStyle{Size: size, Color: text, Align: ui.Center, VAlign: ui.End})
+			p.Text((x0+x1)/2, h-2, valueTitle, ui.TextFormat{FontSize: size, Color: text, Align: ui.Center, VAlign: ui.End})
 		}
 		if posTitle != "" {
-			p.Text(2, 2, posTitle, ui.TextStyle{Size: size, Color: text, Align: ui.Start, VAlign: ui.Start})
+			p.Text(2, 2, posTitle, ui.TextFormat{FontSize: size, Color: text, Align: ui.Start, VAlign: ui.Start})
 		}
 	}
 }

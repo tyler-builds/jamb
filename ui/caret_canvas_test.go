@@ -110,14 +110,14 @@ func TestCanvasCaretIsDrawnAgainAtEachBlink(t *testing.T) {
 	}
 }
 
-// TextStyle.Italic reaches the text system's style, and the monospace family keeps it.
+// TextFormat.Italic reaches the text system's style, and the monospace family keeps it.
 func TestTextStyleItalicReachesTheTextSystem(t *testing.T) {
 	r := newEditorRig(t, func(*Context) Element { return Div() })
 	p := &Painter{rt: r.rt}
-	if l := p.layout("code", TextStyle{Italic: true, Mono: true}); !l.Style.Italic || l.Style.Family != text.FamilyMono {
+	if l := p.layout("code", TextFormat{Italic: true, Mono: true}); !l.Style.Italic || l.Style.Family != text.FamilyMono {
 		t.Errorf("italic mono style = %+v, want italic in the monospace family", l.Style)
 	}
-	if p.layout("code", TextStyle{}).Style.Italic {
+	if p.layout("code", TextFormat{}).Style.Italic {
 		t.Error("text without Italic is set in the italic face")
 	}
 }

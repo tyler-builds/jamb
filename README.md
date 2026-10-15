@@ -350,7 +350,7 @@ ui.Canvas(func(p *ui.Painter, w, h float32) {
 	area.LineTo(w, h).Close()
 	p.Fill(area, ui.LinearPaint(0, 0, 0, h,
 		ui.ColorStop{At: 0, Color: t.Accent.Alpha(0.4)}, ui.ColorStop{At: 1, Color: t.Accent.Alpha(0)}))
-	p.Text(4, 4, "Visits", ui.TextStyle{Color: t.TextMuted})
+	p.Text(4, 4, "Visits", ui.TextFormat{Color: t.TextMuted})
 }).Size(ui.Full, ui.Px(160)).Label("Visits this week, rising")
 ```
 
@@ -3435,7 +3435,7 @@ The inspector shows:
   - `cleared by <layer>`: the layer cleared the field (see `Clear`).
 
   A widget that builds a part's style from layers names each layer with
-  `ui.Layer` before it merges the layer, so the inspector can report it. The
+  `ui.StyleLayer` before it merges the layer, so the inspector can report it. The
   built-in widgets do this.
 - **Live edits**: choose a style field, enter a value and click **Apply**. The
   value takes effect at once in the window. **Clear edits** drops them, and

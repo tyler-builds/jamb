@@ -15,7 +15,7 @@ func TestSearchHighlightsMatchesInNoteRows(t *testing.T) {
 	soft := scene.Color(matchHighlight(ui.DarkTheme()).Background)
 	count := func() int {
 		n := 0
-		for _, q := range r.rt.Frame(time.Now()).Quads {
+		for _, q := range frameScene(r.rt, time.Now()).Quads {
 			if q.Background == soft {
 				n++
 			}

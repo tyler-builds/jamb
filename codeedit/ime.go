@@ -12,25 +12,27 @@ import (
 // away each commit it, as one edit. A confirmed result arrives as typed text,
 // which replaces the composition. A read-only editor shows no composition.
 
-// wireIME connects the canvas to the input method (see ui.DivElement.OnComposition).
+// wireIME connects the canvas to the input method (see ui.DivElement.IME).
 func (e *Editor) wireIME(canvas *ui.DivElement, vs *viewState) {
-	canvas.OnComposition(func(c ui.Composition) {
-		if e.readOnly {
-			c = ui.Composition{}
-		}
-		vs.comp = c
-		vs.touch()
-	})
-	canvas.OnCommitComposition(func() {
-		text := vs.comp.Text
-		vs.comp = ui.Composition{}
-		if text == "" || e.readOnly {
+	canvas.IME(ui.IME{
+		Update: func(c ui.Composition) {
+			if e.readOnly {
+				c = ui.Composition{}
+			}
+			vs.comp = c
 			vs.touch()
-			return
-		}
-		vs.edit(func(d *Document) error { return d.TypeText(text) })
+		},
+		Commit: func() {
+			text := vs.comp.Text
+			vs.comp = ui.Composition{}
+			if text == "" || e.readOnly {
+				vs.touch()
+				return
+			}
+			vs.edit(func(d *Document) error { return d.TypeText(text) })
+		},
+		Caret: vs.compositionCaret,
 	})
-	canvas.CompositionCaret(vs.compositionCaret)
 }
 
 // commitComposition types the composition, if there is one, before the editor changes: a

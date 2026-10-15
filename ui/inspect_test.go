@@ -269,7 +269,7 @@ func TestInspectPickingDoesNotChangeLayoutOrHitTesting(t *testing.T) {
 	for _, n := range rt.hitTest(px, py) {
 		idsBefore = append(idsBefore, n.id)
 	}
-	quadsBefore := len(rt.Frame(time.Now()).Quads)
+	quadsBefore := len(rt.frame(time.Now()).Quads)
 
 	changes := 0
 	tg.Attach(func() { changes++ })
@@ -283,7 +283,7 @@ func TestInspectPickingDoesNotChangeLayoutOrHitTesting(t *testing.T) {
 	if hover := rt.insp.hover; hover == 0 {
 		t.Fatal("pick mode did not find the element under the pointer")
 	}
-	if n := len(rt.Frame(time.Now()).Quads); n <= quadsBefore {
+	if n := len(rt.frame(time.Now()).Quads); n <= quadsBefore {
 		t.Fatalf("the outlines added no quads: %d, before %d", n, quadsBefore)
 	}
 

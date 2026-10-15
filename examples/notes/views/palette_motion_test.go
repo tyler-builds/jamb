@@ -13,7 +13,7 @@ import (
 // scaled in or out.
 func paletteQuads(r *rig) []scene.Quad {
 	var out []scene.Quad
-	for _, q := range r.rt.Frame(time.Now()).Quads {
+	for _, q := range frameScene(r.rt, time.Now()).Quads {
 		if q.Blur == 0 && q.Bounds.W > 480 && q.Bounds.W <= 520 {
 			out = append(out, q)
 		}

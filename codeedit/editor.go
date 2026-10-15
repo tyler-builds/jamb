@@ -138,8 +138,11 @@ func (e *Editor) Render(ctx *ui.Context) ui.Element {
 	}).Size(ui.Full, ui.Full).Grow(1).Role(access.RoleTextArea).Label(name)
 	canvas.Cursor(ui.CursorText).KeyContext("CodeEditor").Focusable().FocusHandle(vs.canvasFocus)
 	e.wire(canvas, vs)
-	canvas.TextPattern(func() *access.TextInfo { return vs.textAccess(e.readOnly, st.Text.FontSize) }).
-		TextSelect(vs.selectText).TextReveal(vs.revealText)
+	canvas.TextAccess(ui.TextAccess{
+		Info:   func() *access.TextInfo { return vs.textAccess(e.readOnly, st.Text.FontSize) },
+		Select: vs.selectText,
+		Reveal: vs.revealText,
+	})
 	// The caret shows focus, as in code editors, so the frame draws no focus ring. BoxFocused
 	// styles the frame while the editor has focus: unset by default, a border under high
 	// contrast (see Style).

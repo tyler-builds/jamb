@@ -75,9 +75,9 @@ func TestCanvasText(t *testing.T) {
 	rt := newTestRuntime(func(ctx *Context) Element {
 		return Canvas(func(p *Painter, w, h float32) {
 			p.FillRect(0, 0, w, h, Color{B: 1, A: 1})
-			tw, _ = p.MeasureText("Label", TextStyle{})
+			tw, _ = p.MeasureText("Label", TextFormat{})
 			p.Translate(10, 0)
-			p.Text(90, 10, "Label", TextStyle{Align: End})
+			p.Text(90, 10, "Label", TextFormat{Align: End})
 		}).Size(Px(200), Px(50))
 	}, 300, 200, 1)
 	if tw <= 0 || len(rt.scene.Glyphs) == 0 {

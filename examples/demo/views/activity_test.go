@@ -172,7 +172,7 @@ func TestActivityFilterHighlightsAndCounts(t *testing.T) {
 	soft := scene.Color(matchHighlight(ui.DarkTheme()).Background)
 	highlights := func() int {
 		n := 0
-		for _, q := range rt.Frame(time.Now()).Quads {
+		for _, q := range frameScene(rt, time.Now()).Quads {
 			if q.Background == soft {
 				n++
 			}

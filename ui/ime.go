@@ -11,7 +11,7 @@ import (
 // The text being composed is drawn inside the focused field, at the caret and
 // underlined, as a native field draws it; it is not part of the field's value
 // until the input method confirms it, which arrives as typed text. An element
-// that draws its own text takes the composition through OnComposition instead
+// that draws its own text takes the composition through DivElement.IME instead
 // (see element_input.go).
 
 // composition is the text an input method is composing in an editor. The
@@ -66,7 +66,7 @@ func (rt *Runtime) hostCompose(c composition) {
 }
 
 // hostComposeHook shows what an input method is composing in n, the focused
-// element that takes the composition itself (see OnComposition). Empty text
+// element that takes the composition itself (see DivElement.IME). Empty text
 // ends it, as it does in a field.
 func (rt *Runtime) hostComposeHook(n *node, c composition) {
 	if c.text == "" {
@@ -76,12 +76,12 @@ func (rt *Runtime) hostComposeHook(n *node, c composition) {
 		return
 	}
 	rt.composing = n.id
-	n.div.ime.update(c.clamped().public())
+	n.div.ime.Update(c.clamped().public())
 	rt.needPaint = true
 }
 
 // hookFocused returns the focused element when it takes the composition itself
-// (see OnComposition), or nil.
+// (see DivElement.IME), or nil.
 func (rt *Runtime) hookFocused() *node {
 	if n := rt.byID[rt.focusID]; n != nil && n.div != nil && n.div.composes() {
 		return n
@@ -96,7 +96,7 @@ func (rt *Runtime) dropComposition() {
 			n.st.edit.comp = composition{}
 		}
 		if n.div != nil && n.div.composes() {
-			n.div.ime.update(Composition{})
+			n.div.ime.Update(Composition{})
 		}
 	}
 	rt.composing = 0
@@ -113,11 +113,11 @@ func (rt *Runtime) commitComposition() {
 	if id == 0 {
 		return
 	}
-	if n := rt.byID[id]; n != nil && n.div != nil && n.div.composes() && n.div.ime.commit != nil {
-		// The element types its composition, and ends it (see OnCommitComposition).
+	if n := rt.byID[id]; n != nil && n.div != nil && n.div.composes() && n.div.ime.Commit != nil {
+		// The element types its composition, and ends it (see IME.Commit).
 		rt.composing = 0
 		rt.needPaint = true
-		n.div.ime.commit()
+		n.div.ime.Commit()
 	} else {
 		var t string
 		if n := rt.byID[id]; n != nil && n.st != nil && n.st.edit != nil {

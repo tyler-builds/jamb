@@ -20,7 +20,7 @@ func TestSegmentStyleTakesItalicFromTheCapture(t *testing.T) {
 		},
 	}
 	fg := ui.Hex("#ffffff")
-	base := ui.TextStyle{Mono: true}
+	base := ui.TextFormat{Mono: true}
 	if seg := vs.segmentStyle(base, fg, []int{0, 1}, 0, 0, 3); !seg.Italic || !seg.Mono {
 		t.Errorf("the run under the italic capture = %+v, want italic and mono", seg)
 	}

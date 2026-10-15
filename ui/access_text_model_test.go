@@ -19,7 +19,7 @@ func asciiContent(v string) *access.TextContent {
 	return c
 }
 
-// A canvas that draws its own text gets the Text pattern from TextPattern, and the tree reports
+// A canvas that draws its own text gets the Text pattern from TextAccess, and the tree reports
 // its text and selection changes as those of a text field. The element renders the signals it
 // reports, as an editor renders its view, so a change builds the tree again.
 func TestTextPatternIsExposedAndFollowsChanges(t *testing.T) {
@@ -31,10 +31,10 @@ func TestTextPatternIsExposedAndFollowsChanges(t *testing.T) {
 		return Div().Column().Children(
 			Canvas(func(p *Painter, w, h float32) {}).Size(Px(200), Px(60)).
 				Role(access.RoleTextArea).Label("Code").
-				TextPattern(func() *access.TextInfo {
+				TextAccess(TextAccess{Info: func() *access.TextInfo {
 					v := text.Peek()
 					return &access.TextInfo{Content: asciiContent(v), Anchor: caret.Peek(), Caret: caret.Peek()}
-				}))
+				}}))
 	})
 	var updates []access.Update
 	r.bridge.Listen(func(u access.Update) { updates = append(updates, u) })

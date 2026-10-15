@@ -97,19 +97,19 @@ func TestAnimatedGIFPlays(t *testing.T) {
 	rt := NewRuntime(func(ctx *Context) Element { return Div().Child(Image(src).Alt("anim")) }, DarkTheme(), nil)
 	rt.clock = func() time.Time { return now }
 	rt.SetViewport(200, 100, 1)
-	sc := rt.Frame(now)
+	sc := rt.frame(now)
 	if !sceneHasTexture(sc, src.frames[0].tex) || rt.imageDue != now.Add(100*time.Millisecond) {
 		t.Fatalf("first frame not drawn or next frame not scheduled (due %v)", rt.imageDue.Sub(now))
 	}
 	now = now.Add(110 * time.Millisecond)
-	sc = rt.Frame(now)
+	sc = rt.frame(now)
 	if !sceneHasTexture(sc, src.frames[1].tex) {
 		t.Fatal("the second frame is not drawn when it is due")
 	}
 
 	reduced := newTestRuntime(func(ctx *Context) Element { return Div().Child(Image(src).Alt("anim")) }, 200, 100, 1)
 	reduced.SetSystemSettings(SystemSettings{ReducedMotion: true})
-	sc = reduced.Frame(now)
+	sc = reduced.frame(now)
 	if !sceneHasTexture(sc, src.frames[0].tex) || !reduced.imageDue.IsZero() {
 		t.Fatal("reduced motion: the GIF is not still on its first frame")
 	}

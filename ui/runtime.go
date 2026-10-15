@@ -486,11 +486,11 @@ func (rt *Runtime) wakeAt(t time.Time) {
 // hostTextInputRect returns the caret of the focused text editor in logical
 // pixels, so the platform can place input-method windows next to it. A focused
 // element that takes the composition itself gives its own caret (see
-// CompositionCaret).
+// IME.Caret).
 func (rt *Runtime) hostTextInputRect() (scene.Rect, bool) {
 	r, ok := rt.textInput, rt.hasTextInput
-	if n := rt.hookFocused(); n != nil && n.div.ime.caret != nil {
-		c := n.div.ime.caret()
+	if n := rt.hookFocused(); n != nil && n.div.ime.Caret != nil {
+		c := n.div.ime.Caret()
 		r, ok = scene.Rect{X: n.abs.X + c.X, Y: n.abs.Y + c.Y, W: c.W, H: c.H}, true
 	}
 	z := rt.zoom
@@ -690,9 +690,6 @@ func (rt *Runtime) AppTheme() *Theme { return rt.appTheme }
 // Theme returns the active theme.
 func (rt *Runtime) Theme() *Theme { return rt.theme }
 
-// Text returns the runtime's text system.
-func (rt *Runtime) Text() *text.System { return rt.text }
-
 // hostCursor returns the cursor for the element under the pointer.
 func (rt *Runtime) hostCursor() input.Cursor { return rt.cursor }
 
@@ -712,11 +709,17 @@ func (rt *Runtime) Settled() bool {
 	return !(rt.rootInst == nil || rt.animating || rt.needLayout || rt.needPaint || rt.hasDirty.Load())
 }
 
-// Frame brings the scene up to date and returns it. Each stage does only the
-// work its inputs require: dirty components re-render and rebuild just their
-// subtrees, layout revisits only invalidated or resized subtrees, and an idle
-// frame returns the retained scene untouched.
-func (rt *Runtime) Frame(now time.Time) *scene.Scene {
+// Frame brings the scene up to date, as the window host does before it draws.
+// Each stage does only the work its inputs require: dirty components re-render
+// and rebuild just their subtrees, layout revisits only invalidated or resized
+// subtrees, and an idle frame keeps the retained scene untouched. The window host
+// draws the scene that a frame brings up to date (see runtimeHost.Frame).
+func (rt *Runtime) Frame(now time.Time) {
+	rt.frame(now)
+}
+
+// frame is Frame, and returns the scene that the host draws.
+func (rt *Runtime) frame(now time.Time) *scene.Scene {
 	rt.framePending.Store(false)
 	continuing := rt.animating || rt.looping // the last frame's paint or animations asked for another
 	rt.animating, rt.looping = false, false

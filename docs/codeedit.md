@@ -150,17 +150,17 @@ or when the editor loses focus; a composition that ends empty is cancelled. A re
 shows no composition.
 
 The candidate window opens at the caret. The editor reports the caret rectangle (a `ui.Rect`, in
-logical pixels from the element's top left) of its primary caret through
-`ui.DivElement.CompositionCaret`, and the host places the window there. An element of an app outside `codeedit` can take composition
-the same way: `OnComposition` receives a `ui.Composition` (the text, the input method's cursor, and
-the clause), and `OnCommitComposition` receives the confirmed text.
+logical pixels from the element's top left) of its primary caret through `ui.IME.Caret`, and the
+host places the window there. An element of an app outside `codeedit` can take composition the same
+way: `ui.IME.Update` receives a `ui.Composition` (the text, the input method's cursor, and the
+clause), and `ui.IME.Commit` types the confirmed composition, set through `ui.DivElement.IME`.
 
 ## Accessibility
 
 The editor's canvas has the role of a multi-line text area and the name given by `Label`. The
 find bar's fields and buttons are named through `ui.Strings` (the `CodeEditor...` fields).
 
-The canvas has a Text pattern through `ui.DivElement.TextPattern`. The editor's model of its text
+The canvas has a Text pattern through `ui.DivElement.TextAccess`. The editor's model of its text
 reads an immutable snapshot of the rope, so assistive technology can read the text from any
 thread. The model gives the points as bytes, and computes characters, words, lines and paragraphs
 locally around a position; a query never copies the whole document. `GetText` reads only the
@@ -169,7 +169,7 @@ of a range: a line outside the painted rows has none, which the pattern allows.
 
 The pattern is writable. Assistive technology can select a range (`Select`, or setting the
 selection), which sets the editor's primary selection, and ScrollIntoView scrolls the editor to
-its caret. The hooks are `ui.DivElement.TextSelect` and `ui.DivElement.TextReveal`.
+its caret. The hooks are `ui.TextAccess.Select` and `ui.TextAccess.Reveal`.
 
 The font name the pattern reports is the name the platform knows the monospace face by, read from
 the font file (`ui.Painter.FontName`).

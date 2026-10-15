@@ -18,6 +18,9 @@ func init() { uihost.Of = func(rt any) any { return (*runtimeHost)(rt.(*Runtime)
 
 func (h *runtimeHost) rt() *Runtime { return (*Runtime)(h) }
 
+// Frame brings the scene up to date (see Runtime.Frame) and returns it, for the host to draw.
+func (h *runtimeHost) Frame(now time.Time) *scene.Scene { return h.rt().frame(now) }
+
 // SetWakeFunc sets the function that asks the host for a frame.
 func (h *runtimeHost) SetWakeFunc(fn func()) { h.rt().hostSetWakeFunc(fn) }
 

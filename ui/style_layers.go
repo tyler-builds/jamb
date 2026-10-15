@@ -32,28 +32,28 @@ type provEntry struct {
 
 var styleType = reflect.TypeOf(Style{})
 
-// Layer returns s with the name of the layer recorded on each style that s holds:
+// StyleLayer returns s with the name of the layer recorded on each style that s holds:
 // s itself when it is a Style, or each Style field of a struct, such as a widget's
 // part styles. When no inspector is attached to the window of ctx, s is returned
 // unchanged.
 //
-// A widget that builds a part's style from layers calls Layer on each layer,
+// A widget that builds a part's style from layers calls StyleLayer on each layer,
 // before it merges the layer, so that the inspector can name the layer each value
 // came from. The names the inspector shows are "built-in default" (the widget's own
 // default), "theme" (the theme's style for the part) and "instance Styles" (the
 // Styles of the element); a widget may name another layer, such as "high contrast".
 // The merged style keeps the names, so the inspector reports the layer of every
 // field. A style that is already merged from named layers keeps its names.
-func Layer[S any](ctx *Context, s S, name string) S {
+func StyleLayer[S any](ctx *Context, s S, name string) S {
 	if ctx == nil || ctx.rt.insp == nil {
 		return s
 	}
 	return recordLayer(s, name)
 }
 
-// recordLayer is Layer while an inspector is attached. It is kept apart from Layer
+// recordLayer is StyleLayer while an inspector is attached. It is kept apart from StyleLayer
 // because taking the address of its argument moves the argument to the heap, which
-// Layer must not do when nothing is recorded.
+// StyleLayer must not do when nothing is recorded.
 func recordLayer[S any](s S, name string) S {
 	tagLayer(reflect.ValueOf(&s).Elem(), name)
 	return s
@@ -177,7 +177,7 @@ func instanceLayer[S any](s S) layer[S] { return layer[S]{inspect.SourceInstance
 // merged over it in order, as the widget's merge does. Under high contrast each
 // layer is first passed through plain, which drops what the system colors replace.
 // The inspector names base as the built-in default, and each layer by its name
-// (see Layer).
+// (see StyleLayer).
 func layered[S any](ctx *Context, base S, merge func(S, S) S, plain func(S) S, layers ...layer[S]) S {
 	hc := ctx.Theme().HighContrast
 	st := base

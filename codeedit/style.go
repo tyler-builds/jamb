@@ -77,9 +77,9 @@ func editorDefaults(t *ui.Theme) Style {
 // holds, so the Styles' colors are dropped.
 func (s Style) resolve(ctx *ui.Context) Style {
 	t := ctx.Theme()
-	st := ui.Layer(ctx, editorDefaults(t), "built-in default").merge(ui.Layer(ctx, s, "instance Styles"))
+	st := ui.StyleLayer(ctx, editorDefaults(t), "built-in default").merge(ui.StyleLayer(ctx, s, "instance Styles"))
 	if t.HighContrast {
-		st = ui.Layer(ctx, editorDefaults(t), "built-in default").merge(ui.Layer(ctx, Style{
+		st = ui.StyleLayer(ctx, editorDefaults(t), "built-in default").merge(ui.StyleLayer(ctx, Style{
 			Box:          plainPart(s.Box),
 			BoxFocused:   plainPart(s.BoxFocused),
 			Text:         plainPart(s.Text),
@@ -90,8 +90,8 @@ func (s Style) resolve(ctx *ui.Context) Style {
 			CurrentMatch: plainPart(s.CurrentMatch),
 			Find:         plainPart(s.Find),
 		}, "instance Styles"))
-		st.Text = st.Text.Merge(ui.Layer(ctx, ui.Style{TextColor: t.Editor.Foreground}, "high contrast"))
-		st.Gutter = st.Gutter.Merge(ui.Layer(ctx, ui.Style{TextColor: t.Editor.LineNumber}, "high contrast"))
+		st.Text = st.Text.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.Editor.Foreground}, "high contrast"))
+		st.Gutter = st.Gutter.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.Editor.LineNumber}, "high contrast"))
 	}
 	return st
 }

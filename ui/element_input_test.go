@@ -19,15 +19,17 @@ func TestElementTakesComposition(t *testing.T) {
 	r := newEditorRig(t, func(ctx *Context) Element {
 		return Div().Padding(10).Gap(10).
 			Child(Div().Key("canvas").Size(Px(200), Px(40)).FocusHandle(field).
-				OnComposition(func(c Composition) {
-					last = c
-					shown = append(shown, c)
+				IME(IME{
+					Update: func(c Composition) {
+						last = c
+						shown = append(shown, c)
+					},
+					Commit: func() {
+						committed = append(committed, last.Text)
+						last = Composition{}
+					},
+					Caret: func() scene.Rect { return scene.Rect{X: 5, Y: 6, W: 2, H: 14} },
 				}).
-				OnCommitComposition(func() {
-					committed = append(committed, last.Text)
-					last = Composition{}
-				}).
-				CompositionCaret(func() scene.Rect { return scene.Rect{X: 5, Y: 6, W: 2, H: 14} }).
 				OnTextInput(func(s string) { typed = append(typed, s) })).
 			Child(Button("Other").FocusHandle(other))
 	})

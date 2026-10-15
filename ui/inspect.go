@@ -42,7 +42,7 @@ func (h *runtimeHost) Attach(changed func()) {
 	if rt.insp == nil {
 		rt.insp = &inspectState{edits: map[uint64]Style{}}
 		// The elements built before the inspector was attached have no records of
-		// their layers (see Layer), so every component is rendered again.
+		// their layers (see StyleLayer), so every component is rendered again.
 		rt.hostInvalidateAll()
 	}
 	rt.insp.changed = changed

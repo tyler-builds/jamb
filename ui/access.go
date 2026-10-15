@@ -81,10 +81,9 @@ type accessInfo struct {
 	// setValue sets the value of an element, for the Set Value action (see DataGrid's
 	// editable cells). Nil means the element takes no value from assistive technology.
 	setValue func(v string)
-	// text is the Text pattern of an element that draws its own text (see TextPattern).
+	// text is the Text pattern of an element that draws its own text (see TextAccess).
 	text func() *access.TextInfo
-	// selectText and revealText are the writable side of the Text pattern (see TextSelect and
-	// TextReveal).
+	// selectText and revealText are the writable side of the Text pattern (see TextAccess).
 	selectText func(anchor, caret int)
 	revealText func()
 }

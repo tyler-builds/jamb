@@ -18,7 +18,7 @@ func focusRingOn(r *rig, key string) bool {
 		r.t.Fatalf("no element with key %q", key)
 	}
 	cx, cy := box.X+box.W/2, box.Y+box.H/2
-	for _, q := range r.rt.Frame(time.Now()).Quads {
+	for _, q := range frameScene(r.rt, time.Now()).Quads {
 		if q.Background.A == 0 && q.BorderWidth > 0 && q.BorderColor == scene.Color(ui.DarkTheme().FocusRing) && q.Bounds.Contains(cx, cy) {
 			return true
 		}
