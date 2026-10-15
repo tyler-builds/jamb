@@ -1,6 +1,7 @@
 package charts
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -36,6 +37,9 @@ func returns() Series[day] {
 	return Series[day]{Name: "Returns", Data: week, Category: func(d day) string { return d.name },
 		Y: func(d day) float64 { return d.returned }}
 }
+
+// en is the English text, which the tests read the summaries and the tables with.
+var en = ui.EnglishStrings()
 
 // rig runs a tree of charts in a runtime of 800 by 600 pixels, with the access bridge on
 // and the announcements it receives collected.
@@ -93,21 +97,44 @@ func lineRoot(c **Chart) func(*ui.Context) ui.Element {
 // the package documents it.
 func TestSummary(t *testing.T) {
 	want := "Line chart, 2 series, 7 points each, from Monday to Sunday; Visits from 120 to 300, Returns from 10 to 40"
-	if got := Line(visits(), returns()).summary(); got != want {
+	if got := Line(visits(), returns()).summary(en); got != want {
 		t.Errorf("summary = %q\nwant      %q", got, want)
 	}
 	pie := Pie(Series[day]{Name: "Share", Data: week, Category: func(d day) string { return d.name },
 		Y: func(d day) float64 { return d.visits }})
-	if got := pie.summary(); !strings.HasPrefix(got, "Pie chart, 7 slices; largest is Saturday at ") {
+	if got := pie.summary(en); !strings.HasPrefix(got, "Pie chart, 7 slices; largest is Saturday at ") {
 		t.Errorf("pie summary = %q", got)
 	}
 	sk := Sankey(SankeyLink{From: "A", To: "B", Value: 3}, SankeyLink{From: "B", To: "C", Value: 2})
-	if got := sk.summary(); got != "Sankey diagram, 3 nodes, 2 links; total flow 5" {
+	if got := sk.summary(en); got != "Sankey diagram, 3 nodes, 2 links; total flow 5" {
 		t.Errorf("sankey summary = %q", got)
 	}
-	if got := Bar(visits()).Stacked().Horizontal().summary(); !strings.HasPrefix(got, "Stacked horizontal bar chart, 1 series") {
+	if got := Bar(visits()).Stacked().Horizontal().summary(en); !strings.HasPrefix(got, "Stacked horizontal bar chart, 1 series") {
 		t.Errorf("stacked horizontal bar summary = %q", got)
 	}
+	one := Sankey(SankeyLink{From: "A", To: "B", Value: 3})
+	if got := one.summary(en); got != "Sankey diagram, 2 nodes, 1 link; total flow 3" {
+		t.Errorf("summary of one link = %q", got)
+	}
+}
+
+// The words of a chart come from the window's Strings: the messages that an app sets
+// name the chart and its legend, and the ones it leaves unset are English.
+func TestCustomStringsChangeTheSummary(t *testing.T) {
+	r := newRig(func(*ui.Context) ui.Element { return ui.Div().Child(Line(visits(), returns())) })
+	r.rt.SetStrings(&ui.Strings{
+		ChartLine: "Diagramma a linee",
+		ChartSeriesSummary: func(chart string, series, least, most int) string {
+			return fmt.Sprintf("%s, %d serie di %d punti", chart, series, least)
+		},
+		ChartPositionRange: func(summary, from, to string) string { return summary + ", da " + from + " a " + to },
+		ChartLegend:        "Legenda",
+	})
+	r.frame()
+	tree := r.rt.AccessTree()
+	want := "Diagramma a linee, 2 serie di 7 punti, da Monday a Sunday; Visits from 120 to 300, Returns from 10 to 40"
+	accesstest.Find(t, tree, access.RoleImage, want)
+	accesstest.Find(t, tree, access.RoleGroup, "Legenda")
 }
 
 // A chart with a Label is named by it, and the summary is what it is named by otherwise.
@@ -116,7 +143,7 @@ func TestAccessibleName(t *testing.T) {
 	r := newRig(lineRoot(&c))
 	tree := r.rt.AccessTree()
 	accesstest.Find(t, tree, access.RoleImage, "Weekly visits")
-	if n := tree.Find(access.RoleImage, c.summary()); n != nil {
+	if n := tree.Find(access.RoleImage, c.summary(en)); n != nil {
 		t.Errorf("the chart is named by its summary although it has a Label")
 	}
 }
@@ -206,7 +233,7 @@ func TestHoverTooltip(t *testing.T) {
 // The data table is a grid of the chart's rows, named by the chart, with a column per series.
 func TestDataTable(t *testing.T) {
 	c := Line(visits(), returns())
-	header, rows := c.table()
+	header, rows := c.table(en)
 	if want := []string{"Category", "Visits", "Returns"}; !reflect.DeepEqual(header, want) {
 		t.Errorf("header %v, want %v", header, want)
 	}
@@ -214,7 +241,7 @@ func TestDataTable(t *testing.T) {
 		t.Errorf("rows %d, second %v", len(rows), rows[1].cells)
 	}
 	r := newRig(func(*ui.Context) ui.Element { return DataTable(c) })
-	accesstest.Find(t, r.rt.AccessTree(), access.RoleDataGrid, "Data table: "+c.summary())
+	accesstest.Find(t, r.rt.AccessTree(), access.RoleDataGrid, "Data table: "+c.summary(en))
 }
 
 // The data table takes a Key and the sizing methods, and is still a ui.Element for the
@@ -227,7 +254,7 @@ func TestDataTableKeyAndSize(t *testing.T) {
 		return ui.Div().Row().Width(ui.Px(600)).
 			Child(DataTable(c).Key("table").Height(ui.Px(200)).MaxWidth(ui.Px(300)))
 	})
-	rc := accesstest.Find(t, r.rt.AccessTree(), access.RoleDataGrid, "Data table: "+c.summary()).Bounds
+	rc := accesstest.Find(t, r.rt.AccessTree(), access.RoleDataGrid, "Data table: "+c.summary(en)).Bounds
 	if rc.H != 200 || rc.W != 300 {
 		t.Errorf("the table is %v by %v, want 300 by 200", rc.W, rc.H)
 	}
@@ -364,7 +391,7 @@ func TestCandlesAndTimeAxis(t *testing.T) {
 	if got := c.positionLabel(c.last.slots[0]); got != first {
 		t.Errorf("first slot labeled %q, want %q", got, first)
 	}
-	if got := c.summary(); !strings.HasPrefix(got, "Candlestick chart, 3 candles, from "+first+" to "+last) {
+	if got := c.summary(en); !strings.HasPrefix(got, "Candlestick chart, 3 candles, from "+first+" to "+last) {
 		t.Errorf("candle summary %q", got)
 	}
 }
@@ -398,7 +425,7 @@ func TestUnhandledKeysPassThrough(t *testing.T) {
 // the announcement. The view carries what the walk reads: the cursor and the geometry.
 func walkFrom(t *testing.T, c *Chart, from cursorAt, k input.Key) (cursorAt, string) {
 	t.Helper()
-	v := &view{c: c, cursor: from, geo: c.last}
+	v := &view{c: c, s: en, cursor: from, geo: c.last}
 	next, text, ok := c.walk(v, k)
 	if !ok {
 		t.Fatalf("the key %v did not move the cursor", k)
@@ -467,9 +494,9 @@ func TestInteractionsEveryKind(t *testing.T) {
 				c = mk()
 				return ui.Div().Child(c)
 			})
-			canvas := r.rt.AccessTree().Find(access.RoleImage, c.summary())
+			canvas := r.rt.AccessTree().Find(access.RoleImage, c.summary(en))
 			if canvas == nil {
-				t.Fatalf("no chart named %q:\n%s", c.summary(), r.rt.AccessTree().Dump())
+				t.Fatalf("no chart named %q:\n%s", c.summary(en), r.rt.AccessTree().Dump())
 			}
 			g := c.last
 			for x := 0.0; x <= 1; x += 0.25 {
@@ -510,14 +537,14 @@ func dayName(d day) string { return d.name }
 // a row for each link.
 func TestPieAndSankeyTables(t *testing.T) {
 	header, rows := Pie(Series[day]{Name: "Visits", Data: week, Category: func(d day) string { return d.name },
-		Y: func(d day) float64 { return d.visits }}).table()
+		Y: func(d day) float64 { return d.visits }}).table(en)
 	if want := []string{"Slice", "Value", "Share"}; !reflect.DeepEqual(header, want) || len(rows) != 7 {
 		t.Fatalf("pie table %v with %d rows", header, len(rows))
 	}
 	if want := []string{"Tuesday", "180", "12.2%"}; !reflect.DeepEqual(rows[1].cells, want) {
 		t.Errorf("Tuesday row %v, want %v", rows[1].cells, want)
 	}
-	header, rows = Sankey(SankeyLink{From: "A", To: "B", Value: 3}).table()
+	header, rows = Sankey(SankeyLink{From: "A", To: "B", Value: 3}).table(en)
 	if want := []string{"From", "To", "Value"}; !reflect.DeepEqual(header, want) || len(rows) != 1 ||
 		!reflect.DeepEqual(rows[0].cells, []string{"A", "B", "3"}) {
 		t.Errorf("sankey table %v %v", header, rows)
@@ -544,7 +571,7 @@ func TestEmptyCharts(t *testing.T) {
 		c := c
 		t.Run(name, func(t *testing.T) {
 			newRig(func(*ui.Context) ui.Element { return ui.Div().Child(c) })
-			if c.summary() == "" {
+			if c.summary(en) == "" {
 				t.Errorf("%s has no summary", name)
 			}
 		})

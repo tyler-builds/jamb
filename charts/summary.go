@@ -1,123 +1,99 @@
 package charts
 
-import (
-	"fmt"
-	"strings"
-)
+import "github.com/tyler-builds/jamb/ui"
 
-// typeName returns the name of the chart's type, as the summary begins with it.
-func (c *Chart) typeName() string {
-	stacked := ""
-	if c.stack {
-		stacked = "stacked "
-	}
+// typeName returns the name of the chart's type in s, as the summary begins with it.
+func (c *Chart) typeName(s *ui.Strings) string {
 	switch c.kind {
 	case kindLine:
-		return "Line chart"
+		return s.ChartLine
 	case kindArea:
-		return capitalize(stacked + "area chart")
-	case kindBar:
-		if c.horiz {
-			return capitalize(stacked + "horizontal bar chart")
+		if c.stack {
+			return s.ChartStackedArea
 		}
-		return capitalize(stacked + "bar chart")
+		return s.ChartArea
+	case kindBar:
+		switch {
+		case c.horiz && c.stack:
+			return s.ChartStackedHorizontalBar
+		case c.horiz:
+			return s.ChartHorizontalBar
+		case c.stack:
+			return s.ChartStackedBar
+		}
+		return s.ChartBar
 	case kindScatter:
-		return "Scatter plot"
+		return s.ChartScatter
 	case kindPie:
-		return "Pie chart"
+		return s.ChartPie
 	case kindDonut:
-		return "Donut chart"
+		return s.ChartDonut
 	case kindRadar:
-		return "Radar chart"
+		return s.ChartRadar
 	case kindCandle:
-		return "Candlestick chart"
+		return s.ChartCandlestick
 	}
-	return "Sankey diagram"
+	return s.ChartSankey
 }
 
-// capitalize returns s with its first letter in capitals.
-func capitalize(s string) string {
-	if s == "" {
-		return s
-	}
-	return strings.ToUpper(s[:1]) + s[1:]
-}
-
-// summary returns the name of the chart for assistive technology, made from its data: its
-// type, its series and their points, the range of its positions and the range of each
-// series' values, as in "Line chart, 2 series, 7 points each, from Monday to Sunday; Visits
-// from 120 to 300". A chart with Label set is named by that instead.
-func (c *Chart) summary() string {
-	var b strings.Builder
-	b.WriteString(c.typeName())
+// summary returns the name of the chart for assistive technology, made from its data with
+// the messages of s: its type, its series and their points, the range of its positions and
+// the range of each series' values, as in "Line chart, 2 series, 7 points each, from Monday
+// to Sunday; Visits from 120 to 300". A chart with Label set is named by that instead.
+func (c *Chart) summary(s *ui.Strings) string {
+	name := c.typeName(s)
 	switch c.kind {
 	case kindSankey:
-		fmt.Fprintf(&b, ", %d nodes, %d links; total flow %s", len(c.sk.nodes), len(c.sk.links), c.valueText(c.sk.total))
-		return b.String()
+		return s.ChartSankeySummary(name, len(c.sk.nodes), len(c.sk.links), c.valueText(c.sk.total))
 	case kindPie, kindDonut:
 		pts := c.ds.series[0].pts
-		fmt.Fprintf(&b, ", %d slices", len(pts))
+		out := s.ChartPieSummary(name, len(pts))
 		if big := largest(pts); big >= 0 {
-			fmt.Fprintf(&b, "; largest is %s at %s", c.xLabel(pts[big]), c.share(pts[big].y, allIndices(len(pts))))
+			out = s.ChartLargestSlice(out, c.xLabel(pts[big]), c.share(pts[big].y, allIndices(len(pts))))
 		}
-		return b.String()
+		return out
 	case kindCandle:
-		fmt.Fprintf(&b, ", %d candles", len(c.ds.series[0].pts))
-		c.writeRanges(&b, true)
-		return b.String()
+		return c.withRanges(s, s.ChartCandleSummary(name, len(c.ds.series[0].pts)))
 	}
-	fmt.Fprintf(&b, ", %d series", len(c.ds.series))
-	c.writeCounts(&b)
-	c.writeRanges(&b, true)
-	return b.String()
+	least, most := c.pointCounts()
+	return c.withRanges(s, s.ChartSeriesSummary(name, len(c.ds.series), least, most))
 }
 
-// writeCounts writes how many points the series have: the same number each, or the least
-// and the most.
-func (c *Chart) writeCounts(b *strings.Builder) {
-	least, most := -1, 0
-	for _, s := range c.ds.series {
-		n := len(s.pts)
-		if least < 0 || n < least {
+// pointCounts returns the least and the most points of a series of the chart, or 0 and 0
+// when it has no series.
+func (c *Chart) pointCounts() (least, most int) {
+	for k, sd := range c.ds.series {
+		n := len(sd.pts)
+		if k == 0 || n < least {
 			least = n
 		}
 		most = max(most, n)
 	}
-	if least < 0 {
-		return
-	}
-	switch {
-	case least == most && least == 1:
-		b.WriteString(", 1 point")
-	case least == most:
-		fmt.Fprintf(b, ", %d points each", least)
-	default:
-		fmt.Fprintf(b, ", %d to %d points each", least, most)
-	}
+	return least, most
 }
 
-// writeRanges writes the range of the positions, as "from Monday to Sunday", and then the
-// range of each series' values, as "; Visits from 120 to 300". The series are listed when
-// they have points, and the value ranges only when values is set.
-func (c *Chart) writeRanges(b *strings.Builder, values bool) {
+// withRanges returns the summary with the range of the positions, as "from Monday to
+// Sunday", and then the range of each series' values, as "Visits from 120 to 300". The
+// series are listed when they have points.
+func (c *Chart) withRanges(s *ui.Strings, summary string) string {
 	var vis []int
-	for k, s := range c.ds.series {
-		if len(s.pts) > 0 {
+	for k, sd := range c.ds.series {
+		if len(sd.pts) > 0 {
 			vis = append(vis, k)
 		}
 	}
 	if lo, hi, ok := c.ds.bounds(vis); ok {
-		fmt.Fprintf(b, ", from %s to %s", c.positionLabel(lo), c.positionLabel(hi))
+		summary = s.ChartPositionRange(summary, c.positionLabel(lo), c.positionLabel(hi))
 	}
-	if !values || len(vis) == 0 {
-		return
+	if len(vis) == 0 {
+		return summary
 	}
-	parts := make([]string, 0, len(vis))
+	ranges := make([]string, 0, len(vis))
 	for _, k := range vis {
-		s := c.ds.series[k]
-		parts = append(parts, fmt.Sprintf("%s from %s to %s", c.itemName(k), c.valueText(s.lo), c.valueText(s.hi)))
+		sd := c.ds.series[k]
+		ranges = append(ranges, s.ChartValueRange(c.itemName(s, k), c.valueText(sd.lo), c.valueText(sd.hi)))
 	}
-	b.WriteString("; " + strings.Join(parts, ", "))
+	return s.ChartValueRanges(summary, ranges)
 }
 
 // largest returns the index of the point with the greatest positive value, or -1 when

@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -244,6 +245,109 @@ type Strings struct {
 	CodeEditorBadPattern string
 	// CodeEditorCount builds the message that gives the position of the current match, from its number and the total.
 	CodeEditorCount func(current, total int) string
+
+	// The charts (package charts): the names of the chart types, which begin a chart's
+	// summary. ChartLine is the name of a line chart.
+	ChartLine string
+	// ChartArea is the name of an area chart.
+	ChartArea string
+	// ChartStackedArea is the name of a stacked area chart.
+	ChartStackedArea string
+	// ChartBar is the name of a bar chart.
+	ChartBar string
+	// ChartStackedBar is the name of a stacked bar chart.
+	ChartStackedBar string
+	// ChartHorizontalBar is the name of a horizontal bar chart.
+	ChartHorizontalBar string
+	// ChartStackedHorizontalBar is the name of a stacked horizontal bar chart.
+	ChartStackedHorizontalBar string
+	// ChartScatter is the name of a scatter plot.
+	ChartScatter string
+	// ChartPie is the name of a pie chart.
+	ChartPie string
+	// ChartDonut is the name of a donut chart.
+	ChartDonut string
+	// ChartRadar is the name of a radar chart.
+	ChartRadar string
+	// ChartCandlestick is the name of a candlestick chart.
+	ChartCandlestick string
+	// ChartSankey is the name of a Sankey diagram.
+	ChartSankey string
+
+	// The summary of a chart, which names it for assistive technology. Each message is
+	// a whole clause, and the clauses after the first take the summary so far, so that a
+	// language sets its own order and punctuation. ChartSeriesSummary begins the
+	// summary of a chart of series, from the name of its type, the number of series and
+	// the least and the most points of a series, such as "Line chart, 2 series, 7 points
+	// each". With no series, least and most are 0.
+	ChartSeriesSummary func(chart string, series, least, most int) string
+	// ChartCandleSummary begins the summary of a candlestick chart, such as "Candlestick chart, 30 candles".
+	ChartCandleSummary func(chart string, candles int) string
+	// ChartPieSummary begins the summary of a pie or a donut chart, such as "Pie chart, 7 slices".
+	ChartPieSummary func(chart string, slices int) string
+	// ChartSankeySummary is the summary of a Sankey diagram, such as "Sankey diagram, 3 nodes, 2 links; total flow 5".
+	ChartSankeySummary func(chart string, nodes, links int, total string) string
+	// ChartLargestSlice adds the largest slice and its share to the summary of a pie, such as
+	// "Pie chart, 7 slices; largest is Saturday at 20%".
+	ChartLargestSlice func(summary, slice, share string) string
+	// ChartPositionRange adds the first and the last position to a summary, such as
+	// "Line chart, 2 series, 7 points each, from Monday to Sunday".
+	ChartPositionRange func(summary, from, to string) string
+	// ChartValueRanges adds the value ranges of the series, each made by ChartValueRange, to a
+	// summary, such as "…, from Monday to Sunday; Visits from 120 to 300, Returns from 10 to 40".
+	ChartValueRanges func(summary string, ranges []string) string
+	// ChartValueRange is the range of the values of one series, such as "Visits from 120 to 300".
+	ChartValueRange func(series, lo, hi string) string
+
+	// The announcements of the keyboard walk and the lines of the tooltips. ChartPointValue
+	// announces a point, from its position, its series and its value, such as "Tuesday, Visits 180".
+	ChartPointValue func(position, series, value string) string
+	// ChartPointNoValue announces a position where the series has no point, such as "Tuesday, Visits no value".
+	ChartPointNoValue func(position, series string) string
+	// ChartSeriesValue is a line of a tooltip, a name and its value, such as "Visits 180" or "Open 12".
+	ChartSeriesValue func(series, value string) string
+	// ChartSliceValue announces a slice of a pie, such as "Saturday, 300 (20%)".
+	ChartSliceValue func(slice, value, share string) string
+	// ChartValueShare is the line of a slice's tooltip, its value and its share, such as "300 (20%)".
+	ChartValueShare func(value, share string) string
+	// ChartCandleValue announces a candle, such as "Monday, open 10, high 14, low 9, close 12".
+	ChartCandleValue func(position, opening, high, low, closing string) string
+	// ChartLink names a link of a Sankey diagram in its tooltip, such as "Home to Signup".
+	ChartLink func(from, to string) string
+	// ChartLinkValue announces a link of a Sankey diagram, such as "Home to Signup, 130".
+	ChartLinkValue func(from, to, value string) string
+
+	// The legend and the table of a chart. ChartLegend is the name of the legend.
+	ChartLegend string
+	// ChartSeriesNumber names a series that has no name, from its number, such as "Series 2".
+	ChartSeriesNumber func(n int) string
+	// ChartDataTable names the table of a chart's data, from the chart's summary, such as
+	// "Data table: Line chart, …".
+	ChartDataTable func(summary string) string
+	// ChartDate is the header of the column of positions on a time axis.
+	ChartDate string
+	// ChartCategory is the header of the column of positions on a category axis.
+	ChartCategory string
+	// ChartPosition is the header of the column of positions on a number axis.
+	ChartPosition string
+	// ChartSlice is the header of the column of a pie's slices.
+	ChartSlice string
+	// ChartValue is the header of the column of values of a pie or a Sankey diagram.
+	ChartValue string
+	// ChartShare is the header of the column of a pie's shares.
+	ChartShare string
+	// ChartFrom is the header of the column of the sources of a Sankey diagram's links.
+	ChartFrom string
+	// ChartTo is the header of the column of the targets of a Sankey diagram's links.
+	ChartTo string
+	// ChartOpen is the opening value of a candle, in its tooltip and its table.
+	ChartOpen string
+	// ChartHigh is the highest value of a candle, in its tooltip and its table.
+	ChartHigh string
+	// ChartLow is the lowest value of a candle, in its tooltip and its table.
+	ChartLow string
+	// ChartClose is the closing value of a candle, in its tooltip and its table.
+	ChartClose string
 }
 
 // englishStrings returns the English text. It is shared by the fallbacks, so its
@@ -375,7 +479,83 @@ func englishStrings() *Strings {
 		CodeEditorCount: func(current, total int) string {
 			return fmt.Sprintf("%d of %d", current, total)
 		},
+
+		ChartLine:                 "Line chart",
+		ChartArea:                 "Area chart",
+		ChartStackedArea:          "Stacked area chart",
+		ChartBar:                  "Bar chart",
+		ChartStackedBar:           "Stacked bar chart",
+		ChartHorizontalBar:        "Horizontal bar chart",
+		ChartStackedHorizontalBar: "Stacked horizontal bar chart",
+		ChartScatter:              "Scatter plot",
+		ChartPie:                  "Pie chart",
+		ChartDonut:                "Donut chart",
+		ChartRadar:                "Radar chart",
+		ChartCandlestick:          "Candlestick chart",
+		ChartSankey:               "Sankey diagram",
+
+		ChartSeriesSummary: func(chart string, series, least, most int) string {
+			s := fmt.Sprintf("%s, %d series", chart, series)
+			switch {
+			case series == 0:
+				return s
+			case least == most && least == 1:
+				return s + ", 1 point"
+			case least == most:
+				return fmt.Sprintf("%s, %d points each", s, least)
+			}
+			return fmt.Sprintf("%s, %d to %d points each", s, least, most)
+		},
+		ChartCandleSummary: func(chart string, candles int) string {
+			return chart + ", " + englishCount(candles, "candle", "candles")
+		},
+		ChartPieSummary: func(chart string, slices int) string {
+			return chart + ", " + englishCount(slices, "slice", "slices")
+		},
+		ChartSankeySummary: func(chart string, nodes, links int, total string) string {
+			return chart + ", " + englishCount(nodes, "node", "nodes") + ", " +
+				englishCount(links, "link", "links") + "; total flow " + total
+		},
+		ChartLargestSlice:  func(summary, slice, share string) string { return summary + "; largest is " + slice + " at " + share },
+		ChartPositionRange: func(summary, from, to string) string { return summary + ", from " + from + " to " + to },
+		ChartValueRanges:   func(summary string, ranges []string) string { return summary + "; " + strings.Join(ranges, ", ") },
+		ChartValueRange:    func(series, lo, hi string) string { return series + " from " + lo + " to " + hi },
+
+		ChartPointValue:   func(position, series, value string) string { return position + ", " + series + " " + value },
+		ChartPointNoValue: func(position, series string) string { return position + ", " + series + " no value" },
+		ChartSeriesValue:  func(series, value string) string { return series + " " + value },
+		ChartSliceValue:   func(slice, value, share string) string { return slice + ", " + value + " (" + share + ")" },
+		ChartValueShare:   func(value, share string) string { return value + " (" + share + ")" },
+		ChartCandleValue: func(position, opening, high, low, closing string) string {
+			return position + ", open " + opening + ", high " + high + ", low " + low + ", close " + closing
+		},
+		ChartLink:      func(from, to string) string { return from + " to " + to },
+		ChartLinkValue: func(from, to, value string) string { return from + " to " + to + ", " + value },
+
+		ChartLegend:       "Legend",
+		ChartSeriesNumber: func(n int) string { return fmt.Sprintf("Series %d", n) },
+		ChartDataTable:    func(summary string) string { return "Data table: " + summary },
+		ChartDate:         "Date",
+		ChartCategory:     "Category",
+		ChartPosition:     "Position",
+		ChartSlice:        "Slice",
+		ChartValue:        "Value",
+		ChartShare:        "Share",
+		ChartFrom:         "From",
+		ChartTo:           "To",
+		ChartOpen:         "Open",
+		ChartHigh:         "High",
+		ChartLow:          "Low",
+		ChartClose:        "Close",
 	}
+}
+
+// englishCount returns n with the English noun for its number: one for 1, many otherwise.
+func englishCount(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return strconv.Itoa(n) + " " + many
 }
 
 // EnglishStrings returns the English text as a new Strings value, which the app can

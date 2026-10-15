@@ -184,31 +184,31 @@ func (c *Chart) describe(v *view, cur cursorAt) string {
 			return ""
 		}
 		e := c.sk.links[cur.index]
-		return c.sk.nodes[e.from].name + " to " + c.sk.nodes[e.to].name + ", " + c.valueText(e.value)
+		return v.s.ChartLinkValue(c.sk.nodes[e.from].name, c.sk.nodes[e.to].name, c.valueText(e.value))
 	case kindPie, kindDonut:
 		pt := c.ds.series[0].pts[cur.index]
-		return c.xLabel(pt) + ", " + c.valueText(pt.y) + " (" + c.share(pt.y, v.visible()) + ")"
+		return v.s.ChartSliceValue(c.xLabel(pt), c.valueText(pt.y), c.share(pt.y, v.visible()))
 	case kindCandle:
 		pt, ok := c.pointAt(v, cur)
 		if !ok {
 			return ""
 		}
-		return c.xLabel(pt) + ", open " + c.valueText(pt.open) + ", high " + c.valueText(pt.high) +
-			", low " + c.valueText(pt.low) + ", close " + c.valueText(pt.close)
+		return v.s.ChartCandleValue(c.xLabel(pt), c.valueText(pt.open), c.valueText(pt.high),
+			c.valueText(pt.low), c.valueText(pt.close))
 	case kindRadar:
 		if cur.index < 0 || cur.index >= len(v.geo.slots) {
 			return ""
 		}
 		label := c.positionLabel(v.geo.slots[cur.index])
 		val := slotValue(c.ds.series[cur.series].pts, v.geo.slots, cur.index)
-		return label + ", " + c.itemName(cur.series) + " " + c.valueText(val)
+		return v.s.ChartPointValue(label, c.itemName(v.s, cur.series), c.valueText(val))
 	}
 	label := c.positionLabel(c.cursorX(v, cur))
 	pt, ok := c.pointAt(v, cur)
 	if !ok {
-		return label + ", " + c.itemName(cur.series) + " no value"
+		return v.s.ChartPointNoValue(label, c.itemName(v.s, cur.series))
 	}
-	return c.xLabel(pt) + ", " + c.itemName(cur.series) + " " + c.valueText(pt.y)
+	return v.s.ChartPointValue(c.xLabel(pt), c.itemName(v.s, cur.series), c.valueText(pt.y))
 }
 
 // cursorX returns the position of the cursor on a cartesian chart: the slot of a band
@@ -250,16 +250,18 @@ func (c *Chart) tipContent(v *view, cur cursorAt) (string, []tipRow) {
 	switch c.kind {
 	case kindSankey:
 		e := c.sk.links[cur.index]
-		return c.sk.nodes[e.from].name + " to " + c.sk.nodes[e.to].name,
+		return v.s.ChartLink(c.sk.nodes[e.from].name, c.sk.nodes[e.to].name),
 			[]tipRow{{v.t.Text, c.valueText(e.value)}}
 	case kindPie, kindDonut:
 		pt := c.ds.series[0].pts[cur.index]
-		return c.xLabel(pt), []tipRow{{seriesLook(v.t, cur.index).color, c.valueText(pt.y) + " (" + c.share(pt.y, v.visible()) + ")"}}
+		return c.xLabel(pt), []tipRow{{seriesLook(v.t, cur.index).color, v.s.ChartValueShare(c.valueText(pt.y), c.share(pt.y, v.visible()))}}
 	case kindCandle:
 		pt, _ := c.pointAt(v, cur)
 		return c.xLabel(pt), []tipRow{
-			{v.t.Text, "Open " + c.valueText(pt.open)}, {v.t.Text, "High " + c.valueText(pt.high)},
-			{v.t.Text, "Low " + c.valueText(pt.low)}, {v.t.Text, "Close " + c.valueText(pt.close)}}
+			{v.t.Text, v.s.ChartSeriesValue(v.s.ChartOpen, c.valueText(pt.open))},
+			{v.t.Text, v.s.ChartSeriesValue(v.s.ChartHigh, c.valueText(pt.high))},
+			{v.t.Text, v.s.ChartSeriesValue(v.s.ChartLow, c.valueText(pt.low))},
+			{v.t.Text, v.s.ChartSeriesValue(v.s.ChartClose, c.valueText(pt.close))}}
 	case kindRadar:
 		if cur.index < 0 || cur.index >= len(v.geo.slots) {
 			return "", nil
@@ -267,7 +269,7 @@ func (c *Chart) tipContent(v *view, cur cursorAt) (string, []tipRow) {
 		var rows []tipRow
 		for _, k := range v.visible() {
 			val := slotValue(c.ds.series[k].pts, v.geo.slots, cur.index)
-			rows = append(rows, tipRow{seriesLook(v.t, k).color, c.itemName(k) + " " + c.valueText(val)})
+			rows = append(rows, tipRow{seriesLook(v.t, k).color, v.s.ChartSeriesValue(c.itemName(v.s, k), c.valueText(val))})
 		}
 		return c.positionLabel(v.geo.slots[cur.index]), rows
 	}
@@ -295,7 +297,7 @@ func (c *Chart) tipContent(v *view, cur cursorAt) (string, []tipRow) {
 		if !ok {
 			continue
 		}
-		rows = append(rows, tipRow{seriesLook(v.t, k).color, c.itemName(k) + " " + c.valueText(pt.y)})
+		rows = append(rows, tipRow{seriesLook(v.t, k).color, v.s.ChartSeriesValue(c.itemName(v.s, k), c.valueText(pt.y))})
 	}
 	return header, rows
 }
