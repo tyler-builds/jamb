@@ -159,9 +159,18 @@ type DateRangePickerElement struct {
 	size        sizing
 	styles      DateRangePickerStyle
 	onChange    func(start, end time.Time)
-	focusHandle *FocusHandle // see FocusHandle
-	ctlSize     controlSize  // see Small and Large
-	tooltip     string       // see Tooltip
+	rules       []Validator[DateRange] // the validators of the range (see Validate)
+	wire        fieldWire              // what a Field gives the field (see Field)
+	focusHandle *FocusHandle           // see FocusHandle
+	ctlSize     controlSize            // see Small and Large
+	tooltip     string                 // see Tooltip
+}
+
+// DateRange is a range of days, as the validators of a date range picker see it (see
+// DateRangePickerElement.Validate): its first day and its last, each at local midnight. A
+// zero Start is no range.
+type DateRange struct {
+	Start, End time.Time
 }
 
 // DateRangePicker creates a date range picker that reads and writes the start and the end of a
@@ -193,10 +202,29 @@ func (d *DateRangePickerElement) Large() *DateRangePickerElement {
 	return d
 }
 
-// FocusHandle lets code focus the date range field (see NewFocusHandle).
+// FocusHandle lets code focus the date range field (see NewFocusHandle). A Field that
+// wraps the control gives it its own handle, which takes precedence.
 func (d *DateRangePickerElement) FocusHandle(h *FocusHandle) *DateRangePickerElement {
 	d.focusHandle = h
 	return d
+}
+
+// Validate sets the validators of the range. A zero DateRange is no range, so Required
+// rejects an empty field (see Field).
+func (d *DateRangePickerElement) Validate(rules ...Validator[DateRange]) *DateRangePickerElement {
+	d.rules = rules
+	return d
+}
+
+// formCheck and formWire make a date range picker a formControl (see Field).
+func (d *DateRangePickerElement) formCheck() error {
+	return firstError(DateRange{Start: d.start.Get(), End: d.end.Get()}, d.rules)
+}
+
+func (d *DateRangePickerElement) formWire(w fieldWire) Element {
+	c := *d
+	c.wire = w
+	return &c
 }
 
 func (*DateRangePickerElement) isElement()           {}
@@ -423,6 +451,10 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 		if d.focusHandle != nil {
 			ret = d.focusHandle
 		}
+		w := d.wire
+		if w.handle != nil {
+			ret = w.handle
+		}
 		if !cur.equal(seen.Peek()) {
 			draft.Set(formatRange(cur, loc))
 			seen.Set(cur)
@@ -431,7 +463,7 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 
 		// now is the range the signals hold at this moment.
 		now := func() dateRange { return dateRange{start: d.start.Peek(), end: d.end.Peek()} }
-		// set makes r the range, and says so to the app.
+		// set makes r the range, and says so to the field and to the app.
 		set := func(r dateRange) {
 			d.start.Set(r.start)
 			d.end.Set(r.end)
@@ -439,6 +471,9 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 			draft.Set(formatRange(r, loc))
 			invalid.Set(false)
 			pending.Set(time.Time{})
+			if w.onEdit != nil {
+				w.onEdit()
+			}
 			if d.onChange != nil {
 				d.onChange(r.start, r.end)
 			}
@@ -481,6 +516,15 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 			}
 			set(dateRange{start: a, end: b})
 			return true
+		}
+		// submit is the field's Enter: a valid text is applied and the form's Enter runs.
+		// A text that is not a range stays in the field, with its message.
+		enter := w.onEnter
+		w.onEnter = nil
+		submit := func(text string) {
+			if commit(text) && enter != nil {
+				enter()
+			}
 		}
 		// blur applies a text that changed and is valid, and otherwise shows the range again (as a
 		// date picker does), so that a form never sees a text the field does not hold.
@@ -572,12 +616,15 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 		}
 		a := root.access()
 		root.Role(access.RoleComboBox).AccessExpanded(open.Get())
-		name := d.name
+		name, labelledBy := d.name, d.labelledBy
+		if w.label != "" {
+			name, labelledBy = w.label, w.labelledBy
+		}
 		if name != "" {
 			root.Label(name)
 		}
-		if len(d.labelledBy) > 0 {
-			root.LabelledBy(d.labelledBy...)
+		if len(labelledBy) > 0 {
+			root.LabelledBy(labelledBy...)
 		}
 		errKey := "daterange-error"
 		if d.key != "" {
@@ -588,8 +635,8 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 		if isInvalid {
 			shown = msg.Get()
 		}
-		if shown != "" {
-			root.Description(shown)
+		if desc := describe(w.description, shown); desc != "" {
+			root.Description(desc)
 		}
 		a.value = draft.Get()
 		a.setExpanded = func(o bool) {
@@ -599,7 +646,7 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 				shut(true)
 			}
 		}
-		a.invalid = isInvalid
+		a.invalid, a.required = isInvalid || w.invalid, w.required
 
 		// The days shaded are the range that is set, or, while the end is being chosen, the range
 		// from the start to the day under the pointer or the keys, when that day can be chosen.
@@ -640,11 +687,10 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 			hint := loc.datePlaceholder()
 			placeholder = hint + " – " + hint
 		}
-		fo := fieldOptions{tooltip: d.tooltip, value: draft, placeholder: placeholder, name: name, labelledBy: d.labelledBy,
-			describedBy: describedBy, widget: "DateRangePicker", handle: ret,
-			onSubmit: func(text string) { commit(text) }, onChange: func(string) { invalid.Set(false) }, onBlur: blur,
-			trailing: button}
-		fo.wire.invalid = isInvalid
+		fo := fieldOptions{tooltip: d.tooltip, value: draft, placeholder: placeholder, name: name, labelledBy: labelledBy,
+			describedBy: describedBy, widget: "DateRangePicker", handle: ret, wire: w,
+			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, trailing: button}
+		fo.wire.invalid = isInvalid || w.invalid
 		fo.size.setWidth(Full)
 		root.Child(fo.expand(ctx, fst, false, 0))
 		// The message is always in the tree, so that the field keeps its place among its siblings,

@@ -527,7 +527,7 @@ parts that the code applies.
 | `TimePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Button`, `Message`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected` | none | none | done |
 | `DateRangePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `CalendarButton`, `Message`, `Popup`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayInRange`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
-| `ColorPicker` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `Swatch`, `Popup`, `Area`, `AreaFocusVisible`, `Thumb`, `Slider`, `Preset`, `PresetFocusVisible` | none | none | done |
+| `ColorPicker` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `TriggerDisabled`, `Swatch`, `Popup`, `Area`, `AreaFocusVisible`, `Thumb`, `Slider`, `Preset`, `PresetFocusVisible` | none | none | done |
 | `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
 | `Dock` | `Group`, `Strip`, `Tab`, `TabHover`, `TabSelected`, `TabFocusVisible`, `Indicator`, `Panel`, `Preview` | none | none | done |
 | `NumberInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |

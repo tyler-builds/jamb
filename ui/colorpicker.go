@@ -31,14 +31,15 @@ const (
 // keyboard focus. Swatch is the box in the trigger that is drawn in the color; the
 // color is its content, so only its other fields apply. Popup is the panel, Area the
 // saturation and brightness area and AreaFocusVisible the area while it has focus.
-// Thumb is the knob at the color in the area: a fixed circle, drawn in the color with
-// its border and shadow. Slider is the hue and opacity sliders, whose parts are those
+// TriggerDisabled is the trigger of a disabled picker. Thumb is the knob at the color
+// in the area: a fixed circle, drawn in the color with its border and shadow. Slider is the hue and opacity sliders, whose parts are those
 // of a Slider (see SliderStyle). Preset is each swatch of Swatches, and
 // PresetFocusVisible a swatch while it has keyboard focus.
 type ColorPickerStyle struct {
 	Trigger             Style       // the button that shows the color
 	TriggerHover        Style       // the trigger while the pointer is over it
 	TriggerFocusVisible Style       // the trigger while it has keyboard focus
+	TriggerDisabled     Style       // the trigger of a disabled picker
 	Swatch              Style       // the box in the trigger, drawn in the color
 	Popup               Style       // the panel
 	Area                Style       // the saturation and brightness area
@@ -55,6 +56,7 @@ func (s ColorPickerStyle) merge(o ColorPickerStyle) ColorPickerStyle {
 		Trigger:             s.Trigger.Merge(o.Trigger),
 		TriggerHover:        s.TriggerHover.Merge(o.TriggerHover),
 		TriggerFocusVisible: s.TriggerFocusVisible.Merge(o.TriggerFocusVisible),
+		TriggerDisabled:     s.TriggerDisabled.Merge(o.TriggerDisabled),
 		Swatch:              s.Swatch.Merge(o.Swatch),
 		Popup:               s.Popup.Merge(o.Popup),
 		Area:                s.Area.Merge(o.Area),
@@ -72,6 +74,7 @@ func (s ColorPickerStyle) plain() ColorPickerStyle {
 		Trigger:             plainStyle(s.Trigger),
 		TriggerHover:        plainStyle(s.TriggerHover),
 		TriggerFocusVisible: plainStyle(s.TriggerFocusVisible),
+		TriggerDisabled:     plainStyle(s.TriggerDisabled),
 		Swatch:              plainStyle(s.Swatch),
 		Popup:               plainStyle(s.Popup),
 		Area:                plainStyle(s.Area),
@@ -109,6 +112,10 @@ func colorPickerDefaults(t *Theme) ColorPickerStyle {
 		d.Area.BorderColor, d.Preset.BorderColor = t.Text, t.Text
 		d.Thumb.BorderColor, d.Thumb.Shadows = t.Text, nil
 		d.Popup.Shadows = nil
+		// A disabled trigger is drawn in the disabled color, as a disabled select is.
+		d.TriggerDisabled = Style{TextColor: t.Disabled, BorderColor: t.Disabled}
+	} else {
+		d.TriggerDisabled = Style{Opacity: 0.5}
 	}
 	return d
 }
@@ -160,12 +167,43 @@ type ColorPickerElement struct {
 	ctlSize  controlSize // see Small and Large
 	size     sizing      // see Width
 	styles   ColorPickerStyle
+
+	labelledBy  []string     // see LabelledBy
+	disabled    bool         // see Disabled
+	focusHandle *FocusHandle // see FocusHandle
+	tooltip     string       // see Tooltip
 }
 
 // ColorPicker creates a color picker that reads and writes value. The trigger shows the
 // color and its hex text, such as "#3B82F6".
 func ColorPicker(value *Signal[Color]) *ColorPickerElement {
 	return &ColorPickerElement{value: value}
+}
+
+// Tooltip shows s below the trigger after the pointer rests on it. Assistive
+// technology reads it as the trigger's description, after the hex text.
+func (c *ColorPickerElement) Tooltip(s string) *ColorPickerElement {
+	c.tooltip = s
+	return c
+}
+
+// FocusHandle lets code focus the trigger (see NewFocusHandle).
+func (c *ColorPickerElement) FocusHandle(h *FocusHandle) *ColorPickerElement {
+	c.focusHandle = h
+	return c
+}
+
+// LabelledBy names the trigger by the text of the elements with the given keys; see
+// DivElement.LabelledBy.
+func (c *ColorPickerElement) LabelledBy(keys ...string) *ColorPickerElement {
+	c.labelledBy = keys
+	return c
+}
+
+// Disabled shows the trigger, with its color, and does not let the panel open.
+func (c *ColorPickerElement) Disabled(on bool) *ColorPickerElement {
+	c.disabled = on
+	return c
 }
 
 func (*ColorPickerElement) isElement()           {}
@@ -454,11 +492,28 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 			name = s.Color
 		}
 		hex := formatHex(cur, c.alpha)
-		trig := Div().asPart("ColorPicker.Trigger").Style(st.Trigger).Hover(st.TriggerHover).
-			Focusable().FocusVisible(st.TriggerFocusVisible).OnClick(toggle).
+		trig := Div().asPart("ColorPicker.Trigger").Style(st.Trigger).Tooltip(c.tooltip).
 			Child(Div().asPart("ColorPicker.Swatch").Style(st.Swatch).Background(cur)).
 			Child(Text(hex).NoWrap())
-		trig.Role(access.RoleButton).Label(name).Description(hex).AccessExpanded(open.Get())
+		// The hex text is the trigger's description; a tooltip says more after it.
+		trig.Role(access.RoleButton).Label(name).Description(describe(hex, c.tooltip)).AccessExpanded(open.Get())
+		if len(c.labelledBy) > 0 {
+			trig.LabelledBy(c.labelledBy...)
+		}
+		if c.disabled {
+			// A disabled trigger takes no focus and no clicks, and a panel that was open
+			// closes.
+			trig.access().disabled = true
+			trig.Style(st.TriggerDisabled).Cursor(CursorNotAllowed)
+			if open.Peek() {
+				open.Set(false)
+			}
+		} else {
+			trig.Hover(st.TriggerHover).Focusable().FocusVisible(st.TriggerFocusVisible).OnClick(toggle)
+			if c.focusHandle != nil {
+				trig.FocusHandle(c.focusHandle)
+			}
+		}
 		// The sizes of the trigger's box are those of the root, which the trigger fills, so
 		// that a Grow or a Width set on the picker reaches the box the panel is placed by.
 		root := Div().Row().AlignSelf(Start).Shrink(0).Child(trig.Grow(1))
@@ -467,7 +522,7 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 		}
 		c.size.apply(root)
 
-		if open.Get() {
+		if open.Get() && !c.disabled {
 			panel := Div().asPart("ColorPicker.Popup").Style(st.Popup).Column().
 				Overlay(BelowStart).OverlayGap(6).
 				Role(access.RoleDialog).Label(name).

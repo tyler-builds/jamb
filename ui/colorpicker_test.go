@@ -3,6 +3,7 @@ package ui
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/access/accesstest"
@@ -340,6 +341,100 @@ func TestColorPickerAccessNames(t *testing.T) {
 	accesstest.Find(t, plain.tree(), access.RoleButton, "Color")
 }
 
+// TestColorPickerDisabledDoesNotOpen checks that a disabled picker is reported disabled,
+// has no focusable element, and does not open on a click.
+func TestColorPickerDisabledDoesNotOpen(t *testing.T) {
+	var changes []Color
+	v := NewSignal(Hex("#3B82F6"))
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().Child(ColorPicker(v).Key("pick").Label("Fill").Disabled(true).
+			OnChange(func(c Color) { changes = append(changes, c) }))
+	})
+	tr := accesstest.Find(t, r.tree(), access.RoleButton, "Fill")
+	if !tr.States.Has(access.StateDisabled) {
+		t.Fatal("a disabled color picker is not reported disabled")
+	}
+	for _, n := range r.rt.byID {
+		if n.key == "pick" && firstFocusable(n) != nil {
+			t.Fatal("a disabled color picker has a focusable element")
+		}
+	}
+	rc := r.rt.nodeRect(accessNode(t, r, access.RoleButton, "Fill"))
+	r.clickAt(rc.X+rc.W/2, rc.Y+rc.H/2)
+	accesstest.Absent(t, r.tree(), access.RoleDialog, "Fill")
+	if tr := accesstest.Find(t, r.tree(), access.RoleButton, "Fill"); tr.States.Has(access.StateExpanded) {
+		t.Fatal("a disabled color picker is expanded")
+	}
+	if len(changes) != 0 {
+		t.Errorf("a disabled color picker reported %d changes, want none", len(changes))
+	}
+}
+
+// TestColorPickerDisabledClosesThePanel checks that a picker disabled while its panel is
+// open closes the panel.
+func TestColorPickerDisabledClosesThePanel(t *testing.T) {
+	off := NewSignal(false)
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().Child(ColorPicker(NewSignal(Hex("#3B82F6"))).Key("pick").Label("Fill").Disabled(off.Get()))
+	})
+	r.clickKey(t, "pick")
+	accesstest.Find(t, r.tree(), access.RoleDialog, "Fill")
+	off.Set(true)
+	r.frame()
+	accesstest.Absent(t, r.tree(), access.RoleDialog, "Fill")
+	off.Set(false)
+	r.frame()
+	accesstest.Absent(t, r.tree(), access.RoleDialog, "Fill")
+}
+
+// TestColorPickerTooltipAndLabelledBy checks that the tooltip shows over the trigger,
+// also on a disabled picker, and is read after the hex text in the description, and
+// that LabelledBy names the trigger by the label's element.
+func TestColorPickerTooltipAndLabelledBy(t *testing.T) {
+	for _, disabled := range []bool{false, true} {
+		r := newOverlayRig(func(ctx *Context) Element {
+			return Div().Padding(20).Column().Align(Start).
+				Child(Text("Fill color").Key("fill-label")).
+				Child(ColorPicker(NewSignal(Hex("#3B82F6"))).Key("pick").Label("Fill").
+					LabelledBy("fill-label").Tooltip("The fill of the shape").Disabled(disabled))
+		}, 800, 600)
+		rc := r.find(t, "pick")
+		r.rt.PointerMove(rc.X+8, rc.Y+rc.H/2, 0)
+		r.frame()
+		r.now = r.now.Add(600 * time.Millisecond)
+		r.frame()
+		if _, ok := r.rt.Find("jamb.tooltip"); !ok {
+			t.Fatalf("disabled %v: no tooltip after resting on the trigger", disabled)
+		}
+	}
+	ar := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().
+			Child(Text("Fill color").Key("fill-label")).
+			Child(ColorPicker(NewSignal(Hex("#3B82F6"))).Key("pick").Label("Fill").
+				LabelledBy("fill-label").Tooltip("The fill of the shape"))
+	})
+	tr := accesstest.Find(t, ar.tree(), access.RoleButton, "Fill")
+	if want := "#3B82F6 The fill of the shape"; tr.Description != want {
+		t.Errorf("description %q, want %q", tr.Description, want)
+	}
+	if len(tr.LabelledBy) != 1 || ar.tree().Node(tr.LabelledBy[0]).Name != "Fill color" {
+		t.Errorf("LabelledBy = %v, want the label's element", tr.LabelledBy)
+	}
+}
+
+// TestColorPickerDisabledHighContrast checks that a disabled trigger is drawn in the
+// disabled color under high contrast, and dimmed otherwise.
+func TestColorPickerDisabledHighContrast(t *testing.T) {
+	hc := HighContrastTheme(HighContrastBlack(), DarkTheme())
+	d := colorPickerDefaults(hc)
+	if d.TriggerDisabled.TextColor != hc.Disabled || d.TriggerDisabled.BorderColor != hc.Disabled || d.TriggerDisabled.Opacity != 0 {
+		t.Errorf("high contrast disabled trigger %+v, want the disabled color and no opacity", d.TriggerDisabled)
+	}
+	if d := colorPickerDefaults(DarkTheme()); d.TriggerDisabled.Opacity != 0.5 {
+		t.Errorf("disabled trigger opacity %v, want 0.5", d.TriggerDisabled.Opacity)
+	}
+}
+
 // partColorPicker is a color picker keyed "pick", labelled "Fill", with the value v,
 // the style st, the alpha option and the presets.
 func partColorPicker(v *Signal[Color], st ColorPickerStyle, alpha bool, swatches ...Color) Element {
@@ -364,6 +459,7 @@ func testColorPickerParts(t *testing.T, applied map[string]bool) {
 		open   bool // open the panel
 		act    func(*testing.T, *accessRig)
 		border bool // the part is checked by its border color, as its color is content
+		off    bool // the picker is disabled
 	}
 	cases := []pickerCase{
 		{part: "Trigger", set: func(s *ColorPickerStyle, m Style) { s.Trigger = m }},
@@ -371,6 +467,8 @@ func testColorPickerParts(t *testing.T, applied map[string]bool) {
 			act: func(t *testing.T, r *accessRig) { hoverNode(r, partNode(t, r.rt, "ColorPicker.Trigger", "")) }},
 		{part: "TriggerFocusVisible", drawn: "ColorPicker.Trigger", set: func(s *ColorPickerStyle, m Style) { s.TriggerFocusVisible = m },
 			act: func(t *testing.T, r *accessRig) { focusNode(r, partNode(t, r.rt, "ColorPicker.Trigger", "")) }},
+		{part: "TriggerDisabled", drawn: "ColorPicker.Trigger", off: true,
+			set: func(s *ColorPickerStyle, m Style) { s.TriggerDisabled = m }},
 		{part: "Swatch", border: true, set: func(s *ColorPickerStyle, m Style) { s.Swatch = m }},
 		{part: "Popup", open: true, set: func(s *ColorPickerStyle, m Style) { s.Popup = m }},
 		{part: "Area", open: true, set: func(s *ColorPickerStyle, m Style) { s.Area = m }},
@@ -398,7 +496,12 @@ func testColorPickerParts(t *testing.T, applied map[string]bool) {
 				swatches = []Color{Hex("#3B82F6")}
 			}
 			v := NewSignal(Hex("#EF4444"))
-			r := newAccessRig(func(ctx *Context) Element { return partColorPicker(v, st, false, swatches...) })
+			r := newAccessRig(func(ctx *Context) Element {
+				if c.off {
+					return Div().Column().Child(ColorPicker(v).Key("pick").Label("Fill").Disabled(true).Styles(st))
+				}
+				return partColorPicker(v, st, false, swatches...)
+			})
 			if c.open {
 				r.clickKey(t, "pick")
 			}

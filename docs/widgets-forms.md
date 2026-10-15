@@ -109,6 +109,11 @@ ui.ColorPicker(fill).Label("Fill color").Alpha().
   the user chose.
 - Assistive technology sees the trigger as a button named by `Label` (default "Color"),
   and the area as a slider named "Saturation and brightness" with its percentages.
+- `Disabled(true)` shows the trigger dimmed, with its color; it cannot be focused or
+  opened, and assistive technology reads it as disabled. `FocusHandle`, `LabelledBy`,
+  `Key`, `Small`, `Large` and the sizing methods are as for the other controls.
+  `Tooltip` shows below the trigger, and assistive technology reads it after the hex
+  text.
 - Under high contrast the area shows its hue alone, since gradients are drawn solid
   there; the thumb still marks the saturation and the brightness.
 - The look is `ui.ColorPickerStyle`, set in `Theme.ColorPicker` or with `.Styles(...)`.
@@ -157,8 +162,9 @@ user works with it.
   frame, and it stays invalid while the control has focus.
 
 **Validators.** A control takes validators with `Validate`: `TextInput`, `TextArea`,
-`NumberInput`, `Select`, `RadioGroup` and `Checkbox` (a `Checkbox` with `Required[bool]()`
-is "must accept"). They are generic over the control's value type:
+`NumberInput`, `Select`, `Combobox`, `RadioGroup`, `Checkbox` (a `Checkbox` with
+`Required[bool]()` is "must accept"), `DatePicker`, `TimePicker` and `DateRangePicker`
+(over a `ui.DateRange`). They are generic over the control's value type:
 
 - `ui.Required[T]()`: rejects the zero value (blank text after trimming, zero, `false`,
   or the placeholder option of a `Select` or `RadioGroup`). A number input does not
