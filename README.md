@@ -4,8 +4,9 @@ A declarative, GPU-accelerated desktop UI framework for Go. Pure Go, no cgo; Win
 
 jamb (formerly goui) is a small, declarative, GPU-rendered desktop UI framework written in plain Go.
 It has no Electron, WebView, HTML, CSS, JavaScript, Node, Rust, or cgo. Windows is the first platform:
-pure-Go Win32 windowing plus a Direct3D 11 renderer reached through COM vtables. An app is a tree of elements built by components, and its state lives in signals, so a
-change re-renders only the parts that depend on it.
+pure-Go Win32 windowing plus a Direct3D 11 renderer reached through COM vtables. An app is a tree
+of elements built by components, and its state lives in signals, so a change re-renders only the
+parts that depend on it.
 
 > **Status:** jamb is pre-1.0. The API may change between versions. It runs on Windows 10 and 11
 > today; other platforms are planned.
@@ -87,18 +88,23 @@ and the [concepts](docs/concepts.md) page introduces the API.
 
 ## Benchmarks
 
-These are headline numbers from [BENCHMARKS.md](BENCHMARKS.md) and
-[docs/comparison-gpui.md](docs/comparison-gpui.md). Each row names the app it was measured on, and the
-two documents give the dates, the method, and the full results. The GPUI column compares against
-GPUI, the UI framework from Zed.
+The same hello-world app (a window, a greeting and a click counter) built with jamb and with GPUI, the
+UI framework from Zed, on one Windows machine; see [docs/comparison-gpui.md](docs/comparison-gpui.md)
+for the method and the full results:
 
-| Measure | jamb | GPUI | Notes |
-|---|---|---|---|
-| Build time after an edit | 2 s (hello app); demo: 250–370 ms for edits that keep the APIs, 550–840 ms for other edits | 4 s (release), 6 s (debug) (hello app) | Incremental builds. The demo figures are from BENCHMARKS.md. |
-| Startup to first frame | 266 ms on a warm launch (hello app); about 195 ms for the demo | 387 ms on a warm launch (hello app) | Process start to first frame on screen. |
-| Idle CPU | 0.29% of one core, focused (hello app); 0 ms of CPU in 10 s (demo) | 1.85% of one core, focused (hello app) | Median of the measurements. |
-| Frame cost | About 0.3 ms per frame for a full re-render of every component; about 0.13 ms for a repaint of the retained tree (demo) | Not measured | CPU time for build, layout, paint, and GPU submit. |
-| Binary size | 8.4 MB, stripped release build (hello app) | 9.21 MB, release build (hello app) | Built with `-trimpath -ldflags "-s -w"` for jamb. |
+| Measure | jamb | GPUI |
+|---|---|---|
+| Startup to first frame (warm launch) | 266 ms | 387 ms |
+| Idle CPU, window focused | 0.29% of one core | 1.85% of one core |
+| Incremental build after an edit | 2 s | 4 s (release), 6 s (debug) |
+| Binary size, release build | 8.4 MB | 9.21 MB |
+
+From [BENCHMARKS.md](BENCHMARKS.md), measured mostly on the demo app:
+
+- A rebuild after an edit takes 250 to 840 ms, depending on the edit.
+- jamb's own trace puts the first frame about 195 ms after the process starts.
+- The idle demo used no CPU over a 10-second sample.
+- A full re-render of every component costs about 0.3 ms of CPU per frame.
 
 ## Documentation
 
