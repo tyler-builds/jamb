@@ -168,7 +168,8 @@ func (c *cleaner) watchInterrupt() (stop func()) {
 // packageApp builds the release of the app in o.dir into o.dir/dist: a zip, and
 // when requested an installer and an MSIX. When a sign command is set, it signs
 // the executable before the zip, the installer after it is built, and the MSIX
-// after it is built.
+// after it is built. Before it signs the executable, it checks the app's AppID against
+// identityName (see checkAppID).
 //
 // The artifacts are built in a work directory inside dist and moved into dist
 // only when every step has succeeded, so a failed signature leaves dist without
@@ -241,6 +242,11 @@ func packageApp(o packageOptions) error {
 	exe := filepath.Join(layout, cfg.Name+".exe")
 	pkgf("building %s for windows/%s", cfg.Name, o.arch)
 	if err := buildExe(o.dir, exe, cfg, icon, winVersion, o.arch, &c); err != nil {
+		return err
+	}
+	// The check runs before signing, so a mismatch stops packaging before the sign
+	// command is asked for anything.
+	if err := checkAppID(o.dir, exe, o.arch, cfg, makensis != "" || makeappx != ""); err != nil {
 		return err
 	}
 	if sign != nil {

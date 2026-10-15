@@ -82,6 +82,39 @@ While it builds, `jamb package` writes a resource object,
 packaging ends, on failure and on Ctrl+C too. If a file with that name already
 exists, packaging stops rather than overwrite it.
 
+## AppID check
+
+The installer and the MSIX take the app's identity from `identityName`: the installer
+gives its Start menu shortcut that ID and removes the notification protocol named after
+it when it uninstalls, and with `notificationProtocol` the MSIX declares that protocol.
+The app takes its own from `App.AppID("...")` in its Go code. When the two differ,
+the installed app's notifications, notification clicks and jump lists do not work, so
+`jamb package` checks them.
+
+After it builds the executable, and before it signs it, `jamb package` runs it once
+with the internal flag `--jamb-print-appid`. The app answers in `Run`, before it opens
+a window, creates a tray icon, takes the single-instance lock, writes a registry key or
+shows anything: it writes its AppID to stdout and exits. Code in the app's `main`
+before `Run` still runs. The run has no console and is stopped after 10 seconds. The
+flag is internal and is not part of the API.
+
+| Result | What happens |
+|---|---|
+| The AppID equals `identityName` | Packaging goes on. The comparison is exact, case included. |
+| They differ, and `--installer` or `--msix` builds a package | Packaging stops with both values, the line of `identityName` in `jamb.json`, and the places in the app's Go files that hold the AppID. |
+| They differ, and only the zip is built | A warning. The zip does not use `identityName`. |
+| The app sets no `AppID` | A warning. The app then uses none of the features that need the ID (`Notify`, `JumpList` and `SingleInstance` require one), but the installer still gives the shortcut `identityName`. |
+| The app is built with a jamb version without the flag | A note, and the app is not run: an older app would open its window. |
+| The executable cannot run here: `--arch arm64` on an x64 PC, or a host other than Windows | A warning. Windows on Arm runs both architectures. |
+| The app does not answer: it exits without the answer, for example because it reads its own command-line flags before `Run` and refuses the unknown one, or it does not answer within 10 seconds | A warning with the reason, and the app is stopped if it is still running. |
+
+`jamb.json` requires `identityName`, so it is never missing. To fix a mismatch, make the
+two equal: change `App.AppID("...")` in the app to the `identityName` value, or change
+`identityName` to the app's AppID. The second is offered only when the AppID is also a
+valid `identityName`, which allows no `_` and at most 50 characters. `identityName` keys
+installer upgrades and the Store listing, so for an app that is already released, change
+the Go code.
+
 ## Installer
 
 `--installer` compiles `<name>-<version>-windows-<arch>-setup.exe` with NSIS,
