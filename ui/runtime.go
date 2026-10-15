@@ -111,13 +111,15 @@ type node struct {
 
 	// Written by paint, read by hit testing. base is the position before the
 	// element's own offset; inOpacity and inFg are what its parent passed down.
-	// They let an exiting element be painted where it was.
+	// They let an exiting element be painted where it was. opacity is the
+	// opacity it was drawn with, its own included (see StyleOf).
 	abs       scene.Rect
 	hit       scene.Rect // the box hit testing uses; see paintNode
 	clip      scene.Rect
 	baseX     float32
 	baseY     float32
 	inOpacity float32
+	opacity   float32
 	inFg      Color
 
 	// paintGen is the paint in which the node was last painted, and painted
