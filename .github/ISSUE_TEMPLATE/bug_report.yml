@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in jamb doesn't work as documented.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: A small program that shows the problem is the most useful thing you can add.
+      render: go
+  - type: input
+    id: jamb
+    attributes:
+      label: jamb version
+      placeholder: v0.1.0, or a commit
+    validations:
+      required: true
+  - type: input
+    id: go
+    attributes:
+      label: Go version
+      placeholder: output of go version
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Windows version
+      placeholder: e.g. Windows 11 24H2
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Display and input
+      description: >-
+        If it matters: display scaling, number of monitors, GPU, remote desktop or a VM, high contrast,
+        screen reader, input method (IME).
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description: Panics, error messages, or a dump from JAMB_SCRIPT or the inspector.
+      render: text

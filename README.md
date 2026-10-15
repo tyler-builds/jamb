@@ -186,6 +186,9 @@ go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples
 `JAMB_LIVE_TESTS=1` to run them as well. The module layout, the packages, and the internals are in
 [docs/architecture.md](docs/architecture.md).
 
+[CONTRIBUTING.md](CONTRIBUTING.md) covers issues, pull requests and the rules the code follows. Report
+security problems privately, as [SECURITY.md](SECURITY.md) describes.
+
 ## Changelog
 
 Release notes are in [CHANGELOG.md](CHANGELOG.md).

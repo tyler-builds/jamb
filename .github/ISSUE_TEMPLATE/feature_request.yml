@@ -1,0 +1,21 @@
+name: Feature request
+description: A widget, an API or a platform feature jamb doesn't have.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to build
+      description: The app or screen, and what jamb makes hard or impossible today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like
+      description: The API or behavior you have in mind, with a code sketch if you have one.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds and other frameworks
+      description: What you do now, and how GPUI, gpui-component or another framework handles it.
