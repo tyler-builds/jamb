@@ -88,8 +88,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	rt.stats.NodesPainted++
 	if n.flags&flagExit != 0 {
 		// Kept so the element can be drawn as a ghost after it is removed.
-		n.baseX, n.baseY, n.inOpacity, n.inFg = bx, by, opacity, fg
+		n.baseX, n.baseY = bx, by
 	}
+	n.inOpacity, n.inFg = opacity, fg // also read by StyleOf
 	if !s.TextColor.IsZero() {
 		fg = s.TextColor
 	}
@@ -108,6 +109,7 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	n.hit = scene.Rect{X: bx + own.OffsetX, Y: by + own.OffsetY, W: w, H: h}
 	n.clip = clip
 	opacity *= v.opacity
+	n.opacity = opacity
 	bg, border, fg := v.bg, v.border, v.fg
 	if v.scale != 1 {
 		// Scale about the element's center. Transforms are in device pixels and
