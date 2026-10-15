@@ -8,12 +8,14 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
+	"github.com/tyler-builds/jamb/markdown"
 	"github.com/tyler-builds/jamb/ui"
 
 	"github.com/tyler-builds/jamb/examples/notes/store"
 )
 
-// editorPane shows the selected note.
+// editorPane shows the selected note, with its Markdown preview beside the editor
+// while the preview is on.
 func (a *App) editorPane() ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
@@ -27,7 +29,14 @@ func (a *App) editorPane() ui.Element {
 				Child(ui.Button("New note").Icon(icons.Plus).OnClick(a.newNote))
 		}
 		// Keyed by note: each note gets its own editor state (caret, undo).
-		return pane.Child(a.toolbar(n)).Child(a.noteEditor(n))
+		if !a.preview.Get() {
+			return pane.Child(a.toolbar(n)).Child(a.noteEditor(n))
+		}
+		return pane.Child(a.toolbar(n)).
+			Child(ui.Div().Row().Grow(1).MinHeight(ui.Px(0)).
+				Child(ui.Div().Grow(1).Basis(ui.Px(0)).MinWidth(ui.Px(0)).Child(a.noteEditor(n))).
+				Child(ui.Div().Width(ui.Px(1)).Background(t.Border)).
+				Child(a.notePreview(n)))
 	})
 }
 
@@ -63,7 +72,11 @@ func (a *App) toolbar(n *store.Note) ui.Element {
 			if !t.Dark {
 				themeIcon = icons.Moon
 			}
+			// The preview is a toggle button too: its state says whether the preview is shown.
+			preview := a.preview.Get()
 			actions.
+				Child(ui.IconButton(icons.Eye).Key("preview-toggle").Label("Markdown preview").AccessChecked(preview).
+					Tooltip("Markdown preview (" + ctx.KeysFor(TogglePreview) + ")").OnClick(a.togglePreview)).
 				Child(pin).
 				Child(ui.IconButton(icons.Trash).Label("Delete note").Tooltip("Delete note").OnClick(func() { a.confirm.Set(n.ID) })).
 				Child(ui.Div().Width(ui.Px(1)).Height(ui.Px(20)).MarginX(4).Background(t.Border)).
@@ -99,6 +112,57 @@ func (a *App) noteEditor(n *store.Note) ui.Element {
 				Child(ui.Div().Height(ui.Px(1)).MarginY(6).Background(t.Border)).
 				Child(body))
 	}).Key("editor-" + n.ID)
+}
+
+// previewDelay is how long the preview waits after the last edit before it shows the
+// new text. A long note costs several milliseconds to show again (see docs/markdown.md),
+// so the preview follows a pause in typing, not each key.
+const previewDelay = 150 * time.Millisecond
+
+// notePreview shows the note's body as Markdown. It follows the edits after a pause
+// of previewDelay; opening the preview or another note shows the text at once. The
+// note is still stored as the text that is typed. Links open with the system, and
+// images are read from the files they name.
+func (a *App) notePreview(n *store.Note) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		// shown is the text the preview shows. Only the view's component reads it, and
+		// only the watcher reads the body, so a key re-renders the watcher and nothing
+		// else until the pause is over.
+		shown := ui.Local(ctx, "shown", n.Body.Peek())
+		shown.Set(n.Body.Peek())
+		return ui.Div().Key("preview").Grow(1).Basis(ui.Px(0)).MinWidth(ui.Px(0)).ScrollY().
+			Child(a.previewWatcher(n, shown)).
+			Child(ui.Component(func(ctx *ui.Context) ui.Element {
+				return ui.Div().Width(ui.Full).MaxWidth(ui.Px(820)).PaddingX(32).PaddingY(24).
+					Child(markdown.View(shown.Get()).Label("Preview"))
+			}))
+	}).Key("preview-" + n.ID)
+}
+
+// previewWatcher shows nothing. It reads the note's body and copies it to shown once
+// the body has not changed for previewDelay.
+func (a *App) previewWatcher(n *store.Note, shown *ui.Signal[string]) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		body := n.Body.Get()
+		pending := ui.Local(ctx, "pending", &previewTimer{cancel: func() {}}).Peek()
+		if !pending.disposing {
+			pending.disposing = true
+			ctx.OnDispose(func() { pending.cancel() })
+		}
+		pending.cancel() // an edit during the pause starts it again
+		pending.cancel = func() {}
+		if body != shown.Peek() {
+			pending.cancel = ctx.After(previewDelay, func() { shown.Set(n.Body.Peek()) })
+		}
+		return nil
+	})
+}
+
+// previewTimer is the pause a preview waits for: the function that cancels it, and
+// whether the watcher's OnDispose cancels it.
+type previewTimer struct {
+	cancel    func()
+	disposing bool
 }
 
 // meta re-renders as the body changes; nothing else does.

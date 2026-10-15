@@ -21,6 +21,7 @@ Shortcuts
 - Alt+Up / Alt+Down: previous or next note
 - Ctrl+Shift+P: command palette
 - Ctrl+K Ctrl+T: toggle theme
+- Ctrl+Shift+V: Markdown preview beside the editor
 - Ctrl+= / Ctrl+- / Ctrl+0: zoom in, out, reset
 - Ctrl+Z / Ctrl+Y: undo and redo
 - Ctrl+A, Ctrl+C, Ctrl+X, Ctrl+V: select all, copy, cut, paste

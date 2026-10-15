@@ -50,6 +50,7 @@ type App struct {
 	title   *ui.FocusHandle
 	body    *ui.FocusHandle
 	confirm *ui.Signal[string] // ID of the note awaiting delete confirmation
+	preview *ui.Signal[bool]   // the Markdown preview is shown beside the editor
 
 	paletteOpen    *ui.Signal[bool]
 	paletteQuery   *ui.Signal[string]
@@ -94,6 +95,7 @@ func RootWith(s *store.Store, layout Layout) func(*ui.Context) ui.Element {
 		title:        ui.NewFocusHandle(),
 		body:         ui.NewFocusHandle(),
 		confirm:      ui.NewSignal(""),
+		preview:      ui.NewSignal(false),
 		paletteOpen:  ui.NewSignal(false),
 		paletteQuery: ui.NewSignal(""),
 		paletteSel:   ui.NewSignal(0),
@@ -110,6 +112,7 @@ func RootWith(s *store.Store, layout Layout) func(*ui.Context) ui.Element {
 			OnAction(NextNote, func() { a.step(true) }).
 			OnAction(TogglePin, a.togglePin).
 			OnAction(ToggleTheme, func() { toggleTheme(ctx) }).
+			OnAction(TogglePreview, a.togglePreview).
 			OnAction(Palette, func() { a.openPalette(ctx) }).
 			OnAction(ZoomIn, func() { zoomStep(ctx, 1) }).
 			OnAction(ZoomOut, func() { zoomStep(ctx, -1) }).
@@ -204,6 +207,9 @@ func plural(n int, word string) string {
 	}
 	return word + "s"
 }
+
+// togglePreview shows or hides the Markdown preview of the note.
+func (a *App) togglePreview() { a.preview.Set(!a.preview.Peek()) }
 
 // togglePin pins or unpins the selected note.
 func (a *App) togglePin() {
