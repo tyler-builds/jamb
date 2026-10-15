@@ -70,7 +70,7 @@ func widgetsSection(t *ui.Theme) ui.Element {
 				Child(ui.Pagination(page, 20).Key("demo-pages")).
 				Child(ui.Pagination(page, 20).Compact().Key("demo-pages-compact")).
 				Child(ui.Textf("Page %d", page.Get()).FontSize(12).TextColor(t.TextMuted))),
-			sample(t, "Avatars: initials, sizes, and Decorative", ui.Div().Row().Gap(8).Align(ui.Center).
+			sample(t, "Avatars: initials, sizes, and AccessHidden", ui.Div().Row().Gap(8).Align(ui.Center).
 				Child(ui.Avatar("Dana Lee")).
 				Child(ui.Avatar("Sam Ortiz").Size(40)).
 				Child(ui.Avatar("Ari").Size(48)).
