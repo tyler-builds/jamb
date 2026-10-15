@@ -37,6 +37,52 @@ shadow), set the part's `Clear` field, for example `ui.Style{Clear: ui.ClearBord
 The parts, the precedence, the states, the guardrails, and how to add styling to a
 new widget are in [docs/styling.md](styling.md).
 
+## Styles of other widgets on a theme
+
+`Theme` has a field for each widget of `ui`. A widget in another package, such as
+`charts`, `codeedit` or a third-party widget, keeps its style for every widget of its
+kind in a typed slot of the theme instead: `ui.SetThemeStyle(t, v)` stores `v` on the
+theme `t` under the type of `v`, and `ui.ThemeStyle[T](t)` returns the value stored
+under `T` and whether there is one. Each type has its own slot, and storing again
+replaces the value.
+
+```go
+light, dark := ui.LightTheme(), ui.DarkTheme()
+for _, t := range []*ui.Theme{light, dark} {
+	ui.SetThemeStyle(t, charts.Style{Title: ui.Style{FontSize: 18}})
+	ui.SetThemeStyle(t, codeedit.Style{Box: ui.Style{Radius: 4}})
+}
+app.Window{LightTheme: light, DarkTheme: dark, Root: root}
+```
+
+The slot belongs to the theme, not to the app, so it follows the theme a window
+uses: a window that follows Windows between a light and a dark theme needs the
+style set on both, as above. The rules are those of the other fields of a theme:
+
+- Set the styles before the theme is given to a window or to `SetTheme`. To change
+  one while the theme is in use, set it on a `Clone` and pass the clone to `SetTheme`.
+- A copy of a theme (`Clone`, a struct copy, or the high contrast theme that the
+  runtime builds from the app's theme) keeps the styles set before the copy, and a
+  later `SetThemeStyle` on one does not change the other. `ui.DarkTheme`,
+  `ui.LightTheme` and `ui.NewTheme` return themes without styles.
+- Reading a slot during a render is safe: the theme does not change then, and
+  `SetThemeStyle` never changes a stored map in place.
+
+A widget author reads the slot while the widget renders, with `ctx.Theme()`, and
+merges it between the widget's built-in defaults and the Styles of the instance,
+naming the layer `"theme"` for the inspector (see `ui.StyleLayer`):
+
+```go
+themed, _ := ui.ThemeStyle[MyStyle](ctx.Theme())
+st := ui.StyleLayer(ctx, myDefaults(ctx.Theme()), "built-in default").
+	merge(ui.StyleLayer(ctx, themed, "theme")).
+	merge(ui.StyleLayer(ctx, instance, "instance Styles"))
+```
+
+Under high contrast `ctx.Theme()` is the high contrast theme, which keeps the slots
+of the app's theme. Treat them as the Styles of an instance: keep their sizes and
+spacing, and drop their colors for the system colors, as `charts` and `codeedit` do.
+
 ## Reusable styles
 
 Reusable styles are ordinary values. Zero-valued fields mean "unset":

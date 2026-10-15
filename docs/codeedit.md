@@ -206,7 +206,20 @@ rule through `ui.Painter.CaretVisible`.
 ## Styling
 
 `codeedit.Style` has the parts of the editor. A part's style merges over the defaults, which come
-from `Theme.CodeEditor` and `Theme.Syntax`, and then over `Styles`:
+from `Theme.CodeEditor` and `Theme.Syntax`, then over the theme's `codeedit.Style`, and then over
+`Styles`, field by field. The theme's style is set for every editor of a theme with
+`ui.SetThemeStyle` (see [Styles of other widgets on a theme](theming.md#styles-of-other-widgets-on-a-theme));
+set it on each theme the window uses. The inspector names the layers "built-in default", "theme",
+"instance Styles" and "high contrast".
+
+```go
+for _, t := range []*ui.Theme{light, dark} {
+	ui.SetThemeStyle(t, codeedit.Style{Box: ui.Style{Radius: 4}, Gutter: ui.Style{FontSize: 12}})
+}
+codeedit.Editor(doc).Styles(codeedit.Style{Box: ui.Style{Radius: 8}}) // this editor: 8, gutter 12
+```
+
+The parts are:
 
 | Part | What it is |
 |---|---|
@@ -220,7 +233,7 @@ from `Theme.CodeEditor` and `Theme.Syntax`, and then over `Styles`:
 | `Find` | The find and replace bar. |
 
 Under high contrast the colors are the system colors (the theme's `CodeEditor` colors), whatever is set
-in `Styles`; sizes and spacing still apply.
+in the theme's `codeedit.Style` or in `Styles`; sizes and spacing still apply.
 
 ## Performance
 
