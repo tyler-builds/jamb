@@ -129,10 +129,6 @@ The milestone status, and the known limitations and next steps.
   rows have been seen; a slice changed in place is not detected (build a new
   one); and a row whose height changes while it is not built keeps its old
   height until it is built again.
-- **No race-detector run.** Go's `-race` needs cgo, and neither of this
-  machine's C toolchains could build it (MSYS2 GCC 16 fails on
-  `runtime/cgo`; Zig's MinGW lacks `synchronization.lib`). The signal and
-  instance locking is covered by a concurrent stress test instead.
 - **Styling.** Border widths are layout, so they don't ease with `Transition`,
   and all sides share one color. Clipping to a rounded shape is exact for one
   rounded container; a nested one keeps only its own corners, and hit testing
