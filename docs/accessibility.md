@@ -79,7 +79,26 @@ ui.Slider(v, 0, 100, 5).Label("Volume") // a slider: RangeValue, with the Range 
 ui.ProgressBar(0.45).Label("Upload")    // a progress bar: read-only RangeValue
 ui.ProgressRing().Label("Sending reply") // a busy indicator: no range, named "Loading…" by default
 ui.Div().Label("Projects").Badged(ui.Badge(6).Noun("items")) // named "Projects, 6 items"
+ui.Div().Role(access.RoleDataGrid).AccessGrid(3, 2)     // a table of 3 rows of data (the header row not counted) and 2 columns
+ui.Div().Role(access.RoleHeaderItem).AccessCell(0, 2)   // the header of column 2
+ui.Div().Role(access.RoleDataItem).AccessCell(1, 2)     // the cell in row 1, column 2
+ui.Div().Role(access.RoleListItem).AccessPosition(2, 5) // "2 of 5"
+ui.Div().Role(access.RoleListItem).AccessLevel(2)       // an item of a list nested in another
 ```
+
+`AccessGrid`, `AccessCell`, `AccessPosition` and `AccessLevel` describe a table or a
+set built from plain elements, as `DataGrid` and `Tree` describe theirs. A data grid
+with `AccessGrid` has the Grid and Table patterns, so a screen reader moves through it
+by row and column (NVDA's Ctrl+Alt+arrows, Narrator's table keys) and reads each
+cell's column header. Its cells are the data items under it with `AccessCell`, at any
+depth (a row element with no role of its own is left out of the tree), and its
+column headers are the header items under it. Rows and columns count from 1, and the
+header row is not one of the rows: a header item takes row 0. A cell's name is its
+text, and the links in it stay links of their own. `AccessGrid` applies to a data
+grid or a calendar and `AccessCell` to a data item or a header item; on another role
+they are not reported, and the development warnings say so, as they do for a data
+item in row 0. `AccessPosition` and `AccessLevel` apply to an item of any role. All
+four panic on numbers that describe no place, such as a position past the size.
 
 `Expanded` and `Selected` declare the state; the element's click handler makes
 the change, so a click on an expandable row must toggle it. Expand and select
@@ -109,7 +128,8 @@ that find a node by its role and name in a unit test.
 Development warnings report what a user cannot identify: an interactive element
 with no accessible name, an image without `Alt`, a check box, switch or radio
 button with no `Checked` call, a selection item outside a selection container,
-and a `LabelledBy` or `DescribedBy` key that matches no element. Each element is
+an `AccessGrid` or `AccessCell` on a role it does not apply to, and a `LabelledBy`
+or `DescribedBy` key that matches no element. Each element is
 reported once, to stderr, in runs with `JAMB_TRACE=1`, under `jamb dev`, or with
 `JAMB_A11Y_WARN=1`.
 

@@ -386,10 +386,13 @@ type Node struct {
 	Text   *TextInfo // the text of a text field or text area, for the Text pattern; nil otherwise
 	Range  *Range    // the number of a slider or spin box, for the RangeValue pattern; nil otherwise
 	// GridRows and GridColumns are the number of rows and columns of a RoleDataGrid, for
-	// the Grid and Table patterns. Rows counts every row of the data, built or not.
+	// the Grid and Table patterns. Rows counts every row of the data, built or not, and
+	// not the header row.
 	GridRows, GridColumns int
 	// GridRow and GridColumn are the 1-based position of a RoleDataItem among the cells of
-	// its grid; 0 when the node is not a cell.
+	// its grid; 0 when the node is not a cell. A RoleHeaderItem may have a GridColumn, the
+	// column it heads, and has no GridRow; without one it heads the column of its place
+	// among the grid's header items.
 	GridRow, GridColumn int
 	// ItemStatus is the status of an item, such as "sorted ascending" for a header item
 	// (UI Automation ItemStatus); empty when there is none.
