@@ -40,11 +40,11 @@ new widget are in [docs/styling.md](styling.md).
 ## Styles of other widgets on a theme
 
 `Theme` has a field for each widget of `ui`. A widget in another package, such as
-`charts`, `codeedit` or a third-party widget, keeps its style for every widget of its
-kind in a typed slot of the theme instead: `ui.SetThemeStyle(t, v)` stores `v` on the
-theme `t` under the type of `v`, and `ui.ThemeStyle[T](t)` returns the value stored
-under `T` and whether there is one. Each type has its own slot, and storing again
-replaces the value.
+`charts`, `codeedit`, `markdown` or a third-party widget, keeps its style for every
+widget of its kind in a typed slot of the theme instead: `ui.SetThemeStyle(t, v)`
+stores `v` on the theme `t` under the type of `v`, and `ui.ThemeStyle[T](t)` returns
+the value stored under `T` and whether there is one. Each type has its own slot, and
+storing again replaces the value.
 
 ```go
 light, dark := ui.LightTheme(), ui.DarkTheme()

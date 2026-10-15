@@ -32,6 +32,7 @@ jamb to an app; the other pages cover one topic each.
 - [Overlays and menus](widgets-overlays.md): menus, dropdowns, popovers, drawers, and modal dialogs.
 - [Charts](charts.md): building charts, data and axes, interaction, and accessibility.
 - [Code editor](codeedit.md): the `codeedit` package, with its keys, highlighting, and limits.
+- [Markdown](markdown.md): the `markdown` package, a read-only view of Markdown, with its links, images, code highlighting, parts, and limits.
 
 ## Accessibility
 

@@ -21,6 +21,7 @@ parts that depend on it.
 - Text: shaping with HarfBuzz, fallback fonts, rich and selectable text, and input method (IME) composition.
 - Graphics: a canvas, SVG images, gradients, and charts.
 - Code editing: a `codeedit` package with tree-sitter highlighting, undo and redo, and find and replace.
+- Markdown: a `markdown` package that shows CommonMark with the GitHub extensions as accessible, selectable elements.
 - OS integration: jump lists, single instance, a notification area icon, taskbar progress, and OS notifications.
 - Development tools: `jamb dev` rebuilds and restarts an app on each save, and a visual inspector shows the
   elements of a running window.
@@ -161,7 +162,7 @@ The full documentation is in [docs/](docs/README.md). Each page covers one topic
 - [Form widgets](docs/widgets-forms.md), [selection and date widgets](docs/widgets-selection.md),
   [navigation widgets](docs/widgets-navigation.md), [feedback widgets](docs/widgets-feedback.md),
   [data widgets](docs/widgets-data.md), and [overlays and menus](docs/widgets-overlays.md).
-- [Charts](docs/charts.md) and the [code editor](docs/codeedit.md).
+- [Charts](docs/charts.md), the [code editor](docs/codeedit.md), and the [Markdown view](docs/markdown.md).
 - [Accessibility](docs/accessibility.md): the guide for app authors. The design and the decision log are in
   [docs/accessibility-design.md](docs/accessibility-design.md), and the checks by hand are in
   [docs/accessibility-testing.md](docs/accessibility-testing.md).

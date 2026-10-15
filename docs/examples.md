@@ -102,9 +102,15 @@ On the Projects page:
 
 ![The Dialogs section of the Components page](screenshots/components-dialogs.png)
 
-- Keyboard: Ctrl+1 to Ctrl+5 open the Dashboard, Projects, Activity, Components
-  and Settings pages, Ctrl+K moves focus to the search field, and Ctrl+Shift+L
-  toggles the theme.
+- The **Markdown** page (Ctrl+6) shows a document with every element of the
+  `markdown` package: headings, emphasis, links, nested and ordered lists, tasks,
+  quotes, a rule, code blocks colored by `markdown/mdcode`, a table, images from
+  the demo's own loader (and one it refuses, shown by its alternative text), a
+  footnote and an anchor link. A click on a task's box marks the task in the text,
+  through `OnTaskToggle`. See [docs/markdown.md](markdown.md).
+- Keyboard: Ctrl+1 to Ctrl+6 open the Dashboard, Projects, Activity, Components,
+  Settings and Markdown pages, Ctrl+K moves focus to the search field, and
+  Ctrl+Shift+L toggles the theme.
 
 ## The notes app
 
@@ -126,7 +132,7 @@ features: focus handles, `AutoFocus`, and `FocusWithin`.
 - Shortcuts: Ctrl+N (new note, title focused), Ctrl+F (search; Enter opens
   the first match), Alt+Up/Down (previous/next note), Ctrl+Shift+P (command
   palette: type to filter, Up/Down to choose, Enter runs, Escape closes),
-  Ctrl+K Ctrl+T (toggle theme). Enter in a title moves to its body. Escape
+  Ctrl+K Ctrl+T (toggle theme), Ctrl+Shift+V (Markdown preview). Enter in a title moves to its body. Escape
   closes the palette and returns focus to the note you were in, and a command
   run from the palette acts on that note.
 - `keymap.json` next to the notes file overrides the shortcuts, in the format
@@ -141,7 +147,7 @@ features: focus handles, `AutoFocus`, and `FocusWithin`.
   when it isn't 100% (click it to reset).
 - A menu bar above the notes has File (New note, Import..., Export note...,
   Exit), Edit (undo, redo, cut, copy, paste, select all), and View (toggle theme,
-  zoom, command palette). Each item with a key shows that key. Alt by itself
+  Markdown preview, zoom, command palette). Each item with a key shows that key. Alt by itself
   focuses the bar. Right-click a note in the list for Pin or Unpin, and Delete.
 - **Import...** opens the native file dialog with `*.md` and `*.txt` offered and
   several files allowed. The files chosen go through the same import as a drop,
@@ -149,6 +155,11 @@ features: focus handles, `AutoFocus`, and `FocusWithin`.
   note: the file is plain text when the chosen name ends in `.txt`, and Markdown,
   with the title as a heading, otherwise. The dialog offers the title as the
   name. The status line names the file, not its folder.
+- The **Markdown preview** (Ctrl+Shift+V, the eye button in the toolbar, or View >
+  Toggle Markdown preview) shows the note's body as a `markdown.View` beside the
+  editor. It shows the note at once when it opens or another note is selected, and
+  follows the edits 150 ms after typing pauses, so a long note does not slow typing.
+  The note is still stored as the text that is typed.
 - Delete in the editor asks for confirmation inline, with Cancel and Delete
   buttons. It does not use a message box, so the notes app shows no native
   dialog for it.
