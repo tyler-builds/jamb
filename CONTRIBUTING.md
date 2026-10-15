@@ -48,6 +48,11 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 example `fix(ui): keep the caret visible after paste`. Mark a breaking change with `!`
 (`feat(ui)!: ...`). One logical change per commit.
 
+Pull requests are squash-merged, so the pull request's title becomes the commit on `main`: write the
+title in the same form, and the commits inside it can be as rough as you like. A pull request whose
+commits are each one clean change in that form may be rebase-merged instead, keeping them. `main` has
+a linear history; there are no merge commits.
+
 ## License
 
 jamb is licensed under the Apache License, Version 2.0. A contribution submitted for inclusion is
