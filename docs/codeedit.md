@@ -1,12 +1,12 @@
 # Code editor
 
-## Code editor
-
-The `codeedit` package is a code editor for source files, with undo and redo, several selections,
-find and replace, folding by indentation, and tree-sitter highlighting. It is built with
+The `codeedit` package is a code editor for source files: a multi-line text area with a
+line-indexed buffer, undo and redo, several selections, find and replace, folding by indentation,
+tree-sitter highlighting, input-method composition, and an accessibility Text pattern. It is pure
+Go and draws on the Canvas of the `ui` package. It is built with
 `codeedit.Editor(codeedit.NewDocument(text))`. Its keys are actions with default bindings, so they
-work without setup, and an app can rebind them. The sections below cover the keys,
-the document, highlighting, the limits and the measured performance.
+work without setup, and an app can rebind them. The sections below cover the keys, the document,
+highlighting, the limits and the measured performance.
 
 The grammars for highlighting are in their own module,
 [github.com/tyler-builds/jamb-grammars](https://github.com/tyler-builds/jamb-grammars), one package
@@ -23,11 +23,6 @@ binary, plus each grammar it imports (Go is 0.36 MB). wazero uses Go's SHA-256, 
 FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `codeedit` uses about
 32 MB more private memory than one that does not (see BENCHMARKS.md). Apps that do not import
 `codeedit` link none of this.
-
-The `codeedit` package is a code editor for source files: a multi-line text area with a
-line-indexed buffer, undo and redo, several selections, find and replace, folding by
-indentation, tree-sitter syntax highlighting, input-method composition, and an accessibility
-Text pattern. It is pure Go, and renders on the Canvas of the `ui` package.
 
 ## Building an editor
 

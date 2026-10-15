@@ -28,13 +28,8 @@ parts that depend on it.
 
 ## Install
 
-jamb needs Windows 10 or 11 and Go 1.27.1 or later. Add it to a module with:
-
-```
-go get github.com/tyler-builds/jamb@v0.1.0
-```
-
-A minimal `main.go` opens a window with a greeting and a button that counts its clicks:
+jamb needs Windows 10 or 11 and Go 1.27.1 or later. A minimal `main.go` opens a window with a
+greeting and a button that counts its clicks:
 
 ```go
 package main
@@ -62,6 +57,14 @@ func main() {
 		},
 	})
 }
+```
+
+In the module that holds it, add jamb and run the app:
+
+```
+go get github.com/tyler-builds/jamb@v0.1.0
+go mod tidy    # records the checksums of jamb's own dependencies
+go run .
 ```
 
 The `jamb` command is a separate module, tagged `cmd/jamb/v0.1.0` for the same release:

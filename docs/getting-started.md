@@ -26,13 +26,8 @@ Results against the performance targets are in [BENCHMARKS.md](../BENCHMARKS.md)
 
 ## Using jamb in your app
 
-The module is `github.com/tyler-builds/jamb`, and the first release is `v0.1.0`:
-
-```
-go get github.com/tyler-builds/jamb@v0.1.0
-```
-
-A minimal `main.go` is a window with a greeting and a button that counts its clicks:
+The module is `github.com/tyler-builds/jamb`, and the first release is `v0.1.0`. A minimal
+`main.go` is a window with a greeting and a button that counts its clicks:
 
 ```go
 package main
@@ -62,6 +57,15 @@ func main() {
 }
 ```
 
+In the module that holds it, add jamb and run the app. `go get` on a module path records only
+that module's checksum, so `go mod tidy` adds the checksums of jamb's own dependencies:
+
+```
+go get github.com/tyler-builds/jamb@v0.1.0
+go mod tidy
+go run .
+```
+
 Start with the [API guide](concepts.md#api-guide). The `jamb` command is its own module, tagged `cmd/jamb/v0.1.0`
 for the same release, and it is installed with:
 
@@ -77,6 +81,7 @@ An app that uses `codeedit` also needs the grammars module, which is tagged `v0.
 
 ```
 go get github.com/tyler-builds/jamb-grammars@v0.1.0
+go mod tidy
 ```
 
 See [Code editor](codeedit.md#code-editor) for the grammars and what `codeedit` adds to a binary.
