@@ -28,7 +28,7 @@ signals. This is the first release, and the API may change before 1.0.
 - Text shaping and layout, with emoji drawn in color, rich text, and selectable text.
 - Fonts registered by the app with `App.Font`, and WebP and animated GIF images.
 - Gradients, borders with rounded clipping, shadows, and transitions.
-- Frames are drawn only when something changes, so an idle window uses no CPU.
+- Frames are drawn only when something changes, so an idle window draws nothing and runs no timers.
 
 #### Layout and styling
 

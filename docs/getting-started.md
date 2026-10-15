@@ -12,14 +12,15 @@ go run ./examples/notes                        # run the notes app
 go run ./cmd/jamb dev ./examples/notes         # rebuild + restart on every save, window position preserved
 go run ./cmd/jamb package --installer ./examples/demo   # Windows zip and setup.exe in examples/demo/dist (see Packaging)
 go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/...   # headless tests; JAMB_LIVE_TESTS=1 adds the few that show a window
-go build -trimpath -ldflags "-s -w -H windowsgui" -o jamb-demo.exe ./examples/demo   # ~16 MB release build
+go build -trimpath -ldflags "-s -w -H windowsgui" -o jamb-demo.exe ./examples/demo   # ~17 MB release build
 ```
 
 Results against the performance targets are in [BENCHMARKS.md](../BENCHMARKS.md):
 
 - Builds take ~0.3–0.8 s after an edit.
 - Startup to the first frame is ~200 ms.
-- Idle CPU is zero.
+- An idle window draws nothing. The demo used no CPU over 10 s; the hello app in the GPUI
+  comparison used 0.16–0.29% of a core, mostly in the graphics driver's own thread.
 - A full re-render costs ~0.3 ms of CPU per frame.
 
 **Compared with GPUI:** [docs/comparison-gpui.md](comparison-gpui.md) measures the same hello-world app built with jamb and with GPUI (Zed's Rust UI framework): project size, binary size, build times, startup, idle CPU and memory.

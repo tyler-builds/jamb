@@ -528,8 +528,8 @@ evidence, yes:
 
 - Iteration is sub-second to build and about 1 s from save to a running window.
 - There's no native toolchain: no cgo, no C compiler, no Rust, no Node.
-- The repository is under 0.5 MB and the release binary is about 7 MB (4 MB before HarfBuzz shaping).
-- Idle CPU is zero, and frame costs are 25–60× under a 120 Hz budget.
+- The repository is under 0.5 MB and the release binary was about 7 MB (4 MB before HarfBuzz shaping); after tier 3 the hello app's binary is 8.41 MB (measured 2026-10-14).
+- The idle demo used no CPU over 10 s (the hello app in the GPUI comparison used 0.16–0.29% of a core, mostly the graphics driver's thread), and frame costs are 25–60× under a 120 Hz budget.
 - Updates are incremental: a signal change in a 10,000-node tree costs about 0.6 ms.
 - The GC is not a problem at this scale: sub-millisecond pauses, a few cycles per second only under a pathological full-rebuild loop.
 
