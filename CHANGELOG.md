@@ -7,6 +7,11 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-15
+
+The additions from the API review of v0.1.0. No API is removed or renamed; the changes below are
+the only ones that can affect existing code.
+
 ### Added
 
 - `Window.Visible()` reports whether a window is shown, and `Tray.Shown()` whether a tray icon is
@@ -160,5 +165,6 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/tyler-builds/jamb/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tyler-builds/jamb/releases/tag/v0.1.0

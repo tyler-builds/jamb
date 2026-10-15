@@ -27,7 +27,7 @@ Results against the performance targets are in [BENCHMARKS.md](../BENCHMARKS.md)
 
 ## Using jamb in your app
 
-The module is `github.com/tyler-builds/jamb`, and the first release is `v0.1.0`. A minimal
+The module is `github.com/tyler-builds/jamb`, and the latest release is `v0.2.0`. A minimal
 `main.go` is a window with a greeting and a button that counts its clicks:
 
 ```go
@@ -62,23 +62,23 @@ In the module that holds it, add jamb and run the app. `go get` on a module path
 that module's checksum, so `go mod tidy` adds the checksums of jamb's own dependencies:
 
 ```
-go get github.com/tyler-builds/jamb@v0.1.0
+go get github.com/tyler-builds/jamb@v0.2.0
 go mod tidy
 go run .
 ```
 
-Start with the [API guide](concepts.md#api-guide). The `jamb` command is its own module, tagged `cmd/jamb/v0.1.0`
+Start with the [API guide](concepts.md#api-guide). The `jamb` command is its own module, tagged `cmd/jamb/v0.2.0`
 for the same release, and it is installed with:
 
 ```
-go install github.com/tyler-builds/jamb/cmd/jamb@v0.1.0
+go install github.com/tyler-builds/jamb/cmd/jamb@v0.2.0
 ```
 
 - `jamb dev ./myapp` rebuilds and restarts the app on each save, keeping its window position (see
   [Tools for humans and coding agents](tools.md#tools-for-humans-and-coding-agents)).
 - `jamb package` builds the Windows zip, installer and MSIX (see [Packaging](packaging.md#packaging)).
 
-An app that uses `codeedit` also needs the grammars module, which is tagged `v0.1.0` too:
+An app that uses `codeedit` also needs the grammars module, whose latest release is `v0.1.0`:
 
 ```
 go get github.com/tyler-builds/jamb-grammars@v0.1.0

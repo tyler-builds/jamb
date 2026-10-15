@@ -19,7 +19,7 @@ body:
     id: jamb
     attributes:
       label: jamb version
-      placeholder: v0.1.0, or a commit
+      placeholder: v0.2.0, or a commit
     validations:
       required: true
   - type: input
