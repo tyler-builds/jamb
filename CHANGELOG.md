@@ -5,6 +5,8 @@ All notable changes to jamb are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [0.1.0] - 2026-10-15
 
 jamb is a small, declarative, GPU-rendered desktop UI framework written in plain Go, licensed under
@@ -114,4 +116,5 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/tyler-builds/jamb/releases/tag/v0.1.0
