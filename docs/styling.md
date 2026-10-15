@@ -661,12 +661,3 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
 Where a look changed under high contrast on purpose, the change is in the guardrails
 above: the selected text of a text field and the highlighted row of a menu are the
 Highlight color with HighlightText on it.
-
-## Reusable styles
-
-Reusable styles are ordinary values. Zero-valued fields mean "unset":
-
-```go
-var Card = ui.Style{Padding: ui.All(16), Radius: 12, Background: ui.Hex("#18181b")}
-ui.Div().Style(Card)
-```

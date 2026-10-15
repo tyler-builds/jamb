@@ -2,9 +2,9 @@
 
 A declarative, GPU-accelerated desktop UI framework for Go. Pure Go, no cgo; Windows first.
 
-jamb is a small UI framework written in plain Go. It has no Electron, WebView, HTML, CSS, JavaScript,
-Node, or Rust. On Windows it uses pure-Go Win32 windowing and a Direct3D 11 renderer reached through
-COM vtables. An app is a tree of elements built by components, and its state lives in signals, so a
+jamb (formerly goui) is a small, declarative, GPU-rendered desktop UI framework written in plain Go.
+It has no Electron, WebView, HTML, CSS, JavaScript, Node, Rust, or cgo. Windows is the first platform:
+pure-Go Win32 windowing plus a Direct3D 11 renderer reached through COM vtables. An app is a tree of elements built by components, and its state lives in signals, so a
 change re-renders only the parts that depend on it.
 
 > **Status:** jamb is pre-1.0. The API may change between versions. It runs on Windows 10 and 11

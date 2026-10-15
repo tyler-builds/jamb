@@ -37,6 +37,15 @@ shadow), set the part's `Clear` field, for example `ui.Style{Clear: ui.ClearBord
 The parts, the precedence, the states, the guardrails, and how to add styling to a
 new widget are in [docs/styling.md](styling.md).
 
+## Reusable styles
+
+Reusable styles are ordinary values. Zero-valued fields mean "unset":
+
+```go
+var Card = ui.Style{Padding: ui.All(16), Radius: 12, Background: ui.Hex("#18181b")}
+ui.Div().Style(Card)
+```
+
 ## Themes
 
 Theming: `ctx.Theme()` returns semantic colors, and `ctx.SetTheme(ui.LightTheme())`
