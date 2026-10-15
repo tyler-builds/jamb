@@ -112,7 +112,8 @@ ui.Pagination(page, pageCount).Compact()                 // Previous, "Page 3 of
   The chevrons between locations are hidden from assistive technology. `MaxItems(n)`
   keeps the first location and the last n-1, and puts a "..." button between them that
   opens a menu of the hidden locations. A hidden location without an `OnClick` is
-  listed as disabled. A value below 2 counts as 2.
+  listed as disabled. A value below 2 counts as 2. `Tooltip(s)` shows s over the trail,
+  and is read as the group's description.
 - **Pagination.** Each page is a button named "Page n", in the Tab order, and Enter
   and Space choose it. The current page is named "Page n, current page", it is
   selected, and it is filled in Accent (Highlight under high contrast). It is not a
@@ -122,7 +123,8 @@ ui.Pagination(page, pageCount).Compact()                 // Previous, "Page 3 of
   skipped. Up to seven pages are shown in full. The page is held between 1 and the
   page count when it is drawn. `Compact()` shows only Previous, "Page 3 of 20" and
   Next. The control is a group named by its `Label` (default "Pagination"). Left and
-  Right do not move between pages.
+  Right do not move between pages. `Tooltip(s)` shows s over the control, and is read
+  as the group's description.
 
 ## Sidebar
 
@@ -160,7 +162,9 @@ ui.Sidebar(page, // *ui.Signal[string]: the selected item's key
   "Navigation"). Its items are list items that report the selected and disabled
   states, and an item with a badge is named with its count, as in "Inbox, 4". Its
   headings are headings. The toggle is a button named "Collapse navigation" or
-  "Expand navigation", which reports the expanded state.
+  "Expand navigation", which reports the expanded state. `Tooltip(s)` shows s over
+  the pane and is read as its description; an item of a collapsed pane shows its own
+  label instead.
 - **Layout.** The pane takes the height of its row, so put it in a row beside the
   content. Its items scroll when they do not fit, and the header and the footer stay
   in place.

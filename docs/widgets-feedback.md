@@ -99,8 +99,11 @@ ui.Skeleton().Circle(32)                             // a placeholder for an ava
 - **Avatar.** The initials are the first letter of the first and last words of the name, or one
   letter for a name of one word. An empty name shows an empty circle, named "Avatar". Without
   `AccessHidden`, the avatar is an image named by the name, so it is read as the person's name.
+  `Tooltip(s)` shows s over the circle, such as the name in full, since an avatar has no visible
+  text; assistive technology reads it as the description unless it is the name.
 - **Tag.** A tag is as wide as its text by default. Under `MaxWidth`, a long text ends with an
-  ellipsis. `OnRemove` adds a button that works with the mouse, Enter and Space.
+  ellipsis. `OnRemove` adds a button that works with the mouse, Enter and Space. `Tooltip(s)`
+  shows s over the chip, such as the full text of a truncated tag, and is read as its description.
 - **Skeleton.** It is hidden from assistive technology. The app marks the region that is loading
   as busy, or labels it "Loading". It pulses about once every 1.2 seconds, between full and half
   opacity, and it is still under reduced motion and high contrast.

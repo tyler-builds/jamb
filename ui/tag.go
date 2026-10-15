@@ -60,6 +60,7 @@ type TagElement struct {
 	key      string
 	styles   TagStyle
 	size     sizing // the tag's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	tooltip  string // see Tooltip
 }
 
 // Tag creates a tag showing text. A tag is as wide as its text by default. Under
@@ -79,6 +80,11 @@ func (g *TagElement) Icon(ic *icons.Icon) *TagElement { g.icon = ic; return g }
 // pressed with the mouse, or with Enter or Space. The button is named "Remove"
 // and the tag's text, such as "Remove Sales".
 func (g *TagElement) OnRemove(fn func()) *TagElement { g.onRemove = fn; return g }
+
+// Tooltip shows s below the tag after the pointer rests on it, such as the full
+// text of a truncated tag. Assistive technology reads it as the tag's description,
+// unless it has another.
+func (g *TagElement) Tooltip(s string) *TagElement { g.tooltip = s; return g }
 
 // The sizing methods give the tag's outer box a size. See Sizing in docs/styling.md.
 func (g *TagElement) Width(l Length) *TagElement { g.size.setWidth(l); return g }
@@ -107,7 +113,7 @@ func (g *TagElement) expand(ctx *Context) Element {
 	st := resolveTag(ctx, g.styles)
 	strs := ctx.Strings()
 	// The tag is a group named by its text, so it is read as one thing.
-	tag := Div().asPart("Tag.Tag").Style(st.Tag).Role(access.RoleGroup).Label(g.text)
+	tag := Div().asPart("Tag.Tag").Style(st.Tag).Role(access.RoleGroup).Label(g.text).Tooltip(g.tooltip)
 	if g.icon != nil {
 		tag.Child(Icon(g.icon).Size(14))
 	}

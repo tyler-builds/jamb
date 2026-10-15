@@ -139,6 +139,7 @@ type PaginationElement struct {
 	onChange func(int)
 	styles   PaginationStyle
 	size     sizing // the control's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	tooltip  string // see Tooltip
 }
 
 // Pagination creates a page control over pages pages, numbered from 1, that reads
@@ -170,6 +171,10 @@ func (p *PaginationElement) OnChange(fn func(page int)) *PaginationElement {
 	p.onChange = fn
 	return p
 }
+
+// Tooltip shows s below the control after the pointer rests on it. Assistive
+// technology reads it as the control's description, unless it has another.
+func (p *PaginationElement) Tooltip(s string) *PaginationElement { p.tooltip = s; return p }
 
 // Compact shows only Previous, the text "Page 3 of 20" and Next, for a place with
 // no room for the page numbers.
@@ -226,7 +231,8 @@ func (p *PaginationElement) expand(ctx *Context) Element {
 		if name == "" {
 			name = s.Pagination
 		}
-		bar := p.size.apply(Div().asPart("Pagination.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().Style(st.Bar))
+		bar := p.size.apply(Div().asPart("Pagination.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().Style(st.Bar).
+			Tooltip(p.tooltip))
 		bar.Child(p.nav(th, st, "previous", s.PreviousPage, icons.ChevronLeft, cur-1, cur > 1))
 		if p.compact {
 			bar.Child(Text(s.PageOf(cur, pages)).NoWrap())
