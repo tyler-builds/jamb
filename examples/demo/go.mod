@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/tyler-builds/jamb v0.0.0
-	github.com/tyler-builds/jamb-grammars v0.0.0-20261014125752-d83e801f74df
+	github.com/tyler-builds/jamb-grammars v0.1.0
 )
 
 require (

@@ -5,13 +5,12 @@ All notable changes to jamb are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - unreleased
+## [0.1.0] - 2026-10-15
 
 jamb is a small, declarative, GPU-rendered desktop UI framework written in plain Go, licensed under
 the Apache License, Version 2.0. Windows is the first platform: windows use Win32, and rendering
-uses Direct3D 11. The framework uses no Electron, WebView, HTML/CSS, JavaScript, Node, Rust or cgo.
-An app is a tree of elements built in render functions, and state lives in signals. This is the
-first release, and the API may change before 1.0.
+uses Direct3D 11. An app is a tree of elements built in render functions, and state lives in
+signals. This is the first release, and the API may change before 1.0.
 
 ### Added
 
@@ -114,3 +113,5 @@ first release, and the API may change before 1.0.
 - Lists and data grids build only the rows that are in view.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
+
+[0.1.0]: https://github.com/tyler-builds/jamb/releases/tag/v0.1.0
