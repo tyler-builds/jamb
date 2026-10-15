@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // ComponentElement is a re-render boundary. Its function runs when the
@@ -188,6 +189,26 @@ func (c *Context) Window() Window { return windowRef{c.rt} }
 // Runtime.Post). It is safe to call from a goroutine that holds the Context,
 // so background work can hand its results back to the window.
 func (c *Context) Post(fn func()) { c.rt.Post(fn) }
+
+// After runs fn on the UI thread once d has passed, at the first frame at or after
+// that time, and wakes the window for it. It returns a function that cancels fn if
+// it has not run yet. Call both on the UI thread, such as in a render or a handler.
+//
+// The time is the window's clock, the one that animations and tooltips use, so a
+// headless test moves it with uitest's Advance. Use After to debounce work that
+// follows typing:
+//
+//	cancel := func() {}
+//	ui.TextInput(query).OnChange(func(string) {
+//		cancel() // a search that was waiting waits again
+//		cancel = ctx.After(150*time.Millisecond, search)
+//	})
+//
+// fn still runs if the component goes away first; cancel it in OnDispose when it
+// must not.
+func (c *Context) After(d time.Duration, fn func()) (cancel func()) {
+	return c.rt.at(c.rt.now().Add(d), fn).cancel
+}
 
 // Zoom returns the UI zoom factor (1 = 100%).
 func (c *Context) Zoom() float32 { return c.rt.zoom }
