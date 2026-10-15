@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/tyler-builds/jamb/internal/rope"
+	"github.com/tyler-builds/jamb/ui"
 )
 
 // undoGroupTime is how long after a typing or deleting step another one of the
@@ -43,9 +44,10 @@ type Document struct {
 	last    stepKind // the kind of the latest step, for grouping typing
 	lastAt  time.Time
 
-	version  uint64 // changes on every text, selection and fold change
-	textVer  uint64 // changes on every text change
-	cache    string // Text, as of textVer cacheVer
+	version  uint64             // changes on every text, selection and fold change
+	versions *ui.Signal[uint64] // version, for the tracked reads of Version
+	textVer  uint64             // changes on every text change
+	cache    string             // Text, as of textVer cacheVer
 	cacheVer uint64
 	cacheOK  bool
 
@@ -117,7 +119,7 @@ var ErrRange = errors.New("codeedit: change out of range")
 // U+FFFD, and a CR LF pair is read as a line feed, so Text returns the text with
 // line feeds only. The caret starts at the beginning of the text.
 func NewDocument(text string) *Document {
-	d := &Document{now: time.Now, sels: []Selection{{}}, tab: 4}
+	d := &Document{now: time.Now, sels: []Selection{{}}, tab: 4, versions: ui.NewSignal[uint64](0)}
 	d.load(text)
 	return d
 }
@@ -198,9 +200,15 @@ func (d *Document) Line(row int) string {
 func (d *Document) RowOf(off int) int { return d.text.Snapshot().PointAt(off).Row }
 
 // Version returns a number that changes on every change of the text, the
-// selections or the folds. Compare it with an earlier value to see whether the
-// document changed since.
-func (d *Document) Version() uint64 { return d.version }
+// selections or the folds: edits, typing, undo and redo, SetText and selection
+// and fold changes. Compare it with an earlier value to see whether the document
+// changed since.
+//
+// Read during a component's render, Version is a tracked read, like Signal.Get:
+// the component renders again after the next change, so a component that shows
+// whether the document is modified needs no OnChange of its own. Read anywhere
+// else it is a plain read.
+func (d *Document) Version() uint64 { return d.versions.Get() }
 
 // OnChange calls fn after each change of the text, the selections or the folds,
 // until the returned function is called. fn runs on the UI thread.
@@ -232,6 +240,7 @@ func (d *Document) OnEdit(fn func(Change)) (cancel func()) {
 // the listeners.
 func (d *Document) changed() {
 	d.version++
+	d.versions.Set(d.version)
 	for _, l := range slices.Clone(d.listeners) {
 		l.fn()
 	}

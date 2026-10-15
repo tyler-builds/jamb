@@ -70,6 +70,18 @@ own scroll position.
 Positions are byte offsets. Selections move with the text: a caret before an insertion moves
 after it, and a caret inside a replaced range goes to its start.
 
+`Version` changes on every change of the text, the selections or the folds, whether it comes
+from typing, an edit, undo or redo, or `SetText`. Read during a component's render it is a tracked
+read, like `Signal.Get`: the component renders again after the next change, with no `OnChange` of
+its own. Read anywhere else it is a plain read.
+
+```go
+saved := ui.Local(ctx, "saved", doc.Version()) // the version at the last save
+if doc.Version() != saved.Get() {              // renders again on each change
+	title += " (modified)"
+}
+```
+
 ## Keys
 
 The keys are the actions in the `CodeEditor` key context. Each action is a `codeedit.Cmd...`
