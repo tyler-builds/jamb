@@ -1,10 +1,10 @@
 package charts
 
 // Axis configures an axis of a chart: its label, its range, its tick format and
-// count, and its grid lines. The zero value is an automatic axis. Set the range
-// with Range, which returns the axis so that it chains:
+// count, and its grid lines. The zero value is an automatic axis. Fix either end of
+// the range with Min and Max, which return the axis so that they chain:
 //
-//	charts.YAxis(charts.Axis{Label: "Visits", Format: formatCount}.Range(0, 400))
+//	charts.YAxis(charts.Axis{Label: "Visits", Format: formatCount}.Min(0).Max(400))
 type Axis struct {
 	// Label is the title of the axis, drawn beside its labels.
 	Label string
@@ -18,8 +18,8 @@ type Axis struct {
 	// them on the value axis only.
 	Grid GridLines
 
-	lo, hi float64
-	ranged bool
+	min, max       float64
+	hasMin, hasMax bool
 }
 
 // GridLines says whether an axis draws grid lines across the plot.
@@ -31,10 +31,17 @@ const (
 	GridOff
 )
 
-// Range fixes the range of the axis to lo to hi, instead of the range of the data.
-// The ticks then run from lo to hi, and the data outside it is not drawn.
-func (a Axis) Range(lo, hi float64) Axis {
-	a.lo, a.hi, a.ranged = lo, hi, true
+// Min fixes the start of the axis at lo, instead of the start of the data. The ticks
+// then start at lo, and the data below it is not drawn. Max does the same for the end
+// of the axis. Either one can be set alone; the other end follows the data.
+func (a Axis) Min(lo float64) Axis {
+	a.min, a.hasMin = lo, true
+	return a
+}
+
+// Max fixes the end of the axis at hi, instead of the end of the data (see Min).
+func (a Axis) Max(hi float64) Axis {
+	a.max, a.hasMax = hi, true
 	return a
 }
 

@@ -17,7 +17,7 @@ ui.Div().Child(charts.Line(charts.Series[Visit]{
 	Time: func(v Visit) time.Time { return v.Day },
 	Y:    func(v Visit) float64 { return float64(v.Count) },
 }).Title("Visits this week").
-	YAxis(charts.Axis{Label: "Visits"}.Range(0, 400)).
+	YAxis(charts.Axis{Label: "Visits"}.Min(0).Max(400)).
 	Size(ui.Full, ui.Px(300)))
 ```
 
@@ -51,8 +51,8 @@ index in `Data`.
 - **Number** axes use nice ticks in steps of 1, 2 or 5 times a power of ten.
 
 `Axis` configures an axis: `Label`, `Format`, the desired `Ticks`, `Grid`
-(`GridAuto` draws grid lines on the value axis only), and `Range(lo, hi)` to fix
-the range. Tick labels are measured with the painter, so the margins hold them,
+(`GridAuto` draws grid lines on the value axis only), and `Min` and `Max` to fix
+the ends of the range. Tick labels are measured with the painter, so the margins hold them,
 and labels that would overlap are thinned out.
 
 Tooltips, the summary and the keyboard announcements format times the same way.

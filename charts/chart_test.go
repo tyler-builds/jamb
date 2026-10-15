@@ -304,7 +304,7 @@ func TestConfigurationsRender(t *testing.T) {
 		"legend top":        Line(visits()).Legend(LegendTop),
 		"legend right":      Line(visits(), returns()).Legend(LegendRight),
 		"legend none":       Line(visits()).Legend(LegendNone),
-		"range y":           Line(visits()).YAxis(Axis{Label: "Visits"}.Range(0, 400)),
+		"range y":           Line(visits()).YAxis(Axis{Label: "Visits"}.Min(0).Max(400)),
 		"no grid":           Line(visits()).YAxis(Axis{Grid: GridOff}),
 		"x grid":            Line(visits()).XAxis(Axis{Grid: GridOn, Label: "Day"}),
 		"donut":             Donut(visits()),

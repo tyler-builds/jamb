@@ -11,7 +11,7 @@
 //		Time: func(v Visit) time.Time { return v.Day },
 //		Y:    func(v Visit) float64 { return float64(v.Count) },
 //	}).Title("Visits this week").
-//		YAxis(charts.Axis{Label: "Visits"}.Range(0, 400)).
+//		YAxis(charts.Axis{Label: "Visits"}.Min(0).Max(400)).
 //		Size(ui.Full, ui.Px(300)))
 //
 // The data is converted once, when the chart is built, so build the chart again

@@ -236,13 +236,23 @@ func spacing(count, n int) int {
 }
 
 // valueTicks returns about n ticks of the value axis, and the domain that they span:
-// the ticks' nice bounds, or the axis's Range when it has one.
+// the ticks' nice bounds, or the ends that the axis's Min and Max fix.
 func (c *Chart) valueTicks(m cartModel, n int) (ticks []float64, lo, hi float64) {
-	if c.ya.ranged {
-		ticks, _, _ = linearTicks(c.ya.lo, c.ya.hi, n)
-		return ticks, c.ya.lo, c.ya.hi
+	vlo, vhi := m.vlo, m.vhi
+	if c.ya.hasMin {
+		vlo = c.ya.min
 	}
-	return linearTicks(m.vlo, m.vhi, n)
+	if c.ya.hasMax {
+		vhi = c.ya.max
+	}
+	ticks, lo, hi = linearTicks(vlo, vhi, n)
+	if c.ya.hasMin {
+		lo = c.ya.min
+	}
+	if c.ya.hasMax {
+		hi = c.ya.max
+	}
+	return ticks, lo, hi
 }
 
 // measureLabels returns the width of the widest label, the height of a line of text,
