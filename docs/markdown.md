@@ -50,7 +50,7 @@ and no part of `codeedit`.
 | Block quote, nested | a box with a line on its left | its blocks |
 | Thematic break, `---` | a rule | a separator |
 | Fenced or indented code block | monospace text that does not wrap, in a box that scrolls sideways | a group named "Code, go" (from the fence) with the code |
-| Table | a grid, with the header row in bold and each column aligned as its delimiter row says | a group named "Table, 3 columns, 4 rows" with the cells in order |
+| Table | a grid, with the header row in bold and each column aligned as its delimiter row says | a table of rows and columns (see Tables below) |
 | Image | the image at its size, at most as wide as the view | an image named by its alternative text |
 | Footnote reference, `[^1]` | a link `[1]` to the note | a link |
 | Footnotes | a rule and a numbered list at the end | a list named "Footnotes" |
@@ -58,6 +58,19 @@ and no part of `codeedit`.
 
 A tight list spaces its items by the `List` part's gap; a loose list (with blank
 lines between its items) spaces them as the document spaces its blocks.
+
+### Tables
+
+A table is a data grid with UI Automation's Grid and Table patterns, and its cells
+have the GridItem and TableItem patterns: the patterns that a screen reader's table
+navigation (NVDA's Ctrl+Alt+arrow keys, Narrator's table keys) reads to move by row
+and column and to say each cell's column header.
+The header row's cells are header items, the table's column headers; the other cells
+are data items, each at its row and column, named by its text. The header row is not
+counted among the table's rows, as in a `ui.DataGrid`: a table with a header and
+three rows has 3 rows, and its first row of data is row 1. A link in a cell is still
+a link of its own and a Tab stop. The table has neither a name nor a description: a
+screen reader says that it is a table, and its size, from the Grid pattern.
 
 ## Options
 
@@ -85,7 +98,7 @@ take focus.
 A link is a segment of its paragraph's rich text. Tab stops on each link, in the
 order of the text, a focus ring is drawn around its words, and Enter follows it; a
 click follows it too. To assistive technology it is a link inside its text, also
-inside a heading or a list item.
+inside a heading, a list item or a table cell.
 
 Without `OnLink`, following a link:
 
@@ -235,7 +248,7 @@ The parts are documented here and in the package doc. They are not listed in
 The words that the view adds to a document are the `Markdown…` fields of the
 window's `ui.Strings`: `MarkdownImage` (the name of an image without alternative
 text), `MarkdownImageNotShown` (the placeholder's text), `MarkdownTask` (the name of
-a task's check box when the task has no text), `MarkdownTable`, `MarkdownCode` and
+a task's check box when the task has no text), `MarkdownCode` and
 `MarkdownFootnotes`. They are English in every built-in pack (see
 [Translations](translations.md)).
 
@@ -297,8 +310,6 @@ parses only the code blocks that changed.
 
 - Selection is per block: a drag selects within one paragraph, heading, cell or
   code block, not across blocks.
-- A table is a group of cells for assistive technology, not a grid: screen readers
-  read its cells in order, without table navigation by row and column.
 - List items do not report their position in the list ("2 of 5").
 - An image keeps its height when the view is narrower than the image, and is
   letterboxed in its box. Image titles are not shown.

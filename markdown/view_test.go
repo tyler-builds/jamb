@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -79,18 +80,61 @@ func TestLists(t *testing.T) {
 	}
 }
 
-// A table is a group named by its size, with its header and its cells in order.
+// A table is a data grid of the rows of its body, described by its size as drawn. Its
+// header cells are header items of their columns, and the other cells data items at
+// their row and column, named by their text; a short row is filled out with empty
+// cells.
 func TestTable(t *testing.T) {
 	u := show(t, func() *ViewElement {
 		return View("| Name | Count |\n|:-----|------:|\n| apples | 12 |\n| pears |\n")
 	})
-	table := u.ByRole(access.RoleGroup, "Table, 2 columns, 3 rows")
-	var cells []string
-	for _, id := range table.Node().Children {
-		cells = append(cells, u.Tree().Node(id).Name)
+	grids := nodes(u, access.RoleDataGrid)
+	if len(grids) != 1 {
+		t.Fatalf("%d data grids, want 1", len(grids))
 	}
-	if want := "Name Count apples 12 pears"; strings.Join(cells, " ") != want {
-		t.Errorf("cells %q, want %q", strings.Join(cells, " "), want)
+	g := grids[0]
+	if g.GridRows != 2 || g.GridColumns != 2 {
+		t.Errorf("grid shape %d rows by %d columns, want 2 by 2 (the header row not counted)", g.GridRows, g.GridColumns)
+	}
+	if g.Name != "" || g.Description != "" {
+		t.Errorf("grid named %q, described %q; want neither, as the Grid pattern gives the size", g.Name, g.Description)
+	}
+	var cells []string
+	for _, id := range g.Children {
+		n := u.Tree().Node(id)
+		cells = append(cells, fmt.Sprintf("%s %d,%d %q", n.Role, n.GridRow, n.GridColumn, n.Name))
+	}
+	want := []string{
+		`header item 0,1 "Name"`, `header item 0,2 "Count"`,
+		`data item 1,1 "apples"`, `data item 1,2 "12"`,
+		`data item 2,1 "pears"`, `data item 2,2 ""`,
+	}
+	if strings.Join(cells, "|") != strings.Join(want, "|") {
+		t.Errorf("cells\n%s\nwant\n%s", strings.Join(cells, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// A link in a cell is a link of its own, under the cell, and a Tab stop.
+func TestTableCellLinks(t *testing.T) {
+	var got []string
+	u := show(t, func() *ViewElement {
+		return View("| Project | Site |\n| --- | --- |\n| jamb | [home](https://example.com) |\n").
+			OnLink(func(url string) { got = append(got, url) })
+	})
+	link := u.ByRole(access.RoleLink, "home").Node()
+	if p := u.Tree().Node(link.Parent); p == nil || p.Role != access.RoleDataItem || p.GridRow != 1 || p.GridColumn != 2 {
+		t.Fatalf("the link's parent is %+v, want the data item at 1,2", p)
+	}
+	if p := u.Tree().Node(link.Parent); p.Name != "home" {
+		t.Errorf("the cell is named %q, want home", p.Name)
+	}
+	u.Press("tab")
+	if f := u.Focused().Node(); f.Role != access.RoleLink || f.Name != "home" {
+		t.Fatalf("Tab: focus on the %s %q, want the link home", f.Role, f.Name)
+	}
+	u.Press("enter")
+	if strings.Join(got, " ") != "https://example.com" {
+		t.Errorf("OnLink got %q, want https://example.com", got)
 	}
 }
 

@@ -16,7 +16,16 @@ func TestMarkdownPageTogglesATask(t *testing.T) {
 	if h := u.ByRole(access.RoleHeading, "Markdown").Node(); h.Heading != 1 {
 		t.Errorf("the title is a heading of level %d, want 1", h.Heading)
 	}
-	u.ByRole(access.RoleGroup, "Table, 3 columns, 4 rows")
+	var table *access.Node
+	u.Tree().Walk(func(n *access.Node) bool {
+		if n.Role == access.RoleDataGrid {
+			table = n
+		}
+		return table == nil
+	})
+	if table == nil || table.GridRows != 3 || table.GridColumns != 3 {
+		t.Errorf("the table is %+v, want a data grid of 3 rows and 3 columns", table)
+	}
 	u.ByRole(access.RoleGroup, "Code, go")
 	task := u.ByRole(access.RoleCheckBox, "A task to do (click its box)")
 	if task.Checked() {
