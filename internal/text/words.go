@@ -7,7 +7,7 @@ import (
 
 // Word units follow the Windows convention, which Notepad, WordPad, Word and the
 // edit controls of Edge and Chrome share (checked against Notepad, see
-// docs/accessibility.md, "Phase C"). A word unit is a run of word characters
+// docs/accessibility-design-phases-b-c.md, "Phase C"). A word unit is a run of word characters
 // (letters, digits, underscore and combining marks), or a run of other visible
 // characters such as punctuation, followed by any spaces and tabs after it. A line
 // break is a unit of its own. So "A small note-taking app. Next" has the units

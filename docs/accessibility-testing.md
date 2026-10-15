@@ -3,7 +3,7 @@
 This page is the manual pass for jamb's examples with a screen reader. It is for
 a person to run. The automated checks are in `scripts/a11y-check.ps1` (see the
 Tools section of the [Tools for humans and coding agents](tools.md)),
-and the design is in [accessibility.md](accessibility.md).
+and the design is in [accessibility-design.md](accessibility-design.md).
 
 The expected results say what the screen reader should speak. Its wording
 depends on its version and settings, so match the meaning (the name, the role,

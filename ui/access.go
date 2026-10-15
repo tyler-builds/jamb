@@ -10,7 +10,7 @@ import (
 )
 
 // The accessibility tree is built from the runtime's nodes (see
-// docs/accessibility.md). Nothing is built until an assistive technology asks
+// docs/accessibility-design.md). Nothing is built until an assistive technology asks
 // for the tree, or development warnings are on. After that, a frame publishes
 // a new tree only when the UI changed (a component re-rendered, a layout or
 // paint moved something, or the focus moved), so frames cost nothing extra

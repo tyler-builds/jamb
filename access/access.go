@@ -8,7 +8,7 @@
 // The tree is published as an immutable *Tree snapshot. Adapters read it from
 // any goroutine; the ui runtime builds a new snapshot on the UI thread only
 // when something changed, and Diff reports what differs from the previous one.
-// See docs/accessibility.md for the design.
+// See docs/accessibility-design.md for the design.
 package access
 
 import (

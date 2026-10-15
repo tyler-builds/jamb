@@ -371,12 +371,12 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 // Sorting orders the rows without changing their keys, and the focus and the
 // selection follow their rows by key, so a sort, a scroll, new rows or a saved
 // edit keep them. Sorting is stable, and it runs on the UI thread: a sort of 100,000
-// rows takes about 8 ms (see docs/accessibility.md, Phase I). Keys must be unique.
+// rows takes about 8 ms (see docs/accessibility-design-phases-i-m.md, Phase I). Keys must be unique.
 //
 // An editing row is built only while it is in view, as the other rows are, because
 // the rows of a grid are one window of the list. When the row scrolls out of view its
 // editor is not laid out, but the edit, its text and its focus are kept, and the
-// editor is laid out again when the row comes back (see docs/accessibility.md).
+// editor is laid out again when the row comes back (see docs/accessibility-design-phases-i-m.md).
 type DataGridElement[T any] struct {
 	rows        []T
 	key         func(T) string

@@ -137,7 +137,7 @@ var fieldSeq atomic.Uint64
 // FieldElement is a labelled field: a label above its control, with optional help
 // text, a required marker and the error the field shows. The control is named by
 // the label, described by the help text and the error, and reports whether it is
-// required and whether its value is valid (see docs/accessibility.md, Phase K).
+// required and whether its value is valid (see docs/accessibility-design-phases-i-m.md, Phase K).
 // Its validators (see Validate) are checked as the user works with the field, and
 // on submit when the field belongs to a Form (see Form and docs/widgets-forms.md, Forms).
 type FieldElement struct {
