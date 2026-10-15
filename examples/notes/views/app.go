@@ -378,10 +378,10 @@ func titleOf(n *store.Note) string {
 // noteRow is a row of the sidebar's note list. The row is the list item: it says
 // whether its note is selected, and takes the clicks, focus and drag. Its text is
 // a component of its own (see noteBody), so typing in a note re-renders only that
-// text.
+// text. The row's key is "row-" and the note's ID; its text's is the note's ID.
 func (a *App) noteRow(t *ui.Theme, n *store.Note, selected bool) ui.Element {
 	// Tab reaches the row; Enter opens the note, as a click does.
-	return ui.Div().Role(access.RoleListItem).AccessSelected(selected).MarginY(1).
+	return ui.Div().Key("row-"+n.ID).Role(access.RoleListItem).AccessSelected(selected).MarginY(1).
 		Gap(3).PaddingX(10).PaddingY(9).Radius(8).Transition(fast).
 		Hover(ui.Style{Background: t.SurfaceHover}).
 		When(selected, func(d *ui.DivElement) { d.Background(t.SurfaceActive) }).

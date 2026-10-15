@@ -11,10 +11,24 @@ import (
 
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/ui"
+
+	"github.com/tyler-builds/jamb/examples/notes/store"
 )
 
-// seededRig opens a store with n notes whose snippets vary in length.
+// seededRig renders the app over a store of n notes (see seededStore).
 func seededRig(t *testing.T, n int) *rig {
+	t.Helper()
+	s := seededStore(t, n)
+	rt := ui.NewRuntime(Root(s), ui.DarkTheme(), nil)
+	rt.AddBindings(Bindings()...)
+	rt.SetViewport(1100, 720, 1)
+	r := &rig{t, s, rt}
+	r.frame()
+	return r
+}
+
+// seededStore opens a store with n notes whose snippets vary in length.
+func seededStore(t *testing.T, n int) *store.Store {
 	t.Helper()
 	notes := make([]map[string]any, n)
 	for i := range n {
@@ -38,12 +52,7 @@ func seededRig(t *testing.T, n int) *rig {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rt := ui.NewRuntime(Root(s), ui.DarkTheme(), nil)
-	rt.AddBindings(Bindings()...)
-	rt.SetViewport(1100, 720, 1)
-	r := &rig{t, s, rt}
-	r.frame()
-	return r
+	return s
 }
 
 // subtreeNodes counts the nodes under the element with the given key, read

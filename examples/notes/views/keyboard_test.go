@@ -2,88 +2,81 @@ package views
 
 import (
 	"testing"
-	"time"
 
-	"github.com/tyler-builds/jamb/input"
-	"github.com/tyler-builds/jamb/internal/scene"
-	"github.com/tyler-builds/jamb/ui"
+	"github.com/tyler-builds/jamb/ui/uitest"
+
+	"github.com/tyler-builds/jamb/examples/notes/store"
 )
 
-// focusRingOn reports whether the focus ring is drawn around the element with
-// key: a ring quad covers the element's center.
-func focusRingOn(r *rig, key string) bool {
-	r.t.Helper()
-	box, ok := r.rt.Find(key)
-	if !ok {
-		r.t.Fatalf("no element with key %q", key)
-	}
-	cx, cy := box.X+box.W/2, box.Y+box.H/2
-	for _, q := range frameScene(r.rt, time.Now()).Quads {
-		if q.Background.A == 0 && q.BorderWidth > 0 && q.BorderColor == scene.Color(ui.DarkTheme().FocusRing) && q.Bounds.Contains(cx, cy) {
-			return true
-		}
-	}
-	return false
+// newUI renders the app over s, with its key bindings, in a window of the
+// app's default size.
+func newUI(t *testing.T, s *store.Store) *uitest.UI {
+	return uitest.New(t, Root(s), uitest.Bindings(Bindings()...), uitest.Size(1100, 720))
 }
 
-// tabTo presses Tab until the focus ring is on the element with key. It gives
-// up after a bounded number of presses.
-func tabTo(r *rig, key string) bool {
+// tabTo presses Tab until the focus ring is drawn around the element with key.
+// It gives up after a bounded number of presses.
+func tabTo(u *uitest.UI, key string) bool {
 	for range 60 {
-		if focusRingOn(r, key) {
+		if u.Get(key).FocusRing() {
 			return true
 		}
-		r.key(input.KeyTab, 0)
+		u.Press("tab")
 	}
-	return focusRingOn(r, key)
+	return u.Get(key).FocusRing()
 }
 
 // Tab reaches a tag chip and a note row. Enter toggles the chip's filter, Space
 // too, and Enter opens the note. A click removes the ring.
 func TestNotesRowsAndChipsByKeyboard(t *testing.T) {
-	r := seededRig(t, 3)
-	notes := r.s.Notes.Peek()
-	r.s.AddTag(notes[1], "work")
-	r.frame()
+	s := seededStore(t, 3)
+	notes := s.Notes.Peek()
+	s.AddTag(notes[1], "work")
+	u := newUI(t, s)
 
-	if !tabTo(r, "chip-work") {
+	if !tabTo(u, "chip-work") {
 		t.Fatal("Tab does not reach the tag chip")
 	}
-	r.key(input.KeyEnter, 0)
-	if r.s.TagFilter.Peek() != "work" {
-		t.Errorf("Enter on the chip: filter %q, want work", r.s.TagFilter.Peek())
+	u.Press("enter")
+	if s.TagFilter.Peek() != "work" {
+		t.Errorf("Enter on the chip: filter %q, want work", s.TagFilter.Peek())
 	}
-	r.key(input.KeySpace, 0)
-	if r.s.TagFilter.Peek() != "" {
-		t.Errorf("Space on the chip: filter %q, want none", r.s.TagFilter.Peek())
+	u.Press("space")
+	if s.TagFilter.Peek() != "" {
+		t.Errorf("Space on the chip: filter %q, want none", s.TagFilter.Peek())
 	}
 
 	id := notes[0].ID
-	if !tabTo(r, id) {
+	row := u.Get("row-" + id) // the row draws the ring; its text is keyed by the ID
+	if !tabTo(u, row.Key()) {
 		t.Fatal("Tab does not reach a note row")
 	}
-	r.key(input.KeyEnter, 0)
-	if r.s.Selected.Peek() != id {
-		t.Errorf("Enter on a note row: selected %q, want %q", r.s.Selected.Peek(), id)
+	u.Press("enter")
+	if s.Selected.Peek() != id {
+		t.Errorf("Enter on a note row: selected %q, want %q", s.Selected.Peek(), id)
+	}
+	if !row.Selected() {
+		t.Error("the opened note's row does not report itself selected")
 	}
 
-	r.clickKey(id)
-	if focusRingOn(r, id) {
+	row.Click()
+	if row.FocusRing() {
 		t.Error("the ring stayed on the note row after a click")
 	}
 }
 
 // Ctrl+Enter is not a click on a focused row, so a modified Enter opens nothing.
 func TestModifiedEnterDoesNotOpenNoteRow(t *testing.T) {
-	r := seededRig(t, 2)
-	notes := r.s.Notes.Peek()
-	r.s.Selected.Set(notes[1].ID)
-	if !tabTo(r, notes[0].ID) {
+	s := seededStore(t, 2)
+	notes := s.Notes.Peek()
+	s.Selected.Set(notes[1].ID)
+	u := newUI(t, s)
+	if !tabTo(u, "row-"+notes[0].ID) {
 		t.Fatal("Tab does not reach a note row")
 	}
-	before := r.s.Selected.Peek()
-	r.key(input.KeyEnter, input.ModCtrl)
-	if r.s.Selected.Peek() != before {
-		t.Errorf("Ctrl+Enter changed the selection to %q", r.s.Selected.Peek())
+	before := s.Selected.Peek()
+	u.Press("ctrl+enter")
+	if s.Selected.Peek() != before {
+		t.Errorf("Ctrl+Enter changed the selection to %q", s.Selected.Peek())
 	}
 }
