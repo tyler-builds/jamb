@@ -154,11 +154,11 @@ func resolveDatePicker(ctx *Context, scale float32, disabled bool, inst DatePick
 }
 
 // DatePickerElement is a text field for a day, with a calendar that opens below it. The
-// text is the day in the short date format of the user's locale (see the README, Date and
+// text is the day in the short date format of the user's locale (see docs/widgets-selection.md, Date and
 // time). The value is a time.Time: its day is the chosen day and its time of day is kept,
 // so one signal can hold a date and a time (see TimePicker); a zero time is no date.
 //
-// The keys of the calendar follow the WAI-ARIA date picker dialog pattern (see the README,
+// The keys of the calendar follow the WAI-ARIA date picker dialog pattern (see docs/widgets-selection.md,
 // Date and time). Alt+Down and F4 open it from the field, with focus on the chosen day or
 // today; Enter or Space chooses the day and closes it, and Escape or Tab closes it without a
 // change. A day that is not between Min and Max, or that DisableDays rules out, cannot be

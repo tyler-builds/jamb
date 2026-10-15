@@ -143,7 +143,7 @@ func resolveDateRangePicker(ctx *Context, scale float32, disabled bool, inst Dat
 // "date - date", each date in the locale's format, and it is refused with a message when either date
 // cannot be chosen.
 //
-// The keys of the calendar follow the WAI-ARIA date picker dialog pattern (see the README, Date and
+// The keys of the calendar follow the WAI-ARIA date picker dialog pattern (see docs/widgets-selection.md, Date and
 // time). Alt+Down and F4 open it, from the start of the range, or from today when there is none.
 type DateRangePickerElement struct {
 	start, end  *Signal[time.Time]

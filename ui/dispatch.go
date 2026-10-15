@@ -581,7 +581,7 @@ type pendingStroke struct {
 }
 
 // KeyDown handles a key press. Bindings and element handlers run in this
-// order, which the README describes:
+// order, which docs/input.md describes:
 //
 //  1. a chord in progress: a key that starts a longer binding waits, for up
 //     to chordTimeout, for the rest of the chord; when the keys held back

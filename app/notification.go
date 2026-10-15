@@ -24,7 +24,7 @@ import (
 )
 
 // Notification is an operating system notification: a Windows toast, shown in the
-// Notification Center. Notify shows it; see the README's OS notifications section.
+// Notification Center. Notify shows it; see the OS notifications section of docs/os-integration.md.
 //
 // Write Title and Body as complete sentences. Windows reads them aloud with screen
 // readers, so "3 warnings in the build" is read as written, and "3 warnings" alone
@@ -317,7 +317,7 @@ type toastAction struct {
 
 // toastContent is what toastXML builds from. Protocol makes a click start the app
 // through its registered scheme, with Launch as the URI, rather than a foreground
-// activation; see the README.
+// activation; see docs/os-integration.md.
 type toastContent struct {
 	Title    string
 	Body     string

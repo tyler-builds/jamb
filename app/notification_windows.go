@@ -14,7 +14,7 @@ import (
 
 // Notify shows a notification. It needs AppID, and it must be called once the app
 // runs: from a window, an action, or a goroutine started after Run. The first call
-// registers the app for the user, as described in the README's OS notifications
+// registers the app for the user, as described in docs/os-integration.md, OS notifications
 // section: a Start menu shortcut that carries the AppID, and, when OnNotification is
 // set, the protocol that a click starts the app through. Nothing is written before
 // the first call.

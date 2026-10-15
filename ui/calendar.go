@@ -79,7 +79,7 @@ type calendarView struct {
 // calendarKeys handles a key that reaches a calendar, while its focus is on the day f. move moves
 // the day the keys have reached, pick chooses a day, shut closes the calendar, and first is the
 // first day of the week. The keys are those of the WAI-ARIA date picker dialog pattern (see the
-// README, Date and time); a key that is not one of them is left to the field.
+// docs/widgets-selection.md, Date and time); a key that is not one of them is left to the field.
 func calendarKeys(e *KeyEvent, f time.Time, first time.Weekday, move, pick func(day time.Time), shut func(restore bool)) {
 	if e.Mods&(input.ModCtrl|input.ModAlt|input.ModSuper) != 0 {
 		return
@@ -121,7 +121,7 @@ func calendarKeys(e *KeyEvent, f time.Time, first time.Weekday, move, pick func(
 
 // calendarPanel returns the open calendar: an overlay below the field (above it when there is no
 // room). It is a calendar for assistive technology, a grid of six week rows, each with seven days,
-// under a header of the weekday names (see the README, Date and time). It takes focus when it
+// under a header of the weekday names (see docs/widgets-selection.md, Date and time). It takes focus when it
 // opens, and the day the keys have reached is its highlighted cell, which the screen reader reads.
 // The navigation buttons are for a pointer; the keys are PageUp and PageDown for a month, and Shift
 // with them for a year.

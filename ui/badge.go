@@ -294,7 +294,7 @@ func badgeDark(t *Theme) Color {
 // Badged adds b to the end of d and names it in d's accessible name, so that
 // the row reads as "Projects, 6 items" rather than as the row followed by a
 // separate badge. The badge is then hidden from assistive technology. See the
-// Badge API in the README.
+// Badge API in docs/widgets-feedback.md.
 func (d *DivElement) Badged(b *BadgeElement) *DivElement {
 	b.attached = true
 	d.access().badge = b

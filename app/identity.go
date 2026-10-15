@@ -16,7 +16,7 @@ const maxAppIDLen = 128
 // such as "JambExamples.Notes": it is letters, digits, '.', '-' and '_', starts
 // with a letter or digit, and is at most 128 characters. Keep it the same across
 // versions. A packaged (MSIX) app has an identity from its package, and the
-// package's ID is used instead; see the README's Jump lists and single instance
+// package's ID is used instead; see docs/os-integration.md, Jump lists and single instance
 // section.
 func (a *App) AppID(id string) *App {
 	a.appID = id

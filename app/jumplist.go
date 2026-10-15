@@ -46,7 +46,7 @@ type JumpTask struct {
 // JumpList sets the app's jump list, which is committed when the app starts. It
 // needs an AppID. Each task starts the program's executable, and a program run
 // with go run has an executable that is removed when the run ends, so its tasks
-// stop working then. See the README's Jump lists and single instance section.
+// stop working then. See the Jump lists and single instance section of docs/os-integration.md.
 func (a *App) JumpList(j JumpList) *App {
 	a.jumpList = &j
 	return a

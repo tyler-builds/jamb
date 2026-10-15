@@ -156,7 +156,7 @@ type comboState[T comparable] struct {
 // ComboboxElement is an editable text field with a list of suggestions below it. As
 // the user types, the suggestions for the text are found and the list opens; the
 // highlighted suggestion is the one the keys have reached, and focus stays in the
-// text (see the README, Combobox). The text is the signal the field reads and writes.
+// text (see docs/widgets-selection.md, Combobox). The text is the signal the field reads and writes.
 //
 // The suggestions come from a function of the query (see Combobox), or from a
 // function that runs in the background (see SuggestAsync), whose results are
@@ -733,7 +733,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 			switch {
 			case e.Key == input.KeyTab:
 				// Tab closes the list and leaves the text as it is: Enter chooses a
-				// suggestion, and Tab only moves on (see the README).
+				// suggestion, and Tab only moves on (see docs/widgets-selection.md).
 				shut()
 			case e.Key == input.KeyDown && e.Mods == input.ModAlt && !e.Repeat:
 				openList(0)

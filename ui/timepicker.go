@@ -117,7 +117,7 @@ type timeList struct {
 
 // TimePickerElement is a text field for a time of day, with a list of the times at a fixed
 // step below it. The text is the time in the clock format of the user's locale (see the
-// README, Date and time). The value is a time.Time: its clock is the time and its date is
+// docs/widgets-selection.md, Date and time). The value is a time.Time: its clock is the time and its date is
 // kept, so one signal can hold a date and a time (see DatePicker); a zero time is no time.
 //
 // Up and Down step the time by the step while the list is closed, and move the highlight

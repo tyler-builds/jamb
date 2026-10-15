@@ -153,7 +153,7 @@ func TestValidationMessagesFollowTheLanguage(t *testing.T) {
 	}
 }
 
-// TestPackCoverage logs how many of the messages each pack translates, for the README
+// TestPackCoverage logs how many of the messages each pack translates, for docs/translations.md
 // and the review. It fails when a pack translates nothing.
 func TestPackCoverage(t *testing.T) {
 	total := reflect.TypeOf(Strings{}).NumField()

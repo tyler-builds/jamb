@@ -299,7 +299,7 @@ func (s *dockShared) wanted(key string) bool {
 // divider dragged, or a floating window moved or resized, is saved late: OnChange runs
 // once the layout has been still for half a second, and at the end of a divider drag. A
 // dock fills its container, as Split does; give it a size or a grow factor in a column
-// with other children. See the Docking section of the README.
+// with other children. See the Docking section of docs/layout.md.
 func Dock(layout *Signal[DockLayout], panels map[string]DockPanel) *DockElement {
 	if layout == nil {
 		panic("ui.Dock: the layout is nil; make one with ui.NewSignal(ui.DockLayout{...})")

@@ -9,15 +9,15 @@ import (
 	"github.com/tyler-builds/jamb/icons"
 )
 
-// The README lists every icon; keep it in sync with icons.All.
-func TestReadmeListsEveryIcon(t *testing.T) {
-	readme, err := os.ReadFile(filepath.Join("..", "..", "..", "README.md"))
+// The icon list in docs/drawing.md names every icon; keep it in sync with icons.All.
+func TestDrawingDocListsEveryIcon(t *testing.T) {
+	readme, err := os.ReadFile(filepath.Join("..", "..", "docs", "drawing.md"))
 	if err != nil {
-		t.Skip("README not found:", err)
+		t.Skip("docs/drawing.md not found:", err)
 	}
 	for _, ic := range icons.All {
 		if !strings.Contains(string(readme), ic.Name) {
-			t.Errorf("README icon list is missing %q", ic.Name)
+			t.Errorf("docs/drawing.md icon list is missing %q", ic.Name)
 		}
 	}
 }

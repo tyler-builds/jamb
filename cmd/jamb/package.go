@@ -30,9 +30,9 @@ type packageOptions struct {
 // removedFlags are the flags of earlier versions of jamb package. Each one is
 // refused with what to do instead, rather than reported as an unknown flag.
 var removedFlags = map[string]string{
-	"cert":      "jamb package no longer reads certificates or their passwords; sign the output with --sign-command (see the README, Packaging)",
-	"test-cert": "jamb package no longer creates certificates; sign the MSIX with --sign-command, using a certificate whose subject matches publisherSubject (see the README, Packaging)",
-	"timestamp": "put the timestamp server in the sign command, for example with signtool's /tr option (see the README, Packaging)",
+	"cert":      "jamb package no longer reads certificates or their passwords; sign the output with --sign-command (see docs/packaging.md)",
+	"test-cert": "jamb package no longer creates certificates; sign the MSIX with --sign-command, using a certificate whose subject matches publisherSubject (see docs/packaging.md)",
+	"timestamp": "put the timestamp server in the sign command, for example with signtool's /tr option (see docs/packaging.md)",
 	"no-msix":   "the MSIX is no longer built by default; leave out --msix to build the zip only",
 }
 

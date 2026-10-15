@@ -226,7 +226,7 @@ func TestContextPredicateNotOperator(t *testing.T) {
 	}
 }
 
-// The predicates here are checked against the stack from the README's
+// The predicates here are checked against the stack from docs/input.md's
 // example: a Workspace, a Pane and an editor in full mode.
 func TestContextDepth(t *testing.T) {
 	stack := parseStack(t, "Workspace", "Pane", "Editor mode=full")

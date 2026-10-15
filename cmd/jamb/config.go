@@ -18,7 +18,7 @@ import (
 const configFile = "jamb.json"
 
 // config is the content of jamb.json. Every field is required except
-// copyright and notificationProtocol. The Packaging section of the README describes each
+// copyright and notificationProtocol. The Packaging section of docs/packaging.md describes each
 // one.
 type config struct {
 	Name                 string `json:"name"`
@@ -58,7 +58,7 @@ func loadConfig(dir string) (*config, error) {
 	path := filepath.Join(dir, configFile)
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("%s not found in %s; jamb package reads the app's settings from it (see the Packaging section of the README)", configFile, dir)
+		return nil, fmt.Errorf("%s not found in %s; jamb package reads the app's settings from it (see docs/packaging.md)", configFile, dir)
 	}
 	if err != nil {
 		return nil, err

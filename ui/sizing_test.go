@@ -264,7 +264,7 @@ func TestSizingMinMaxAndGrow(t *testing.T) {
 }
 
 // TestSizingDefaults checks the default outer width of each widget at the Text
-// size of 100 percent, as the README and the sizing section of styling.md state.
+// size of 100 percent, as the topic docs and the sizing section of styling.md state.
 func TestSizingDefaults(t *testing.T) {
 	want := map[string]float32{
 		"TextInput":                textFieldWidth,

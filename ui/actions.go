@@ -114,7 +114,7 @@ func (s keystroke) typesText() bool {
 }
 
 // Bind maps keys to a: the binding applies everywhere, after any contextual
-// binding (BindIn) that matches, as the dispatch order in the README says.
+// binding (BindIn) that matches, as the dispatch order in docs/input.md says.
 // keys is strokes separated by spaces, each stroke modifiers and one key
 // joined by "+", for example "ctrl+shift+p", "alt+up", "ctrl+k ctrl+t" or
 // "f2".

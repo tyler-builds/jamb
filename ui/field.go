@@ -139,7 +139,7 @@ var fieldSeq atomic.Uint64
 // the label, described by the help text and the error, and reports whether it is
 // required and whether its value is valid (see docs/accessibility.md, Phase K).
 // Its validators (see Validate) are checked as the user works with the field, and
-// on submit when the field belongs to a Form (see Form and the README, Forms).
+// on submit when the field belongs to a Form (see Form and docs/widgets-forms.md, Forms).
 type FieldElement struct {
 	label    string
 	control  Element

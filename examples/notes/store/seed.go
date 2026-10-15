@@ -26,7 +26,7 @@ Shortcuts
 - Ctrl+A, Ctrl+C, Ctrl+X, Ctrl+V: select all, copy, cut, paste
 - Ctrl+Left / Ctrl+Right: move by word
 - Double-click selects a word; triple-click selects a paragraph
-- keymap.json next to your notes file overrides shortcuts (see the README)
+- keymap.json next to your notes file overrides shortcuts (see docs/input.md)
 
 Text is shaped with HarfBuzz (via go-text/typesetting), so ligatures, right-to-left scripts and complex scripts render correctly. See the "Languages" note.`,
 		},

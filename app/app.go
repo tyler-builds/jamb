@@ -193,7 +193,7 @@ func (a *App) Font(family string, weight ui.FontWeight, data []byte) *App {
 // window: Ctrl+Shift+I opens an inspector window for the window that has the
 // focus, and closes it again. The inspector is on by default under `jamb dev`
 // and with JAMB_INSPECT=1, and it shows the elements, styles, accessibility and
-// frame timings of a window; see the README, "Tools for humans and coding agents".
+// frame timings of a window; see docs/tools.md, "Tools for humans and coding agents".
 func (a *App) DevTools(on bool) *App {
 	a.devTools = on
 	return a

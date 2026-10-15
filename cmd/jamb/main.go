@@ -12,7 +12,7 @@
 // package builds a Windows release of the application into dist/: a zip, and
 // optionally an NSIS installer (--installer) and an MSIX (--msix). A sign command
 // (--sign-command) signs the files it builds. The app's jamb.json holds its name,
-// version, publisher and icon. The README's Packaging section describes it.
+// version, publisher and icon. docs/packaging.md describes it.
 //
 // Run it from the repository root with:
 //
@@ -40,7 +40,7 @@ func usage() {
        jamb package [flags] [package dir]
 
   dev      build, run, and rebuild/restart on source changes
-  package  build the Windows zip of an app, and optionally an installer and an MSIX (see the README, Packaging)`)
+  package  build the Windows zip of an app, and optionally an installer and an MSIX (see docs/packaging.md)`)
 	os.Exit(2)
 }
 
