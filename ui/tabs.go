@@ -14,11 +14,16 @@ import (
 // panels of the other tabs are not built, unless the Tabs keeps its panels (see
 // KeepMounted). A disabled tab is shown but cannot be selected.
 type Tab[T comparable] struct {
-	Value    T
-	Label    string
-	Icon     *icons.Icon
+	// Value identifies the tab; the selected signal holds it.
+	Value T
+	// Label is the text of the tab.
+	Label string
+	// Icon is an icon shown before the label.
+	Icon *icons.Icon
+	// Disabled makes the tab unable to be chosen.
 	Disabled bool
-	Panel    func() Element
+	// Panel builds the content of the tab, which is shown while the tab is selected.
+	Panel func() Element
 }
 
 // TabsVariant selects the look of a tab list.
@@ -204,8 +209,12 @@ func (t *TabsElement[T]) Styles(s TabsStyle) *TabsElement[T] { t.styles = t.styl
 // the Tabs. The segmented tab list is as wide as its tabs by default, and the
 // underline tab list fills its container, as WinUI's TabView does. See Sizing in
 // docs/styling.md.
-func (t *TabsElement[T]) Width(l Length) *TabsElement[T]    { t.size.setWidth(l); return t }
+func (t *TabsElement[T]) Width(l Length) *TabsElement[T] { t.size.setWidth(l); return t }
+
+// MinWidth sets the smallest width of the tabs.
 func (t *TabsElement[T]) MinWidth(l Length) *TabsElement[T] { t.size.setMinWidth(l); return t }
+
+// MaxWidth sets the largest width of the tabs.
 func (t *TabsElement[T]) MaxWidth(l Length) *TabsElement[T] { t.size.setMaxWidth(l); return t }
 
 // RenderTab replaces the content of each tab (its icon and label) with what fn

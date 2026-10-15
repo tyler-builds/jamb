@@ -59,6 +59,7 @@ type Document struct {
 // was started and Head is the caret: the selection is the text between them, and
 // an empty selection is a plain caret.
 type Selection struct {
+	// Anchor and Head are the byte offsets of the two ends of the selection; Head is where the caret is.
 	Anchor, Head int
 }
 
@@ -71,8 +72,10 @@ func (s Selection) Range() (from, to int) { return min(s.Anchor, s.Head), max(s.
 // A Change replaces the bytes [From, To) of the text with Text. An insertion has
 // From equal to To, and a deletion has an empty Text.
 type Change struct {
+	// From and To are the byte range that Text replaces.
 	From, To int
-	Text     string
+	// Text is the new text that replaces the range.
+	Text string
 }
 
 // stepKind says what a step of the undo history did, so that steps of the same

@@ -10,7 +10,17 @@ import (
 
 // Color is a straight-alpha sRGB color with components in [0,1].
 // The zero value is transparent and, inside a Style, means "unset".
-type Color struct{ R, G, B, A float32 }
+// R, G, B and A are the red, green, blue and alpha channels, from 0 to 1.
+type Color struct {
+	// R is the red channel, from 0 to 1.
+	R float32
+	// G is the green channel, from 0 to 1.
+	G float32
+	// B is the blue channel, from 0 to 1.
+	B float32
+	// A is the alpha channel, from 0 (transparent) to 1 (opaque).
+	A float32
+}
 
 // Transparent is fully transparent black.
 var Transparent = Color{}

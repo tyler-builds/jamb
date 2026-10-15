@@ -33,19 +33,33 @@ const dayCellSize = 32
 // Under high contrast the selected day is drawn in the system Highlight colors, and today
 // and the focused day by their borders, so that no state is shown by color alone.
 type DatePickerStyle struct {
-	Field           FieldStyle
-	CalendarButton  Style
-	Message         Style
-	Popup           Style
-	Header          Style
-	NavButton       Style
-	WeekdayLabel    Style
-	Day             Style
-	DayHover        Style
-	DaySelected     Style
-	DayToday        Style
-	DayDisabled     Style
+	// Field is the text frame of the date picker.
+	Field FieldStyle
+	// CalendarButton is the button that opens the calendar.
+	CalendarButton Style
+	// Message is the message under the field.
+	Message Style
+	// Popup is the panel of the calendar.
+	Popup Style
+	// Header is the row with the month and the year.
+	Header Style
+	// NavButton is each button that moves the calendar to another month or year.
+	NavButton Style
+	// WeekdayLabel is the name of each day of the week.
+	WeekdayLabel Style
+	// Day is each day of the calendar.
+	Day Style
+	// DayHover is a day under the pointer.
+	DayHover Style
+	// DaySelected is the day that is chosen.
+	DaySelected Style
+	// DayToday is today.
+	DayToday Style
+	// DayDisabled is a day that cannot be chosen.
+	DayDisabled Style
+	// DayOutsideMonth is a day of the adjacent months.
 	DayOutsideMonth Style
+	// DayFocusVisible is the day that has keyboard focus.
 	DayFocusVisible Style
 }
 
@@ -224,6 +238,7 @@ func (d *DatePickerElement) formWire(w fieldWire) Element {
 func (*DatePickerElement) isElement()           {}
 func (d *DatePickerElement) elementKey() string { return d.key }
 
+// Key identifies the date picker among its siblings (see DivElement.Key).
 func (d *DatePickerElement) Key(k string) *DatePickerElement { d.key = k; return d }
 
 // Label names the field for assistive technology, such as "Due date".
@@ -276,19 +291,33 @@ func (d *DatePickerElement) OnChange(fn func(time.Time)) *DatePickerElement {
 // The sizing methods give the field a size. The field is datePickerWidth wide at the Text
 // size of 100 percent by default; Width(Full) fills its container. See Sizing in
 // docs/styling.md.
-func (d *DatePickerElement) Width(l Length) *DatePickerElement    { d.size.setWidth(l); return d }
-func (d *DatePickerElement) Height(l Length) *DatePickerElement   { d.size.setHeight(l); return d }
+func (d *DatePickerElement) Width(l Length) *DatePickerElement { d.size.setWidth(l); return d }
+
+// Height sets the height of the date picker.
+func (d *DatePickerElement) Height(l Length) *DatePickerElement { d.size.setHeight(l); return d }
+
+// MinWidth sets the smallest width of the date picker.
 func (d *DatePickerElement) MinWidth(l Length) *DatePickerElement { d.size.setMinWidth(l); return d }
+
+// MinHeight sets the smallest height of the date picker.
 func (d *DatePickerElement) MinHeight(l Length) *DatePickerElement {
 	d.size.setMinHeight(l)
 	return d
 }
+
+// MaxWidth sets the largest width of the date picker.
 func (d *DatePickerElement) MaxWidth(l Length) *DatePickerElement { d.size.setMaxWidth(l); return d }
+
+// MaxHeight sets the largest height of the date picker.
 func (d *DatePickerElement) MaxHeight(l Length) *DatePickerElement {
 	d.size.setMaxHeight(l)
 	return d
 }
+
+// Grow makes the date picker take a share of the free space on its parent's main axis.
 func (d *DatePickerElement) Grow(f float32) *DatePickerElement { d.size.setGrow(f); return d }
+
+// GridSpan sets how many columns and rows the date picker covers in its parent's grid.
 func (d *DatePickerElement) GridSpan(cols, rows int) *DatePickerElement {
 	d.size.setSpan(cols, rows)
 	return d

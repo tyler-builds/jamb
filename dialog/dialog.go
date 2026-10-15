@@ -41,7 +41,9 @@ type FileOptions struct {
 // Filter is a named group of file types, such as "Notes" with the patterns
 // "*.md" and "*.txt".
 type Filter struct {
-	Name     string
+	// Name is the label of the filter, such as "Text files".
+	Name string
+	// Patterns are the file name patterns of the filter, such as "*.txt".
 	Patterns []string
 }
 
@@ -49,16 +51,22 @@ type Filter struct {
 // closed the dialog without choosing a file. That is a result, not an error.
 // Err is set only when the dialog could not be shown.
 type FileResult struct {
-	Paths    []string // the chosen paths, as the dialog returns them
+	Paths []string // the chosen paths, as the dialog returns them
+	// Canceled reports whether the user closed the dialog without choosing.
 	Canceled bool
-	Err      error
+	// Err reports a failure to show the dialog or to read the choice.
+	Err error
 }
 
 // MessageOptions describes a message box.
 type MessageOptions struct {
-	Title   string
-	Text    string
-	Icon    Icon
+	// Title is the title of the message box.
+	Title string
+	// Text is the message that the box shows.
+	Text string
+	// Icon is the icon that the box shows.
+	Icon Icon
+	// Buttons is the set of buttons that the box offers.
 	Buttons ButtonSet
 	Default Button // the button Enter chooses; zero means the first of Buttons
 }
@@ -67,10 +75,15 @@ type MessageOptions struct {
 type Icon uint8
 
 const (
+	// IconNone shows no icon.
 	IconNone Icon = iota
+	// IconInfo shows the information icon.
 	IconInfo
+	// IconWarning shows the warning icon.
 	IconWarning
+	// IconError shows the error icon.
 	IconError
+	// IconQuestion shows the question icon.
 	IconQuestion
 )
 
@@ -78,9 +91,13 @@ const (
 type ButtonSet uint8
 
 const (
+	// ButtonsOK offers OK.
 	ButtonsOK ButtonSet = iota
+	// ButtonsOKCancel offers OK and Cancel.
 	ButtonsOKCancel
+	// ButtonsYesNo offers Yes and No.
 	ButtonsYesNo
+	// ButtonsYesNoCancel offers Yes, No and Cancel.
 	ButtonsYesNoCancel
 )
 
@@ -92,8 +109,12 @@ type Button uint8
 const (
 	// NoButton means no button was chosen, because the box could not be shown.
 	NoButton Button = iota
+	// OK is the answer of the OK button.
 	OK
+	// Cancel is the answer of the Cancel button.
 	Cancel
+	// Yes is the answer of the Yes button.
 	Yes
+	// No is the answer of the No button.
 	No
 )

@@ -36,9 +36,12 @@ const (
 // line it ends. Top, Height and Right are in layout units, from the top-left of
 // the layout: Right is the end of the line's text, without its trailing spaces.
 type TextLine struct {
-	Start       int
+	// Start is the first point of the line.
+	Start int
+	// Top and Height are the vertical position and the height of the line, in layout units.
 	Top, Height float32
-	Right       float32
+	// Right is the end of the line's text, without its trailing spaces, in layout units.
+	Right float32
 }
 
 // TextModel is the text of a text field or text area, as the Text pattern reads
@@ -115,6 +118,7 @@ func (c *TextContent) ByteOf(p int) int {
 // TextInfo is the state of a text field or text area in one snapshot: its
 // content, its selection, and where the content is drawn in the window.
 type TextInfo struct {
+	// Content is the text of the field, as the Text pattern reads it.
 	Content TextModel
 	Anchor  int // the selection is the points between Anchor and Caret; a degenerate one is a caret
 	Caret   int // the end of the selection that moves
@@ -122,15 +126,20 @@ type TextInfo struct {
 	// corner, in physical pixels, and Scale is the number of physical pixels per
 	// layout unit. Clip is the visible part of the field, in physical pixels.
 	OriginX, OriginY float32
-	Scale            float32
-	Clip             Rect
+	// Scale is the number of physical pixels per layout unit.
+	Scale float32
+	// Clip is the visible part of the field, in physical pixels.
+	Clip Rect
 	// FontName, FontSize and FontWeight describe the text's font. FontSize is in
 	// points, and FontWeight is the CSS-style weight (400 is normal).
-	FontName   string
-	FontSize   float64
+	FontName string
+	// FontSize is the font size, in points.
+	FontSize float64
+	// FontWeight is the CSS-style weight of the font.
 	FontWeight int
-	Italic     bool
-	ReadOnly   bool // the text can be read but not edited
+	// Italic reports whether the text is set in italic.
+	Italic   bool
+	ReadOnly bool // the text can be read but not edited
 }
 
 // Equal reports whether two infos describe the same text state. Their contents
@@ -333,7 +342,9 @@ func step(c TextModel, u TextUnit, p, count int) (int, int) {
 // even after the field has changed. Actions on a range (Select, ScrollIntoView)
 // act on the current text, and their points are clamped to it.
 type TextRange struct {
-	Info       *TextInfo
+	// Info is the text that the range lies in.
+	Info *TextInfo
+	// Start and End are the points where the range begins and ends.
 	Start, End int
 }
 

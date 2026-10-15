@@ -144,11 +144,13 @@ type Update struct {
 	// Opened are the dialogs and menus that were added, and Closed the ones that
 	// were removed (taken from the previous snapshot).
 	Opened []Popup
+	// Closed are the dialogs and menus that were removed, as Opened describes.
 	Closed []Popup
 	// TextChanged are the text fields and text areas whose text changed, and
 	// TextSelection those whose selection or caret moved. Adapters raise the
 	// text events for them.
-	TextChanged   []ID
+	TextChanged []ID
+	// TextSelection are the text fields and text areas whose selection or caret moved; see TextChanged.
 	TextSelection []ID
 	// Announcements are the status messages queued since the last snapshot.
 	Announcements []Announcement
@@ -156,7 +158,9 @@ type Update struct {
 
 // Popup is a dialog or a menu that appeared or went away.
 type Popup struct {
-	ID   ID
+	// ID is the node of the dialog or menu.
+	ID ID
+	// Role is the role of the dialog or menu.
 	Role Role
 }
 

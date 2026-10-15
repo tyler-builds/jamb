@@ -89,8 +89,10 @@ func (g *grammar) ABI() int      { return ABI }
 // the same text. A span later in the slice takes precedence over an earlier
 // one that overlaps it.
 type Span struct {
+	// Start and End are the byte offsets of the span.
 	Start, End int
-	Capture    int
+	// Capture is the index of the capture name, in the names from CaptureNames.
+	Capture int
 }
 
 // Options configures a Session.
@@ -110,8 +112,10 @@ type Options struct {
 // insertion has Start equal to OldEnd, and a deletion has empty Text. Offsets
 // are bytes in the document as it is before the edit.
 type EditRecord struct {
+	// Start is the byte offset where the edit begins, and OldEnd is the end of the replaced bytes before the edit.
 	Start, OldEnd int
-	Text          []byte
+	// Text is the new bytes that replace the old range.
+	Text []byte
 }
 
 // Session highlights one document. Its methods are safe for concurrent use,

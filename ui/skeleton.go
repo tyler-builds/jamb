@@ -108,10 +108,18 @@ func (s *SkeletonElement) Lines(n int) *SkeletonElement {
 
 // The sizing methods give the skeleton's outer box a size. See Sizing in
 // docs/styling.md.
-func (s *SkeletonElement) Width(l Length) *SkeletonElement    { s.size.setWidth(l); return s }
-func (s *SkeletonElement) Height(l Length) *SkeletonElement   { s.size.setHeight(l); return s }
+func (s *SkeletonElement) Width(l Length) *SkeletonElement { s.size.setWidth(l); return s }
+
+// Height sets the height of the skeleton.
+func (s *SkeletonElement) Height(l Length) *SkeletonElement { s.size.setHeight(l); return s }
+
+// MaxWidth sets the largest width of the skeleton.
 func (s *SkeletonElement) MaxWidth(l Length) *SkeletonElement { s.size.setMaxWidth(l); return s }
-func (s *SkeletonElement) Grow(f float32) *SkeletonElement    { s.size.setGrow(f); return s }
+
+// Grow makes the skeleton take a share of the free space on its parent's main axis.
+func (s *SkeletonElement) Grow(f float32) *SkeletonElement { s.size.setGrow(f); return s }
+
+// GridSpan sets how many columns and rows the skeleton covers in its parent's grid.
 func (s *SkeletonElement) GridSpan(cols, rows int) *SkeletonElement {
 	s.size.setSpan(cols, rows)
 	return s

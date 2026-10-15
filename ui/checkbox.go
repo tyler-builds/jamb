@@ -11,8 +11,11 @@ import (
 type CheckState uint8
 
 const (
+	// CheckOff is an unchecked box.
 	CheckOff CheckState = iota
+	// CheckOn is a checked box.
 	CheckOn
+	// CheckMixed is a box with a dash, for a mixed state.
 	CheckMixed
 )
 
@@ -221,6 +224,7 @@ func checkOf(on bool) CheckState {
 func (*CheckboxElement) isElement()           {}
 func (c *CheckboxElement) elementKey() string { return c.key }
 
+// Key identifies the checkbox among its siblings (see DivElement.Key).
 func (c *CheckboxElement) Key(k string) *CheckboxElement { c.key = k; return c }
 
 // Disabled shows the box but does not let it change.
@@ -228,13 +232,27 @@ func (c *CheckboxElement) Disabled(d bool) *CheckboxElement { c.disabled = d; re
 
 // The sizing methods give the check box's control, its box and label, a size. It
 // is as wide as its label by default; see Sizing in docs/styling.md.
-func (c *CheckboxElement) Width(l Length) *CheckboxElement     { c.size.setWidth(l); return c }
-func (c *CheckboxElement) Height(l Length) *CheckboxElement    { c.size.setHeight(l); return c }
-func (c *CheckboxElement) MinWidth(l Length) *CheckboxElement  { c.size.setMinWidth(l); return c }
+func (c *CheckboxElement) Width(l Length) *CheckboxElement { c.size.setWidth(l); return c }
+
+// Height sets the height of the checkbox.
+func (c *CheckboxElement) Height(l Length) *CheckboxElement { c.size.setHeight(l); return c }
+
+// MinWidth sets the smallest width of the checkbox.
+func (c *CheckboxElement) MinWidth(l Length) *CheckboxElement { c.size.setMinWidth(l); return c }
+
+// MinHeight sets the smallest height of the checkbox.
 func (c *CheckboxElement) MinHeight(l Length) *CheckboxElement { c.size.setMinHeight(l); return c }
-func (c *CheckboxElement) MaxWidth(l Length) *CheckboxElement  { c.size.setMaxWidth(l); return c }
+
+// MaxWidth sets the largest width of the checkbox.
+func (c *CheckboxElement) MaxWidth(l Length) *CheckboxElement { c.size.setMaxWidth(l); return c }
+
+// MaxHeight sets the largest height of the checkbox.
 func (c *CheckboxElement) MaxHeight(l Length) *CheckboxElement { c.size.setMaxHeight(l); return c }
-func (c *CheckboxElement) Grow(f float32) *CheckboxElement     { c.size.setGrow(f); return c }
+
+// Grow makes the checkbox take a share of the free space on its parent's main axis.
+func (c *CheckboxElement) Grow(f float32) *CheckboxElement { c.size.setGrow(f); return c }
+
+// GridSpan sets how many columns and rows the checkbox covers in its parent's grid.
 func (c *CheckboxElement) GridSpan(cols, rows int) *CheckboxElement {
 	c.size.setSpan(cols, rows)
 	return c

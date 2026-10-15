@@ -27,7 +27,9 @@ type GridLines uint8
 
 const (
 	GridAuto GridLines = iota // on the value axis, off on the position axis
+	// GridOn draws grid lines across the plot, whatever the axis is.
 	GridOn
+	// GridOff draws no grid lines across the plot.
 	GridOff
 )
 

@@ -36,13 +36,20 @@ const timePickerDefaultStep = 15
 // time is drawn in the system Highlight colors, and the selected one has a check mark, so
 // that no state is shown by color alone.
 type TimePickerStyle struct {
-	Field             FieldStyle
-	Button            Style
-	Message           Style
-	Popup             Style
-	Option            Style
+	// Field is the text frame of the time picker.
+	Field FieldStyle
+	// Button is the button that opens the list of times.
+	Button Style
+	// Message is the message under the field.
+	Message Style
+	// Popup is the panel of the list of times.
+	Popup Style
+	// Option is the style of each time in the list.
+	Option Style
+	// OptionHighlighted is the style of the time that the keyboard or the pointer is on.
 	OptionHighlighted Style
-	OptionSelected    Style
+	// OptionSelected is the style of the time that is chosen.
+	OptionSelected Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -208,6 +215,7 @@ func (p *TimePickerElement) formWire(w fieldWire) Element {
 func (*TimePickerElement) isElement()           {}
 func (p *TimePickerElement) elementKey() string { return p.key }
 
+// Key identifies the time picker among its siblings (see DivElement.Key).
 func (p *TimePickerElement) Key(k string) *TimePickerElement { p.key = k; return p }
 
 // Label names the field for assistive technology, such as "Start time".
@@ -237,19 +245,33 @@ func (p *TimePickerElement) OnChange(fn func(time.Time)) *TimePickerElement {
 // The sizing methods give the field a size. The field is timePickerWidth wide at the Text
 // size of 100 percent by default; Width(Full) fills its container, and the list is at least
 // as wide as the field. See Sizing in docs/styling.md.
-func (p *TimePickerElement) Width(l Length) *TimePickerElement    { p.size.setWidth(l); return p }
-func (p *TimePickerElement) Height(l Length) *TimePickerElement   { p.size.setHeight(l); return p }
+func (p *TimePickerElement) Width(l Length) *TimePickerElement { p.size.setWidth(l); return p }
+
+// Height sets the height of the time picker.
+func (p *TimePickerElement) Height(l Length) *TimePickerElement { p.size.setHeight(l); return p }
+
+// MinWidth sets the smallest width of the time picker.
 func (p *TimePickerElement) MinWidth(l Length) *TimePickerElement { p.size.setMinWidth(l); return p }
+
+// MinHeight sets the smallest height of the time picker.
 func (p *TimePickerElement) MinHeight(l Length) *TimePickerElement {
 	p.size.setMinHeight(l)
 	return p
 }
+
+// MaxWidth sets the largest width of the time picker.
 func (p *TimePickerElement) MaxWidth(l Length) *TimePickerElement { p.size.setMaxWidth(l); return p }
+
+// MaxHeight sets the largest height of the time picker.
 func (p *TimePickerElement) MaxHeight(l Length) *TimePickerElement {
 	p.size.setMaxHeight(l)
 	return p
 }
+
+// Grow makes the time picker take a share of the free space on its parent's main axis.
 func (p *TimePickerElement) Grow(f float32) *TimePickerElement { p.size.setGrow(f); return p }
+
+// GridSpan sets how many columns and rows the time picker covers in its parent's grid.
 func (p *TimePickerElement) GridSpan(cols, rows int) *TimePickerElement {
 	p.size.setSpan(cols, rows)
 	return p

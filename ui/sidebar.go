@@ -22,10 +22,14 @@ const (
 // selected signal to its Key. A disabled item is shown but cannot be selected.
 // A heading is made with SidebarHeading instead.
 type SidebarItem struct {
-	Key      string
-	Label    string
-	Icon     *icons.Icon
-	Badge    int // a count shown at the end of the item when it is above zero
+	// Key identifies the item among the items of the sidebar.
+	Key string
+	// Label is the text of the item.
+	Label string
+	// Icon is an icon shown before the label.
+	Icon  *icons.Icon
+	Badge int // a count shown at the end of the item when it is above zero
+	// Disabled makes the item unable to be chosen.
 	Disabled bool
 	heading  bool // set by SidebarHeading
 }
@@ -209,9 +213,15 @@ func (s *SidebarElement) Footer(el Element) *SidebarElement { s.footer = el; ret
 // The sizing methods give the expanded sidebar a width, which the Text size
 // scales by default. A collapsed sidebar is always about 48 px wide, whatever they
 // are set to. See Sizing in docs/styling.md.
-func (s *SidebarElement) Width(l Length) *SidebarElement    { s.size.setWidth(l); return s }
+func (s *SidebarElement) Width(l Length) *SidebarElement { s.size.setWidth(l); return s }
+
+// MinWidth sets the smallest width of the sidebar.
 func (s *SidebarElement) MinWidth(l Length) *SidebarElement { s.size.setMinWidth(l); return s }
+
+// MaxWidth sets the largest width of the sidebar.
 func (s *SidebarElement) MaxWidth(l Length) *SidebarElement { s.size.setMaxWidth(l); return s }
+
+// GridSpan sets how many columns and rows the sidebar covers in its parent's grid.
 func (s *SidebarElement) GridSpan(cols, rows int) *SidebarElement {
 	s.size.setSpan(cols, rows)
 	return s

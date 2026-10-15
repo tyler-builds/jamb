@@ -44,18 +44,23 @@ const cascade = 32
 
 // Window describes an application window and its content.
 type Window struct {
-	Title     string
-	Width     int // logical pixels; default 1024
-	Height    int // logical pixels; default 720
-	MinWidth  int
+	// Title is the title of the window, which its title bar and taskbar button show.
+	Title  string
+	Width  int // logical pixels; default 1024
+	Height int // logical pixels; default 720
+	// MinWidth is the smallest width that the user can resize the window to, in logical pixels.
+	MinWidth int
+	// MinHeight is the smallest height that the user can resize the window to, in logical pixels.
 	MinHeight int
 	// Theme pins the window to one theme. Without it, the window follows the
 	// system's app mode (light or dark), live: it uses DarkTheme while Windows
 	// is in dark mode and LightTheme otherwise, by default ui.DarkTheme() and
 	// ui.LightTheme(). ctx.SetTheme also pins one theme.
-	Theme      *ui.Theme
+	Theme *ui.Theme
+	// LightTheme is the theme used in light mode; by default it is ui.LightTheme().
 	LightTheme *ui.Theme
-	DarkTheme  *ui.Theme
+	// DarkTheme is the theme used in dark mode; by default it is ui.DarkTheme().
+	DarkTheme *ui.Theme
 	// Strings is the text that the built-in controls show and announce. Without it,
 	// the window uses the display language of Windows (see ui.SystemStrings), and
 	// English where that language has no translation or cannot be read. Give
@@ -68,7 +73,8 @@ type Window struct {
 	// Zoom is the initial UI zoom (0 = 100%). Users change it with Ctrl+=,
 	// Ctrl+-, Ctrl+0 and Ctrl+wheel; OnZoom is called after each change so
 	// the app can remember it.
-	Zoom   float32
+	Zoom float32
+	// OnZoom is called after each change of the zoom, with the new zoom.
 	OnZoom func(zoom float32)
 	// Bindings maps keys to actions for the whole window; see ui.Bind.
 	Bindings []ui.Binding
@@ -79,7 +85,8 @@ type Window struct {
 	// the valid bindings still apply. Actions lists the actions the file may
 	// name.
 	KeymapFile string
-	Actions    []*ui.Action
+	// Actions lists the actions that KeymapFile may name.
+	Actions []*ui.Action
 	// OnKeymapLoad is called on the UI thread after the startup load and after
 	// each reload that changed the bindings, with nil on success or the
 	// problems. Use it to show errors in the app.

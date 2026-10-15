@@ -13,8 +13,11 @@ import (
 // plain text. The last location is the current one, and it is plain text whatever
 // its OnClick is.
 type Crumb struct {
-	Label   string
-	Icon    *icons.Icon
+	// Label is the text of the crumb.
+	Label string
+	// Icon is an icon shown before the label.
+	Icon *icons.Icon
+	// OnClick runs when the crumb is clicked.
 	OnClick func()
 }
 
@@ -153,9 +156,15 @@ func (b *BreadcrumbsElement) Styles(s BreadcrumbsStyle) *BreadcrumbsElement {
 
 // The sizing methods give the trail's outer box a size. A trail is as wide as its
 // locations by default; see Sizing in docs/styling.md.
-func (b *BreadcrumbsElement) Width(l Length) *BreadcrumbsElement    { b.size.setWidth(l); return b }
+func (b *BreadcrumbsElement) Width(l Length) *BreadcrumbsElement { b.size.setWidth(l); return b }
+
+// MinWidth sets the smallest width of the breadcrumbs.
 func (b *BreadcrumbsElement) MinWidth(l Length) *BreadcrumbsElement { b.size.setMinWidth(l); return b }
+
+// MaxWidth sets the largest width of the breadcrumbs.
 func (b *BreadcrumbsElement) MaxWidth(l Length) *BreadcrumbsElement { b.size.setMaxWidth(l); return b }
+
+// GridSpan sets how many columns and rows the breadcrumbs covers in its parent's grid.
 func (b *BreadcrumbsElement) GridSpan(cols, rows int) *BreadcrumbsElement {
 	b.size.setSpan(cols, rows)
 	return b

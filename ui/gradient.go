@@ -9,7 +9,8 @@ package ui
 // Gradient colors do not animate: a Transition does not ease them, so a hover
 // that changes the gradient snaps to the new one.
 type Gradient struct {
-	Angle        float32 // degrees: 0 points up, 90 right, 180 down (as in CSS)
+	Angle float32 // degrees: 0 points up, 90 right, 180 down (as in CSS)
+	// From and To are the colors at the start and the end of the gradient.
 	From, To     Color
 	FromAt, ToAt float32 // stop positions 0..1; both zero means 0 and 1
 	Oklab        bool    // interpolate in Oklab (smoother, no muddy middle); default sRGB like GPUI

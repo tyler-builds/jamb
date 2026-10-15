@@ -322,13 +322,27 @@ func (s *SplitElement) OnChange(fn func()) *SplitElement { s.onChange = fn; retu
 
 // The sizing methods give the split's outer box a size. A split fills its container
 // by default; see Sizing in docs/styling.md.
-func (s *SplitElement) Width(l Length) *SplitElement          { s.size.setWidth(l); return s }
-func (s *SplitElement) Height(l Length) *SplitElement         { s.size.setHeight(l); return s }
-func (s *SplitElement) MinWidth(l Length) *SplitElement       { s.size.setMinWidth(l); return s }
-func (s *SplitElement) MinHeight(l Length) *SplitElement      { s.size.setMinHeight(l); return s }
-func (s *SplitElement) MaxWidth(l Length) *SplitElement       { s.size.setMaxWidth(l); return s }
-func (s *SplitElement) MaxHeight(l Length) *SplitElement      { s.size.setMaxHeight(l); return s }
-func (s *SplitElement) Grow(f float32) *SplitElement          { s.size.setGrow(f); return s }
+func (s *SplitElement) Width(l Length) *SplitElement { s.size.setWidth(l); return s }
+
+// Height sets the height of the split.
+func (s *SplitElement) Height(l Length) *SplitElement { s.size.setHeight(l); return s }
+
+// MinWidth sets the smallest width of the split.
+func (s *SplitElement) MinWidth(l Length) *SplitElement { s.size.setMinWidth(l); return s }
+
+// MinHeight sets the smallest height of the split.
+func (s *SplitElement) MinHeight(l Length) *SplitElement { s.size.setMinHeight(l); return s }
+
+// MaxWidth sets the largest width of the split.
+func (s *SplitElement) MaxWidth(l Length) *SplitElement { s.size.setMaxWidth(l); return s }
+
+// MaxHeight sets the largest height of the split.
+func (s *SplitElement) MaxHeight(l Length) *SplitElement { s.size.setMaxHeight(l); return s }
+
+// Grow makes the split take a share of the free space on its parent's main axis.
+func (s *SplitElement) Grow(f float32) *SplitElement { s.size.setGrow(f); return s }
+
+// GridSpan sets how many columns and rows the split covers in its parent's grid.
 func (s *SplitElement) GridSpan(cols, rows int) *SplitElement { s.size.setSpan(cols, rows); return s }
 
 // Styles sets the look of the parts of the split, for this instance only. Set fields

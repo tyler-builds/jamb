@@ -10,10 +10,15 @@ import (
 type BadgeVariant uint8
 
 const (
+	// BadgeNeutral is the default look, for text that needs no emphasis.
 	BadgeNeutral BadgeVariant = iota
+	// BadgeAccent is the accent look, for a count or a label that needs emphasis.
 	BadgeAccent
+	// BadgeSuccess is the look of a success or a good state.
 	BadgeSuccess
+	// BadgeWarning is the look of a warning.
 	BadgeWarning
+	// BadgeDanger is the look of an error or a dangerous state.
 	BadgeDanger
 )
 
@@ -52,6 +57,7 @@ func (s BadgeStyle) plain() BadgeStyle {
 // BadgeVariants holds the style of each variant of a badge, for the theme's
 // Badges. It merges over Theme.Badge, which applies to every variant.
 type BadgeVariants struct {
+	// Neutral, Accent, Success, Warning and Danger are the styles of the badge variants, and each merges over Badge.
 	Neutral, Accent, Success, Warning, Danger BadgeStyle
 }
 
@@ -137,6 +143,7 @@ func BadgeDot() *BadgeElement { return &BadgeElement{kind: badgeDot} }
 func (*BadgeElement) isElement()           {}
 func (b *BadgeElement) elementKey() string { return b.key }
 
+// Key identifies the badge among its siblings (see DivElement.Key).
 func (b *BadgeElement) Key(k string) *BadgeElement { b.key = k; return b }
 
 // Variant sets the color: BadgeNeutral, BadgeAccent, BadgeSuccess, BadgeWarning
@@ -156,10 +163,18 @@ func (b *BadgeElement) StatusDot() *BadgeElement { b.leadDot = true; return b }
 
 // The sizing methods give the badge's outer box a size. A badge is as wide as its
 // text by default; see Sizing in docs/styling.md.
-func (b *BadgeElement) Width(l Length) *BadgeElement          { b.size.setWidth(l); return b }
-func (b *BadgeElement) MinWidth(l Length) *BadgeElement       { b.size.setMinWidth(l); return b }
-func (b *BadgeElement) MaxWidth(l Length) *BadgeElement       { b.size.setMaxWidth(l); return b }
-func (b *BadgeElement) Grow(f float32) *BadgeElement          { b.size.setGrow(f); return b }
+func (b *BadgeElement) Width(l Length) *BadgeElement { b.size.setWidth(l); return b }
+
+// MinWidth sets the smallest width of the badge.
+func (b *BadgeElement) MinWidth(l Length) *BadgeElement { b.size.setMinWidth(l); return b }
+
+// MaxWidth sets the largest width of the badge.
+func (b *BadgeElement) MaxWidth(l Length) *BadgeElement { b.size.setMaxWidth(l); return b }
+
+// Grow makes the badge take a share of the free space on its parent's main axis.
+func (b *BadgeElement) Grow(f float32) *BadgeElement { b.size.setGrow(f); return b }
+
+// GridSpan sets how many columns and rows the badge covers in its parent's grid.
 func (b *BadgeElement) GridSpan(cols, rows int) *BadgeElement { b.size.setSpan(cols, rows); return b }
 
 // Styles sets the look of the parts of the badge, for this instance only. Set

@@ -21,10 +21,15 @@ import (
 //
 // Methods may be added to Highlighter in later versions.
 type Highlighter interface {
+	// Edit tells the highlighter about one change of the text, with the bytes it replaces.
 	Edit(e highlight.EditRecord) error
+	// SetViewport tells the highlighter which bytes are shown, so that it parses those first.
 	SetViewport(lo, hi int) error
+	// Spans returns the spans as they are now, and a version that changes when they do.
 	Spans() ([]highlight.Span, uint64)
+	// CaptureNames returns the names that highlight.Span.Capture indexes.
 	CaptureNames() []string
+	// Close stops the highlighter and releases what it holds.
 	Close() error
 }
 

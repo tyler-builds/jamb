@@ -39,9 +39,12 @@ type DragSpec struct {
 // position on the screen in logical pixels, which may lie outside the window. They are zero
 // when the drag was cancelled.
 type DragEnd struct {
-	Dropped   bool
+	// Dropped is set when a target took the drop.
+	Dropped bool
+	// Cancelled is set when the drag was cancelled.
 	Cancelled bool
-	X, Y      float32
+	// X and Y are the pointer position at the end of the drag, in window coordinates.
+	X, Y float32
 }
 
 // Drag makes a payload of type T that an element can be dragged with. Drop
@@ -79,10 +82,14 @@ func (d *DivElement) Dragging(s Style) *DivElement { d.dragging = mergeInto(d.dr
 //
 //	after := e.LocalY > e.Height/2
 type DropEvent struct {
-	X, Y           float32
+	// X and Y are the pointer position, in window coordinates.
+	X, Y float32
+	// LocalX and LocalY are the pointer position relative to the target.
 	LocalX, LocalY float32
-	Width, Height  float32
-	Mods           input.Modifiers
+	// Width and Height are the size of the target.
+	Width, Height float32
+	// Mods are the modifier keys held during the drop.
+	Mods input.Modifiers
 }
 
 // DropTarget is a drop target for one payload type. *DropSpec[T] implements

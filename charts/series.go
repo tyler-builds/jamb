@@ -21,10 +21,15 @@ import (
 //		Y:        func(v Visit) float64 { return float64(v.Count) },
 //	})
 type Series[T any] struct {
-	Name     string
-	Data     []T
-	X        func(T) float64
-	Time     func(T) time.Time
+	// Name is the name of the series, shown in the legend and in the table.
+	Name string
+	// Data are the data points of the series, in order.
+	Data []T
+	// X is the position of a point, for a chart with numeric positions.
+	X func(T) float64
+	// Time is the time of a point, for a chart with a time axis.
+	Time func(T) time.Time
+	// Category is the category of a point, for a chart with category positions.
 	Category func(T) string
 	// Y is the value of a point: the height of a line point, a bar or an area, or
 	// the size of a slice. It is required.
@@ -35,15 +40,24 @@ type Series[T any] struct {
 // with its open, high, low and close values. Its position is set as for a
 // Series, and the four value functions are required.
 type CandleSeries[T any] struct {
-	Name     string
-	Data     []T
-	X        func(T) float64
-	Time     func(T) time.Time
+	// Name is the name of the series, shown in the legend and in the table.
+	Name string
+	// Data are the candles of the series, in order.
+	Data []T
+	// X is the position of a candle, for numeric positions.
+	X func(T) float64
+	// Time is the time of a candle, for a time axis.
+	Time func(T) time.Time
+	// Category is the category of a candle, for category positions.
 	Category func(T) string
-	Open     func(T) float64
-	High     func(T) float64
-	Low      func(T) float64
-	Close    func(T) float64
+	// Open is the opening value of a candle.
+	Open func(T) float64
+	// High is the highest value of a candle.
+	High func(T) float64
+	// Low is the lowest value of a candle.
+	Low func(T) float64
+	// Close is the closing value of a candle.
+	Close func(T) float64
 }
 
 // xKind is how the points of a chart are placed on its horizontal axis.

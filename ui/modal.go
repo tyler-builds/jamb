@@ -119,8 +119,12 @@ func (m *ModalElement) Styles(st ModalStyle) *ModalElement {
 // The sizing methods give the panel a width. The panel is 420 px wide by default. A
 // percentage is of the window's width, so Width(Percent(90)) leaves a margin on each
 // side. See Sizing in docs/styling.md.
-func (m *ModalElement) Width(l Length) *ModalElement    { m.size.setWidth(l); return m }
+func (m *ModalElement) Width(l Length) *ModalElement { m.size.setWidth(l); return m }
+
+// MinWidth sets the smallest width of the modal.
 func (m *ModalElement) MinWidth(l Length) *ModalElement { m.size.setMinWidth(l); return m }
+
+// MaxWidth sets the largest width of the modal.
 func (m *ModalElement) MaxWidth(l Length) *ModalElement { m.size.setMaxWidth(l); return m }
 
 // modalSpec is what the runtime keeps from a built Modal, on its backdrop

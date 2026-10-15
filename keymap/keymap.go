@@ -114,7 +114,9 @@ func Load(path string, actions []*ui.Action) ([]ui.Binding, error) {
 // "keymap:"+Path, which keeps its place among the bindings (see
 // ui.Runtime.SetBindings). Actions are the actions the file may name.
 type File struct {
-	Path    string
+	// Path is the path of the keymap file.
+	Path string
+	// Actions lists the actions that the file may name.
 	Actions []*ui.Action
 
 	last    []byte // the bytes of the last successful read

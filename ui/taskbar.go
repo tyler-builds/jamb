@@ -20,6 +20,7 @@ const (
 // TaskbarProgress is the progress bar of a window's taskbar button, which
 // Window.SetTaskbarProgress sets. The button is shown while the window is.
 type TaskbarProgress struct {
+	// State is the state of the progress bar, such as normal or error (see TaskbarState).
 	State TaskbarState
 	// Value is the progress, from 0 to 1. A value outside that range, and NaN,
 	// are clamped to it. TaskbarNone and TaskbarIndeterminate ignore it.

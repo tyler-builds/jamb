@@ -16,9 +16,13 @@ import (
 // any other node it returns the node's children, and it is called only while the
 // node is open, so a large tree can load each part when it is shown.
 type TreeNode struct {
-	Key      string
-	Label    string
-	Icon     *icons.Icon
+	// Key identifies the node among its siblings.
+	Key string
+	// Label is the text of the node.
+	Label string
+	// Icon is an icon shown before the label.
+	Icon *icons.Icon
+	// Children are the children of the node, shown when it is open.
 	Children func() []TreeNode
 }
 
@@ -145,13 +149,27 @@ type TreeElement struct {
 
 // The sizing methods give the tree's outer box a size, over its Style. See Sizing
 // in docs/styling.md.
-func (tv *TreeElement) Width(l Length) *TreeElement          { tv.size.setWidth(l); return tv }
-func (tv *TreeElement) Height(l Length) *TreeElement         { tv.size.setHeight(l); return tv }
-func (tv *TreeElement) MinWidth(l Length) *TreeElement       { tv.size.setMinWidth(l); return tv }
-func (tv *TreeElement) MinHeight(l Length) *TreeElement      { tv.size.setMinHeight(l); return tv }
-func (tv *TreeElement) MaxWidth(l Length) *TreeElement       { tv.size.setMaxWidth(l); return tv }
-func (tv *TreeElement) MaxHeight(l Length) *TreeElement      { tv.size.setMaxHeight(l); return tv }
-func (tv *TreeElement) Grow(f float32) *TreeElement          { tv.size.setGrow(f); return tv }
+func (tv *TreeElement) Width(l Length) *TreeElement { tv.size.setWidth(l); return tv }
+
+// Height sets the height of the tree.
+func (tv *TreeElement) Height(l Length) *TreeElement { tv.size.setHeight(l); return tv }
+
+// MinWidth sets the smallest width of the tree.
+func (tv *TreeElement) MinWidth(l Length) *TreeElement { tv.size.setMinWidth(l); return tv }
+
+// MinHeight sets the smallest height of the tree.
+func (tv *TreeElement) MinHeight(l Length) *TreeElement { tv.size.setMinHeight(l); return tv }
+
+// MaxWidth sets the largest width of the tree.
+func (tv *TreeElement) MaxWidth(l Length) *TreeElement { tv.size.setMaxWidth(l); return tv }
+
+// MaxHeight sets the largest height of the tree.
+func (tv *TreeElement) MaxHeight(l Length) *TreeElement { tv.size.setMaxHeight(l); return tv }
+
+// Grow makes the tree take a share of the free space on its parent's main axis.
+func (tv *TreeElement) Grow(f float32) *TreeElement { tv.size.setGrow(f); return tv }
+
+// GridSpan sets how many columns and rows the tree covers in its parent's grid.
 func (tv *TreeElement) GridSpan(cols, rows int) *TreeElement { tv.size.setSpan(cols, rows); return tv }
 
 // FocusHandle lets code focus the tree (see NewFocusHandle). A Field that wraps

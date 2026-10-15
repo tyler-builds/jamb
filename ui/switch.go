@@ -144,6 +144,7 @@ func Switch(label string, on *Signal[bool]) *SwitchElement {
 func (*SwitchElement) isElement()           {}
 func (s *SwitchElement) elementKey() string { return s.key }
 
+// Key identifies the switch among its siblings (see DivElement.Key).
 func (s *SwitchElement) Key(k string) *SwitchElement { s.key = k; return s }
 
 // Disabled shows the switch but does not let it change.
@@ -155,10 +156,18 @@ func (s *SwitchElement) OnChange(fn func(bool)) *SwitchElement { s.onChange = fn
 
 // The sizing methods give the track a width. The track is 38 px wide by default, and
 // the knob stays 3 px from the end it is at. See Sizing in docs/styling.md.
-func (s *SwitchElement) Width(l Length) *SwitchElement          { s.size.setWidth(l); return s }
-func (s *SwitchElement) MinWidth(l Length) *SwitchElement       { s.size.setMinWidth(l); return s }
-func (s *SwitchElement) MaxWidth(l Length) *SwitchElement       { s.size.setMaxWidth(l); return s }
-func (s *SwitchElement) Grow(f float32) *SwitchElement          { s.size.setGrow(f); return s }
+func (s *SwitchElement) Width(l Length) *SwitchElement { s.size.setWidth(l); return s }
+
+// MinWidth sets the smallest width of the switch.
+func (s *SwitchElement) MinWidth(l Length) *SwitchElement { s.size.setMinWidth(l); return s }
+
+// MaxWidth sets the largest width of the switch.
+func (s *SwitchElement) MaxWidth(l Length) *SwitchElement { s.size.setMaxWidth(l); return s }
+
+// Grow makes the switch take a share of the free space on its parent's main axis.
+func (s *SwitchElement) Grow(f float32) *SwitchElement { s.size.setGrow(f); return s }
+
+// GridSpan sets how many columns and rows the switch covers in its parent's grid.
 func (s *SwitchElement) GridSpan(cols, rows int) *SwitchElement { s.size.setSpan(cols, rows); return s }
 
 // Styles sets the look of the parts of the switch, for this instance only. Set

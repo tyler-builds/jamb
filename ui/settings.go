@@ -28,7 +28,8 @@ type SystemSettings struct {
 	// CaretBlinkOff keeps the text caret solid. CaretBlink is how long the
 	// caret stays on, and then off, in each blink; zero means 530 ms.
 	CaretBlinkOff bool
-	CaretBlink    time.Duration
+	// CaretBlink is how long the caret stays on, and then off, in each blink.
+	CaretBlink time.Duration
 	// CaretWidth scales the caret's thickness, whose default is 1.5 logical
 	// pixels. Zero means 1. A display's scale is applied as for the rest of
 	// the UI.
@@ -38,13 +39,20 @@ type SystemSettings struct {
 // SystemColors are the Windows system colors that a high contrast theme uses
 // (see GetSysColor). Each is opaque.
 type SystemColors struct {
-	Window, WindowText         Color
-	Highlight, HighlightText   Color
-	HotLight, GrayText         Color
-	ButtonFace, ButtonText     Color
-	ButtonShadow, WindowFrame  Color
+	// Window and WindowText are the system colors of window backgrounds and text.
+	Window, WindowText Color
+	// Highlight and HighlightText are the system colors of a selection.
+	Highlight, HighlightText Color
+	// HotLight and GrayText are the system colors of a hot-tracked item and of disabled text.
+	HotLight, GrayText Color
+	// ButtonFace and ButtonText are the system colors of buttons.
+	ButtonFace, ButtonText Color
+	// ButtonShadow and WindowFrame are the system colors of a button's shadow and of a window frame.
+	ButtonShadow, WindowFrame Color
+	// CaptionText and ActiveCaption are the system colors of a title bar.
 	CaptionText, ActiveCaption Color
-	Menu, MenuText, InfoBack   Color
+	// Menu, MenuText and InfoBack are the system colors of menus and of tooltips.
+	Menu, MenuText, InfoBack Color
 }
 
 const (

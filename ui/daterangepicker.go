@@ -25,20 +25,35 @@ const dateRangePickerWidth = 280
 // the range is not shown by its fill alone. Under high contrast the ends are drawn in the system
 // Highlight colors, and the days between by their lines, in the text color.
 type DateRangePickerStyle struct {
-	Field           FieldStyle
-	CalendarButton  Style
-	Message         Style
-	Popup           Style
-	Header          Style
-	NavButton       Style
-	WeekdayLabel    Style
-	Day             Style
-	DayHover        Style
-	DaySelected     Style
-	DayInRange      Style
-	DayToday        Style
-	DayDisabled     Style
+	// Field is the text frame of the date range picker.
+	Field FieldStyle
+	// CalendarButton is the button that opens the calendar.
+	CalendarButton Style
+	// Message is the message under the field.
+	Message Style
+	// Popup is the panel of the calendar.
+	Popup Style
+	// Header is the row with the month and the year.
+	Header Style
+	// NavButton is each button that moves the calendar to another month or year.
+	NavButton Style
+	// WeekdayLabel is the name of each day of the week.
+	WeekdayLabel Style
+	// Day is each day of the calendar.
+	Day Style
+	// DayHover is a day under the pointer.
+	DayHover Style
+	// DaySelected is a day at either end of the range.
+	DaySelected Style
+	// DayInRange is a day between the ends of the range.
+	DayInRange Style
+	// DayToday is today.
+	DayToday Style
+	// DayDisabled is a day that cannot be chosen.
+	DayDisabled Style
+	// DayOutsideMonth is a day of the adjacent months.
 	DayOutsideMonth Style
+	// DayFocusVisible is the day that has keyboard focus.
 	DayFocusVisible Style
 }
 
@@ -187,6 +202,7 @@ func (d *DateRangePickerElement) FocusHandle(h *FocusHandle) *DateRangePickerEle
 func (*DateRangePickerElement) isElement()           {}
 func (d *DateRangePickerElement) elementKey() string { return d.key }
 
+// Key identifies the date range picker among its siblings (see DivElement.Key).
 func (d *DateRangePickerElement) Key(k string) *DateRangePickerElement { d.key = k; return d }
 
 // Label names the field for assistive technology, such as "Trip dates".
@@ -255,30 +271,44 @@ func (d *DateRangePickerElement) Width(l Length) *DateRangePickerElement {
 	d.size.setWidth(l)
 	return d
 }
+
+// Height sets the height of the date range picker.
 func (d *DateRangePickerElement) Height(l Length) *DateRangePickerElement {
 	d.size.setHeight(l)
 	return d
 }
+
+// MinWidth sets the smallest width of the date range picker.
 func (d *DateRangePickerElement) MinWidth(l Length) *DateRangePickerElement {
 	d.size.setMinWidth(l)
 	return d
 }
+
+// MinHeight sets the smallest height of the date range picker.
 func (d *DateRangePickerElement) MinHeight(l Length) *DateRangePickerElement {
 	d.size.setMinHeight(l)
 	return d
 }
+
+// MaxWidth sets the largest width of the date range picker.
 func (d *DateRangePickerElement) MaxWidth(l Length) *DateRangePickerElement {
 	d.size.setMaxWidth(l)
 	return d
 }
+
+// MaxHeight sets the largest height of the date range picker.
 func (d *DateRangePickerElement) MaxHeight(l Length) *DateRangePickerElement {
 	d.size.setMaxHeight(l)
 	return d
 }
+
+// Grow makes the date range picker take a share of the free space on its parent's main axis.
 func (d *DateRangePickerElement) Grow(f float32) *DateRangePickerElement {
 	d.size.setGrow(f)
 	return d
 }
+
+// GridSpan sets how many columns and rows the date range picker covers in its parent's grid.
 func (d *DateRangePickerElement) GridSpan(cols, rows int) *DateRangePickerElement {
 	d.size.setSpan(cols, rows)
 	return d

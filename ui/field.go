@@ -202,10 +202,16 @@ func (f *FieldElement) Focus(h *FocusHandle) *FieldElement { f.focus = h; return
 // field as a unit. A field fills its container by default, as a column does. Its
 // control keeps its own width: a control whose width is Auto or Full fills the field,
 // and a fixed one keeps its size. See Sizing in docs/styling.md.
-func (f *FieldElement) Width(l Length) *FieldElement    { f.size.setWidth(l); return f }
+func (f *FieldElement) Width(l Length) *FieldElement { f.size.setWidth(l); return f }
+
+// MinWidth sets the smallest width of the field.
 func (f *FieldElement) MinWidth(l Length) *FieldElement { f.size.setMinWidth(l); return f }
+
+// MaxWidth sets the largest width of the field.
 func (f *FieldElement) MaxWidth(l Length) *FieldElement { f.size.setMaxWidth(l); return f }
-func (f *FieldElement) Grow(g float32) *FieldElement    { f.size.setGrow(g); return f }
+
+// Grow makes the field take a share of the free space on its parent's main axis.
+func (f *FieldElement) Grow(g float32) *FieldElement { f.size.setGrow(g); return f }
 
 // Styles sets the look of the parts of the field, for this instance only. Set fields
 // win over the theme's FormField and the defaults; see FormFieldStyle and

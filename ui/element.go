@@ -45,6 +45,7 @@ func (c *Composite) SetKey(k string) { c.key = k }
 // Renderer is an element defined in another package (see Composite).
 type Renderer interface {
 	Element
+	// Render returns the element's content, built with ctx.
 	Render(ctx *Context) Element
 }
 
@@ -312,9 +313,16 @@ func (d *DivElement) Size(w, h Length) *DivElement {
 	return d
 }
 
-func (d *DivElement) MinWidth(l Length) *DivElement  { d.style.MinWidth = l; return d }
+// MinWidth sets the smallest width of the element.
+func (d *DivElement) MinWidth(l Length) *DivElement { d.style.MinWidth = l; return d }
+
+// MinHeight sets the smallest height of the element.
 func (d *DivElement) MinHeight(l Length) *DivElement { d.style.MinHeight = l; return d }
-func (d *DivElement) MaxWidth(l Length) *DivElement  { d.style.MaxWidth = l; return d }
+
+// MaxWidth sets the largest width of the element.
+func (d *DivElement) MaxWidth(l Length) *DivElement { d.style.MaxWidth = l; return d }
+
+// MaxHeight sets the largest height of the element.
 func (d *DivElement) MaxHeight(l Length) *DivElement { d.style.MaxHeight = l; return d }
 
 // Grow makes the element take a share of the free space on its parent's main axis.
@@ -357,10 +365,16 @@ func (d *DivElement) inset(i int, px float32) *DivElement {
 }
 
 // Top, Right, Bottom and Left position an Absolute element relative to its parent's padding box.
-func (d *DivElement) Top(px float32) *DivElement    { return d.inset(0, px) }
-func (d *DivElement) Right(px float32) *DivElement  { return d.inset(1, px) }
+func (d *DivElement) Top(px float32) *DivElement { return d.inset(0, px) }
+
+// Right sets the right inset of an Absolute element, in logical pixels (see Top).
+func (d *DivElement) Right(px float32) *DivElement { return d.inset(1, px) }
+
+// Bottom sets the bottom inset of an Absolute element, in logical pixels (see Top).
 func (d *DivElement) Bottom(px float32) *DivElement { return d.inset(2, px) }
-func (d *DivElement) Left(px float32) *DivElement   { return d.inset(3, px) }
+
+// Left sets the left inset of an Absolute element, in logical pixels (see Top).
+func (d *DivElement) Left(px float32) *DivElement { return d.inset(3, px) }
 
 // Inset pins all four sides (Absolute + Top/Right/Bottom/Left).
 func (d *DivElement) Inset(px float32) *DivElement {
@@ -511,13 +525,26 @@ func (d *DivElement) OnClick(fn func()) *DivElement {
 	return d
 }
 
-func (d *DivElement) OnDoubleClick(fn func()) *DivElement          { d.h.onDoubleClick = fn; return d }
+// OnDoubleClick sets the function that runs on a double-click on the element.
+func (d *DivElement) OnDoubleClick(fn func()) *DivElement { d.h.onDoubleClick = fn; return d }
+
+// OnMouseDown sets the function that runs when a mouse button is pressed over the element.
 func (d *DivElement) OnMouseDown(fn func(*MouseEvent)) *DivElement { d.h.onMouseDown = fn; return d }
-func (d *DivElement) OnMouseUp(fn func(*MouseEvent)) *DivElement   { d.h.onMouseUp = fn; return d }
+
+// OnMouseUp sets the function that runs when a mouse button is released over the element.
+func (d *DivElement) OnMouseUp(fn func(*MouseEvent)) *DivElement { d.h.onMouseUp = fn; return d }
+
+// OnMouseMove sets the function that runs when the pointer moves over the element.
 func (d *DivElement) OnMouseMove(fn func(*MouseEvent)) *DivElement { d.h.onMouseMove = fn; return d }
-func (d *DivElement) OnMouseEnter(fn func()) *DivElement           { d.h.onMouseEnter = fn; return d }
-func (d *DivElement) OnMouseLeave(fn func()) *DivElement           { d.h.onMouseLeave = fn; return d }
-func (d *DivElement) OnScroll(fn func(*ScrollEvent)) *DivElement   { d.h.onScroll = fn; return d }
+
+// OnMouseEnter sets the function that runs when the pointer enters the element.
+func (d *DivElement) OnMouseEnter(fn func()) *DivElement { d.h.onMouseEnter = fn; return d }
+
+// OnMouseLeave sets the function that runs when the pointer leaves the element.
+func (d *DivElement) OnMouseLeave(fn func()) *DivElement { d.h.onMouseLeave = fn; return d }
+
+// OnScroll sets the function that runs when the wheel or the trackpad scrolls over the element.
+func (d *DivElement) OnScroll(fn func(*ScrollEvent)) *DivElement { d.h.onScroll = fn; return d }
 
 // OnPinch receives the pinch gestures of a touchpad or touchscreen whose center
 // is over the element (see PinchEvent). A handler that stops the event keeps the
@@ -527,7 +554,9 @@ func (d *DivElement) OnPinch(fn func(*PinchEvent)) *DivElement { d.h.onPinch = f
 // OnKeyDown receives key presses while this element or a descendant has focus
 // (or, on the root element, when nothing has focus).
 func (d *DivElement) OnKeyDown(fn func(*KeyEvent)) *DivElement { d.h.onKeyDown = fn; return d }
-func (d *DivElement) OnKeyUp(fn func(*KeyEvent)) *DivElement   { d.h.onKeyUp = fn; return d }
+
+// OnKeyUp sets the function that runs when a key is released while the element has focus.
+func (d *DivElement) OnKeyUp(fn func(*KeyEvent)) *DivElement { d.h.onKeyUp = fn; return d }
 
 // OnClickOutside runs fn when any mouse button is pressed outside the element
 // and its descendants, for closing menus and popovers. On an Overlay, presses
@@ -580,8 +609,11 @@ func (d *DivElement) OnTextInput(fn func(string)) *DivElement {
 	return d
 }
 
+// OnFocus sets the function that runs when the element gets keyboard focus, and makes it focusable.
 func (d *DivElement) OnFocus(fn func()) *DivElement { d.h.onFocus = fn; d.focusable = true; return d }
-func (d *DivElement) OnBlur(fn func()) *DivElement  { d.h.onBlur = fn; d.focusable = true; return d }
+
+// OnBlur sets the function that runs when the element loses keyboard focus, and makes it focusable.
+func (d *DivElement) OnBlur(fn func()) *DivElement { d.h.onBlur = fn; d.focusable = true; return d }
 
 // Focusable lets the element take keyboard focus when clicked or tabbed to.
 func (d *DivElement) Focusable() *DivElement { d.focusable = true; return d }

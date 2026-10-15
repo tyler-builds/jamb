@@ -10,8 +10,10 @@ import (
 // SankeyLink is a flow from one node to another, of the given value. Nodes are named by
 // their text, so two links that name the same node share it.
 type SankeyLink struct {
+	// From and To are the names of the nodes that the link joins.
 	From, To string
-	Value    float64
+	// Value is the amount that flows along the link.
+	Value float64
 }
 
 // Sankey layout constants, in logical pixels.

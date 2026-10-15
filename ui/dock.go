@@ -120,9 +120,13 @@ func resolveDock(ctx *Context, inst DockStyle) DockStyle {
 // another window runs its Content once more there, with its state kept, so the app need not
 // hold that state in its own signals. Closable adds a Close command to the panel's menu.
 type DockPanel struct {
-	Title    string
-	Icon     *icons.Icon
-	Content  func() Element
+	// Title is the name of the panel, shown on its tab and read by assistive technology.
+	Title string
+	// Icon is an icon shown on the panel's tab.
+	Icon *icons.Icon
+	// Content builds the content of the panel; see the type comment.
+	Content func() Element
+	// Closable lets the user close the panel.
 	Closable bool
 }
 
@@ -135,13 +139,20 @@ type DockPanel struct {
 // the user closes it, so a panel is never lost with its window. The window's own Root,
 // Title and handlers are passed on to app.Window by app.OpenDockWindow.
 type DockWindow struct {
-	Title         string
-	X, Y          int
+	// Title is the title of the floating window.
+	Title string
+	// X and Y are the position of the window's top-left corner, in logical screen pixels.
+	X, Y int
+	// Width and Height are the size of the window's content, in logical pixels.
 	Width, Height int
-	Root          func(ctx *Context) Element
-	OnClose       func() bool
-	OnGeometry    func(x, y, width, height int)
-	OnClosed      func()
+	// Root builds the content of the window.
+	Root func(ctx *Context) Element
+	// OnClose is called when the window is asked to close; it returns false to keep the window open.
+	OnClose func() bool
+	// OnGeometry is called as the window is moved or resized, with its position and size.
+	OnGeometry func(x, y, width, height int)
+	// OnClosed is called after the window has closed.
+	OnClosed func()
 }
 
 // DockElement is a dock: the panels of a DockLayout, in splits and tab groups that the
@@ -341,13 +352,27 @@ func (d *DockElement) Floating(open func(DockWindow) Window) *DockElement { d.op
 
 // The sizing methods give the dock's outer box a size. A dock fills its container by
 // default; see Sizing in docs/styling.md.
-func (d *DockElement) Width(l Length) *DockElement          { d.size.setWidth(l); return d }
-func (d *DockElement) Height(l Length) *DockElement         { d.size.setHeight(l); return d }
-func (d *DockElement) MinWidth(l Length) *DockElement       { d.size.setMinWidth(l); return d }
-func (d *DockElement) MinHeight(l Length) *DockElement      { d.size.setMinHeight(l); return d }
-func (d *DockElement) MaxWidth(l Length) *DockElement       { d.size.setMaxWidth(l); return d }
-func (d *DockElement) MaxHeight(l Length) *DockElement      { d.size.setMaxHeight(l); return d }
-func (d *DockElement) Grow(f float32) *DockElement          { d.size.setGrow(f); return d }
+func (d *DockElement) Width(l Length) *DockElement { d.size.setWidth(l); return d }
+
+// Height sets the height of the dock.
+func (d *DockElement) Height(l Length) *DockElement { d.size.setHeight(l); return d }
+
+// MinWidth sets the smallest width of the dock.
+func (d *DockElement) MinWidth(l Length) *DockElement { d.size.setMinWidth(l); return d }
+
+// MinHeight sets the smallest height of the dock.
+func (d *DockElement) MinHeight(l Length) *DockElement { d.size.setMinHeight(l); return d }
+
+// MaxWidth sets the largest width of the dock.
+func (d *DockElement) MaxWidth(l Length) *DockElement { d.size.setMaxWidth(l); return d }
+
+// MaxHeight sets the largest height of the dock.
+func (d *DockElement) MaxHeight(l Length) *DockElement { d.size.setMaxHeight(l); return d }
+
+// Grow makes the dock take a share of the free space on its parent's main axis.
+func (d *DockElement) Grow(f float32) *DockElement { d.size.setGrow(f); return d }
+
+// GridSpan sets how many columns and rows the dock covers in its parent's grid.
 func (d *DockElement) GridSpan(cols, rows int) *DockElement { d.size.setSpan(cols, rows); return d }
 
 // scope is the prefix of the keys of the dock: its Key, or the identity of its layout.

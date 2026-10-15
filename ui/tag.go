@@ -81,10 +81,18 @@ func (g *TagElement) Icon(ic *icons.Icon) *TagElement { g.icon = ic; return g }
 func (g *TagElement) OnRemove(fn func()) *TagElement { g.onRemove = fn; return g }
 
 // The sizing methods give the tag's outer box a size. See Sizing in docs/styling.md.
-func (g *TagElement) Width(l Length) *TagElement          { g.size.setWidth(l); return g }
-func (g *TagElement) MinWidth(l Length) *TagElement       { g.size.setMinWidth(l); return g }
-func (g *TagElement) MaxWidth(l Length) *TagElement       { g.size.setMaxWidth(l); return g }
-func (g *TagElement) Grow(f float32) *TagElement          { g.size.setGrow(f); return g }
+func (g *TagElement) Width(l Length) *TagElement { g.size.setWidth(l); return g }
+
+// MinWidth sets the smallest width of the tag.
+func (g *TagElement) MinWidth(l Length) *TagElement { g.size.setMinWidth(l); return g }
+
+// MaxWidth sets the largest width of the tag.
+func (g *TagElement) MaxWidth(l Length) *TagElement { g.size.setMaxWidth(l); return g }
+
+// Grow makes the tag take a share of the free space on its parent's main axis.
+func (g *TagElement) Grow(f float32) *TagElement { g.size.setGrow(f); return g }
+
+// GridSpan sets how many columns and rows the tag covers in its parent's grid.
 func (g *TagElement) GridSpan(cols, rows int) *TagElement { g.size.setSpan(cols, rows); return g }
 
 // Styles sets the look of the parts of the tag, for this instance only. Set fields

@@ -14,8 +14,11 @@ const (
 	BelowStart  Placement = iota + 1 // under the anchor, left edges aligned
 	BelowCenter                      // under the anchor, centered
 	BelowEnd                         // under the anchor, right edges aligned
+	// AboveStart is above the anchor, left edges aligned.
 	AboveStart
+	// AboveCenter is above the anchor, centered.
 	AboveCenter
+	// AboveEnd is above the anchor, right edges aligned.
 	AboveEnd
 	RightStart  // right of the anchor, top edges aligned
 	LeftStart   // left of the anchor, top edges aligned

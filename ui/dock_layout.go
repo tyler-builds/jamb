@@ -37,7 +37,9 @@ func (z DockZone) after() bool { return z == DockRight || z == DockBottom }
 // DockLayout is the layout of a Dock: the root node of the tree of splits and groups,
 // and the floating groups. A zero DockLayout is an empty dock.
 type DockLayout struct {
-	Root     DockNode    `json:"root"`
+	// Root is the root of the tree of splits and groups.
+	Root DockNode `json:"root"`
+	// Floating lists the groups that float, each in its own window.
 	Floating []DockFloat `json:"floating,omitempty"`
 }
 
@@ -48,23 +50,34 @@ type DockLayout struct {
 // Active is the one it shows. The sizes need not sum to 1; they are normalized when the
 // layout is used.
 type DockNode struct {
-	Vertical bool       `json:"vertical,omitempty"`
-	Sizes    []float64  `json:"sizes,omitempty"`
+	// Vertical reports whether a split stacks its children from top to bottom.
+	Vertical bool `json:"vertical,omitempty"`
+	// Sizes are the share of the space that each child takes.
+	Sizes []float64 `json:"sizes,omitempty"`
+	// Children are the nodes of a split.
 	Children []DockNode `json:"children,omitempty"`
-	Panels   []string   `json:"panels,omitempty"`
-	Active   string     `json:"active,omitempty"`
+	// Panels are the IDs of the panels in a tab group.
+	Panels []string `json:"panels,omitempty"`
+	// Active is the ID of the selected panel of a tab group.
+	Active string `json:"active,omitempty"`
 }
 
 // DockFloat is a tab group that floats in a window of its own. ID names the window. X
 // and Y are the window's position and Width and Height its size, in logical pixels: they
 // are the position it opens at, and they are recorded when the window closes.
 type DockFloat struct {
-	ID     string   `json:"id"`
-	Group  DockNode `json:"group"`
-	X      int      `json:"x"`
-	Y      int      `json:"y"`
-	Width  int      `json:"width"`
-	Height int      `json:"height"`
+	// ID identifies the floating group.
+	ID string `json:"id"`
+	// Group is the tree of splits and tab groups of the floating window.
+	Group DockNode `json:"group"`
+	// X is the horizontal position of the window, in logical screen pixels.
+	X int `json:"x"`
+	// Y is the vertical position of the window, in logical screen pixels.
+	Y int `json:"y"`
+	// Width is the width of the window's content, in logical pixels.
+	Width int `json:"width"`
+	// Height is the height of the window's content, in logical pixels.
+	Height int `json:"height"`
 }
 
 // isSplit reports whether n is a split rather than a tab group.

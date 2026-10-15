@@ -137,6 +137,7 @@ func ProgressBar(value float64) *ProgressBarElement {
 func (*ProgressBarElement) isElement()           {}
 func (p *ProgressBarElement) elementKey() string { return p.key }
 
+// Key identifies the progress bar among its siblings (see DivElement.Key).
 func (p *ProgressBarElement) Key(k string) *ProgressBarElement { p.key = k; return p }
 
 // Label names the bar for assistive technology, such as "Upload". Without it
@@ -160,10 +161,18 @@ func (p *ProgressBarElement) Max(hi float64) *ProgressBarElement { p.hi = hi; re
 // The sizing methods give the bar's outer box a size, including its readout. A bar
 // fills its container by default; Width(Px(240)) fixes it, and the track keeps the
 // room that is left for the readout. See Sizing in docs/styling.md.
-func (p *ProgressBarElement) Width(l Length) *ProgressBarElement    { p.size.setWidth(l); return p }
+func (p *ProgressBarElement) Width(l Length) *ProgressBarElement { p.size.setWidth(l); return p }
+
+// MinWidth sets the smallest width of the progress bar.
 func (p *ProgressBarElement) MinWidth(l Length) *ProgressBarElement { p.size.setMinWidth(l); return p }
+
+// MaxWidth sets the largest width of the progress bar.
 func (p *ProgressBarElement) MaxWidth(l Length) *ProgressBarElement { p.size.setMaxWidth(l); return p }
-func (p *ProgressBarElement) Grow(f float32) *ProgressBarElement    { p.size.setGrow(f); return p }
+
+// Grow makes the progress bar take a share of the free space on its parent's main axis.
+func (p *ProgressBarElement) Grow(f float32) *ProgressBarElement { p.size.setGrow(f); return p }
+
+// GridSpan sets how many columns and rows the progress bar covers in its parent's grid.
 func (p *ProgressBarElement) GridSpan(cols, rows int) *ProgressBarElement {
 	p.size.setSpan(cols, rows)
 	return p
@@ -313,6 +322,7 @@ func ProgressRing() *ProgressRingElement { return &ProgressRingElement{size: Rin
 func (*ProgressRingElement) isElement()           {}
 func (r *ProgressRingElement) elementKey() string { return r.key }
 
+// Key identifies the progress ring among its siblings (see DivElement.Key).
 func (r *ProgressRingElement) Key(k string) *ProgressRingElement { r.key = k; return r }
 
 // Size sets the diameter, in logical pixels: RingSmall, RingMedium or RingLarge.

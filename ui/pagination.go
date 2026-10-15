@@ -185,9 +185,15 @@ func (p *PaginationElement) Styles(s PaginationStyle) *PaginationElement {
 
 // The sizing methods give the control's outer box a size. The control is as wide as
 // its pages by default; see Sizing in docs/styling.md.
-func (p *PaginationElement) Width(l Length) *PaginationElement    { p.size.setWidth(l); return p }
+func (p *PaginationElement) Width(l Length) *PaginationElement { p.size.setWidth(l); return p }
+
+// MinWidth sets the smallest width of the pagination.
 func (p *PaginationElement) MinWidth(l Length) *PaginationElement { p.size.setMinWidth(l); return p }
+
+// MaxWidth sets the largest width of the pagination.
 func (p *PaginationElement) MaxWidth(l Length) *PaginationElement { p.size.setMaxWidth(l); return p }
+
+// GridSpan sets how many columns and rows the pagination covers in its parent's grid.
 func (p *PaginationElement) GridSpan(cols, rows int) *PaginationElement {
 	p.size.setSpan(cols, rows)
 	return p

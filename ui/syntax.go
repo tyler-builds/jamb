@@ -5,21 +5,30 @@ package ui
 // capture name, such as "keyword" or "string.escape". A capture that is not in
 // the map takes the editor foreground.
 type SyntaxStyle struct {
-	Color  Color
+	// Color is the color of the text for the capture.
+	Color Color
+	// Italic sets the text in italic.
 	Italic bool
-	Bold   bool
+	// Bold sets the text in bold.
+	Bold bool
 }
 
 // CodeEditorColors are the colors of a code editor, as the predefined themes set
 // them from their editor colors. Selection is translucent, so it is drawn over
 // the text.
 type CodeEditorColors struct {
-	Background       Color
-	Foreground       Color
-	ActiveLine       Color
-	LineNumber       Color
+	// Background is the background of the editor.
+	Background Color
+	// Foreground is the color of the text that has no syntax color.
+	Foreground Color
+	// ActiveLine is the background of the line that holds the caret.
+	ActiveLine Color
+	// LineNumber is the color of the line numbers.
+	LineNumber Color
+	// ActiveLineNumber is the color of the line number of the caret's line.
 	ActiveLineNumber Color
-	Selection        Color
+	// Selection is the background of the selected text.
+	Selection Color
 }
 
 // darkSyntax and lightSyntax are the syntax colors of the built-in themes. Each

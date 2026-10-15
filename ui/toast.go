@@ -15,9 +15,13 @@ import (
 type ToastVariant uint8
 
 const (
+	// ToastInfo is a toast for information.
 	ToastInfo ToastVariant = iota
+	// ToastSuccess is a toast for a completed action.
 	ToastSuccess
+	// ToastWarning is a toast for a situation that needs attention.
 	ToastWarning
+	// ToastError is a toast for a failure.
 	ToastError
 )
 
@@ -76,6 +80,7 @@ func (s ToastStyle) plain() ToastStyle {
 // ToastVariants holds the style of each kind of toast, for the theme's Toasts.
 // It merges over Theme.Toast, which applies to every kind.
 type ToastVariants struct {
+	// Info, Success, Warning and Error are the styles of the toast kinds, and each merges over Toast.
 	Info, Success, Warning, Error ToastStyle
 }
 
@@ -387,6 +392,7 @@ func Toaster() *ToasterElement { return &ToasterElement{} }
 func (*ToasterElement) isElement()            {}
 func (tv *ToasterElement) elementKey() string { return tv.key }
 
+// Key identifies the toaster among its siblings (see DivElement.Key).
 func (tv *ToasterElement) Key(k string) *ToasterElement { tv.key = k; return tv }
 
 // Max sets how many toasts are shown at once. The oldest is dismissed to make

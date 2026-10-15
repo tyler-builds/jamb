@@ -13,9 +13,13 @@ import (
 type ButtonVariant uint8
 
 const (
+	// ButtonPrimary is the look for the main action of a form or a dialog.
 	ButtonPrimary ButtonVariant = iota
+	// ButtonSecondary is the default look, for an action that is not the main one.
 	ButtonSecondary
+	// ButtonGhost is a button with no fill or border, for an action of low emphasis.
 	ButtonGhost
+	// ButtonDanger is the look for an action that deletes or cannot be undone.
 	ButtonDanger
 )
 
@@ -65,10 +69,14 @@ func (s ButtonStyle) plain() ButtonStyle {
 // ButtonVariants holds the style of each variant of a button, for the theme's
 // Buttons. It merges over Theme.Button, which applies to every variant.
 type ButtonVariants struct {
-	Primary   ButtonStyle
+	// Primary is the style of a ButtonPrimary button.
+	Primary ButtonStyle
+	// Secondary is the style of a ButtonSecondary button.
 	Secondary ButtonStyle
-	Ghost     ButtonStyle
-	Danger    ButtonStyle
+	// Ghost is the style of a ButtonGhost button.
+	Ghost ButtonStyle
+	// Danger is the style of a ButtonDanger button.
+	Danger ButtonStyle
 }
 
 // of returns the style of variant v.
@@ -208,31 +216,64 @@ func IconButton(ic *icons.Icon) *ButtonElement {
 func (*ButtonElement) isElement()           {}
 func (b *ButtonElement) elementKey() string { return b.key }
 
-func (b *ButtonElement) Key(k string) *ButtonElement            { b.key = k; return b }
-func (b *ButtonElement) OnClick(fn func()) *ButtonElement       { b.onClick = fn; return b }
-func (b *ButtonElement) Icon(ic *icons.Icon) *ButtonElement     { b.icon = ic; return b }
+// Key identifies the button among its siblings (see DivElement.Key).
+func (b *ButtonElement) Key(k string) *ButtonElement { b.key = k; return b }
+
+// OnClick sets the function that runs when the button is clicked.
+func (b *ButtonElement) OnClick(fn func()) *ButtonElement { b.onClick = fn; return b }
+
+// Icon sets an icon drawn before the button's label.
+func (b *ButtonElement) Icon(ic *icons.Icon) *ButtonElement { b.icon = ic; return b }
+
+// Variant sets the button's look (see ButtonVariant).
 func (b *ButtonElement) Variant(v ButtonVariant) *ButtonElement { b.variant = v; return b }
-func (b *ButtonElement) Primary() *ButtonElement                { return b.Variant(ButtonPrimary) }
-func (b *ButtonElement) Secondary() *ButtonElement              { return b.Variant(ButtonSecondary) }
-func (b *ButtonElement) Ghost() *ButtonElement                  { return b.Variant(ButtonGhost) }
-func (b *ButtonElement) Danger() *ButtonElement                 { return b.Variant(ButtonDanger) }
-func (b *ButtonElement) Small() *ButtonElement                  { b.ctlSize = sizeSmall; return b }
+
+// Primary sets the button's look to ButtonPrimary.
+func (b *ButtonElement) Primary() *ButtonElement { return b.Variant(ButtonPrimary) }
+
+// Secondary sets the button's look to ButtonSecondary.
+func (b *ButtonElement) Secondary() *ButtonElement { return b.Variant(ButtonSecondary) }
+
+// Ghost sets the button's look to ButtonGhost.
+func (b *ButtonElement) Ghost() *ButtonElement { return b.Variant(ButtonGhost) }
+
+// Danger sets the button's look to ButtonDanger.
+func (b *ButtonElement) Danger() *ButtonElement { return b.Variant(ButtonDanger) }
+
+// Small makes the button use the small control size.
+func (b *ButtonElement) Small() *ButtonElement { b.ctlSize = sizeSmall; return b }
 
 // Large makes the button larger: 40 px high with 16 px text, for prominent or
 // touch-friendly actions. Small and Large replace each other.
-func (b *ButtonElement) Large() *ButtonElement          { b.ctlSize = sizeLarge; return b }
+func (b *ButtonElement) Large() *ButtonElement { b.ctlSize = sizeLarge; return b }
+
+// Disabled sets whether the button is disabled, so that it cannot be pressed.
 func (b *ButtonElement) Disabled(d bool) *ButtonElement { b.disabled = d; return b }
 
 // The sizing methods give the button's outer box a size. A button is as wide as
 // its label by default, and Width(Full) fills its container (see Sizing in
 // docs/styling.md).
-func (b *ButtonElement) Width(l Length) *ButtonElement          { b.size.setWidth(l); return b }
-func (b *ButtonElement) Height(l Length) *ButtonElement         { b.size.setHeight(l); return b }
-func (b *ButtonElement) MinWidth(l Length) *ButtonElement       { b.size.setMinWidth(l); return b }
-func (b *ButtonElement) MinHeight(l Length) *ButtonElement      { b.size.setMinHeight(l); return b }
-func (b *ButtonElement) MaxWidth(l Length) *ButtonElement       { b.size.setMaxWidth(l); return b }
-func (b *ButtonElement) MaxHeight(l Length) *ButtonElement      { b.size.setMaxHeight(l); return b }
-func (b *ButtonElement) Grow(f float32) *ButtonElement          { b.size.setGrow(f); return b }
+func (b *ButtonElement) Width(l Length) *ButtonElement { b.size.setWidth(l); return b }
+
+// Height sets the height of the button.
+func (b *ButtonElement) Height(l Length) *ButtonElement { b.size.setHeight(l); return b }
+
+// MinWidth sets the smallest width of the button.
+func (b *ButtonElement) MinWidth(l Length) *ButtonElement { b.size.setMinWidth(l); return b }
+
+// MinHeight sets the smallest height of the button.
+func (b *ButtonElement) MinHeight(l Length) *ButtonElement { b.size.setMinHeight(l); return b }
+
+// MaxWidth sets the largest width of the button.
+func (b *ButtonElement) MaxWidth(l Length) *ButtonElement { b.size.setMaxWidth(l); return b }
+
+// MaxHeight sets the largest height of the button.
+func (b *ButtonElement) MaxHeight(l Length) *ButtonElement { b.size.setMaxHeight(l); return b }
+
+// Grow makes the button take a share of the free space on its parent's main axis.
+func (b *ButtonElement) Grow(f float32) *ButtonElement { b.size.setGrow(f); return b }
+
+// GridSpan sets how many columns and rows the button covers in its parent's grid.
 func (b *ButtonElement) GridSpan(cols, rows int) *ButtonElement { b.size.setSpan(cols, rows); return b }
 
 // Label names the button for assistive technology. A button with text needs
@@ -540,7 +581,10 @@ func TextInput(value *Signal[string]) *TextInputElement {
 func (*TextInputElement) isElement()            {}
 func (ti *TextInputElement) elementKey() string { return ti.key }
 
-func (ti *TextInputElement) Key(k string) *TextInputElement         { ti.key = k; return ti }
+// Key identifies the text input among its siblings (see DivElement.Key).
+func (ti *TextInputElement) Key(k string) *TextInputElement { ti.key = k; return ti }
+
+// Placeholder sets the text shown while the field is empty.
 func (ti *TextInputElement) Placeholder(s string) *TextInputElement { ti.placeholder = s; return ti }
 
 // Label names the field for assistive technology. A field has no visible
@@ -559,8 +603,14 @@ func (ti *TextInputElement) DescribedBy(keys ...string) *TextInputElement {
 	ti.describedBy = keys
 	return ti
 }
-func (ti *TextInputElement) Icon(ic *icons.Icon) *TextInputElement      { ti.icon = ic; return ti }
+
+// Icon sets an icon drawn inside the field, before the text.
+func (ti *TextInputElement) Icon(ic *icons.Icon) *TextInputElement { ti.icon = ic; return ti }
+
+// OnSubmit sets the function that runs with the text when Enter is pressed.
 func (ti *TextInputElement) OnSubmit(fn func(string)) *TextInputElement { ti.onSubmit = fn; return ti }
+
+// OnChange sets the function that runs with the text on each change.
 func (ti *TextInputElement) OnChange(fn func(string)) *TextInputElement { ti.onChange = fn; return ti }
 
 // ReadOnly shows the text without letting it change: the field can still be
@@ -622,13 +672,27 @@ func (ti *TextInputElement) Large() *TextInputElement { ti.ctlSize = sizeLarge; 
 // The sizing methods give the field's frame a size. A field is textFieldWidth wide
 // by default, so Width(Full) fills its container, and the frame never shrinks below
 // the room for a few characters (see MinWidth). See Sizing in docs/styling.md.
-func (ti *TextInputElement) Width(l Length) *TextInputElement     { ti.size.setWidth(l); return ti }
-func (ti *TextInputElement) Height(l Length) *TextInputElement    { ti.size.setHeight(l); return ti }
-func (ti *TextInputElement) MinWidth(l Length) *TextInputElement  { ti.size.setMinWidth(l); return ti }
+func (ti *TextInputElement) Width(l Length) *TextInputElement { ti.size.setWidth(l); return ti }
+
+// Height sets the height of the text input.
+func (ti *TextInputElement) Height(l Length) *TextInputElement { ti.size.setHeight(l); return ti }
+
+// MinWidth sets the smallest width of the text input.
+func (ti *TextInputElement) MinWidth(l Length) *TextInputElement { ti.size.setMinWidth(l); return ti }
+
+// MinHeight sets the smallest height of the text input.
 func (ti *TextInputElement) MinHeight(l Length) *TextInputElement { ti.size.setMinHeight(l); return ti }
-func (ti *TextInputElement) MaxWidth(l Length) *TextInputElement  { ti.size.setMaxWidth(l); return ti }
+
+// MaxWidth sets the largest width of the text input.
+func (ti *TextInputElement) MaxWidth(l Length) *TextInputElement { ti.size.setMaxWidth(l); return ti }
+
+// MaxHeight sets the largest height of the text input.
 func (ti *TextInputElement) MaxHeight(l Length) *TextInputElement { ti.size.setMaxHeight(l); return ti }
-func (ti *TextInputElement) Grow(f float32) *TextInputElement     { ti.size.setGrow(f); return ti }
+
+// Grow makes the text input take a share of the free space on its parent's main axis.
+func (ti *TextInputElement) Grow(f float32) *TextInputElement { ti.size.setGrow(f); return ti }
+
+// GridSpan sets how many columns and rows the text input covers in its parent's grid.
 func (ti *TextInputElement) GridSpan(cols, rows int) *TextInputElement {
 	ti.size.setSpan(cols, rows)
 	return ti
@@ -676,7 +740,10 @@ func TextArea(value *Signal[string]) *TextAreaElement {
 func (*TextAreaElement) isElement()            {}
 func (ta *TextAreaElement) elementKey() string { return ta.key }
 
-func (ta *TextAreaElement) Key(k string) *TextAreaElement         { ta.key = k; return ta }
+// Key identifies the text area among its siblings (see DivElement.Key).
+func (ta *TextAreaElement) Key(k string) *TextAreaElement { ta.key = k; return ta }
+
+// Placeholder sets the text shown while the area is empty.
 func (ta *TextAreaElement) Placeholder(s string) *TextAreaElement { ta.placeholder = s; return ta }
 
 // Label names the field for assistive technology; see TextInputElement.Label.
@@ -694,6 +761,8 @@ func (ta *TextAreaElement) DescribedBy(keys ...string) *TextAreaElement {
 	ta.describedBy = keys
 	return ta
 }
+
+// OnChange sets the function that runs with the text on each change.
 func (ta *TextAreaElement) OnChange(fn func(string)) *TextAreaElement { ta.onChange = fn; return ta }
 
 // ReadOnly shows the text without letting it change: the field can still be
@@ -724,13 +793,27 @@ func (ta *TextAreaElement) Style(s Style) *TextAreaElement {
 
 // The sizing methods give the editor's frame a size, as for TextInput. A text area
 // is textFieldWidth wide by default.
-func (ta *TextAreaElement) Width(l Length) *TextAreaElement     { ta.size.setWidth(l); return ta }
-func (ta *TextAreaElement) Height(l Length) *TextAreaElement    { ta.size.setHeight(l); return ta }
-func (ta *TextAreaElement) MinWidth(l Length) *TextAreaElement  { ta.size.setMinWidth(l); return ta }
+func (ta *TextAreaElement) Width(l Length) *TextAreaElement { ta.size.setWidth(l); return ta }
+
+// Height sets the height of the text area.
+func (ta *TextAreaElement) Height(l Length) *TextAreaElement { ta.size.setHeight(l); return ta }
+
+// MinWidth sets the smallest width of the text area.
+func (ta *TextAreaElement) MinWidth(l Length) *TextAreaElement { ta.size.setMinWidth(l); return ta }
+
+// MinHeight sets the smallest height of the text area.
 func (ta *TextAreaElement) MinHeight(l Length) *TextAreaElement { ta.size.setMinHeight(l); return ta }
-func (ta *TextAreaElement) MaxWidth(l Length) *TextAreaElement  { ta.size.setMaxWidth(l); return ta }
+
+// MaxWidth sets the largest width of the text area.
+func (ta *TextAreaElement) MaxWidth(l Length) *TextAreaElement { ta.size.setMaxWidth(l); return ta }
+
+// MaxHeight sets the largest height of the text area.
 func (ta *TextAreaElement) MaxHeight(l Length) *TextAreaElement { ta.size.setMaxHeight(l); return ta }
-func (ta *TextAreaElement) Grow(f float32) *TextAreaElement     { ta.size.setGrow(f); return ta }
+
+// Grow makes the text area take a share of the free space on its parent's main axis.
+func (ta *TextAreaElement) Grow(f float32) *TextAreaElement { ta.size.setGrow(f); return ta }
+
+// GridSpan sets how many columns and rows the text area covers in its parent's grid.
 func (ta *TextAreaElement) GridSpan(cols, rows int) *TextAreaElement {
 	ta.size.setSpan(cols, rows)
 	return ta

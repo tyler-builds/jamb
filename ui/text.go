@@ -53,9 +53,13 @@ func (t *TextElement) FontSize(px float32) *TextElement { t.style.FontSize = px;
 func (t *TextElement) Weight(w FontWeight) *TextElement { t.style.FontWeight = w; return t }
 
 // Medium, Semibold and Bold are shorthands for Weight.
-func (t *TextElement) Medium() *TextElement   { return t.Weight(FontMedium) }
+func (t *TextElement) Medium() *TextElement { return t.Weight(FontMedium) }
+
+// Semibold sets the text's weight to FontSemibold.
 func (t *TextElement) Semibold() *TextElement { return t.Weight(FontSemibold) }
-func (t *TextElement) Bold() *TextElement     { return t.Weight(FontBold) }
+
+// Bold sets the text's weight to FontBold.
+func (t *TextElement) Bold() *TextElement { return t.Weight(FontBold) }
 
 // TextColor sets the text color.
 func (t *TextElement) TextColor(c Color) *TextElement { t.style.TextColor = c; return t }

@@ -72,7 +72,9 @@ func (c Color) vectorPaint() vector.Paint {
 
 // ColorStop is a color at At (0 to 1) along a gradient.
 type ColorStop struct {
-	At    float32
+	// At is the position of the stop, from 0 to 1 along the gradient.
+	At float32
+	// Color is the color at the stop.
 	Color Color
 }
 
@@ -194,25 +196,31 @@ type LineJoin uint8
 
 const (
 	JoinMiter LineJoin = iota // sharp, cut flat past the miter limit
+	// JoinRound joins two segments with a round corner.
 	JoinRound
+	// JoinBevel joins two segments with a corner cut flat across the angle.
 	JoinBevel
 )
 
 // StrokeStyle is how Painter.Stroke draws a path's outline.
 type StrokeStyle struct {
 	Width float32 // 0 means 1
+	// Color is the color of the stroke, unless Paint is set.
 	Color Color
 	// Paint, when set, paints the stroke in place of Color, such as with a
 	// gradient.
 	Paint Paint
-	Cap   LineCap
-	Join  LineJoin
+	// Cap is the shape of the ends of an open path.
+	Cap LineCap
+	// Join is the shape of the corners of the path.
+	Join LineJoin
 	// MiterLimit is the longest a miter join gets, as a multiple of Width,
 	// before it is cut flat; 0 means 4.
 	MiterLimit float32
 	// Dash alternates dash and gap lengths, such as {4, 2}; empty is solid.
 	// DashOffset starts the pattern that far in.
-	Dash       []float32
+	Dash []float32
+	// DashOffset starts the dash pattern that far in.
 	DashOffset float32
 }
 
@@ -220,7 +228,8 @@ type StrokeStyle struct {
 type TextFormat struct {
 	FontSize float32 // 0 means the theme's text size
 	Color    Color   // zero means the inherited text color (see Painter.TextColor)
-	Weight   FontWeight
+	// Weight is the font weight of the text.
+	Weight FontWeight
 	// Mono sets the text in the monospace family, as code is set.
 	Mono bool
 	// Italic draws the text in the italic face of its family. A family with no
@@ -267,7 +276,9 @@ func (p *Painter) Stroke(path *Path, s StrokeStyle) {
 }
 
 // Save remembers the transform, clip and alpha, which Restore brings back.
-func (p *Painter) Save()    { p.c.Save() }
+func (p *Painter) Save() { p.c.Save() }
+
+// Restore brings back the transform, clip and alpha that the last Save remembered.
 func (p *Painter) Restore() { p.c.Restore() }
 
 // Translate moves the origin of later drawing by x, y.

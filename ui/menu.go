@@ -34,8 +34,11 @@ const (
 type MenuCheck uint8
 
 const (
+	// MenuCheckNone shows no check mark.
 	MenuCheckNone MenuCheck = iota
+	// MenuCheckBox shows a check mark, for an item that turns on and off.
 	MenuCheckBox
+	// MenuCheckRadio shows a radio mark, for one item of a group.
 	MenuCheckRadio
 )
 
@@ -44,10 +47,14 @@ const (
 // are set, Action runs. A non-empty Submenu opens a menu to the right instead
 // of running.
 type MenuItem struct {
-	Kind     MenuKind
-	Label    string // defaults to the Action's label
-	Icon     *icons.Icon
-	Action   *Action
+	// Kind is the kind of item: an action, a separator, or a submenu.
+	Kind  MenuKind
+	Label string // defaults to the Action's label
+	// Icon is an icon shown before the label.
+	Icon *icons.Icon
+	// Action is the action that the item runs, and whose key it shows.
+	Action *Action
+	// OnClick runs when the item is chosen.
 	OnClick  func()
 	Disabled bool       // shown, but cannot be chosen
 	Check    MenuCheck  // see MenuCheck
@@ -174,7 +181,9 @@ func resolveMenu(ctx *Context, inst MenuStyle) MenuStyle {
 // TopMenu is one menu of a MenuBar: the label on the bar, and the function that
 // builds the menu's items when the menu opens.
 type TopMenu struct {
+	// Label is the text of the menu in the menu bar.
 	Label string
+	// Items builds the items of the menu when it opens.
 	Items func() []MenuItem
 }
 

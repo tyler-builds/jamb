@@ -255,6 +255,7 @@ func NumberInput[T int | float64](value *Signal[T], lo, hi, step T) *NumberInput
 func (*NumberInputElement[T]) isElement()           {}
 func (n *NumberInputElement[T]) elementKey() string { return n.key }
 
+// Key identifies the number input among its siblings (see DivElement.Key).
 func (n *NumberInputElement[T]) Key(k string) *NumberInputElement[T] { n.key = k; return n }
 
 // Label names the field for assistive technology, such as "Quiet hours from".
@@ -293,19 +294,29 @@ func (n *NumberInputElement[T]) Precision(d int) *NumberInputElement[T] { n.prec
 // wide at the Text size of 100 percent; Width(Full) fills the container, and the
 // spin buttons stay at the frame's edges. See Sizing in docs/styling.md.
 func (n *NumberInputElement[T]) Width(l Length) *NumberInputElement[T] { n.size.setWidth(l); return n }
+
+// Height sets the height of the number input.
 func (n *NumberInputElement[T]) Height(l Length) *NumberInputElement[T] {
 	n.size.setHeight(l)
 	return n
 }
+
+// MinWidth sets the smallest width of the number input.
 func (n *NumberInputElement[T]) MinWidth(l Length) *NumberInputElement[T] {
 	n.size.setMinWidth(l)
 	return n
 }
+
+// MaxWidth sets the largest width of the number input.
 func (n *NumberInputElement[T]) MaxWidth(l Length) *NumberInputElement[T] {
 	n.size.setMaxWidth(l)
 	return n
 }
+
+// Grow makes the number input take a share of the free space on its parent's main axis.
 func (n *NumberInputElement[T]) Grow(f float32) *NumberInputElement[T] { n.size.setGrow(f); return n }
+
+// GridSpan sets how many columns and rows the number input covers in its parent's grid.
 func (n *NumberInputElement[T]) GridSpan(cols, rows int) *NumberInputElement[T] {
 	n.size.setSpan(cols, rows)
 	return n

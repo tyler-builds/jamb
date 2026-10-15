@@ -27,13 +27,27 @@ type ListElement struct {
 
 // The sizing methods give the list's outer box a size, over its Style. See Sizing
 // in docs/styling.md.
-func (l *ListElement) Width(v Length) *ListElement          { l.size.setWidth(v); return l }
-func (l *ListElement) Height(v Length) *ListElement         { l.size.setHeight(v); return l }
-func (l *ListElement) MinWidth(v Length) *ListElement       { l.size.setMinWidth(v); return l }
-func (l *ListElement) MinHeight(v Length) *ListElement      { l.size.setMinHeight(v); return l }
-func (l *ListElement) MaxWidth(v Length) *ListElement       { l.size.setMaxWidth(v); return l }
-func (l *ListElement) MaxHeight(v Length) *ListElement      { l.size.setMaxHeight(v); return l }
-func (l *ListElement) Grow(f float32) *ListElement          { l.size.setGrow(f); return l }
+func (l *ListElement) Width(v Length) *ListElement { l.size.setWidth(v); return l }
+
+// Height sets the height of the list.
+func (l *ListElement) Height(v Length) *ListElement { l.size.setHeight(v); return l }
+
+// MinWidth sets the smallest width of the list.
+func (l *ListElement) MinWidth(v Length) *ListElement { l.size.setMinWidth(v); return l }
+
+// MinHeight sets the smallest height of the list.
+func (l *ListElement) MinHeight(v Length) *ListElement { l.size.setMinHeight(v); return l }
+
+// MaxWidth sets the largest width of the list.
+func (l *ListElement) MaxWidth(v Length) *ListElement { l.size.setMaxWidth(v); return l }
+
+// MaxHeight sets the largest height of the list.
+func (l *ListElement) MaxHeight(v Length) *ListElement { l.size.setMaxHeight(v); return l }
+
+// Grow makes the list take a share of the free space on its parent's main axis.
+func (l *ListElement) Grow(f float32) *ListElement { l.size.setGrow(f); return l }
+
+// GridSpan sets how many columns and rows the list covers in its parent's grid.
 func (l *ListElement) GridSpan(cols, rows int) *ListElement { l.size.setSpan(cols, rows); return l }
 
 // ListOf creates a scrolling list of items whose rows may differ in height.

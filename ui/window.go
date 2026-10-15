@@ -87,7 +87,9 @@ func (d *DivElement) interactive() bool {
 // in later versions, so an implementation should embed NopWindow, which has every
 // method of Window.
 type Window interface {
+	// Minimize minimizes the window to the taskbar.
 	Minimize()
+	// ToggleMaximize maximizes the window, or restores it when it is maximized.
 	ToggleMaximize()
 	// Focus brings the window to the front and gives it keyboard focus.
 	Focus()
@@ -104,6 +106,7 @@ type Window interface {
 	// the notification area instead. A close button that the app draws itself
 	// calls it.
 	RequestClose()
+	// SetTitle sets the title that the title bar and the taskbar show.
 	SetTitle(title string)
 	// Focused reports whether the window has keyboard focus. Read inside a
 	// component, it is reactive.
@@ -112,14 +115,17 @@ type Window interface {
 	// Position returns the window's top-left corner on the screen, and Size
 	// the size of its content, in logical pixels as app.Window takes them.
 	Position() (x, y int)
+	// Size returns the size of the window's content in logical pixels; see Position.
 	Size() (width, height int)
 	// SetPosition moves the window and SetSize resizes its content, in logical
 	// pixels. A maximized or fullscreen window is restored first.
 	SetPosition(x, y int)
+	// SetSize resizes the window's content, in logical pixels; see SetPosition.
 	SetSize(width, height int)
 	// SetFullscreen makes the window cover its monitor without a frame, or puts
 	// it back where it was. Fullscreen reports which.
 	SetFullscreen(on bool)
+	// Fullscreen reports whether the window is fullscreen; see SetFullscreen.
 	Fullscreen() bool
 
 	// OpenFiles shows the system's file-open dialog, owned by this window. It
@@ -137,6 +143,7 @@ type Window interface {
 	// hidden window draws nothing until Show. These are Windows operations, and
 	// see also app.Window.CloseToTray.
 	Show()
+	// Hide hides the window and its taskbar button; see Show.
 	Hide()
 	// SetTaskbarProgress sets the progress bar of the window's taskbar button.
 	SetTaskbarProgress(p TaskbarProgress)
@@ -158,30 +165,74 @@ type NopWindow struct{}
 
 var _ Window = NopWindow{}
 
-func (NopWindow) Minimize()       {}
-func (NopWindow) ToggleMaximize() {}
-func (NopWindow) Maximized() bool { return false }
-func (NopWindow) Focus()          {}
-func (NopWindow) Closed() bool    { return false }
-func (NopWindow) Close()          {}
-func (NopWindow) RequestClose()   {}
-func (NopWindow) SetTitle(string) {}
-func (NopWindow) Focused() bool   { return false }
+// Minimize does nothing.
+func (NopWindow) Minimize() {}
 
-func (NopWindow) Position() (x, y int)                                   { return 0, 0 }
-func (NopWindow) Size() (width, height int)                              { return 0, 0 }
-func (NopWindow) SetPosition(x, y int)                                   {}
-func (NopWindow) SetSize(width, height int)                              {}
-func (NopWindow) SetFullscreen(on bool)                                  {}
-func (NopWindow) Fullscreen() bool                                       { return false }
-func (NopWindow) OpenFiles(dialog.FileOptions, func(dialog.FileResult))  {}
-func (NopWindow) SaveFile(dialog.FileOptions, func(dialog.FileResult))   {}
+// ToggleMaximize does nothing.
+func (NopWindow) ToggleMaximize() {}
+
+// Maximized returns false.
+func (NopWindow) Maximized() bool { return false }
+
+// Focus does nothing.
+func (NopWindow) Focus() {}
+
+// Closed returns false.
+func (NopWindow) Closed() bool { return false }
+
+// Close does nothing.
+func (NopWindow) Close() {}
+
+// RequestClose does nothing.
+func (NopWindow) RequestClose() {}
+
+// SetTitle does nothing.
+func (NopWindow) SetTitle(string) {}
+
+// Focused returns false.
+func (NopWindow) Focused() bool { return false }
+
+// Position returns the zero position.
+func (NopWindow) Position() (x, y int) { return 0, 0 }
+
+// Size returns zero.
+func (NopWindow) Size() (width, height int) { return 0, 0 }
+
+// SetPosition does nothing.
+func (NopWindow) SetPosition(x, y int) {}
+
+// SetSize does nothing.
+func (NopWindow) SetSize(width, height int) {}
+
+// SetFullscreen does nothing.
+func (NopWindow) SetFullscreen(on bool) {}
+
+// Fullscreen returns false.
+func (NopWindow) Fullscreen() bool { return false }
+
+// OpenFiles does nothing, and its done function is not called.
+func (NopWindow) OpenFiles(dialog.FileOptions, func(dialog.FileResult)) {}
+
+// SaveFile does nothing, and its done function is not called.
+func (NopWindow) SaveFile(dialog.FileOptions, func(dialog.FileResult)) {}
+
+// PickFolder does nothing, and its done function is not called.
 func (NopWindow) PickFolder(dialog.FileOptions, func(dialog.FileResult)) {}
-func (NopWindow) Show()                                                  {}
-func (NopWindow) Hide()                                                  {}
-func (NopWindow) SetTaskbarProgress(TaskbarProgress)                     {}
-func (NopWindow) SetTaskbarBadge(image.Image, string)                    {}
-func (NopWindow) MessageBox(dialog.MessageOptions, func(dialog.Button))  {}
+
+// Show does nothing.
+func (NopWindow) Show() {}
+
+// Hide does nothing.
+func (NopWindow) Hide() {}
+
+// SetTaskbarProgress does nothing.
+func (NopWindow) SetTaskbarProgress(TaskbarProgress) {}
+
+// SetTaskbarBadge does nothing.
+func (NopWindow) SetTaskbarBadge(image.Image, string) {}
+
+// MessageBox does nothing, and its done function is not called.
+func (NopWindow) MessageBox(dialog.MessageOptions, func(dialog.Button)) {}
 
 // windowRef is what Context.Window returns. Its actions go to the app's
 // controls (a headless runtime has none, so they do nothing). Maximized and

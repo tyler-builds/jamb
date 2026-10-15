@@ -213,14 +213,22 @@ type FrameStats struct {
 	NodesLaidOut int // nodes whose children were re-positioned
 	Measured     int // layout measurements that were not served from cache
 	NodesPainted int // nodes painted (off-screen subtrees are culled and not counted)
-	Built        bool
-	LaidOut      bool
-	Painted      bool
-	BuildTime    time.Duration
-	LayoutTime   time.Duration
-	PaintTime    time.Duration
-	Quads        int
-	Glyphs       int
+	// Built reports whether the frame built the tree.
+	Built bool
+	// LaidOut reports whether the frame laid out the tree.
+	LaidOut bool
+	// Painted reports whether the frame painted the tree.
+	Painted bool
+	// BuildTime is the time the frame spent building the tree.
+	BuildTime time.Duration
+	// LayoutTime is the time the frame spent laying out the tree.
+	LayoutTime time.Duration
+	// PaintTime is the time the frame spent painting.
+	PaintTime time.Duration
+	// Quads is the number of quads drawn in the frame.
+	Quads int
+	// Glyphs is the number of glyphs drawn in the frame.
+	Glyphs int
 }
 
 // Runtime turns a root render function into scenes and routes input to
@@ -618,8 +626,12 @@ func (rt *Runtime) SetZoom(z float32) {
 }
 
 // ZoomIn and ZoomOut move to the next zoom level; ResetZoom returns to 100%.
-func (rt *Runtime) ZoomIn()    { rt.zoomStep(+1) }
-func (rt *Runtime) ZoomOut()   { rt.zoomStep(-1) }
+func (rt *Runtime) ZoomIn() { rt.zoomStep(+1) }
+
+// ZoomOut makes the content one step smaller.
+func (rt *Runtime) ZoomOut() { rt.zoomStep(-1) }
+
+// ResetZoom returns the content to 100 percent.
 func (rt *Runtime) ResetZoom() { rt.SetZoom(1) }
 
 func (rt *Runtime) zoomStep(dir int) {

@@ -215,6 +215,7 @@ func (s *SelectElement[T]) formWire(w fieldWire) Element {
 func (*SelectElement[T]) isElement()           {}
 func (s *SelectElement[T]) elementKey() string { return s.key }
 
+// Key identifies the select among its siblings (see DivElement.Key).
 func (s *SelectElement[T]) Key(k string) *SelectElement[T] { s.key = k; return s }
 
 // Label names the field for assistive technology, such as "Channel".
@@ -243,13 +244,27 @@ func (s *SelectElement[T]) OnChange(fn func(T)) *SelectElement[T] { s.onChange =
 // The sizing methods give the field a size. The field is 220 px wide at the Text
 // size of 100 percent by default; Width(Full) fills its container. The list is at
 // least as wide as the field. See Sizing in docs/styling.md.
-func (s *SelectElement[T]) Width(l Length) *SelectElement[T]     { s.size.setWidth(l); return s }
-func (s *SelectElement[T]) Height(l Length) *SelectElement[T]    { s.size.setHeight(l); return s }
-func (s *SelectElement[T]) MinWidth(l Length) *SelectElement[T]  { s.size.setMinWidth(l); return s }
+func (s *SelectElement[T]) Width(l Length) *SelectElement[T] { s.size.setWidth(l); return s }
+
+// Height sets the height of the select.
+func (s *SelectElement[T]) Height(l Length) *SelectElement[T] { s.size.setHeight(l); return s }
+
+// MinWidth sets the smallest width of the select.
+func (s *SelectElement[T]) MinWidth(l Length) *SelectElement[T] { s.size.setMinWidth(l); return s }
+
+// MinHeight sets the smallest height of the select.
 func (s *SelectElement[T]) MinHeight(l Length) *SelectElement[T] { s.size.setMinHeight(l); return s }
-func (s *SelectElement[T]) MaxWidth(l Length) *SelectElement[T]  { s.size.setMaxWidth(l); return s }
+
+// MaxWidth sets the largest width of the select.
+func (s *SelectElement[T]) MaxWidth(l Length) *SelectElement[T] { s.size.setMaxWidth(l); return s }
+
+// MaxHeight sets the largest height of the select.
 func (s *SelectElement[T]) MaxHeight(l Length) *SelectElement[T] { s.size.setMaxHeight(l); return s }
-func (s *SelectElement[T]) Grow(f float32) *SelectElement[T]     { s.size.setGrow(f); return s }
+
+// Grow makes the select take a share of the free space on its parent's main axis.
+func (s *SelectElement[T]) Grow(f float32) *SelectElement[T] { s.size.setGrow(f); return s }
+
+// GridSpan sets how many columns and rows the select covers in its parent's grid.
 func (s *SelectElement[T]) GridSpan(cols, rows int) *SelectElement[T] {
 	s.size.setSpan(cols, rows)
 	return s

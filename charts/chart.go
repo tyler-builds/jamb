@@ -250,13 +250,20 @@ func (c *Chart) Styles(st Style) *Chart {
 // Under high contrast the colors of these parts are the system colors, whatever is set
 // here; their sizes, spacing and fonts still apply.
 type Style struct {
-	Chart      ui.Style
-	Title      ui.Style
-	Axis       ui.Style
-	Grid       ui.Style
-	Legend     ui.Style
+	// Chart is the style of the whole chart.
+	Chart ui.Style
+	// Title is the style of the chart's title.
+	Title ui.Style
+	// Axis is the style of the axis labels and titles.
+	Axis ui.Style
+	// Grid is the style of the grid lines.
+	Grid ui.Style
+	// Legend is the style of the legend.
+	Legend ui.Style
+	// LegendItem is the style of each item of the legend.
 	LegendItem ui.Style
-	Tooltip    ui.Style
+	// Tooltip is the style of the tooltip that the pointer shows.
+	Tooltip ui.Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.

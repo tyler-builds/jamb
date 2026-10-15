@@ -70,11 +70,21 @@ func (d *DrawerElement) Styles(st DrawerStyle) *DrawerElement { d.m.Styles(st); 
 // The sizing methods size the panel across its side: the width of a left or
 // right drawer (360 px by default) and the height of a top or bottom one (280 px).
 // A percentage is of the window. See Sizing in docs/styling.md.
-func (d *DrawerElement) Width(l Length) *DrawerElement     { d.m.size.setWidth(l); return d }
-func (d *DrawerElement) MinWidth(l Length) *DrawerElement  { d.m.size.setMinWidth(l); return d }
-func (d *DrawerElement) MaxWidth(l Length) *DrawerElement  { d.m.size.setMaxWidth(l); return d }
-func (d *DrawerElement) Height(l Length) *DrawerElement    { d.m.size.setHeight(l); return d }
+func (d *DrawerElement) Width(l Length) *DrawerElement { d.m.size.setWidth(l); return d }
+
+// MinWidth sets the smallest width of the drawer.
+func (d *DrawerElement) MinWidth(l Length) *DrawerElement { d.m.size.setMinWidth(l); return d }
+
+// MaxWidth sets the largest width of the drawer.
+func (d *DrawerElement) MaxWidth(l Length) *DrawerElement { d.m.size.setMaxWidth(l); return d }
+
+// Height sets the height of the drawer.
+func (d *DrawerElement) Height(l Length) *DrawerElement { d.m.size.setHeight(l); return d }
+
+// MinHeight sets the smallest height of the drawer.
 func (d *DrawerElement) MinHeight(l Length) *DrawerElement { d.m.size.setMinHeight(l); return d }
+
+// MaxHeight sets the largest height of the drawer.
 func (d *DrawerElement) MaxHeight(l Length) *DrawerElement { d.m.size.setMaxHeight(l); return d }
 
 // drawerDefaults returns the built-in look of a drawer at side, from the colors

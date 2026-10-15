@@ -16,8 +16,11 @@ type Rect = scene.Rect
 // method's caret at byte Cursor in it, and the clause being converted from byte
 // ClauseStart to ClauseEnd. The clause is empty when there is none.
 type Composition struct {
-	Text                   string
-	Cursor                 int
+	// Text is the text of the composition.
+	Text string
+	// Cursor is the byte offset of the caret in Text.
+	Cursor int
+	// ClauseStart and ClauseEnd are the byte range of the clause that is being converted.
 	ClauseStart, ClauseEnd int
 }
 

@@ -239,8 +239,11 @@ var actionNames = [...]string{
 // fraction of the view to move, positive down and right. For ActionSetRangeValue
 // X is the new value of the range.
 type Request struct {
-	Action        Action
-	Value         string
+	// Action is the action that the request asks the tree to perform.
+	Action Action
+	// Value is the new text for ActionSetValue.
+	Value string
+	// X and Y are the position or the amount that the action takes, as described above.
 	X, Y          float64
 	Anchor, Caret int // the selection for ActionSetTextSelection, as byte offsets of the text
 }
@@ -270,7 +273,9 @@ const (
 // PropertyChange records that a property of a node changed between two
 // snapshots.
 type PropertyChange struct {
-	ID       ID
+	// ID is the node whose property changed.
+	ID ID
+	// Property is the property that changed.
 	Property Property
 }
 
@@ -285,6 +290,7 @@ func (a Action) String() string {
 // Rect is a rectangle in physical pixels, relative to the top-left corner of
 // the window's client area. Adapters convert it to screen coordinates.
 type Rect struct {
+	// X, Y, W and H are the position and the size of the rectangle, in physical pixels.
 	X, Y, W, H float32
 }
 
@@ -317,14 +323,18 @@ func (p Politeness) String() string {
 // Announcement is text to speak for a status message that has no focused
 // element to carry it, such as "3 results".
 type Announcement struct {
-	Text       string
+	// Text is the message to announce.
+	Text string
+	// Politeness is how urgently the message is announced.
 	Politeness Politeness
 }
 
 // Range is the number a slider or spin box holds, with the bounds and the steps
 // it moves by. A node with a Range exposes the RangeValue pattern.
 type Range struct {
-	Value       float64
+	// Value is the current value of the range.
+	Value float64
+	// Min and Max are the ends of the range.
 	Min, Max    float64
 	SmallChange float64 // the step of an arrow key
 	LargeChange float64 // the step of Page Up and Page Down
@@ -344,18 +354,25 @@ func (r *Range) Equal(o *Range) bool {
 // Node is one element of the access tree. A Tree holds its nodes; a Node is
 // not changed after the tree is published.
 type Node struct {
-	ID          ID
+	// ID identifies the node in its tree.
+	ID ID
+	// Role is the kind of control that the node is, as assistive technology sees it.
 	Role        Role
 	Name        string // the accessible name: what a screen reader says first
 	Description string // help text, read after the name
 	// Key is the element's key in the ui package, exposed as the automation
 	// ID so that tests can find a node by something other than its name.
-	Key         string
-	Value       string // the current value of a text field
-	States      State
-	Actions     []Action
-	Bounds      Rect
-	Parent      ID
+	Key   string
+	Value string // the current value of a text field
+	// States are the state flags of the node, such as focused or disabled.
+	States State
+	// Actions are the actions that assistive technology may ask the node to perform.
+	Actions []Action
+	// Bounds is the rectangle of the node, in window coordinates.
+	Bounds Rect
+	// Parent is the ID of the node's parent, or zero for the root.
+	Parent ID
+	// Children are the IDs of the node's children, in order.
 	Children    []ID
 	LabelledBy  []ID // nodes whose names name this one, in order
 	DescribedBy []ID // nodes whose text describes this one, in order
@@ -364,9 +381,10 @@ type Node struct {
 	PosInSet    int  // 1-based position among its siblings in a set, such as a row of a list; 0 when not in a set
 	SetSize     int  // the number of items in the set; 0 when not in a set
 	Level       int  // the nesting depth of a menu or tree item, 1 for the top; 0 when not set
-	Scroll      Scroll
-	Text        *TextInfo // the text of a text field or text area, for the Text pattern; nil otherwise
-	Range       *Range    // the number of a slider or spin box, for the RangeValue pattern; nil otherwise
+	// Scroll is the scroll state of the node, when it is a scroll container.
+	Scroll Scroll
+	Text   *TextInfo // the text of a text field or text area, for the Text pattern; nil otherwise
+	Range  *Range    // the number of a slider or spin box, for the RangeValue pattern; nil otherwise
 	// GridRows and GridColumns are the number of rows and columns of a RoleDataGrid, for
 	// the Grid and Table patterns. Rows counts every row of the data, built or not.
 	GridRows, GridColumns int

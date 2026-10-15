@@ -36,19 +36,33 @@ type UniformListElement struct {
 
 // The sizing methods give the list's outer box a size, over its Style. See Sizing
 // in docs/styling.md.
-func (l *UniformListElement) Width(v Length) *UniformListElement    { l.size.setWidth(v); return l }
-func (l *UniformListElement) Height(v Length) *UniformListElement   { l.size.setHeight(v); return l }
+func (l *UniformListElement) Width(v Length) *UniformListElement { l.size.setWidth(v); return l }
+
+// Height sets the height of the uniform list.
+func (l *UniformListElement) Height(v Length) *UniformListElement { l.size.setHeight(v); return l }
+
+// MinWidth sets the smallest width of the uniform list.
 func (l *UniformListElement) MinWidth(v Length) *UniformListElement { l.size.setMinWidth(v); return l }
+
+// MinHeight sets the smallest height of the uniform list.
 func (l *UniformListElement) MinHeight(v Length) *UniformListElement {
 	l.size.setMinHeight(v)
 	return l
 }
+
+// MaxWidth sets the largest width of the uniform list.
 func (l *UniformListElement) MaxWidth(v Length) *UniformListElement { l.size.setMaxWidth(v); return l }
+
+// MaxHeight sets the largest height of the uniform list.
 func (l *UniformListElement) MaxHeight(v Length) *UniformListElement {
 	l.size.setMaxHeight(v)
 	return l
 }
+
+// Grow makes the uniform list take a share of the free space on its parent's main axis.
 func (l *UniformListElement) Grow(f float32) *UniformListElement { l.size.setGrow(f); return l }
+
+// GridSpan sets how many columns and rows the uniform list covers in its parent's grid.
 func (l *UniformListElement) GridSpan(cols, rows int) *UniformListElement {
 	l.size.setSpan(cols, rows)
 	return l

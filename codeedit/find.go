@@ -10,14 +10,18 @@ import (
 // FindOptions are the options of a search: whether it matches case, whole words only,
 // and whether the query is a regular expression (in Go's syntax, RE2).
 type FindOptions struct {
+	// MatchCase makes the search case-sensitive.
 	MatchCase bool
+	// WholeWord matches only whole words.
 	WholeWord bool
-	Regex     bool
+	// Regex treats the query as a regular expression.
+	Regex bool
 }
 
 // A Match is a range of the text that a Finder found, in bytes. For a regular
 // expression it also keeps the submatches, which Replace expands with $1 or ${name}.
 type Match struct {
+	// From and To are the byte offsets of the match.
 	From, To int
 	groups   []int
 }

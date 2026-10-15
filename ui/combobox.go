@@ -46,15 +46,24 @@ var (
 // under the field that says what was reverted or cleared (see AllowFree); both have the
 // look of a field's error message.
 type ComboboxStyle struct {
-	Field             FieldStyle
-	Popup             Style
-	Option            Style
+	// Field is the text frame of the combo box.
+	Field FieldStyle
+	// Popup is the panel that holds the list of options.
+	Popup Style
+	// Option is the style of each option in the list.
+	Option Style
+	// OptionHighlighted is the style of the option that the keyboard or the pointer is on.
 	OptionHighlighted Style
-	OptionDisabled    Style
-	Match             Style
-	Empty             Style
-	Loading           Style
-	Error             Style
+	// OptionDisabled is the style of an option that cannot be chosen.
+	OptionDisabled Style
+	// Match is the style of the part of an option that matches the typed text.
+	Match Style
+	// Empty is the style of the message shown when no option matches.
+	Empty Style
+	// Loading is the style of the message shown while the suggestions load.
+	Loading Style
+	// Error is the style of the message shown when the suggestions cannot be loaded.
+	Error Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -225,6 +234,7 @@ func (c *ComboboxElement[T]) formWire(w fieldWire) Element {
 func (*ComboboxElement[T]) isElement()           {}
 func (c *ComboboxElement[T]) elementKey() string { return c.key }
 
+// Key identifies the combobox among its siblings (see DivElement.Key).
 func (c *ComboboxElement[T]) Key(k string) *ComboboxElement[T] { c.key = k; return c }
 
 // Label names the field for assistive technology, such as "City". The placeholder
@@ -328,19 +338,33 @@ func (c *ComboboxElement[T]) RenderOption(fn func(opt Option[T], state PartState
 // The sizing methods give the field a size. The field is textFieldWidth wide at the
 // Text size of 100 percent by default; Width(Full) fills its container. The list is
 // at least as wide as the field. See Sizing in docs/styling.md.
-func (c *ComboboxElement[T]) Width(l Length) *ComboboxElement[T]    { c.size.setWidth(l); return c }
-func (c *ComboboxElement[T]) Height(l Length) *ComboboxElement[T]   { c.size.setHeight(l); return c }
+func (c *ComboboxElement[T]) Width(l Length) *ComboboxElement[T] { c.size.setWidth(l); return c }
+
+// Height sets the height of the combobox.
+func (c *ComboboxElement[T]) Height(l Length) *ComboboxElement[T] { c.size.setHeight(l); return c }
+
+// MinWidth sets the smallest width of the combobox.
 func (c *ComboboxElement[T]) MinWidth(l Length) *ComboboxElement[T] { c.size.setMinWidth(l); return c }
+
+// MinHeight sets the smallest height of the combobox.
 func (c *ComboboxElement[T]) MinHeight(l Length) *ComboboxElement[T] {
 	c.size.setMinHeight(l)
 	return c
 }
+
+// MaxWidth sets the largest width of the combobox.
 func (c *ComboboxElement[T]) MaxWidth(l Length) *ComboboxElement[T] { c.size.setMaxWidth(l); return c }
+
+// MaxHeight sets the largest height of the combobox.
 func (c *ComboboxElement[T]) MaxHeight(l Length) *ComboboxElement[T] {
 	c.size.setMaxHeight(l)
 	return c
 }
+
+// Grow makes the combobox take a share of the free space on its parent's main axis.
 func (c *ComboboxElement[T]) Grow(f float32) *ComboboxElement[T] { c.size.setGrow(f); return c }
+
+// GridSpan sets how many columns and rows the combobox covers in its parent's grid.
 func (c *ComboboxElement[T]) GridSpan(cols, rows int) *ComboboxElement[T] {
 	c.size.setSpan(cols, rows)
 	return c

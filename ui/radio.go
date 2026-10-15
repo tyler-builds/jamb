@@ -8,8 +8,11 @@ import (
 // Option is one choice of a RadioGroup or a Select: the value it sets, the text
 // it shows, and whether it can be chosen.
 type Option[T comparable] struct {
-	Value    T
-	Label    string
+	// Value is the value that the option sets.
+	Value T
+	// Label is the text of the option.
+	Label string
+	// Disabled makes the option unable to be chosen.
 	Disabled bool
 }
 
@@ -166,6 +169,7 @@ func (r *RadioGroupElement[T]) formWire(w fieldWire) Element {
 func (*RadioGroupElement[T]) isElement()           {}
 func (r *RadioGroupElement[T]) elementKey() string { return r.key }
 
+// Key identifies the radio group among its siblings (see DivElement.Key).
 func (r *RadioGroupElement[T]) Key(k string) *RadioGroupElement[T] { r.key = k; return r }
 
 // Label names the group for assistive technology, such as "Frequency". The
@@ -188,17 +192,27 @@ func (r *RadioGroupElement[T]) Disabled(d bool) *RadioGroupElement[T] { r.disabl
 
 // The sizing methods give the group's outer box a size. A group is as wide as its
 // widest option by default; see Sizing in docs/styling.md.
-func (r *RadioGroupElement[T]) Width(l Length) *RadioGroupElement[T]  { r.size.setWidth(l); return r }
+func (r *RadioGroupElement[T]) Width(l Length) *RadioGroupElement[T] { r.size.setWidth(l); return r }
+
+// Height sets the height of the radio group.
 func (r *RadioGroupElement[T]) Height(l Length) *RadioGroupElement[T] { r.size.setHeight(l); return r }
+
+// MinWidth sets the smallest width of the radio group.
 func (r *RadioGroupElement[T]) MinWidth(l Length) *RadioGroupElement[T] {
 	r.size.setMinWidth(l)
 	return r
 }
+
+// MaxWidth sets the largest width of the radio group.
 func (r *RadioGroupElement[T]) MaxWidth(l Length) *RadioGroupElement[T] {
 	r.size.setMaxWidth(l)
 	return r
 }
+
+// Grow makes the radio group take a share of the free space on its parent's main axis.
 func (r *RadioGroupElement[T]) Grow(f float32) *RadioGroupElement[T] { r.size.setGrow(f); return r }
+
+// GridSpan sets how many columns and rows the radio group covers in its parent's grid.
 func (r *RadioGroupElement[T]) GridSpan(cols, rows int) *RadioGroupElement[T] {
 	r.size.setSpan(cols, rows)
 	return r

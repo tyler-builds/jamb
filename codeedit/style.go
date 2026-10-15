@@ -18,15 +18,24 @@ import "github.com/tyler-builds/jamb/ui"
 // Under high contrast the colors of these parts are the system colors, whatever is set
 // here; their sizes and spacing still apply.
 type Style struct {
-	Box          ui.Style
-	BoxFocused   ui.Style
-	Text         ui.Style
-	Gutter       ui.Style
-	ActiveLine   ui.Style
-	Selection    ui.Style
-	Match        ui.Style
+	// Box is the frame of the editor and its background.
+	Box ui.Style
+	// BoxFocused is the frame while the editor has keyboard focus.
+	BoxFocused ui.Style
+	// Text is the look of the text itself.
+	Text ui.Style
+	// Gutter is the column of line numbers and fold markers.
+	Gutter ui.Style
+	// ActiveLine is the look of the line that holds the caret.
+	ActiveLine ui.Style
+	// Selection is the look of the selected text.
+	Selection ui.Style
+	// Match is the look of each find match.
+	Match ui.Style
+	// CurrentMatch is the look of the find match that is current.
 	CurrentMatch ui.Style
-	Find         ui.Style
+	// Find is the look of the find bar.
+	Find ui.Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.

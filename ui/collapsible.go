@@ -140,10 +140,18 @@ func (c *CollapsibleElement) OnChange(fn func(open bool)) *CollapsibleElement {
 
 // The sizing methods give the section's outer box a width. A section fills its
 // container by default; see Sizing in docs/styling.md.
-func (c *CollapsibleElement) Width(l Length) *CollapsibleElement    { c.size.setWidth(l); return c }
+func (c *CollapsibleElement) Width(l Length) *CollapsibleElement { c.size.setWidth(l); return c }
+
+// MinWidth sets the smallest width of the collapsible.
 func (c *CollapsibleElement) MinWidth(l Length) *CollapsibleElement { c.size.setMinWidth(l); return c }
+
+// MaxWidth sets the largest width of the collapsible.
 func (c *CollapsibleElement) MaxWidth(l Length) *CollapsibleElement { c.size.setMaxWidth(l); return c }
-func (c *CollapsibleElement) Grow(f float32) *CollapsibleElement    { c.size.setGrow(f); return c }
+
+// Grow makes the collapsible take a share of the free space on its parent's main axis.
+func (c *CollapsibleElement) Grow(f float32) *CollapsibleElement { c.size.setGrow(f); return c }
+
+// GridSpan sets how many columns and rows the collapsible covers in its parent's grid.
 func (c *CollapsibleElement) GridSpan(cols, rows int) *CollapsibleElement {
 	c.size.setSpan(cols, rows)
 	return c
@@ -293,10 +301,18 @@ func (a *AccordionElement) elementKey() string { return a.key }
 func (a *AccordionElement) Key(k string) *AccordionElement { a.key = k; return a }
 
 // The sizing methods give the group's outer box a width, as for a Collapsible.
-func (a *AccordionElement) Width(l Length) *AccordionElement    { a.size.setWidth(l); return a }
+func (a *AccordionElement) Width(l Length) *AccordionElement { a.size.setWidth(l); return a }
+
+// MinWidth sets the smallest width of the accordion.
 func (a *AccordionElement) MinWidth(l Length) *AccordionElement { a.size.setMinWidth(l); return a }
+
+// MaxWidth sets the largest width of the accordion.
 func (a *AccordionElement) MaxWidth(l Length) *AccordionElement { a.size.setMaxWidth(l); return a }
-func (a *AccordionElement) Grow(f float32) *AccordionElement    { a.size.setGrow(f); return a }
+
+// Grow makes the accordion take a share of the free space on its parent's main axis.
+func (a *AccordionElement) Grow(f float32) *AccordionElement { a.size.setGrow(f); return a }
+
+// GridSpan sets how many columns and rows the accordion covers in its parent's grid.
 func (a *AccordionElement) GridSpan(cols, rows int) *AccordionElement {
 	a.size.setSpan(cols, rows)
 	return a

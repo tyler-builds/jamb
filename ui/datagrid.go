@@ -105,7 +105,9 @@ func (c DataColumn[T]) minWidth() float32 {
 // key Key, in descending order when Desc is set. An empty Key leaves the rows in
 // the order they were given.
 type SortState struct {
-	Key  string
+	// Key is the key of the column that the grid is sorted by.
+	Key string
+	// Desc is true when the sort is descending.
 	Desc bool
 }
 
@@ -145,7 +147,9 @@ const (
 type DataGridDensity uint8
 
 const (
+	// DataGridComfortable is the default row height, with room around the text.
 	DataGridComfortable DataGridDensity = iota
+	// DataGridCompact is a smaller row height, for more rows on the screen.
 	DataGridCompact
 )
 
@@ -166,24 +170,42 @@ const (
 // is its text field (a FieldStyle; FrameInvalid is its frame while the last save
 // failed), and EditorMessage is the popover under the cell that says why a save failed.
 type DataGridStyle struct {
-	Grid             Style
+	// Grid is the frame of the grid.
+	Grid Style
+	// GridFocusVisible is the frame while the grid has keyboard focus.
 	GridFocusVisible Style
-	Header           Style
-	HeaderCell       Style
-	HeaderCellHover  Style
+	// Header is the header row.
+	Header Style
+	// HeaderCell is each cell of the header row.
+	HeaderCell Style
+	// HeaderCellHover is a header cell under the pointer.
+	HeaderCellHover Style
+	// HeaderCellSorted is the header cell of the column that the grid is sorted by.
 	HeaderCellSorted Style
-	SortIndicator    Style
-	ResizeHandle     Style
-	Row              Style
-	RowHover         Style
-	RowSelected      Style
-	RowAlternate     Style
-	Cell             Style
-	CellFocused      Style
-	Empty            Style
-	CellEditing      Style
-	Editor           FieldStyle
-	EditorMessage    Style
+	// SortIndicator is the mark that shows the sort direction in a header cell.
+	SortIndicator Style
+	// ResizeHandle is the handle that resizes a column.
+	ResizeHandle Style
+	// Row is each row.
+	Row Style
+	// RowHover is a row under the pointer.
+	RowHover Style
+	// RowSelected is a selected row.
+	RowSelected Style
+	// RowAlternate is every other row, for banding.
+	RowAlternate Style
+	// Cell is each cell of a row.
+	Cell Style
+	// CellFocused is the cell that has keyboard focus.
+	CellFocused Style
+	// Empty is the message shown when the grid has no rows.
+	Empty Style
+	// CellEditing is a cell that is being edited.
+	CellEditing Style
+	// Editor is the field of the cell editor.
+	Editor FieldStyle
+	// EditorMessage is the message of the cell editor, such as an error.
+	EditorMessage Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -377,19 +399,33 @@ type DataGridElement[T any] struct {
 
 // The sizing methods give the grid's outer box a size, over its Style. See Sizing
 // in docs/styling.md.
-func (g *DataGridElement[T]) Width(l Length) *DataGridElement[T]    { g.size.setWidth(l); return g }
-func (g *DataGridElement[T]) Height(l Length) *DataGridElement[T]   { g.size.setHeight(l); return g }
+func (g *DataGridElement[T]) Width(l Length) *DataGridElement[T] { g.size.setWidth(l); return g }
+
+// Height sets the height of the data grid.
+func (g *DataGridElement[T]) Height(l Length) *DataGridElement[T] { g.size.setHeight(l); return g }
+
+// MinWidth sets the smallest width of the data grid.
 func (g *DataGridElement[T]) MinWidth(l Length) *DataGridElement[T] { g.size.setMinWidth(l); return g }
+
+// MinHeight sets the smallest height of the data grid.
 func (g *DataGridElement[T]) MinHeight(l Length) *DataGridElement[T] {
 	g.size.setMinHeight(l)
 	return g
 }
+
+// MaxWidth sets the largest width of the data grid.
 func (g *DataGridElement[T]) MaxWidth(l Length) *DataGridElement[T] { g.size.setMaxWidth(l); return g }
+
+// MaxHeight sets the largest height of the data grid.
 func (g *DataGridElement[T]) MaxHeight(l Length) *DataGridElement[T] {
 	g.size.setMaxHeight(l)
 	return g
 }
+
+// Grow makes the data grid take a share of the free space on its parent's main axis.
 func (g *DataGridElement[T]) Grow(f float32) *DataGridElement[T] { g.size.setGrow(f); return g }
+
+// GridSpan sets how many columns and rows the data grid covers in its parent's grid.
 func (g *DataGridElement[T]) GridSpan(cols, rows int) *DataGridElement[T] {
 	g.size.setSpan(cols, rows)
 	return g

@@ -69,7 +69,8 @@ type NotificationActivation struct {
 	// body of the notification.
 	Action string
 	// Tag and Args are the Tag and Args of the notification.
-	Tag  string
+	Tag string
+	// Args is the Args of the notification, as Tag describes.
 	Args string
 }
 

@@ -8,9 +8,11 @@ import (
 // Animation configures timed motion. Easing maps progress 0..1; nil means
 // ease-out (cubic). Use the functions in github.com/tyler-builds/jamb/ease or your own.
 type Animation struct {
+	// Duration is how long the animation runs.
 	Duration time.Duration
-	Easing   func(t float32) float32
-	Repeat   bool // Animate only: loop forever
+	// Easing maps the linear progress of the animation to its eased progress, such as ease.OutCubic.
+	Easing func(t float32) float32
+	Repeat bool // Animate only: loop forever
 }
 
 // Animate re-renders fn every frame with eased progress t (0..1) until the

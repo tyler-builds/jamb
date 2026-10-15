@@ -39,6 +39,7 @@ type TrayOptions struct {
 // after the menu closes, when the user chooses the item. A separator is made by
 // TraySeparator.
 type TrayItem struct {
+	// Label is the text of the item.
 	Label string
 	// Disabled shows the item, but it cannot be chosen.
 	Disabled bool
@@ -46,6 +47,7 @@ type TrayItem struct {
 	Checked bool
 	// Submenu opens a menu of its items to the right, instead of running OnClick.
 	Submenu []TrayItem
+	// OnClick runs when the item is chosen.
 	OnClick func()
 
 	separator bool

@@ -212,10 +212,18 @@ func (c *ColorPickerElement) Large() *ColorPickerElement {
 
 // The sizing methods give the trigger's outer box a size, as they do for the other
 // widgets. See Sizing in docs/styling.md.
-func (c *ColorPickerElement) Width(l Length) *ColorPickerElement    { c.size.setWidth(l); return c }
+func (c *ColorPickerElement) Width(l Length) *ColorPickerElement { c.size.setWidth(l); return c }
+
+// MinWidth sets the smallest width of the color picker.
 func (c *ColorPickerElement) MinWidth(l Length) *ColorPickerElement { c.size.setMinWidth(l); return c }
+
+// MaxWidth sets the largest width of the color picker.
 func (c *ColorPickerElement) MaxWidth(l Length) *ColorPickerElement { c.size.setMaxWidth(l); return c }
-func (c *ColorPickerElement) Grow(f float32) *ColorPickerElement    { c.size.setGrow(f); return c }
+
+// Grow makes the color picker take a share of the free space on its parent's main axis.
+func (c *ColorPickerElement) Grow(f float32) *ColorPickerElement { c.size.setGrow(f); return c }
+
+// GridSpan sets how many columns and rows the color picker covers in its parent's grid.
 func (c *ColorPickerElement) GridSpan(cols, rows int) *ColorPickerElement {
 	c.size.setSpan(cols, rows)
 	return c

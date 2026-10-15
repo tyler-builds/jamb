@@ -13,6 +13,7 @@ import (
 
 // Icon is a vector icon on a 24×24 grid.
 type Icon struct {
+	// Name is the name of the icon in its icon set.
 	Name    string
 	strokes [][]pt // open or closed polylines, stroked
 	fills   [][]pt // closed polygons, filled

@@ -12,8 +12,11 @@ import (
 
 // Highlight styles a range of text. Zero fields are unset (keep the text's own style).
 type Highlight struct {
-	Color, Background                Color
-	Weight                           FontWeight
+	// Color and Background are the text color and the background of the highlighted text.
+	Color, Background Color
+	// Weight is the font weight of the text.
+	Weight FontWeight
+	// Italic, Underline and Strikethrough turn on that look for the text.
 	Italic, Underline, Strikethrough bool
 	Mono                             bool // monospace family (inline code)
 }
@@ -55,14 +58,24 @@ type Segment struct {
 func Seg(s string) Segment { return Segment{text: s} }
 
 // Bold, Italic, Mono, Underline and Strikethrough style the segment.
-func (g Segment) Bold() Segment          { g.hl.Weight = FontBold; return g }
-func (g Segment) Italic() Segment        { g.hl.Italic = true; return g }
-func (g Segment) Mono() Segment          { g.hl.Mono = true; return g }
-func (g Segment) Underline() Segment     { g.hl.Underline = true; return g }
+func (g Segment) Bold() Segment { g.hl.Weight = FontBold; return g }
+
+// Italic sets the segment's text in italic.
+func (g Segment) Italic() Segment { g.hl.Italic = true; return g }
+
+// Mono sets the segment's text in the monospace font.
+func (g Segment) Mono() Segment { g.hl.Mono = true; return g }
+
+// Underline draws a line under the segment's text.
+func (g Segment) Underline() Segment { g.hl.Underline = true; return g }
+
+// Strikethrough draws a line through the segment's text.
 func (g Segment) Strikethrough() Segment { g.hl.Strikethrough = true; return g }
 
 // Color and Background set the segment's text and background colors.
-func (g Segment) Color(c Color) Segment      { g.hl.Color = c; return g }
+func (g Segment) Color(c Color) Segment { g.hl.Color = c; return g }
+
+// Background sets the color behind the segment's text.
 func (g Segment) Background(c Color) Segment { g.hl.Background = c; return g }
 
 // Style merges h into the segment.

@@ -5,44 +5,63 @@ import "maps"
 // Theme is a set of semantic colors and metrics used by built-in widgets and
 // available to applications through Context.Theme.
 type Theme struct {
+	// Name is the name of the theme.
 	Name string
+	// Dark reports whether the theme is a dark theme.
 	Dark bool
 	// HighContrast is true for the high contrast theme, which HighContrastTheme
 	// builds from the system colors. Apps can read it to choose their own colors.
 	HighContrast bool
 
-	Background    Color // window background
-	Panel         Color // secondary panels
-	Surface       Color // cards, inputs
-	SurfaceHover  Color
+	Background Color // window background
+	Panel      Color // secondary panels
+	Surface    Color // cards, inputs
+	// SurfaceHover is the surface color under the pointer.
+	SurfaceHover Color
+	// SurfaceActive is the surface color while it is pressed.
 	SurfaceActive Color
-	Border        Color
-	BorderStrong  Color
+	// Border is the color of the borders of the controls.
+	Border Color
+	// BorderStrong is the stronger border color, for a control that needs more contrast.
+	BorderStrong Color
 
-	Text       Color
-	TextMuted  Color
+	// Text is the main text color.
+	Text Color
+	// TextMuted is the color of secondary text.
+	TextMuted Color
+	// TextSubtle is the color of the least important text.
 	TextSubtle Color
 
+	// Accent is the accent color, for primary buttons and selections.
 	Accent Color
 	Link   Color // hyperlink text; a separate token so that Accent can fill buttons
 	// Disabled is the color of disabled text, icons and borders. Under high
 	// contrast it is GrayText; in the normal themes disabled controls are dimmed
 	// with Opacity instead, so it equals TextSubtle there.
-	Disabled     Color
-	AccentHover  Color
+	Disabled Color
+	// AccentHover is the accent color under the pointer.
+	AccentHover Color
+	// AccentActive is the accent color while it is pressed.
 	AccentActive Color
 	AccentText   Color // text on Accent
 	AccentSoft   Color // tinted backgrounds (selection, badges)
 
+	// Success is the color of success states.
 	Success Color
+	// Warning is the color of warning states.
 	Warning Color
-	Danger  Color
+	// Danger is the color of error and dangerous states.
+	Danger Color
 
+	// Scrollbar is the color of scroll bars.
 	Scrollbar Color
+	// FocusRing is the color of the ring that shows keyboard focus.
 	FocusRing Color
 	Scrim     Color // the dimmed backdrop behind a Modal
 
-	Radius   float32
+	// Radius is the default corner radius of the controls, in logical pixels.
+	Radius float32
+	// FontSize is the default text size, in logical pixels.
 	FontSize float32
 
 	// Syntax is the look of each syntax capture of a code editor, keyed by the
@@ -57,7 +76,8 @@ type Theme struct {
 	// above, and an instance's Styles merge over them. Under high contrast only
 	// their sizes, spacing, fonts, radius and border widths apply (see
 	// docs/styling.md).
-	Tabs   TabsStyle
+	Tabs TabsStyle
+	// Select is the look of every select box, including its list.
 	Select SelectStyle
 	// Combobox is the look of every combo box: its text frame (Field), its list and
 	// its rows.
@@ -65,18 +85,23 @@ type Theme struct {
 	// DatePicker and TimePicker are the look of every date picker (with its calendar) and
 	// every time picker.
 	DatePicker DatePickerStyle
+	// TimePicker is the look of every time picker.
 	TimePicker TimePickerStyle
-	Slider     SliderStyle
-	Split      SplitStyle
+	// Slider is the look of every slider.
+	Slider SliderStyle
+	// Split is the look of every split, including its dividers and grips.
+	Split SplitStyle
 	// Dock is the look of every dock: its tab groups, tabs, panels and drop preview.
 	Dock DockStyle
 	// Field is the text frame of every TextInput and TextArea, and of every
 	// NumberInput's frame, before the NumberInput parts below.
-	Field       FieldStyle
+	Field FieldStyle
+	// NumberInput is the look of the parts of every number input, beyond its text frame.
 	NumberInput NumberInputStyle
 	// Button is the look of every button, whatever its variant. Buttons is the
 	// look of each variant, and merges over Button.
-	Button  ButtonStyle
+	Button ButtonStyle
+	// Buttons is the look of each variant of button, and merges over Button.
 	Buttons ButtonVariants
 	// Checkbox is the look of every check box, including CheckboxTri.
 	Checkbox CheckboxStyle
@@ -97,24 +122,29 @@ type Theme struct {
 	MenuBar MenuBarStyle
 	// Modal is the look of every modal dialog, Drawer of every drawer, and
 	// Popover of every popover's panel.
-	Modal   ModalStyle
-	Drawer  DrawerStyle
+	Modal ModalStyle
+	// Drawer is the look of every drawer.
+	Drawer DrawerStyle
+	// Popover is the look of the panel of every popover.
 	Popover PopoverStyle
 	// FormField is the look of every field (its label, help text and error), and Form
 	// is the look of every form's error summary.
 	FormField FormFieldStyle
-	Form      FormStyle
+	// Form is the look of every form's error summary.
+	Form FormStyle
 	// ProgressBar is the look of every progress bar, determinate or not.
 	ProgressBar ProgressBarStyle
 	// ProgressRing is the look of every progress ring.
 	ProgressRing ProgressRingStyle
 	// Badge is the look of every badge, whatever its variant. Badges is the look
 	// of each variant, and merges over Badge.
-	Badge  BadgeStyle
+	Badge BadgeStyle
+	// Badges is the look of each badge variant, and merges over Badge.
 	Badges BadgeVariants
 	// Toast is the look of every toast, whatever its kind. Toasts is the look of
 	// each kind, and merges over Toast.
-	Toast  ToastStyle
+	Toast ToastStyle
+	// Toasts is the look of each toast kind, and merges over Toast.
 	Toasts ToastVariants
 	// Tooltip is the look of every tooltip.
 	Tooltip TooltipStyle
