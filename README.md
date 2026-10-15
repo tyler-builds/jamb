@@ -4228,3 +4228,35 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
 
 jamb is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE)
 and [NOTICE](NOTICE).
+
+## Licenses of what your app ships
+
+jamb is licensed under the Apache License, Version 2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+A binary built with jamb also contains third-party code. When you distribute the binary, include the
+notices of that code with it. Every app built with jamb contains:
+
+- `github.com/go-text/typesetting`, licensed under the Unlicense or the BSD 3-Clause License (SPDX
+  `Unlicense OR BSD-3-Clause`). Include its `LICENSE` file, which holds both texts.
+- `golang.org/x/image`, licensed under the BSD 3-Clause License. It includes the Go Regular font, which
+  jamb embeds as its fallback font, and the Go fonts are under the same license. Include the `LICENSE`
+  and `PATENTS` files of the module.
+- `golang.org/x/sys` and `golang.org/x/text`, licensed under the BSD 3-Clause License. Include the
+  `LICENSE` and `PATENTS` files of each module.
+
+An app that imports `codeedit` also contains:
+
+- `github.com/tetratelabs/wazero`, licensed under the Apache License, Version 2.0. Include its `LICENSE`
+  and `NOTICE` files.
+- `golang.org/x/sys/windows`, licensed under the BSD 3-Clause License, as above.
+- `github.com/tyler-builds/jamb-grammars`, the tree-sitter runtime and grammars for highlighting. The
+  module's code is licensed under the Apache License, Version 2.0; the tree-sitter runtime and the
+  grammars it embeds are licensed under the MIT License. Include its `LICENSE` and `NOTICE` files, which
+  hold the MIT notices.
+
+jamb's own `NOTICE` file also covers material from gpui-component (Apache License, Version 2.0) that is
+compiled into jamb, so include it with the app.
+
+To collect these files for a build, [go-licenses](https://github.com/google/go-licenses) can be run from
+your app's module. It is a tool, not a dependency of jamb: `go-licenses report ./...` lists each module
+with its license, and `go-licenses save ./... --save_path=licenses` copies the license files into a
+`licenses` folder.
