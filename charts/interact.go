@@ -254,7 +254,7 @@ func (c *Chart) tipContent(v *view, cur cursorAt) (string, []tipRow) {
 			[]tipRow{{v.t.Text, c.valueText(e.value)}}
 	case kindPie, kindDonut:
 		pt := c.ds.series[0].pts[cur.index]
-		return c.xLabel(pt), []tipRow{{seriesLook(v.t, cur.index).color, v.s.ChartValueShare(c.valueText(pt.y), c.share(pt.y, v.visible()))}}
+		return c.xLabel(pt), []tipRow{{c.lookOf(v.t, cur.index).color, v.s.ChartValueShare(c.valueText(pt.y), c.share(pt.y, v.visible()))}}
 	case kindCandle:
 		pt, _ := c.pointAt(v, cur)
 		return c.xLabel(pt), []tipRow{
@@ -269,7 +269,7 @@ func (c *Chart) tipContent(v *view, cur cursorAt) (string, []tipRow) {
 		var rows []tipRow
 		for _, k := range v.visible() {
 			val := slotValue(c.ds.series[k].pts, v.geo.slots, cur.index)
-			rows = append(rows, tipRow{seriesLook(v.t, k).color, v.s.ChartSeriesValue(c.itemName(v.s, k), c.valueText(val))})
+			rows = append(rows, tipRow{c.lookOf(v.t, k).color, v.s.ChartSeriesValue(c.itemName(v.s, k), c.valueText(val))})
 		}
 		return c.positionLabel(v.geo.slots[cur.index]), rows
 	}
@@ -297,7 +297,7 @@ func (c *Chart) tipContent(v *view, cur cursorAt) (string, []tipRow) {
 		if !ok {
 			continue
 		}
-		rows = append(rows, tipRow{seriesLook(v.t, k).color, v.s.ChartSeriesValue(c.itemName(v.s, k), c.valueText(pt.y))})
+		rows = append(rows, tipRow{c.lookOf(v.t, k).color, v.s.ChartSeriesValue(c.itemName(v.s, k), c.valueText(pt.y))})
 	}
 	return header, rows
 }

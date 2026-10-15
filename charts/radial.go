@@ -47,7 +47,7 @@ func (c *Chart) paintPie(v *view, p *ui.Painter, w, h float32) {
 		b := a + 2*math.Pi*pts[i].y/total
 		g.slices = append(g.slices, sliceGeo{a0: a, a1: b, index: i})
 		shape := slicePath(g.cx, g.cy, r, ri, a, b)
-		l := seriesLook(v.t, i)
+		l := c.lookOf(v.t, i)
 		if v.t.HighContrast {
 			fillHatched(p, v.t, shape, l, box)
 		} else {
@@ -159,7 +159,7 @@ func (c *Chart) paintRadar(v *view, p *ui.Painter, w, h float32) {
 	}
 
 	for _, k := range vis {
-		l := seriesLook(v.t, k)
+		l := c.lookOf(v.t, k)
 		vals := slotValues(c.ds.series[k].pts, slots)
 		path := ui.NewPath()
 		for i, val := range vals {
