@@ -115,7 +115,8 @@ crashed app does not block later launches.
   only under the package ID. `AppID` still names the single instance.
 - Use `identityName` from `jamb.json` as the `AppID`. The installer, the MSIX
   manifest and the app then agree on the shortcut's ID and on the notification
-  protocol, which is `jamb-` and the `AppID` in lower case.
+  protocol, which is `jamb-` and the `AppID` in lower case. `jamb package` checks
+  that the two are equal (see [AppID check](packaging.md#appid-check)).
 
 Windows may show only the first few tasks of a jump list, and it keeps the Recent
 category's list itself.

@@ -175,6 +175,12 @@ const stampFlag = "--jamb-stamp-shortcut"
 // with a jamb that predates the flag would open its window when the installer runs it,
 // so the installer runs it only when the flag's text is in the executable.
 func takesStampFlag(path string) bool {
+	return takesFlag(path, stampFlag)
+}
+
+// takesFlag reports whether the executable at path knows one of the internal flags of
+// jamb apps, by whether the flag's text is in the executable.
+func takesFlag(path, flag string) bool {
 	data, err := os.ReadFile(path)
-	return err == nil && bytes.Contains(data, []byte(stampFlag))
+	return err == nil && bytes.Contains(data, []byte(flag))
 }
