@@ -167,6 +167,11 @@ its siblings, combined with its element type.
 background goroutines to hand them their results. A component that holds its
 `ui.Context` can call `ctx.Post(fn)` for the same thing.
 
+`ctx.After(d, fn)` runs fn on the UI thread once d has passed on the window's
+clock, and returns a function that cancels it. A test moves that clock with
+uitest's `Advance` (see [Testing your app](testing.md#time)). Cancel and start it
+again on each change to wait for a pause, such as in typing.
+
 ## Errors
 
 Errors explain what failed and how to fix it. For example, `ui.Hex("#12")`
