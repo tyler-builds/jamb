@@ -119,6 +119,10 @@ ui.SVG(logo).Size(ui.Px(120), ui.Px(40)).Alt("Acme")
 
 It takes the image's own size (width and height, else the viewBox) unless `Size`
 sets one, and fits the image in its box as its `preserveAspectRatio` says.
+`Fit(ui.FitCover)`, `Fit(ui.FitContain)` and `Fit(ui.FitFill)` place it as they place
+an `ui.Image` instead: cover fills the box and crops the image, contain shows all of
+it, letterboxed, and fill stretches it. `Radius(r)` rounds its corners (those of the
+letterboxed image under contain), and `Opacity(o)` fades it, as for an `ui.Image`.
 `currentColor` is the inherited text color, as for an `Icon`, so monochrome icon
 sets such as Lucide's or Heroicons' SVG files follow the text and the theme;
 `Color` sets it instead, and high contrast always uses the text color. Without
