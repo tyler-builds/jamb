@@ -67,6 +67,8 @@ type PinchEvent struct {
 	X, Y float32
 	// LocalX and LocalY are the position relative to the element whose handler is running.
 	LocalX, LocalY float32
+	// Width and Height are the size of the element whose handler is running.
+	Width, Height float32
 	// Mods are the modifier keys held.
 	Mods    input.Modifiers
 	stopped bool
