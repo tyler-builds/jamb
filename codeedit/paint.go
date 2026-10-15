@@ -170,8 +170,8 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 		y := float32(vi)*lineH - vs.scrollY
 		if ps.numbers {
 			nts.Color = gutterFg
-			if carets[row] && !ps.t.Editor.ActiveLineNumber.IsZero() {
-				nts.Color = ps.t.Editor.ActiveLineNumber
+			if carets[row] && !ps.t.CodeEditor.ActiveLineNumber.IsZero() {
+				nts.Color = ps.t.CodeEditor.ActiveLineNumber
 			}
 			p.Text(numW-6, y, strconv.Itoa(row+1), nts)
 		}

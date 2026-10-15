@@ -36,7 +36,7 @@ type SidebarItem struct {
 func SidebarHeading(label string) SidebarItem { return SidebarItem{Label: label, heading: true} }
 
 // SidebarStyle is the look of each part of a sidebar. A part's style merges over
-// the built-in defaults, then over the theme's SidebarNav, then over the Styles
+// the built-in defaults, then over the theme's Sidebar, then over the Styles
 // of the instance. The states are parts of their own: ItemHover applies to an
 // enabled item the pointer is over, if it is not selected, ItemSelected to the
 // selected item, ItemDisabled to a disabled one, and ItemFocusVisible to an item
@@ -90,7 +90,7 @@ func (s SidebarStyle) plain() SidebarStyle {
 func sidebarDefaults(t *Theme) SidebarStyle {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	d := SidebarStyle{
-		Pane: Style{Gap: 2, Padding: All(6), Background: t.Sidebar, BorderEdges: Edges{Right: 1}, BorderColor: t.Border},
+		Pane: Style{Gap: 2, Padding: All(6), Background: t.Panel, BorderEdges: Edges{Right: 1}, BorderColor: t.Border},
 		Item: Style{Direction: Row, Align: Center, Gap: 10, MinHeight: Px(36), NoShrink: true,
 			Radius: t.Radius / 2, Padding: XY(10, 0), TextColor: t.Text},
 		ItemHover:        Style{Background: t.SurfaceHover},
@@ -116,12 +116,12 @@ func sidebarDefaults(t *Theme) SidebarStyle {
 }
 
 // resolveSidebar returns the look of a sidebar: the defaults, merged with the
-// theme's SidebarNav and then the instance's Styles. Under high contrast the two
+// theme's Sidebar and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
 func resolveSidebar(ctx *Context, inst SidebarStyle) SidebarStyle {
 	t := ctx.Theme()
 	return layered(ctx, sidebarDefaults(t), SidebarStyle.merge, SidebarStyle.plain,
-		themeLayer(t.SidebarNav), instanceLayer(inst))
+		themeLayer(t.Sidebar), instanceLayer(inst))
 }
 
 // SidebarElement is a vertical navigation pane, as the left pane of WinUI's
@@ -179,7 +179,7 @@ func (s *SidebarElement) Label(name string) *SidebarElement { s.name = name; ret
 func (s *SidebarElement) OnChange(fn func(key string)) *SidebarElement { s.onChange = fn; return s }
 
 // Styles sets the look of the parts of the sidebar, for this instance only. Set
-// fields win over the theme's SidebarNav and the defaults; see SidebarStyle and
+// fields win over the theme's Sidebar and the defaults; see SidebarStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (s *SidebarElement) Styles(st SidebarStyle) *SidebarElement {
 	s.styles = s.styles.merge(st)

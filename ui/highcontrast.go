@@ -23,7 +23,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		HighContrast:  true,
 		Dark:          (c.Window.R+c.Window.G+c.Window.B)/3 < 0.5,
 		Background:    c.Window,
-		Sidebar:       c.Window,
+		Panel:         c.Window,
 		Surface:       c.Window,
 		SurfaceHover:  c.Window,
 		SurfaceActive: c.Highlight,
@@ -78,7 +78,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Avatar:        base.Avatar,
 		Tag:           base.Tag,
 		Skeleton:      base.Skeleton,
-		SidebarNav:    base.SidebarNav,
+		Sidebar:       base.Sidebar,
 		Breadcrumbs:   base.Breadcrumbs,
 		Pagination:    base.Pagination,
 
@@ -90,7 +90,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Drawer:          base.Drawer,
 		Popover:         base.Popover,
 	}
-	t.Editor = EditorColors{
+	t.CodeEditor = CodeEditorColors{
 		Background:       c.Window,
 		Foreground:       c.WindowText,
 		ActiveLine:       c.Window,

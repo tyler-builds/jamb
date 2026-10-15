@@ -10,10 +10,10 @@ type SyntaxStyle struct {
 	Bold   bool
 }
 
-// EditorColors are the colors of a code editor, as the predefined themes set
+// CodeEditorColors are the colors of a code editor, as the predefined themes set
 // them from their editor colors. Selection is translucent, so it is drawn over
 // the text.
-type EditorColors struct {
+type CodeEditorColors struct {
 	Background       Color
 	Foreground       Color
 	ActiveLine       Color
@@ -77,7 +77,7 @@ var lightSyntax = map[string]SyntaxStyle{
 // darkEditor and lightEditor are the editor colors of the built-in themes. The
 // editor is drawn on the Surface, and its selection is Accent at alpha 0.32.
 var (
-	darkEditor = EditorColors{
+	darkEditor = CodeEditorColors{
 		Background:       Hex("#18181b"),
 		Foreground:       Hex("#f4f4f5"),
 		ActiveLine:       Hex("#1f1f23"),
@@ -85,7 +85,7 @@ var (
 		ActiveLineNumber: Hex("#f4f4f5"),
 		Selection:        Hex("#6265ed52"),
 	}
-	lightEditor = EditorColors{
+	lightEditor = CodeEditorColors{
 		Background:       Hex("#ffffff"),
 		Foreground:       Hex("#18181b"),
 		ActiveLine:       Hex("#f4f4f5"),

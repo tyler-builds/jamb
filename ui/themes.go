@@ -14,14 +14,6 @@ type ThemeInfo struct {
 	Dark   bool   // true for a dark variant
 }
 
-// New returns a new copy of the theme that the ThemeInfo names, as NewTheme
-// returns it. It returns nil for a ThemeInfo that does not name a predefined
-// theme.
-func (i ThemeInfo) New() *Theme {
-	t, _ := NewTheme(i.Name)
-	return t
-}
-
 // predefinedTheme is one entry of the predefined themes: its description, and
 // either the function that returns a new copy of the theme (Dark and Light) or
 // the spec it is built from (the themes converted from gpui-component).
@@ -51,16 +43,16 @@ var predefined = func() []predefinedTheme {
 type themeSpec struct {
 	Info ThemeInfo
 
-	Background, Sidebar, Surface, SurfaceHover, SurfaceActive string
-	Border, BorderStrong                                      string
-	Text, TextMuted, TextSubtle                               string
-	Accent, Link, Disabled, AccentHover, AccentActive         string
-	AccentText, AccentSoft                                    string
-	Success, Warning, Danger                                  string
-	Scrollbar, FocusRing, Scrim                               string
+	Background, Panel, Surface, SurfaceHover, SurfaceActive string
+	Border, BorderStrong                                    string
+	Text, TextMuted, TextSubtle                             string
+	Accent, Link, Disabled, AccentHover, AccentActive       string
+	AccentText, AccentSoft                                  string
+	Success, Warning, Danger                                string
+	Scrollbar, FocusRing, Scrim                             string
 
-	Syntax []syntaxSpec
-	Editor editorSpec
+	Syntax     []syntaxSpec
+	CodeEditor codeEditorSpec
 }
 
 // syntaxSpec is one capture of a themeSpec's Syntax: its name, its color, and
@@ -80,8 +72,8 @@ const (
 	boldItalic           = italic | bold
 )
 
-// editorSpec is the EditorColors of a themeSpec.
-type editorSpec struct {
+// codeEditorSpec is the CodeEditorColors of a themeSpec.
+type codeEditorSpec struct {
 	Background, Foreground, ActiveLine, LineNumber, ActiveLineNumber, Selection string
 }
 
@@ -97,7 +89,7 @@ func (s *themeSpec) build() *Theme {
 		dst *Color
 		hex string
 	}{
-		{&t.Background, s.Background}, {&t.Sidebar, s.Sidebar}, {&t.Surface, s.Surface},
+		{&t.Background, s.Background}, {&t.Panel, s.Panel}, {&t.Surface, s.Surface},
 		{&t.SurfaceHover, s.SurfaceHover}, {&t.SurfaceActive, s.SurfaceActive},
 		{&t.Border, s.Border}, {&t.BorderStrong, s.BorderStrong},
 		{&t.Text, s.Text}, {&t.TextMuted, s.TextMuted}, {&t.TextSubtle, s.TextSubtle},
@@ -113,8 +105,8 @@ func (s *themeSpec) build() *Theme {
 	for _, c := range s.Syntax {
 		t.Syntax[c.name] = SyntaxStyle{Color: Hex(c.color), Italic: c.style&italic != 0, Bold: c.style&bold != 0}
 	}
-	e := s.Editor
-	t.Editor = EditorColors{
+	e := s.CodeEditor
+	t.CodeEditor = CodeEditorColors{
 		Background: Hex(e.Background), Foreground: Hex(e.Foreground), ActiveLine: Hex(e.ActiveLine),
 		LineNumber: Hex(e.LineNumber), ActiveLineNumber: Hex(e.ActiveLineNumber), Selection: Hex(e.Selection),
 	}
@@ -124,7 +116,7 @@ func (s *themeSpec) build() *Theme {
 // Themes returns the predefined themes in a stable order: Dark and Light first,
 // then the themes converted from gpui-component, in the order of their upstream
 // files and of the variants in each file. The themes are described, not built;
-// NewTheme or ThemeInfo.New returns a copy of one.
+// NewTheme returns a copy of one.
 func Themes() []ThemeInfo {
 	out := make([]ThemeInfo, len(predefined))
 	for i, p := range predefined {
@@ -136,8 +128,8 @@ func Themes() []ThemeInfo {
 // NewTheme returns a new copy of the predefined theme with the given name from
 // Themes, and true. It returns nil and false for a name that is not in Themes.
 // The name must match exactly. Each call returns a new copy, which the caller
-// may change. The Name field of the copies of Dark and Light stays "dark" and
-// "light", as DarkTheme and LightTheme return them.
+// may change. The Name of each copy is the name in Themes, so NewTheme(t.Name)
+// returns a theme for every predefined theme.
 func NewTheme(name string) (*Theme, bool) {
 	for _, p := range predefined {
 		if p.info.Name == name {

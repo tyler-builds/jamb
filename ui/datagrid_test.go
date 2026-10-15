@@ -542,7 +542,7 @@ func TestDataGridStripedRows(t *testing.T) {
 	})
 	var alt int
 	for _, n := range partNodes(r.rt, "DataGrid.Row") {
-		if n.style.Background == DarkTheme().Sidebar {
+		if n.style.Background == DarkTheme().Panel {
 			alt++
 		}
 	}

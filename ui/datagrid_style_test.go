@@ -109,7 +109,7 @@ func TestDataGridPrecedence(t *testing.T) {
 	// The striped rows of the default look have a background; Clear removes it.
 	r = newAccessRig(partDataGrid(6, DataGridStyle{RowAlternate: Style{Clear: ClearBackground}}, sel, sort))
 	for _, n := range partNodes(r.rt, "DataGrid.Row") {
-		if n.style.Background == DarkTheme().Sidebar {
+		if n.style.Background == DarkTheme().Panel {
 			t.Fatalf("ClearBackground did not remove the striped background")
 		}
 	}

@@ -49,7 +49,7 @@ func TestSystemSettingsSwitchTheme(t *testing.T) {
 		hc = ctx.HighContrast()
 		return Div().Child(Text("x"))
 	}, 300, 200)
-	if r.rt.Theme().Name != "dark" {
+	if r.rt.Theme().Name != "Dark" {
 		t.Fatal("the app's theme is not the default")
 	}
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastWhite()})

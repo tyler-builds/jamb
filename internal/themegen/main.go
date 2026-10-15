@@ -12,7 +12,7 @@
 //
 //	Token                                        Upstream keys, in order                           If none
 //	Background                                   background
-//	Sidebar                                      sidebar.background, title_bar.background          Background
+//	Panel                                        sidebar.background, title_bar.background          Background
 //	Surface                                      popover.background, list.even.background          Background
 //	SurfaceHover                                 list.hover.background                             Surface mixed halfway to SurfaceActive
 //	SurfaceActive                                secondary.active.background, muted.background
@@ -34,10 +34,10 @@
 //	Scrim                                        dark: black at alpha 0.6; light: Text at alpha 0.35
 //	Radius, FontSize                             from the built-in theme
 //	Syntax                                       highlight.syntax; a capture with no color takes the editor foreground
-//	Editor.Background, Foreground, ActiveLine,   editor.background, editor.foreground,
-//	Editor.LineNumber, ActiveLineNumber          editor.active_line.background, editor.line_number,
-//	                                             editor.active_line_number (the last falls back to the foreground)
-//	Editor.Selection                             selection.background                              Accent at alpha 0.32
+//	CodeEditor.Background, Foreground, ActiveLine,  editor.background, editor.foreground,
+//	CodeEditor.LineNumber, ActiveLineNumber        editor.active_line.background, editor.line_number,
+//	                                               editor.active_line_number (the last falls back to the foreground)
+//	CodeEditor.Selection                           selection.background                              Accent at alpha 0.32
 //
 // The colors are then moved in lightness, minimally, to meet the contrast
 // criteria of the ui tests: text (Text, TextMuted, TextSubtle, Link) and syntax
@@ -184,7 +184,7 @@ func (p *palette) firstOr(def rgba, keys ...string) rgba {
 	return def
 }
 
-// token is one Theme field (or EditorColors field) of a generated theme. was is
+// token is one Theme field (or CodeEditorColors field) of a generated theme. was is
 // the converted color before it was moved for contrast, when adjusted is set.
 type token struct {
 	field    string
@@ -209,7 +209,7 @@ type converted struct {
 	name, family, mode string
 	tokens             []token // Theme fields, in the order of the Theme struct
 	syntax             []syntaxToken
-	editor             []token // EditorColors fields
+	codeEditor         []token // CodeEditorColors fields
 }
 
 // converter moves colors in lightness until they meet a criterion.
@@ -372,7 +372,7 @@ func convertVariant(family string, th themeConfig) (converted, error) {
 	c := converted{name: th.Name, family: family, mode: th.Mode}
 	c.tokens = []token{
 		newToken("Background", bg, bg),
-		newToken("Sidebar", sidebar, sidebar),
+		newToken("Panel", sidebar, sidebar),
 		newToken("Surface", surface, surface),
 		newToken("SurfaceHover", surfaceHover, surfaceHover),
 		newToken("SurfaceActive", surfaceActive, surfaceActive),
@@ -399,7 +399,7 @@ func convertVariant(family string, th themeConfig) (converted, error) {
 		newToken("FocusRing", focus, focusFit),
 		newToken("Scrim", scrim, scrim),
 	)
-	c.editor = []token{
+	c.codeEditor = []token{
 		newToken("Background", edBg, edBg),
 		newToken("Foreground", edFg, edFgFit),
 		newToken("ActiveLine", activeLine, activeLine),
@@ -560,8 +560,8 @@ func emitSpec(b *strings.Builder, name, info string, c converted) {
 		b.WriteString("\n")
 	}
 	b.WriteString("\t},\n")
-	b.WriteString("\tEditor: editorSpec{\n")
-	for _, tk := range c.editor {
+	b.WriteString("\tCodeEditor: codeEditorSpec{\n")
+	for _, tk := range c.codeEditor {
 		writeToken(b, "\t\t", tk)
 	}
 	b.WriteString("\t},\n")

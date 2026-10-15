@@ -1043,7 +1043,7 @@ areas, explicit line placement, dense packing or subgrids.
 
 `ui.Sidebar(selected, items...)` is a vertical navigation pane, as the left pane of
 WinUI's NavigationView. Its look is `ui.SidebarStyle`, set on the theme as
-`Theme.SidebarNav` or with `Styles`, and it follows high contrast, the Text size and
+`Theme.Sidebar` or with `Styles`, and it follows high contrast, the Text size and
 reduced motion.
 
 ```go
@@ -2061,9 +2061,9 @@ WCAG 2 ratios of each pair the built-in widgets use, in both themes.
 
 Predefined themes: `ui.Themes()` lists the built-in Dark and Light themes, then 37
 themes converted from gpui-component (Apache-2.0), in 22 families. `ui.NewTheme(name)`
-returns a new copy of one of them by its exact name, and `info.New()` does the same for
-a `ui.ThemeInfo`. Each theme also has syntax colors for a code editor (`Theme.Syntax`,
-keyed by the tree-sitter capture name) and its editor colors (`Theme.Editor`).
+returns a new copy of one of them by its exact name, which is the `Theme.Name` of the copy.
+Each theme also has syntax colors for a code editor (`Theme.Syntax`, keyed by the tree-sitter
+capture name) and its editor colors (`Theme.CodeEditor`).
 
 ```go
 latte, _ := ui.NewTheme("Catppuccin Latte")

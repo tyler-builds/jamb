@@ -101,7 +101,7 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 	}
 	if v == TabsSegmented {
 		d.List = Style{Direction: Row, Gap: 2, Padding: All(3), Radius: th.Radius,
-			Background: th.Sidebar, BorderWidth: 1, BorderColor: th.Border, fitWidth: true}
+			Background: th.Panel, BorderWidth: 1, BorderColor: th.Border, fitWidth: true}
 		d.Tab.MinHeight = Px(30)
 		d.Tab.Radius = max(th.Radius-3, 0)
 		d.TabSelected = Style{Background: th.Accent, TextColor: th.AccentText}

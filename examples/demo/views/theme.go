@@ -45,8 +45,8 @@ func demoThemeNamed(name string) (*ui.Theme, bool) {
 }
 
 // themeOptionName returns the name that the theme picker shows for t, or "" for
-// a theme that is not predefined. The built-in themes are named "dark" and
-// "light" in Theme.Name, and "Dark" and "Light" in ui.Themes.
+// a theme that is not predefined. The Name of a predefined theme is its name in
+// ui.Themes.
 func themeOptionName(t *ui.Theme) string {
 	for _, info := range ui.Themes() {
 		if strings.EqualFold(info.Name, t.Name) {

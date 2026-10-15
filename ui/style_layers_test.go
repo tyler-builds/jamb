@@ -193,7 +193,7 @@ var layerBuilders = []layerBuilder{
 			closed := false
 			return partDrawer(DrawerLeft, st.(DrawerStyle), &closed)
 		}},
-	{"Sidebar", func(th *Theme) any { return &th.SidebarNav },
+	{"Sidebar", func(th *Theme) any { return &th.Sidebar },
 		func(st any) Element { return partSidebar(st.(SidebarStyle)) }},
 	{"Breadcrumbs", func(th *Theme) any { return &th.Breadcrumbs },
 		func(st any) Element {

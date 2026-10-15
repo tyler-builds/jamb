@@ -12,7 +12,7 @@ type Theme struct {
 	HighContrast bool
 
 	Background    Color // window background
-	Sidebar       Color // secondary panels
+	Panel         Color // secondary panels
 	Surface       Color // cards, inputs
 	SurfaceHover  Color
 	SurfaceActive Color
@@ -49,8 +49,8 @@ type Theme struct {
 	// tree-sitter capture name (see SyntaxStyle). Under high contrast it keeps the
 	// same names, with system colors.
 	Syntax map[string]SyntaxStyle
-	// Editor is the colors of a code editor.
-	Editor EditorColors
+	// CodeEditor is the colors of a code editor.
+	CodeEditor CodeEditorColors
 
 	// The parts of the built-in widgets, for every widget of that kind in the
 	// app. They merge over the built-in defaults, which are made from the colors
@@ -124,9 +124,9 @@ type Theme struct {
 	Tag TagStyle
 	// Skeleton is the look of every skeleton placeholder.
 	Skeleton SkeletonStyle
-	// SidebarNav is the look of every sidebar. It is not named Sidebar, which is the
-	// background color of the theme's secondary panels.
-	SidebarNav SidebarStyle
+	// Sidebar is the look of every sidebar. Panel is the background color of the
+	// theme's secondary panels, which the sidebar and other parts also use.
+	Sidebar SidebarStyle
 	// Breadcrumbs is the look of every breadcrumb trail.
 	Breadcrumbs BreadcrumbsStyle
 	// Pagination is the look of every pagination control.
@@ -142,10 +142,10 @@ type Theme struct {
 // darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme
 // return copies, so that changing a theme never changes it for another window.
 var darkTheme = &Theme{
-	Name:          "dark",
+	Name:          "Dark",
 	Dark:          true,
 	Background:    Hex("#0c0c0e"),
-	Sidebar:       Hex("#111113"),
+	Panel:         Hex("#111113"),
 	Surface:       Hex("#18181b"),
 	SurfaceHover:  Hex("#1f1f23"),
 	SurfaceActive: Hex("#27272a"),
@@ -170,13 +170,13 @@ var darkTheme = &Theme{
 	Radius:        8,
 	FontSize:      14,
 	Syntax:        darkSyntax,
-	Editor:        darkEditor,
+	CodeEditor:    darkEditor,
 }
 
 var lightTheme = &Theme{
-	Name:          "light",
+	Name:          "Light",
 	Background:    Hex("#fafafa"),
-	Sidebar:       Hex("#f4f4f5"),
+	Panel:         Hex("#f4f4f5"),
 	Surface:       Hex("#ffffff"),
 	SurfaceHover:  Hex("#f4f4f5"),
 	SurfaceActive: Hex("#e4e4e7"),
@@ -201,7 +201,7 @@ var lightTheme = &Theme{
 	Radius:        8,
 	FontSize:      14,
 	Syntax:        lightSyntax,
-	Editor:        lightEditor,
+	CodeEditor:    lightEditor,
 }
 
 // DarkTheme returns the built-in dark theme: a neutral zinc palette with an

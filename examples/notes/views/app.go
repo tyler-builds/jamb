@@ -297,7 +297,7 @@ func (a *App) sidebar() ui.Element {
 				}
 			})
 
-		return ui.Div().Height(ui.Full).Shrink(0).Background(t.Sidebar).
+		return ui.Div().Height(ui.Full).Shrink(0).Background(t.Panel).
 			Child(ui.Div().Row().Align(ui.Center).Justify(ui.SpaceBetween).PaddingX(16).MinHeight(ui.Px(56)).Shrink(0).
 				Child(ui.Div().Row().Align(ui.Center).Gap(10).
 					Child(ui.Div().Size(ui.Px(26), ui.Px(26)).Radius(7).Background(t.Accent).Center().

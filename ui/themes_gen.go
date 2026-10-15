@@ -13,7 +13,7 @@ var themeAdventure = themeSpec{
 	Info: ThemeInfo{Name: "Adventure", Family: "Adventure", Author: "iTerm2-Color-Schemes", URL: "https://github.com/mbadolato/iTerm2-Color-Schemes", Dark: true},
 
 	Background:    "#040404",
-	Sidebar:       "#0f1112",
+	Panel:         "#0f1112",
 	Surface:       "#040404",
 	SurfaceHover:  "#0f1111",
 	SurfaceActive: "#191d1e",
@@ -61,7 +61,7 @@ var themeAdventure = themeSpec{
 		{"type", "#eebb6e", plain},
 		{"variable.special", "#d84a33", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#040404",
 		Foreground:       "#feffff",
 		ActiveLine:       "#0e0e0e",
@@ -76,7 +76,7 @@ var themeAdventureTime = themeSpec{
 	Info: ThemeInfo{Name: "Adventure Time", Family: "Adventure", Author: "iTerm2-Color-Schemes", URL: "https://github.com/mbadolato/iTerm2-Color-Schemes", Dark: true},
 
 	Background:    "#1f1d45",
-	Sidebar:       "#1c1a3e",
+	Panel:         "#1c1a3e",
 	Surface:       "#1f1d45",
 	SurfaceHover:  "#2b2952",
 	SurfaceActive: "#36345f",
@@ -124,7 +124,7 @@ var themeAdventureTime = themeSpec{
 		{"type", "#bd7949", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#1f1d45",
 		Foreground:       "#f8dcc0",
 		ActiveLine:       "#36345f",
@@ -139,7 +139,7 @@ var themeAlduin = themeSpec{
 	Info: ThemeInfo{Name: "Alduin", Family: "Alduin", Author: "AlessandroYorba", URL: "https://github.com/AlessandroYorba/Alduin", Dark: true},
 
 	Background:    "#1c1c1c",
-	Sidebar:       "#262626",
+	Panel:         "#262626",
 	Surface:       "#262626",
 	SurfaceHover:  "#2e2c2b",
 	SurfaceActive: "#35322f",
@@ -187,7 +187,7 @@ var themeAlduin = themeSpec{
 		{"type", "#b67442", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#000000",
 		Foreground:       "#dddddd",
 		ActiveLine:       "#131313",
@@ -202,7 +202,7 @@ var themeAsciinema = themeSpec{
 	Info: ThemeInfo{Name: "Asciinema", Family: "Asciinema", Author: "asciinema.org", URL: "https://asciinema.org", Dark: true},
 
 	Background:    "#121314",
-	Sidebar:       "#1a1b1c",
+	Panel:         "#1a1b1c",
 	Surface:       "#1a1b1c",
 	SurfaceHover:  "#1d1e1e",
 	SurfaceActive: "#1f2020",
@@ -250,7 +250,7 @@ var themeAsciinema = themeSpec{
 		{"type", "#26b0d7", plain},
 		{"variable.special", "#dd4471", plain}, // was #dd3c69
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#121314",
 		Foreground:       "#cccccc",
 		ActiveLine:       "#1a1b1c",
@@ -265,7 +265,7 @@ var themeAuroraLight = themeSpec{
 	Info: ThemeInfo{Name: "Aurora Light", Family: "Aurora", Author: "Longbridge", URL: "https://github.com/longbridge/gpui-component", Dark: false},
 
 	Background:    "#ffffff",
-	Sidebar:       "#f8fafc",
+	Panel:         "#f8fafc",
 	Surface:       "#ffffff",
 	SurfaceHover:  "#f1f5f9",
 	SurfaceActive: "#cbd5e1",
@@ -317,7 +317,7 @@ var themeAuroraLight = themeSpec{
 		{"variable", "#333333", plain},
 		{"variable.special", "#c5060b", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#ffffff",
 		Foreground:       "#020617",
 		ActiveLine:       "#f8fafc",
@@ -332,7 +332,7 @@ var themeAyuLight = themeSpec{
 	Info: ThemeInfo{Name: "Ayu Light", Family: "Ayu", Author: "Zed Industries", URL: "https://github.com/zed-industries/zed/blob/e62dd2a0e584154886ff86cc1e9e3e060558b977/assets/themes/ayu", Dark: false},
 
 	Background:    "#fcfcfc",
-	Sidebar:       "#ececed",
+	Panel:         "#ececed",
 	Surface:       "#ececed",
 	SurfaceHover:  "#ddddde",
 	SurfaceActive: "#cecece",
@@ -399,7 +399,7 @@ var themeAyuLight = themeSpec{
 		{"variable", "#5c6166", plain},
 		{"variant", "#1a79bc", plain}, // was #3b9ee5
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#fcfcfc",
 		Foreground:       "#5c6773",
 		ActiveLine:       "#ececed",
@@ -414,7 +414,7 @@ var themeAyuDark = themeSpec{
 	Info: ThemeInfo{Name: "Ayu Dark", Family: "Ayu", Author: "Zed Industries", URL: "https://github.com/zed-industries/zed/blob/e62dd2a0e584154886ff86cc1e9e3e060558b977/assets/themes/ayu", Dark: true},
 
 	Background:    "#0d1016",
-	Sidebar:       "#16191f",
+	Panel:         "#16191f",
 	Surface:       "#0d1016",
 	SurfaceHover:  "#1a1c23",
 	SurfaceActive: "#26282f",
@@ -481,7 +481,7 @@ var themeAyuDark = themeSpec{
 		{"variable", "#bfbdb6", plain},
 		{"variant", "#5ac1fe", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#0d1016",
 		Foreground:       "#bfbdb6",
 		ActiveLine:       "#1f2127bf",
@@ -496,7 +496,7 @@ var themeCatppuccinLatte = themeSpec{
 	Info: ThemeInfo{Name: "Catppuccin Latte", Family: "Catppuccin", Author: "Catppuccino", URL: "https://github.com/catppuccin/catppuccin", Dark: false},
 
 	Background:    "#e5e9ef",
-	Sidebar:       "#dce0e8",
+	Panel:         "#dce0e8",
 	Surface:       "#eff1f5",
 	SurfaceHover:  "#dee2ea",
 	SurfaceActive: "#ccd2de",
@@ -620,7 +620,7 @@ var themeCatppuccinLatte = themeSpec{
 		{"variable.special", "#d00f38", italic},  // was #d20f39
 		{"variant", "#d00f38", plain},            // was #d20f39
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#eff1f5",
 		Foreground:       "#4c4f69",
 		ActiveLine:       "#dce0e8",
@@ -635,7 +635,7 @@ var themeCatppuccinFrappe = themeSpec{
 	Info: ThemeInfo{Name: "Catppuccin Frappe", Family: "Catppuccin", Author: "Catppuccino", URL: "https://github.com/catppuccin/catppuccin", Dark: true},
 
 	Background:    "#232634",
-	Sidebar:       "#1d202b",
+	Panel:         "#1d202b",
 	Surface:       "#1e202b",
 	SurfaceHover:  "#282a38",
 	SurfaceActive: "#313445",
@@ -683,7 +683,7 @@ var themeCatppuccinFrappe = themeSpec{
 		{"type", "#8caaee", plain},
 		{"variable.special", "#e78284", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#232634",
 		Foreground:       "#c6d0f5",
 		ActiveLine:       "#41455977",
@@ -698,7 +698,7 @@ var themeCatppuccinMacchiato = themeSpec{
 	Info: ThemeInfo{Name: "Catppuccin Macchiato", Family: "Catppuccin", Author: "Catppuccino", URL: "https://github.com/catppuccin/catppuccin", Dark: true},
 
 	Background:    "#1e2030",
-	Sidebar:       "#171926",
+	Panel:         "#171926",
 	Surface:       "#24273a",
 	SurfaceHover:  "#2f3348",
 	SurfaceActive: "#3a3f55",
@@ -746,7 +746,7 @@ var themeCatppuccinMacchiato = themeSpec{
 		{"type", "#8aadf4", plain},
 		{"variable.special", "#f5bde6", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#1e2030",
 		Foreground:       "#cad3f5",
 		ActiveLine:       "#363a4f",
@@ -761,7 +761,7 @@ var themeCatppuccinMocha = themeSpec{
 	Info: ThemeInfo{Name: "Catppuccin Mocha", Family: "Catppuccin", Author: "Catppuccino", URL: "https://github.com/catppuccin/catppuccin", Dark: true},
 
 	Background:    "#181825",
-	Sidebar:       "#11111b",
+	Panel:         "#11111b",
 	Surface:       "#1e1e2e",
 	SurfaceHover:  "#202031",
 	SurfaceActive: "#45475a",
@@ -809,7 +809,7 @@ var themeCatppuccinMocha = themeSpec{
 		{"type", "#89b4fa", plain},
 		{"variable.special", "#f5c2e7", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#181825",
 		Foreground:       "#cdd6f4",
 		ActiveLine:       "#222230aa",
@@ -824,7 +824,7 @@ var themeEverforestLight = themeSpec{
 	Info: ThemeInfo{Name: "Everforest Light", Family: "Everforest", Author: "sainnhe", URL: "https://github.com/sainnhe/everforest", Dark: false},
 
 	Background:    "#fefcee",
-	Sidebar:       "#f9f5e4",
+	Panel:         "#f9f5e4",
 	Surface:       "#fefcee",
 	SurfaceHover:  "#f8f6e8",
 	SurfaceActive: "#f1f0e2",
@@ -872,7 +872,7 @@ var themeEverforestLight = themeSpec{
 		{"type", "#427d75", plain},                  // was #7fbbb3
 		{"variable.special", "#e5191b", plain},      // was #e67e80
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#fefcee",
 		Foreground:       "#5f6d75",
 		ActiveLine:       "#e7e5d4",
@@ -887,7 +887,7 @@ var themeEverforestDark = themeSpec{
 	Info: ThemeInfo{Name: "Everforest Dark", Family: "Everforest", Author: "sainnhe", URL: "https://github.com/sainnhe/everforest", Dark: true},
 
 	Background:    "#262e34",
-	Sidebar:       "#1f262b",
+	Panel:         "#1f262b",
 	Surface:       "#262e34",
 	SurfaceHover:  "#2b3539",
 	SurfaceActive: "#303b3e",
@@ -935,7 +935,7 @@ var themeEverforestDark = themeSpec{
 		{"type", "#c8845f", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#262e34",
 		Foreground:       "#d3c6aa",
 		ActiveLine:       "#3c4448",
@@ -950,7 +950,7 @@ var themeFahrenheit = themeSpec{
 	Info: ThemeInfo{Name: "Fahrenheit", Family: "Fahrenheit", Author: "iTerm2-Color-Schemes", URL: "https://github.com/mbadolato/iTerm2-Color-Schemes", Dark: true},
 
 	Background:    "#000000",
-	Sidebar:       "#0e0e0e",
+	Panel:         "#0e0e0e",
 	Surface:       "#090909",
 	SurfaceHover:  "#111111",
 	SurfaceActive: "#1c1c1c",
@@ -998,7 +998,7 @@ var themeFahrenheit = themeSpec{
 		{"type", "#cda074", plain},
 		{"variable.special", "#cb4a05", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#000000",
 		Foreground:       "#ffffce",
 		ActiveLine:       "#1e1e1e",
@@ -1013,7 +1013,7 @@ var themeFlexokiLight = themeSpec{
 	Info: ThemeInfo{Name: "Flexoki Light", Family: "Flexoki", Author: "kepano", URL: "https://github.com/kepano/flexoki", Dark: false},
 
 	Background:    "#fffcf0",
-	Sidebar:       "#f2f0e5",
+	Panel:         "#f2f0e5",
 	Surface:       "#f2f0e5",
 	SurfaceHover:  "#e6e4da",
 	SurfaceActive: "#dad8ce",
@@ -1061,7 +1061,7 @@ var themeFlexokiLight = themeSpec{
 		{"type", "#8f6f01", plain},         // was #ad8301
 		{"variable.special", "#205ea6", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#fffcf0",
 		Foreground:       "#100f0f",
 		ActiveLine:       "#f2f0e5",
@@ -1076,7 +1076,7 @@ var themeFlexokiDark = themeSpec{
 	Info: ThemeInfo{Name: "Flexoki Dark", Family: "Flexoki", Author: "kepano", URL: "https://github.com/kepano/flexoki", Dark: true},
 
 	Background:    "#100f0f",
-	Sidebar:       "#191818",
+	Panel:         "#191818",
 	Surface:       "#100f0f",
 	SurfaceHover:  "#1b1a19",
 	SurfaceActive: "#262423",
@@ -1124,7 +1124,7 @@ var themeFlexokiDark = themeSpec{
 		{"type", "#d0a215", plain},
 		{"variable.special", "#4385be", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#100f0f",
 		Foreground:       "#cecdc3",
 		ActiveLine:       "#1c1b1a",
@@ -1139,7 +1139,7 @@ var themeGruvboxLight = themeSpec{
 	Info: ThemeInfo{Name: "Gruvbox Light", Family: "Gruvbox", Author: "Pavel Pertsev", URL: "https://github.com/morhetz/gruvbox", Dark: false},
 
 	Background:    "#fbf1c7",
-	Sidebar:       "#ebdbb2",
+	Panel:         "#ebdbb2",
 	Surface:       "#fbf1c7",
 	SurfaceHover:  "#ebdbb2",
 	SurfaceActive: "#d5c4a1",
@@ -1187,7 +1187,7 @@ var themeGruvboxLight = themeSpec{
 		{"type", "#956314", plain},                  // was #b57614
 		{"variable.special", "#cc241d", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#fbf1c7",
 		Foreground:       "#3c3836",
 		ActiveLine:       "#ebdbb2",
@@ -1202,7 +1202,7 @@ var themeGruvboxDark = themeSpec{
 	Info: ThemeInfo{Name: "Gruvbox Dark", Family: "Gruvbox", Author: "Pavel Pertsev", URL: "https://github.com/morhetz/gruvbox", Dark: true},
 
 	Background:    "#1d2021",
-	Sidebar:       "#252525",
+	Panel:         "#252525",
 	Surface:       "#1d2021",
 	SurfaceHover:  "#282a2a",
 	SurfaceActive: "#333332",
@@ -1250,7 +1250,7 @@ var themeGruvboxDark = themeSpec{
 		{"type", "#bb7745", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#1d2021",
 		Foreground:       "#dddddd",
 		ActiveLine:       "#131313",
@@ -1265,7 +1265,7 @@ var themeHarper = themeSpec{
 	Info: ThemeInfo{Name: "Harper", Family: "Harper", Author: "iTerm2-Color-Schemes", URL: "https://github.com/mbadolato/iTerm2-Color-Schemes", Dark: true},
 
 	Background:    "#010101",
-	Sidebar:       "#101010",
+	Panel:         "#101010",
 	Surface:       "#010101",
 	SurfaceHover:  "#17141a",
 	SurfaceActive: "#2c2632",
@@ -1313,7 +1313,7 @@ var themeHarper = themeSpec{
 		{"type", "#b296c6", plain},
 		{"variable.special", "#ff5874", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#010101",
 		Foreground:       "#a8a49d",
 		ActiveLine:       "#18151b",
@@ -1328,7 +1328,7 @@ var themeHybridLight = themeSpec{
 	Info: ThemeInfo{Name: "Hybrid Light", Family: "Hybrid", Author: "Andrew Wong", URL: "https://github.com/w0ng/vim-hybrid", Dark: false},
 
 	Background:    "#e4e4e4",
-	Sidebar:       "#d0d0d0",
+	Panel:         "#d0d0d0",
 	Surface:       "#dfdfdf",
 	SurfaceHover:  "#d5d5d5",
 	SurfaceActive: "#c4c4c4",
@@ -1376,7 +1376,7 @@ var themeHybridLight = themeSpec{
 		{"type", "#5f1c51", plain},
 		{"variable.special", "#5f1c51", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#e4e4e4",
 		Foreground:       "#1c1c1c",
 		ActiveLine:       "#d3d3d3",
@@ -1391,7 +1391,7 @@ var themeHybridDark = themeSpec{
 	Info: ThemeInfo{Name: "Hybrid Dark", Family: "Hybrid", Author: "Andrew Wong", URL: "https://github.com/w0ng/vim-hybrid", Dark: true},
 
 	Background:    "#1d1f21",
-	Sidebar:       "#242629",
+	Panel:         "#242629",
 	Surface:       "#1d1f21",
 	SurfaceHover:  "#282b2e",
 	SurfaceActive: "#33363b",
@@ -1439,7 +1439,7 @@ var themeHybridDark = themeSpec{
 		{"type", "#ba7644", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#000000",
 		Foreground:       "#dddddd",
 		ActiveLine:       "#131313",
@@ -1454,7 +1454,7 @@ var themeJellybeans = themeSpec{
 	Info: ThemeInfo{Name: "Jellybeans", Family: "Jellybeans", Author: "nanotech", URL: "https://github.com/nanotech/jellybeans.vim", Dark: true},
 
 	Background:    "#151515",
-	Sidebar:       "#101010",
+	Panel:         "#101010",
 	Surface:       "#151515",
 	SurfaceHover:  "#222222",
 	SurfaceActive: "#2f2f2f",
@@ -1502,7 +1502,7 @@ var themeJellybeans = themeSpec{
 		{"type", "#ae703e", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#000000",
 		Foreground:       "#dddddd",
 		ActiveLine:       "#131313",
@@ -1517,7 +1517,7 @@ var themeKibble = themeSpec{
 	Info: ThemeInfo{Name: "Kibble", Family: "Kibble", Author: "iTerm2-Color-Schemes", URL: "https://github.com/mbadolato/iTerm2-Color-Schemes", Dark: true},
 
 	Background:    "#0e100a",
-	Sidebar:       "#161712",
+	Panel:         "#161712",
 	Surface:       "#0e100a",
 	SurfaceHover:  "#181815",
 	SurfaceActive: "#292825",
@@ -1565,7 +1565,7 @@ var themeKibble = themeSpec{
 		{"type", "#6075d8", plain},             // was #3449d1
 		{"variable.special", "#f70041", plain}, // was #c70031
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#0e100a",
 		Foreground:       "#f7f7f7",
 		ActiveLine:       "#242223",
@@ -1580,7 +1580,7 @@ var themeMacOSClassicLight = themeSpec{
 	Info: ThemeInfo{Name: "macOS Classic Light", Family: "macOS Classic", Author: "huacnlee", URL: "https://github.com/huacnlee/zed-theme-macos-classic", Dark: false},
 
 	Background:    "#f9f9f9",
-	Sidebar:       "#fefefe",
+	Panel:         "#fefefe",
 	Surface:       "#f5f5f5",
 	SurfaceHover:  "#e7e7e7",
 	SurfaceActive: "#d9d9d9",
@@ -1629,7 +1629,7 @@ var themeMacOSClassicLight = themeSpec{
 		{"variable", "#333333", plain},
 		{"variable.special", "#c5060b", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#ffffff",
 		Foreground:       "#000000",
 		ActiveLine:       "#f5f5f5",
@@ -1644,7 +1644,7 @@ var themeMacOSClassicDark = themeSpec{
 	Info: ThemeInfo{Name: "macOS Classic Dark", Family: "macOS Classic", Author: "huacnlee", URL: "https://github.com/huacnlee/zed-theme-macos-classic", Dark: true},
 
 	Background:    "#131313",
-	Sidebar:       "#1c1c1e",
+	Panel:         "#1c1c1e",
 	Surface:       "#101010",
 	SurfaceHover:  "#232323",
 	SurfaceActive: "#353535",
@@ -1692,7 +1692,7 @@ var themeMacOSClassicDark = themeSpec{
 		{"type", "#cd5b28", plain}, // was #c75828
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#131313",
 		Foreground:       "#caccca",
 		ActiveLine:       "#35343666",
@@ -1707,7 +1707,7 @@ var themeMatrix = themeSpec{
 	Info: ThemeInfo{Name: "Matrix", Family: "Matrix", Author: "iruzo", URL: "https://github.com/iruzo/matrix-nvim", Dark: true},
 
 	Background:    "#020d02",
-	Sidebar:       "#020d02",
+	Panel:         "#020d02",
 	Surface:       "#020d02",
 	SurfaceHover:  "#011401",
 	SurfaceActive: "#001b00",
@@ -1755,7 +1755,7 @@ var themeMatrix = themeSpec{
 		{"type", "#82d967", plain},
 		{"variable.special", "#ff0000", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#020d02",
 		Foreground:       "#88ff88",
 		ActiveLine:       "#001900",
@@ -1770,7 +1770,7 @@ var themeMellifluousLight = themeSpec{
 	Info: ThemeInfo{Name: "Mellifluous Light", Family: "Mellifluous", Author: "Ramojus Lapinskas", URL: "https://github.com/ramojus/mellifluous.nvim", Dark: false},
 
 	Background:    "#e7e7e7",
-	Sidebar:       "#dfdfdf",
+	Panel:         "#dfdfdf",
 	Surface:       "#e4e4e4",
 	SurfaceHover:  "#d5d5d5",
 	SurfaceActive: "#cccccc",
@@ -1818,7 +1818,7 @@ var themeMellifluousLight = themeSpec{
 		{"type", "#676767", plain},                  // was #727272
 		{"variable.special", "#c91f28", plain},      // was #e06c75
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#e7e7e7",
 		Foreground:       "#383a42",
 		ActiveLine:       "#d5d5d5",
@@ -1833,7 +1833,7 @@ var themeMellifluousDark = themeSpec{
 	Info: ThemeInfo{Name: "Mellifluous Dark", Family: "Mellifluous", Author: "Ramojus Lapinskas", URL: "https://github.com/ramojus/mellifluous.nvim", Dark: true},
 
 	Background:    "#1a1a1a",
-	Sidebar:       "#171717",
+	Panel:         "#171717",
 	Surface:       "#1a1a1a",
 	SurfaceHover:  "#262626",
 	SurfaceActive: "#323232",
@@ -1881,7 +1881,7 @@ var themeMellifluousDark = themeSpec{
 		{"type", "#929292", plain},
 		{"variable.special", "#e06c75", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#1a1a1a",
 		Foreground:       "#abb2bf",
 		ActiveLine:       "#29292977",
@@ -1896,7 +1896,7 @@ var themeMolokaiLight = themeSpec{
 	Info: ThemeInfo{Name: "Molokai Light", Family: "Molokai", Author: "Tomas Restrepo", URL: "https://github.com/tomasr/molokai", Dark: false},
 
 	Background:    "#fefaf9",
-	Sidebar:       "#e8e3e0",
+	Panel:         "#e8e3e0",
 	Surface:       "#fefaf9",
 	SurfaceHover:  "#f8f4f3",
 	SurfaceActive: "#f1eded",
@@ -1944,7 +1944,7 @@ var themeMolokaiLight = themeSpec{
 		{"type", "#1c7c98", plain},             // was #1c8ca8
 		{"variable.special", "#e01e4c", plain}, // was #e14775
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#fefaf9",
 		Foreground:       "#0a0a0a",
 		ActiveLine:       "#e4deda",
@@ -1959,7 +1959,7 @@ var themeMolokaiDark = themeSpec{
 	Info: ThemeInfo{Name: "Molokai Dark", Family: "Molokai", Author: "Tomas Restrepo", URL: "https://github.com/tomasr/molokai", Dark: true},
 
 	Background:    "#1b1d1e",
-	Sidebar:       "#202223",
+	Panel:         "#202223",
 	Surface:       "#1b1d1e",
 	SurfaceHover:  "#26292a",
 	SurfaceActive: "#303436",
@@ -2007,7 +2007,7 @@ var themeMolokaiDark = themeSpec{
 		{"type", "#b87543", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#000000",
 		Foreground:       "#dddddd",
 		ActiveLine:       "#131313",
@@ -2022,7 +2022,7 @@ var themeSolarizedLight = themeSpec{
 	Info: ThemeInfo{Name: "Solarized Light", Family: "Solarized", Author: "Ethan Schoonover", URL: "https://ethanschoonover.com/solarized", Dark: false},
 
 	Background:    "#fdf6e3",
-	Sidebar:       "#f4ecd7",
+	Panel:         "#f4ecd7",
 	Surface:       "#fdf6e3",
 	SurfaceHover:  "#ede5d0",
 	SurfaceActive: "#dcd4bc",
@@ -2070,7 +2070,7 @@ var themeSolarizedLight = themeSpec{
 		{"type", "#1e7d74", plain},             // was #2aa198
 		{"variable.special", "#db2623", plain}, // was #dc322f
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#fdf6e3",
 		Foreground:       "#586e75",
 		ActiveLine:       "#eee8d5",
@@ -2085,7 +2085,7 @@ var themeSolarizedDark = themeSpec{
 	Info: ThemeInfo{Name: "Solarized Dark", Family: "Solarized", Author: "Ethan Schoonover", URL: "https://ethanschoonover.com/solarized", Dark: true},
 
 	Background:    "#002b36",
-	Sidebar:       "#09323d",
+	Panel:         "#09323d",
 	Surface:       "#002b36",
 	SurfaceHover:  "#043541",
 	SurfaceActive: "#083e4b",
@@ -2133,7 +2133,7 @@ var themeSolarizedDark = themeSpec{
 		{"type", "#c17d51", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#002b36",
 		Foreground:       "#dddddd",
 		ActiveLine:       "#073642",
@@ -2148,7 +2148,7 @@ var themeSpaceduck = themeSpec{
 	Info: ThemeInfo{Name: "Spaceduck", Family: "Spaceduck", Author: "Guillermo Rodriguez", URL: "https://github.com/pineapplegiant/spaceduck", Dark: true},
 
 	Background:    "#0f111b",
-	Sidebar:       "#141724",
+	Panel:         "#141724",
 	Surface:       "#0f111b",
 	SurfaceHover:  "#1c1e36",
 	SurfaceActive: "#292b51",
@@ -2196,7 +2196,7 @@ var themeSpaceduck = themeSpec{
 		{"type", "#089cc5", plain},
 		{"variable.special", "#c86d8c", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#0f111b",
 		Foreground:       "#ecf0c1",
 		ActiveLine:       "#1c1d39",
@@ -2211,7 +2211,7 @@ var themeTokyoNight = themeSpec{
 	Info: ThemeInfo{Name: "Tokyo Night", Family: "Tokyo", Author: "Folke Lemaitre", URL: "https://github.com/folke/tokyonight.nvim", Dark: true},
 
 	Background:    "#1a1b26",
-	Sidebar:       "#161720",
+	Panel:         "#161720",
 	Surface:       "#1a1b26",
 	SurfaceHover:  "#222534",
 	SurfaceActive: "#292e42",
@@ -2259,7 +2259,7 @@ var themeTokyoNight = themeSpec{
 		{"type", "#7dcfff", plain},
 		{"variable.special", "#f7768e", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#1a1b26",
 		Foreground:       "#c0caf5",
 		ActiveLine:       "#292e42",
@@ -2274,7 +2274,7 @@ var themeTokyoStorm = themeSpec{
 	Info: ThemeInfo{Name: "Tokyo Storm", Family: "Tokyo", Author: "Folke Lemaitre", URL: "https://github.com/folke/tokyonight.nvim", Dark: true},
 
 	Background:    "#24283b",
-	Sidebar:       "#202435",
+	Panel:         "#202435",
 	Surface:       "#24283b",
 	SurfaceHover:  "#2b3046",
 	SurfaceActive: "#323750",
@@ -2322,7 +2322,7 @@ var themeTokyoStorm = themeSpec{
 		{"type", "#c48057", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#24283b",
 		Foreground:       "#b0b9e2",
 		ActiveLine:       "#292e42",
@@ -2337,7 +2337,7 @@ var themeTokyoMoon = themeSpec{
 	Info: ThemeInfo{Name: "Tokyo Moon", Family: "Tokyo", Author: "Folke Lemaitre", URL: "https://github.com/folke/tokyonight.nvim", Dark: true},
 
 	Background:    "#222436",
-	Sidebar:       "#1e2030",
+	Panel:         "#1e2030",
 	Surface:       "#222436",
 	SurfaceHover:  "#292c41",
 	SurfaceActive: "#2f334c",
@@ -2385,7 +2385,7 @@ var themeTokyoMoon = themeSpec{
 		{"type", "#86e1fc", plain},
 		{"variable.special", "#ed8796", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#222436",
 		Foreground:       "#c0caf5",
 		ActiveLine:       "#2d3149",
@@ -2400,7 +2400,7 @@ var themeTwilight = themeSpec{
 	Info: ThemeInfo{Name: "Twilight", Family: "Twilight", Author: "MacroMates", URL: "https://macromates.com", Dark: true},
 
 	Background:    "#141414",
-	Sidebar:       "#1e1e1e",
+	Panel:         "#1e1e1e",
 	Surface:       "#1a1a1a",
 	SurfaceHover:  "#222222",
 	SurfaceActive: "#2a2a2a",
@@ -2448,7 +2448,7 @@ var themeTwilight = themeSpec{
 		{"type", "#ae703e", plain}, // was #a86d3b
 		{"variable.special", "#e19773", plain},
 	},
-	Editor: editorSpec{
+	CodeEditor: codeEditorSpec{
 		Background:       "#000000",
 		Foreground:       "#dddddd",
 		ActiveLine:       "#131313",

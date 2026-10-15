@@ -83,7 +83,7 @@ func Sidebar(s *Store) ui.Element {
 		}
 
 		return ui.Div().Width(ui.Px(244 * layoutScale(ctx))).Height(ui.Full).Shrink(0).
-			Background(t.Sidebar).PaddingX(12).PaddingY(14).Gap(2).SelectionContainer().Label("Navigation").
+			Background(t.Panel).PaddingX(12).PaddingY(14).Gap(2).SelectionContainer().Label("Navigation").
 			Child(brand(t, focused)).
 			Child(sectionLabel(t, "Menu")).
 			Child(nav(PageDashboard, icons.Dashboard, "Dashboard", 0, GoDashboard)).

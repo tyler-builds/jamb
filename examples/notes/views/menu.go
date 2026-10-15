@@ -20,7 +20,7 @@ func (a *App) menuBar(ctx *ui.Context) ui.Element {
 	t := ctx.Theme()
 	return ui.Div().Absolute().Top(0).Left(0).Right(0).
 		Row().Align(ui.Center).MinHeight(ui.Px(menuBarHeightFor(ctx))).PaddingX(4).
-		Background(t.Sidebar).BorderEdges(ui.Edges{Bottom: 1}, t.Border).
+		Background(t.Panel).BorderEdges(ui.Edges{Bottom: 1}, t.Border).
 		Child(ui.MenuBar(
 			ui.TopMenu{Label: "File", Items: func() []ui.MenuItem {
 				return []ui.MenuItem{

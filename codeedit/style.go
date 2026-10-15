@@ -3,7 +3,7 @@ package codeedit
 import "github.com/tyler-builds/jamb/ui"
 
 // Style is the look of the parts of an Editor. A part's style merges over the built-in
-// defaults, which come from the colors of the theme (Theme.Editor and Theme.Syntax), and
+// defaults, which come from the colors of the theme (Theme.CodeEditor and Theme.Syntax), and
 // then over the Styles of the editor. Box is the frame of the editor: its Background,
 // border, radius and padding. BoxFocused is the frame while the editor has focus. By default
 // it is unset, as in code editors, where the caret shows focus: the frame does not change.
@@ -54,7 +54,7 @@ func plainPart(s ui.Style) ui.Style {
 
 // editorDefaults returns the built-in look of the parts, from the colors of t.
 func editorDefaults(t *ui.Theme) Style {
-	ec := t.Editor
+	ec := t.CodeEditor
 	var focused ui.Style // the caret shows focus; the frame does not change
 	if t.HighContrast {
 		focused = ui.Style{BorderColor: t.Accent} // the Highlight color of the system
@@ -90,8 +90,8 @@ func (s Style) resolve(ctx *ui.Context) Style {
 			CurrentMatch: plainPart(s.CurrentMatch),
 			Find:         plainPart(s.Find),
 		}, "instance Styles"))
-		st.Text = st.Text.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.Editor.Foreground}, "high contrast"))
-		st.Gutter = st.Gutter.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.Editor.LineNumber}, "high contrast"))
+		st.Text = st.Text.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.CodeEditor.Foreground}, "high contrast"))
+		st.Gutter = st.Gutter.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.CodeEditor.LineNumber}, "high contrast"))
 	}
 	return st
 }

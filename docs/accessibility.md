@@ -817,7 +817,7 @@ boundaries. The guidance also says not to hard-code colors in a contrast theme.
 
 | Token | System color |
 |---|---|
-| Background, Sidebar, Surface, SurfaceHover | Window |
+| Background, Panel, Surface, SurfaceHover | Window |
 | SurfaceActive (selection, pressed) | Highlight |
 | Text, TextMuted, TextSubtle, Border, BorderStrong, Scrollbar, Success, Warning, Danger | WindowText (status is shown by text and icons) |
 | Accent, AccentHover, AccentActive, FocusRing | Highlight |
@@ -881,7 +881,7 @@ Token changes (before, then after, with the minimum):
 
 | Pair | Theme | Before | After | Minimum | Change |
 |---|---|---|---|---|---|
-| TextSubtle on Background, Sidebar, Surface, SurfaceHover, SurfaceActive | dark | 4.04, 3.90, 3.67, 3.40, 3.08 | 6.01, 5.80, 5.45, 5.05, 4.58 | 4.5 | TextSubtle #71717a to #8e8e96 |
+| TextSubtle on Background, Panel, Surface, SurfaceHover, SurfaceActive | dark | 4.04, 3.90, 3.67, 3.40, 3.08 | 6.01, 5.80, 5.45, 5.05, 4.58 | 4.5 | TextSubtle #71717a to #8e8e96 |
 | TextSubtle on the same surfaces | light | 2.46, 2.33, 2.56, 2.33, 2.02 | 5.79, 5.50, 6.04, 5.50, 4.76 | 4.5 | TextSubtle #a1a1aa to #62626a |
 | Placeholder (TextSubtle) on Surface | dark / light | 3.67 / 2.56 | 5.45 / 6.04 | 4.5 | (same token) |
 | AccentText on Accent | dark | 4.47 | 4.56 | 4.5 | Accent #6366f1 to #6265ed |
@@ -889,11 +889,11 @@ Token changes (before, then after, with the minimum):
 | AccentText on AccentActive | dark | 5.50 | 5.50 | 4.5 | none |
 | White label on Danger, hover, pressed | dark | 3.76, 3.46, 4.53 | 5.01, 4.56, 5.94 | 4.5 | Danger #ef4444 to #d62828 |
 | White label on Danger, hover, pressed | light | 4.83, 4.43, 5.74 | 5.15, 4.66, 6.10 | 4.5 | Danger #dc2626 to #d12a2a |
-| BorderStrong (control border) on Background, Sidebar, Surface | dark | 1.73, 1.67, 1.57 | 3.43, 3.31, 3.11 | 3 | BorderStrong #3a3a41 to #66666d; controls now draw BorderStrong at rest |
+| BorderStrong (control border) on Background, Panel, Surface | dark | 1.73, 1.67, 1.57 | 3.43, 3.31, 3.11 | 3 | BorderStrong #3a3a41 to #66666d; controls now draw BorderStrong at rest |
 | BorderStrong on the same surfaces | light | 1.42, 1.34, 1.48 | 3.28, 3.12, 3.43 | 3 | BorderStrong #d4d4d8 to #8a8a92 |
 | Scrollbar thumb at rest on Surface | dark | 1.21 | 3.23 at alpha 0.35, 5.24 at 0.5 | 3 | Scrollbar #ffffff33 to #ffffff; rest alpha 0.35 to 0.5 (scrollbar.go) |
 | Scrollbar thumb at rest on Surface | light | 1.21 | 2.44 at alpha 0.35, 3.98 at 0.5 | 3 | Scrollbar #0000003d to #000000; rest alpha 0.5 |
-| Link text on Background, Sidebar, Surface | dark | Accent: 4.38, 4.22, 3.97 | Link token: 9.80, 9.46, 8.89 (all five surfaces 7.47 to 9.80) | 4.5 | new Link token (#a5b4fc); Accent kept for fills |
+| Link text on Background, Panel, Surface | dark | Accent: 4.38, 4.22, 3.97 | Link token: 9.80, 9.46, 8.89 (all five surfaces 7.47 to 9.80) | 4.5 | new Link token (#a5b4fc); Accent kept for fills |
 | Link text on the light surfaces | light | Accent passed | Link token: 6.23 to 7.90 | 4.5 | new Link token (#4338ca) |
 | Disabled text | both | TextSubtle (no change in normal themes) | Disabled token; GrayText under high contrast | exempt (1.4.3) | normal themes dim with Opacity as before |
 | Demo badge text (Accent.Lighten(0.3) on AccentSoft) | light | 2.84 | text now Text (passes) | 4.5 | demo badge uses t.Text |

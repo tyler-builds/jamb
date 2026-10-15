@@ -185,7 +185,7 @@ rule through `ui.Painter.CaretVisible`.
 ## Styling
 
 `codeedit.Style` has the parts of the editor. A part's style merges over the defaults, which come
-from `Theme.Editor` and `Theme.Syntax`, and then over `Styles`:
+from `Theme.CodeEditor` and `Theme.Syntax`, and then over `Styles`:
 
 | Part | What it is |
 |---|---|

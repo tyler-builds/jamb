@@ -256,7 +256,7 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 	st := DataGridStyle{
 		Grid:             Style{Grow: 1, Background: t.Surface, BorderWidth: 1, BorderColor: t.Border, TextColor: t.Text},
 		GridFocusVisible: Style{Shadows: []Shadow{ring}},
-		Header: Style{Direction: Row, Align: Center, MinHeight: Px(h), Background: t.Sidebar,
+		Header: Style{Direction: Row, Align: Center, MinHeight: Px(h), Background: t.Panel,
 			BorderEdges: line, BorderColor: t.Border, TextColor: t.TextMuted, FontWeight: FontSemibold},
 		// A header cell takes the height of the header row, as a row's cells take the height
 		// of their row, so its hover and sorted fills cover the whole cell.
@@ -269,7 +269,7 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 			BorderEdges: line, BorderColor: t.Border, TextColor: t.Text},
 		RowHover:     Style{Background: t.SurfaceHover},
 		RowSelected:  Style{Background: t.AccentSoft},
-		RowAlternate: Style{Background: t.Sidebar},
+		RowAlternate: Style{Background: t.Panel},
 		// A cell takes the height of its row even with no content, so an empty cell
 		// (an interactive column's cell with no control) still has a bounding box.
 		// A cell clips what it draws to its column: content wider than the column is cut

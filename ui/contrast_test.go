@@ -69,7 +69,7 @@ func contrastPairs(th *Theme) []contrastPair {
 		c    Color
 	}{
 		{"Background", th.Background},
-		{"Sidebar", th.Sidebar},
+		{"Panel", th.Panel},
 		{"Surface", th.Surface},
 		{"SurfaceHover", th.SurfaceHover},
 		{"SurfaceActive", th.SurfaceActive},

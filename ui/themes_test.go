@@ -54,8 +54,25 @@ func TestNewThemeUnknownName(t *testing.T) {
 			t.Errorf("NewTheme(%q) returned a theme=%t and ok=%t, want nil and false", name, th != nil, ok)
 		}
 	}
-	if th := (ThemeInfo{Name: "Nope"}).New(); th != nil {
-		t.Errorf("ThemeInfo.New of an unknown name returned a theme, want nil")
+}
+
+// An app saves the Name of the theme it uses and restores it with NewTheme, so
+// that name must be one NewTheme takes, for every predefined theme.
+func TestNewThemeTakesTheNameOfEveryPredefinedTheme(t *testing.T) {
+	for _, info := range Themes() {
+		th, ok := NewTheme(info.Name)
+		if !ok {
+			t.Fatalf("NewTheme(%q) found no theme, though Themes lists it", info.Name)
+		}
+		rt := newTestRuntime(func(ctx *Context) Element { return Div() }, 200, 100, 1)
+		rt.SetTheme(th)
+		saved := rt.Theme().Name
+		if saved != info.Name {
+			t.Errorf("the Name of %q is %q, want the name in Themes", info.Name, saved)
+		}
+		if back, ok := NewTheme(saved); !ok || back.Name != saved {
+			t.Errorf("NewTheme(%q) of the saved name returned ok=%t, want the theme back", saved, ok)
+		}
 	}
 }
 
@@ -70,10 +87,6 @@ func TestNewThemeReturnsCopies(t *testing.T) {
 	if b.Syntax["keyword"] == (SyntaxStyle{}) {
 		t.Errorf("a change to one copy's Syntax changed another copy")
 	}
-	c := ThemeInfo{Name: "Catppuccin Mocha"}.New()
-	if c == nil || c.Name != b.Name || c.Background != b.Background {
-		t.Errorf("ThemeInfo.New does not return the theme NewTheme returns")
-	}
 }
 
 func TestCloneCopiesSyntaxAndEditor(t *testing.T) {
@@ -81,14 +94,14 @@ func TestCloneCopiesSyntaxAndEditor(t *testing.T) {
 	c := base.Clone()
 	c.Syntax["keyword"] = SyntaxStyle{Bold: true}
 	c.Syntax["added"] = SyntaxStyle{}
-	c.Editor.Selection = Hex("#ffffff")
+	c.CodeEditor.Selection = Hex("#ffffff")
 	if base.Syntax["keyword"] == c.Syntax["keyword"] {
 		t.Errorf("Clone shares the Syntax map: a change to the copy changed the original")
 	}
 	if _, ok := base.Syntax["added"]; ok {
 		t.Errorf("Clone shares the Syntax map: a new capture of the copy appears in the original")
 	}
-	if base.Editor.Selection == c.Editor.Selection {
+	if base.CodeEditor.Selection == c.CodeEditor.Selection {
 		t.Errorf("a change to the copy's Editor changed the original")
 	}
 	if _, ok := darkTheme.Syntax["added"]; ok {
@@ -119,7 +132,7 @@ func checkPredefinedContrast(t *testing.T, th *Theme, converted bool) {
 		c    Color
 	}{
 		{"Background", th.Background},
-		{"Sidebar", th.Sidebar},
+		{"Panel", th.Panel},
 		{"Surface", th.Surface},
 		{"SurfaceHover", th.SurfaceHover},
 		{"SurfaceActive", th.SurfaceActive},
@@ -141,7 +154,7 @@ func checkPredefinedContrast(t *testing.T, th *Theme, converted bool) {
 		themePair{"white on Danger", Hex("#ffffff"), th.Danger, minText},
 		themePair{"white on Danger hover", Hex("#ffffff"), th.Danger.Lighten(0.08), minText},
 		themePair{"white on Danger pressed", Hex("#ffffff"), th.Danger.Darken(0.1), minText},
-		themePair{"Editor.Foreground on Editor.Background", th.Editor.Foreground, th.Editor.Background, minText},
+		themePair{"Editor.Foreground on Editor.Background", th.CodeEditor.Foreground, th.CodeEditor.Background, minText},
 	)
 	names := make([]string, 0, len(th.Syntax))
 	for name := range th.Syntax {
@@ -152,16 +165,16 @@ func checkPredefinedContrast(t *testing.T, th *Theme, converted bool) {
 		s := th.Syntax[name]
 		ps = append(ps,
 			themePair{"syntax " + name + " on Background", s.Color, th.Background, minText},
-			themePair{"syntax " + name + " on Editor.Background", s.Color, th.Editor.Background, minText},
+			themePair{"syntax " + name + " on Editor.Background", s.Color, th.CodeEditor.Background, minText},
 		)
 	}
 	if converted {
 		ps = append(ps,
 			themePair{"BorderStrong on Background", th.BorderStrong, th.Background, minNonText},
-			themePair{"BorderStrong on Sidebar", th.BorderStrong, th.Sidebar, minNonText},
+			themePair{"BorderStrong on Panel", th.BorderStrong, th.Panel, minNonText},
 			themePair{"BorderStrong on Surface", th.BorderStrong, th.Surface, minNonText},
 			themePair{"FocusRing on Background", th.FocusRing, th.Background, minNonText},
-			themePair{"FocusRing on Sidebar", th.FocusRing, th.Sidebar, minNonText},
+			themePair{"FocusRing on Panel", th.FocusRing, th.Panel, minNonText},
 			themePair{"FocusRing on Surface", th.FocusRing, th.Surface, minNonText},
 		)
 	}
@@ -194,7 +207,7 @@ func TestHighContrastKeepsSyntaxCaptures(t *testing.T) {
 					t.Errorf("%s: high contrast capture %q is %+v, want color %v with the font styles of %+v", info.Name, name, got, want, s)
 				}
 			}
-			if hc.Editor.Foreground != sys.WindowText || hc.Editor.Background != sys.Window {
+			if hc.CodeEditor.Foreground != sys.WindowText || hc.CodeEditor.Background != sys.Window {
 				t.Errorf("%s: high contrast editor is not in system colors", info.Name)
 			}
 		}
