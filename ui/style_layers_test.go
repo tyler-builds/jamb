@@ -169,6 +169,10 @@ var layerBuilders = []layerBuilder{
 		func(st any) Element { return partCombobox(NewSignal(""), st.(ComboboxStyle)) }},
 	{"ColorPicker", func(th *Theme) any { return &th.ColorPicker },
 		func(st any) Element { return ColorPicker(NewSignal(Hex("#112233"))).Styles(st.(ColorPickerStyle)) }},
+	{"ColorPicker", func(th *Theme) any { return &th.ColorPicker },
+		func(st any) Element {
+			return ColorPicker(NewSignal(Hex("#112233"))).Disabled(true).Styles(st.(ColorPickerStyle))
+		}},
 	{"DatePicker", func(th *Theme) any { return &th.DatePicker },
 		func(st any) Element {
 			return DatePicker(NewSignal(time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC))).Styles(st.(DatePickerStyle))

@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -446,6 +448,65 @@ func TestDateRangePickerSizing(t *testing.T) {
 	})
 	if w := r.nodeByKey(t, "trip").style.Width; w != Full {
 		t.Fatalf("width %v, want Full", w)
+	}
+}
+
+func TestDateRangePickerValidateRequired(t *testing.T) {
+	start, end := NewSignal(time.Time{}), NewSignal(time.Time{})
+	p := DateRangePicker(start, end).Validate(Required[DateRange]())
+	if err := p.formCheck(); err == nil {
+		t.Fatal("Required accepts no range")
+	}
+	start.Set(day(2026, time.October, 13))
+	end.Set(day(2026, time.October, 20))
+	if err := p.formCheck(); err != nil {
+		t.Fatalf("Required rejects a range: %v", err)
+	}
+	// A custom rule sees both ends.
+	week := Custom(func(r DateRange) error {
+		if r.End.Sub(r.Start) > 7*24*time.Hour {
+			return errTooLong
+		}
+		return nil
+	})
+	end.Set(day(2026, time.October, 21))
+	if err := DateRangePicker(start, end).Validate(week).formCheck(); err != errTooLong {
+		t.Fatalf("the custom rule gave %v, want %v", err, errTooLong)
+	}
+}
+
+// errTooLong is the error of a test rule that rejects a range of more than a week.
+var errTooLong = errors.New("At most a week.")
+
+func TestDateRangePickerRequiredInFieldShowsError(t *testing.T) {
+	prev := localeOverride
+	localeOverride = testLocaleEN()
+	t.Cleanup(func() { localeOverride = prev })
+	start, end := NewSignal(day(2026, time.October, 13)), NewSignal(day(2026, time.October, 20))
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().Child(Field("Trip dates", DateRangePicker(start, end).Key("trip").Validate(Required[DateRange]())))
+	})
+	field := accesstest.Find(t, r.tree(), access.RoleComboBox, "Trip dates")
+	if len(field.LabelledBy) != 1 {
+		t.Fatalf("the field's label does not name the range picker: LabelledBy %v", field.LabelledBy)
+	}
+	r.focusKey(t, "trip")
+	n := len([]rune(r.stateOf(t, access.RoleComboBox, "Trip dates").Value))
+	r.press(input.KeyEnd, 0)
+	for range n {
+		r.press(input.KeyBackspace, 0)
+	}
+	r.rt.setFocus(0)
+	r.frame()
+	if !start.Get().IsZero() || !end.Get().IsZero() {
+		t.Fatalf("an emptied field left the range %v to %v", start.Get(), end.Get())
+	}
+	e := partNodeOrNil(r.rt, "FormField.Error")
+	if e == nil || e.div.noDisplay || !strings.Contains(nodeText(e), "This field is required.") {
+		t.Fatal("Required does not show its error after the field was emptied and left")
+	}
+	if f := accesstest.Find(t, r.tree(), access.RoleComboBox, "Trip dates"); !f.States.Has(access.StateInvalid) {
+		t.Error("the range picker is not reported invalid")
 	}
 }
 
