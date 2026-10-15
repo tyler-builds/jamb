@@ -1222,9 +1222,9 @@ var defaultLayout = ui.DockLayout{Root: ui.DockNode{
 }}
 
 panels := map[string]ui.DockPanel{
-	"explorer": {Title: "Explorer", Render: explorer, Closable: true},
-	"editor":   {Title: "Editor", Render: editor},
-	"output":   {Title: "Output", Render: output, Closable: true},
+	"explorer": {Title: "Explorer", Content: explorer, Closable: true},
+	"editor":   {Title: "Editor", Content: editor},
+	"output":   {Title: "Output", Content: output, Closable: true},
 }
 layout := ui.NewSignal(loadLayout(defaultLayout)) // the saved layout, or the default
 
@@ -1232,8 +1232,8 @@ ui.Dock(layout, panels).OnChange(func(l ui.DockLayout) { saveLayout(l) }).
 	Floating(app.OpenDockWindow)
 
 // Reset layout, and reopen a panel that was closed:
-layout.Set(ui.DockReset(defaultLayout))
-layout.Set(ui.DockShow(layout.Peek(), "output"))
+layout.Set(defaultLayout.Clone())
+layout.Set(layout.Peek().Show("output"))
 ```
 
 **The layout model.** A `DockLayout` is a tree of `DockNode`s and a list of
@@ -1242,13 +1242,12 @@ one above the other when `Vertical` is set, and `Sizes` holds each child's share
 the split, which need not sum to 1. A node without children is a tab group: `Panels`
 lists its panels in tab order and `Active` is the one it shows. A floating group is
 a tab group with an `ID`, and the position and size of its window. The layout is a
-value: the functions `DockMove`, `DockClose`, `DockShow`, `DockFocus`, `DockFloatPanel`,
-`DockBack`, `DockMoveSide` and `DockReset` return a new layout and never change their
-argument. They also put the layout in order: an empty group goes, a split with one
+value: its methods `Move`, `Close`, `Show`, `Focus`, `Float`, `Dock`, `MoveSide` and `Clone`
+return a new layout and never change their receiver. They also put the layout in order: an empty group goes, a split with one
 child is replaced by it, and a split inside a split of the same direction is merged
 into it. The layout marshals to JSON with `encoding/json`. A panel ID in a loaded
 layout that the dock does not have is dropped when the dock is shown, and a panel
-that the layout does not hold stays hidden until `DockShow` shows it.
+that the layout does not hold stays hidden until `Show` shows it.
 
 **Dragging.** Drag a tab over a group: the group shows the zone the panel will land
 in, the center to add it as a tab or a side to make a group beside it. Drag a tab to
@@ -1282,7 +1281,7 @@ dropped on an edge, floated into a window and docked back, or put back by a layo
 reset. Its components keep their `Local` state, their signals and their `OnDispose`
 functions. Its text fields keep their text, undo history and selection, its scroll
 containers their offsets, and it keeps the focus when it had it. `OnDispose` runs
-only when the panel closes: with `DockClose`, or when a layout no longer holds the
+only when the panel closes: with `Close`, or when a layout no longer holds the
 panel. A panel that moves to another window renders once more there, with its state
 kept. A dock that its parent builds again for the same layout keeps its panels the
 same way. A signal that a panel reads still re-renders it, in whichever window it is

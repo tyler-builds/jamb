@@ -86,7 +86,7 @@ func TestDockWindowMovesSaveOnceTheWindowIsStill(t *testing.T) {
 		return f
 	}
 	saves := 0
-	sig := NewSignal(DockFloatPanel(dockSplitLayout(), "tree", 30, 40, 300, 200))
+	sig := NewSignal(dockSplitLayout().Float("tree", 30, 40, 300, 200))
 	r := newAccessRig(func(ctx *Context) Element {
 		return Div().Column().Size(Full, Full).Child(Dock(sig, testDockPanels()).Key("dock").
 			Floating(open).OnChange(func(DockLayout) { saves++ }))

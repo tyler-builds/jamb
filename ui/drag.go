@@ -30,11 +30,10 @@ var dragPreviewID = mix(rootID, 0xd4a6)
 type DragSpec struct {
 	payload any
 	preview func() Element
-	end     func(dropped bool)
-	endAt   func(DragEnd)
+	end     func(DragEnd)
 }
 
-// DragEnd says how a drag ended, for DragSpec.EndAt. Dropped is set when a target took the
+// DragEnd says how a drag ended, for DragSpec.End. Dropped is set when a target took the
 // payload, and Cancelled when Escape or the window losing focus ended the drag. Otherwise
 // the button was released with no target under the pointer, and X and Y are the pointer's
 // position on the screen in logical pixels, which may lie outside the window. They are zero
@@ -58,13 +57,11 @@ func Drag[T any](v T) *DragSpec {
 // it is not hit-tested: targets under it are found as if it were not there.
 func (s *DragSpec) Preview(fn func() Element) *DragSpec { s.preview = fn; return s }
 
-// End runs fn after the drag ends. dropped is true when a target took the
-// payload, and false when the drag was cancelled or released over nothing.
-func (s *DragSpec) End(fn func(dropped bool)) *DragSpec { s.end = fn; return s }
-
-// EndAt is like End, and also reports where the drag ended, on the screen (see DragEnd).
-// Use it to float a panel where the user let go of it.
-func (s *DragSpec) EndAt(fn func(DragEnd)) *DragSpec { s.endAt = fn; return s }
+// End runs fn after the drag ends, with how it ended (see DragEnd). Dropped is true when a
+// target took the payload, and false when the drag was cancelled or released over nothing.
+// Where the drag ended, on the screen, is reported too, so that fn can float a panel where
+// the user let go of it.
+func (s *DragSpec) End(fn func(DragEnd)) *DragSpec { s.end = fn; return s }
 
 // OnDrag makes the element a drag source. The drag starts once the pointer
 // moves 4 px with the primary button held; a press that does not move is a
@@ -336,15 +333,12 @@ func (rt *Runtime) endDrag(dropped, cancelled bool) {
 	rt.needPaint = true
 	rt.requestFrame()
 	if d.spec.end != nil {
-		d.spec.end(dropped)
-	}
-	if d.spec.endAt != nil {
 		e := DragEnd{Dropped: dropped, Cancelled: cancelled}
 		if !cancelled {
 			ox, oy := rt.screenOrigin()
 			e.X, e.Y = d.x+ox, d.y+oy
 		}
-		d.spec.endAt(e)
+		d.spec.end(e)
 	}
 }
 

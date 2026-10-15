@@ -13,9 +13,9 @@ import (
 // Each panel's content is a text, so a test can find it.
 func testDockPanels() map[string]DockPanel {
 	return map[string]DockPanel{
-		"notes": {Title: "Notes", Render: func() Element { return Text("Notes body") }},
-		"log":   {Title: "Output", Render: func() Element { return Text("Output body") }, Closable: true},
-		"tree":  {Title: "Explorer", Render: func() Element { return Text("Explorer body") }},
+		"notes": {Title: "Notes", Content: func() Element { return Text("Notes body") }},
+		"log":   {Title: "Output", Content: func() Element { return Text("Output body") }, Closable: true},
+		"tree":  {Title: "Explorer", Content: func() Element { return Text("Explorer body") }},
 	}
 }
 
@@ -102,14 +102,14 @@ func TestDockRendersGroupsSplitsAndTabs(t *testing.T) {
 }
 
 // TestDockHidesUnknownPanels checks that the panels a layout names but the dock does not
-// have are dropped, and that a panel the layout does not hold is shown by DockShow.
+// have are dropped, and that a panel the layout does not hold is shown by DockLayout.Show.
 func TestDockHidesUnknownPanels(t *testing.T) {
 	l := DockLayout{Root: grp("notes", "notes", "ghost")}
 	r, sig := dockRig(l, DockStyle{})
 	if n := len(accessNodes(r, access.RoleTab)); n != 1 {
 		t.Errorf("%d tabs, want only the known panel", n)
 	}
-	sig.Set(DockShow(sig.Peek(), "tree"))
+	sig.Set(sig.Peek().Show("tree"))
 	r.frame()
 	accessNamed(t, r, access.RoleTab, "Explorer")
 }
@@ -119,7 +119,7 @@ func TestDockHidesUnknownPanels(t *testing.T) {
 func TestDockPanelKeepsItsStateWhileItsTabIsNotActive(t *testing.T) {
 	var count *Signal[int]
 	panels := testDockPanels()
-	panels["notes"] = DockPanel{Title: "Notes", Render: func() Element {
+	panels["notes"] = DockPanel{Title: "Notes", Content: func() Element {
 		return Component(func(ctx *Context) Element {
 			count = Local(ctx, "count", 0)
 			return Text("Notes body")
@@ -130,9 +130,9 @@ func TestDockPanelKeepsItsStateWhileItsTabIsNotActive(t *testing.T) {
 		return Div().Column().Size(Full, Full).Child(Dock(sig, panels).Key("dock"))
 	})
 	count.Set(2)
-	sig.Set(DockFocus(sig.Peek(), "log"))
+	sig.Set(sig.Peek().Focus("log"))
 	r.frame()
-	sig.Set(DockFocus(sig.Peek(), "notes"))
+	sig.Set(sig.Peek().Focus("notes"))
 	r.frame()
 	if got := count.Peek(); got != 2 {
 		t.Errorf("state of Notes after switching tabs: %d, want 2", got)
@@ -276,7 +276,7 @@ func TestDockFloatingGroupOpensAndClosesItsWindow(t *testing.T) {
 		return f
 	}
 	changes := 0
-	sig := NewSignal(DockFloatPanel(dockSplitLayout(), "tree", 30, 40, 300, 200))
+	sig := NewSignal(dockSplitLayout().Float("tree", 30, 40, 300, 200))
 	r := newAccessRig(func(ctx *Context) Element {
 		return Div().Column().Size(Full, Full).Child(Dock(sig, testDockPanels()).Key("dock").
 			Floating(open).OnChange(func(DockLayout) { changes++ }))
@@ -309,12 +309,12 @@ func TestDockFloatingGroupOpensAndClosesItsWindow(t *testing.T) {
 	}
 
 	// A group that docks back closes its window.
-	sig.Set(DockFloatPanel(sig.Peek(), "log", 10, 10, 200, 100))
+	sig.Set(sig.Peek().Float("log", 10, 10, 200, 100))
 	r.frame()
 	if len(opened) != 2 {
 		t.Fatalf("%d windows opened, want one more for the floated panel", len(opened))
 	}
-	sig.Set(DockBack(sig.Peek(), "log"))
+	sig.Set(sig.Peek().Dock("log"))
 	r.frame()
 	if wins[1].closed != 1 {
 		t.Errorf("the window of a group that docked back was closed %d times, want 1", wins[1].closed)
@@ -324,7 +324,7 @@ func TestDockFloatingGroupOpensAndClosesItsWindow(t *testing.T) {
 // TestDockWithoutOpenerShowsNoFloatingGroup checks that a dock with no way to open a window
 // shows only its docked panels, so a floating group does not appear as a tab.
 func TestDockWithoutOpenerShowsNoFloatingGroup(t *testing.T) {
-	l := DockFloatPanel(dockSplitLayout(), "tree", 30, 40, 300, 200)
+	l := dockSplitLayout().Float("tree", 30, 40, 300, 200)
 	r, _ := dockRig(l, DockStyle{})
 	if n := len(accessNodes(r, access.RoleTab)); n != 2 {
 		t.Errorf("%d tabs, want the two docked panels only", n)

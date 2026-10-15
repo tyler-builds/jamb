@@ -111,18 +111,18 @@ func resolveDock(ctx *Context, inst DockStyle) DockStyle {
 }
 
 // DockPanel is one panel of a Dock: its title, which names its tab and its tab panel for
-// assistive technology, its icon, and Render, which builds its content. The content keeps
+// assistive technology, its icon, and Content, which builds its content. The content keeps
 // its state wherever the panel goes: to another group, split off, dropped on an edge,
 // floated into a window and docked back, or put back by a layout reset. Its components keep
 // their Local state, signals and OnDispose functions, and its text fields keep their text,
 // undo history and selection, its scroll containers their offsets, and the panel keeps the
 // focus when it had it. OnDispose runs only when the panel closes. A panel that moves to
-// another window runs its Render once more there, with its state kept, so the app need not
+// another window runs its Content once more there, with its state kept, so the app need not
 // hold that state in its own signals. Closable adds a Close command to the panel's menu.
 type DockPanel struct {
 	Title    string
 	Icon     *icons.Icon
-	Render   func() Element
+	Content  func() Element
 	Closable bool
 }
 
@@ -178,7 +178,7 @@ type dockSaver struct {
 // builds again, for the same layout, takes over the panels that the earlier one showed: their
 // instances, which keep their state (see retain.go), and the component of each panel. It also
 // holds the windows that show the dock and a save that waits. panels and version are those of
-// the latest Dock element: a panel renders with the latest Render functions, and a new Dock
+// the latest Dock element: a panel renders with the latest Content functions, and a new Dock
 // element makes the panels render again.
 //
 // The state lives while something shows the layout: mounts counts the mounted Dock elements
@@ -273,7 +273,7 @@ func (s *dockShared) wanted(key string) bool {
 // layout with its settings and load it back. Each panel is named by an ID that the layout
 // holds, and is shown from panels; a panel ID in the layout that panels does not have is
 // dropped when the dock is shown, and a panel of panels that the layout does not hold is
-// hidden until DockShow shows it.
+// hidden until DockLayout.Show shows it.
 //
 // The dock is split and grouped as its layout says. Each group is a tab strip over its
 // panels, and each divider between groups is a Split. A user moves a panel by dragging its
@@ -295,7 +295,7 @@ func Dock(layout *Signal[DockLayout], panels map[string]DockPanel) *DockElement 
 	}
 	s := sharedFor(layout)
 	s.panels = panels
-	s.version.Set(s.version.Peek() + 1) // the panels render with these Render functions
+	s.version.Set(s.version.Peek() + 1) // the panels render with these Content functions
 	return &DockElement{layout: layout, panels: panels, shared: s}
 }
 
@@ -370,14 +370,14 @@ func (d *DockElement) contentKey(id string) string { return d.scope() + "/conten
 
 // content returns the component that renders the panel id. It is made once, so that the
 // dock renders the same element for a panel wherever the panel is shown, and its instance is
-// kept through its key (see retain.go). It renders the latest Render function of the panel.
+// kept through its key (see retain.go). It renders the latest Content function of the panel.
 func (d *DockElement) content(id string) *ComponentElement {
 	s := d.shared
 	c := s.contents[id]
 	if c == nil {
 		c = Component(func(*Context) Element {
 			s.version.Get() // a new Dock element for the layout renders the panels again
-			render := s.panels[id].Render
+			render := s.panels[id].Content
 			if render == nil {
 				return Div()
 			}
@@ -499,7 +499,7 @@ func (v *dockView) norm(l DockLayout) DockLayout { return normalizeLayout(l.clon
 
 // selectPanel makes the panel id the active tab of its group, and focuses its tab.
 func (v *dockView) selectPanel(id string) {
-	v.record(DockFocus(v.norm(v.layout.Peek()), id))
+	v.record(v.norm(v.layout.Peek()).Focus(id))
 	v.handle(id).Focus()
 }
 
@@ -513,7 +513,7 @@ func (v *dockView) movePanel(id string, next DockLayout) {
 // changes the layout. The preview of a drop that changes nothing is not shown.
 func (v *dockView) moves(id, target string, zone DockZone) bool {
 	cur := v.norm(v.layout.Peek())
-	return !reflect.DeepEqual(DockMove(cur, id, target, zone), cur)
+	return !reflect.DeepEqual(cur.Move(id, target, zone), cur)
 }
 
 // zoneOf returns the zone of a drop on a group: the side or the center of the group under
@@ -750,7 +750,7 @@ func (v *dockView) group(g DockNode) Element {
 	})
 	return gv.OnDrop(Drop(func(p dockDrag, e *DropEvent) {
 		v.setHover(dockHover{})
-		v.movePanel(p.panel, DockMove(v.norm(v.layout.Peek()), p.panel, anchor, v.zoneOf(e)))
+		v.movePanel(p.panel, v.norm(v.layout.Peek()).Move(p.panel, anchor, v.zoneOf(e)))
 	}).Accept(v.accepts).
 		Move(func(p dockDrag, e *DropEvent) {
 			zone := v.zoneOf(e)
@@ -784,7 +784,7 @@ func (v *dockView) band(side DockZone) *DivElement {
 	}
 	return b.OnDrop(Drop(func(p dockDrag, e *DropEvent) {
 		v.setHover(dockHover{})
-		v.movePanel(p.panel, DockMove(v.norm(v.layout.Peek()), p.panel, "", side))
+		v.movePanel(p.panel, v.norm(v.layout.Peek()).Move(p.panel, "", side))
 	}).Accept(v.accepts).
 		Move(func(p dockDrag, e *DropEvent) {
 			v.setHover(dockHover{drag: true, edge: true, zone: side})
@@ -813,7 +813,7 @@ func (v *dockView) tab(g DockNode, id string) *DivElement {
 		Dragging(source).
 		OnDrag(Drag(dockDrag{scope: v.d.scope(), panel: id}).Preview(func() Element {
 			return Div().Padding(6).Background(v.th.Surface).Border(1, v.th.Border).Child(Text(title))
-		}).EndAt(func(e DragEnd) {
+		}).End(func(e DragEnd) {
 			v.setHover(dockHover{})
 			if !e.Dropped && !e.Cancelled {
 				v.releaseOutside(id, e.X, e.Y)
@@ -847,7 +847,7 @@ func (v *dockView) tabKeys(g DockNode, id string) func(*KeyEvent) {
 		if e.Mods == input.ModCtrl|input.ModShift {
 			if side, ok := dockKeySide(e.Key); ok {
 				e.StopPropagation()
-				v.movePanel(id, DockMoveSide(v.norm(v.layout.Peek()), id, side))
+				v.movePanel(id, v.norm(v.layout.Peek()).MoveSide(id, side))
 			}
 			return
 		}
@@ -893,11 +893,11 @@ func (v *dockView) menu(g DockNode, id string) func() []MenuItem {
 		s := v.strs
 		move := func(label string, side DockZone) MenuItem {
 			return MenuItem{Label: label, Disabled: v.float || !dockHasSide(l, id, side),
-				OnClick: func() { v.movePanel(id, DockMoveSide(v.norm(v.layout.Peek()), id, side)) }}
+				OnClick: func() { v.movePanel(id, v.norm(v.layout.Peek()).MoveSide(id, side)) }}
 		}
 		split := func(label string, side DockZone) MenuItem {
 			return MenuItem{Label: label, Disabled: v.float || len(g.Panels) < 2,
-				OnClick: func() { v.movePanel(id, DockMove(v.norm(v.layout.Peek()), id, id, side)) }}
+				OnClick: func() { v.movePanel(id, v.norm(v.layout.Peek()).Move(id, id, side)) }}
 		}
 		items := []MenuItem{
 			move(s.MovePanelLeft, DockLeft),
@@ -911,14 +911,14 @@ func (v *dockView) menu(g DockNode, id string) func() []MenuItem {
 		}
 		if v.float || l.floating(id) {
 			items = append(items, MenuItem{Label: s.DockPanelBack,
-				OnClick: func() { v.movePanel(id, DockBack(v.norm(v.layout.Peek()), id)) }})
+				OnClick: func() { v.movePanel(id, v.norm(v.layout.Peek()).Dock(id)) }})
 		} else {
 			items = append(items, MenuItem{Label: s.FloatPanel, Disabled: v.d.open == nil,
 				OnClick: func() { v.floatPanel(id) }})
 		}
 		if p := v.d.panels[id]; p.Closable {
 			items = append(items, MenuSeparator(), MenuItem{Label: s.ClosePanel,
-				OnClick: func() { v.movePanel(id, DockClose(v.norm(v.layout.Peek()), id)) }})
+				OnClick: func() { v.movePanel(id, v.norm(v.layout.Peek()).Close(id)) }})
 		}
 		return items
 	}
@@ -928,7 +928,7 @@ func (v *dockView) menu(g DockNode, id string) func() []MenuItem {
 // the main window.
 func (v *dockView) floatPanel(id string) {
 	x, y := v.ctx.Window().Position()
-	v.movePanel(id, DockFloatPanel(v.norm(v.layout.Peek()), id, x+48, y+48, dockFloatWidth, dockFloatHeight))
+	v.movePanel(id, v.norm(v.layout.Peek()).Float(id, x+48, y+48, dockFloatWidth, dockFloatHeight))
 }
 
 // releaseOutside handles a tab of the panel id that was dragged and released with no target
@@ -957,7 +957,7 @@ func (v *dockView) releaseOutside(id string, x, y float32) {
 	}
 	left := int(math.Round(float64(x))) - dockGrabX
 	top := int(math.Round(float64(y))) - dockGrabY
-	v.movePanel(id, DockFloatPanel(v.norm(v.layout.Peek()), id, left, top, dockFloatWidth, dockFloatHeight))
+	v.movePanel(id, v.norm(v.layout.Peek()).Float(id, left, top, dockFloatWidth, dockFloatHeight))
 }
 
 // syncWindows opens a window for each floating group that has none, and closes the window
@@ -1025,9 +1025,9 @@ func (d *DockElement) floatWindow(v *dockView, f DockFloat) DockWindow {
 			next := l
 			for i, p := range panels {
 				if i == 0 {
-					next = DockBack(next, p)
+					next = next.Dock(p)
 				} else {
-					next = DockMove(next, p, panels[0], DockCenter)
+					next = next.Move(p, panels[0], DockCenter)
 				}
 			}
 			v.record(next)

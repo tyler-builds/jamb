@@ -13,7 +13,7 @@ import (
 // counted in disposed. The other panels are testDockPanels.
 func statefulPanels(disposed *int, text, label *Signal[string]) map[string]DockPanel {
 	panels := testDockPanels()
-	panels["notes"] = DockPanel{Title: "Notes", Render: func() Element {
+	panels["notes"] = DockPanel{Title: "Notes", Content: func() Element {
 		return Component(func(ctx *Context) Element {
 			count := Local(ctx, "count", 0)
 			if seen := Local(ctx, "seen", false); !seen.Peek() {
@@ -134,18 +134,18 @@ func TestPanelKeepsItsStateAcrossMoves(t *testing.T) {
 	check := dockStateCheck{t: t, disposed: &disposed, text: text}
 	check.verify("before the moves", r.rt)
 
-	sig.Set(DockMove(sig.Peek(), "notes", "tree", DockCenter))
+	sig.Set(sig.Peek().Move("notes", "tree", DockCenter))
 	r.frame()
 	check.verify("moved to another group", r.rt)
 	if !focusedIn(r.rt, "notes-text") {
 		t.Errorf("the text field lost the focus when its panel moved")
 	}
 
-	sig.Set(DockMove(sig.Peek(), "notes", "tree", DockRight))
+	sig.Set(sig.Peek().Move("notes", "tree", DockRight))
 	r.frame()
 	check.verify("split beside a group", r.rt)
 
-	sig.Set(DockMove(sig.Peek(), "notes", "", DockBottom))
+	sig.Set(sig.Peek().Move("notes", "", DockBottom))
 	r.frame()
 	check.verify("dropped on the bottom edge", r.rt)
 
@@ -157,7 +157,7 @@ func TestPanelKeepsItsStateAcrossMoves(t *testing.T) {
 	check.verify("dragged onto a group", r.rt)
 
 	// Floating: the panel moves into a window of its own, which renders it in its own runtime.
-	sig.Set(DockFloatPanel(sig.Peek(), "notes", 30, 40, 300, 200))
+	sig.Set(sig.Peek().Float("notes", 30, 40, 300, 200))
 	r.frame()
 	r.frame()
 	if len(opened) != 1 {
@@ -174,7 +174,7 @@ func TestPanelKeepsItsStateAcrossMoves(t *testing.T) {
 	}
 
 	// Docking back closes the window, and the panel returns with its state.
-	sig.Set(DockBack(sig.Peek(), "notes"))
+	sig.Set(sig.Peek().Dock("notes"))
 	r.frame()
 	r.frame()
 	if wins[0].closed != 1 {
@@ -186,12 +186,12 @@ func TestPanelKeepsItsStateAcrossMoves(t *testing.T) {
 	}
 
 	// A layout reset that keeps the panel: it moves back to its default place.
-	sig.Set(DockReset(dockSplitLayout()))
+	sig.Set(dockSplitLayout().Clone())
 	r.frame()
 	check.verify("layout reset", r.rt)
 
 	// Closing the panel disposes it, once.
-	sig.Set(DockClose(sig.Peek(), "notes"))
+	sig.Set(sig.Peek().Close("notes"))
 	r.frame()
 	r.frame()
 	if disposed != 1 {
@@ -226,7 +226,7 @@ func TestRecreatedDockKeepsItsPanels(t *testing.T) {
 	r.frame()
 	check.verify("the dock was built again", r.rt)
 
-	sig.Set(DockClose(sig.Peek(), "notes"))
+	sig.Set(sig.Peek().Close("notes"))
 	r.frame()
 	r.frame()
 	if disposed != 1 {
@@ -252,7 +252,7 @@ func TestPanelOpenedInAnotherRuntimeKeepsItsFocusAndInput(t *testing.T) {
 	r.frame()
 	r.clickKey(t, "notes-text")
 	r.typeText("ab")
-	sig.Set(DockFloatPanel(sig.Peek(), "notes", 30, 40, 300, 200))
+	sig.Set(sig.Peek().Float("notes", 30, 40, 300, 200))
 	r.frame()
 	r.frame()
 	wr := newTestRuntime(opened[0].Root, 300, 200, 1)
@@ -336,7 +336,7 @@ func TestDockDropOnAGroupOfAnotherWindowMovesThePanelThere(t *testing.T) {
 		return f
 	}
 	// The floating window lies beyond the main window's right edge, which is 500 pixels wide.
-	sig := NewSignal(DockFloatPanel(dockSplitLayout(), "log", 600, 40, 300, 200))
+	sig := NewSignal(dockSplitLayout().Float("log", 600, 40, 300, 200))
 	r := newAccessRig(func(ctx *Context) Element {
 		return Div().Column().Size(Full, Full).Child(Dock(sig, testDockPanels()).Key("dock").Floating(open))
 	})

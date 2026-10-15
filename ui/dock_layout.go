@@ -8,11 +8,11 @@ import (
 
 // A DockLayout is the arrangement of the panels of a Dock: a tree of splits and tab
 // groups, and the groups that float in windows of their own. It is a value. Copy it,
-// save it, and change it with the functions below, which return a new layout and never
+// save it, and change it with the methods below, which return a new layout and never
 // change their argument. It marshals to JSON with encoding/json, so an app saves it
 // with its settings and loads it back as it was. A panel ID in a loaded layout that the
 // Dock does not know is dropped, and a known panel that the layout does not hold can be
-// shown again with DockShow.
+// shown again with DockLayout.Show.
 
 // DockZone is where a panel lands when it is moved in a Dock. DockCenter adds it to a
 // group as a tab. The four sides give it a group of its own, beside the group it is
@@ -397,13 +397,13 @@ func (l DockLayout) nextFloatID() string {
 	}
 }
 
-// DockReset returns a copy of def, the layout an app starts from. An app's Reset layout
+// Clone returns a copy of l, the layout an app starts from. An app's Reset layout
 // command sets the layout to it.
-func DockReset(def DockLayout) DockLayout { return normalizeLayout(def.clone(), nil) }
+func (l DockLayout) Clone() DockLayout { return normalizeLayout(l.clone(), nil) }
 
-// DockFocus returns l with the panel id shown in its group, so that it is the active
+// Focus returns l with the panel id shown in its group, so that it is the active
 // tab. A panel that l does not hold leaves the layout as it is.
-func DockFocus(l DockLayout, id string) DockLayout {
+func (l DockLayout) Focus(id string) DockLayout {
 	out := normalizeLayout(l.clone(), nil)
 	if g := out.group(id); g != nil {
 		g.Active = id
@@ -411,7 +411,7 @@ func DockFocus(l DockLayout, id string) DockLayout {
 	return out
 }
 
-// DockMove returns l with the panel id moved to the zone of the group that holds the
+// Move returns l with the panel id moved to the zone of the group that holds the
 // panel target. The panel leaves its group, and a group left empty goes. A target of ""
 // names the whole dock: a side zone then puts the panel along that outer edge, and
 // DockCenter does nothing. A target that is the panel itself names the group the panel
@@ -421,7 +421,7 @@ func DockFocus(l DockLayout, id string) DockLayout {
 // floats does nothing, and a panel dropped at the center of a floating group joins it.
 // A move that cannot happen, such as a panel alone in its group dropped beside it, or a
 // target the layout does not hold, leaves the layout as it is.
-func DockMove(l DockLayout, id, target string, zone DockZone) DockLayout {
+func (l DockLayout) Move(id, target string, zone DockZone) DockLayout {
 	out := normalizeLayout(l.clone(), nil)
 	if out.group(id) == nil {
 		return out
@@ -439,7 +439,7 @@ func DockMove(l DockLayout, id, target string, zone DockZone) DockLayout {
 		if !ok {
 			// The panel is alone in its group: it is already where it can be.
 			if zone == DockCenter {
-				return DockFocus(out, id)
+				return out.Focus(id)
 			}
 			return out
 		}
@@ -484,20 +484,20 @@ func (l *DockLayout) removePanel(id string) {
 	}
 }
 
-// DockClose returns l without the panel id. A closed panel is shown again with DockShow.
-func DockClose(l DockLayout, id string) DockLayout {
+// Close returns l without the panel id. A closed panel is shown again with DockLayout.Show.
+func (l DockLayout) Close(id string) DockLayout {
 	out := normalizeLayout(l.clone(), nil)
 	out.removePanel(id)
 	return normalizeLayout(out, nil)
 }
 
-// DockShow returns l with the panel id shown. A panel that the layout already holds is
+// Show returns l with the panel id shown. A panel that the layout already holds is
 // made the active tab of its group. Otherwise it joins the first group of the dock, in
 // reading order, as its active tab, or it fills an empty dock.
-func DockShow(l DockLayout, id string) DockLayout {
+func (l DockLayout) Show(id string) DockLayout {
 	out := normalizeLayout(l.clone(), nil)
 	if out.group(id) != nil {
-		return DockFocus(out, id)
+		return out.Focus(id)
 	}
 	if out.Root.empty() {
 		out.Root = newGroup(id)
@@ -510,11 +510,11 @@ func DockShow(l DockLayout, id string) DockLayout {
 	return normalizeLayout(out, nil)
 }
 
-// DockFloatPanel returns l with the panel id moved out of its group into a floating group
+// Float returns l with the panel id moved out of its group into a floating group
 // of its own, in a window at x, y of w by h logical pixels. The window's ID is the lowest
 // free one of the form float-1. A panel that already floats alone only has its window's
 // position and size set. A panel that l does not hold leaves the layout as it is.
-func DockFloatPanel(l DockLayout, id string, x, y, w, h int) DockLayout {
+func (l DockLayout) Float(id string, x, y, w, h int) DockLayout {
 	out := normalizeLayout(l.clone(), nil)
 	if out.group(id) == nil {
 		return out
@@ -530,10 +530,10 @@ func DockFloatPanel(l DockLayout, id string, x, y, w, h int) DockLayout {
 	return normalizeLayout(out, nil)
 }
 
-// DockBack returns l with the panel id taken out of its floating group and docked back
+// Dock returns l with the panel id taken out of its floating group and docked back
 // into the dock, as a group along the right edge. A panel that is docked already, or
 // that does not float, leaves the layout as it is.
-func DockBack(l DockLayout, id string) DockLayout {
+func (l DockLayout) Dock(id string) DockLayout {
 	out := normalizeLayout(l.clone(), nil)
 	if groupIn(&out.Root, id) != nil || !out.floating(id) {
 		return out
@@ -543,19 +543,19 @@ func DockBack(l DockLayout, id string) DockLayout {
 	return normalizeLayout(out, nil)
 }
 
-// DockMoveSide returns l with the panel id moved into the group beside its own, on the
+// MoveSide returns l with the panel id moved into the group beside its own, on the
 // side given (DockLeft, DockRight, DockTop or DockBottom), as one of its tabs. When no
 // group lies that way, the layout is unchanged. It is the keyboard move of a panel.
-func DockMoveSide(l DockLayout, id string, side DockZone) DockLayout {
+func (l DockLayout) MoveSide(id string, side DockZone) DockLayout {
 	out := normalizeLayout(l.clone(), nil)
 	other, ok := neighbourPanel(&out.Root, id, side)
 	if !ok {
 		return out
 	}
-	return DockMove(out, id, other, DockCenter)
+	return out.Move(id, other, DockCenter)
 }
 
-// dockHasSide reports whether DockMoveSide would move the panel id on the side given.
+// dockHasSide reports whether DockLayout.MoveSide would move the panel id on the side given.
 func dockHasSide(l DockLayout, id string, side DockZone) bool {
 	n := normalizeLayout(l.clone(), nil)
 	_, ok := neighbourPanel(&n.Root, id, side)

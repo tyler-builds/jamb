@@ -111,7 +111,7 @@ func TestFloatingWindowKeepsTheSharedStateWhileTheDockIsShown(t *testing.T) {
 		})
 	})
 	r.frame()
-	sig.Set(DockFloatPanel(sig.Peek(), "log", 10, 10, 300, 200))
+	sig.Set(sig.Peek().Float("log", 10, 10, 300, 200))
 	r.frame()
 	r.frame()
 	if len(opened) != 1 {
@@ -124,7 +124,7 @@ func TestFloatingWindowKeepsTheSharedStateWhileTheDockIsShown(t *testing.T) {
 		t.Fatal("closing a floating window released the state of a dock that is shown")
 	}
 
-	sig.Set(DockFloatPanel(sig.Peek(), "log", 10, 10, 300, 200))
+	sig.Set(sig.Peek().Float("log", 10, 10, 300, 200))
 	r.frame()
 	r.frame()
 	show.Set(false)
@@ -174,7 +174,7 @@ func TestReleasingTheSharedStateFlushesTheDebouncedOnChange(t *testing.T) {
 		})
 	})
 	r.frame()
-	sig.Set(DockFloatPanel(sig.Peek(), "log", 10, 10, 300, 200))
+	sig.Set(sig.Peek().Float("log", 10, 10, 300, 200))
 	r.frame()
 	r.frame()
 	savedBefore := len(saved)
@@ -190,7 +190,7 @@ func TestReleasingTheSharedStateFlushesTheDebouncedOnChange(t *testing.T) {
 
 	// Docking the group back closes its window without a save of its own, so the late change
 	// is still waiting when the dock is hidden.
-	sig.Set(DockBack(sig.Peek(), "log"))
+	sig.Set(sig.Peek().Dock("log"))
 	r.frame()
 	opened[0].OnClosed()
 	r.frame()

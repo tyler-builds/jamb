@@ -45,7 +45,7 @@ func TestDragThresholdDecidesClickOrDrag(t *testing.T) {
 	rt := newTestRuntime(func(ctx *Context) Element {
 		return Div().Padding(20).Child(Div().Key("src").Size(Px(100), Px(40)).
 			OnClick(func() { clicks++ }).
-			OnDrag(Drag(42).End(func(bool) { ends++ })))
+			OnDrag(Drag(42).End(func(DragEnd) { ends++ })))
 	}, 400, 300, 1)
 	x, y := center(t, rt, "src")
 
@@ -155,7 +155,7 @@ func TestMoveLeaveDropAndEnd(t *testing.T) {
 	rt := newTestRuntime(func(ctx *Context) Element {
 		return Div().Padding(10).Gap(10).
 			Child(Div().Key("src").Size(Px(100), Px(30)).OnDrag(Drag(7).
-				End(func(dropped bool) { log = append(log, fmt.Sprintf("end:%v", dropped)) }))).
+				End(func(e DragEnd) { log = append(log, fmt.Sprintf("end:%v", e.Dropped)) }))).
 			Child(Div().Key("target").Size(Px(100), Px(60)).
 				OnDrop(Drop(func(v int, e *DropEvent) {
 					log = append(log, fmt.Sprintf("drop:%d:%.0f,%.0f", v, e.LocalX, e.LocalY))
@@ -213,7 +213,7 @@ func TestDragEndsWithoutADropOnCancelAndMisses(t *testing.T) {
 			rt := newTestRuntime(func(ctx *Context) Element {
 				return Div().Padding(10).Gap(10).
 					Child(Div().Key("src").Size(Px(100), Px(30)).OnDrag(Drag(7).
-						End(func(dropped bool) { log = append(log, fmt.Sprintf("end:%v", dropped)) }))).
+						End(func(e DragEnd) { log = append(log, fmt.Sprintf("end:%v", e.Dropped)) }))).
 					Child(Div().Key("target").Size(Px(100), Px(60)).
 						OnDrop(Drop(func(int, *DropEvent) { log = append(log, "drop") })))
 			}, 300, 300, 1)
