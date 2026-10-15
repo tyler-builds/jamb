@@ -7,6 +7,28 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Added
+
+- A `markdown` package: `markdown.View(src)` shows CommonMark with GitHub's tables, task lists,
+  strikethrough, autolinks and footnotes, parsed with goldmark. Headings, links, lists and task
+  states are accessible, text is selectable per block, and raw HTML is shown as text. Links open with
+  the system or call `OnLink`; images come from an app's loader or local files under `BaseDir`, and
+  the view never downloads anything. It is styled through `markdown.Style`, a theme slot and
+  `Styles`. The guide is [docs/markdown.md](docs/markdown.md).
+- `markdown/mdcode` colors fenced code blocks with the code editor's tree-sitter grammars. It is a
+  separate package, so an app that does not import it links neither the editor nor wazero.
+- `ui.LinkSegs` makes one link of several styled segments.
+- `Context.After` runs a function on the UI thread after a delay on the window's clock, which
+  `ui/uitest` can advance.
+- The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a
+  Markdown page.
+
+### Changed
+
+- Links in rich text (`ui.Link` and segments with `OnClick`) are Tab stops: the focused link shows a
+  focus ring and Enter follows it. Links inside headings and list items are kept in the
+  accessibility tree.
+
 ## [0.2.0] - 2026-10-15
 
 The additions from the API review of v0.1.0. No API is removed or renamed; the changes below are
