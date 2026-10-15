@@ -68,7 +68,7 @@ func (c *Chart) legendItem(v *view, hidden *ui.Signal[[]bool], cursor *ui.Signal
 // high contrast, for the other kinds. It is hidden from assistive technology, which
 // reads the name.
 func (c *Chart) swatch(v *view, i int) ui.Element {
-	l := seriesLook(v.t, i)
+	l := c.lookOf(v.t, i)
 	lined := c.kind == kindLine || c.kind == kindScatter || c.kind == kindRadar
 	return ui.Canvas(func(p *ui.Painter, w, h float32) {
 		if lined {

@@ -546,7 +546,7 @@ func (c *Chart) paintMarks(v *view, p *ui.Painter, g *geometry, m cartModel) {
 		c.paintBars(v, p, g, m)
 	case kindScatter:
 		for _, k := range m.vis {
-			l := seriesLook(v.t, k)
+			l := c.lookOf(v.t, k)
 			for _, pt := range c.ds.series[k].pts {
 				x, y := g.xy(pt.x, pt.y)
 				drawMarker(p, l.marker, float32(x), float32(y), markSize, l.color)
@@ -620,7 +620,7 @@ func (c *Chart) linePath(g *geometry, xs, ys []float64) *ui.Path {
 // paintLine draws the line of series k, with a marker at each point when the line is
 // short enough for them to read.
 func (c *Chart) paintLine(v *view, p *ui.Painter, g *geometry, k int) {
-	l := seriesLook(v.t, k)
+	l := c.lookOf(v.t, k)
 	xs, ys := c.thinned(g, k)
 	clipped := reveal(p, g, v.progress)
 	// A round join is an arc at every vertex, which costs the rasterizer more than the
@@ -668,7 +668,7 @@ func (c *Chart) paintArea(v *view, p *ui.Painter, g *geometry, m cartModel) {
 		c.paintStackedArea(v, p, g, m)
 	} else {
 		for _, k := range m.vis {
-			l := seriesLook(v.t, k)
+			l := c.lookOf(v.t, k)
 			xs, ys := c.thinned(g, k)
 			c.fillArea(v, p, g, c.areaPath(g, xs, ys), l)
 			p.Stroke(c.linePath(g, xs, ys), ui.StrokeStyle{Width: lineWidth, Color: l.color, Dash: l.dash, Join: ui.JoinRound})
@@ -688,7 +688,7 @@ func (c *Chart) paintStackedArea(v *view, p *ui.Painter, g *geometry, m cartMode
 	totals := m.hi[len(m.hi)-1]
 	idx := lttb(m.slots, totals, clampInt(int(2*math.Abs(g.plot.x1-g.plot.x0)), 3, max(3, len(m.slots))))
 	for j, k := range m.vis {
-		l := seriesLook(v.t, k)
+		l := c.lookOf(v.t, k)
 		xs := make([]float64, len(idx))
 		top := make([]float64, len(idx))
 		bottom := make([]float64, len(idx))
@@ -751,7 +751,7 @@ func (c *Chart) paintBars(v *view, p *ui.Painter, g *geometry, m cartModel) {
 	base := g.val.at(0)
 	group := sw * barShare
 	for j, k := range m.vis {
-		l := seriesLook(v.t, k)
+		l := c.lookOf(v.t, k)
 		bw := group / float64(len(m.vis))
 		off := -group/2 + float64(j)*bw
 		if c.stack {
@@ -778,7 +778,8 @@ func (c *Chart) paintBars(v *view, p *ui.Painter, g *geometry, m cartModel) {
 
 // paintCandles draws the candles at the slots: a wick from the low to the high, and a body
 // from the open to the close, in the success color when the candle rises and the danger
-// color when it falls. Under high contrast a rising body is hollow and a falling one solid.
+// color when it falls, unless the CandleSeries sets its own (see candleColor). Under high
+// contrast a rising body is hollow and a falling one solid.
 func (c *Chart) paintCandles(v *view, p *ui.Painter, g *geometry, m cartModel) {
 	if len(c.ds.series) == 0 {
 		return
@@ -792,13 +793,7 @@ func (c *Chart) paintCandles(v *view, p *ui.Painter, g *geometry, m cartModel) {
 		}
 		cd := pts[j]
 		up := cd.close >= cd.open
-		color := v.t.Danger
-		if up {
-			color = v.t.Success
-		}
-		if v.t.HighContrast {
-			color = v.t.Text
-		}
+		color := c.candleColor(v.t, up)
 		center := g.pos.at(float64(i))
 		hx, hy := g.xy(float64(i), cd.high)
 		lx, ly := g.xy(float64(i), cd.low)

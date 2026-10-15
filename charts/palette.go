@@ -75,6 +75,39 @@ func seriesLook(t *ui.Theme, i int) look {
 	return l
 }
 
+// lookOf returns the look of legend item i of the chart in the theme t: the palette's
+// (see seriesLook), with the series' Color in place of the palette's color when the
+// app sets one. Under high contrast the app's colors are ignored, and the slices of a
+// pie and the nodes of a Sankey diagram always take the palette. The other series keep
+// the palette colors of their places, whichever series set their own.
+func (c *Chart) lookOf(t *ui.Theme, i int) look {
+	l := seriesLook(t, i)
+	if t.HighContrast || c.kind == kindPie || c.kind == kindDonut || c.kind == kindSankey || i >= len(c.ds.series) {
+		return l
+	}
+	if color := c.ds.series[i].color; !color.IsZero() {
+		l.color = color
+	}
+	return l
+}
+
+// candleColor returns the color of a candle in the theme t: the CandleSeries' Rising or
+// Falling color when the app sets it, else the theme's Success or Danger. Under high
+// contrast every candle is the text color, and its fill tells rising from falling.
+func (c *Chart) candleColor(t *ui.Theme, up bool) ui.Color {
+	switch {
+	case t.HighContrast:
+		return t.Text
+	case up && !c.ds.rising.IsZero():
+		return c.ds.rising
+	case up:
+		return t.Success
+	case !c.ds.falling.IsZero():
+		return c.ds.falling
+	}
+	return t.Danger
+}
+
 // drawMarker draws the marker m of radius r about x, y in color c. Plus and cross
 // are strokes, so they are drawn with their weight; the others are filled.
 func drawMarker(p *ui.Painter, m marker, x, y, r float32, c ui.Color) {

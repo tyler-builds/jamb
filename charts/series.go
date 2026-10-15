@@ -5,6 +5,8 @@ import (
 	"math"
 	"slices"
 	"time"
+
+	"github.com/tyler-builds/jamb/ui"
 )
 
 // Series is one series of a chart: its points, and the functions that read the
@@ -34,6 +36,13 @@ type Series[T any] struct {
 	// Y is the value of a point: the height of a line point, a bar or an area, or
 	// the size of a slice. It is required.
 	Y func(T) float64
+	// Color is the color of the series' line, bars, area or markers, in place of the
+	// palette's. The zero value takes the color of the palette for the series' place.
+	// Under high contrast it is ignored, and the series is the text color like every
+	// other. A pie or a donut colors its slices from the palette and ignores it. The
+	// chart does not check that the colors an app sets differ from one another or
+	// stand out against the surface.
+	Color ui.Color
 }
 
 // CandleSeries is the data of a candlestick chart: one candle for each point,
@@ -58,6 +67,14 @@ type CandleSeries[T any] struct {
 	Low func(T) float64
 	// Close is the closing value of a candle.
 	Close func(T) float64
+	// Rising is the color of a candle that rises, whose close is at or above its open.
+	// The zero value is the theme's Success color. Under high contrast it is ignored: a
+	// rising candle is hollow, in the text color.
+	Rising ui.Color
+	// Falling is the color of a candle that falls, whose close is below its open. The
+	// zero value is the theme's Danger color. Under high contrast it is ignored: a
+	// falling candle is solid, in the text color.
+	Falling ui.Color
 }
 
 // xKind is how the points of a chart are placed on its horizontal axis.
@@ -81,6 +98,7 @@ type point struct {
 // the greatest value, which are taken once here rather than on every draw.
 type seriesData struct {
 	name   string
+	color  ui.Color // the Series' Color; zero takes the palette's
 	pts    []point
 	lo, hi float64
 	// xs and ys are the coordinates of pts, kept apart for the downsampling.
@@ -107,12 +125,14 @@ func (s *seriesData) valueRange(candles bool) {
 
 // dataset is the data of a chart, converted from the caller's series. Every
 // series places its points the same way: x is the axis kind, cats holds the
-// categories by position, and loc is the time zone of the times.
+// categories by position, and loc is the time zone of the times. rising and
+// falling are the candle colors of a candlestick chart, zero when unset.
 type dataset struct {
-	x      xKind
-	cats   []string
-	loc    *time.Location
-	series []seriesData
+	x               xKind
+	cats            []string
+	loc             *time.Location
+	series          []seriesData
+	rising, falling ui.Color
 }
 
 // placer assigns horizontal positions to points while the data is converted.
@@ -201,7 +221,7 @@ func fromSeries[T any](series []Series[T], keep bool) dataset {
 	ds.setKind(kinds)
 	pl := newPlacer(&ds)
 	for _, s := range series {
-		sd := seriesData{name: s.Name, pts: make([]point, 0, len(s.Data))}
+		sd := seriesData{name: s.Name, color: s.Color, pts: make([]point, 0, len(s.Data))}
 		for i, item := range s.Data {
 			p := point{y: s.Y(item)}
 			switch ds.x {
@@ -231,7 +251,7 @@ func fromCandles[T any](s CandleSeries[T]) dataset {
 	if s.Open == nil || s.High == nil || s.Low == nil || s.Close == nil {
 		panic("charts: a candlestick series has no Open, High, Low or Close function")
 	}
-	var ds dataset
+	ds := dataset{rising: s.Rising, falling: s.Falling}
 	ds.setKind([]xKind{axisKind(s.Time != nil, s.Category != nil)})
 	pl := newPlacer(&ds)
 	sd := seriesData{name: s.Name, pts: make([]point, 0, len(s.Data))}

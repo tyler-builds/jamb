@@ -121,6 +121,20 @@ own dash pattern and marker, and under high contrast every series is the text
 color, with its own hatch on bars, areas and slices. Axis labels use the theme's
 `TextMuted`, and grid lines the theme's `Border`.
 
+A series can set its own color with `Series.Color`; the zero value takes the
+palette's color for its place, and the other series keep theirs. A pie or a donut
+colors its slices from the palette and ignores it. A candlestick's candles are the
+theme's `Success` when they rise and `Danger` when they fall, unless
+`CandleSeries.Rising` and `Falling` set other colors. Under high contrast the colors
+an app sets are ignored: every series is the text color, and a rising candle is
+hollow and a falling one solid. The package tests check the palette; the colors an
+app sets are its own choice, and the chart does not check that they differ from one
+another or stand out against the surface.
+
+```go
+charts.Line(charts.Series[Visit]{Name: "Visits", Data: visits, Time: day, Y: count, Color: ui.Hex("#0f766e")})
+```
+
 ## Motion
 
 On the first draw a chart animates in over 600 milliseconds: lines and areas reveal

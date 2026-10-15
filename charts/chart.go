@@ -45,8 +45,10 @@
 // palette for each kind of theme (light, dark and high contrast), and each
 // series of a line also has its own dash pattern and marker, and each bar, area
 // and slice its own hatch under high contrast, so series are not told apart by
-// color alone. Under high contrast every series is the text color. The text,
-// axis and grid colors are the theme's TextMuted and Border.
+// color alone. Under high contrast every series is the text color. A series sets
+// its own color with Series.Color, and a candlestick its rising and falling colors
+// with CandleSeries.Rising and Falling; under high contrast those are ignored too.
+// The text, axis and grid colors are the theme's TextMuted and Border.
 //
 // Parts (see Style) are the chart box (Chart), the title (Title), the axis labels
 // and titles (Axis), the grid lines (Grid), the legend row (Legend), each legend

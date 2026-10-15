@@ -77,7 +77,59 @@ func TestHighContrastLooks(t *testing.T) {
 	}
 }
 
+// A series' Color replaces its palette color, and the zero value keeps the palette's; the
+// other series keep the colors of their places. Under high contrast the app's color is
+// ignored and the series is the text color, as every series is. A pie colors its slices
+// from the palette.
+func TestSeriesColor(t *testing.T) {
+	brand := ui.Hex("#123456")
+	second := returns()
+	second.Color = brand
+	c := Line(visits(), second)
+	light, hc := ui.LightTheme(), ui.HighContrastTheme(ui.HighContrastBlack(), ui.DarkTheme())
+	if got := c.lookOf(light, 0).color; got != lightColors[0] {
+		t.Errorf("a series without a Color is %v, want the palette's first %v", got, lightColors[0])
+	}
+	if got := c.lookOf(light, 1).color; got != brand {
+		t.Errorf("a series with a Color is %v, want %v", got, brand)
+	}
+	if got := c.lookOf(light, 1); got.key() != seriesLook(light, 1).key() {
+		t.Errorf("a Color changed the dash, marker or hatch of the series: %s", got.key())
+	}
+	if got := c.lookOf(hc, 1).color; got != hc.Text {
+		t.Errorf("under high contrast a series with a Color is %v, want the text color %v", got, hc.Text)
+	}
+	slices := Series[day]{Name: "Share", Data: week, Category: dayName, Y: visitOf, Color: brand}
+	if got := Pie(slices).lookOf(light, 0).color; got != lightColors[0] {
+		t.Errorf("a pie's first slice is %v, want the palette's %v", got, lightColors[0])
+	}
+}
+
+// A candlestick's Rising and Falling colors replace the theme's Success and Danger, and
+// the zero values keep them. Under high contrast every candle is the text color.
+func TestCandleColors(t *testing.T) {
+	up, down := ui.Hex("#1d4ed8"), ui.Hex("#c2410c")
+	candles := func(rising, falling ui.Color) *Chart {
+		return Candlestick(CandleSeries[day]{Name: "Price", Data: week, Category: dayName,
+			Open: visitOf, High: visitOf, Low: visitOf, Close: visitOf, Rising: rising, Falling: falling})
+	}
+	light, hc := ui.LightTheme(), ui.HighContrastTheme(ui.HighContrastBlack(), ui.DarkTheme())
+	set, unset := candles(up, down), candles(ui.Color{}, ui.Color{})
+	if set.candleColor(light, true) != up || set.candleColor(light, false) != down {
+		t.Errorf("set candle colors are %v and %v, want %v and %v",
+			set.candleColor(light, true), set.candleColor(light, false), up, down)
+	}
+	if unset.candleColor(light, true) != light.Success || unset.candleColor(light, false) != light.Danger {
+		t.Errorf("default candle colors are not the theme's Success and Danger")
+	}
+	if set.candleColor(hc, true) != hc.Text || set.candleColor(hc, false) != hc.Text {
+		t.Errorf("under high contrast the candles are not the text color")
+	}
+}
+
 // Consecutive series of a theme differ in color, and the first six in dash, marker and hatch.
+// The check covers the palette: the colors that an app sets with Series.Color are its own
+// choice, and the chart does not check them.
 func TestSeriesLooksAreDistinct(t *testing.T) {
 	for _, th := range []*ui.Theme{ui.LightTheme(), ui.DarkTheme()} {
 		for i := 1; i < len(lightColors); i++ {
