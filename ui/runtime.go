@@ -316,7 +316,10 @@ type Runtime struct {
 	hoverIDs       []uint64 // deepest first
 	pressIDs       []uint64
 	focusID        uint64
-	blurring       uint64 // the element whose OnBlur is running, see setFocus
+	// focusLink is 1 + the index of the link segment of the focused rich text
+	// that has keyboard focus, or 0 when the element itself has it (see tabPlace).
+	focusLink int
+	blurring  uint64 // the element whose OnBlur is running, see setFocus
 	// keyboardModality is true when the last input was a key press and false
 	// after a pointer press. FocusVisible styles show only while it is true.
 	keyboardModality bool
@@ -987,7 +990,7 @@ func (rt *Runtime) rebuildDirty() {
 		rt.rerender(inst)
 	}
 	if rt.focusID != 0 && rt.byID[rt.focusID] == nil {
-		rt.focusID = 0
+		rt.focusID, rt.focusLink = 0, 0
 	}
 	if rt.composing != 0 && rt.byID[rt.composing] == nil {
 		// The field went away while an input method composed in it.

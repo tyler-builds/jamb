@@ -12,7 +12,7 @@ line when it is `Truncate()`d.
 ui.Rich(
     ui.Seg("Alex").Style(ui.Highlight{Weight: ui.FontSemibold}), // or .Bold()
     ui.Seg(" pushed to ").Color(t.TextMuted),
-    ui.Link("Project Beta", openProject),   // accent color; underlined on hover; a click runs openProject
+    ui.Link("Project Beta", openProject),   // link color; underlined on hover; a click or Enter runs openProject
     ui.Seg(" main").Mono().Background(t.Surface),
 ).Truncate()
 
@@ -38,6 +38,16 @@ ui.Text(body).HighlightMatches(query, ui.Highlight{Background: t.AccentSoft, Col
 - `OnClick` (and `Link`) make a segment clickable: the pointer becomes a hand
   over it. A link inside a clickable row gets the click; the row's `OnClick`
   runs only for the rest of the row.
+- A clickable segment is a link for the keyboard and for assistive technology.
+  Tab stops on each one, in the order of the text, a focus ring is drawn around
+  its words, and Enter runs its `OnClick`. Screen readers find it as a link
+  inside the text, also when the text is inside a control that is named by its
+  text, such as a heading or a list item.
+- `ui.LinkSegs(fn, segs...)` makes one link of several segments, for a link whose
+  text mixes styles: `ui.LinkSegs(open, ui.Seg("the "), ui.Seg("guide").Bold())`.
+  Placed one after another in a `Rich` text, they are one Tab stop, one focus ring,
+  one link named "the guide" for assistive technology, and they underline together
+  under the pointer.
 - `ui.Text(...).Italic()` and segment `Italic()` use the family's italic face.
   A family without an italic face for that weight uses its upright face: there
   is no synthetic slant. Segoe UI and Consolas have italics on Windows; the

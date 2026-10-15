@@ -49,10 +49,17 @@ func paintOnly(h Highlight) Highlight {
 type Segment struct {
 	text    string
 	hl      Highlight
-	accent  bool // a Link: Accent color unless a Color is set
+	accent  bool // a Link: the theme's Link color unless a Color is set
 	onClick func()
 	hover   *Highlight
+	// link is shared by the segments of one link made by LinkSegs, so that
+	// consecutive segments with the same link are one link (see linkEnd).
+	link *linkGroup
 }
+
+// linkGroup is the identity of a link made of several segments (see LinkSegs).
+// It has a field so that two groups are never the same pointer.
+type linkGroup struct{ _ int }
 
 // Seg is a plain piece of rich text.
 func Seg(s string) Segment { return Segment{text: s} }
@@ -82,7 +89,9 @@ func (g Segment) Background(c Color) Segment { g.hl.Background = c; return g }
 func (g Segment) Style(h Highlight) Segment { g.hl = g.hl.over(h); return g }
 
 // OnClick makes the segment clickable: the pointer is a hand over it, and a
-// click runs fn instead of the clickable elements around it.
+// click runs fn instead of the clickable elements around it. The segment is a
+// link to assistive technology and a stop of its own in the Tab order, and
+// Enter runs fn while it has focus.
 func (g Segment) OnClick(fn func()) Segment { g.onClick = fn; return g }
 
 // Hover merges h into the segment while the pointer is over it. Only the
@@ -90,12 +99,55 @@ func (g Segment) OnClick(fn func()) Segment { g.onClick = fn; return g }
 // Strikethrough), so hovering never re-lays out the text.
 func (g Segment) Hover(h Highlight) Segment { g.hover = &h; return g }
 
-// Link is a clickable piece of text. It takes the theme's Accent color (when
-// no Color is set) and underlines while the pointer is over it.
+// Link is a clickable piece of text. It takes the theme's Link color (when
+// no Color is set) and underlines while the pointer is over it. Tab stops on
+// it, a ring shows its keyboard focus, and Enter follows it (see OnClick).
 func Link(s string, fn func()) Segment {
 	g := Seg(s).OnClick(fn).Hover(Highlight{Underline: true})
 	g.accent = true
 	return g
+}
+
+// LinkSegs makes one link of the segments segs, as Link does for one: each takes
+// the theme's Link color unless it sets a Color, underlines while the pointer is
+// over the link (unless it has a Hover of its own), and a click on any of them
+// runs fn. Use it for a link whose text mixes styles, such as a bold word in it:
+//
+//	ui.Rich(append([]ui.Segment{ui.Seg("See ")},
+//		ui.LinkSegs(open, ui.Seg("the "), ui.Seg("guide").Bold())...)...)
+//
+// Placed one after another in a Rich text, the segments are one link: one stop in
+// the Tab order, one focus ring around all of their words, and one link for
+// assistive technology, named by their joined text. Enter runs fn once.
+func LinkSegs(fn func(), segs ...Segment) []Segment {
+	g := &linkGroup{}
+	out := make([]Segment, len(segs))
+	for i, s := range segs {
+		s.onClick, s.accent, s.link = fn, true, g
+		if s.hover == nil {
+			s.hover = &Highlight{Underline: true}
+		}
+		out[i] = s
+	}
+	return out
+}
+
+// linkEnd returns the index after the last segment of the link that starts at
+// segs[i]: the segments after it that LinkSegs made with it, or i+1.
+func linkEnd(segs []Segment, i int) int {
+	j := i + 1
+	if g := segs[i].link; g != nil {
+		for j < len(segs) && segs[j].link == g {
+			j++
+		}
+	}
+	return j
+}
+
+// linkStart reports whether segs[i] begins a link: it is clickable, and is not
+// the continuation of the link of the segment before it.
+func linkStart(segs []Segment, i int) bool {
+	return segs[i].onClick != nil && (i == 0 || segs[i].link == nil || segs[i-1].link != segs[i].link)
 }
 
 // Rich creates one text element from segments. It is laid out, wrapped,
@@ -255,7 +307,7 @@ func (rt *Runtime) runPaint(n *node, span int, base Color, opacity float32) text
 	}
 	p := n.rich.paint[span]
 	hl := p.hl
-	if p.owner >= 0 && rt.hoverSeg == (segRef{n.id, p.owner}) {
+	if p.owner >= 0 && rt.hovered(n, p.owner) {
 		if h := n.rich.segs[p.owner].hover; h != nil {
 			hl = hl.over(paintOnly(*h))
 		}
@@ -273,6 +325,17 @@ func (rt *Runtime) runPaint(n *node, span int, base Color, opacity float32) text
 		Underline:  hl.Underline,
 		Strike:     hl.Strikethrough,
 	}
+}
+
+// hovered reports whether the pointer is over segment i of rich text n, or over
+// another segment of the same link.
+func (rt *Runtime) hovered(n *node, i int) bool {
+	h := rt.hoverSeg
+	if h.node != n.id || h.seg < 0 || h.seg >= len(n.rich.segs) {
+		return false
+	}
+	g := n.rich.segs[i].link
+	return h.seg == i || (g != nil && n.rich.segs[h.seg].link == g)
 }
 
 // checkRange panics, naming the text and how to fix it, when [start, end) is

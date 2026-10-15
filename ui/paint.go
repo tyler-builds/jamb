@@ -305,12 +305,43 @@ func (rt *Runtime) paintText(n *node, x, y, w float32, fg Color, opacity float32
 			return rt.runPaint(n, span, fg, opacity)
 		})
 		rt.redrawSelected(rects, func(c Color) { rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, c.Alpha(opacity).scene()) })
+		if rt.focusID == n.id && rt.keyboardModality {
+			rt.paintLinkRing(n, l, tx, ty, opacity)
+		}
 		return
 	}
 	l := rt.text.Layout(n.textEl.text, n.textStyle(), contentW+0.01)
 	rects := rt.textSelectionRects(n, l, tx, ty, opacity)
 	rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, fg.Alpha(opacity).scene())
 	rt.redrawSelected(rects, func(c Color) { rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, c.Alpha(opacity).scene()) })
+}
+
+// paintLinkRing draws the focus ring around the link of rich text n that has
+// keyboard focus, if it has, laid out as l at x, y: a ring around each piece of
+// the link's text (all of its segments), one per line it covers.
+func (rt *Runtime) paintLinkRing(n *node, l *text.Layout, x, y, opacity float32) {
+	if rt.focusedLink() == nil {
+		return
+	}
+	start, end := 0, 0
+	first := rt.focusLink - 1
+	for i, g := range n.rich.segs[:linkEnd(n.rich.segs, first)] {
+		if i < first {
+			start += len(g.text)
+		}
+		end += len(g.text)
+	}
+	ring := rt.theme.FocusRing.Alpha(opacity).scene()
+	w := max(1, round(2*rt.scale))
+	rt.selRects = l.SelectionRects(start, end, rt.selRects[:0])
+	for _, r := range rt.selRects {
+		li := 0
+		if l.LineHeight > 0 {
+			li = min(max(int(r.Y/l.LineHeight+0.5), 0), len(l.Lines)-1)
+		}
+		b := rt.px(scene.Rect{X: x + n.lineOffset(l, li) + r.X - 2, Y: y + r.Y, W: r.W + 4, H: r.H})
+		rt.scene.AddQuad(scene.Quad{Bounds: b, BorderColor: ring, BorderWidth: w, Radii: scene.Uniform(3 * rt.scale)})
+	}
 }
 
 func (rt *Runtime) paintIcon(n *node, x, y float32, c Color) {

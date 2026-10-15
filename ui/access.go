@@ -371,7 +371,9 @@ func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 			rt.clickNode(n)
 		}
 	case access.ActionFocus:
-		if n.div == nil || n.div.focusable || n.kind == kindEditor {
+		if t.seg >= 0 {
+			rt.focusStop(tabPlace{n.id, t.seg + 1})
+		} else if n.div == nil || n.div.focusable || n.kind == kindEditor {
 			rt.setFocus(n.id)
 		} else if n.div.acc != nil && n.div.acc.focusInside {
 			rt.focusChild(n)
@@ -577,13 +579,22 @@ func (b *accessBuilder) issue(id access.ID, msg string) {
 }
 
 // focusTarget returns the access ID of the node that should carry focus: the
-// focused element if it is exposed, otherwise its nearest exposed ancestor, or
-// the window when there is none. Focus inside a hidden subtree, or with nothing
-// focused, is zero.
+// focused link of rich text, the focused element if it is exposed, otherwise its
+// nearest exposed ancestor, or the window when there is none. Focus inside a
+// hidden subtree, or with nothing focused, is zero.
 func (b *accessBuilder) focusTarget() access.ID {
 	n := b.rt.byID[b.rt.focusID]
 	if n == nil {
 		return 0
+	}
+	if b.rt.focusedLink() != nil {
+		// A link of rich text has focus: it is a node of its own (see emitLinks).
+		for a := n; a != nil; a = a.parent {
+			if a.flags&flagNoDisplay != 0 || (a.div != nil && a.div.acc != nil && a.div.acc.hidden) {
+				return 0
+			}
+		}
+		return linkID(n.id, b.rt.focusLink-1)
 	}
 	for ; n != nil; n = n.parent {
 		if n.flags&flagNoDisplay != 0 || (n.div != nil && n.div.acc != nil && n.div.acc.hidden) {
@@ -1028,35 +1039,60 @@ func (b *accessBuilder) bounds(n *node) access.Rect {
 }
 
 // emitText returns a static text node for a text element that is not inside a
-// control. Links in rich text become child nodes of it.
+// control. Links in rich text become child nodes of it. Inside a control whose
+// name is its text (absorbed), such as a heading or a list item, the text is
+// left out, and its links become nodes of the control, so they can still be
+// reached and followed.
 func (b *accessBuilder) emitText(n *node, absorbed bool) []access.ID {
 	s := strings.TrimSpace(n.textEl.text)
-	if absorbed || s == "" {
+	if s == "" {
 		return nil
 	}
 	id := accID(n.id)
-	an := &access.Node{ID: id, Role: access.RoleStaticText, Name: s, Key: n.key, Bounds: b.bounds(n)}
-	an.States = b.offscreen(n)
+	bounds, states := b.bounds(n), b.offscreen(n)
+	if absorbed {
+		return b.emitLinks(n, 0, bounds, states)
+	}
+	an := &access.Node{ID: id, Role: access.RoleStaticText, Name: s, Key: n.key, Bounds: bounds, States: states}
 	if n.st != nil && n.st.sel != nil {
 		// A click focuses selectable text (see Selectable).
 		an.States |= access.StateFocusable
 	}
-	if n.rich != nil {
-		for i, seg := range n.rich.segs {
-			if seg.onClick == nil {
-				continue
-			}
-			lid := linkID(n.id, i)
-			link := &access.Node{ID: lid, Role: access.RoleLink, Name: seg.text, Bounds: an.Bounds, Parent: id,
-				Actions: []access.Action{access.ActionClick}}
-			link.States = an.States
-			an.Children = append(an.Children, lid)
-			b.byID[lid] = link
-			b.targets[lid] = accessTarget{node: n, seg: i}
-		}
-	}
+	an.Children = b.emitLinks(n, id, bounds, states)
 	b.add(an, n, nil)
 	return []access.ID{id}
+}
+
+// emitLinks returns a link node for each link of rich text n: each segment with
+// an OnClick, with the segments that LinkSegs made with it, named by their joined
+// text. parent is their parent (0 when the caller sets it). A link is a tab stop
+// of its own (see tabStops), so it is focusable, and focused while it has
+// keyboard focus.
+func (b *accessBuilder) emitLinks(n *node, parent access.ID, bounds access.Rect, states access.State) []access.ID {
+	if n.rich == nil {
+		return nil
+	}
+	var ids []access.ID
+	segs := n.rich.segs
+	for i := range segs {
+		if !linkStart(segs, i) {
+			continue
+		}
+		name := segs[i].text
+		for _, g := range segs[i+1 : linkEnd(segs, i)] {
+			name += g.text
+		}
+		lid := linkID(n.id, i)
+		link := &access.Node{ID: lid, Role: access.RoleLink, Name: strings.TrimSpace(name), Bounds: bounds, Parent: parent,
+			States: states | access.StateFocusable, Actions: []access.Action{access.ActionClick, access.ActionFocus}}
+		if lid == b.focus {
+			link.States |= access.StateFocused
+		}
+		ids = append(ids, lid)
+		b.byID[lid] = link
+		b.targets[lid] = accessTarget{node: n, seg: i}
+	}
+	return ids
 }
 
 // emitImage returns an image node, named by its alternative text. An image
