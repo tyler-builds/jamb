@@ -373,3 +373,65 @@ func TestSyntaxStylesMapCaptures(t *testing.T) {
 		t.Fatalf("capture styles = %+v, want the first mapped and the second not", cs)
 	}
 }
+
+// The sizing methods size the editor's box as they size a widget of the ui package: Grow
+// takes the free space of a row, MaxWidth caps the width, MinHeight raises the height,
+// and GridSpan covers the columns of a grid.
+func TestSizingMethods(t *testing.T) {
+	root := func(*ui.Context) ui.Element {
+		return ui.Div().Column().
+			Child(ui.Div().Row().Width(ui.Px(600)).
+				Child(Editor(NewDocument("a")).Width(ui.Px(100)).Grow(1).Key("grow")).
+				Child(ui.Div().Width(ui.Px(100)).Height(ui.Px(10)))).
+			Child(ui.Div().Row().Width(ui.Px(600)).
+				Child(Editor(NewDocument("b")).MaxWidth(ui.Px(250)).Height(ui.Px(100)).MinHeight(ui.Px(140)).Key("capped"))).
+			Child(ui.Div().Grid(ui.Fr(1), ui.Fr(1)).Width(ui.Px(600)).
+				Child(Editor(NewDocument("c")).Width(ui.Auto).GridSpan(2, 1).Height(ui.Px(80)).Key("span")))
+	}
+	rt := ui.NewRuntime(root, ui.DarkTheme(), nil)
+	rt.SetViewport(800, 600, 1)
+	rt.Frame(time.Unix(1_000_000, 0))
+	find := func(key string) ui.Rect {
+		rc, ok := rt.Find(key)
+		if !ok {
+			t.Fatalf("no element with key %q", key)
+		}
+		return rc
+	}
+	if grow := find("grow"); grow.W != 500 {
+		t.Errorf("a growing editor beside 100 pixels in a row of 600 is %v wide, want 500", grow.W)
+	}
+	if capped := find("capped"); capped.W != 250 || capped.H != 140 {
+		t.Errorf("the capped editor is %v by %v, want 250 by 140", capped.W, capped.H)
+	}
+	if span := find("span"); span.W != 600 {
+		t.Errorf("an editor spanning two columns of 600 pixels is %v wide", span.W)
+	}
+}
+
+// A size the app sets wins over the Box style, whatever the order of the calls, and the
+// Box style wins over the default size.
+func TestSetSizeWinsOverTheBoxStyle(t *testing.T) {
+	box := Style{Box: ui.Style{Width: ui.Px(200), Height: ui.Px(120)}}
+	root := func(*ui.Context) ui.Element {
+		return ui.Div().Column().Width(ui.Px(600)).
+			Child(Editor(NewDocument("a")).Styles(box).Key("box")).
+			Child(Editor(NewDocument("b")).Size(ui.Px(400), ui.Px(90)).Styles(box).Key("set")).
+			Child(Editor(NewDocument("c")).Styles(box).Width(ui.Px(300)).Key("width"))
+	}
+	rt := ui.NewRuntime(root, ui.DarkTheme(), nil)
+	rt.SetViewport(800, 600, 1)
+	rt.Frame(time.Unix(1_000_000, 0))
+	for _, c := range []struct {
+		key  string
+		w, h float32
+	}{{"box", 200, 120}, {"set", 400, 90}, {"width", 300, 120}} {
+		rc, ok := rt.Find(c.key)
+		if !ok {
+			t.Fatalf("no element with key %q", c.key)
+		}
+		if rc.W != c.w || rc.H != c.h {
+			t.Errorf("editor %q is %v by %v, want %v by %v", c.key, rc.W, rc.H, c.w, c.h)
+		}
+	}
+}

@@ -23,6 +23,12 @@ ui.Div().Child(charts.Line(charts.Series[Visit]{
 
 A chart is a `ui.Element` (it embeds `ui.Composite`), so it goes straight into a tree, and it keeps its state between renders; give it a `Key` when its place in the tree may change.
 
+A chart is Full wide and 300 pixels high by default. `Size` sets both, and the
+sizing methods of the `ui` widgets (`Width`, `Height`, `MinWidth`, `MinHeight`,
+`MaxWidth`, `MaxHeight`, `Grow` and `GridSpan`) size its box as they do there (see
+Sizing in [docs/styling.md](styling.md#sizing)). They win over the `Chart` part of
+`Styles`.
+
 | Constructor | Data | Options that apply |
 | --- | --- | --- |
 | `Line`, `Area` | `Series[T]` per line | `Smooth`; `Stacked` (area) |

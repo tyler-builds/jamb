@@ -295,7 +295,8 @@ its default width; a width set with `Width` is kept. The methods size the widget
 field or a number input, the trigger of a select, the track of a slider and the bar
 of a progress bar (its readout included), the control of a check box, the group of
 radio buttons, the tab list of `Tabs`, the section of a collapsible, the panel of a
-modal, and the track of a switch, and the split of `Split`.
+modal, and the track of a switch, and the split of `Split`. A chart (package `charts`) and
+the code editor (package `codeedit`) take them too, on their box.
 
 ```go
 ui.TextInput(query).Width(ui.Full)          // fills its container

@@ -13,7 +13,7 @@ import (
 // An EditorElement is a code editor under construction. It is made by Editor and configured with the
 // methods below, each of which returns the editor so that they chain. An EditorElement is an
 // element: place it in a tree as it is, and it renders itself. Its size is Full by 300
-// pixels unless Size or Height says otherwise.
+// pixels unless the sizing methods (Size, Width, Height and the others) say otherwise.
 type EditorElement struct {
 	ui.Composite
 	doc         *Document
@@ -22,8 +22,7 @@ type EditorElement struct {
 	readOnly    bool
 	tabSize     int
 	comment     string
-	width       ui.Length
-	height      ui.Length
+	size        sizes // see Size
 	styles      Style
 	hl          Highlighter
 	lang        highlight.Grammar
@@ -34,7 +33,7 @@ type EditorElement struct {
 // Editor returns an editor that shows doc. Line numbers are on, tabs are four columns wide,
 // and the editor is writable with no comment prefix.
 func Editor(doc *Document) *EditorElement {
-	return &EditorElement{doc: doc, lineNumbers: true, tabSize: 4, width: ui.Full, height: ui.Px(300)}
+	return &EditorElement{doc: doc, lineNumbers: true, tabSize: 4}
 }
 
 // Key gives the editor a stable identity among its siblings, so its state (the scroll
@@ -67,10 +66,39 @@ func (e *EditorElement) TabSize(n int) *EditorElement {
 func (e *EditorElement) CommentPrefix(prefix string) *EditorElement { e.comment = prefix; return e }
 
 // Size sets the width and the height of the editor.
-func (e *EditorElement) Size(w, h ui.Length) *EditorElement { e.width, e.height = w, h; return e }
+func (e *EditorElement) Size(w, h ui.Length) *EditorElement {
+	e.size.setWidth(w)
+	e.size.setHeight(h)
+	return e
+}
+
+// The sizing methods give the editor's box a size, as they do for the widgets of the ui
+// package. The editor is Full wide by default. See Sizing in docs/styling.md.
+func (e *EditorElement) Width(l ui.Length) *EditorElement { e.size.setWidth(l); return e }
 
 // Height sets the height of the editor, which is 300 pixels by default.
-func (e *EditorElement) Height(h ui.Length) *EditorElement { e.height = h; return e }
+func (e *EditorElement) Height(h ui.Length) *EditorElement { e.size.setHeight(h); return e }
+
+// MinWidth sets the smallest width of the editor.
+func (e *EditorElement) MinWidth(l ui.Length) *EditorElement { e.size.setMinWidth(l); return e }
+
+// MinHeight sets the smallest height of the editor.
+func (e *EditorElement) MinHeight(l ui.Length) *EditorElement { e.size.setMinHeight(l); return e }
+
+// MaxWidth sets the largest width of the editor.
+func (e *EditorElement) MaxWidth(l ui.Length) *EditorElement { e.size.setMaxWidth(l); return e }
+
+// MaxHeight sets the largest height of the editor.
+func (e *EditorElement) MaxHeight(l ui.Length) *EditorElement { e.size.setMaxHeight(l); return e }
+
+// Grow makes the editor take a share of the free space on its parent's main axis.
+func (e *EditorElement) Grow(f float32) *EditorElement { e.size.setGrow(f); return e }
+
+// GridSpan sets how many columns and rows the editor covers in its parent's grid.
+func (e *EditorElement) GridSpan(cols, rows int) *EditorElement {
+	e.size.setSpan(cols, rows)
+	return e
+}
 
 // Styles sets the look of the parts of the editor, for this editor only. Set fields win
 // over the defaults. Calling Styles again merges with the earlier values.
@@ -145,8 +173,10 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	})
 	// The caret shows focus, as in code editors, so the frame draws no focus ring. BoxFocused
 	// styles the frame while the editor has focus: unset by default, a border under high
-	// contrast (see Style).
-	root := ui.Div().Column().Size(e.width, e.height).Style(st.Box).FocusWithin(st.BoxFocused)
+	// contrast (see Style). The default size comes before the Box style, and the sizes the
+	// app set come after it, so they win over it.
+	root := ui.Div().Column().Size(ui.Full, ui.Px(300)).Style(st.Box).FocusWithin(st.BoxFocused)
+	e.size.apply(root)
 	if vs.bar != barNone {
 		root.Child(vs.findBar(ctx, st, e.readOnly))
 	}
