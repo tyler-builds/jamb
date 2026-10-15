@@ -84,18 +84,35 @@ and the [concepts](docs/concepts.md) page introduces the API.
 ## Benchmarks
 
 The same hello-world app (a window, a greeting and a click counter) built with jamb and with GPUI, the
-UI framework from Zed, on one Windows machine; see [docs/comparison-gpui.md](docs/comparison-gpui.md)
-for the method and the full results:
+UI framework from Zed, on one Windows machine. Lower is better in every row, and the better figure is
+in bold. [docs/comparison-gpui.md](docs/comparison-gpui.md) has the method, the ranges of each
+measurement and the setup.
 
 | Measure | jamb | GPUI |
 |---|---|---|
-| Startup to first frame (warm launch) | 266 ms | 387 ms |
-| Idle CPU, window focused | 0.29% of one core | 1.85% of one core |
-| Incremental build after an edit | 2 s | 4 s (release), 6 s (debug) |
-| Binary size, release build | 8.4 MB | 9.21 MB |
+| Startup to first frame, warm launch | **266 ms** | 387 ms |
+| Startup to first frame, first launch (scanned by the antivirus) | **496 ms** | 611 ms |
+| Idle CPU, window focused | **0.29%** of one core | 1.85% |
+| Idle CPU, window in the background | **0.16%** | 1.67% |
+| Memory, private bytes | 78.2 MB | **75.3 MB** |
+| Memory, working set | 58.8 MB | **52.5 MB** |
+| GPU memory, dedicated | **13.8 MB** | 17.5 MB |
+| Threads | 36 | **30** |
+| CPU while the pointer moves over the window | **2.2%** | 3.4% |
+| CPU while the window is resized | **11.5%** | 18.8% |
+| Context switches per second while resizing | 2,411 | **1,820** |
+| Build after an edit | **2 s** | 4 s (release), 6 s (debug) |
+| Clean build | **9 s** | 138 s (release), 100 s (debug) |
+| Binary size, default release build | **8.4 MB** | 9.21 MB |
+| Binary size, GPUI's size-optimized build profile (a clean build of about 238 s) | | **4.31 MB** |
 
-Measured on the demo app (four pages, about 200 elements on screen); see
-[BENCHMARKS.md](BENCHMARKS.md) for the machine, the method and the other results:
+The runtime and memory rows were measured on 2026-10-12, before the themes, the dock, the inspector,
+charts and the code editor were added; since then the hello app's binary has grown from 7.18 MB to
+8.41 MB (measured on 2026-10-14), and memory and startup may have changed too. They will be measured
+again.
+
+The demo app (four pages, about 200 elements on screen), from [BENCHMARKS.md](BENCHMARKS.md), measured
+on 2026-10-06 and 2026-10-12, also before those additions:
 
 | Measure | Result | What it means |
 |---|---|---|
