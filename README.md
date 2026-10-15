@@ -1,10 +1,8 @@
 # jamb
 
-A declarative, GPU-accelerated desktop UI framework for Go. Pure Go, no cgo; Windows first.
+A declarative, GPU-accelerated desktop UI framework for Go. Tested only on Windows.
 
-jamb (formerly goui) is a small, declarative, GPU-rendered desktop UI framework written in plain Go.
-It has no Electron, WebView, HTML, CSS, JavaScript, Node, Rust, or cgo. Windows is the first platform:
-pure-Go Win32 windowing plus a Direct3D 11 renderer reached through COM vtables. An app is a tree
+jamb is a small, declarative, GPU-rendered desktop UI framework written in plain Go. An app is a tree
 of elements built by components, and its state lives in signals, so a change re-renders only the
 parts that depend on it.
 
@@ -16,8 +14,8 @@ parts that depend on it.
 - Widgets: buttons, text fields, checkboxes, switches, sliders, selects, comboboxes, date and time
   pickers, color pickers, menus, tabs, trees, data grids, forms with validation, toasts, and modal dialogs.
 - Layout: flexbox, grid, sidebars, split panes, docking, and variable-height and uniform lists.
-- Theming: light and dark themes that follow Windows, 37 converted predefined themes in 22 families, and
-  automatic high contrast.
+- Theming: light and dark themes that follow the system's light or dark mode, 37 converted predefined
+  themes in 22 families, and automatic high contrast.
 - Accessibility: a UI Automation tree for screen readers, keyboard navigation, reduced motion, and a
   text size setting.
 - Text: shaping with HarfBuzz, fallback fonts, rich and selectable text, and input method (IME) composition.
@@ -30,12 +28,9 @@ parts that depend on it.
 
 ## Install
 
-jamb needs Windows 10 or 11 and Go 1.27.1 or later. The module is `github.com/tyler-builds/jamb`.
-The repository is private for now, so Go must fetch it directly rather than through the public module
-proxy, and git must be able to clone it:
+jamb needs Windows 10 or 11 and Go 1.27.1 or later. Add it to a module with:
 
 ```
-go env -w GOPRIVATE=github.com/tyler-builds/*
 go get github.com/tyler-builds/jamb@v0.1.0
 ```
 
@@ -99,12 +94,33 @@ for the method and the full results:
 | Incremental build after an edit | 2 s | 4 s (release), 6 s (debug) |
 | Binary size, release build | 8.4 MB | 9.21 MB |
 
-From [BENCHMARKS.md](BENCHMARKS.md), measured mostly on the demo app:
+Measured on the demo app (four pages, about 200 elements on screen); see
+[BENCHMARKS.md](BENCHMARKS.md) for the machine, the method and the other results:
 
-- A rebuild after an edit takes 250 to 840 ms, depending on the edit.
-- jamb's own trace puts the first frame about 195 ms after the process starts.
-- The idle demo used no CPU over a 10-second sample.
-- A full re-render of every component costs about 0.3 ms of CPU per frame.
+| Measure | Result | What it means |
+|---|---|---|
+| Rebuild after an edit | 0.25 to 0.84 s | Edit, build and run stays under a second; `jamb dev` shows the new window 1.05 to 1.36 s after a save. |
+| Startup to first frame | about 195 ms | About 180 ms of it is the graphics driver creating the Direct3D device. |
+| Idle CPU | 0 ms in 10 s | An idle window draws nothing and wakes no timers. |
+| Full re-render of every component | about 0.3 ms of CPU per frame | A 120 Hz display allows 8.3 ms per frame, so this is about 4% of the budget. |
+| One signal change in a 10,000-element tree | 0.59 ms | Only the component that read the signal renders again. |
+| One scroll step in a 100,000-row list | 0.17 ms | Only the rows in view are built. |
+
+## How it works
+
+jamb is plain Go, with no cgo. On Windows it uses Win32 for windows and input, and draws with a
+Direct3D 11 renderer that it reaches through COM vtables; text is shaped with HarfBuzz (through
+go-text) and the accessibility tree is exposed through UI Automation. Each frame, components whose
+signals changed render again, the layout updates what moved, and the renderer submits the scene to
+the GPU; nothing is drawn while nothing changes. [docs/architecture.md](docs/architecture.md) has the
+details.
+
+## Examples
+
+The examples are in [examples/](examples/). `examples/hello` is the minimal app shown above.
+`examples/demo` is a tour of the widgets and layouts. It is also the app that `jamb package` builds in
+the packaging guide. `examples/notes` is a note-taking app with persistence, a command palette,
+and a keymap file. [docs/examples.md](docs/examples.md) describes the demo and notes apps.
 
 ## Documentation
 
@@ -135,13 +151,6 @@ The full documentation is in [docs/](docs/README.md). Each page covers one topic
 - [Architecture](docs/architecture.md): the repository layout, the rendering pipeline, and GPU device loss.
 - [Comparison with GPUI](docs/comparison-gpui.md): the hello-world app built with jamb and with GPUI.
 - [Status and known limitations](docs/status.md): the milestone status and the known limitations.
-
-## Examples
-
-The examples are in [examples/](examples/). `examples/hello` is the minimal app shown above.
-`examples/demo` is a tour of the widgets and layouts. It is also the app that `jamb package` builds in
-the packaging guide. `examples/notes` is a note-taking app with persistence, a command palette,
-and a keymap file. [docs/examples.md](docs/examples.md) describes the demo and notes apps.
 
 ## Contributing
 

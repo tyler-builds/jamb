@@ -26,12 +26,9 @@ Results against the performance targets are in [BENCHMARKS.md](../BENCHMARKS.md)
 
 ## Using jamb in your app
 
-The module is `github.com/tyler-builds/jamb`, and the first release is `v0.1.0`. The repository is
-private for now, so Go must fetch it directly rather than through the public module proxy, and git
-must be able to clone it:
+The module is `github.com/tyler-builds/jamb`, and the first release is `v0.1.0`:
 
 ```
-go env -w GOPRIVATE=github.com/tyler-builds/*
 go get github.com/tyler-builds/jamb@v0.1.0
 ```
 
