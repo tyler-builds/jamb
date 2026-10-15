@@ -173,8 +173,8 @@ tray.Hide()              // Show adds the icon again
   on `OnDoubleClick` alone and leave `OnClick` nil. A right click, the context menu
   key and Shift+F10 open the menu. Enter and Space, on the focused icon, run
   `OnClick`.
-- **Identity.** With `AppID`, Windows is given a GUID, derived with UUID version 5
-  from a fixed jamb namespace, the `AppID` and the icon's place in the order of
+- **Identity.** With `AppID`, Windows is given a GUID, a version 8 UUID made with
+  128-bit FNV-1a from a fixed jamb namespace, the `AppID` and the icon's place in the order of
   `NewTray` calls. Windows keeps the user's choice to show or hide the icon by that
   GUID, so the choice survives restarts. Keep the order of `NewTray` calls the same
   from run to run. Windows also ties the GUID to the executable's path: an executable
