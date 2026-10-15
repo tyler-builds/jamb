@@ -166,6 +166,13 @@ func (t *Tray) Hide() {
 	})
 }
 
+// Shown reports whether the icon is in the notification area: Show has added
+// it, and Hide has not taken it out. An icon stays shown when Explorer restarts,
+// as it is added to the new notification area again. It is safe from any
+// goroutine: from another goroutine, it waits for the UI thread to run the calls
+// made before it, and it reports false once the app has quit.
+func (t *Tray) Shown() bool { return readUI(false, func() bool { return t.native != nil }) }
+
 // trayGUIDNamespace is the namespace of the tray icon GUIDs: a fixed UUID made
 // for jamb. It must not change, or the icons lose the user's choices.
 var trayGUIDNamespace = [16]byte{0x6f, 0x4a, 0x2c, 0x9e, 0x3b, 0x1d, 0x4e, 0x7a, 0x8c, 0x5f, 0x0b, 0x2d, 0x9a, 0x61, 0x7e, 0x34}

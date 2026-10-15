@@ -47,23 +47,26 @@ func (w *appWindow) do(fn func(h *host)) {
 // read returns fn's result for the window, computed on the UI thread, or zero
 // when the window does not exist (yet, or any more) or the app has quit.
 func read[T any](w *appWindow, zero T, fn func(h *host) T) T {
-	if onUIThread() {
+	if !onUIThread() && w.closed.Load() {
+		return zero
+	}
+	return readUI(zero, func() T {
 		if w.host == nil {
 			return zero
 		}
 		return fn(w.host)
-	}
-	if w.closed.Load() {
-		return zero
+	})
+}
+
+// readUI returns fn's result, computed on the UI thread: at once when it is
+// called there, else after the work posted before it, while the caller waits.
+// It returns zero when the app has quit.
+func readUI[T any](zero T, fn func() T) T {
+	if onUIThread() {
+		return fn()
 	}
 	ch := make(chan T, 1)
-	postUI(func() {
-		if w.host == nil {
-			ch <- zero
-			return
-		}
-		ch <- fn(w.host)
-	})
+	postUI(func() { ch <- fn() })
 	select {
 	case v := <-ch:
 		return v
@@ -88,6 +91,14 @@ func (w *appWindow) RequestClose() { w.do(func(h *host) { h.closeAsked = false; 
 // Show and Hide implement ui.Window.
 func (w *appWindow) Show() { w.do(func(h *host) { h.win.Restore() }) }
 func (w *appWindow) Hide() { w.do(func(h *host) { h.win.Hide() }) }
+
+// Visible reads the platform window, so it agrees with every way the window is
+// shown or hidden: Show, Hide, the first show after Open, a CloseToTray close,
+// and the platform calls that show a hidden window. A window that has not
+// opened yet, or has closed, is not visible.
+func (w *appWindow) Visible() bool {
+	return read(w, false, func(h *host) bool { return h.win.Shown() })
+}
 
 func (w *appWindow) Maximized() bool {
 	return read(w, false, func(h *host) bool { return h.win.Maximized() })

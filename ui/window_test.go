@@ -97,6 +97,7 @@ func TestWindowAreaOnlyPaintedElements(t *testing.T) {
 type fakeWindow struct {
 	NopWindow
 	maximized, focused, fullscreen bool
+	hidden                         bool
 	calls                          []string
 	// The dialogs are recorded in calls; their callbacks are kept, so a test
 	// answers a dialog by calling fileDone or msgDone.
@@ -125,6 +126,7 @@ func (f *fakeWindow) SetFullscreen(on bool) {
 	f.calls = append(f.calls, fmt.Sprintf("fullscreen:%v", on))
 }
 func (f *fakeWindow) Fullscreen() bool { return f.fullscreen }
+func (f *fakeWindow) Visible() bool    { return !f.hidden }
 
 func (f *fakeWindow) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
 	f.calls = append(f.calls, "open")
@@ -224,6 +226,28 @@ func TestHeadlessWindowDoesNothing(t *testing.T) {
 	ctx.Window().SetTitle("nothing")
 	if ctx.Window().Maximized() || ctx.Window().Focused() {
 		t.Error("a headless window reports maximized or focused by default")
+	}
+	if !ctx.Window().Visible() {
+		t.Error("a headless window reports that it is hidden")
+	}
+}
+
+// Visible reads the app's window, and NopWindow answers false as for its other
+// states.
+func TestWindowVisibleReadsTheControls(t *testing.T) {
+	win := &fakeWindow{}
+	rt := NewRuntime(func(ctx *Context) Element { return Div() }, DarkTheme(), nil)
+	rt.SetWindow(win)
+	ctx := &Context{rt: rt}
+	if !ctx.Window().Visible() {
+		t.Error("a shown window reports that it is hidden")
+	}
+	win.hidden = true
+	if ctx.Window().Visible() {
+		t.Error("a hidden window reports that it is visible")
+	}
+	if (NopWindow{}).Visible() {
+		t.Error("NopWindow reports that it is visible")
 	}
 }
 

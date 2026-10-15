@@ -4,6 +4,7 @@ import (
 	"image"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -53,6 +54,22 @@ func TestTrayIDsCount(t *testing.T) {
 	}
 	if first.native != nil {
 		t.Error("a new tray has an icon before Show")
+	}
+}
+
+// A tray that was never shown is not, and its read does not wait for a UI loop
+// that has ended.
+func TestTrayShownWithoutTheApp(t *testing.T) {
+	endUI() // as after the loop ends: a read must not wait for it
+	done := make(chan bool, 1)
+	go func() { done <- NewTray(TrayOptions{}).Shown() }()
+	select {
+	case shown := <-done:
+		if shown {
+			t.Error("a tray that was never shown reports Shown")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Shown waited for a UI loop that has ended")
 	}
 }
 
