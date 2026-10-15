@@ -80,13 +80,13 @@ func nanValue() float64 {
 }
 
 func TestProgressStateNative(t *testing.T) {
-	for state, want := range map[ui.ProgressState]uint8{
+	for state, want := range map[ui.TaskbarState]uint8{
 		ui.TaskbarNone:          0,
 		ui.TaskbarNormal:        1,
 		ui.TaskbarIndeterminate: 2,
 		ui.TaskbarPaused:        3,
 		ui.TaskbarError:         4,
-		ui.ProgressState(200):   0,
+		ui.TaskbarState(200):    0,
 	} {
 		if got := uint8(nativeState(state)); got != want {
 			t.Errorf("nativeState(%d) = %d; want %d", state, got, want)

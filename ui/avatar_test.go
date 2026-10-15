@@ -72,7 +72,7 @@ func TestAvatarColorFromName(t *testing.T) {
 }
 
 // TestAvatarImageAndAccess checks that an image replaces the initials, that the
-// avatar is named by its name and is an image, and that Decorative hides it.
+// avatar is named by its name and is an image, and that AccessHidden hides it.
 func TestAvatarImageAndAccess(t *testing.T) {
 	r := newAccessRig(func(ctx *Context) Element { return Avatar("Dana Lee") })
 	if n := len(partNodes(r.rt, "Avatar.Initials")); n != 1 {
@@ -86,8 +86,8 @@ func TestAvatarImageAndAccess(t *testing.T) {
 	}
 	accesstest.Find(t, withImage.tree(), access.RoleImage, "Dana Lee")
 
-	decorative := newAccessRig(func(ctx *Context) Element { return Avatar("Dana Lee").Decorative() })
-	accesstest.Absent(t, decorative.tree(), access.RoleImage, "Dana Lee")
+	hidden := newAccessRig(func(ctx *Context) Element { return Avatar("Dana Lee").AccessHidden() })
+	accesstest.Absent(t, hidden.tree(), access.RoleImage, "Dana Lee")
 
 	unnamed := newAccessRig(func(ctx *Context) Element { return Avatar("") })
 	accesstest.Find(t, unnamed.tree(), access.RoleImage, "Avatar")

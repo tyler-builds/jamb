@@ -14,7 +14,7 @@ import (
 
 // nativeState returns the platform's state for a taskbar progress state. An
 // unknown state shows nothing.
-func nativeState(s ui.ProgressState) platform.TaskbarState {
+func nativeState(s ui.TaskbarState) platform.TaskbarState {
 	switch s {
 	case ui.TaskbarNormal:
 		return platform.TaskbarNormal

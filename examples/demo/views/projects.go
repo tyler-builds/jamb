@@ -109,11 +109,11 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 		Dragging(ui.Style{Opacity: 0.5}).
 		OnDrop(ui.Drop(func(id int, e *ui.DropEvent) {
 			s.DropMark.Set(dropMark{})
-			s.MoveProject(id, p.ID, e.LocalY > e.H/2) // the lower half drops after the card
+			s.MoveProject(id, p.ID, e.LocalY > e.Height/2) // the lower half drops after the card
 		}).
 			Accept(func(id int) bool { return id != p.ID }).
 			Move(func(id int, e *ui.DropEvent) {
-				mark := dropMark{ID: p.ID, After: e.LocalY > e.H/2}
+				mark := dropMark{ID: p.ID, After: e.LocalY > e.Height/2}
 				if s.DropMark.Peek() != mark {
 					s.DropMark.Set(mark)
 				}

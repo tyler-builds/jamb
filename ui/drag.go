@@ -74,14 +74,14 @@ func (d *DivElement) Dragging(s Style) *DivElement { d.dragging = mergeInto(d.dr
 
 // DropEvent describes a drop, or a pointer position over a target during a
 // drag. Coordinates are logical pixels; X and Y are relative to the window,
-// and LocalX and LocalY relative to the target. W and H are the target's size,
+// and LocalX and LocalY relative to the target. Width and Height are the target's size,
 // so a list row can tell which half the pointer is over:
 //
-//	after := e.LocalY > e.H/2
+//	after := e.LocalY > e.Height/2
 type DropEvent struct {
 	X, Y           float32
 	LocalX, LocalY float32
-	W, H           float32
+	Width, Height  float32
 	Mods           input.Modifiers
 }
 
@@ -288,7 +288,7 @@ func (rt *Runtime) dropEvent(id uint64, x, y float32, mods input.Modifiers) *Dro
 	if n := rt.byID[id]; n != nil {
 		r = rt.nodeRect(n)
 	}
-	return &DropEvent{X: x, Y: y, LocalX: x - r.X, LocalY: y - r.Y, W: r.W, H: r.H, Mods: mods}
+	return &DropEvent{X: x, Y: y, LocalX: x - r.X, LocalY: y - r.Y, Width: r.W, Height: r.H, Mods: mods}
 }
 
 // finishDrag handles the release of the button during a drag: the payload is

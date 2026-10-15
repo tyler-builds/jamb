@@ -38,7 +38,7 @@ func widgetsSection(t *ui.Theme) ui.Element {
 				Child(ui.Div().Grow(1).Child(ui.Skeleton().Lines(3)))
 		} else {
 			preview = ui.Div().Row().Gap(10).Width(ui.Px(260)).Align(ui.Start).
-				Child(ui.Avatar("Dana Lee").Size(36).Decorative()).
+				Child(ui.Avatar("Dana Lee").Size(36).AccessHidden()).
 				Child(ui.Text("Dana Lee left a comment on the design review.").FontSize(13))
 		}
 

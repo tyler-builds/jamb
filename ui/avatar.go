@@ -94,14 +94,14 @@ func resolveAvatar(ctx *Context, name string, size float32, inst AvatarStyle) Av
 
 // AvatarElement is a circle that stands for a person: the initials of the name in
 // a fill that the name picks, or an image cropped to the circle. It is an image
-// named by the name, unless Decorative hides it.
+// named by the name, unless AccessHidden does.
 type AvatarElement struct {
-	name       string
-	size       float32
-	src        *ImageSource
-	decorative bool
-	key        string
-	styles     AvatarStyle
+	name         string
+	size         float32
+	src          *ImageSource
+	accessHidden bool
+	key          string
+	styles       AvatarStyle
 }
 
 // Avatar creates an avatar of name, a circle of 32 logical pixels with the
@@ -122,10 +122,10 @@ func (a *AvatarElement) Image(src *ImageSource) *AvatarElement { a.src = src; re
 // initials grow with the Text size, as the text in a control does.
 func (a *AvatarElement) Size(px float32) *AvatarElement { a.size = px; return a }
 
-// Decorative hides the avatar from assistive technology. Use it for an avatar
+// AccessHidden leaves the avatar out of the accessibility tree. Use it for an avatar
 // that stands beside the name of the person it shows, since the name is read
 // already.
-func (a *AvatarElement) Decorative() *AvatarElement { a.decorative = true; return a }
+func (a *AvatarElement) AccessHidden() *AvatarElement { a.accessHidden = true; return a }
 
 // Styles sets the look of the parts of the avatar, for this instance only. Set
 // fields win over the theme's Avatar and the defaults; see AvatarStyle and
@@ -146,7 +146,7 @@ func (a *AvatarElement) expand(ctx *Context) Element {
 	} else if initials := avatarInitials(a.name); initials != "" {
 		av.Child(Div().asPart("Avatar.Initials").AccessHidden().Style(st.Initials).Child(Text(initials)))
 	}
-	if a.decorative {
+	if a.accessHidden {
 		av.AccessHidden()
 		return av
 	}

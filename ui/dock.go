@@ -522,7 +522,7 @@ func (v *dockView) zoneOf(e *DropEvent) DockZone {
 	if v.float {
 		return DockCenter
 	}
-	return dockZoneAt(e.LocalX, e.LocalY, e.W, e.H)
+	return dockZoneAt(e.LocalX, e.LocalY, e.Width, e.Height)
 }
 
 // dockKeySide returns the side that Ctrl+Shift with the arrow key k moves a panel to.
@@ -687,7 +687,7 @@ func (v *dockView) split(n DockNode, path []int) Element {
 		panes[k] = Pane(v.node(c, childPath)).Key(dockChildKey(c, childPath)).SizeSignal(sigs[k]).Min(Px(dockMinPane))
 	}
 	key := fmt.Sprintf("%s/split:%s", v.scope, dockPath(path))
-	sp := Split(panes...).Key(key).Grip(GripOnHover).OnChange(func() { v.resize(path, sigs) })
+	sp := Split(panes...).Key(key).Grip(SplitGripOnHover).OnChange(func() { v.resize(path, sigs) })
 	sp.onRelease = v.d.saveNow
 	if n.Vertical {
 		sp.Orientation(SplitVertical)

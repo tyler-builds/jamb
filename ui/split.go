@@ -119,15 +119,15 @@ const (
 type SplitGrip uint8
 
 const (
-	// GripShown always shows the grip. It is the default.
-	GripShown SplitGrip = iota
-	// GripOnHover shows the grip only while the pointer is over the divider, while it is
+	// SplitGripShown always shows the grip. It is the default.
+	SplitGripShown SplitGrip = iota
+	// SplitGripOnHover shows the grip only while the pointer is over the divider, while it is
 	// dragged, and while it has keyboard focus. Otherwise the divider is the bar alone, a line
 	// between the panes like a border.
-	GripOnHover
-	// GripHidden never shows the grip: the divider is the bar alone. It still changes color
+	SplitGripOnHover
+	// SplitGripHidden never shows the grip: the divider is the bar alone. It still changes color
 	// when the pointer is over it (DividerHover), so it can be found.
-	GripHidden
+	SplitGripHidden
 )
 
 // PaneElement is one pane of a split, made by Pane and given to Split.
@@ -310,9 +310,9 @@ func (s *SplitElement) Orientation(o SplitOrientation) *SplitElement { s.orient 
 // and Editor", and any other divider is named with the Resize panes text of the window's Strings.
 func (s *SplitElement) Label(name string) *SplitElement { s.name = name; return s }
 
-// Grip sets when the divider shows its grip: always (GripShown, the default), only while
-// the pointer is over the divider or it is dragged or focused (GripOnHover), or never
-// (GripHidden). Without the grip, the divider is a line between the panes.
+// Grip sets when the divider shows its grip: always (SplitGripShown, the default), only while
+// the pointer is over the divider or it is dragged or focused (SplitGripOnHover), or never
+// (SplitGripHidden). Without the grip, the divider is a line between the panes.
 func (s *SplitElement) Grip(g SplitGrip) *SplitElement { s.grip = g; return s }
 
 // OnChange runs fn after the user changes the size of a pane, from the keyboard or the pointer,
@@ -758,7 +758,7 @@ func (r *splitRender) handle(st SplitStyle, d int) Element {
 			hit.Row().Width(Px(splitHit)).Cursor(input.CursorResizeEW)
 		}
 		hit.Child(bar)
-		if r.s.grip == GripShown || r.s.grip == GripOnHover && (ctx.hovered() || dragged || ctx.KeyboardFocus()) {
+		if r.s.grip == SplitGripShown || r.s.grip == SplitGripOnHover && (ctx.hovered() || dragged || ctx.KeyboardFocus()) {
 			hit.Child(Div().Absolute().Inset(0).Center().Child(Div().asPart("Split.Grip").Style(st.Grip)))
 		}
 		hit.Role(access.RoleSeparator).Label(r.dividerName(ctx, d)).Focusable()

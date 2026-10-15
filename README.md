@@ -1158,13 +1158,13 @@ must differ. A pane without a key is known by its position.
 
 The divider is 1 px wide by default (`Divider`, its `Width` in a horizontal split and its
 `Height` in a vertical one), in a 9 px hit area, so it is easy to grab. The grip is a short
-pill over its middle. `Grip` on the split sets when it shows: always (`ui.GripShown`, the
+pill over its middle. `Grip` on the split sets when it shows: always (`ui.SplitGripShown`, the
 default), only while the pointer is over the divider or it is dragged or focused
-(`ui.GripOnHover`), or never (`ui.GripHidden`). Without the grip the divider is a plain
-line between the panes, like a border. The dock's dividers use `GripOnHover`.
+(`ui.SplitGripOnHover`), or never (`ui.SplitGripHidden`). Without the grip the divider is a plain
+line between the panes, like a border. The dock's dividers use `SplitGripOnHover`.
 
 ```go
-ui.Split(files, editor).Grip(ui.GripOnHover) // a line, with the grip on hover
+ui.Split(files, editor).Grip(ui.SplitGripOnHover) // a line, with the grip on hover
 ```
 
 - **Pointer.** Dragging the divider moves it. The pointer is captured while the button is
@@ -1406,7 +1406,7 @@ and `Theme.Skeleton`, or per instance with `Styles`.
 ```go
 ui.Avatar("Dana Lee")                                // "DL" on a color picked from the name
 ui.Avatar("Dana Lee").Image(photo).Size(48)          // an image cropped to the circle
-ui.Avatar("Dana Lee").Decorative()                   // beside the name, which is read already
+ui.Avatar("Dana Lee").AccessHidden()                   // beside the name, which is read already
 ui.Tag("Sales").Icon(icons.Folder).OnRemove(remove)  // a chip with a button named "Remove Sales"
 ui.Skeleton().Lines(3)                               // placeholder lines while content loads
 ui.Skeleton().Circle(32)                             // a placeholder for an avatar
@@ -1414,7 +1414,7 @@ ui.Skeleton().Circle(32)                             // a placeholder for an ava
 
 - **Avatar.** The initials are the first letter of the first and last words of the name, or one
   letter for a name of one word. An empty name shows an empty circle, named "Avatar". Without
-  `Decorative`, the avatar is an image named by the name, so it is read as the person's name.
+  `AccessHidden`, the avatar is an image named by the name, so it is read as the person's name.
 - **Tag.** A tag is as wide as its text by default. Under `MaxWidth`, a long text ends with an
   ellipsis. `OnRemove` adds a button that works with the mouse, Enter and Space.
 - **Skeleton.** It is hidden from assistive technology. The app marks the region that is loading
@@ -1528,8 +1528,8 @@ ui.Div().OnDrop(ui.Drop(func(files ui.Files, e *ui.DropEvent) { ... }))
 - Matching is by type assertion, so `ui.Drop[fmt.Stringer]` takes any payload
   that implements it, and a `ui.Drop[string]` never takes a `type label string`.
 - `DropEvent` has logical pixels: `X`, `Y` in the window, `LocalX`,
-  `LocalY` relative to the target, and the target's size `W`, `H`, so a row
-  can insert before or after itself with `e.LocalY > e.H/2`.
+  `LocalY` relative to the target, and the target's size `Width`, `Height`, so a row
+  can insert before or after itself with `e.LocalY > e.Height/2`.
 - Escape, or the window losing focus, cancels a drag; `End` then runs with
   `false`. The source may leave the tree mid-drag; the drop still delivers its
   payload.

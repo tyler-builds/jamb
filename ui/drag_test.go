@@ -542,10 +542,10 @@ func TestDropEventHasTargetSize(t *testing.T) {
 				OnDrop(Drop(func(v int, ev *DropEvent) { e = *ev })))
 	}, 300, 400, 1)
 	dragBetween(t, rt, "src", "row")
-	if e.W != 180 || e.H != 64 {
-		t.Errorf("DropEvent size %vx%v, want the target's 180x64", e.W, e.H)
+	if e.Width != 180 || e.Height != 64 {
+		t.Errorf("DropEvent size %vx%v, want the target's 180x64", e.Width, e.Height)
 	}
-	if e.LocalY < e.H/2-1 || e.LocalY > e.H/2+1 {
+	if e.LocalY < e.Height/2-1 || e.LocalY > e.Height/2+1 {
 		t.Errorf("LocalY %v, want about half the height (the drag ends at the target's center)", e.LocalY)
 	}
 }
