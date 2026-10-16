@@ -21,6 +21,13 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   as their column headers, and list items report their position ("2 of 5") and level.
 - `AccessGrid`, `AccessCell`, `AccessPosition` and `AccessLevel` on `Div` let any element describe a
   table, a cell, or an item's place in a set and its nesting level to assistive technology.
+- `Tabs.OnReselect` runs when the selected tab is activated again, and `Tab.Popup` shows any
+  content the app builds in a floating panel under the tab. It opens on a second click on the
+  selected tab, or with Down, Shift+F10 or the Menu key, and closes on Escape, a click outside or
+  its `close` func.
+- `Tabs.Reorderable` lets the user move tabs by dragging them or with Ctrl+Shift+Left and Right,
+  with the new position announced, and `OnReorder` reports the new order. The drop line is the
+  `DropLine` part of `TabsStyle`.
 - `ui.LinkSegs` makes one link of several styled segments.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.
