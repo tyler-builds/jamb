@@ -135,6 +135,9 @@ type Strings struct {
 	// ResizeBetween names the divider between two panes that have labels, such as "Resize Sidebar and
 	// Editor" (see Split.Label).
 	ResizeBetween func(first, second string) string
+	// TabMoved is announced after the user moves a tab (see Tabs.Reorderable), such as
+	// "Sales moved to position 2 of 3".
+	TabMoved func(tab string, position, count int) string
 	// Page is the name of a page button, such as "Page 3". CurrentPage names the page
 	// that is shown, and PageOf is the text of a compact pagination, such as "Page 3 of 9".
 	Page func(n int) string
@@ -430,6 +433,10 @@ func englishStrings() *Strings {
 		Page:          func(n int) string { return fmt.Sprintf("Page %d", n) },
 		CurrentPage:   func(n int) string { return fmt.Sprintf("Page %d, current page", n) },
 		PageOf:        func(page, pages int) string { return fmt.Sprintf("Page %d of %d", page, pages) },
+
+		TabMoved: func(tab string, position, count int) string {
+			return fmt.Sprintf("%s moved to position %d of %d", tab, position, count)
+		},
 
 		Today:        "Today",
 		StartOfRange: "Start of range",
