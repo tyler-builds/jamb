@@ -19,6 +19,9 @@ ui.Tabs(section,                                  // *ui.Signal[T], for any comp
 ui.Tabs(filter, tabs...).Variant(ui.TabsSegmented)   // one row of segments, the selected one filled
 ui.Tabs(view, tabs...).Styles(ui.TabsStyle{Indicator: ui.Style{Height: ui.Px(3)}}) // parts: see Styling
 ui.Tabs(count, tabs...).RenderTab(func(tab ui.Tab[int], s ui.PartState) ui.Element { ... }) // your content in each tab
+ui.Tabs(view, tabs...).OnReselect(func(v string) { refresh(v) }) // the selected tab clicked again
+ui.Tab[string]{Value: "sales", Label: "Sales", Panel: salesPanel,
+	Popup: func(close func()) ui.Element { return tabActions(close) }} // anything, in a panel under the tab
 
 ui.Collapsible("Advanced options", open, content).Key("advanced") // *ui.Signal[bool]
 ui.Accordion(sectionA, sectionB, sectionC).SingleOpen()          // one section open at a time
@@ -61,6 +64,17 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
   `TabFocusVisible`, `Indicator`, `Panel`) are set with `Styles` or the theme, and
   `RenderTab` draws each tab's content yourself. A tab's accessible name stays its
   `Label`, so a count the user must hear belongs in the label.
+  `OnReselect` runs when the selected tab is activated again, by a click, Enter
+  or Space, for an action such as a refresh. A tab's `Popup` builds anything the
+  app wants, such as a menu of actions or a rename field, in a floating panel
+  under the tab, styled as a Popover. It opens when the selected tab is clicked
+  again, and with Down, Shift+F10 or the Menu key while the tab has focus. Focus
+  moves into it when it opens; Escape, a click outside or the `close` func passed
+  to `Popup` closes it, and Escape and `close` return focus to the tab. While focus
+  is in it, the arrow keys and Ctrl+Tab belong to its content and do not switch
+  tabs. The tab reports Expanded or Collapsed, Expand and Collapse from assistive
+  technology open and close it, and the panel is a dialog named by the tab. A
+  change of selection closes it.
 - **Collapsible.** The header is a button with the Expanded state. Space and
   Enter open and close it, as a click does, and its chevron points right when closed
   and down when open. The content is not built while the section is closed. With
