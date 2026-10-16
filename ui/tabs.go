@@ -24,6 +24,14 @@ type Tab[T comparable] struct {
 	Disabled bool
 	// Panel builds the content of the tab, which is shown while the tab is selected.
 	Panel func() Element
+	// Popup builds what a floating panel under the tab shows, such as a menu of
+	// actions or a small form. It opens when the selected tab is clicked again,
+	// and with Down, Shift+F10 or the Menu key while the tab has focus. Escape, a
+	// click outside or a call to close closes it. Its focus behaves as a Popover's:
+	// it moves into the panel when the panel opens, and back to the tab when
+	// Escape or close is used. The panel is styled as a Popover. Assistive
+	// technology hears the tab as expanded or collapsed.
+	Popup func(close func()) Element
 }
 
 // TabsVariant selects the look of a tab list.
@@ -145,6 +153,7 @@ type TabsElement[T comparable] struct {
 	name        string // the accessible name of the tab list, see Label
 	key         string
 	onChange    func(T)
+	onReselect  func(T)
 	keep        bool // see KeepMounted
 	variant     TabsVariant
 	styles      TabsStyle
@@ -180,6 +189,11 @@ func (t *TabsElement[T]) Label(name string) *TabsElement[T] { t.name = name; ret
 // OnChange runs fn with the new value after the user selects a tab, by a click,
 // by the keys or by Ctrl+Tab. The signal is set first.
 func (t *TabsElement[T]) OnChange(fn func(T)) *TabsElement[T] { t.onChange = fn; return t }
+
+// OnReselect runs fn with the selected tab's value when the user activates
+// that tab again, by a click, Enter or Space. A tab with a Popup also opens or
+// closes it then.
+func (t *TabsElement[T]) OnReselect(fn func(T)) *TabsElement[T] { t.onReselect = fn; return t }
 
 // KeepMounted keeps each panel once it has been built. A panel is built the first
 // time its tab is selected, as it is by default, and then stays in the tree while
@@ -267,11 +281,51 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		if t.focusHandle != nil {
 			focus = t.focusHandle
 		}
-		// choose selects the tab at index i and moves focus to it.
-		choose := func(i int) {
-			if i < 0 || opts[i].Disabled || i == sel {
+		// popupFor is the key of the tab whose Popup is open, or "". Only the
+		// selected tab's can be open, so a change of tab, even by code, closes it.
+		popupFor := Local(ctx, "popup", "")
+		popupH := Local(ctx, "popupFocus", NewFocusHandle()).Peek()
+		entering := Local(ctx, "popupEntering", false)
+		selKey := ""
+		if sel >= 0 && t.tabs[sel].Popup != nil {
+			selKey = t.tabKey(cur)
+		}
+		if k := popupFor.Peek(); k != "" && k != selKey {
+			popupFor.Set("") // the selection moved on, by code, while it was open
+		}
+		rt := ctx.rt
+		isOpen := func() bool { return selKey != "" && popupFor.Peek() == selKey }
+		// inPopup reports whether focus is in the open popup, whose keys belong to
+		// its content and not to the tab list it hangs from.
+		inPopup := func() bool { return isOpen() && popupH.id != 0 && rt.focusInside(popupH.id) }
+		setPopup := func(on bool) {
+			if isOpen() == on || selKey == "" {
 				return
 			}
+			if !on && inPopup() {
+				focus.FocusNow() // focus inside it returns to the tab
+			}
+			if on {
+				popupFor.Set(selKey)
+			} else {
+				popupFor.Set("")
+			}
+			entering.Set(on)
+		}
+		// choose selects the tab at index i and moves focus to it. Choosing the
+		// selected tab again is a reselect.
+		choose := func(i int) {
+			if i < 0 || opts[i].Disabled {
+				return
+			}
+			if i == sel {
+				if t.onReselect != nil {
+					t.onReselect(opts[i].Value)
+				}
+				setPopup(!isOpen())
+				return
+			}
+			setPopup(false)
 			t.choose(opts[i].Value)
 			focus.Focus()
 		}
@@ -307,6 +361,16 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				}
 				tab.Child(ind)
 			}
+			if on && tb.Popup != nil {
+				open := popupFor.Get() == selKey
+				tab.AccessExpanded(open)
+				// Expand and Collapse from assistive technology open and close it
+				// without counting as a reselect.
+				tab.access().setExpanded = setPopup
+				if open {
+					tab.Child(t.popupPanel(ctx, tb, popupH, entering, func() { setPopup(false) }))
+				}
+			}
 			if tb.Disabled {
 				tab.access().disabled = true
 				tab.Cursor(CursorNotAllowed)
@@ -324,7 +388,16 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			tab.Cursor(CursorPointer).Focusable().FocusVisible(st.TabFocusVisible).
 				OnClick(func() { choose(i) }).
 				OnKeyDown(func(e *KeyEvent) {
-					if e.Mods != 0 || e.Repeat {
+					if e.Repeat || inPopup() {
+						return
+					}
+					if on && tb.Popup != nil && (e.Key == input.KeyF10 && e.Mods == input.ModShift ||
+						e.Mods == 0 && (e.Key == input.KeyDown || e.Key == input.KeyMenu)) {
+						e.StopPropagation()
+						setPopup(true)
+						return
+					}
+					if e.Mods != 0 {
 						return
 					}
 					j := -1
@@ -368,7 +441,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			// Ctrl+Tab and Ctrl+Shift+Tab reach here from the tab list and from the
 			// panel, since both are inside the group.
 			OnKeyDown(func(e *KeyEvent) {
-				if e.Key != input.KeyTab || e.Repeat || (e.Mods != input.ModCtrl && e.Mods != input.ModCtrl|input.ModShift) {
+				if e.Key != input.KeyTab || e.Repeat || (e.Mods != input.ModCtrl && e.Mods != input.ModCtrl|input.ModShift) || inPopup() {
 					return
 				}
 				dir := 1
@@ -393,6 +466,27 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		}
 		return group
 	})
+}
+
+// popupPanel returns the floating panel of tb's Popup, which hangs under the
+// tab. Like a Popover's panel, it takes focus when it opens and hands it to its
+// first field or button, and it closes on a click outside it and on Escape.
+func (t *TabsElement[T]) popupPanel(ctx *Context, tb Tab[T], h *FocusHandle, entering *Signal[bool], closeFn func()) Element {
+	rt := ctx.rt
+	st := resolvePopover(ctx, PopoverStyle{})
+	return Div().asPart("Popover.Panel").Overlay(BelowStart).OverlayGap(6).Style(st.Panel).
+		Role(access.RoleDialog).Label(tb.Label).
+		Focusable().TabStop(false).AutoFocus().FocusHandle(h).
+		OnFocus(func() {
+			if entering.Peek() {
+				entering.Set(false)
+				rt.focusFirstIn(h.id)
+			}
+		}).
+		OnClickOutside(closeFn).
+		Enter(Fade().Slide(0, -4), Animation{Duration: 120 * time.Millisecond}).
+		Exit(Fade(), Animation{Duration: 80 * time.Millisecond}).
+		Child(tb.Popup(closeFn))
 }
 
 // keptPanels returns the panel of each tab that has been selected, with the
