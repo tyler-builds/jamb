@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
@@ -60,6 +61,7 @@ type TabsStyle struct {
 	TabFocusVisible Style // a tab that has keyboard focus
 	Indicator       Style // the line under a tab in TabsUnderline; only the selected one shows it
 	Panel           Style // the panel of the selected tab
+	DropLine        Style // the line that shows where a dragged tab lands (see Reorderable)
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -73,6 +75,7 @@ func (s TabsStyle) merge(o TabsStyle) TabsStyle {
 		TabFocusVisible: s.TabFocusVisible.Merge(o.TabFocusVisible),
 		Indicator:       s.Indicator.Merge(o.Indicator),
 		Panel:           s.Panel.Merge(o.Panel),
+		DropLine:        s.DropLine.Merge(o.DropLine),
 	}
 }
 
@@ -90,6 +93,7 @@ func (s TabsStyle) plain() TabsStyle {
 		TabFocusVisible: plainStyle(s.TabFocusVisible),
 		Indicator:       ind,
 		Panel:           plainStyle(s.Panel),
+		DropLine:        plainStyle(s.DropLine),
 	}
 }
 
@@ -105,6 +109,7 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 		TabSelected:     Style{TextColor: th.Text},
 		TabFocusVisible: Style{Shadows: []Shadow{ring}},
 		Indicator:       Style{Height: Px(2), Background: th.Accent, Transition: 120 * time.Millisecond},
+		DropLine:        Style{Width: Px(2), Background: th.Accent},
 	}
 	if th.HighContrast {
 		// Under high contrast a disabled tab is GrayText, not dimmed.
@@ -154,6 +159,8 @@ type TabsElement[T comparable] struct {
 	key         string
 	onChange    func(T)
 	onReselect  func(T)
+	reorder     bool // see Reorderable
+	onReorder   func([]T)
 	keep        bool // see KeepMounted
 	variant     TabsVariant
 	styles      TabsStyle
@@ -194,6 +201,19 @@ func (t *TabsElement[T]) OnChange(fn func(T)) *TabsElement[T] { t.onChange = fn;
 // that tab again, by a click, Enter or Space. A tab with a Popup also opens or
 // closes it then.
 func (t *TabsElement[T]) OnReselect(fn func(T)) *TabsElement[T] { t.onReselect = fn; return t }
+
+// Reorderable lets the user move the tabs: drag a tab and drop it on the half
+// of another tab it should go beside, where a line shows it will land, or press
+// Ctrl+Shift+Left or Ctrl+Shift+Right on the focused tab. Assistive technology
+// hears the new position. The Tabs keeps the user's order; tabs it has not seen
+// before go after the others, in the order given. A disabled tab cannot be
+// dragged, but a tab can be put beside it.
+func (t *TabsElement[T]) Reorderable() *TabsElement[T] { t.reorder = true; return t }
+
+// OnReorder runs fn with the values of the tabs in their new order after the
+// user moves a tab (see Reorderable), for example to save it. Passing the tabs
+// in that order next time restores it.
+func (t *TabsElement[T]) OnReorder(fn func(order []T)) *TabsElement[T] { t.onReorder = fn; return t }
 
 // KeepMounted keeps each panel once it has been built. A panel is built the first
 // time its tab is selected, as it is by default, and then stays in the tree while
@@ -269,8 +289,15 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		th := ctx.Theme()
 		st := resolveTabs(ctx, t.variant, t.styles)
 		cur := t.selected.Get()
-		opts := make([]Option[T], len(t.tabs))
-		for i, tb := range t.tabs {
+		// order is the order of the values once the user has moved a tab (see
+		// Reorderable); until then the tabs are shown in the order given.
+		order := Local(ctx, "order", []T(nil))
+		tabs := t.tabs
+		if t.reorder {
+			tabs = arrangeTabs(t.tabs, order.Get())
+		}
+		opts := make([]Option[T], len(tabs))
+		for i, tb := range tabs {
 			opts[i] = Option[T]{Value: tb.Value, Label: tb.Label, Disabled: tb.Disabled}
 		}
 		sel := indexOf(opts, cur)
@@ -287,7 +314,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		popupH := Local(ctx, "popupFocus", NewFocusHandle()).Peek()
 		entering := Local(ctx, "popupEntering", false)
 		selKey := ""
-		if sel >= 0 && t.tabs[sel].Popup != nil {
+		if sel >= 0 && tabs[sel].Popup != nil {
 			selKey = t.tabKey(cur)
 		}
 		if k := popupFor.Peek(); k != "" && k != selKey {
@@ -329,9 +356,40 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			t.choose(opts[i].Value)
 			focus.Focus()
 		}
+		// move puts the tab at index from at index to, keeps the order, reports it,
+		// and announces the tab's new position.
+		move := func(from, to int) {
+			if from == to || from < 0 || to < 0 || to >= len(tabs) {
+				return
+			}
+			vals := make([]T, 0, len(tabs))
+			for _, tb := range tabs {
+				vals = append(vals, tb.Value)
+			}
+			v := vals[from]
+			vals = slices.Insert(slices.Delete(vals, from, from+1), to, v)
+			order.Set(vals)
+			if t.onReorder != nil {
+				t.onReorder(slices.Clone(vals))
+			}
+			Announce(ctx.Strings().TabMoved(tabs[from].Label, to+1, len(vals)), access.Polite)
+		}
+		// mark is where a dragged tab would land: before or after the tab with
+		// the key, which draws the drop line on that side.
+		mark := Local(ctx, "dropMark", tabDropMark{})
+		setMark := func(m tabDropMark) {
+			if mark.Peek() != m {
+				mark.Set(m)
+			}
+		}
+		// The dragged tab is dimmed, except under high contrast, where it keeps its colors.
+		source := Style{Opacity: 0.5}
+		if th.HighContrast {
+			source = Style{}
+		}
 		// drawTab returns the tab at index i, in the state ps describes.
 		drawTab := func(i int, ps PartState) *DivElement {
-			tb := t.tabs[i]
+			tb := tabs[i]
 			on := i == sel
 			style := st.Tab
 			if on {
@@ -371,10 +429,45 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 					tab.Child(t.popupPanel(ctx, tb, popupH, entering, func() { setPopup(false) }))
 				}
 			}
+			if t.reorder {
+				// Every tab is a drop target, a disabled one too, so a tab can be put
+				// beside it; the half of the tab under the pointer picks the side.
+				key := t.tabKey(tb.Value)
+				if m := mark.Get(); m.key == key {
+					line := Div().asPart("Tabs.DropLine").Absolute().Top(0).Bottom(0).Style(st.DropLine)
+					if m.after {
+						line.Right(-3)
+					} else {
+						line.Left(-3)
+					}
+					tab.Child(line)
+				}
+				tab.OnDrop(Drop(func(p tabDrag, e *DropEvent) {
+					setMark(tabDropMark{})
+					from := slices.IndexFunc(tabs, func(x Tab[T]) bool { return any(x.Value) == p.value })
+					to := i
+					if e.LocalX > e.Width/2 {
+						to++
+					}
+					if from < to {
+						to-- // the tab leaves its place before it is put back
+					}
+					move(from, to)
+				}).
+					Accept(func(p tabDrag) bool { return p.scope == t.scope() && p.value != any(tb.Value) }).
+					Move(func(p tabDrag, e *DropEvent) { setMark(tabDropMark{key: key, after: e.LocalX > e.Width/2}) }).
+					Leave(func() { setMark(tabDropMark{}) }))
+			}
 			if tb.Disabled {
 				tab.access().disabled = true
 				tab.Cursor(CursorNotAllowed)
 				return tab
+			}
+			if t.reorder {
+				label := tb.Label
+				tab.Dragging(source).OnDrag(Drag(tabDrag{scope: t.scope(), value: tb.Value}).Preview(func() Element {
+					return Div().Padding(6).Background(th.Surface).Border(1, th.Border).Child(Text(label))
+				}).End(func(DragEnd) { setMark(tabDropMark{}) }))
 			}
 			if on {
 				tab.FocusHandle(focus) // a handle makes the tab focusable, so a disabled one has none
@@ -395,6 +488,15 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 						e.Mods == 0 && (e.Key == input.KeyDown || e.Key == input.KeyMenu)) {
 						e.StopPropagation()
 						setPopup(true)
+						return
+					}
+					if t.reorder && e.Mods == input.ModCtrl|input.ModShift && (e.Key == input.KeyLeft || e.Key == input.KeyRight) {
+						e.StopPropagation()
+						if e.Key == input.KeyLeft {
+							move(i, i-1)
+						} else {
+							move(i, i+1)
+						}
 						return
 					}
 					if e.Mods != 0 {
@@ -423,7 +525,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		if t.name != "" {
 			strip.Label(t.name)
 		}
-		for i, tb := range t.tabs {
+		for i, tb := range tabs {
 			if t.renderTab == nil {
 				strip.Child(drawTab(i, PartState{Selected: i == sel, Disabled: tb.Disabled, HighContrast: th.HighContrast}))
 				continue
@@ -433,7 +535,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			i := i
 			strip.Child(Component(func(ctx *Context) Element {
 				return drawTab(i, PartState{Hovered: ctx.hovered(), Pressed: ctx.pressed(), Focused: ctx.isFocused(),
-					Selected: i == sel, Disabled: t.tabs[i].Disabled, HighContrast: th.HighContrast})
+					Selected: i == sel, Disabled: tabs[i].Disabled, HighContrast: th.HighContrast})
 			}).Key(t.tabKey(tb.Value)))
 		}
 
@@ -454,18 +556,55 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			}).
 			Child(strip)
 		if t.keep {
-			group.Children(t.keptPanels(ctx, sel, panels, st.Panel)...)
-		} else if sel >= 0 && t.tabs[sel].Panel != nil {
-			if p := t.tabs[sel].Panel(); p != nil {
+			group.Children(t.keptPanels(ctx, tabs, sel, panels, st.Panel)...)
+		} else if sel >= 0 && tabs[sel].Panel != nil {
+			if p := tabs[sel].Panel(); p != nil {
 				// The panel is named by its tab: the label is its name, and LabelledBy
 				// links it to the tab for the relation.
 				group.Child(Div().asPart("Tabs.Panel").Key(t.scope() + "/panel").Column().Grow(1).MinHeight(Px(0)).
-					Role(access.RoleTabPanel).Label(t.tabs[sel].Label).Style(st.Panel).
-					LabelledBy(t.tabKey(t.tabs[sel].Value)).Child(p))
+					Role(access.RoleTabPanel).Label(tabs[sel].Label).Style(st.Panel).
+					LabelledBy(t.tabKey(tabs[sel].Value)).Child(p))
 			}
 		}
 		return group
 	})
+}
+
+// tabDrag is the payload of a dragged tab: the value of the tab, and the scope
+// of its tab list, so that a tab is dropped only on its own list.
+type tabDrag struct {
+	scope string
+	value any
+}
+
+// tabDropMark is where a dragged tab would land: beside the tab whose key it
+// holds, after it when after is set. The zero value marks nothing.
+type tabDropMark struct {
+	key   string
+	after bool
+}
+
+// arrangeTabs returns tabs in order: the tabs whose values are in order first,
+// in that order, then the others as given. Values in order with no tab are
+// skipped.
+func arrangeTabs[T comparable](tabs []Tab[T], order []T) []Tab[T] {
+	if len(order) == 0 {
+		return tabs
+	}
+	out := make([]Tab[T], 0, len(tabs))
+	placed := make(map[T]bool, len(tabs))
+	for _, v := range order {
+		if i := slices.IndexFunc(tabs, func(x Tab[T]) bool { return x.Value == v }); i >= 0 && !placed[v] {
+			out = append(out, tabs[i])
+			placed[v] = true
+		}
+	}
+	for _, tb := range tabs {
+		if !placed[tb.Value] {
+			out = append(out, tb)
+		}
+	}
+	return out
 }
 
 // popupPanel returns the floating panel of tb's Popup, which hangs under the
@@ -493,13 +632,13 @@ func (t *TabsElement[T]) popupPanel(ctx *Context, tb Tab[T], h *FocusHandle, ent
 // selected one shown and the others hidden (see KeepMounted). The first time a
 // tab is selected its panel is recorded in the Local set; its component is made
 // once per render of the tab list, so a tab switch reuses it.
-func (t *TabsElement[T]) keptPanels(ctx *Context, sel int, panels map[T]*ComponentElement, panel Style) []Element {
+func (t *TabsElement[T]) keptPanels(ctx *Context, tabs []Tab[T], sel int, panels map[T]*ComponentElement, panel Style) []Element {
 	built := Local(ctx, "built", map[T]bool{}).Peek()
-	if sel >= 0 && t.tabs[sel].Panel != nil {
-		built[t.tabs[sel].Value] = true
+	if sel >= 0 && tabs[sel].Panel != nil {
+		built[tabs[sel].Value] = true
 	}
 	var out []Element
-	for i, tb := range t.tabs {
+	for i, tb := range tabs {
 		if !built[tb.Value] {
 			continue
 		}

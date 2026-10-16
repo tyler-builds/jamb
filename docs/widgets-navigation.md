@@ -20,6 +20,7 @@ ui.Tabs(filter, tabs...).Variant(ui.TabsSegmented)   // one row of segments, the
 ui.Tabs(view, tabs...).Styles(ui.TabsStyle{Indicator: ui.Style{Height: ui.Px(3)}}) // parts: see Styling
 ui.Tabs(count, tabs...).RenderTab(func(tab ui.Tab[int], s ui.PartState) ui.Element { ... }) // your content in each tab
 ui.Tabs(view, tabs...).OnReselect(func(v string) { refresh(v) }) // the selected tab clicked again
+ui.Tabs(view, tabs...).Reorderable().OnReorder(func(order []string) { save(order) }) // the user moves tabs
 ui.Tab[string]{Value: "sales", Label: "Sales", Panel: salesPanel,
 	Popup: func(close func()) ui.Element { return tabActions(close) }} // anything, in a panel under the tab
 
@@ -61,7 +62,7 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
   the selected segment filled in Accent (Highlight under high contrast). Both
   variants keep the same keys, keyboard behavior and accessible names. The parts
   of a tab list (`List`, `Tab`, `TabSelected`, `TabHover`, `TabDisabled`,
-  `TabFocusVisible`, `Indicator`, `Panel`) are set with `Styles` or the theme, and
+  `TabFocusVisible`, `Indicator`, `Panel`, `DropLine`) are set with `Styles` or the theme, and
   `RenderTab` draws each tab's content yourself. A tab's accessible name stays its
   `Label`, so a count the user must hear belongs in the label.
   `OnReselect` runs when the selected tab is activated again, by a click, Enter
@@ -75,6 +76,15 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
   tabs. The tab reports Expanded or Collapsed, Expand and Collapse from assistive
   technology open and close it, and the panel is a dialog named by the tab. A
   change of selection closes it.
+  `Reorderable()` lets the user move the tabs: drag a tab onto the half of
+  another tab it should go beside, where a line (the `DropLine` part) shows
+  where it lands, or press Ctrl+Shift+Left or Ctrl+Shift+Right on the focused
+  tab, as the Dock does for its panels. Assistive technology hears the new
+  position, such as "Sales moved to position 2 of 3" (`Strings.TabMoved`). The
+  Tabs keeps the user's order; a tab it has not seen before goes after the
+  others. `OnReorder` gets the values in their new order, so an app can save
+  it and pass the tabs in that order next time. A disabled tab cannot be
+  dragged, but a tab can be put beside it.
 - **Collapsible.** The header is a button with the Expanded state. Space and
   Enter open and close it, as a click does, and its chevron points right when closed
   and down when open. The content is not built while the section is closed. With

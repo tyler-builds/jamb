@@ -378,6 +378,18 @@ func testTabsParts(t *testing.T, v TabsVariant, applied map[string]bool) {
 			wantBackground(t, partNode(t, r.rt, drawnBy(c.part), c.key), c.part, markBG)
 		})
 	}
+	// The drop line is drawn while a tab of a reorderable list is dragged over another.
+	applied["Tabs.DropLine"] = true
+	t.Run("Tabs.DropLine", func(t *testing.T) {
+		st := TabsStyle{DropLine: Style{Background: markBG}}
+		r := newAccessRig(func(ctx *Context) Element {
+			return Div().Column().Child(Tabs(NewSignal("a"),
+				Tab[string]{Value: "a", Label: "Alpha"}, Tab[string]{Value: "c", Label: "Gamma"},
+			).Key("settings").Variant(v).Styles(st).Reorderable())
+		})
+		dragHover(t, r, "settings/tab:a", "settings/tab:c")
+		wantBackground(t, partNode(t, r.rt, "Tabs.DropLine", ""), "Tabs.DropLine", markBG)
+	})
 	if v == TabsSegmented {
 		r := newAccessRig(func(ctx *Context) Element { return partTabs(NewSignal("a"), v, TabsStyle{}) })
 		if got := len(partNodes(r.rt, "Tabs.Indicator")); got != 0 {
