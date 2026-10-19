@@ -103,6 +103,11 @@ var editorActions = []struct {
 			n.editor.onCancel()
 			return
 		}
+		// A clearable field that has text clears it first; the next Escape leaves.
+		if n, _, v := rt.editorOf(id); n != nil && n.editor.clearable && v != "" && !n.editor.locked() {
+			rt.editorSet(id, "", 0, editOther)
+			return
+		}
 		rt.setFocus(0)
 	}},
 }

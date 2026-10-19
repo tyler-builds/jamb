@@ -3,6 +3,7 @@ package ui
 import (
 	"testing"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/input"
 )
@@ -15,7 +16,8 @@ func partTextInput(sig *Signal[string], st FieldStyle) Element {
 // partField is a text field of widget ("TextInput" or "TextArea") with the
 // instance style st. With slots, it has a Leading and a Trailing element, and a
 // TextInput also has an icon before its text. state is "", "disabled",
-// "readonly", or "buttons" for a TextInput with its own buttons (see Revealable).
+// "readonly", or "buttons" for a TextInput with its own buttons (see Clearable
+// and Revealable).
 func partField(widget string, sig *Signal[string], st FieldStyle, slots bool, state string) Element {
 	if widget == "TextArea" {
 		ta := TextArea(sig).Label("Notes").Placeholder("Write here").Styles(st).
@@ -28,7 +30,7 @@ func partField(widget string, sig *Signal[string], st FieldStyle, slots bool, st
 	ti := TextInput(sig).Label("Name").Placeholder("Your name").Styles(st).
 		Disabled(state == "disabled").ReadOnly(state == "readonly")
 	if state == "buttons" {
-		ti.Masked().Revealable()
+		ti.Masked().Revealable().Clearable()
 	}
 	if slots {
 		ti.Icon(icons.Check).Leading(Text("lead")).Trailing(Text("trail"))
@@ -66,7 +68,7 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 		cases = append(cases,
 			fieldCase{part: "Button", set: func(s *FieldStyle, m Style) { s.Button = m }, state: "buttons"},
 			fieldCase{part: "ButtonHover", set: func(s *FieldStyle, m Style) { s.ButtonHover = m }, state: "buttons",
-				act: func(t *testing.T, r *accessRig) { hoverNode(r, partNodes(r.rt, widget+".Button")[0]) }})
+				act: func(t *testing.T, r *accessRig) { hoverNode(r, accessNode(t, r, access.RoleButton, "Clear")) }})
 	}
 	for _, c := range cases {
 		name := widget + "." + c.part
@@ -98,7 +100,7 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 					wantBackground(t, n, name, markBG)
 				}
 			case "ButtonHover":
-				wantBackground(t, partNodes(r.rt, widget+".Button")[0], name, markBG)
+				wantBackground(t, accessNode(t, r, access.RoleButton, "Clear"), name, markBG)
 			default:
 				wantBackground(t, partNode(t, r.rt, drawnBy(name), ""), name, markBG)
 			}

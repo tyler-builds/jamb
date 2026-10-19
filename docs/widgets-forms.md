@@ -148,8 +148,18 @@ ui.OTPInput("Recovery code", rec, 8).Alphanumeric() // letters and digits
   the field (see Styling). A masked field works in a `Field` and a `Form` as any
   text input does.
 
+- A `TextInput` with `Clearable()` shows a small X button at its end while it has
+  text. A click on it clears the text, runs `OnChange` with "", and leaves the focus
+  in the field. Escape clears the text too, while the field has text, and the clear
+  can be undone with Ctrl+Z; in an empty field Escape does what it does in any field,
+  such as leaving it or closing the modal. The button is not a Tab stop, and a
+  read-only or disabled field has none. In the `Trailing` part the clear button comes
+  first, then the reveal button of a `Revealable` field, then the field's own
+  `Trailing` element.
+
 ```go
 ui.TextInput(password).Masked().Revealable().Label("Password") // bullets, with a reveal button
+ui.TextInput(query).Icon(icons.Search).Clearable().Label("Search") // an X while it has text, and Escape clears
 ```
 
 ![Inline spin buttons inside the field, with the pointer over the plus button](screenshots/spin-buttons-inline.png)
@@ -175,6 +185,7 @@ input is a text field with IsPassword, whose value and text are a bullet for eac
 character, unless its text is shown. Its reveal button is a button named "Show
 password", or "Hide password" while the text is shown (`Strings.ShowPassword` and
 `Strings.HidePassword`); its name says what a press does, so it has no pressed state.
+The clear button of a clearable text input is a button named "Clear" (`Strings.Clear`).
 
 ## Color picker
 
