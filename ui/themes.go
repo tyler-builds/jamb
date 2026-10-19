@@ -16,7 +16,7 @@ type ThemeInfo struct {
 
 // predefinedTheme is one entry of the predefined themes: its description, and
 // either the function that returns a new copy of the theme (Dark and Light) or
-// the spec it is built from (the themes converted from gpui-component).
+// the spec it is built from (the themes converted from GPUI Kit).
 type predefinedTheme struct {
 	info  ThemeInfo
 	build func() *Theme
@@ -24,7 +24,7 @@ type predefinedTheme struct {
 }
 
 // predefined lists the predefined themes in the order of Themes: Dark and Light,
-// then the themes converted from gpui-component (see themes_gen.go).
+// then the themes converted from GPUI Kit (see themes_gen.go).
 var predefined = func() []predefinedTheme {
 	out := []predefinedTheme{
 		{info: ThemeInfo{Name: "Dark", Family: "jamb", Dark: true}, build: DarkTheme},
@@ -114,7 +114,7 @@ func (s *themeSpec) build() *Theme {
 }
 
 // Themes returns the predefined themes in a stable order: Dark and Light first,
-// then the themes converted from gpui-component, in the order of their upstream
+// then the themes converted from GPUI Kit, in the order of their upstream
 // files and of the variants in each file. The themes are described, not built;
 // NewTheme returns a copy of one.
 func Themes() []ThemeInfo {

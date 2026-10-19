@@ -1,4 +1,4 @@
-// Command themegen converts the predefined themes of gpui-component into jamb
+// Command themegen converts the predefined themes of GPUI Kit (formerly gpui-component) into jamb
 // themes. It reads the theme sets in third_party/gpui-component-themes and
 // writes ui/themes_gen.go. The ui package runs it with go generate:
 //
@@ -510,7 +510,7 @@ func render(dir string) ([]byte, error) {
 	var out strings.Builder
 	out.WriteString(header)
 	out.WriteString(body.String())
-	out.WriteString("// generatedThemes lists the themes converted from gpui-component, in the order of their\n")
+	out.WriteString("// generatedThemes lists the themes converted from GPUI Kit, in the order of their\n")
 	out.WriteString("// files and of the variants in each file.\n")
 	out.WriteString("var generatedThemes = []*themeSpec{\n")
 	out.WriteString(table.String())

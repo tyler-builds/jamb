@@ -202,11 +202,11 @@ var themeAsciinema = themeSpec{
 	Info: ThemeInfo{Name: "Asciinema", Family: "Asciinema", Author: "asciinema.org", URL: "https://asciinema.org", Dark: true},
 
 	Background:    "#121314",
-	Panel:         "#1a1b1c",
+	Panel:         "#181919",
 	Surface:       "#1a1b1c",
 	SurfaceHover:  "#1d1e1e",
 	SurfaceActive: "#1f2020",
-	Border:        "#3a3a3a",
+	Border:        "#303030",
 	BorderStrong:  "#676767", // was #3a3a3a
 	Text:          "#cccccc",
 	TextMuted:     "#878787", // was #6d6d6d
@@ -262,7 +262,7 @@ var themeAsciinema = themeSpec{
 
 // themeAuroraLight is the Aurora Light theme, a light variant of the Aurora scheme.
 var themeAuroraLight = themeSpec{
-	Info: ThemeInfo{Name: "Aurora Light", Family: "Aurora", Author: "Longbridge", URL: "https://github.com/longbridge/gpui-component", Dark: false},
+	Info: ThemeInfo{Name: "Aurora Light", Family: "Aurora", Author: "Longbridge", URL: "https://github.com/longbridge/gpui-kit", Dark: false},
 
 	Background:    "#ffffff",
 	Panel:         "#f8fafc",
@@ -1580,7 +1580,7 @@ var themeMacOSClassicLight = themeSpec{
 	Info: ThemeInfo{Name: "macOS Classic Light", Family: "macOS Classic", Author: "huacnlee", URL: "https://github.com/huacnlee/zed-theme-macos-classic", Dark: false},
 
 	Background:    "#f9f9f9",
-	Panel:         "#fefefe",
+	Panel:         "#f7f7f7",
 	Surface:       "#f5f5f5",
 	SurfaceHover:  "#e7e7e7",
 	SurfaceActive: "#d9d9d9",
@@ -1644,7 +1644,7 @@ var themeMacOSClassicDark = themeSpec{
 	Info: ThemeInfo{Name: "macOS Classic Dark", Family: "macOS Classic", Author: "huacnlee", URL: "https://github.com/huacnlee/zed-theme-macos-classic", Dark: true},
 
 	Background:    "#131313",
-	Panel:         "#1c1c1e",
+	Panel:         "#171717",
 	Surface:       "#101010",
 	SurfaceHover:  "#232323",
 	SurfaceActive: "#353535",
@@ -1668,29 +1668,30 @@ var themeMacOSClassicDark = themeSpec{
 	Scrim:         "#00000099",
 
 	Syntax: []syntaxSpec{
-		{"attribute", "#e7cb8f", plain},
-		{"boolean", "#e1d797", plain},
-		{"comment", "#9e9e9e", plain},
-		{"comment.doc", "#9e9e9e", plain},
-		{"constant", "#e1d797", plain},
-		{"constructor", "#b5af9a", plain},
+		{"attribute", "#7faef9", plain},
+		{"boolean", "#cc9e00", plain},
+		{"comment", "#9d9d9d", plain},
+		{"comment.doc", "#9d9d9d", plain},
+		{"constant", "#cc9e00", plain},
+		{"constructor", "#cba6f7", plain},
 		{"embedded", "#caccca", plain},
-		{"function", "#fdd888", plain},
-		{"keyword", "#c28b12", plain},
-		{"link_text", "#307bf6", plain},
+		{"function", "#b3c5f3", plain},
+		{"keyword", "#87b1f6", plain},
+		{"link_text", "#419cff", plain},
 		{"link_uri", "#7faef9", italic},
-		{"number", "#e1d797", plain},
-		{"property", "#caccca", plain},
-		{"string", "#62ba46", plain},
-		{"string.escape", "#62ba46", plain},
-		{"string.regex", "#62ba46", plain},
-		{"string.special", "#e1d797", plain},
-		{"string.special.symbol", "#e1d797", plain},
-		{"tag", "#b5af9a", plain},
-		{"text.literal", "#e1d797", plain},
-		{"title", "#fdd888", bold},
-		{"type", "#cd5b28", plain}, // was #c75828
-		{"variable.special", "#e19773", plain},
+		{"number", "#cc9e00", plain},
+		{"property", "#bcc4e0", plain},
+		{"string", "#a3e09f", plain},
+		{"string.escape", "#68dc7c", plain},
+		{"string.regex", "#68dc7c", plain},
+		{"string.special", "#a3e09f", plain},
+		{"string.special.symbol", "#a3e09f", plain},
+		{"tag", "#419cff", plain},
+		{"text.code.span", "#a3e09f", plain},
+		{"text.literal", "#a3e09f", plain},
+		{"title", "#cc9e00", bold},
+		{"type", "#cba6f7", plain},
+		{"variable.special", "#419cff", plain},
 	},
 	CodeEditor: codeEditorSpec{
 		Background:       "#131313",
@@ -2458,7 +2459,7 @@ var themeTwilight = themeSpec{
 	},
 }
 
-// generatedThemes lists the themes converted from gpui-component, in the order of their
+// generatedThemes lists the themes converted from GPUI Kit, in the order of their
 // files and of the variants in each file.
 var generatedThemes = []*themeSpec{
 	&themeAdventure,

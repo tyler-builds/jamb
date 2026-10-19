@@ -9,7 +9,7 @@ import (
 // Every predefined theme is checked against the WCAG 2 criteria that the
 // built-in themes meet (contrast_test.go), for the pairs its widgets draw, and
 // for the syntax captures and the editor. The converted themes, which are the
-// ones from gpui-component, also meet the non-text criteria of their borders and
+// ones from GPUI Kit, also meet the non-text criteria of their borders and
 // focus ring, which the generator enforces (see internal/themegen). Border is
 // decorative and is not checked.
 

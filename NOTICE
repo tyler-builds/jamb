@@ -14,12 +14,14 @@ these words and phrases from gpui-component (crates/ui/locales/ui.yml):
 gpui-component is Copyright Longbridge and is licensed under the Apache License,
 Version 2.0. Its license text is at https://www.apache.org/licenses/LICENSE-2.0.
 
-Third-party software: gpui-component themes
+Third-party software: GPUI Kit themes
 
 The predefined themes in ui/themes_gen.go are converted from the theme sets of
-gpui-component (https://github.com/longbridge/gpui-component, commit
-f2f0f563292114fecf55fb8ab92a97e14989dbd0), Copyright 2024-2025 Longbridge, licensed
-under the Apache License, Version 2.0. The theme sets are in
+GPUI Kit, formerly gpui-component (https://github.com/longbridge/gpui-kit, tag v0.8.0,
+commit 1676826d9d49b90f4d7b6808b69924f58796f6f1), Copyright 2024-2026 Longbridge,
+licensed under the Apache License, Version 2.0. The Matrix theme set is from
+gpui-component at commit f2f0f563292114fecf55fb8ab92a97e14989dbd0; it was removed
+upstream after that commit. The theme sets are in
 third_party/gpui-component-themes/, with the license text in LICENSE-APACHE there.
 They are converted for jamb: their colors are mapped to jamb's tokens, and some are
 moved in lightness for contrast. Each theme credits the color scheme it is taken

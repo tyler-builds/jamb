@@ -39,6 +39,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Links in rich text (`ui.Link` and segments with `OnClick`) are Tab stops: the focused link shows a
   focus ring and Enter follows it. Links inside headings and list items are kept in the
   accessibility tree.
+- The predefined themes are converted from GPUI Kit v0.8.0 (formerly gpui-component). Panel and
+  border colors of Asciinema and macOS Classic, and the syntax colors of macOS Classic Dark,
+  follow upstream. The Matrix theme, which GPUI Kit no longer has, stays.
 
 ## [0.2.0] - 2026-10-15
 
