@@ -45,7 +45,7 @@ The milestone status, and the known limitations and next steps.
   element, Tab starts from the first element of the order and Shift+Tab
   from the last.
 - **Overlays.** They animate in and out only when they set `Enter` and `Exit`
-  (tooltips and the notes palette do). Escape closes an overlay only when it
+  (tooltips and the command palette do). Escape closes an overlay only when it
   has an `OnClickOutside`; any other overlay handles Escape itself, with
   `OnAction` and a binding or in `OnKeyDown`.
 - **Key bindings.** A handler can't pass the key on to the next binding.
@@ -55,6 +55,11 @@ The milestone status, and the known limitations and next steps.
   partly like GPUI's (its base, default and user keymaps): the file's layer is
   replaced in place, and otherwise the order in which bindings are added
   decides between them.
+- **Toolbars.** A toolbar does not wrap, and does not move controls that do not
+  fit into an overflow menu; keep it short enough for its window.
+- **Inspector.** An element picked in the window inside a collapsed branch of the
+  tree is selected, but its row is not revealed: `ui.Tree` cannot open nodes from
+  outside yet. The breadcrumb of the details and the tree filter reach it.
 - **Platforms.** Only the Windows adapter exists. macOS (Cocoa + Metal) and
   Linux (Wayland/X11 + Vulkan or GL) adapters plug in behind
   `platform.Window` and `render.Renderer`. Since there is no cgo today,

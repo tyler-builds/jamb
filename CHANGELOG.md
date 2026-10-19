@@ -7,6 +7,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+Nineteen widgets, a Markdown view, more of `Tabs` and `TextInput`, a new look for the visual
+inspector, and a fix for fonts kept in memory after their window closed. No API is removed or
+renamed.
+
 ### Added
 
 - A `markdown` package: `markdown.View(src)` shows CommonMark with GitHub's tables, task lists,
@@ -28,25 +32,17 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - `Tabs.Reorderable` lets the user move tabs by dragging them or with Ctrl+Shift+Left and Right,
   with the new position announced, and `OnReorder` reports the new order. The drop line is the
   `DropLine` part of `TabsStyle`.
+- `ui.CommandPalette(open)` is a searchable list of commands, open while its signal is true. It
+  lists the actions available where focus was (or what `Commands` returns), without hidden ones,
+  and keeps those whose names contain every word typed, with the matches highlighted and each
+  command's key binding beside it. Up, Down, PageUp and PageDown move the highlight, Enter or a
+  click runs the command where focus was and gives focus back, and Escape closes it. Assistive
+  technology sees a dialog with a combo box whose highlighted command is the focus. It is styled
+  through `ui.CommandPaletteStyle` and `Theme.CommandPalette`, and its texts are
+  `Strings.CommandPalette`, `CommandPalettePlaceholder` and `NoMatchingCommands`.
 - `ui.Alert` is a message box in the flow of the page, with a title, a description, an icon per
   variant (`Info`, `Success`, `Warning`, `Danger`), an optional action and an optional close button.
   It is a group named by its title; it is not announced, so an app calls `Announce` when it should be.
-- `ui.DescriptionList` shows terms with their values in a grid of `Columns(n)`, with the term beside
-  the value or above it (`Vertical`), optionally `Bordered`. Each item is a group named by its term.
-- `ui.GroupBox` is a titled section for related content, outlined or filled (`Fill`), with an
-  optional description. It is a group named by its title.
-- `ui.Kbd` shows a keyboard shortcut as key caps, from keys written as for `Bind`, with the key
-  names a menu shows. It is one static text for assistive technology, such as "Ctrl+Shift+P".
-- `ui.Toggle(label, on)` is a button that stays pressed while it is on, such as a Bold button in a
-  toolbar, with the sizes and the Ghost or Secondary look of a button, an optional icon and
-  `IconOnly`. Assistive technology reads it as a toggle button.
-- `ui.ToggleGroup(value, options...)` is a row of joined toggles of which one is selected. It takes
-  the options of a radio group, which now have an `Icon`, and behaves as a radio group for the
-  keyboard, for assistive technology and in a `Field`.
-- `ui.Rating(label, value)` is a row of stars for a whole number from 0 to `Max` (5 by default):
-  the pointer previews and a click sets the value, a click on the current star clears it, and
-  the arrows, Home, End and the digit keys set it. `ReadOnly` shows it without input. Assistive
-  technology reads it as a slider with a value such as "3 of 5 stars" (`Strings.RatingValue`).
 - `ui.Calendar(value)` is the month of a date picker's calendar on its own, inline on the page,
   and `ui.CalendarRange(from, to)` the month of a date range picker's, choosing a range in two
   steps. They take the pickers' `Min`, `Max`, `DisableDays` and `FirstDay`, their keys (Enter
@@ -60,71 +56,80 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   with a short motion. The carousel is a group described as a carousel, the slide shown a group named
   "Slide 2 of 5", and a change the user makes is announced. It is styled through
   `ui.CarouselStyle` and `Theme.Carousel`.
-- `ui.LinkSegs` makes one link of several styled segments.
-- `ui.Stepper(current, steps...)` shows the progress through the steps of a process: complete
-  steps show a check mark, the current one is highlighted, and the later ones are muted. It lays
-  out horizontally or with `Vertical()`, and `OnSelect` makes the steps choosable with a click or
-  the keyboard. Each step is named for assistive technology by its position, title and state, such
-  as "Step 2 of 4: Shipping, current". It is styled through `ui.StepperStyle` and `Theme.Stepper`.
-- `ui.OTPInput(label, code, length)` takes a one-time code in a row of single-character boxes, as
-  one control with a caret: typing moves on, Backspace and Delete clear, the arrows move, and a
-  paste fills the boxes with the characters it takes. It has `Masked`, `Alphanumeric`, `Groups`,
-  `OnComplete` and `Validate`, works in a `Field` and a `Form`, and is one text field for assistive
-  technology, reported as a password field when masked. It is styled through `ui.OTPInputStyle`
-  and `Theme.OTPInput`.
-- `ui.CommandPalette(open)` is a searchable list of commands, open while its signal is true. It
-  lists the actions available where focus was (or what `Commands` returns), without hidden ones,
-  and keeps those whose names contain every word typed, with the matches highlighted and each
-  command's key binding beside it. Up, Down, PageUp and PageDown move the highlight, Enter or a
-  click runs the command where focus was and gives focus back, and Escape closes it. Assistive
-  technology sees a dialog with a combo box whose highlighted command is the focus. It is styled
-  through `ui.CommandPaletteStyle` and `Theme.CommandPalette`, and its texts are
-  `Strings.CommandPalette`, `CommandPalettePlaceholder` and `NoMatchingCommands`.
-- `ui.StatusBar()` is the bar along the bottom of a window, with items at its `Start` and its
-  `End`, a top border and small muted text. Assistive technology sees a status bar (the new
-  `access.RoleStatusBar`, UI Automation's StatusBar control type). It is styled through
-  `ui.StatusBarStyle` and `Theme.StatusBar`. The demo's main window has one.
-- `ui.Toolbar(label)` is a row of controls that is one Tab stop: Left and Right move focus
-  between its controls, Home and End go to the first and the last, and Tab comes back to the
-  control that had focus last. Controls that use those keys, such as a text field, keep them.
-  `ui.ToolbarSeparator()` divides groups of controls. Assistive technology sees a tool bar
-  named by its label (the new `access.RoleToolBar`, UI Automation's ToolBar control type). It
-  is styled through `ui.ToolbarStyle` and `Theme.Toolbar`.
+- `ui.DescriptionList` shows terms with their values in a grid of `Columns(n)`, with the term beside
+  the value or above it (`Vertical`), optionally `Bordered`. Each item is a group named by its term.
 - `ui.Empty(title)` is an empty state: an icon (an inbox by default), a title, an optional
   `Description` and an optional `Action`, centered and muted, for `DataGrid.Empty` and lists
   with no items. It is a group named by its title. It is styled through `ui.EmptyStyle` and
   `Theme.Empty`. The demo's Projects page uses it for its cards and its table.
+- `ui.GroupBox` is a titled section for related content, outlined or filled (`Fill`), with an
+  optional description. It is a group named by its title.
 - `ui.HoverCard(trigger, content)` shows a floating card of rich content once the pointer
   rests on the trigger or keyboard focus reaches it (`OpenDelay`, 500 ms by default). It stays
   open while the pointer is over the trigger or the card, closes `CloseDelay` (300 ms) after it
   leaves, and closes at once on Escape, a click outside or focus leaving. It never takes focus;
   assistive technology reads it as the trigger's description, as a tooltip. It has the look of
   a popover's panel, through `ui.HoverCardStyle` and `Theme.HoverCard`, and `Placement`.
-- `Context.After` runs a function on the UI thread after a delay on the window's clock, which
-  `ui/uitest` can advance.
-- The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a
-  Markdown page.
-- `TextInput.Masked()` draws a bullet for each character, as a Windows password box does: copy and
-  cut do nothing, a word is the whole text, and assistive technology reads a password field whose
-  value is the bullets. `Revealable()` adds an eye button that shows and hides the text (Alt+F8 from
-  the keyboard), a toggle button named by `Strings.ShowPassword` and `HidePassword` that leaves the
-  focus in the field. Its look is the new `Button` and `ButtonHover` parts of `ui.FieldStyle`, and
-  `icons.EyeOff` is new.
-- `TextInput.Clearable()` shows an X button while the field has text: a click clears the text,
-  runs `OnChange` and leaves the focus in the field, and Escape clears a field that has text
-  before it does anything else. The button is named by `Strings.Clear`, and the demo's
-  Components filter uses it in place of its own button.
+- `ui.Kbd` shows a keyboard shortcut as key caps, from keys written as for `Bind`, with the key
+  names a menu shows. It is one static text for assistive technology, such as "Ctrl+Shift+P".
+- `ui.OTPInput(label, code, length)` takes a one-time code in a row of single-character boxes, as
+  one control with a caret: typing moves on, Backspace and Delete clear, the arrows move, and a
+  paste fills the boxes with the characters it takes. It has `Masked`, `Alphanumeric`, `Groups`,
+  `OnComplete` and `Validate`, works in a `Field` and a `Form`, and is one text field for assistive
+  technology, reported as a password field when masked. It is styled through `ui.OTPInputStyle`
+  and `Theme.OTPInput`.
 - `ui.RangeSlider(low, high, min, max, step)` sets a range with two thumbs on one track, with the
   track between them filled. The thumbs cannot cross (`MinGap` keeps them apart), a press on the
   track moves the nearer thumb, and each thumb is a Tab stop with a slider's keys. Assistive
   technology sees a group named by the label with two sliders, named by `Strings.Minimum` and
   `Maximum`. It is styled through `ui.RangeSliderStyle` and `Theme.RangeSlider`.
+- `ui.Rating(label, value)` is a row of stars for a whole number from 0 to `Max` (5 by default):
+  the pointer previews and a click sets the value, a click on the current star clears it, and
+  the arrows, Home, End and the digit keys set it. `ReadOnly` shows it without input. Assistive
+  technology reads it as a slider with a value such as "3 of 5 stars" (`Strings.RatingValue`).
 - `ui.SplitButton(label, onClick, menu)` is a button with an action and an arrow that opens a menu,
   as two joined segments with a button's variants and sizes and an optional `Icon`. The arrow opens
   the menu on a click, Enter, Space or Down, and Alt+Down opens it from either segment. Assistive
   technology sees a group with two buttons: the action and the arrow, named by
   `Strings.MoreOptions`, with its expanded state. It is styled through `ui.SplitButtonStyle` and
   `Theme.SplitButton`.
+- `ui.StatusBar()` is the bar along the bottom of a window, with items at its `Start` and its
+  `End`, a top border and small muted text. Assistive technology sees a status bar (the new
+  `access.RoleStatusBar`, UI Automation's StatusBar control type). It is styled through
+  `ui.StatusBarStyle` and `Theme.StatusBar`. The demo's main window has one.
+- `ui.Stepper(current, steps...)` shows the progress through the steps of a process: complete
+  steps show a check mark, the current one is highlighted, and the later ones are muted. It lays
+  out horizontally or with `Vertical()`, and `OnSelect` makes the steps choosable with a click or
+  the keyboard. Each step is named for assistive technology by its position, title and state, such
+  as "Step 2 of 4: Shipping, current". It is styled through `ui.StepperStyle` and `Theme.Stepper`.
+- `ui.Toggle(label, on)` is a button that stays pressed while it is on, such as a Bold button in a
+  toolbar, with the sizes and the Ghost or Secondary look of a button, an optional icon and
+  `IconOnly`. Assistive technology reads it as a toggle button.
+- `ui.ToggleGroup(value, options...)` is a row of joined toggles of which one is selected. It takes
+  the options of a radio group, which now have an `Icon`, and behaves as a radio group for the
+  keyboard, for assistive technology and in a `Field`.
+- `ui.Toolbar(label)` is a row of controls that is one Tab stop: Left and Right move focus
+  between its controls, Home and End go to the first and the last, and Tab comes back to the
+  control that had focus last. Controls that use those keys, such as a text field, keep them.
+  `ui.ToolbarSeparator()` divides groups of controls. Assistive technology sees a tool bar
+  named by its label (the new `access.RoleToolBar`, UI Automation's ToolBar control type). It
+  is styled through `ui.ToolbarStyle` and `Theme.Toolbar`.
+- `TextInput.Masked()` draws a bullet for each character, as a Windows password box does: copy and
+  cut do nothing, a word is the whole text, and assistive technology reads a password field whose
+  value is the bullets. `Revealable()` adds an eye button that shows and hides the text (Alt+F8 from
+  the keyboard), named by `Strings.ShowPassword` or `HidePassword` for what a press does, that
+  leaves the focus in the field. Its look is the new `Button` and `ButtonHover` parts of `ui.FieldStyle`.
+- `TextInput.Clearable()` shows an X button while the field has text: a click clears the text,
+  runs `OnChange` and leaves the focus in the field, and Escape clears a field that has text
+  before it does anything else. The button is named by `Strings.Clear`, and the demo's
+  Components filter uses it in place of its own button.
+- `icons.Pause` and `icons.Play` are new, for the carousel's play button, and `icons.EyeOff` for
+  the reveal button of a masked text input.
+- `ui.LinkSegs` makes one link of several styled segments.
+- `Context.After` runs a function on the UI thread after a delay on the window's clock, which
+  `ui/uitest` can advance.
+- The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a
+  Markdown page.
 
 ### Changed
 
