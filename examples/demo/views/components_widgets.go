@@ -10,8 +10,8 @@ import (
 )
 
 // widgetsSection shows the smaller widgets: a sidebar, breadcrumbs,
-// pagination, avatars, tags, skeletons, a color picker, a date range picker and
-// group boxes.
+// pagination, avatars, tags, skeletons, a color picker, a date range picker,
+// group boxes and description lists.
 func widgetsSection(t *ui.Theme) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		nav := ui.Local(ctx, "w.nav", "inbox")
@@ -96,7 +96,17 @@ func widgetsSection(t *ui.Theme) ui.Element {
 					Child(ui.Checkbox("Desktop", desktop))).
 				Child(ui.GroupBox("Storage").Fill().Width(ui.Px(240)).
 					Child(ui.ProgressBar(0.7).Label("Storage used")).
-					Child(ui.Text("7 of 10 GB used").FontSize(12).TextColor(t.TextMuted)))))
+					Child(ui.Text("7 of 10 GB used").FontSize(12).TextColor(t.TextMuted)))),
+			sample(t, "DescriptionList, and Columns(2).Vertical().Bordered()", ui.Div().Gap(12).Width(ui.Px(420)).
+				Child(ui.DescriptionList().
+					ItemText("Owner", "Dana Lee").
+					ItemText("Region", "West").
+					Item("Status", ui.BadgeText("Active").Variant(ui.BadgeSuccess))).
+				Child(ui.DescriptionList().Columns(2).Vertical().Bordered().
+					ItemText("Created", "May 4").
+					ItemText("Updated", "June 12").
+					ItemText("Members", "8").
+					ItemText("Visibility", "Team"))))
 	})
 }
 
