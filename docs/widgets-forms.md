@@ -30,6 +30,7 @@ ui.RadioGroup(freq,                               // *ui.Signal[T], for any comp
 ui.Select(channel, ui.Option[string]{Value: "email", Label: "Email"}).Label("Channel").Placeholder("Choose").Width(ui.Px(240)).OnChange(func(v string) { ... })
 ui.Rating("Rating", stars).Max(5).OnChange(func(n int) { ... }) // *ui.Signal[int], 0 to Max; ReadOnly() to show it
 ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percent).OnChange(fn).Width(ui.Full)
+ui.RangeSlider(from, to, 0, 500, 10).Label("Price").MinGap(20).OnChange(func(low, high float64) { ... })
 ui.NumberInput(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStacked).Precision(2) // int or float64
 // every control also takes .Key("id") and .Disabled(true), and every control with a value takes
 // .OnChange(fn), which runs after the user changes it (the signal is already set);
@@ -90,6 +91,16 @@ ui.NumberInput(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStac
 - A slider moves by one `step` with the arrows, by a tenth of the range with Page
   Up and Page Down, and to the ends with Home and End. A click or drag sets the
   value to the nearest step. `OnChange` runs when the value changes.
+- A range slider, `ui.RangeSlider(low, high, min, max, step)`, sets a range with two
+  thumbs on one track, and fills the track between them. The thumbs cannot cross: a
+  thumb moved into the other stops there, or `MinGap(v)` before it. A press on the
+  track moves the nearer thumb there and focuses it, and a drag moves it on. Each
+  thumb is a Tab stop with the keys of a slider: the arrows, Page Up and Page Down,
+  and Home and End, which go as far as the thumb can go. `Format` sets how the values
+  are shown in the readout beside the track, such as "20 – 80". `OnChange(func(low,
+  high float64))` runs when either value changes. Its look is `ui.RangeSliderStyle`,
+  set with `Theme.RangeSlider` or `.Styles(...)`; it has a slider's parts, with the
+  focus ring on the focused thumb (`ThumbFocusVisible`).
 - A number input takes typed text, or steps with Up and Down (and its spin buttons,
   added with `SpinButtons(ui.SpinInline)`, a - button at its left edge and a + button at
   its right, inside the frame, or `SpinButtons(ui.SpinStacked)`, an up arrow above a down
@@ -170,7 +181,10 @@ Assistive technology reads a check box with a mixed state as mixed, a switch as 
 check box with the Toggle pattern (as Phase B chose), a toggle as a button with
 the Toggle pattern (as a `Button` with `AccessChecked` is), a radio group and a
 toggle group as a selection container of radio buttons named by its label, and a select as a combo box whose Value is the
-chosen label. A slider and a number input report their range (RangeValue). A
+chosen label. A slider and a number input report their range (RangeValue). A range slider is a
+group named by its label that holds two sliders, "Minimum" and "Maximum"
+(`Strings.Minimum` and `Strings.Maximum`), each with its own range and a value text
+from `Format`. A
 rating is a slider from 0 to its maximum, whose Value is a text such as "3 of 5
 stars" (`Strings.RatingValue`), as the WinUI rating control reports it; a
 read-only rating is a read-only slider. A

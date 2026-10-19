@@ -100,6 +100,11 @@ func sizeCases() []sizeCase {
 			set: func(w, minW, maxW Length, g float32) Element {
 				return Slider(NewSignal(50.0), 0, 100, 5).Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
 			}},
+		{name: "RangeSlider", box: 400, auto: autoFill,
+			def: func() Element { return RangeSlider(NewSignal(20.0), NewSignal(80.0), 0, 100, 5) },
+			set: func(w, minW, maxW Length, g float32) Element {
+				return RangeSlider(NewSignal(20.0), NewSignal(80.0), 0, 100, 5).Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
+			}},
 		{name: "ProgressBar", box: 400, auto: autoFill,
 			def: func() Element { return ProgressBar(0.5) },
 			set: func(w, minW, maxW Length, g float32) Element {
@@ -272,6 +277,7 @@ func TestSizingDefaults(t *testing.T) {
 		"NumberInput":              numberInputWidth,
 		"Select":                   selectWidth,
 		"Slider":                   400,
+		"RangeSlider":              400,
 		"ProgressBar":              400,
 		"IndeterminateProgressBar": 400,
 		"Switch":                   38,
@@ -493,6 +499,7 @@ func TestBarsKeepAMinimumWhereTheirContainerHasNoWidth(t *testing.T) {
 	}{
 		{"ProgressBar", func() Element { return ProgressBar(0.5) }, progressBarMinWidth},
 		{"Slider", func() Element { return Slider(NewSignal(50.0), 0, 100, 5) }, sliderMinWidth},
+		{"RangeSlider", func() Element { return RangeSlider(NewSignal(20.0), NewSignal(80.0), 0, 100, 5) }, sliderMinWidth},
 	} {
 		if got := outerOf(t, rowFrame(c.def()), sizeCase{name: c.name}).lay.W; got != c.min {
 			t.Errorf("%s in an auto-width row is %v wide, want its default minimum %v", c.name, got, c.min)

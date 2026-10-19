@@ -132,6 +132,8 @@ var layerBuilders = []layerBuilder{
 		func(st any) Element { return partSelect(NewSignal("a"), st.(SelectStyle), true) }},
 	{"Slider", func(th *Theme) any { return &th.Slider },
 		func(st any) Element { return partSlider(NewSignal(0.5), st.(SliderStyle)) }},
+	{"RangeSlider", func(th *Theme) any { return &th.RangeSlider },
+		func(st any) Element { return partRangeSlider(st.(RangeSliderStyle)) }},
 	{"Split", func(th *Theme) any { return &th.Split },
 		func(st any) Element { return partSplit(st.(SplitStyle)) }},
 	{"Dock", func(th *Theme) any { return &th.Dock },

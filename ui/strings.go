@@ -133,6 +133,10 @@ type Strings struct {
 	HidePassword string
 	// Clear is the name of the button that clears the text of a field.
 	Clear string
+	// Minimum is the name of the low thumb of a range slider.
+	Minimum string
+	// Maximum is the name of the high thumb of a range slider.
+	Maximum string
 
 	// The names of a dock's tab strip and of the commands of its tabs' menus.
 	PanelGroup string
@@ -471,6 +475,8 @@ func englishStrings() *Strings {
 		ShowPassword:        "Show password",
 		HidePassword:        "Hide password",
 		Clear:               "Clear",
+		Minimum:             "Minimum",
+		Maximum:             "Maximum",
 
 		PanelGroup:      "Panels",
 		MovePanelLeft:   "Move left",

@@ -27,6 +27,8 @@ func formControlsSection() ui.Element {
 		channel := ui.Local(ctx, "form.channel", "email")
 		picked := ui.Local(ctx, "form.picked", "red")
 		volume := ui.Local(ctx, "form.volume", 40.0)
+		priceFrom := ui.Local(ctx, "form.priceFrom", 20.0)
+		priceTo := ui.Local(ctx, "form.priceTo", 80.0)
 		quiet := ui.Local(ctx, "form.quiet", 22)
 		otp := ui.Local(ctx, "form.otp", "")
 		pin := ui.Local(ctx, "form.pin", "")
@@ -85,6 +87,8 @@ func formControlsSection() ui.Element {
 			formSample(t, "Select", selectSample(channel, false), channelName(channel.Get())),
 			formSample(t, "Select, disabled", selectSample(picked, true), channelName(picked.Get())),
 			formSample(t, "Slider", ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percentOf).Width(ui.Px(200)), percentOf(volume.Get())),
+			formSample(t, "Range slider", ui.RangeSlider(priceFrom, priceTo, 0, 100, 5).Label("Price range").MinGap(10).Format(dollars).Width(ui.Px(240)),
+				dollars(priceFrom.Get())+" to "+dollars(priceTo.Get())),
 			formSample(t, "Slider, disabled", ui.Slider(volume, 0, 100, 5).Label("Volume, disabled").Format(percentOf).Width(ui.Px(200)).Disabled(true), percentOf(volume.Get())),
 			formSample(t, "Number input", ui.NumberInput(quiet, 0, 23, 1).Label("Sample quiet hours").SpinButtons(ui.SpinInline), fmt.Sprintf("%02d:00", quiet.Get())),
 			formSample(t, "One-time code, in groups", ui.OTPInput("Sample verification code", otp, 6).Groups(3, 3).
@@ -265,6 +269,9 @@ func onOff(on bool) string {
 
 // percentOf is a value from 0 to 100 shown as a percent.
 func percentOf(v float64) string { return fmt.Sprintf("%d%%", int(math.Round(v))) }
+
+// dollars is a price in whole dollars, such as "$40".
+func dollars(v float64) string { return fmt.Sprintf("$%d", int(math.Round(v))) }
 
 // channelsOf lists the alerts that are on, such as "email and push".
 func channelsOf(email, text, push bool) string {

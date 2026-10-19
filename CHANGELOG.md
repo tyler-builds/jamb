@@ -114,6 +114,11 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   runs `OnChange` and leaves the focus in the field, and Escape clears a field that has text
   before it does anything else. The button is named by `Strings.Clear`, and the demo's
   Components filter uses it in place of its own button.
+- `ui.RangeSlider(low, high, min, max, step)` sets a range with two thumbs on one track, with the
+  track between them filled. The thumbs cannot cross (`MinGap` keeps them apart), a press on the
+  track moves the nearer thumb, and each thumb is a Tab stop with a slider's keys. Assistive
+  technology sees a group named by the label with two sliders, named by `Strings.Minimum` and
+  `Maximum`. It is styled through `ui.RangeSliderStyle` and `Theme.RangeSlider`.
 
 ### Changed
 

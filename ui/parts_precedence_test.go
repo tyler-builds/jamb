@@ -77,6 +77,14 @@ func TestWidgetPartPrecedence(t *testing.T) {
 					return Div().Column().Child(Switch("Sync", NewSignal(false)).Styles(SwitchStyle{Track: bgStyle(inst)}))
 				})
 			}},
+		{name: "RangeSlider", part: "RangeSlider.Fill",
+			theme: func(th *Theme, c Color) { th.RangeSlider.Fill.Background = c },
+			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
+				return newThemedRig(th, func(ctx *Context) Element {
+					return Div().Column().Child(RangeSlider(NewSignal(2.0), NewSignal(8.0), 0, 10, 1).Label("Levels").
+						Styles(RangeSliderStyle{Fill: bgStyle(inst)}))
+				})
+			}},
 		{name: "Toggle", part: "Toggle.Root",
 			theme: func(th *Theme, c Color) { th.Toggle.Root.Background = c },
 			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
