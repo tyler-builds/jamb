@@ -89,6 +89,8 @@ type Theme struct {
 	TimePicker TimePickerStyle
 	// Slider is the look of every slider.
 	Slider SliderStyle
+	// RangeSlider is the look of every range slider.
+	RangeSlider RangeSliderStyle
 	// Split is the look of every split, including its dividers and grips.
 	Split SplitStyle
 	// Dock is the look of every dock: its tab groups, tabs, panels and drop preview.

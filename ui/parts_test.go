@@ -187,6 +187,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Tabs segmented", func(t *testing.T) { testTabsParts(t, TabsSegmented, applied) })
 	t.Run("Select", func(t *testing.T) { testSelectParts(t, applied) })
 	t.Run("Slider", func(t *testing.T) { testSliderParts(t, applied) })
+	t.Run("RangeSlider", func(t *testing.T) { testRangeSliderParts(t, applied) })
 	t.Run("Split", func(t *testing.T) { testSplitParts(t, applied) })
 	t.Run("Dock", func(t *testing.T) { testDockParts(t, applied) })
 	t.Run("TextInput", func(t *testing.T) { testFieldParts(t, "TextInput", applied) })

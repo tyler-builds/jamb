@@ -126,7 +126,7 @@ var componentSections = []componentSection{
 	{"Docking", "Dock DockLayout DockPanel OpenDockWindow panels tabs float drag layout window",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return dockSection() }},
 	{"Form controls", "Checkbox CheckboxTri Switch Toggle ToggleGroup segmented Rating stars RadioGroup radio Select " +
-		"Slider NumberInput spin OTPInput one-time code PIN TextInput Masked Revealable password Clearable clear ReadOnly read-only Disabled Form Field " +
+		"Slider RangeSlider range price thumbs NumberInput spin OTPInput one-time code PIN TextInput Masked Revealable password Clearable clear ReadOnly read-only Disabled Form Field " +
 		"Notification preferences validation",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return formControlsSection() }},
 	{"Forms", "Form Field TextInput Validate Required MaxLength Pattern email error summary submit async ProgressRing validation",

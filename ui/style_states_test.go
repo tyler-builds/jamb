@@ -63,6 +63,7 @@ var layerStateNotDrawn = map[string]string{
 	"Form.SummaryItemHover":           "the form summary lists the errors of a form that has failed validation",
 	"Form.SummaryItemFocusVisible":    "the form summary lists the errors of a form that has failed validation",
 	"Slider.ThumbPressed":             "a press on the thumb starts a drag, which the table does not start",
+	"RangeSlider.ThumbPressed":        "a press on a thumb starts a drag, which the table does not start",
 	"ColorPicker.AreaFocusVisible":    "the area is drawn while the color picker's popup is open",
 	"ColorPicker.PresetFocusVisible":  "the presets are drawn while the color picker's popup is open",
 	"Split.DividerHover":              "the hover of the divider is on its handle (Split.Handle), not on the bar that the docs name Split.Divider",

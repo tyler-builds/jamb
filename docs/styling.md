@@ -329,7 +329,7 @@ the Text size of 100 percent:
 | `DateRangePicker` | 280 px at the Text size of 100 percent, room for two dates; `Full` stretches it, and the calendar is its own size |
 | `TimePicker` | 140 px at the Text size of 100 percent; `Full` stretches it, and the list is at least as wide as the field |
 | `Calendar`, `CalendarRange` | as wide and as high as its month: seven days of 32 px at the Text size of 100 percent, and six weeks |
-| `Slider`, `ProgressBar` (also when indeterminate) | fills the container, and at least 160 px, so it is visible where its container has no width |
+| `Slider`, `RangeSlider`, `ProgressBar` (also when indeterminate) | fills the container, and at least 160 px, so it is visible where its container has no width |
 | `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |
 | `Breadcrumbs`, `Pagination` | as wide as their locations or pages; `Width`, `MinWidth` and `MaxWidth` set it |
 | `Stepper` | fills the container when horizontal, with the lines sharing the room between the steps; as wide as its steps when `Vertical` |
@@ -542,6 +542,7 @@ parts that the code applies.
 | `DateRangePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `CalendarButton`, `Message`, `Popup`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayInRange`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
 | `Calendar` | `Root`, `RootDisabled`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayInRange`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
+| `RangeSlider` | `Track`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ThumbFocusVisible`, `ValueText` | none | none | done |
 | `ColorPicker` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `TriggerDisabled`, `Swatch`, `Popup`, `Area`, `AreaFocusVisible`, `Thumb`, `Slider`, `Preset`, `PresetFocusVisible` | none | none | done |
 | `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
 | `Dock` | `Group`, `Strip`, `Tab`, `TabHover`, `TabSelected`, `TabFocusVisible`, `Indicator`, `Panel`, `Preview` | none | none | done |

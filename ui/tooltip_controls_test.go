@@ -36,6 +36,7 @@ func TestControlsTakeATooltip(t *testing.T) {
 		{"ToggleGroup", access.RoleGroup, ToggleGroup(NewSignal("a"), opts...).Label("C").Tooltip("Help")},
 		{"Rating", access.RoleSlider, Rating("C", NewSignal(2)).Tooltip("Help")},
 		{"Slider", access.RoleSlider, Slider(NewSignal(1.0), 0, 9, 1).Label("C").Tooltip("Help")},
+		{"RangeSlider", access.RoleGroup, RangeSlider(NewSignal(1.0), NewSignal(5.0), 0, 9, 1).Label("C").Tooltip("Help")},
 		{"RadioGroup", access.RoleGroup, RadioGroup(NewSignal("a"), opts...).Label("C").Tooltip("Help")},
 	}
 	for _, c := range cases {
