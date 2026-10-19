@@ -103,39 +103,47 @@ func (s DatePickerStyle) plain() DatePickerStyle {
 	}
 }
 
+// calendar returns the parts of the calendar of a date picker as a CalendarStyle, with its
+// Popup as the Root and inRange as the look of the days between the ends of a range.
+func (s DatePickerStyle) calendar(inRange Style) CalendarStyle {
+	return CalendarStyle{
+		Root:            s.Popup,
+		Header:          s.Header,
+		NavButton:       s.NavButton,
+		WeekdayLabel:    s.WeekdayLabel,
+		Day:             s.Day,
+		DayHover:        s.DayHover,
+		DaySelected:     s.DaySelected,
+		DayInRange:      inRange,
+		DayToday:        s.DayToday,
+		DayDisabled:     s.DayDisabled,
+		DayOutsideMonth: s.DayOutsideMonth,
+		DayFocusVisible: s.DayFocusVisible,
+	}
+}
+
 // datePickerDefaults returns the built-in look of a date picker at the Text size scale,
-// from the colors of t. The text frame's defaults come from resolveField.
+// from the colors of t. The calendar's days and header are those of a Calendar (see
+// calendarDefaults), in a popup panel with a shadow. The text frame's defaults come from
+// resolveField.
 func datePickerDefaults(t *Theme, scale float32, disabled bool) DatePickerStyle {
-	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	cell := dayCellSize * scale
+	c := calendarDefaults(t, scale)
 	d := DatePickerStyle{
 		CalendarButton: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(24 * scale),
 			Height: Px(24 * scale), NoShrink: true, Radius: 4, TextColor: t.TextMuted, Transition: 110 * time.Millisecond},
 		Message: messageStyle(t),
 		Popup: Style{Direction: Column, Gap: 4 * scale, Padding: All(8 * scale), Background: t.Surface,
 			BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius, Shadows: []Shadow{ShadowMd}},
-		Header: Style{Direction: Row, Align: Center, Justify: Center, Grow: 1, Height: Px(28 * scale),
-			FontSize: 14, FontWeight: FontSemibold, TextColor: t.Text},
-		NavButton: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(28 * scale),
-			Height: Px(28 * scale), NoShrink: true, Radius: 4, TextColor: t.TextMuted},
-		WeekdayLabel: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(cell), Height: Px(24 * scale),
-			NoShrink: true, FontSize: 12, TextColor: t.TextMuted},
-		Day: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(cell), Height: Px(cell),
-			NoShrink: true, Radius: 4, FontSize: 13, TextColor: t.Text, Transition: 110 * time.Millisecond},
-		DayHover:        Style{Background: t.SurfaceHover},
-		DaySelected:     Style{Background: t.Accent, TextColor: t.AccentText},
-		DayFocusVisible: Style{Shadows: []Shadow{ring}},
-	}
-	if t.HighContrast {
-		d.DaySelected = Style{Background: t.Accent, TextColor: t.AccentText}
-		d.DayToday = Style{BorderWidth: 1, BorderColor: t.Text}
-		d.DayDisabled = Style{TextColor: t.Disabled}
-		// The focus is an inner outline, as the focus of a number input's buttons is.
-		d.DayFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
-	} else {
-		d.DayToday = Style{BorderWidth: 1, BorderColor: t.Accent}
-		d.DayDisabled = Style{Opacity: 0.45}
-		d.DayOutsideMonth = Style{TextColor: t.TextSubtle}
+		Header:          c.Header,
+		NavButton:       c.NavButton,
+		WeekdayLabel:    c.WeekdayLabel,
+		Day:             c.Day,
+		DayHover:        c.DayHover,
+		DaySelected:     c.DaySelected,
+		DayToday:        c.DayToday,
+		DayDisabled:     c.DayDisabled,
+		DayOutsideMonth: c.DayOutsideMonth,
+		DayFocusVisible: c.DayFocusVisible,
 	}
 	if disabled {
 		d.CalendarButton.TextColor = t.Disabled
@@ -582,8 +590,8 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 
 		if open.Get() {
 			enabled := func(day time.Time) bool { return d.enabled(day, s) }
-			root.Child(calendarPanel(calendarView{st: st, widget: "DatePicker", loc: loc, scale: scale, value: v,
-				focus: focus.Get(), today: dayOf(rt.now()), name: name, fallback: s.DateField, move: moveTo, pick: pick,
+			root.Child(calendarPanel(calendarView{st: st.calendar(Style{}), widget: "DatePicker", loc: loc, scale: scale,
+				value: v, focus: focus.Get(), ring: true, today: dayOf(rt.now()), name: name, fallback: s.DateField, move: moveTo, pick: pick,
 				keys: keys, shut: shut, enabled: enabled, firstSet: d.firstSet, firstDay: d.firstDay}, s))
 		}
 		return d.size.apply(root)

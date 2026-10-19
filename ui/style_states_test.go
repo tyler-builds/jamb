@@ -85,6 +85,7 @@ var layerStateNotDrawn = map[string]string{
 	"Combobox.OptionDisabled":         "a disabled option is drawn in an open list",
 	"TimePicker.OptionHighlighted":    "the highlighted option is drawn in an open list",
 	"TimePicker.OptionSelected":       "the selected option is drawn in an open list",
+	"Calendar.DayFocusVisible":        "the keys' day is outlined while the calendar has keyboard focus, a re-render the table does not wait for",
 	"DatePicker.DaySelected":          "the days are drawn in an open calendar",
 	"DatePicker.DayToday":             "the days are drawn in an open calendar",
 	"DatePicker.DayDisabled":          "the days are drawn in an open calendar",

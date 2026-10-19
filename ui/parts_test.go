@@ -230,6 +230,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Stepper", func(t *testing.T) { testStepperParts(t, applied) })
 	t.Run("OTPInput", func(t *testing.T) { testOTPInputParts(t, applied) })
 	t.Run("DateRangePicker", func(t *testing.T) { testDateRangePickerParts(t, applied) })
+	t.Run("Calendar", func(t *testing.T) { testCalendarParts(t, applied) })
 	t.Run("ColorPicker", func(t *testing.T) { testColorPickerParts(t, applied) })
 	t.Run("StatusBar", func(t *testing.T) { testStatusBarParts(t, applied) })
 	t.Run("Toolbar", func(t *testing.T) { testToolbarParts(t, applied) })

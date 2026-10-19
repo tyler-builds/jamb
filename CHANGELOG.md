@@ -47,6 +47,11 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   the pointer previews and a click sets the value, a click on the current star clears it, and
   the arrows, Home, End and the digit keys set it. `ReadOnly` shows it without input. Assistive
   technology reads it as a slider with a value such as "3 of 5 stars" (`Strings.RatingValue`).
+- `ui.Calendar(value)` is the month of a date picker's calendar on its own, inline on the page,
+  and `ui.CalendarRange(from, to)` the month of a date range picker's, choosing a range in two
+  steps. They take the pickers' `Min`, `Max`, `DisableDays` and `FirstDay`, their keys (Enter
+  chooses, and Escape and Tab are left to the page) and their accessible grid, and are styled
+  through `ui.CalendarStyle` and `Theme.Calendar`, with the part names of the pickers' calendars.
 - `ui.LinkSegs` makes one link of several styled segments.
 - `ui.Stepper(current, steps...)` shows the progress through the steps of a process: complete
   steps show a check mark, the current one is highlighted, and the later ones are muted. It lays
