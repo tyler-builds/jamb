@@ -149,6 +149,20 @@ func TestWidgetPartPrecedence(t *testing.T) {
 						Child(CommandPalette(NewSignal(true)).Styles(CommandPaletteStyle{Panel: bgStyle(inst)}))
 				})
 			}},
+		{name: "HoverCard", part: "HoverCard.Panel",
+			theme: func(th *Theme, c Color) { th.HoverCard.Panel.Background = c },
+			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
+				r := newThemedRig(th, func(ctx *Context) Element {
+					return Div().Column().Child(HoverCard(Button("Dana Lee").Key("t"), func() Element { return Text("Designer") }).
+						Styles(HoverCardStyle{Panel: bgStyle(inst)}))
+				})
+				rc := r.rt.nodeRect(keyNode(t, r.rt, "t"))
+				r.rt.PointerMove(rc.X+rc.W/2, rc.Y+rc.H/2, 0)
+				r.now = r.now.Add(600 * time.Millisecond)
+				r.frame()
+				r.frame()
+				return r
+			}},
 		{name: "ProgressBar", part: "ProgressBar.Track",
 			theme: func(th *Theme, c Color) { th.ProgressBar.Track.Background = c },
 			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {

@@ -302,6 +302,7 @@ var layerNotDrawn = map[string]string{
 	"Menu":            "the menu's parts are drawn while it is open",
 	"MenuBar":         "the menu bar's parts are drawn with an open menu",
 	"Popover":         "the popover is drawn while it is open",
+	"HoverCard":       "the card is drawn while the pointer rests on its trigger",
 	"CommandPalette":  "the match is a highlight of a command's name, not an element; the keys need a binding",
 	"Toast":           "the toasts are drawn once notified",
 	"Tooltip":         "the tooltip is drawn while the pointer rests on its element",

@@ -1,6 +1,6 @@
 # Overlays and menus
 
-Menus, dropdowns, popovers, drawers, modal dialogs and the command palette.
+Menus, dropdowns, popovers, drawers, hover cards, modal dialogs and the command palette.
 
 ## Menus
 
@@ -134,6 +134,42 @@ ui.If(open.Get(), ui.Drawer("Filters", filters).
 
 Their looks are `ui.PopoverStyle` (`Panel`) and `ui.DrawerStyle` (the modal's parts),
 set in `Theme.Popover` and `Theme.Drawer` or with `.Styles(...)`.
+
+## Hover cards
+
+`ui.HoverCard(trigger, content)` shows a floating card of rich content, such as the
+profile behind a name or the preview behind a link, while the pointer rests on its
+trigger. Where a tooltip shows a line of text, a hover card shows any content, in the
+look of a popover's panel. Its look is `ui.HoverCardStyle` (`Panel`, which defaults to
+the popover's): per app in `Theme.HoverCard`, or per instance with `Styles`.
+
+```go
+ui.HoverCard(ui.Button("Dana Lee").Ghost().Small(), func() ui.Element {
+	return profileCard("Dana Lee")          // runs while the card is open
+}).Placement(ui.BelowStart).            // default; any Placement, flipped when it does not fit
+	OpenDelay(500 * time.Millisecond).  // the default
+	CloseDelay(300 * time.Millisecond)  // the default
+```
+
+- **Opening.** The card opens once the pointer has rested on the trigger for the open
+  delay, or once keyboard focus has been on the trigger for that delay. A pointer that
+  passes over the trigger opens nothing.
+- **Closing.** The card stays open while the pointer is over the trigger or the card, and
+  closes the close delay after the pointer leaves both, so the pointer can cross the gap
+  between them. Escape and a click outside close it at once, and so does focus leaving
+  the trigger and the card while the pointer is elsewhere. It does not open again until
+  the pointer or the focus comes back.
+- **Focus.** The card never takes focus. Tab from the trigger reaches the card's links
+  and buttons while it is open, and the card stays open while focus is inside it.
+- **Time.** The delays run on the window's clock, as a tooltip's do, so a test moves them
+  with `ui/uitest`'s `Advance`.
+- **Accessibility.** While it is open, the card is a tooltip whose name is its text, and
+  it describes the trigger: the trigger's description is the card's text, unless the
+  trigger has one of its own, and the trigger is described by the card. A screen reader
+  reads it after the trigger's name, as it reads a tooltip. Put what a user needs in the
+  page too: a user who neither points nor focuses the trigger does not see the card.
+- **Reduced motion.** The card fades in and out, and appears at once when the system asks
+  for reduced motion.
 
 ## Modal dialogs
 

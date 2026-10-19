@@ -29,7 +29,7 @@ jamb to an app; the other pages cover one topic each.
 - [Navigation widgets](widgets-navigation.md): tabs, collapsible sections, trees, the sidebar, group boxes, description lists, status bars, and toolbars.
 - [Feedback widgets](widgets-feedback.md): feedback and status indicators, alerts, empty states, avatars, tags, skeleton placeholders, and keyboard shortcuts.
 - [Data widgets](widgets-data.md): variable-height lists, uniform lists, and data grids.
-- [Overlays and menus](widgets-overlays.md): menus, dropdowns, popovers, drawers, modal dialogs, and the command palette.
+- [Overlays and menus](widgets-overlays.md): menus, dropdowns, popovers, drawers, hover cards, modal dialogs, and the command palette.
 - [Charts](charts.md): building charts, data and axes, interaction, and accessibility.
 - [Code editor](codeedit.md): the `codeedit` package, with its keys, highlighting, and limits.
 - [Markdown](markdown.md): the `markdown` package, a read-only view of Markdown, with its links, images, code highlighting, parts, and limits.
