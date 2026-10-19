@@ -36,16 +36,25 @@ func (ins *inspector) treeColumn() ui.Element {
 			nodes = append(nodes, ins.treeNode(c, names))
 		}
 	}
+	// The row under the pointer is outlined in the window, until the pointer
+	// leaves the tree.
+	tree := ui.Tree(nodes, ins.sel).Key("inspector.tree").Grow(1).
+		Styles(ui.TreeStyle{Label: ui.Style{Grow: 1, MinWidth: ui.Px(0)}}).
+		RenderLabel(func(n ui.TreeNode, _ ui.PartState) ui.Element {
+			id := idOf(n.Key)
+			return ui.Div().OnMouseEnter(func() { tg.Hover(id) }).Child(ui.Text(n.Label).NoWrap())
+		}).
+		OnChange(func(key string) {
+			tg.Select(idOf(key))
+			ins.bump()
+		})
 	return ui.Div().Column().Gap(8).Width(ui.Px(380)).Height(ui.Full).Children(
 		ui.Text("Elements"),
 		ui.Button(pick).Key("inspector.pick").OnClick(func() {
 			tg.Pick(!tg.Picking())
 			ins.bump()
 		}),
-		ui.Tree(nodes, ins.sel).Key("inspector.tree").Grow(1).OnChange(func(key string) {
-			tg.Select(idOf(key))
-			ins.bump()
-		}),
+		ui.Div().Column().Grow(1).OnMouseLeave(func() { tg.Hover(0) }).Child(tree),
 	)
 }
 

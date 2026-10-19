@@ -21,13 +21,14 @@ import (
 // inspector is attached. An inspector attached to a window makes it draw the
 // outline of the selected element, and in pick mode the element under the
 // pointer, on top of everything; both are painted, so layout and hit testing
-// are the same with or without them.
+// are the same with or without them. The element under the pointer in the
+// inspector's tree is outlined too, more lightly (see Hover).
 
 // inspectState is the inspector's state in one window, made by Attach.
 type inspectState struct {
 	edits    map[uint64]Style // the live edits, by element ID; each lasts until its element is built again
 	picking  bool             // pick mode: the pointer outlines elements, and a press selects one
-	hover    uint64           // the element under the pointer in pick mode, 0 for none
+	hover    uint64           // the element under the pointer in pick mode, or in the inspector's tree; 0 for none
 	selected uint64           // the element the inspector selected, 0 for none
 	changed  func()           // called on the UI thread when the selection or the picking changes
 }
@@ -637,6 +638,18 @@ func (h *runtimeHost) Selected() uint64 {
 	return 0
 }
 
+// Hover outlines the element with the given ID lightly, as the inspector's tree
+// does for the row under the pointer. Zero clears it. In pick mode the pointer
+// in the window moves it.
+func (h *runtimeHost) Hover(id uint64) {
+	rt := h.rt()
+	if rt.insp == nil || rt.insp.hover == id {
+		return
+	}
+	rt.insp.hover = id
+	rt.setInspectPaint()
+}
+
 // Pick turns pick mode on or off.
 func (h *runtimeHost) Pick(on bool) {
 	rt := h.rt()
@@ -697,57 +710,120 @@ func (rt *Runtime) setInspectPaint() {
 	rt.requestFrame()
 }
 
-// paintInspect paints the outlines of the inspector's elements: the selected
-// element, and in pick mode the element under the pointer, with a label that
-// gives its kind, key and size. It is painted last, over every other layer.
+// The tints of the box model on the selected element, as the browser's
+// developer tools draw them: translucent, so the element shows through on a
+// light or a dark theme.
+var (
+	inspectMarginTint  = Hex("#f6b26b80") // the margin, outside the border box
+	inspectBorderTint  = Hex("#ffe59980") // the border
+	inspectPaddingTint = Hex("#93c47d70") // the padding, inside the border
+	inspectContentTint = Hex("#6fa8dc60") // the content box
+)
+
+// paintInspect paints the inspector's marks: the selected element with its box
+// model, and the element under the pointer (in pick mode, or in the inspector's
+// tree) with a lighter outline. Each has a label that gives its kind, key and
+// size. It is painted last, over every other layer.
 func (rt *Runtime) paintInspect(view scene.Rect) {
 	if rt.insp == nil {
 		return
 	}
 	if rt.insp.selected != 0 {
-		rt.paintOutline(rt.insp.selected, rt.theme.Warning, view)
+		rt.paintInspected(rt.insp.selected, true, view)
 	}
-	if rt.insp.picking && rt.insp.hover != 0 {
-		rt.paintOutline(rt.insp.hover, rt.theme.Accent, view)
+	if h := rt.insp.hover; h != 0 && h != rt.insp.selected {
+		rt.paintInspected(h, false, view)
 	}
 }
 
-// paintOutline draws a border around the element id in color c, and a label
-// above it with the element's kind, key and size. An element with no width or
-// no height has no inside to outline, so it gets a line 2 pixels thick along
-// its edge (a dot when it has neither). The label stays inside view.
-func (rt *Runtime) paintOutline(id uint64, c Color, view scene.Rect) {
+// paintInspected marks the element id. The selected element gets its margin,
+// border and padding as tinted bands, its content box filled, and an outline in
+// the accent color 2 pixels wide; any other gets a light accent fill and a
+// 1-pixel outline. An element with no width or no height has no inside to
+// outline, so it gets a line 2 pixels thick along its edge (a dot when it has
+// neither). The label above it stays inside view.
+func (rt *Runtime) paintInspected(id uint64, selected bool, view scene.Rect) {
 	n := rt.byID[id]
 	if n == nil {
 		return
 	}
+	accent := rt.theme.Accent
 	r := rt.nodeRect(n)
-	if r.W < 1 || r.H < 1 {
-		rt.scene.AddQuad(scene.Quad{Bounds: rt.px(zeroMarker(r)), Background: c.scene()})
-	} else {
-		width := max(1, round(2*rt.scale))
-		rt.scene.AddQuad(scene.Quad{
-			Bounds:      rt.px(r),
-			BorderSides: scene.Sides{Top: width, Right: width, Bottom: width, Left: width},
-			BorderColor: c.scene(),
-		})
+	switch {
+	case r.W < 1 || r.H < 1:
+		rt.scene.AddQuad(scene.Quad{Bounds: rt.px(zeroMarker(r)), Background: accent.scene()})
+	case selected:
+		s := &n.style
+		m, b, p := nonNegative(s.Margin), nonNegative(s.borderEdges()), nonNegative(s.Padding)
+		rt.paintBand(outset(r, m), m, inspectMarginTint)
+		rt.paintBand(r, b, inspectBorderTint)
+		inner := outset(r, Edges{-b.Top, -b.Right, -b.Bottom, -b.Left})
+		rt.paintBand(inner, p, inspectPaddingTint)
+		content := outset(inner, Edges{-p.Top, -p.Right, -p.Bottom, -p.Left})
+		if content.W > 0 && content.H > 0 {
+			rt.scene.AddQuad(scene.Quad{Bounds: rt.px(content), Background: inspectContentTint.scene()})
+		}
+		rt.paintInspectFrame(r, 2, accent)
+	default:
+		rt.scene.AddQuad(scene.Quad{Bounds: rt.px(r), Background: accent.Alpha(0.12).scene()})
+		rt.paintInspectFrame(r, 1, accent)
 	}
+	rt.paintInspectLabel(n, r, view)
+}
+
+// paintInspectFrame draws a border of width logical pixels just inside r, in c.
+func (rt *Runtime) paintInspectFrame(r scene.Rect, width float32, c Color) {
+	w := max(1, round(width*rt.scale))
+	rt.scene.AddQuad(scene.Quad{
+		Bounds:      rt.px(r),
+		BorderSides: scene.Sides{Top: w, Right: w, Bottom: w, Left: w},
+		BorderColor: c.scene(),
+	})
+}
+
+// paintBand fills the band of the widths e just inside r, in c. A band with no
+// width is not drawn.
+func (rt *Runtime) paintBand(r scene.Rect, e Edges, c Color) {
+	if e == (Edges{}) || r.W <= 0 || r.H <= 0 {
+		return
+	}
+	s := rt.scale
+	rt.scene.AddQuad(scene.Quad{
+		Bounds:      rt.px(r),
+		BorderSides: scene.Sides{Top: round(e.Top * s), Right: round(e.Right * s), Bottom: round(e.Bottom * s), Left: round(e.Left * s)},
+		BorderColor: c.scene(),
+	})
+}
+
+// paintInspectLabel draws the label of the element n, whose box is r: its kind,
+// key and size on the accent color, above the box, or below it when there is no
+// room above, and inside view.
+func (rt *Runtime) paintInspectLabel(n *node, r, view scene.Rect) {
 	label := nodeKindName(n.kind)
 	if n.key != "" {
 		label += " key=" + n.key
 	}
-	label += fmt.Sprintf(" %.0f x %.0f", r.W, r.H)
+	label += fmt.Sprintf("  %s × %s", num(float32(math.Round(float64(r.W)))), num(float32(math.Round(float64(r.H)))))
 	l := rt.text.Layout(label, text.Style{Size: 11, NoWrap: true}, 1e6)
-	lh := l.LineHeight
-	y := r.Y - lh - 4
-	if y < 0 {
-		y = r.Y
+	box := scene.Rect{X: r.X, W: l.Width + 10, H: l.LineHeight + 4}
+	box.Y = r.Y - box.H - 2
+	if box.Y < 0 {
+		box.Y = r.Y + max(r.H, 0) + 2
 	}
-	box := scene.Rect{X: r.X, Y: y, W: l.Width + 8, H: lh + 4}
 	box.X = max(0, min(box.X, view.W-box.W))
 	box.Y = max(0, min(box.Y, view.H-box.H))
-	rt.scene.AddQuad(scene.Quad{Bounds: rt.px(box), Background: c.scene()})
-	rt.text.Draw(&rt.scene, l, box.X+4, box.Y+2, l.Width, rt.scale, 0, rt.theme.AccentText.scene())
+	rt.scene.AddQuad(scene.Quad{Bounds: rt.px(box), Background: rt.theme.Accent.scene(), Radii: scene.Uniform(3 * rt.scale)})
+	rt.text.Draw(&rt.scene, l, box.X+5, box.Y+2, l.Width, rt.scale, 0, rt.theme.AccentText.scene())
+}
+
+// outset returns r with e added on each side; a negative side shrinks it.
+func outset(r scene.Rect, e Edges) scene.Rect {
+	return scene.Rect{X: r.X - e.Left, Y: r.Y - e.Top, W: max(0, r.W+e.Left+e.Right), H: max(0, r.H+e.Top+e.Bottom)}
+}
+
+// nonNegative returns e with its negative sides set to zero.
+func nonNegative(e Edges) Edges {
+	return Edges{max(0, e.Top), max(0, e.Right), max(0, e.Bottom), max(0, e.Left)}
 }
 
 // zeroMarker returns the rectangle that marks an element with no width or no

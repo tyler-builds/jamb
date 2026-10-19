@@ -409,6 +409,63 @@ func TestInspectOutlinesAnElementWithNoHeight(t *testing.T) {
 	}
 }
 
+// TestInspectHoverOutlinesAnElementUntilCleared checks the light outline that
+// the inspector's tree asks for: Hover paints it over the element at once, and
+// Hover(0) takes it away.
+func TestInspectHoverOutlinesAnElementUntilCleared(t *testing.T) {
+	th := DarkTheme()
+	clicks, checked, tick := 0, NewSignal(false), NewSignal(0)
+	rt, tg := inspRuntime(t, th, inspSample(&clicks, checked, tick))
+	rt.Frame(time.Now())
+	card := inspByKey(t, tg, "card")
+	r, _ := rt.Find("card")
+	fill := th.Accent.Alpha(0.12).scene()
+	hovered := func() bool {
+		for _, q := range rt.frame(time.Now()).Quads {
+			if q.Background == fill && q.Bounds == rt.px(r) {
+				return true
+			}
+		}
+		return false
+	}
+
+	tg.Hover(card)
+	if !rt.needPaint || !rt.framePending.Load() {
+		t.Fatal("Hover did not ask the window for a paint")
+	}
+	if !hovered() {
+		t.Fatal("the hovered card has no light accent fill")
+	}
+	tg.Hover(0)
+	if !rt.needPaint {
+		t.Fatal("clearing the hover did not ask for a paint")
+	}
+	if hovered() {
+		t.Fatal("the light fill stayed after Hover(0)")
+	}
+}
+
+// TestInspectSelectionShowsTheBoxModel checks the bands of the selected element:
+// its padding as a tinted band of the padding's width, and its content box filled.
+func TestInspectSelectionShowsTheBoxModel(t *testing.T) {
+	clicks, checked, tick := 0, NewSignal(false), NewSignal(0)
+	rt, tg := inspRuntime(t, DarkTheme(), inspSample(&clicks, checked, tick))
+	tg.Select(inspByKey(t, tg, "card"))
+	r, _ := rt.Find("card")
+	var band, content bool
+	for _, q := range rt.frame(time.Now()).Quads {
+		if q.BorderColor == inspectPaddingTint.scene() && q.Bounds == rt.px(r) && q.BorderSides.Top == 8 {
+			band = true
+		}
+		if q.Background == inspectContentTint.scene() && q.Bounds == rt.px(outset(r, Edges{-8, -8, -8, -8})) {
+			content = true
+		}
+	}
+	if !band || !content {
+		t.Fatalf("the selected card's padding band %v, content box %v; want both", band, content)
+	}
+}
+
 func TestInspectShortenKeepsWholeCharacters(t *testing.T) {
 	if got := shorten("héllo wörld", 4); got != "héll…" {
 		t.Errorf("shorten = %q, want héll…", got)

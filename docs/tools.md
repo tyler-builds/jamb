@@ -76,7 +76,12 @@ The inspector shows:
   **Pick an element**, then click an element in the window. The press selects
   it and is not passed to the element; Escape ends picking without a selection.
   While picking, the element under the pointer is outlined. A selected element
-  stays outlined in the window.
+  stays outlined in the window, with its margin, border and padding drawn as
+  tinted bands (orange, yellow and green) and its content box in blue, and a
+  label with its kind, key and size. The pointer over a row of the tree
+  outlines that element in the window, more lightly, until the pointer leaves
+  the tree. An element with no width or no height is marked with a line 2
+  pixels thick.
 - **Layout**: the border box in window coordinates, padding, margin, border,
   content size and overflow.
 - **Accessibility**: the role, name, description, value, states and actions of
