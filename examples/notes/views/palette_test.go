@@ -12,18 +12,18 @@ func openPaletteKey(r *rig) {
 
 func TestPaletteOpensAndFilters(t *testing.T) {
 	r := newRig(t)
-	if _, ok := r.rt.Find("palette"); ok {
+	if _, ok := r.rt.Find("jamb.palette"); ok {
 		t.Fatal("palette is open before any key was pressed")
 	}
 	openPaletteKey(r)
-	if _, ok := r.rt.Find("palette"); !ok {
+	if _, ok := r.rt.Find("jamb.palette"); !ok {
 		t.Fatal("Ctrl+Shift+P did not open the palette")
 	}
 	r.typeText("theme")
-	if _, ok := r.rt.Find("palette-notes.theme"); !ok {
+	if _, ok := r.rt.Find("jamb.palette/notes.theme"); !ok {
 		t.Error(`typing "theme" does not list Toggle theme`)
 	}
-	if _, ok := r.rt.Find("palette-notes.new"); ok {
+	if _, ok := r.rt.Find("jamb.palette/notes.new"); ok {
 		t.Error(`typing "theme" still lists New note`)
 	}
 }
@@ -37,7 +37,7 @@ func TestPaletteEnterRunsSelectedCommand(t *testing.T) {
 	if r.rt.Theme().Dark == dark {
 		t.Error("Enter did not toggle the theme")
 	}
-	if _, ok := r.rt.Find("palette"); ok {
+	if _, ok := r.rt.Find("jamb.palette"); ok {
 		t.Error("the palette is still open after running a command")
 	}
 }
@@ -46,7 +46,7 @@ func TestPaletteEscapeCloses(t *testing.T) {
 	r := newRig(t)
 	openPaletteKey(r)
 	r.key(input.KeyEscape, 0)
-	if _, ok := r.rt.Find("palette"); ok {
+	if _, ok := r.rt.Find("jamb.palette"); ok {
 		t.Error("Escape did not close the palette")
 	}
 }

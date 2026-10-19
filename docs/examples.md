@@ -135,7 +135,8 @@ features: focus handles, `AutoFocus`, and `FocusWithin`.
   entry, the word count and the editor, never the whole list.
 - Shortcuts: Ctrl+N (new note, title focused), Ctrl+F (search; Enter opens
   the first match), Alt+Up/Down (previous/next note), Ctrl+Shift+P (command
-  palette: type to filter, Up/Down to choose, Enter runs, Escape closes),
+  palette, a `ui.CommandPalette`: type to filter, Up/Down to choose, Enter runs,
+  Escape closes),
   Ctrl+K Ctrl+T (toggle theme), Ctrl+Shift+V (Markdown preview). Enter in a title moves to its body. Escape
   closes the palette and returns focus to the note you were in, and a command
   run from the palette acts on that note.
