@@ -604,9 +604,15 @@ func componentName(inst *componentInstance) string {
 	return reflect.TypeOf(inst.el).String()
 }
 
+// shorten returns s cut to n characters, with an ellipsis when it was longer. It
+// counts runes, so it never cuts a character in two.
 func shorten(s string, n int) string {
-	if len(s) > n {
-		return s[:n] + "…"
+	i := 0
+	for j := range s {
+		if i == n {
+			return s[:j] + "…"
+		}
+		i++
 	}
 	return s
 }
@@ -619,6 +625,7 @@ func (h *runtimeHost) Select(id uint64) {
 		return
 	}
 	rt.insp.selected = id
+	rt.setInspectPaint() // the window draws the new outline without waiting for its own input
 	rt.changedInspect()
 }
 
@@ -698,27 +705,33 @@ func (rt *Runtime) paintInspect(view scene.Rect) {
 		return
 	}
 	if rt.insp.selected != 0 {
-		rt.paintOutline(rt.insp.selected, rt.theme.Warning)
+		rt.paintOutline(rt.insp.selected, rt.theme.Warning, view)
 	}
 	if rt.insp.picking && rt.insp.hover != 0 {
-		rt.paintOutline(rt.insp.hover, rt.theme.Accent)
+		rt.paintOutline(rt.insp.hover, rt.theme.Accent, view)
 	}
 }
 
 // paintOutline draws a border around the element id in color c, and a label
-// above it with the element's kind, key and size.
-func (rt *Runtime) paintOutline(id uint64, c Color) {
+// above it with the element's kind, key and size. An element with no width or
+// no height has no inside to outline, so it gets a line 2 pixels thick along
+// its edge (a dot when it has neither). The label stays inside view.
+func (rt *Runtime) paintOutline(id uint64, c Color, view scene.Rect) {
 	n := rt.byID[id]
 	if n == nil {
 		return
 	}
 	r := rt.nodeRect(n)
-	width := max(1, round(2*rt.scale))
-	rt.scene.AddQuad(scene.Quad{
-		Bounds:      rt.px(r),
-		BorderSides: scene.Sides{Top: width, Right: width, Bottom: width, Left: width},
-		BorderColor: c.scene(),
-	})
+	if r.W < 1 || r.H < 1 {
+		rt.scene.AddQuad(scene.Quad{Bounds: rt.px(zeroMarker(r)), Background: c.scene()})
+	} else {
+		width := max(1, round(2*rt.scale))
+		rt.scene.AddQuad(scene.Quad{
+			Bounds:      rt.px(r),
+			BorderSides: scene.Sides{Top: width, Right: width, Bottom: width, Left: width},
+			BorderColor: c.scene(),
+		})
+	}
 	label := nodeKindName(n.kind)
 	if n.key != "" {
 		label += " key=" + n.key
@@ -731,6 +744,20 @@ func (rt *Runtime) paintOutline(id uint64, c Color) {
 		y = r.Y
 	}
 	box := scene.Rect{X: r.X, Y: y, W: l.Width + 8, H: lh + 4}
+	box.X = max(0, min(box.X, view.W-box.W))
+	box.Y = max(0, min(box.Y, view.H-box.H))
 	rt.scene.AddQuad(scene.Quad{Bounds: rt.px(box), Background: c.scene()})
 	rt.text.Draw(&rt.scene, l, box.X+4, box.Y+2, l.Width, rt.scale, 0, rt.theme.AccentText.scene())
+}
+
+// zeroMarker returns the rectangle that marks an element with no width or no
+// height: its edge widened to 2 pixels, centred on the element's line.
+func zeroMarker(r scene.Rect) scene.Rect {
+	if r.W < 1 {
+		r.X, r.W = r.X+r.W/2-1, 2
+	}
+	if r.H < 1 {
+		r.Y, r.H = r.Y+r.H/2-1, 2
+	}
+	return r
 }
