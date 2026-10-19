@@ -7,6 +7,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-19
+
 Nineteen widgets, a Markdown view, more of `Tabs` and `TextInput`, a new look for the visual
 inspector, and a fix for fonts kept in memory after their window closed. No API is removed or
 renamed.
@@ -320,6 +322,7 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tyler-builds/jamb/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tyler-builds/jamb/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tyler-builds/jamb/releases/tag/v0.1.0

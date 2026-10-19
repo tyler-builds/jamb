@@ -66,12 +66,12 @@ func main() {
 In the module that holds it, add jamb and run the app:
 
 ```
-go get github.com/tyler-builds/jamb@v0.2.0
+go get github.com/tyler-builds/jamb@v0.3.0
 go mod tidy    # records the checksums of jamb's own dependencies
 go run .
 ```
 
-The `jamb` command is a separate module, tagged `cmd/jamb/v0.2.0` for the same release:
+The `jamb` command is a separate module, whose latest release is `cmd/jamb/v0.2.0` (it is unchanged in v0.3.0):
 
 ```
 go install github.com/tyler-builds/jamb/cmd/jamb@v0.2.0
