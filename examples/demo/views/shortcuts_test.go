@@ -97,3 +97,31 @@ func TestProjectsHighlightSearchMatches(t *testing.T) {
 		t.Errorf("searching for renderer painted %d highlight quads, want more than the %d before", got, base)
 	}
 }
+
+// Ctrl+Shift+P opens the command palette over the demo's actions; a command run
+// from it acts as its shortcut does, and the palette closes.
+func TestShortcutOpensCommandPalette(t *testing.T) {
+	s := NewStore()
+	rt := shortcutRig(s)
+	rt.Press(input.KeyP, input.ModCtrl|input.ModShift)
+	rt.Frame(time.Now())
+	if _, ok := rt.Find("jamb.palette"); !ok {
+		t.Fatal("Ctrl+Shift+P did not open the command palette")
+	}
+	if _, ok := rt.Find("jamb.palette/nav.settings"); !ok {
+		t.Error("the palette does not list Go to Settings")
+	}
+	rt.Type("settings go")
+	rt.Frame(time.Now())
+	if _, ok := rt.Find("jamb.palette/nav.projects"); ok {
+		t.Error(`the palette still lists Go to Projects for "settings go"`)
+	}
+	rt.Press(input.KeyEnter, 0)
+	rt.Frame(time.Now())
+	if s.Page.Get() != PageSettings {
+		t.Errorf("page %v after running Go to Settings, want Settings", s.Page.Get())
+	}
+	if s.PaletteOpen.Peek() {
+		t.Error("the palette is still open after running a command")
+	}
+}
