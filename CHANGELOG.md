@@ -77,6 +77,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `ui.ToolbarSeparator()` divides groups of controls. Assistive technology sees a tool bar
   named by its label (the new `access.RoleToolBar`, UI Automation's ToolBar control type). It
   is styled through `ui.ToolbarStyle` and `Theme.Toolbar`.
+- `ui.Empty(title)` is an empty state: an icon (an inbox by default), a title, an optional
+  `Description` and an optional `Action`, centered and muted, for `DataGrid.Empty` and lists
+  with no items. It is a group named by its title. It is styled through `ui.EmptyStyle` and
+  `Theme.Empty`. The demo's Projects page uses it for its cards and its table.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.
 - The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a

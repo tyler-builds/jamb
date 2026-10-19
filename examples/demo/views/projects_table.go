@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -58,7 +59,7 @@ func projectsTable(t *ui.Theme, s *Store, visible []Project, picked *ui.Signal[[
 	}
 	return ui.DataGrid(visible, func(p Project) string { return strconv.Itoa(p.ID) }, cols...).
 		Label("Projects").Selection(ui.SelectionMultiple, picked).Sort(order).Striped().
-		Empty(ui.Text("No projects match the search or filter")).
+		Empty(ui.Empty("No projects match").Icon(icons.Search).Description("Try a different search or filter.")).
 		OnActivate(func(p Project) { OpenProject(s, p.ID) }).
 		Style(ui.Style{Height: ui.Px(480)})
 }
