@@ -257,3 +257,43 @@ ui.DateRangePicker(start, end).Label("Trip dates").
   such as `ui.Required[ui.DateRange]()` (a zero range is no range) or a `ui.Custom` rule over both ends.
   They run as a date picker's do, in a `Field` (see Forms in docs/widgets-forms.md).
 - The calendar shows one month at a time.
+
+**Calendars on the page.** `ui.Calendar` is the month of a date picker's calendar on its own,
+inline on the page, with no field and no popup, and `ui.CalendarRange` is the month of a date
+range picker's calendar. They share the grid, the keys, the names and the defaults of the
+pickers' calendars.
+
+```go
+var day = ui.NewSignal(time.Time{}) // a zero time is no date
+ui.Calendar(day).Label("Delivery day").
+	Min(today).Max(today.AddDate(0, 3, 0)).
+	DisableDays(func(d time.Time) bool { return d.Weekday() == time.Sunday }).
+	OnChange(func(d time.Time) { ... })
+
+var from, to = ui.NewSignal(time.Time{}), ui.NewSignal(time.Time{})
+ui.CalendarRange(from, to).Label("Stay").OnChange(func(start, end time.Time) { ... })
+```
+
+- A calendar shows the month of its day (of the start for a range), or of today when there is
+  none, and moves to the month of a value set from outside. Its value is as a date picker's: the
+  time of day is kept, and a zero time is no date. A range's days are at local midnight.
+- The calendar is one Tab stop. Its keys are those of the picker's calendar above, except that
+  Enter and Space choose the day and the calendar stays; Escape and Tab are left to the page. A
+  click chooses a day, and the header's buttons move a month or a year. The month is announced
+  politely when it changes.
+- A range is chosen in two steps, as in a date range picker: the first day is the start, the
+  second the end, swapped when it is earlier, and only then do the signals change and `OnChange`
+  run. While the end is being chosen, the range is shaded to the day under the pointer or the keys;
+  Escape, or focus leaving the calendar, drops the start.
+- `Min`, `Max`, `DisableDays` and `FirstDay` are those of the pickers. `Label`, `LabelledBy`,
+  `Disabled`, `Key`, `FocusHandle`, `Tooltip`, `Styles` and the sizing methods are as for the
+  other controls; a calendar is as large as its month by default. Without a label a calendar is
+  named "Date", and a range "Date range" (`Strings.DateField`, `Strings.DateRangeField`).
+- For assistive technology it is the picker's calendar: a Calendar with the Grid and Table
+  patterns, which takes focus itself and reports the day the keys have reached as the focused
+  item. The day is outlined (`DayFocusVisible`) while the calendar has keyboard focus.
+- Its look is `CalendarStyle`, with the part names of the pickers' calendars and `Root` for its
+  panel; `Theme.Calendar` sets it for every calendar on the page, and does not change the pickers'
+  calendars (see docs/styling.md).
+- A calendar is not a form control: it has no `Validate`, and a `Field` does not wrap it. Use a
+  date picker in a form.

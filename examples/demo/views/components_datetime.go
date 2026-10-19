@@ -9,12 +9,15 @@ import (
 // dateTimeSection shows the date picker and the time picker: a date with its limits and a
 // rule that disables the weekends, a time in steps of 15 minutes between two limits, a date and
 // a time that share one value, and a required date in a form. The fields take the locale's
-// hints as their placeholders.
+// hints as their placeholders. Calendars on the page choose a day and a range without a field.
 func dateTimeSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 	due := ui.Local(ctx, "dt.due", time.Time{})
 	start := ui.Local(ctx, "dt.start", time.Time{})
 	when := ui.Local(ctx, "dt.when", time.Time{})
 	review := ui.Local(ctx, "dt.review", time.Time{})
+	pickup := ui.Local(ctx, "dt.pickup", time.Time{})
+	stayFrom := ui.Local(ctx, "dt.stayFrom", time.Time{})
+	stayTo := ui.Local(ctx, "dt.stayTo", time.Time{})
 	form := ui.Local(ctx, "dt.form", ui.NewForm()).Peek()
 	result := ui.Local(ctx, "dt.result", "")
 	today := startOfToday()
@@ -25,6 +28,14 @@ func dateTimeSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 	meeting := "No date and time set."
 	if !when.Get().IsZero() {
 		meeting = "Set to " + when.Get().Format("Jan 2, 2006 at 3:04 PM") + "."
+	}
+	picked := "No day chosen."
+	if !pickup.Get().IsZero() {
+		picked = "Pickup on " + pickup.Get().Format("Mon, Jan 2, 2006") + "."
+	}
+	stay := "No range chosen."
+	if !stayFrom.Get().IsZero() {
+		stay = "From " + stayFrom.Get().Format("Jan 2") + " to " + stayTo.Get().Format("Jan 2, 2006") + "."
 	}
 	return section(t, "Date and time",
 		sample(t, "Date, from today for 90 days, weekends disabled",
@@ -39,6 +50,15 @@ func dateTimeSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 					Child(ui.Field("Meeting date", ui.DatePicker(when)).Width(ui.Px(200))).
 					Child(ui.Field("Meeting time", ui.TimePicker(when)).Width(ui.Px(160)))).
 				Child(ui.Text(meeting).FontSize(13).TextColor(t.TextMuted))),
+		sample(t, "Calendar and CalendarRange, on the page",
+			ui.Div().Row().Gap(16).Align(ui.Start).Wrap().
+				Child(ui.Div().Column().Gap(6).
+					Child(ui.Calendar(pickup).Key("dt-calendar").Label("Pickup day").
+						Min(today).DisableDays(weekendDay)).
+					Child(ui.Text(picked).FontSize(13).TextColor(t.TextMuted))).
+				Child(ui.Div().Column().Gap(6).
+					Child(ui.CalendarRange(stayFrom, stayTo).Key("dt-calendar-range").Label("Stay")).
+					Child(ui.Text(stay).FontSize(13).TextColor(t.TextMuted)))),
 		sample(t, "In a form, required",
 			ui.Div().Column().Gap(10).
 				Child(form.Summary()).

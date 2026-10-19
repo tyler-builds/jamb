@@ -141,7 +141,7 @@ var componentSections = []componentSection{
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return formsSection(t) }},
 	{"Combobox", "Combobox Field Option autocomplete suggestions typeahead",
 		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return comboboxSection(ctx, t) }},
-	{"Date and time", "DatePicker TimePicker Field Form Required date time calendar",
+	{"Date and time", "DatePicker TimePicker Calendar CalendarRange Field Form Required date time calendar range",
 		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return dateTimeSection(ctx, t) }},
 	{"Data grid", "DataGrid SortBy SortByText Select Tabs Checkbox BadgeText table rows columns sort resize density striped",
 		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return dataGridSection(ctx, t) }},

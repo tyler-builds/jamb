@@ -196,6 +196,23 @@ var layerBuilders = []layerBuilder{
 			day := time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC)
 			return DateRangePicker(NewSignal(day), NewSignal(day.AddDate(0, 0, 2))).Styles(st.(DateRangePickerStyle))
 		}},
+	{"Calendar", func(th *Theme) any { return &th.Calendar },
+		func(st any) Element {
+			// The rig's today is January 12, 1970: the value is the day after, and the
+			// Sundays are disabled.
+			v := dayOf(time.Unix(1_000_000, 0)).AddDate(0, 0, 1)
+			return Calendar(NewSignal(v)).DisableDays(func(d time.Time) bool { return d.Weekday() == time.Sunday }).
+				Styles(st.(CalendarStyle))
+		}},
+	{"Calendar", func(th *Theme) any { return &th.Calendar },
+		func(st any) Element {
+			return Calendar(NewSignal(time.Time{})).Disabled(true).Styles(st.(CalendarStyle))
+		}},
+	{"Calendar", func(th *Theme) any { return &th.Calendar },
+		func(st any) Element {
+			v := dayOf(time.Unix(1_000_000, 0))
+			return CalendarRange(NewSignal(v), NewSignal(v.AddDate(0, 0, 3))).Styles(st.(CalendarStyle))
+		}},
 	{"DataGrid", func(th *Theme) any { return &th.DataGrid },
 		func(st any) Element {
 			return Component(partDataGrid(3, st.(DataGridStyle), NewSignal([]string{}), NewSignal(SortState{})))

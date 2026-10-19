@@ -113,11 +113,7 @@ func (s DateRangePickerStyle) plain() DateRangePickerStyle {
 // dateRangePickerDefaults returns the built-in look of a date range picker at the Text size scale,
 // from the colors of t: the look of a date picker, and the days between the ends drawn as a band.
 func dateRangePickerDefaults(t *Theme, scale float32, disabled bool) DateRangePickerStyle {
-	in := Style{Clear: ClearRadius, BorderColor: t.Accent, BorderEdges: Edges{Top: 1, Bottom: 1}, Background: t.AccentSoft}
-	if t.HighContrast {
-		in = Style{Clear: ClearRadius, BorderColor: t.Text, BorderEdges: Edges{Top: 2, Bottom: 2}}
-	}
-	return rangeStyle(datePickerDefaults(t, scale, disabled), in)
+	return rangeStyle(datePickerDefaults(t, scale, disabled), calendarDefaults(t, scale).DayInRange)
 }
 
 // resolveDateRangePicker returns the look of a date range picker: the defaults, merged with the
@@ -703,8 +699,8 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 
 		if open.Get() {
 			enabled := func(day time.Time) bool { return d.enabled(day, s) }
-			root.Child(calendarPanel(calendarView{st: st, widget: "DateRangePicker", loc: loc, scale: scale,
-				from: from, to: to, inRange: rs.DayInRange, focus: focus.Get(), today: dayOf(rt.now()),
+			root.Child(calendarPanel(calendarView{st: st.calendar(rs.DayInRange), widget: "DateRangePicker", loc: loc,
+				scale: scale, from: from, to: to, focus: focus.Get(), ring: true, today: dayOf(rt.now()),
 				name: name, fallback: s.DateRangeField, move: moveTo, pick: pick, keys: keys, shut: shut,
 				enabled: enabled, hover: hovered, firstSet: d.firstSet, firstDay: d.firstDay}, s))
 		}

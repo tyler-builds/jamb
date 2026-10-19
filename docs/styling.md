@@ -41,7 +41,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Border`, `Disabled` and the others), so the defaults follow the theme's colors.
    Some defaults depend on the state of the widget, such as a disabled select.
 2. **The theme.** Set on the `ui.Theme` for every widget of that kind in the app:
-   `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.DateRangePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Dock`, `Theme.Field` (the frame of every
+   `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.DateRangePicker`, `Theme.Calendar`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Dock`, `Theme.Field` (the frame of every
    `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.OTPInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Toggle`, `Theme.ToggleGroup`, `Theme.Rating`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
@@ -324,6 +324,7 @@ the Text size of 100 percent:
 | `DatePicker` | 180 px at the Text size of 100 percent; `Full` stretches it, and the calendar is its own size |
 | `DateRangePicker` | 280 px at the Text size of 100 percent, room for two dates; `Full` stretches it, and the calendar is its own size |
 | `TimePicker` | 140 px at the Text size of 100 percent; `Full` stretches it, and the list is at least as wide as the field |
+| `Calendar`, `CalendarRange` | as wide and as high as its month: seven days of 32 px at the Text size of 100 percent, and six weeks |
 | `Slider`, `ProgressBar` (also when indeterminate) | fills the container, and at least 160 px, so it is visible where its container has no width |
 | `Tabs` | the tab list: `TabsSegmented` as wide as its tabs; `TabsUnderline` fills the container, as WinUI's `TabView` does |
 | `Breadcrumbs`, `Pagination` | as wide as their locations or pages; `Width`, `MinWidth` and `MaxWidth` set it |
@@ -534,6 +535,7 @@ parts that the code applies.
 | `DatePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `CalendarButton`, `Message`, `Popup`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
 | `TimePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Button`, `Message`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected` | none | none | done |
 | `DateRangePicker` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `CalendarButton`, `Message`, `Popup`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayInRange`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
+| `Calendar` | `Root`, `RootDisabled`, `Header`, `NavButton`, `WeekdayLabel`, `Day`, `DayHover`, `DaySelected`, `DayInRange`, `DayToday`, `DayDisabled`, `DayOutsideMonth`, `DayFocusVisible` | none | none | done |
 | `Slider` | `Track`, `TrackFocusVisible`, `Rail`, `Fill`, `Thumb`, `ThumbHover`, `ThumbPressed`, `ValueText` | none | none (see above) | done |
 | `ColorPicker` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `TriggerDisabled`, `Swatch`, `Popup`, `Area`, `AreaFocusVisible`, `Thumb`, `Slider`, `Preset`, `PresetFocusVisible` | none | none | done |
 | `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
@@ -656,6 +658,12 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
 - The Tree has no `RowFocused` part. The keyboard focus ring is drawn on the tree
   itself (`TreeFocusVisible`), because a row cannot see whether the tree has focus.
 - The Tree's `Indent` (pixels per level) is a size on `TreeStyle`, not a part.
+- `CalendarRange` draws the parts of `Calendar` (`Calendar.Root` and the others), and
+  only a range draws `DayInRange`. The calendar of a `DatePicker` or a
+  `DateRangePicker` is that picker's own (its `Popup`, `Day` and the others), which
+  `Theme.Calendar` does not style. A calendar outlines the day the keys have reached
+  (`DayFocusVisible`) only while it has keyboard focus, as the picker's open calendar
+  always does.
 - A Switch draws no text, so its label position is the app's. There is no label
   position option.
 - A Rating's `StarHover` is not paint-only: it applies to every star up to the one

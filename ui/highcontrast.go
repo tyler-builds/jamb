@@ -95,6 +95,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Combobox:        base.Combobox,
 		DatePicker:      base.DatePicker,
 		DateRangePicker: base.DateRangePicker,
+		Calendar:        base.Calendar,
 		TimePicker:      base.TimePicker,
 		ColorPicker:     base.ColorPicker,
 		Drawer:          base.Drawer,

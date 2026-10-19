@@ -25,6 +25,8 @@ func TestControlsTakeATooltip(t *testing.T) {
 		{"Combobox", access.RoleComboBox, Combobox(NewSignal(""), func(string) []Option[string] { return opts }).Label("C").Tooltip("Help")},
 		{"DatePicker", access.RoleTextField, DatePicker(NewSignal(day)).Label("C").Tooltip("Help")},
 		{"DateRangePicker", access.RoleTextField, DateRangePicker(NewSignal(day), NewSignal(day.AddDate(0, 0, 2))).Label("C").Tooltip("Help")},
+		{"Calendar", access.RoleCalendar, Calendar(NewSignal(day)).Label("C").Tooltip("Help")},
+		{"CalendarRange", access.RoleCalendar, CalendarRange(NewSignal(day), NewSignal(day.AddDate(0, 0, 2))).Label("C").Tooltip("Help")},
 		{"TimePicker", access.RoleComboBox, TimePicker(NewSignal(day)).Label("C").Tooltip("Help")},
 		{"Select", access.RoleComboBox, Select(NewSignal("a"), opts...).Label("C").Tooltip("Help")},
 		{"Checkbox", access.RoleCheckBox, Checkbox("C", NewSignal(false)).Tooltip("Help")},

@@ -37,6 +37,13 @@ func TestEveryControlTakesAFocusHandle(t *testing.T) {
 			day := time.Date(2026, 1, 2, 0, 0, 0, 0, time.Local)
 			return DateRangePicker(NewSignal(day), NewSignal(day.AddDate(0, 0, 2))).Label("Days").FocusHandle(h)
 		}},
+		{"Calendar", func(h *FocusHandle) Element {
+			return Calendar(NewSignal(time.Date(2026, 1, 2, 0, 0, 0, 0, time.Local))).Label("Day").FocusHandle(h)
+		}},
+		{"CalendarRange", func(h *FocusHandle) Element {
+			day := time.Date(2026, 1, 2, 0, 0, 0, 0, time.Local)
+			return CalendarRange(NewSignal(day), NewSignal(day.AddDate(0, 0, 2))).Label("Days").FocusHandle(h)
+		}},
 		{"ColorPicker", func(h *FocusHandle) Element {
 			return ColorPicker(NewSignal(Hex("#3B82F6"))).Label("Fill").FocusHandle(h)
 		}},
