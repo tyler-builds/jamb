@@ -220,6 +220,8 @@ var layerBuilders = []layerBuilder{
 		func(st any) Element { return Tag("Sample").Styles(st.(TagStyle)) }},
 	{"Tag", func(th *Theme) any { return &th.Tag },
 		func(st any) Element { return Tag("Sample").OnRemove(func() {}).Styles(st.(TagStyle)) }},
+	{"Kbd", func(th *Theme) any { return &th.Kbd },
+		func(st any) Element { return Kbd("ctrl+k ctrl+t").Styles(st.(KbdStyle)) }},
 	{"Skeleton", func(th *Theme) any { return &th.Skeleton },
 		func(st any) Element { return Skeleton().Styles(st.(SkeletonStyle)) }},
 	{"FormField", func(th *Theme) any { return &th.FormField },

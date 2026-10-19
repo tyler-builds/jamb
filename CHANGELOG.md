@@ -28,6 +28,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - `Tabs.Reorderable` lets the user move tabs by dragging them or with Ctrl+Shift+Left and Right,
   with the new position announced, and `OnReorder` reports the new order. The drop line is the
   `DropLine` part of `TabsStyle`.
+- `ui.Kbd` shows a keyboard shortcut as key caps, from keys written as for `Bind`, with the key
+  names a menu shows. It is one static text for assistive technology, such as "Ctrl+Shift+P".
 - `ui.LinkSegs` makes one link of several styled segments.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.

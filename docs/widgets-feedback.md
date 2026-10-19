@@ -1,6 +1,6 @@
 # Feedback widgets
 
-Feedback and status indicators, avatars, tags and skeleton placeholders.
+Feedback and status indicators, avatars, tags, skeleton placeholders and keyboard shortcuts.
 
 ## Feedback
 
@@ -107,3 +107,26 @@ ui.Skeleton().Circle(32)                             // a placeholder for an ava
 - **Skeleton.** It is hidden from assistive technology. The app marks the region that is loading
   as busy, or labels it "Loading". It pulses about once every 1.2 seconds, between full and half
   opacity, and it is still under reduced motion and high contrast.
+
+## Keyboard shortcuts
+
+`Kbd` shows a keyboard shortcut as key caps, such as a hint beside a command or in a help
+page. It takes the keys as `Bind` does, and names them as a menu shows its shortcuts, so
+`"ctrl+shift+p"` draws the caps Ctrl, Shift and P, and reads "Ctrl+Shift+P". Its look is
+`ui.KbdStyle`: per app in `Theme.Kbd`, or per instance with `Styles`.
+
+```go
+ui.Kbd("ctrl+shift+p")                 // three caps: Ctrl, Shift, P
+ui.Kbd("ctrl+k ctrl+t")                // a sequence: the strokes are spaced apart
+ui.Kbd("f2").Tooltip("Rename")         // read as the shortcut's description
+```
+
+- **Keys.** Each key is a cap of its own (the `Key` part). The caps of a stroke sit close
+  together, and the `Gap` of the `Kbd` part spaces the strokes of a sequence. The key names
+  are the ones `KeysFor` gives a menu, in English, in the order Ctrl, Alt, Shift, Super.
+  A malformed keys string panics, as `Bind` does.
+- **Look.** The caps are small, in the surface color, with muted text and a border that is
+  heavier at the bottom. Under high contrast they are outlined in the text color.
+- **Accessibility.** The shortcut is one static text named by the keys, such as
+  "Ctrl+Shift+P". Its caps are hidden from assistive technology, so the shortcut is not
+  read key by key.

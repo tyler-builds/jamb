@@ -152,6 +152,8 @@ type Theme struct {
 	Avatar AvatarStyle
 	// Tag is the look of every tag.
 	Tag TagStyle
+	// Kbd is the look of every keyboard shortcut drawn as key caps.
+	Kbd KbdStyle
 	// Skeleton is the look of every skeleton placeholder.
 	Skeleton SkeletonStyle
 	// Sidebar is the look of every sidebar. Panel is the background color of the

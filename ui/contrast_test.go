@@ -113,6 +113,8 @@ func contrastPairs(th *Theme) []contrastPair {
 	)
 	ps = append(ps, badgePairs(th)...)
 	ps = append(ps, progressPairs(th)...)
+	// kbd.go: a key cap's text is TextMuted on Surface, at 12 px.
+	ps = append(ps, contrastPair{name: "Kbd_text_on_Surface", role: "key cap text (kbd.go, TextMuted on Surface)", fg: th.TextMuted, bg: th.Surface, min: minText})
 	for _, s := range surfaces[:3] {
 		ps = append(ps,
 			// widgets.go: the focus ring is a spread shadow in FocusRing.
