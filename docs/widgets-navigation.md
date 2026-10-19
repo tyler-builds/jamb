@@ -151,6 +151,47 @@ ui.Pagination(page, pageCount).Compact()                 // Previous, "Page 3 of
   Right do not move between pages. `Tooltip(s)` shows s over the control, and is read
   as the group's description.
 
+Steppers. A stepper shows the progress through the steps of a process, such as the
+pages of a checkout. Its look is `ui.StepperStyle`, set on the theme as
+`Theme.Stepper` or with `Styles`, and it follows high contrast and the Text size.
+
+```go
+ui.Stepper(step, // *ui.Signal[int]: the current step, from 0
+	ui.Step{Title: "Account", Description: "Sign in or create one"},
+	ui.Step{Title: "Shipping", Icon: icons.Home},
+	ui.Step{Title: "Payment"},
+).Key("checkout").Label("Checkout steps").
+	Vertical().                                  // stacked, with the line running down between the indicators
+	OnSelect(func(i int) { step.Set(i) })        // the steps can be chosen; the app sets the signal
+```
+
+- **States.** The steps before the current one are complete: their indicator is
+  filled with Accent and shows a check mark. The current step has an Accent outline
+  on AccentSoft, and the later steps an outlined circle with their number, or their
+  `Icon`, in the muted text color. The line after a complete step is Accent. No state
+  changes the font weight. Under high contrast a complete indicator is Highlight, the
+  current one has a thicker Highlight outline, and the others are outlined in the text
+  color. A current step equal to the number of steps marks every step complete.
+- **Width.** A horizontal stepper fits the width it is given: when its steps do not
+  fit, they shrink down to their indicators, and their titles and descriptions end
+  with an ellipsis. A vertical stepper wraps its texts instead.
+- **Choosing.** Without `OnSelect` the stepper only shows the progress, and it takes
+  no focus. With it, a click, or Enter or Space on the focused step, runs `OnSelect`
+  with the step's index. The signal is not set by the stepper, so the app decides
+  whether a step can be reached yet. The stepper is one Tab stop, at the current step.
+  Left and Right (Up and Down when `Vertical`) move the focus to the previous and next
+  step without choosing it and without wrapping, and Home and End go to the first and
+  last step, as in a Sidebar. `Disabled(true)` shows the steps of a stepper with
+  `OnSelect` dimmed (GrayText under high contrast), and they cannot be focused or
+  chosen.
+- **Accessibility.** The stepper is a list named by `Label` (default "Steps"). Each
+  step is a list item named by its position, title and state, such as "Step 2 of 4:
+  Shipping, current", "Step 1 of 4: Account, completed" or "Step 3 of 4: Payment, not
+  started" (the `StepCompleted`, `StepCurrent` and `StepUpcoming` messages of
+  `ui.Strings`). The current step is selected in the list, as the current location of
+  a breadcrumb trail is. The lines are hidden from assistive technology. `Tooltip(s)`
+  shows s over the stepper, and is read as the list's description.
+
 ## Sidebar
 
 `ui.Sidebar(selected, items...)` is a vertical navigation pane, as the left pane of

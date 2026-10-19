@@ -172,6 +172,8 @@ type Theme struct {
 	Breadcrumbs BreadcrumbsStyle
 	// Pagination is the look of every pagination control.
 	Pagination PaginationStyle
+	// Stepper is the look of every stepper.
+	Stepper StepperStyle
 	// DateRangePicker is the look of every date range picker and its calendar. It is not
 	// DatePicker: a range has its own parts, such as DayInRange.
 	DateRangePicker DateRangePickerStyle

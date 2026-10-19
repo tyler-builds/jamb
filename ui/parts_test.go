@@ -223,6 +223,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Sidebar", func(t *testing.T) { testSidebarParts(t, applied) })
 	t.Run("Breadcrumbs", func(t *testing.T) { testBreadcrumbsParts(t, applied) })
 	t.Run("Pagination", func(t *testing.T) { testPaginationParts(t, applied) })
+	t.Run("Stepper", func(t *testing.T) { testStepperParts(t, applied) })
 	t.Run("DateRangePicker", func(t *testing.T) { testDateRangePickerParts(t, applied) })
 	t.Run("ColorPicker", func(t *testing.T) { testColorPickerParts(t, applied) })
 

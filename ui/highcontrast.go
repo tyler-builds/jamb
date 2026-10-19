@@ -86,6 +86,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Sidebar:       base.Sidebar,
 		Breadcrumbs:   base.Breadcrumbs,
 		Pagination:    base.Pagination,
+		Stepper:       base.Stepper,
 
 		Combobox:        base.Combobox,
 		DatePicker:      base.DatePicker,

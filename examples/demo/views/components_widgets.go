@@ -10,13 +10,14 @@ import (
 )
 
 // widgetsSection shows the smaller widgets: a sidebar, breadcrumbs,
-// pagination, avatars, tags, skeletons, a color picker, a date range picker,
-// group boxes and description lists.
+// pagination, a stepper, avatars, tags, skeletons, a color picker, a date range
+// picker, group boxes and description lists.
 func widgetsSection(t *ui.Theme) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		nav := ui.Local(ctx, "w.nav", "inbox")
 		collapsed := ui.Local(ctx, "w.collapsed", false)
 		page := ui.Local(ctx, "w.page", 4)
+		step := ui.Local(ctx, "w.step", 1)
 		color := ui.Local(ctx, "w.color", ui.Hex("#3b82f6"))
 		from := ui.Local(ctx, "w.from", time.Time{})
 		to := ui.Local(ctx, "w.to", time.Time{})
@@ -73,6 +74,14 @@ func widgetsSection(t *ui.Theme) ui.Element {
 				Child(ui.Pagination(page, 20).Key("demo-pages")).
 				Child(ui.Pagination(page, 20).Compact().Key("demo-pages-compact")).
 				Child(ui.Textf("Page %d", page.Get()).FontSize(12).TextColor(t.TextMuted))),
+			sample(t, "Stepper, with OnSelect, and Vertical", ui.Div().Gap(14).Width(ui.Px(600)).
+				Child(ui.Stepper(step, demoSteps...).Key("demo-steps").Label("Checkout steps").
+					OnSelect(func(i int) { step.Set(i) })).
+				Child(ui.Stepper(step, demoSteps...).Key("demo-steps-vertical").Label("Checkout steps, vertical").Vertical()).
+				Child(ui.Div().Row().Gap(8).
+					Child(ui.Button("Back").Small().Disabled(step.Get() == 0).OnClick(func() { step.Set(max(step.Peek()-1, 0)) })).
+					Child(ui.Button("Next").Small().Primary().Disabled(step.Get() >= len(demoSteps)).
+						OnClick(func() { step.Set(min(step.Peek()+1, len(demoSteps))) })))),
 			sample(t, "Avatars: initials, sizes, and AccessHidden", ui.Div().Row().Gap(8).Align(ui.Center).
 				Child(ui.Avatar("Dana Lee")).
 				Child(ui.Avatar("Sam Ortiz").Size(40)).
@@ -108,6 +117,14 @@ func widgetsSection(t *ui.Theme) ui.Element {
 					ItemText("Members", "8").
 					ItemText("Visibility", "Team"))))
 	})
+}
+
+// demoSteps are the steps of the stepper samples.
+var demoSteps = []ui.Step{
+	{Title: "Account", Description: "Sign in"},
+	{Title: "Shipping", Description: "Address and speed"},
+	{Title: "Payment", Icon: icons.Star},
+	{Title: "Review"},
 }
 
 // rangeText describes a chosen range in days.
