@@ -75,7 +75,8 @@ func TestInspectorWindowShowsTheSelectedElementWithoutAccessibilityWarnings(t *t
 	}
 	var dump strings.Builder
 	irt.Dump(&dump, 0)
-	for _, want := range []string{"key=save", "Style, set fields only", "Copy as Go", "Frames of the window"} {
+	for _, want := range []string{`text "div save`, `text "Layout"`, `text "Accessibility"`, `text "Style"`,
+		"Copy as Go", "Frames of the window"} {
 		if !strings.Contains(dump.String(), want) {
 			t.Errorf("the inspector's window does not show %q", want)
 		}
@@ -123,6 +124,131 @@ func TestInspectorTreeHoverOutlinesTheElement(t *testing.T) {
 	irt.Frame(time.Now())
 	if n := len(rec.hover); rec.hover[n-1] != 0 {
 		t.Fatalf("leaving the tree did not clear the hover: %v", rec.hover)
+	}
+}
+
+// inspectorRuntime renders the inspector's window for ins, at its default
+// size, with its pick shortcut, and collects its accessibility warnings.
+func inspectorRuntime(ins *inspector) (*ui.Runtime, *[]string) {
+	irt := ui.NewRuntime(ins.root, ui.DarkTheme(), nil)
+	var warnings []string
+	irt.SetWarnFunc(func(s string) { warnings = append(warnings, s) })
+	irt.SetAccessWarnings(true)
+	irt.AddBindings(ui.Bind("ctrl+shift+c", inspectPick))
+	irt.SetViewport(1100, 760, 1)
+	irt.Frame(time.Now())
+	return irt, &warnings
+}
+
+// accessNamed returns the first node of the access tree whose name contains s.
+func accessNamed(rt *ui.Runtime, s string) *access.Node {
+	var found *access.Node
+	rt.AccessTree().Walk(func(n *access.Node) bool {
+		if found == nil && strings.Contains(n.Name, s) {
+			found = n
+		}
+		return found == nil
+	})
+	return found
+}
+
+// TestInspectorEmptyStateAndPickShortcut checks the details with nothing
+// selected, which name the pick shortcut, and that the shortcut and Escape in
+// the window turn pick mode on and off with the toggle following.
+func TestInspectorEmptyStateAndPickShortcut(t *testing.T) {
+	h, rt, tg := inspSampleWindow(t)
+	ins := newInspector(h, tg)
+	tg.Attach(ins.changed)
+	irt, warnings := inspectorRuntime(ins)
+	if len(*warnings) != 0 {
+		t.Fatalf("the empty inspector has accessibility warnings: %v", *warnings)
+	}
+	if accessNamed(irt, "No element selected") == nil || accessNamed(irt, "(Ctrl+Shift+C)") == nil {
+		t.Fatal("the empty details do not say that nothing is selected, or do not name the pick shortcut")
+	}
+
+	irt.KeyDown(input.KeyC, input.ModCtrl|input.ModShift, false)
+	irt.Frame(time.Now())
+	if !tg.Picking() || !ins.picking.Peek() {
+		t.Fatalf("Ctrl+Shift+C: picking %v, toggle %v; want both on", tg.Picking(), ins.picking.Peek())
+	}
+	rt.KeyDown(input.KeyEscape, 0, false) // in the inspected window
+	if tg.Picking() || ins.picking.Peek() {
+		t.Fatalf("Escape: picking %v, toggle %v; want both off", tg.Picking(), ins.picking.Peek())
+	}
+}
+
+// TestInspectorFilterListsTheMatches checks that the filter turns the tree into
+// a flat list of the elements that match it, nested ones included.
+func TestInspectorFilterListsTheMatches(t *testing.T) {
+	h, _, tg := inspSampleWindow(t)
+	ins := newInspector(h, tg)
+	tg.Attach(ins.changed)
+	save, _ := inspFindKey(tg, tg.Root(), "save")
+	card, _ := inspFindKey(tg, tg.Root(), "card")
+	var label uint64
+	for id := save; label == 0; { // the text is the first leaf of the button
+		e, _ := tg.Element(id)
+		if e.Text == "Save" {
+			label = id
+		} else if len(e.Children) == 0 {
+			t.Fatal("no text Save in the button")
+		} else {
+			id = e.Children[0]
+		}
+	}
+	ins.filter.Set("SAVE")
+	irt, warnings := inspectorRuntime(ins)
+	if len(*warnings) != 0 {
+		t.Fatalf("the filtered inspector has accessibility warnings: %v", *warnings)
+	}
+	for _, id := range []uint64{save, label} {
+		if _, ok := irt.Find(keyOf(id)); !ok {
+			t.Errorf("element %d, which matches the filter, has no row", id)
+		}
+	}
+	if _, ok := irt.Find(keyOf(card)); ok {
+		t.Error("the card, which does not match the filter, has a row")
+	}
+}
+
+// TestInspectorBreadcrumbSelectsTheAncestor checks the trail of ancestors in the
+// details: a click on a crumb selects that ancestor.
+func TestInspectorBreadcrumbSelectsTheAncestor(t *testing.T) {
+	h, _, tg := inspSampleWindow(t)
+	ins := newInspector(h, tg)
+	tg.Attach(ins.changed)
+	save, _ := inspFindKey(tg, tg.Root(), "save")
+	tg.Select(save)
+	irt, _ := inspectorRuntime(ins)
+	crumb := irt.AccessTree().Find(access.RoleLink, "div root")
+	if crumb == nil {
+		crumb = irt.AccessTree().Find(access.RoleButton, "div root")
+	}
+	if crumb == nil {
+		t.Fatal("no crumb for the root in the details")
+	}
+	b := crumb.Bounds
+	irt.PointerDown(b.X+b.W/2, b.Y+b.H/2, input.ButtonLeft, 1, 0)
+	irt.PointerUp(b.X+b.W/2, b.Y+b.H/2, input.ButtonLeft, 0)
+	irt.Frame(time.Now())
+	if tg.Selected() != tg.Root() || ins.sel.Peek() != keyOf(tg.Root()) {
+		t.Fatalf("after the crumb, selected %d (tree %s), want the root %d", tg.Selected(), ins.sel.Peek(), tg.Root())
+	}
+}
+
+func TestInspectorShortComponentNames(t *testing.T) {
+	for full, want := range map[string]string{
+		"github.com/tyler-builds/jamb/ui.(*TitleBarElement).expand.func1": "ui.TitleBar",
+		"example.com/app/views.Card":                                      "views.Card",
+		"example.com/app/views.Card.func2":                                "views.Card",
+		"*ui.ButtonElement":                                               "ui.Button",
+		"main.main.func1":                                                 "main.main",
+		"plain":                                                           "plain",
+	} {
+		if got := shortComponent(full); got != want {
+			t.Errorf("shortComponent(%q) = %q, want %q", full, got, want)
+		}
 	}
 }
 

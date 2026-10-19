@@ -68,37 +68,54 @@ It is on in three cases:
 Ctrl+Shift+I opens the inspector of the focused window, or closes it again.
 The shortcut is taken before the window's own key bindings.
 
+The inspector's window has a toolbar at the top, with the **Pick an element**
+toggle, the title of the window it inspects and a filter for the tree. Under it,
+a split that can be resized holds the element tree on the left and the details
+of the selected element on the right. The details scroll as one pane, with the
+frame timings pinned at the bottom. With nothing selected, the details say how
+to pick an element.
+
 The inspector shows:
 
-- **The element tree**: each element's kind, key, widget part (such as
-  `Checkbox.Box`), its text, the component whose output it is, and its role and
-  name in the accessibility tree. Click
-  **Pick an element**, then click an element in the window. The press selects
-  it and is not passed to the element; Escape ends picking without a selection.
-  While picking, the element under the pointer is outlined. A selected element
-  stays outlined in the window, with its margin, border and padding drawn as
-  tinted bands (orange, yellow and green) and its content box in blue, and a
-  label with its kind, key and size. The pointer over a row of the tree
-  outlines that element in the window, more lightly, until the pointer leaves
-  the tree. An element with no width or no height is marked with a line 2
-  pixels thick.
-- **Layout**: the border box in window coordinates, padding, margin, border,
-  content size and overflow.
+- **The element tree**: on each row, the element's kind, its key in the link
+  color, its widget part (such as `Checkbox.Box`), its text in quotes, and the
+  short name of the component whose output it is, such as `views.Card`; a
+  hidden element is dimmed. A long row ends with an ellipsis. The row's tooltip
+  adds the element's role and name in the accessibility tree and the full
+  component name. Text in the filter field turns the tree into a
+  flat list of the elements whose kind, key, part, text or component contains
+  it. Turn on **Pick an element** (or press Ctrl+Shift+C in the inspector), then
+  click an element in the window. The press selects it and is not passed to the
+  element; Escape ends picking without a selection. While picking, the element
+  under the pointer is outlined. A selected element stays outlined in the
+  window, with its margin, border and padding drawn as tinted bands (orange,
+  yellow and green) and its content box in blue, and a label with its kind, key
+  and size. The pointer over a row of the tree outlines that element in the
+  window, more lightly, until the pointer leaves the tree. An element with no
+  width or no height is marked with a line 2 pixels thick.
+- **The header**: the element's kind, key and part, the full name of the
+  component that rendered it (selectable, to copy), and the trail of its
+  ancestors; a click on an ancestor selects it.
+- **Layout**: a box model diagram, as the browser's developer tools draw it:
+  the margin, border and padding around the content box, each with its four
+  insets. Beside it, the position of the border box in window coordinates, its
+  size, the content size and the overflow.
 - **Accessibility**: the role, name, description, value, states and actions of
-  the element's node, and the warnings that `JAMB_A11Y_WARN` reports for it.
-- **Style**: each set field of the resolved style, with the layer its value came
-  from, and the values of the layers it overrides. The winning value comes first,
-  and each overridden value follows, marked `overridden`, from the highest layer
+  the element's node, and the warnings that `JAMB_A11Y_WARN` reports for it, as
+  warning alerts.
+- **Style**: a table of each set field of the resolved style, with its value
+  and the layer the value came from. Under it, a row for each value it
+  overrides, struck through and marked `overridden`, from the highest layer
   down:
 
   ```
-  Radius = 9   (instance Styles)
-    overridden: Radius = 5   (theme)
-    overridden: Radius = 4   (built-in default)
+  Radius   9   instance Styles
+           5   overridden: theme
+           4   overridden: built-in default
   ```
 
   A layer that sets the same value as the layer below it is marked
-  `same value as the layer below`. The sources are:
+  `same as below`. The sources are:
   - `built-in default`: the widget's own default for the part.
   - `theme`: the theme's style for the part, such as `Theme.Checkbox.Box`. This is
     the theme in effect, a predefined one or the high contrast theme.
@@ -118,13 +135,17 @@ The inspector shows:
   A widget that builds a part's style from layers names each layer with
   `ui.StyleLayer` before it merges the layer, so the inspector can report it. The
   built-in widgets do this.
-- **Live edits**: choose a style field, enter a value and click **Apply**. The
-  value takes effect at once in the window. **Clear edits** drops them, and
-  **Copy as Go** copies them to the clipboard as a `ui.Style` literal. An edit
-  lasts until its element is built again, such as when its component renders.
-- **Frames**: the build, layout and paint time of the last frame, the number of
-  nodes, rendered components, quads and glyphs, the average and peak over the
-  last 120 frames, and a line of the CPU time per frame.
+- **Live edits**, at the top of the Style section: choose a style field, enter
+  a value and click **Apply** (or press Enter). The value takes effect at once
+  in the window. **Clear edits** drops them, and **Copy as Go** copies them to
+  the clipboard as a `ui.Style` literal. An edit lasts until its element is
+  built again, such as when its component renders.
+- **Frames**: tiles with the CPU time of the last frame, the average and peak
+  over the last 120 frames, and the number of nodes, rendered components, quads
+  and glyphs; the build, layout and paint time of the last frame; and a line of
+  the CPU time per frame with the 16.7 ms budget of a 60 Hz frame. The line is
+  scaled to the larger of the peak and the budget, so one slow frame does not
+  flatten the rest.
 
 The limits:
 
