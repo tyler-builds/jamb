@@ -24,6 +24,10 @@ func main() {
 }
 `
 
+// codeEditorContext is the key context around the code editor and its find bar,
+// in which the demo's Ctrl+F is turned off (see Bindings).
+const codeEditorContext = "CodeEditorSample"
+
 // codeEditorSection shows a code editor on a sample Go file, highlighted with the Go grammar. The
 // document is kept in the section, so the text and the caret survive the section's re-renders.
 // Try Ctrl+F, Ctrl+H, Ctrl+G, Ctrl+D and Alt+click.
@@ -32,6 +36,6 @@ func codeEditorSection() ui.Element {
 		t := ctx.Theme()
 		doc := ui.Local(ctx, "codeedit.doc", codeedit.NewDocument(codeEditorSample)).Peek()
 		ed := codeedit.Editor(doc).Label("Sample Go file").Language(golang.Grammar).CommentPrefix("// ").Height(ui.Px(260))
-		return section(t, "Code editor", ed)
+		return section(t, "Code editor", ui.Div().Key("code-editor").Width(ui.Full).KeyContext(codeEditorContext).Child(ed))
 	})
 }

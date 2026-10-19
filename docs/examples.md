@@ -29,7 +29,10 @@ On the Projects page:
 - Right-click a project card for its menu: Open, Open in window, Star (a check
   mark), a Status submenu with radio items, and a disabled Archive item.
 - The Components page (Ctrl+4) shows the controls, overlays, gradients, rounded
-  clipping, per-side borders, motion and focus styles, one section each. Its
+  clipping, per-side borders, motion and focus styles, one section each. A filter
+  bar above the sections stays in view as they scroll: it shows only the sections
+  whose title or keywords (the API names they show, such as `Stepper` or `Kbd`)
+  contain every word typed, and Ctrl+F focuses it. Its
   Drawing and layout section has a canvas chart that follows the pointer and zooms
   with a pinch, SVG
   images, selectable text and a form laid out as a grid. Its More widgets section
@@ -109,8 +112,9 @@ On the Projects page:
   footnote and an anchor link. A click on a task's box marks the task in the text,
   through `OnTaskToggle`. See [docs/markdown.md](markdown.md).
 - Keyboard: Ctrl+1 to Ctrl+6 open the Dashboard, Projects, Activity, Components,
-  Settings and Markdown pages, Ctrl+K moves focus to the search field, and
-  Ctrl+Shift+L toggles the theme.
+  Settings and Markdown pages, Ctrl+K moves focus to the search field, Ctrl+F
+  to the Components page's filter (the code editor keeps Ctrl+F for its find
+  bar), and Ctrl+Shift+L toggles the theme.
 
 ## The notes app
 

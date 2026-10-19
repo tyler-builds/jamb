@@ -142,7 +142,7 @@ func Activity(s *Store) ui.Element {
 
 		// The page announces the count the filter settles on (see announceQuiet).
 		said := ui.Local(ctx, "said", 0)
-		if n := s.Notice.Get(); n.Seq != said.Peek() {
+		if n := s.Notice.Get(); n.Page == PageActivity && n.Seq != said.Peek() {
 			said.Set(n.Seq)
 			ui.Announce(n.Text, access.Polite)
 		}
@@ -153,7 +153,7 @@ func Activity(s *Store) ui.Element {
 			Child(ui.Div().Row().Align(ui.Center).Gap(12).
 				Child(ui.TextInput(s.EventQuery).Label("Filter events").Placeholder("Filter events").Icon(icons.Search).
 					Style(ui.Style{Width: ui.Px(260), MinWidth: ui.Px(140)}).
-					OnChange(func(q string) { s.announceQuiet(eventCountText(len(s.matchingEvents(q)), q)) })).
+					OnChange(func(q string) { s.announceQuiet(PageActivity, eventCountText(len(s.matchingEvents(q)), q)) })).
 				Child(ui.Text(count).FontSize(12).TextColor(t.TextMuted).NoWrap())).
 			Child(ui.Div().Row().Align(ui.Center).Gap(8).Wrap().
 				Child(ui.Button("Jump to top").Icon(icons.ChevronUp).Secondary().Small().Key("jump-top").

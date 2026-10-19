@@ -77,6 +77,10 @@ type Store struct {
 	DropMark *ui.Signal[dropMark]
 	// EventQuery filters the Activity page.
 	EventQuery *ui.Signal[string]
+	// SectionQuery filters the sections of the Components page, and SectionField
+	// is its field, which Ctrl+F focuses there.
+	SectionQuery *ui.Signal[string]
+	SectionField *ui.FocusHandle
 	// Expanded holds the build events whose details are open, by event ID.
 	Expanded *ui.Signal[map[int]bool]
 	// Notice is the status message that the Activity page announces, with a
@@ -154,6 +158,8 @@ func NewStore() *Store {
 		Badge:        ui.NewSignal(false),
 		DropMark:     ui.NewSignal(dropMark{}),
 		EventQuery:   ui.NewSignal(""),
+		SectionQuery: ui.NewSignal(""),
+		SectionField: ui.NewFocusHandle(),
 		Expanded:     ui.NewSignal(map[int]bool{}),
 		Notice:       ui.NewSignal(notice{}),
 		Inbox:        ui.NewSignal([]inboxItem(nil)),
@@ -392,26 +398,28 @@ func (s *Store) Project(id int) (Project, bool) {
 	return Project{}, false
 }
 
-// notice is a status message for assistive technology, numbered.
+// notice is a status message for assistive technology, numbered. Page is the
+// page that announces it, so that one page's count is not read out on another.
 type notice struct {
 	Text string
 	Seq  int
+	Page Page
 }
 
 // quietFor is how long the user must stop before a debounced announcement is
 // made.
 const quietFor = 600 * time.Millisecond
 
-// announceQuiet announces text once the user has been quiet for quietFor. Each
-// call restarts the wait, so a burst of keystrokes is announced once. The timer
-// runs on its own goroutine, so it sets the Notice signal, and the Activity page
-// makes the announcement when it renders (ui.Announce is queued for the next
-// published tree, which a frame makes).
-func (s *Store) announceQuiet(text string) {
+// announceQuiet announces text on page p once the user has been quiet for
+// quietFor. Each call restarts the wait, so a burst of keystrokes is announced
+// once. The timer runs on its own goroutine, so it sets the Notice signal, and
+// the page makes the announcement when it renders (ui.Announce is queued for the
+// next published tree, which a frame makes).
+func (s *Store) announceQuiet(p Page, text string) {
 	if s.quiet != nil {
 		s.quiet.Stop()
 	}
 	s.quietN++
-	n := notice{Text: text, Seq: s.quietN}
+	n := notice{Text: text, Seq: s.quietN, Page: p}
 	s.quiet = time.AfterFunc(quietFor, func() { s.Notice.Set(n) })
 }
