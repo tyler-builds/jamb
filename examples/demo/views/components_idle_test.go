@@ -26,12 +26,27 @@ func TestComponentsPageSettlesAfterScrollUnderHover(t *testing.T) {
 	for range 20 {
 		frame()
 	}
-	// (600, 400) is on the edge of the hover card, which the scroll moves under
-	// the pointer. It is the point where the loop was found.
+	// Scroll the card up from below the window, then put the pointer just inside
+	// its bottom edge, where its lift takes it out from under the pointer. The
+	// card is found by its key, so the test does not depend on the page layout.
 	rt.PointerMove(600, 400, 0)
 	for range 3 {
 		rt.Scroll(600, 400, 0, 600, false, 0)
 	}
+	frame()
+	card, ok := rt.Find("hover-lift-card")
+	if !ok {
+		t.Fatal("the hover card is not on the Components page")
+	}
+	for i := 0; i < 100 && card.Y+card.H > 700; i++ {
+		rt.Scroll(600, 400, 0, 600, false, 0)
+		frame()
+		card, _ = rt.Find("hover-lift-card")
+	}
+	if card.Y < 0 || card.Y+card.H > 760 {
+		t.Fatalf("the hover card is at %v, outside the 760 px window", card)
+	}
+	rt.PointerMove(card.X+card.W/2, card.Y+card.H-1, 0)
 	quiet := 0
 	for i := 0; i < 300 && quiet < 3; i++ {
 		frame()

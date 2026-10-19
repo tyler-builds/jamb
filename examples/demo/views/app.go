@@ -26,6 +26,13 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			OnAction(GoSettings, goTo(PageSettings)).
 			OnAction(GoMarkdown, goTo(PageMarkdown)).
 			OnAction(FocusSearch, s.Search.Focus).
+			// On the root, so Ctrl+F works wherever the focus is, or with none; the
+			// filter is there only on the Components page.
+			OnAction(FilterComponents, func() {
+				if s.Page.Peek() == PageComponents {
+					s.SectionField.Focus()
+				}
+			}).
 			OnAction(ToggleTheme, func() {
 				if ctx.Theme().Dark {
 					ctx.SetTheme(DemoLightTheme)

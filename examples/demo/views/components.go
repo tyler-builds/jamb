@@ -2,70 +2,218 @@ package views
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/ease"
+	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
 
 // Components is a reference page for the framework's controls and styles. Each
-// section shows the options of one part of the API; it is not a design.
+// section shows the options of one part of the API; it is not a design. The
+// filter bar stays above the scrolling sections, and only the sections that
+// match its query are built (see matchingSections).
 func Components(s *Store) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
-		return ui.Div().Grow(1).ScrollY().
-			Child(ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(1100)).
-				Child(ui.Div().Gap(4).
-					Child(ui.Div().Heading(1).Child(ui.Text("Components").FontSize(26).Semibold())).
-					Child(ui.Text("One section per part of the framework. Hover, click and Tab to try them.").TextColor(t.TextMuted))).
-				Child(section(t, "Text",
-					sample(t, "Italic", ui.Text("Italic text").Italic()),
-					sample(t, "Mono", ui.Text("Mono text").Mono()),
-					sample(t, "Highlight: Underline", wordHighlight("Underline", ui.Highlight{Underline: true})),
-					sample(t, "Highlight: Strikethrough", wordHighlight("Strikethrough", ui.Highlight{Strikethrough: true})),
-					sample(t, "Highlight: Italic", wordHighlight("Italic", ui.Highlight{Italic: true})),
-					sample(t, "Highlight: Mono", wordHighlight("Mono", ui.Highlight{Mono: true})),
-					sample(t, "Highlight: Background", wordHighlight("Background", ui.Highlight{Background: t.AccentSoft, Color: t.Text})),
-					clickSample(t))).
-				Child(section(t, "Buttons",
-					sample(t, "Primary", ui.Button("Primary").Primary().OnClick(pressed("Primary"))),
-					sample(t, "Secondary", ui.Button("Secondary").Secondary().OnClick(pressed("Secondary"))),
-					sample(t, "Ghost", ui.Button("Ghost").Ghost().OnClick(pressed("Ghost"))),
-					sample(t, "Danger", ui.Button("Danger").Danger().OnClick(pressed("Danger"))),
-					sample(t, "Small", ui.Button("Small").Small().OnClick(pressed("Small"))),
-					sample(t, "Disabled", ui.Button("Disabled").Disabled(true)))).
-				Child(section(t, "Overlays", placements(t))).
-				Child(section(t, "Menus", dropdownSample(t), contextSample(t))).
-				Child(navigationSection()).
-				Child(splitSection()).
-				Child(dockSection()).
-				Child(formControlsSection()).
-				Child(formsSection(t)).
-				Child(comboboxSection(ctx, t)).
-				Child(dateTimeSection(ctx, t)).
-				Child(dataGridSection(ctx, t)).
-				Child(chartsSection(ctx, t)).
-				Child(codeEditorSection()).
-				Child(customizingSection()).
-				Child(dialogsSection(ctx, t, s)).
-				Child(section(t, "Images",
-					fitSample(t, "Cover", ui.FitCover),
-					fitSample(t, "Contain", ui.FitContain),
-					fitSample(t, "Fill", ui.FitFill))).
-				Child(section(t, "Gradients",
-					sample(t, "sRGB", gradientBox(ui.LinearGradient(90, gradFrom, gradTo))),
-					sample(t, "InOklab", gradientBox(ui.LinearGradient(90, gradFrom, gradTo).InOklab())),
-					sample(t, "Stops 0.3 to 0.7", gradientBox(ui.LinearGradient(90, gradFrom, gradTo).Stops(0.3, 0.7))))).
-				Child(drawingSection(t)).
-				Child(widgetsSection(t)).
-				Child(clipboardSection(t)).
-				Child(clipSection(t)).
-				Child(motionSection(t)).
-				Child(focusSection(t)).
-				Child(feedbackSection(ctx, t, s)).
-				Child(shellSection(ctx, s)))
+		query := s.SectionQuery.Get()
+		shown := matchingSections(query)
+
+		// The page announces the count the filter settles on (see announceQuiet). It
+		// starts from the latest notice, so a notice made before the page was shown
+		// is not repeated.
+		said := ui.Local(ctx, "said", s.Notice.Peek().Seq)
+		if n := s.Notice.Get(); n.Page == PageComponents && n.Seq != said.Peek() {
+			said.Set(n.Seq)
+			ui.Announce(n.Text, access.Polite)
+		}
+
+		content := ui.Div().PaddingX(32).PaddingY(28).Gap(20).MaxWidth(ui.Px(1100)).
+			Child(ui.Div().Gap(4).
+				Child(ui.Div().Heading(1).Child(ui.Text("Components").FontSize(26).Semibold())).
+				Child(ui.Text("One section per part of the framework. Hover, click and Tab to try them.").TextColor(t.TextMuted)))
+		for _, sec := range shown {
+			// The key keeps each section's state with it while the filter hides the others.
+			content.Child(ui.Div().Key("section:" + sec.title).Child(sec.build(ctx, t, s)))
+		}
+		if len(shown) == 0 {
+			content.Child(ui.Text("No sections match “" + strings.TrimSpace(query) + "”.").TextColor(t.TextMuted))
+		}
+		// MinHeight 0: the page fits under the header, and only the sections scroll.
+		return ui.Div().Grow(1).MinHeight(ui.Px(0)).
+			Child(componentsFilterBar(ctx, s, query, len(shown))).
+			Child(ui.Div().Grow(1).MinHeight(ui.Px(0)).ScrollY().Child(content))
 	})
+}
+
+// componentsFilterBar is the bar above the sections: the filter field and, while
+// it filters, how many sections it shows. It is outside the scrolling area, so it
+// stays in view. Ctrl+F focuses the field (see FilterComponents).
+func componentsFilterBar(ctx *ui.Context, s *Store, query string, shown int) ui.Element {
+	t := ctx.Theme()
+	field := ui.TextInput(s.SectionQuery).Key("components-filter").Label("Filter components").
+		Placeholder("Filter components…").Icon(icons.Search).FocusHandle(s.SectionField).
+		Tooltip(tip(ctx, "Filter components", FilterComponents)).
+		Width(ui.Px(320 * layoutScale(ctx))).MinWidth(ui.Px(140)).
+		OnChange(func(q string) {
+			s.announceQuiet(PageComponents, componentCountText(len(matchingSections(q)), q))
+		})
+	if query != "" {
+		// TextInput has no clear button of its own, so the bar puts one in the field.
+		field.Trailing(ui.IconButton(icons.X).Key("components-filter-clear").Small().
+			Label("Clear filter").Tooltip("Clear filter").
+			OnClick(func() {
+				s.SectionQuery.Set("")
+				s.SectionField.Focus()
+				s.announceQuiet(PageComponents, componentCountText(len(componentSections), ""))
+			}))
+	}
+	row := ui.Div().Row().Wrap().Align(ui.Center).Gap(12).PaddingX(32).PaddingY(12).MaxWidth(ui.Px(1100)).
+		Child(field)
+	if strings.TrimSpace(query) != "" {
+		row.Child(ui.Text(componentCountText(shown, query)).FontSize(12).TextColor(t.TextMuted).NoWrap())
+	}
+	return ui.Div().Shrink(0).Background(t.Background).BorderEdges(ui.Edges{Bottom: 1}, t.Border).Child(row)
+}
+
+// componentCountText is the count of the sections that a query shows: "6 of 26
+// sections", or "26 sections" with no query.
+func componentCountText(n int, query string) string {
+	if strings.TrimSpace(query) == "" {
+		return fmt.Sprintf("%d sections", n)
+	}
+	return fmt.Sprintf("%d of %d sections", n, len(componentSections))
+}
+
+// componentSection is one section of the Components page: its title, the words
+// the filter matches besides the title (the API names and the topics that the
+// section shows, with plain words for some), and the function that builds it.
+type componentSection struct {
+	title    string
+	keywords string
+	build    func(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element
+}
+
+// componentSections are the sections of the Components page, in page order.
+var componentSections = []componentSection{
+	{"Text", "Text Italic Mono Highlight Underline Strikethrough Background Rich Seg Hover OnClick rich text font style link",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {
+			return section(t, "Text",
+				sample(t, "Italic", ui.Text("Italic text").Italic()),
+				sample(t, "Mono", ui.Text("Mono text").Mono()),
+				sample(t, "Highlight: Underline", wordHighlight("Underline", ui.Highlight{Underline: true})),
+				sample(t, "Highlight: Strikethrough", wordHighlight("Strikethrough", ui.Highlight{Strikethrough: true})),
+				sample(t, "Highlight: Italic", wordHighlight("Italic", ui.Highlight{Italic: true})),
+				sample(t, "Highlight: Mono", wordHighlight("Mono", ui.Highlight{Mono: true})),
+				sample(t, "Highlight: Background", wordHighlight("Background", ui.Highlight{Background: t.AccentSoft, Color: t.Text})),
+				clickSample(t))
+		}},
+	{"Buttons", "Button Primary Secondary Ghost Danger Small Disabled click press",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {
+			return section(t, "Buttons",
+				sample(t, "Primary", ui.Button("Primary").Primary().OnClick(pressed("Primary"))),
+				sample(t, "Secondary", ui.Button("Secondary").Secondary().OnClick(pressed("Secondary"))),
+				sample(t, "Ghost", ui.Button("Ghost").Ghost().OnClick(pressed("Ghost"))),
+				sample(t, "Danger", ui.Button("Danger").Danger().OnClick(pressed("Danger"))),
+				sample(t, "Small", ui.Button("Small").Small().OnClick(pressed("Small"))),
+				sample(t, "Disabled", ui.Button("Disabled").Disabled(true)))
+		}},
+	{"Overlays", "Overlay Placement OverlayGap OnClickOutside Popover popup popover filters " +
+		"BelowStart BelowCenter BelowEnd AboveStart AboveCenter AboveEnd RightStart RightCenter RightEnd LeftStart LeftCenter LeftEnd",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return section(t, "Overlays", placements(t)) }},
+	{"Menus", "DropdownMenu ContextMenu MenuItem MenuSeparator Submenu MenuCheckBox MenuCheckRadio dropdown context menu right-click Shift+F10",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {
+			return section(t, "Menus", dropdownSample(t), contextSample(t))
+		}},
+	{"Navigation and layout", "Tabs Collapsible Accordion Tree tree view folders panels expand",
+		func(*ui.Context, *ui.Theme, *Store) ui.Element { return navigationSection() }},
+	{"Split panes", "Split Pane Percent resize divider panes collapsible",
+		func(*ui.Context, *ui.Theme, *Store) ui.Element { return splitSection() }},
+	{"Docking", "Dock DockLayout DockPanel OpenDockWindow panels tabs float drag layout window",
+		func(*ui.Context, *ui.Theme, *Store) ui.Element { return dockSection() }},
+	{"Form controls", "Checkbox CheckboxTri Switch Toggle ToggleGroup segmented Rating stars RadioGroup radio Select " +
+		"Slider NumberInput spin OTPInput one-time code PIN TextInput ReadOnly read-only Disabled Form Field " +
+		"Notification preferences validation",
+		func(*ui.Context, *ui.Theme, *Store) ui.Element { return formControlsSection() }},
+	{"Forms", "Form Field TextInput Validate Required MaxLength Pattern email error summary submit async ProgressRing validation",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return formsSection(t) }},
+	{"Combobox", "Combobox Field Option autocomplete suggestions typeahead",
+		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return comboboxSection(ctx, t) }},
+	{"Date and time", "DatePicker TimePicker Field Form Required date time calendar",
+		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return dateTimeSection(ctx, t) }},
+	{"Data grid", "DataGrid SortBy SortByText Select Tabs Checkbox BadgeText table rows columns sort resize density striped",
+		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return dataGridSection(ctx, t) }},
+	{"Charts", "charts Line Area Bar Scatter Pie Donut Radar Candlestick Sankey DataTable graph plot table",
+		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return chartsSection(ctx, t) }},
+	{"Code editor", "codeedit Editor NewDocument code syntax highlighting Go grammar find replace go to line cursors",
+		func(*ui.Context, *ui.Theme, *Store) ui.Element { return codeEditorSection() }},
+	{"Customizing", "Styles Theme Variant RenderTab Tabs Segmented Indicator Checkbox Collapsible NumberInput SpinButtons " +
+		"Select Button Badge render slot styling",
+		func(*ui.Context, *ui.Theme, *Store) ui.Element { return customizingSection() }},
+	{"Dialogs", "MessageBox OpenFiles SaveFile PickFolder Modal Drawer Clipboard SetClipboard dialog file open save folder " +
+		"message box modal sheet copy paste",
+		func(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element { return dialogsSection(ctx, t, s) }},
+	{"Images", "Image ImageFit FitCover FitContain FitFill picture photo",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {
+			return section(t, "Images",
+				fitSample(t, "Cover", ui.FitCover),
+				fitSample(t, "Contain", ui.FitContain),
+				fitSample(t, "Fill", ui.FitFill))
+		}},
+	{"Gradients", "LinearGradient InOklab Stops gradient Oklab sRGB color",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {
+			return section(t, "Gradients",
+				sample(t, "sRGB", gradientBox(ui.LinearGradient(90, gradFrom, gradTo))),
+				sample(t, "InOklab", gradientBox(ui.LinearGradient(90, gradFrom, gradTo).InOklab())),
+				sample(t, "Stops 0.3 to 0.7", gradientBox(ui.LinearGradient(90, gradFrom, gradTo).Stops(0.3, 0.7))))
+		}},
+	{"Drawing and layout", "Canvas Painter NewPath LinearPaint SVG MustSVG Selectable Grid Fr Auto " +
+		"drawing paint pinch zoom illustration icon selectable text grid",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return drawingSection(t) }},
+	{"More widgets", "Stepper GroupBox DescriptionList Pagination Breadcrumbs Sidebar SidebarHeading Avatar Tag Skeleton " +
+		"ColorPicker DateRangePicker steps pages initials loading placeholder color date range",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return widgetsSection(t) }},
+	{"Clipboard images", "ClipboardImage SetClipboardImage ClipboardHasImage OnPasteImage ImageFromImage TextArea " +
+		"clipboard copy paste screenshot image transparency",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return clipboardSection(t) }},
+	{"Clipping and borders", "Radius BorderEdges Border ScrollY clip rounded corners underline tabs accent bar",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return clipSection(t) }},
+	{"Motion", "Animate Animation ease Linear OutCubic InOutCubic Bounce Reverse Scale Offset Transition Hover ZIndex " +
+		"animation easing transform",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return motionSection(t) }},
+	{"Focus and scrolling", "FocusWithin Focused FocusVisible Focusable TabIndex TabStop ScrollX focus ring keyboard Tab order scroll",
+		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return focusSection(t) }},
+	{"Feedback", "Kbd Alert Badge BadgeText BadgeDot Toast ProgressBar ProgressRing Notify " +
+		"keyboard shortcut spinner busy progress toast badge alert OS notification",
+		func(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element { return feedbackSection(ctx, t, s) }},
+	{"Notification area and taskbar", "TaskbarProgress SetTaskbarBadge NewTray tray icon taskbar badge progress system tray",
+		func(ctx *ui.Context, _ *ui.Theme, s *Store) ui.Element { return shellSection(ctx, s) }},
+}
+
+// matchingSections returns the sections that query shows: those whose title or
+// keywords contain every word of it, ignoring case. An empty query shows them all.
+func matchingSections(query string) []componentSection {
+	words := strings.Fields(strings.ToLower(query))
+	if len(words) == 0 {
+		return componentSections
+	}
+	var out []componentSection
+	for _, sec := range componentSections {
+		text := strings.ToLower(sec.title + " " + sec.keywords)
+		all := true
+		for _, w := range words {
+			if !strings.Contains(text, w) {
+				all = false
+				break
+			}
+		}
+		if all {
+			out = append(out, sec)
+		}
+	}
+	return out
 }
 
 // section is a titled card holding the samples of one part of the framework.
@@ -260,7 +408,7 @@ func motionSection(t *ui.Theme) ui.Element {
 	return card.Child(ui.Divider()).Child(ui.Div().Row().Wrap().Align(ui.Start).Gap(22).
 		Child(sample(t, "Scale(0.8)", tile(t, "Card").Scale(0.8))).
 		Child(sample(t, "Offset(10, 6)", tile(t, "Card").Offset(10, 6))).
-		Child(sample(t, "Hover: scale and lift", tile(t, "Card").Transition(fast).Hover(ui.Style{Scale: 1.08, OffsetY: -4}))).
+		Child(sample(t, "Hover: scale and lift", tile(t, "Card").Key("hover-lift-card").Transition(fast).Hover(ui.Style{Scale: 1.08, OffsetY: -4}))).
 		Child(sample(t, "ZIndex: first child on top", stack)))
 }
 
