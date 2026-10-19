@@ -113,6 +113,8 @@ type Theme struct {
 	Toggle ToggleStyle
 	// ToggleGroup is the look of every toggle group.
 	ToggleGroup ToggleGroupStyle
+	// Rating is the look of every rating.
+	Rating RatingStyle
 	// Collapsible is the look of every collapsible section, including the
 	// sections of an Accordion.
 	Collapsible CollapsibleStyle
