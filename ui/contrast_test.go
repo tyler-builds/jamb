@@ -111,6 +111,14 @@ func contrastPairs(th *Theme) []contrastPair {
 		contrastPair{name: "Success_text_on_Surface", role: "status text, not used as text by built-ins", fg: th.Success, bg: th.Surface},
 		contrastPair{name: "Warning_text_on_Surface", role: "status text, not used as text by built-ins", fg: th.Warning, bg: th.Surface},
 	)
+	for _, s := range surfaces[:3] {
+		ps = append(ps,
+			// toggle.go: an on toggle is Text on AccentSoft, with an Accent border that
+			// marks the state beside the fill.
+			contrastPair{name: "ToggleOn_Text_on_" + s.name, role: "on toggle label (Text on AccentSoft)", fg: th.Text, bg: over(th.AccentSoft, s.c), min: minText},
+			contrastPair{name: "ToggleOn_Border_on_" + s.name, role: "on toggle border (Accent)", fg: th.Accent, bg: s.c, min: minNonText},
+		)
+	}
 	ps = append(ps, badgePairs(th)...)
 	ps = append(ps, progressPairs(th)...)
 	ps = append(ps, alertPairs(th)...)

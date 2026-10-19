@@ -2,11 +2,12 @@ package ui
 
 import (
 	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/input"
 )
 
-// Option is one choice of a RadioGroup or a Select: the value it sets, the text
-// it shows, and whether it can be chosen.
+// Option is one choice of a RadioGroup, a Select or a ToggleGroup: the value it
+// sets, the text it shows, and whether it can be chosen.
 type Option[T comparable] struct {
 	// Value is the value that the option sets.
 	Value T
@@ -14,6 +15,9 @@ type Option[T comparable] struct {
 	Label string
 	// Disabled makes the option unable to be chosen.
 	Disabled bool
+	// Icon is drawn before the label of a ToggleGroup's option, or in its place
+	// (see ToggleGroupElement.IconOnly). A RadioGroup and a Select show the label alone.
+	Icon *icons.Icon
 }
 
 // RadioGroupStyle is the look of each part of a radio group. A part's style

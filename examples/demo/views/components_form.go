@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -19,6 +20,8 @@ func formControlsSection() ui.Element {
 		off := ui.Local(ctx, "form.off", false)
 		mixed := ui.Local(ctx, "form.mixed", ui.CheckMixed)
 		sync := ui.Local(ctx, "form.sync", false)
+		pinned := ui.Local(ctx, "form.pinned", true)
+		view := ui.Local(ctx, "form.view", "list")
 		freq := ui.Local(ctx, "form.freq", "daily")
 		channel := ui.Local(ctx, "form.channel", "email")
 		picked := ui.Local(ctx, "form.picked", "red")
@@ -69,6 +72,8 @@ func formControlsSection() ui.Element {
 			formSample(t, "Checkbox, mixed", ui.CheckboxTri("Some channels", mixed), checkName(mixed.Get())),
 			formSample(t, "Switch", ui.Switch("Sync settings", sync), onOff(sync.Get())),
 			formSample(t, "Switch, disabled", ui.Switch("Unavailable sync", off).Disabled(true), onOff(off.Get())),
+			formSample(t, "Toggle", toggleSample(pinned), onOff(pinned.Get())),
+			formSample(t, "Toggle group", viewSample(view), view.Get()),
 			formSample(t, "Radio group", radioSample(freq), freq.Get()),
 			formSample(t, "Select", selectSample(channel, false), channelName(channel.Get())),
 			formSample(t, "Select, disabled", selectSample(picked, true), channelName(picked.Get())),
@@ -179,6 +184,28 @@ func radioSample(value *ui.Signal[string]) ui.Element {
 		ui.Option[string]{Value: "daily", Label: "Daily digest"},
 		ui.Option[string]{Value: "weekly", Label: "Weekly digest (unavailable)", Disabled: true},
 	).Label("Frequency")
+}
+
+// toggleSample is a toggle with a label, an icon-only one beside it, and a
+// disabled one, all bound to the same value.
+func toggleSample(pinned *ui.Signal[bool]) ui.Element {
+	return ui.Div().Row().Gap(6).Align(ui.Center).
+		Child(ui.Toggle("Pin", pinned).Icon(icons.Pin)).
+		Child(ui.Toggle("Pin, icon only", pinned).Icon(icons.Pin).IconOnly().Secondary().Tooltip("Pin")).
+		Child(ui.Toggle("Pinned", pinned).Disabled(true))
+}
+
+// viewSample is a toggle group of views with icons and a disabled option, and its
+// icon-only, small form.
+func viewSample(view *ui.Signal[string]) ui.Element {
+	opts := []ui.Option[string]{
+		{Value: "list", Label: "List", Icon: icons.Menu},
+		{Value: "board", Label: "Board", Icon: icons.Dashboard},
+		{Value: "files", Label: "Files", Icon: icons.Folder, Disabled: true},
+	}
+	return ui.Div().Gap(8).Align(ui.Start).
+		Child(ui.ToggleGroup(view, opts...).Label("View")).
+		Child(ui.ToggleGroup(view, opts...).Label("View, icons only").IconOnly().Small())
 }
 
 // selectSample is a select of channels, or a disabled one.

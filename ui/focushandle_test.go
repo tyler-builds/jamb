@@ -17,6 +17,8 @@ func TestEveryControlTakesAFocusHandle(t *testing.T) {
 		{"Button", func(h *FocusHandle) Element { return Button("Save").FocusHandle(h) }},
 		{"Checkbox", func(h *FocusHandle) Element { return Checkbox("On", NewSignal(false)).FocusHandle(h) }},
 		{"Switch", func(h *FocusHandle) Element { return Switch("On", NewSignal(false)).FocusHandle(h) }},
+		{"Toggle", func(h *FocusHandle) Element { return Toggle("Bold", NewSignal(false)).FocusHandle(h) }},
+		{"ToggleGroup", func(h *FocusHandle) Element { return ToggleGroup(NewSignal("b"), opts...).Label("Pick").FocusHandle(h) }},
 		{"Slider", func(h *FocusHandle) Element { return Slider(NewSignal(5.0), 0, 10, 1).Label("Level").FocusHandle(h) }},
 		{"RadioGroup", func(h *FocusHandle) Element { return RadioGroup(NewSignal("b"), opts...).Label("Pick").FocusHandle(h) }},
 		{"Select", func(h *FocusHandle) Element { return Select(NewSignal("a"), opts...).Label("Pick").FocusHandle(h) }},

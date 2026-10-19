@@ -4,18 +4,25 @@ Form controls, the color picker, and forms with validation and submission.
 
 ## Form controls
 
-Checkboxes, switches, radio groups, selects, sliders and number inputs are bound
-to signals, as `TextInput` is. Each reads its signal when it renders and writes
-it when the user changes it. They use the theme's colors, follow high contrast
-and the Text size, and show their state by a shape as well as a color: a check,
-a dash, a dot, or the place of the knob. Their looks are `ui.CheckboxStyle`,
-`ui.RadioGroupStyle` and `ui.SwitchStyle`, set with `Theme.Checkbox`, `Theme.RadioGroup`,
-`Theme.Switch` or `.Styles(...)`, and a button's look is `ui.ButtonStyle` (see Styling).
+Checkboxes, switches, toggles, toggle groups, radio groups, selects, sliders and
+number inputs are bound to signals, as `TextInput` is. Each reads its signal when
+it renders and writes it when the user changes it. They use the theme's colors,
+follow high contrast and the Text size, and show their state by a shape as well as
+a color: a check, a dash, a dot, the place of the knob, or a fill with a border.
+Their looks are `ui.CheckboxStyle`, `ui.RadioGroupStyle`, `ui.SwitchStyle`,
+`ui.ToggleStyle` and `ui.ToggleGroupStyle`, set with `Theme.Checkbox`,
+`Theme.RadioGroup`, `Theme.Switch`, `Theme.Toggle`, `Theme.ToggleGroup` or
+`.Styles(...)`, and a button's look is `ui.ButtonStyle` (see Styling).
 
 ```go
 ui.Checkbox("Email alerts", email)                // *ui.Signal[bool]
 ui.CheckboxTri("All alerts", all)                 // *ui.Signal[ui.CheckState]: CheckOff, CheckOn or CheckMixed
 ui.Switch("Dark mode", dark).OnChange(func(on bool) { ... })
+ui.Toggle("Pin", pinned).Icon(icons.Pin).IconOnly().Small() // *ui.Signal[bool]; Ghost (default) or Secondary
+ui.ToggleGroup(view,                              // *ui.Signal[T]; the options of a RadioGroup, with an Icon
+	ui.Option[string]{Value: "list", Label: "List", Icon: icons.Menu},
+	ui.Option[string]{Value: "grid", Label: "Grid", Icon: icons.Dashboard},
+).Label("View").IconOnly().OnChange(func(v string) { ... })
 ui.RadioGroup(freq,                               // *ui.Signal[T], for any comparable T
 	ui.Option[string]{Value: "daily", Label: "Daily digest"},
 	ui.Option[string]{Value: "weekly", Label: "Weekly digest", Disabled: true},
@@ -38,6 +45,19 @@ ui.NumberInput(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStac
   toggle it: Enter goes on to the modal's default button or the form, as on Windows.
 - A switch is drawn as a track and a knob, with no text: its label is its
   accessible name, so put the title beside it. Space toggles it; Enter does not.
+- A toggle is a button that stays pressed while it is on, such as a Bold button in a
+  toolbar. It has the size and look of a Ghost button (or, with `Secondary()`, a
+  Secondary one), so it lines up with buttons, and `Small()` and `Large()` are the
+  button sizes. On, it has a soft accent fill and an accent border; the weight of
+  its text does not change. `Icon` adds an icon before the label, and `IconOnly()`
+  draws the icon alone, with the label as its accessible name; give an icon-only
+  toggle a `Tooltip` for the pointer. A click or Space toggles it; Enter does not.
+- A toggle group is a row of joined toggles of which one is selected: the items
+  share their borders, and the outer corners are rounded. It takes the options of a
+  radio group, with an `Icon` each if you like, and `IconOnly()` draws the icons
+  alone. Its keys are a radio group's: one Tab stop, the arrows select and move,
+  Space chooses, and Enter goes on to the default button. A `Field` names it and
+  checks it with `Validate`, as for a radio group.
 - A radio group is one Tab stop, at the selected option. Up and Left go to the
   previous option, and Down and Right to the next. The arrows select the option
   they reach and move the focus to it. They wrap around and skip disabled options.
@@ -107,8 +127,9 @@ ui.OTPInput("Recovery code", rec, 8).Alphanumeric() // letters and digits
 ![Stacked spin buttons, with the pointer over the up button](screenshots/spin-buttons-stacked.png)
 
 Assistive technology reads a check box with a mixed state as mixed, a switch as a
-check box with the Toggle pattern (as Phase B chose), a radio group as a selection
-container named by its label, and a select as a combo box whose Value is the
+check box with the Toggle pattern (as Phase B chose), a toggle as a button with
+the Toggle pattern (as a `Button` with `AccessChecked` is), a radio group and a
+toggle group as a selection container of radio buttons named by its label, and a select as a combo box whose Value is the
 chosen label. A slider and a number input report their range (RangeValue). A
 number input is a spin box that holds its text field, as Microsoft's Spinner
 control type describes

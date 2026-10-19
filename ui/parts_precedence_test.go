@@ -77,6 +77,21 @@ func TestWidgetPartPrecedence(t *testing.T) {
 					return Div().Column().Child(Switch("Sync", NewSignal(false)).Styles(SwitchStyle{Track: bgStyle(inst)}))
 				})
 			}},
+		{name: "Toggle", part: "Toggle.Root",
+			theme: func(th *Theme, c Color) { th.Toggle.Root.Background = c },
+			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
+				return newThemedRig(th, func(ctx *Context) Element {
+					return Div().Column().Child(Toggle("Bold", NewSignal(false)).Styles(ToggleStyle{Root: bgStyle(inst)}))
+				})
+			}},
+		{name: "ToggleGroup", part: "ToggleGroup.Group",
+			theme: func(th *Theme, c Color) { th.ToggleGroup.Group.Background = c },
+			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
+				return newThemedRig(th, func(ctx *Context) Element {
+					return Div().Column().Child(ToggleGroup(NewSignal("a"), Option[string]{Value: "a", Label: "A"}).
+						Label("Letters").Styles(ToggleGroupStyle{Group: bgStyle(inst)}))
+				})
+			}},
 		{name: "Collapsible", part: "Collapsible.Section", border: true,
 			theme: func(th *Theme, c Color) { th.Collapsible.Section.BorderColor = c },
 			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {

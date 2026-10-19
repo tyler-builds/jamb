@@ -109,6 +109,10 @@ type Theme struct {
 	RadioGroup RadioGroupStyle
 	// Switch is the look of every switch.
 	Switch SwitchStyle
+	// Toggle is the look of every toggle.
+	Toggle ToggleStyle
+	// ToggleGroup is the look of every toggle group.
+	ToggleGroup ToggleGroupStyle
 	// Collapsible is the look of every collapsible section, including the
 	// sections of an Accordion.
 	Collapsible CollapsibleStyle

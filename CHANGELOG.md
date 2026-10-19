@@ -37,6 +37,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   optional description. It is a group named by its title.
 - `ui.Kbd` shows a keyboard shortcut as key caps, from keys written as for `Bind`, with the key
   names a menu shows. It is one static text for assistive technology, such as "Ctrl+Shift+P".
+- `ui.Toggle(label, on)` is a button that stays pressed while it is on, such as a Bold button in a
+  toolbar, with the sizes and the Ghost or Secondary look of a button, an optional icon and
+  `IconOnly`. Assistive technology reads it as a toggle button.
+- `ui.ToggleGroup(value, options...)` is a row of joined toggles of which one is selected. It takes
+  the options of a radio group, which now have an `Icon`, and behaves as a radio group for the
+  keyboard, for assistive technology and in a `Field`.
 - `ui.LinkSegs` makes one link of several styled segments.
 - `ui.Stepper(current, steps...)` shows the progress through the steps of a process: complete
   steps show a check mark, the current one is highlighted, and the later ones are muted. It lays
