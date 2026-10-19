@@ -80,6 +80,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - The predefined themes are converted from GPUI Kit v0.8.0 (formerly gpui-component). Panel and
   border colors of Asciinema and macOS Classic, and the syntax colors of macOS Classic Dark,
   follow upstream. The Matrix theme, which GPUI Kit no longer has, stays.
+- The visual inspector has a new look: a toolbar with the pick toggle (Ctrl+Shift+C), the inspected
+  window's title and a filter for the tree, over a resizable split of the element tree and the
+  details. Tree rows show the kind, key, part, text and the component's short name on one line. The
+  details show the element's component and ancestors, a box model diagram, the accessibility node
+  with its warnings as alerts, the style as a table with the overridden values struck through, and
+  frame tiles over a sparkline with the 16.7 ms budget.
 - The inspector outlines the element of the tree row under the pointer in the inspected window,
   more lightly than the selection. The selected element shows its margin, border and padding as
   tinted bands and its content box filled, as browsers' developer tools do, under an accent outline
@@ -95,6 +101,7 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - The inspector marks an element with no width or no height with a 2-pixel line and its label,
   where it drew nothing visible before. Its label stays inside the window.
 - The inspector shortens long texts by characters, so it no longer cuts a character in two.
+- The inspector's pick button follows pick mode when Escape in the inspected window ends it.
 
 ## [0.2.0] - 2026-10-15
 

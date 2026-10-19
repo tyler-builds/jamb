@@ -34,16 +34,19 @@ const (
 // inspector is the inspector of one window: the state of its window and the data
 // it shows. It is used on the UI thread only.
 type inspector struct {
-	target *host           // the inspected window
-	tg     inspect.Target  // the target side of the inspected window's runtime
-	win    ui.Window       // the inspector's own window
-	perf   *inspect.Perf   // the frame timings of the inspected window
-	due    time.Time       // when the inspector reads the target again, at the latest
-	tick   *ui.Signal[int] // changes to make the inspector read the target again
-	sel    *ui.Signal[string]
-	field  *ui.Signal[string] // the style field the edit row sets
-	value  *ui.Signal[string] // the value the edit row sets it to
-	status *ui.Signal[string] // the outcome of the last edit or copy
+	target  *host           // the inspected window
+	tg      inspect.Target  // the target side of the inspected window's runtime
+	win     ui.Window       // the inspector's own window
+	perf    *inspect.Perf   // the frame timings of the inspected window
+	due     time.Time       // when the inspector reads the target again, at the latest
+	tick    *ui.Signal[int] // changes to make the inspector read the target again
+	sel     *ui.Signal[string]
+	picking *ui.Signal[bool]   // pick mode, for the pick toggle
+	filter  *ui.Signal[string] // the text that filters the tree
+	field   *ui.Signal[string] // the style field the edit row sets
+	value   *ui.Signal[string] // the value the edit row sets it to
+	status  *ui.Signal[string] // the outcome of the last edit or copy
+	title   string             // what the toolbar says is inspected
 }
 
 // newInspector returns the state of an inspector for tg, the target side of the
@@ -55,12 +58,15 @@ func newInspector(target *host, tg inspect.Target) *inspector {
 	}
 	return &inspector{
 		target: target, tg: tg,
-		perf:   inspect.NewPerf(inspectHistory),
-		tick:   ui.NewSignal(0),
-		sel:    ui.NewSignal(""),
-		field:  ui.NewSignal(first),
-		value:  ui.NewSignal(""),
-		status: ui.NewSignal(""),
+		perf:    inspect.NewPerf(inspectHistory),
+		tick:    ui.NewSignal(0),
+		sel:     ui.NewSignal(""),
+		picking: ui.NewSignal(false),
+		filter:  ui.NewSignal(""),
+		field:   ui.NewSignal(first),
+		value:   ui.NewSignal(""),
+		status:  ui.NewSignal(""),
+		title:   "Inspecting " + strconv.Quote(target.cfg.Title),
 	}
 }
 
@@ -107,6 +113,7 @@ func openInspector(h *host) {
 		Height:   760,
 		Strings:  h.cfg.Strings,
 		Root:     ins.root,
+		Bindings: []ui.Binding{ui.Bind("ctrl+shift+c", inspectPick)},
 		OnClosed: ins.close,
 	})
 	hi, err := openWindow(cfg, handle)
@@ -145,9 +152,11 @@ func (ins *inspector) bump() {
 }
 
 // changed is the target's callback when its selection or its pick mode changes:
-// the tree follows the selection, and the details are read again.
+// the tree follows the selection, the pick toggle follows the mode, and the
+// details are read again.
 func (ins *inspector) changed() {
 	ins.sel.Set(keyOf(ins.tg.Selected()))
+	ins.picking.Set(ins.tg.Picking())
 	ins.bump()
 }
 

@@ -65,15 +65,16 @@ func TestInspectorWindowShowsOverriddenLayers(t *testing.T) {
 	}
 	var dump strings.Builder
 	irt.Dump(&dump, 0)
-	// The dump shortens each text to 32 characters, so the lines are matched by their
-	// start: the layer of the value is in the rest of the line.
-	for _, want := range []string{
-		"Radius = 9   (instance Styles)",
-		"overridden: Radius = 5",
-		"overridden: Radius = 4",
-	} {
-		if !strings.Contains(dump.String(), want) {
-			t.Errorf("the inspector's window does not show %q", want)
+	// The table has a row for the field, with the winning value and its layer, and a
+	// row under it for each value it overrides, from the highest layer down.
+	want := []string{`text "Radius"`, `text "9"`, `text "instance Styles"`,
+		`text "5"`, `text "overridden: theme"`, `text "4"`, `text "overridden: built-in default"`}
+	rest := dump.String()
+	for _, w := range want {
+		i := strings.Index(rest, w)
+		if i < 0 {
+			t.Fatalf("the inspector's window does not show %s after the ones before it in %q", w, want)
 		}
+		rest = rest[i+len(w):]
 	}
 }
