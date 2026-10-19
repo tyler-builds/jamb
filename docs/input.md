@@ -77,7 +77,9 @@ when that changes.
   negative index, or `TabStop(false)`, keeps an element focusable by click or
   `FocusHandle` while Tab skips it. Each link of a rich text (`ui.Link` or a
   segment with `OnClick`) is a stop of its own, in tree order, and Enter
-  follows the focused link (see [docs/text.md](text.md#rich-text)).
+  follows the focused link (see [docs/text.md](text.md#rich-text)). A `Toolbar`
+  is one stop, at the control that had focus last; the arrow keys move within it
+  (see [widgets-navigation.md](widgets-navigation.md#toolbars)).
 - **Tab reveals.** Tab scrolls the element it moves to into view, in its nearest
   vertically scrolling ancestor.
 - **Focus moves in OnBlur.** An `OnBlur` handler may move focus to another

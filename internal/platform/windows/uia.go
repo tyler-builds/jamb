@@ -38,6 +38,7 @@ const (
 	ctTab         = 50018
 	ctTabItem     = 50019
 	ctText        = 50020
+	ctToolBar     = 50021 // UIA_ToolBarControlTypeId
 	ctToolTip     = 50022
 	ctTree        = 50023
 	ctTreeItem    = 50024
@@ -226,6 +227,7 @@ const (
 //	calendar                  Calendar          calendar (Grid and Table patterns)
 //	progress bar, busy ring   ProgressBar      progress bar (read-only RangeValue when determinate)
 //	status bar                StatusBar         status bar
+//	tool bar                  ToolBar           tool bar
 //	unknown                   Pane              unknown
 //
 // A text area is an Edit, not a Document: a Document is for read-only rich
@@ -293,6 +295,8 @@ func controlType(r access.Role) int32 {
 		return ctHeaderItem
 	case access.RoleStatusBar:
 		return ctStatusBar
+	case access.RoleToolBar:
+		return ctToolBar
 	}
 	return ctPane
 }

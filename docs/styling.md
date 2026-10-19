@@ -329,6 +329,7 @@ the Text size of 100 percent:
 | `Breadcrumbs`, `Pagination` | as wide as their locations or pages; `Width`, `MinWidth` and `MaxWidth` set it |
 | `Stepper` | fills the container when horizontal, with the lines sharing the room between the steps; as wide as its steps when `Vertical` |
 | `StatusBar` | fills the container; the start items take the free room, and the end items keep their width |
+| `Toolbar` | fills the container, as a row does; its controls keep their own widths |
 | `Collapsible`, `Accordion` | fills the container |
 | `DataGrid`, `Tree`, `ListOf`, `UniformList` | fills the container's width; give a height (`Height`, `MaxHeight`, or `Grow` in a column) so the rows scroll inside it |
 | `Split` | fills the container's width; its height is the container's, as `Full` gives (set `Height` or `Grow` in a column with other children) |
@@ -572,6 +573,7 @@ parts that the code applies.
 | `Pagination` | `Bar`, `Page`, `PageHover`, `PageCurrent`, `Nav`, `Ellipsis` | none | none | done |
 | `Stepper` | `Stepper`, `Step`, `StepHover`, `StepFocusVisible`, `StepDisabled`, `Indicator`, `IndicatorComplete`, `IndicatorCurrent`, `Title`, `Description`, `Connector`, `ConnectorComplete` | `Vertical()` | none | done |
 | `StatusBar` | `Bar`, `Start`, `End` | none | `Start`, `End` (elements) | done |
+| `Toolbar` | `Bar`, `Separator` | none | none | done |
 
 ## Examples
 

@@ -71,6 +71,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `End`, a top border and small muted text. Assistive technology sees a status bar (the new
   `access.RoleStatusBar`, UI Automation's StatusBar control type). It is styled through
   `ui.StatusBarStyle` and `Theme.StatusBar`. The demo's main window has one.
+- `ui.Toolbar(label)` is a row of controls that is one Tab stop: Left and Right move focus
+  between its controls, Home and End go to the first and the last, and Tab comes back to the
+  control that had focus last. Controls that use those keys, such as a text field, keep them.
+  `ui.ToolbarSeparator()` divides groups of controls. Assistive technology sees a tool bar
+  named by its label (the new `access.RoleToolBar`, UI Automation's ToolBar control type). It
+  is styled through `ui.ToolbarStyle` and `Theme.Toolbar`.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.
 - The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a

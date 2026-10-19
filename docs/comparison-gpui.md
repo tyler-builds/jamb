@@ -247,8 +247,7 @@ GPUI Kit's component page lists 69 components in four groups. The jamb column na
 | Resizable, Scrollable | `Split` and `Pane`, `Div` with `ScrollX` and `ScrollY` |
 | Root, Theme | The app window, `ui.Theme` |
 | DescriptionList, GroupBox | Same names |
-| StatusBar | Same name |
-| Toolbar | None |
+| StatusBar, Toolbar | Same names |
 | **Advanced** | |
 | Dock, Tabs, Tree | Same names |
 | DataTable | `DataGrid` |
@@ -263,7 +262,7 @@ The component page also links AlertDialog, Clipboard, Empty, Focus Trap, HoverCa
 
 jamb has some widgets GPUI Kit does not list: `MenuBar`, `Breadcrumbs`, `DateRangePicker` and `CheckboxTri`. It also has Windows shell integration (`NewTray`, jump lists, taskbar progress and badges), native file and message dialogs (`dialog`), `Canvas` and `SVG` drawing, and the inspector.
 
-In total, 11 of GPUI Kit's 69 listed components have no jamb equivalent, six of them the chat and survey components, and jamb has a calendar only inside its date pickers.
+In total, 10 of GPUI Kit's 69 listed components have no jamb equivalent, six of them the chat and survey components, and jamb has a calendar only inside its date pickers.
 
 ## Open items
 

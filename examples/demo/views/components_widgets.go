@@ -11,7 +11,7 @@ import (
 
 // widgetsSection shows the smaller widgets: a sidebar, breadcrumbs,
 // pagination, a stepper, avatars, tags, skeletons, a color picker, a date range
-// picker, group boxes, description lists and a status bar.
+// picker, group boxes, description lists, a status bar and a toolbar.
 func widgetsSection(t *ui.Theme) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		nav := ui.Local(ctx, "w.nav", "inbox")
@@ -25,6 +25,9 @@ func widgetsSection(t *ui.Theme) ui.Element {
 		loading := ui.Local(ctx, "w.loading", true)
 		email := ui.Local(ctx, "w.email", true)
 		desktop := ui.Local(ctx, "w.desktop", false)
+		bold := ui.Local(ctx, "w.bold", true)
+		italic := ui.Local(ctx, "w.italic", false)
+		underline := ui.Local(ctx, "w.underline", false)
 
 		tagRow := ui.Div().Row().Wrap().Gap(6)
 		for i, name := range tags.Get() {
@@ -120,7 +123,16 @@ func widgetsSection(t *ui.Theme) ui.Element {
 				Child(ui.Div().Height(ui.Px(60)).Padding(12).Child(ui.Text("Document").TextColor(t.TextMuted))).
 				Child(ui.StatusBar().Label("Editor status").
 					Start(ui.Text("Saved")).
-					End(ui.Text("Ln 12, Col 4"), ui.Text("UTF-8")))))
+					End(ui.Text("Ln 12, Col 4"), ui.Text("UTF-8")))),
+			sample(t, "Toolbar: one Tab stop, Left and Right move between the controls", ui.Div().Gap(8).Width(ui.Px(420)).
+				Child(ui.Toolbar("Formatting").
+					Child(ui.Toggle("Bold", bold).Small()).
+					Child(ui.Toggle("Italic", italic).Small()).
+					Child(ui.Toggle("Underline", underline).Small()).
+					Child(ui.ToolbarSeparator()).
+					Child(ui.Button("Undo").Ghost().Small().OnClick(pressed("Undo"))).
+					Child(ui.Button("Redo").Ghost().Small().OnClick(pressed("Redo")))).
+				Child(formatPreview(bold.Get(), italic.Get(), underline.Get()))))
 	})
 }
 
@@ -130,6 +142,23 @@ var demoSteps = []ui.Step{
 	{Title: "Shipping", Description: "Address and speed"},
 	{Title: "Payment", Icon: icons.Star},
 	{Title: "Review"},
+}
+
+// formatPreview is a line of text in the formatting that the toolbar sample's
+// toggles choose.
+func formatPreview(bold, italic, underline bool) ui.Element {
+	const s = "The quick brown fox"
+	text := ui.Text(s).FontSize(13)
+	if bold {
+		text.Bold()
+	}
+	if italic {
+		text.Italic()
+	}
+	if underline {
+		text.Highlight(0, len(s), ui.Highlight{Underline: true})
+	}
+	return text
 }
 
 // rangeText describes a chosen range in days.

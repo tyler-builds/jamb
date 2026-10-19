@@ -143,6 +143,7 @@ func TestControlTypeMapping(t *testing.T) {
 		{access.RoleTab, ctTabItem},
 		{access.RoleTabPanel, ctPane},
 		{access.RoleStatusBar, 50017},
+		{access.RoleToolBar, 50021},
 		{access.RoleUnknown, ctPane},
 	}
 	for _, c := range cases {

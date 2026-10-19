@@ -1,7 +1,7 @@
 # Navigation widgets
 
 Tabs, collapsible sections, trees, the sidebar, the other navigation controls, group boxes,
-description lists and status bars.
+description lists, status bars and toolbars.
 
 ## Navigation and layout
 
@@ -307,3 +307,34 @@ ui.Div().Column().Size(ui.Full, ui.Full).
   holds its items, so a screen reader can find it by its type. It needs no name; `Label`
   names it when a window has two. It is not a live region: a change to its text is not
   announced, so an app announces a change the user should hear about with `Announce`.
+
+## Toolbars
+
+`ui.Toolbar(label)` is a row of controls, such as the formatting buttons above an editor,
+named by `label` for assistive technology. `ui.ToolbarSeparator()` draws a thin line
+between groups of controls. Its look is `ui.ToolbarStyle`: per app in `Theme.Toolbar`, or
+per instance with `Styles`. It follows high contrast and the Text size.
+
+```go
+ui.Toolbar("Formatting").
+	Child(ui.Toggle("Bold", bold).Small()).
+	Child(ui.Toggle("Italic", italic).Small()).
+	Child(ui.ToolbarSeparator()).
+	Child(ui.Button("Undo").Ghost().Small().OnClick(undo))
+```
+
+- **Keys.** The toolbar follows the WAI-ARIA toolbar pattern
+  (https://www.w3.org/WAI/ARIA/apg/patterns/toolbar/). It is one Tab stop: Tab enters it at
+  the control that had focus last (the first one at the start), and the next Tab leaves it.
+  Left and Right move focus to the previous and the next control, wrapping at the ends, and
+  Home and End move it to the first and the last. Separators and disabled controls are
+  passed over. A control that uses those keys keeps them, as the pattern says: a text field
+  moves its caret with them, and a slider or a toggle group changes its value.
+- **Look.** The controls are in a row 2 pixels apart, on the surface color and outlined in
+  the border color. The toolbar does not restyle its controls, so give its buttons and
+  toggles the looks that suit it, usually `Ghost()` (the default of a toggle) and `Small()`.
+  Under high contrast the outline and the separators are the text color.
+- **Layout.** The toolbar fills the width of its container. It does not wrap or move
+  controls that do not fit into a menu; keep it short enough for the window.
+- **Accessibility.** The toolbar is a tool bar (UI Automation's ToolBar control type) named
+  by its label, with its controls and separators inside it.
