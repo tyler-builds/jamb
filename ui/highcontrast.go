@@ -80,6 +80,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Tooltip:       base.Tooltip,
 		Avatar:        base.Avatar,
 		Tag:           base.Tag,
+		GroupBox:      base.GroupBox,
 		Kbd:           base.Kbd,
 		Skeleton:      base.Skeleton,
 		Sidebar:       base.Sidebar,

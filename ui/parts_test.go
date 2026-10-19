@@ -217,6 +217,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Avatar", func(t *testing.T) { testAvatarParts(t, applied) })
 	t.Run("Tag", func(t *testing.T) { testTagParts(t, applied) })
 	t.Run("Kbd", func(t *testing.T) { testKbdParts(t, applied) })
+	t.Run("GroupBox", func(t *testing.T) { testGroupBoxParts(t, applied) })
 	t.Run("Skeleton", func(t *testing.T) { testSkeletonParts(t, applied) })
 	t.Run("Sidebar", func(t *testing.T) { testSidebarParts(t, applied) })
 	t.Run("Breadcrumbs", func(t *testing.T) { testBreadcrumbsParts(t, applied) })
