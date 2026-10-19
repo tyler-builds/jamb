@@ -38,6 +38,11 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - `ui.Kbd` shows a keyboard shortcut as key caps, from keys written as for `Bind`, with the key
   names a menu shows. It is one static text for assistive technology, such as "Ctrl+Shift+P".
 - `ui.LinkSegs` makes one link of several styled segments.
+- `ui.Stepper(current, steps...)` shows the progress through the steps of a process: complete
+  steps show a check mark, the current one is highlighted, and the later ones are muted. It lays
+  out horizontally or with `Vertical()`, and `OnSelect` makes the steps choosable with a click or
+  the keyboard. Each step is named for assistive technology by its position, title and state, such
+  as "Step 2 of 4: Shipping, current". It is styled through `ui.StepperStyle` and `Theme.Stepper`.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.
 - The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a

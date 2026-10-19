@@ -23,6 +23,7 @@ func italianStrings() *Strings {
 		ResizePanes:          "Ridimensiona riquadri",
 		DateField:            "Data",
 		DateRangeField:       "Intervallo di date",
+		Steps:                "Passaggi",
 		LoadingEllipsis:      "Caricamento…",
 		LoadingSuggestions:   "Caricamento dei suggerimenti",
 		SaturationBrightness: "Saturazione e luminosità",

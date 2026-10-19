@@ -54,6 +54,8 @@ type Strings struct {
 	DateField string
 	// DateRangeField is the default name of a date range field.
 	DateRangeField string
+	// Steps is the default name of a stepper.
+	Steps string
 
 	// The labels of the controls that jamb draws.
 	LoadingEllipsis string
@@ -145,6 +147,14 @@ type Strings struct {
 	CurrentPage func(n int) string
 	// PageOf builds the name of a page, from its number and the number of pages.
 	PageOf func(page, pages int) string
+	// StepCompleted, StepCurrent and StepUpcoming name a step of a stepper, from its
+	// number, the number of steps and its title, such as "Step 2 of 4: Shipping,
+	// current". StepCompleted names a step before the current one.
+	StepCompleted func(n, steps int, title string) string
+	// StepCurrent names the current step of a stepper.
+	StepCurrent func(n, steps int, title string) string
+	// StepUpcoming names a step after the current one.
+	StepUpcoming func(n, steps int, title string) string
 
 	// The notes of a calendar's days: Today, and the ends and the middle of a range.
 	Today string
@@ -387,6 +397,7 @@ func englishStrings() *Strings {
 		ResizePanes:    "Resize panes",
 		DateField:      "Date",
 		DateRangeField: "Date range",
+		Steps:          "Steps",
 
 		LoadingEllipsis:      "Loading…",
 		LoadingSuggestions:   "Loading suggestions",
@@ -433,6 +444,16 @@ func englishStrings() *Strings {
 		Page:          func(n int) string { return fmt.Sprintf("Page %d", n) },
 		CurrentPage:   func(n int) string { return fmt.Sprintf("Page %d, current page", n) },
 		PageOf:        func(page, pages int) string { return fmt.Sprintf("Page %d of %d", page, pages) },
+
+		StepCompleted: func(n, steps int, title string) string {
+			return fmt.Sprintf("Step %d of %d: %s, completed", n, steps, title)
+		},
+		StepCurrent: func(n, steps int, title string) string {
+			return fmt.Sprintf("Step %d of %d: %s, current", n, steps, title)
+		},
+		StepUpcoming: func(n, steps int, title string) string {
+			return fmt.Sprintf("Step %d of %d: %s, not started", n, steps, title)
+		},
 
 		TabMoved: func(tab string, position, count int) string {
 			return fmt.Sprintf("%s moved to position %d of %d", tab, position, count)

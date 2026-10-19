@@ -212,7 +212,7 @@ var appliedStates = map[string]string{
 	"Checked": "checked", "Mixed": "mixed", "Disabled": "disabled", "Invalid": "invalid",
 	"Selected": "selected", "Highlighted": "highlighted", "Open": "open", "Current": "current",
 	"Today": "today", "InRange": "in range", "OutsideMonth": "outside month", "Sorted": "sorted",
-	"Alternate": "alternate", "Editing": "editing",
+	"Alternate": "alternate", "Editing": "editing", "Complete": "complete",
 }
 
 // nameStates names the layers of the applied states of a resolved widget style (see

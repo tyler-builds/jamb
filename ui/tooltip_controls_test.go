@@ -74,6 +74,7 @@ func TestWidgetsTakeATooltip(t *testing.T) {
 		{"Sidebar", access.RoleGroup, "C",
 			Div().Row().Height(Px(200)).Child(Sidebar(NewSignal("a"), SidebarItem{Key: "a", Label: "A"}).Label("C").Tooltip("Help"))},
 		{"Tag", access.RoleGroup, "Sales", Tag("Sales").Tooltip("Help")},
+		{"Stepper", access.RoleList, "C", Stepper(NewSignal(1), Step{Title: "One"}, Step{Title: "Two"}).Label("C").Tooltip("Help")},
 		{"Avatar", access.RoleImage, "Sample User", Avatar("Sample User").Tooltip("Help")},
 	}
 	for _, c := range cases {
