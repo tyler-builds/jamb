@@ -1,6 +1,7 @@
 # Navigation widgets
 
-Tabs, collapsible sections, trees, the sidebar, the other navigation controls, and group boxes.
+Tabs, collapsible sections, trees, the sidebar, the other navigation controls, group boxes and
+description lists.
 
 ## Navigation and layout
 
@@ -213,3 +214,29 @@ ui.GroupBox("Storage").Fill().Children(usageBar, cleanButton) // filled, without
   contrast both looks are the window color outlined in the text color.
 - **Accessibility.** The box is a group named by its title, with the description as its
   description, so assistive technology reads the title as it enters the group.
+
+## Description lists
+
+`ui.DescriptionList()` shows terms with their values, such as the details of a record.
+Its look is `ui.DescriptionListStyle`: per app in `Theme.DescriptionList`, or per instance
+with `Styles`. It follows high contrast and the Text size.
+
+```go
+ui.DescriptionList().
+	ItemText("Owner", "Dana Lee").
+	ItemText("Region", "West").
+	Item("Status", ui.BadgeText("Active").Variant(ui.BadgeSuccess)) // any element as the value
+ui.DescriptionList().Columns(2).Vertical().Bordered(). // two columns, terms above values, with lines
+	ItemText("Created", "May 4").ItemText("Updated", "June 12")
+```
+
+- **Layout.** The items are laid out in a grid, row by row, in `Columns(n)` columns of the
+  same width (1 by default). By default each term is in a column of its own, 120 pixels
+  wide (the `Width` of the `Term` part), beside its value; `Vertical()` puts the term above
+  the value instead. The term is muted text, and the value takes the rest of the item.
+- **Bordered.** `Bordered()` outlines the list and draws a line between its items, which are
+  padded. The lines are the border edges of each `Item`: one above every row but the first
+  and one before every column but the first. Under high contrast the lines and the terms are
+  the text color.
+- **Accessibility.** Each item is a group named by its term, with the value inside it, so
+  assistive technology reads the value with its term.

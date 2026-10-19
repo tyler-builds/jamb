@@ -94,6 +94,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		ColorPicker:     base.ColorPicker,
 		Drawer:          base.Drawer,
 		Popover:         base.Popover,
+		DescriptionList: base.DescriptionList,
 
 		styles: base.styles, // never changed in place (see SetThemeStyle)
 	}

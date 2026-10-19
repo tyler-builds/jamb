@@ -159,6 +159,8 @@ type Theme struct {
 	Tag TagStyle
 	// GroupBox is the look of every group box, outlined or filled.
 	GroupBox GroupBoxStyle
+	// DescriptionList is the look of every description list.
+	DescriptionList DescriptionListStyle
 	// Kbd is the look of every keyboard shortcut drawn as key caps.
 	Kbd KbdStyle
 	// Skeleton is the look of every skeleton placeholder.
