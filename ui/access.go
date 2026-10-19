@@ -1237,8 +1237,12 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 		role = access.RoleTextArea
 	}
 	v := n.editor.value.Peek()
+	value := v
+	if n.editor.hidden() {
+		value = b.rt.maskedText(v) // a bullet for each character, as the field draws it
+	}
 	an := &access.Node{ID: id, Role: role, Name: n.editor.name, Key: n.key, Bounds: b.bounds(n),
-		Value:   v,
+		Value:   value,
 		Actions: []access.Action{access.ActionFocus, access.ActionSetValue, access.ActionSetTextSelection}}
 	if n.st != nil && n.st.edit != nil {
 		n.st.edit.sync(v)
@@ -1258,6 +1262,9 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 	}
 	if n.editor.multiline {
 		an.States |= access.StateMultiLine
+	}
+	if n.editor.password {
+		an.States |= access.StatePassword
 	}
 	if a := n.div.acc; a != nil {
 		if a.invalid {

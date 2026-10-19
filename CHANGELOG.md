@@ -104,6 +104,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `ui/uitest` can advance.
 - The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a
   Markdown page.
+- `TextInput.Masked()` draws a bullet for each character, as a Windows password box does: copy and
+  cut do nothing, a word is the whole text, and assistive technology reads a password field whose
+  value is the bullets. `Revealable()` adds an eye button that shows and hides the text (Alt+F8 from
+  the keyboard), a toggle button named by `Strings.ShowPassword` and `HidePassword` that leaves the
+  focus in the field. Its look is the new `Button` and `ButtonHover` parts of `ui.FieldStyle`, and
+  `icons.EyeOff` is new.
 
 ### Changed
 

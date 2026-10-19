@@ -244,6 +244,12 @@ func (rt *Runtime) editorHorizontal(id uint64, dir int, word, extend bool) {
 	}
 	p := es.caret
 	switch {
+	case word && n.editor.password:
+		// The words of a password are not shown, so a word is the whole text.
+		p = len(v)
+		if dir < 0 {
+			p = 0
+		}
 	case word && dir < 0:
 		p = wordBackward(v, p)
 	case word:
@@ -326,6 +332,13 @@ func (rt *Runtime) editorDeleteStep(id uint64, dir int, word bool) {
 	switch {
 	case a != b:
 		rt.editorDelete(id, a, b)
+	case word && n.editor.password:
+		// A word of a password is the whole text before or after the caret.
+		if dir < 0 {
+			rt.editorDelete(id, 0, a)
+		} else {
+			rt.editorDelete(id, a, len(v))
+		}
 	case dir < 0 && word:
 		rt.editorDelete(id, wordBackward(v, a), a)
 	case dir < 0:
@@ -359,9 +372,11 @@ func (rt *Runtime) editorSelectAll(id uint64) {
 	rt.editorTouched(id)
 }
 
+// editorCopy copies the selection. A masked field keeps its text off the
+// clipboard: it copies nothing, and cuts nothing either.
 func (rt *Runtime) editorCopy(id uint64) {
 	n, es, v := rt.editorOf(id)
-	if n == nil || !es.hasSelection() {
+	if n == nil || !es.hasSelection() || n.editor.password {
 		return
 	}
 	a, b := es.selection()
@@ -371,7 +386,7 @@ func (rt *Runtime) editorCopy(id uint64) {
 func (rt *Runtime) editorCut(id uint64) {
 	rt.editorCopy(id)
 	n, es, v := rt.editorOf(id)
-	if n == nil || !es.hasSelection() {
+	if n == nil || !es.hasSelection() || n.editor.password {
 		return
 	}
 	a, b := es.selection()

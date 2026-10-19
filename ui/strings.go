@@ -127,6 +127,10 @@ type Strings struct {
 	Increase string
 	// Decrease is the name of the button that decreases a number.
 	Decrease string
+	// ShowPassword is the name of the button that shows the text of a masked field.
+	ShowPassword string
+	// HidePassword is the name of that button while the text is shown.
+	HidePassword string
 
 	// The names of a dock's tab strip and of the commands of its tabs' menus.
 	PanelGroup string
@@ -462,6 +466,8 @@ func englishStrings() *Strings {
 		Restore:             "Restore",
 		Increase:            "Increase",
 		Decrease:            "Decrease",
+		ShowPassword:        "Show password",
+		HidePassword:        "Hide password",
 
 		PanelGroup:      "Panels",
 		MovePanelLeft:   "Move left",

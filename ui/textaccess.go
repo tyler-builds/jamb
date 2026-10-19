@@ -70,11 +70,17 @@ func (rt *Runtime) buildTextContent(v string, l *text.Layout) *access.TextConten
 // and the editor state es, as the snapshot being built shows them.
 func (b *accessBuilder) textInfo(n *node, es *editState, v string) *access.TextInfo {
 	rt := b.rt
+	anchor, caret := es.anchor, es.caret
+	if n.editor.hidden() {
+		// A masked field's content is its bullets, as it draws them.
+		anchor, caret = rt.maskOffset(v, anchor), rt.maskOffset(v, caret)
+		v = rt.maskedText(v)
+	}
 	c := rt.textContent(es, v)
 	return &access.TextInfo{
 		Content:    c,
-		Anchor:     c.PointOf(es.anchor),
-		Caret:      c.PointOf(es.caret),
+		Anchor:     c.PointOf(anchor),
+		Caret:      c.PointOf(caret),
 		OriginX:    (n.abs.X + es.originX) * rt.scale,
 		OriginY:    (n.abs.Y + es.originY) * rt.scale,
 		Scale:      rt.scale,
@@ -89,10 +95,14 @@ func (b *accessBuilder) textInfo(n *node, es *editState, v string) *access.TextI
 // caret, clamped to the text on a rune boundary, and focuses the editor, as a
 // selection made by an assistive technology should. It is the Select of a text
 // range. The request is made from a snapshot, so the offsets may be out of date.
+// The offsets of a masked field are of its bullets (see textInfo).
 func (rt *Runtime) editorSelect(id uint64, anchor, caret int) {
 	n, es, v := rt.editorOf(id)
 	if n == nil {
 		return
+	}
+	if n.editor.hidden() {
+		anchor, caret = rt.unmaskOffset(v, anchor), rt.unmaskOffset(v, caret)
 	}
 	if rt.focusID != id {
 		rt.setFocus(id)
