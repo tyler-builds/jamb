@@ -315,7 +315,11 @@ func keyLabel(k input.Key) string {
 }
 
 // strokeLabel formats a stroke as "Ctrl+Shift+P".
-func strokeLabel(s keystroke) string {
+func strokeLabel(s keystroke) string { return strings.Join(strokeKeys(s), "+") }
+
+// strokeKeys returns the names of the keys of a stroke, the modifiers first, such
+// as "Ctrl", "Shift" and "P". A Kbd draws each as a key cap.
+func strokeKeys(s keystroke) []string {
 	var parts []string
 	for _, m := range []struct {
 		bit  input.Modifiers
@@ -325,7 +329,7 @@ func strokeLabel(s keystroke) string {
 			parts = append(parts, m.name)
 		}
 	}
-	return strings.Join(append(parts, keyLabel(s.key)), "+")
+	return append(parts, keyLabel(s.key))
 }
 
 // bindingsOn lists the bindings that apply on the focus path, in precedence
