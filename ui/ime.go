@@ -45,8 +45,11 @@ func (rt *Runtime) hostCompose(c composition) {
 		return
 	}
 	n, es, v := rt.editorOf(rt.focusID)
-	if n == nil || n.editor.locked() {
-		return // a read-only field, or no field, shows nothing
+	if n == nil || n.editor.locked() || n.editor.password {
+		// A read-only field, or no field, shows nothing. A masked field does not show
+		// the composition either, as a one-time code input does not: the text that the
+		// input method confirms is typed as typed text is.
+		return
 	}
 	if c.text == "" {
 		if rt.composing != 0 {

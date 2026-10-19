@@ -169,6 +169,8 @@ var layerBuilders = []layerBuilder{
 		func(st any) Element { return partField("TextInput", NewSignal(""), st.(FieldStyle), false, "disabled") }},
 	{"TextInput", func(th *Theme) any { return &th.Field },
 		func(st any) Element { return partField("TextInput", NewSignal(""), st.(FieldStyle), true, "") }},
+	{"TextInput", func(th *Theme) any { return &th.Field },
+		func(st any) Element { return partField("TextInput", NewSignal("x"), st.(FieldStyle), false, "buttons") }},
 	{"TextArea", func(th *Theme) any { return &th.Field },
 		func(st any) Element { return partField("TextArea", NewSignal(""), st.(FieldStyle), false, "") }},
 	{"TextArea", func(th *Theme) any { return &th.Field },

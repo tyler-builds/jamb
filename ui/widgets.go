@@ -7,6 +7,7 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
+	"github.com/tyler-builds/jamb/input"
 )
 
 // ButtonVariant selects a button's look.
@@ -390,8 +391,11 @@ func (dividerElement) expand(ctx *Context) Element {
 // TextInput or TextArea is empty. Leading and Trailing are the containers of the
 // content before and after the text: the icon (see Icon) and the element of
 // Leading, and the element of Trailing. A number input has no placeholder, icon
-// or element, so Placeholder, Leading and Trailing do not apply to it. The caret
-// is drawn in the text color, and its width and blink follow the system settings.
+// or element, so Placeholder, Leading and Trailing do not apply to it. Button is
+// each button that a TextInput puts in its Trailing part (see Revealable), and
+// ButtonHover such a button while the pointer is over it; a TextArea has none. The
+// caret is drawn in the text color, and its width and blink follow the system
+// settings.
 type FieldStyle struct {
 	Frame            Style // the box around the text; not drawn when a field is Borderless
 	FrameHover       Style // the frame while the pointer is over it, if the field is enabled (paint only)
@@ -404,6 +408,8 @@ type FieldStyle struct {
 	Selection        Style // the background of the selected text
 	Leading          Style // the container of the icon and the Leading element, before the text
 	Trailing         Style // the container of the Trailing element, after the text
+	Button           Style // each button of a TextInput in the Trailing part: the reveal button
+	ButtonHover      Style // such a button while the pointer is over it (paint only)
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -420,6 +426,8 @@ func (s FieldStyle) merge(o FieldStyle) FieldStyle {
 		Selection:        s.Selection.Merge(o.Selection),
 		Leading:          s.Leading.Merge(o.Leading),
 		Trailing:         s.Trailing.Merge(o.Trailing),
+		Button:           s.Button.Merge(o.Button),
+		ButtonHover:      s.ButtonHover.Merge(o.ButtonHover),
 	}
 }
 
@@ -437,6 +445,8 @@ func (s FieldStyle) plain() FieldStyle {
 		Selection:        plainStyle(s.Selection),
 		Leading:          plainStyle(s.Leading),
 		Trailing:         plainStyle(s.Trailing),
+		Button:           plainStyle(s.Button),
+		ButtonHover:      plainStyle(s.ButtonHover),
 	}
 }
 
@@ -469,11 +479,18 @@ func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
 		Placeholder:      Style{TextColor: t.TextSubtle},
 		Selection:        Style{Background: t.Accent.Alpha(0.32)},
 		Leading:          Style{Direction: Row, Align: Center, NoShrink: true, TextColor: t.TextSubtle},
-		Trailing:         Style{Direction: Row, Align: Center, NoShrink: true},
+		Trailing:         Style{Direction: Row, Align: Center, Gap: 2, NoShrink: true},
+		// A TextInput's own buttons are small and quiet, and do not take the text's room.
+		Button: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(22), Height: Px(22),
+			NoShrink: true, Radius: 4, TextColor: t.TextMuted},
+		ButtonHover: Style{Background: t.SurfaceHover, TextColor: t.Text},
 	}
 	if t.HighContrast {
 		// The selection is the Highlight color with HighlightText on it, as Windows draws it.
 		d.Selection = Style{Background: t.Accent, TextColor: t.AccentText}
+		// A button is drawn in the text color, and in Highlight under the pointer.
+		d.Button.TextColor = t.Text
+		d.ButtonHover = Style{Background: t.Accent, TextColor: t.AccentText}
 	}
 	// A read-only field keeps its border and full-contrast text, on a fill that
 	// sets it apart from an editable one. The step between surfaces is smaller in
@@ -536,6 +553,8 @@ type fieldOptions struct {
 	description string            // set by DataGrid, to say why the last save failed (a literal, not a key)
 	onStep      func(dir int)     // set by NumberInput, for Up and Down
 	readOnly    bool              // see ReadOnly
+	masked      bool              // see TextInputElement.Masked
+	revealable  bool              // see TextInputElement.Revealable
 	tooltip     string            // shown over the frame; the field's description when it has none
 	disabled    bool              // see Disabled
 	styles      FieldStyle        // the instance's parts: from Styles, and the frame's Style
@@ -617,6 +636,27 @@ func (ti *TextInputElement) OnChange(fn func(string)) *TextInputElement { ti.onC
 // focused, and its text selected and copied. Assistive technology reports it as
 // read-only. Its frame is the FrameReadOnly part.
 func (ti *TextInputElement) ReadOnly(on bool) *TextInputElement { ti.readOnly = on; return ti }
+
+// Masked draws a bullet (•) in place of each character, as a password box does.
+// The caret and the selection still move by characters. Copy and cut do nothing,
+// so the text stays off the clipboard, while paste works. A word is the whole
+// text, since its words are not shown: a double-click selects it all, and
+// Ctrl+Left, Ctrl+Right, Ctrl+Backspace and Ctrl+Delete go to the start or the
+// end. An input method's composition is not shown in the field: the text that it
+// confirms is typed as typed text is, as in an OTPInput. Assistive technology
+// reads the field as a password field, whose value is a bullet for each character.
+func (ti *TextInputElement) Masked() *TextInputElement { ti.masked = true; return ti }
+
+// Revealable adds a button after the text of a Masked field that shows the text
+// and masks it again, as the reveal button of a Windows password box does; Alt+F8
+// does the same while the field has focus. The button is not a Tab stop, and
+// pressing it leaves the focus in the field. Assistive technology reads it as a
+// toggle button named Strings.ShowPassword, or HidePassword while the text is
+// shown, which is pressed while the text is shown. A shown text is drawn and read
+// as it is, but copy and cut still do nothing and the field is still a password
+// field. The button is drawn in the Button part, inside the Trailing part and
+// before the Trailing element. Without Masked, Revealable does nothing.
+func (ti *TextInputElement) Revealable() *TextInputElement { ti.revealable = true; return ti }
 
 // OnPasteImage runs fn with the image on the clipboard when the user pastes
 // (Ctrl+V or the Paste action) and the clipboard holds an image but no text,
@@ -927,6 +967,16 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		}
 		h = ctxState.focus
 	}
+	// A revealable field keeps whether it shows its text with the field, and reading
+	// it subscribes the field, as the value does.
+	revealable := f.masked && f.revealable && !f.disabled
+	revealed := false
+	if revealable {
+		if ctxState.revealed == nil {
+			ctxState.revealed = NewSignal(false)
+		}
+		revealed = ctxState.revealed.Get()
+	}
 	ed := &editorElement{
 		value: f.value, placeholder: f.placeholder, name: name, labelledBy: labelledBy, describedBy: describedBy, multiline: multiline,
 		onSubmit: onSubmit, onChange: onChange, onBlur: onBlur, onCancel: f.onCancel, description: description,
@@ -934,6 +984,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
 		readOnly: f.readOnly, disabled: f.disabled, onPasteImage: f.onPasteImg,
+		password: f.masked, revealed: revealed,
 	}
 	if multiline && minRows > 0 {
 		size := t.FontSize
@@ -980,8 +1031,31 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		box.Child(lead)
 	}
 	box.Child(ed)
-	if f.trailingEl != nil {
-		box.Child(Div().asPart(f.widget + ".Trailing").Style(st.Trailing).Child(f.trailingEl))
+	// The field's own buttons come before the Trailing element, in the Trailing part.
+	var buttons []Element
+	if revealable {
+		strs := ctx.Strings()
+		name, ic := strs.ShowPassword, icons.Eye
+		if revealed {
+			name, ic = strs.HidePassword, icons.EyeOff
+		}
+		toggle := func() { ctxState.revealed.Set(!ctxState.revealed.Peek()) }
+		// The name says what a press does, so the button reports no pressed state as well.
+		buttons = append(buttons, f.button(st, ic, name, toggle))
+		// Alt+F8 shows and hides the text from the keyboard, as in a WinUI PasswordBox.
+		box.OnKeyDown(func(e *KeyEvent) {
+			if e.Key == input.KeyF8 && e.Mods == input.ModAlt {
+				e.StopPropagation()
+				toggle()
+			}
+		})
+	}
+	if len(buttons) > 0 || f.trailingEl != nil {
+		trail := Div().asPart(f.widget + ".Trailing").Style(st.Trailing).Children(buttons...)
+		if f.trailingEl != nil {
+			trail.Child(f.trailingEl)
+		}
+		box.Child(trail)
 	}
 	if f.trailing != nil {
 		box.Child(f.trailing)
@@ -990,4 +1064,13 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		box.Child(o)
 	}
 	return f.size.apply(box)
+}
+
+// button returns one of the field's own buttons, named name, in the Button part.
+// It is not a Tab stop and does not take focus, so a press on it leaves the focus
+// in the field (the frame keeps it, see KeepFocus).
+func (f *fieldOptions) button(st FieldStyle, ic *icons.Icon, name string, onClick func()) *DivElement {
+	return Div().asPart(f.widget + ".Button").Style(st.Button).Hover(st.ButtonHover).
+		Role(access.RoleButton).Label(name).Tooltip(name).OnClick(onClick).
+		Child(Icon(ic).Size(14))
 }

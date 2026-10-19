@@ -35,6 +35,7 @@ func TestMatchingSections(t *testing.T) {
 		{"otp", []string{"Form controls"}},
 		{"one-time code", []string{"Form controls"}},
 		{"toggle", []string{"Form controls"}},
+		{"password", []string{"Form controls"}},
 		{"chart", []string{"Charts"}},
 		{"spinner", []string{"Feedback"}},
 		{"sheet", []string{"Dialogs"}},

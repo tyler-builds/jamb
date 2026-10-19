@@ -133,6 +133,25 @@ ui.OTPInput("PIN", pin, 4).Masked()                 // dots, reported as a passw
 ui.OTPInput("Recovery code", rec, 8).Alphanumeric() // letters and digits
 ```
 
+- A password field is a `TextInput` with `Masked()`, which draws a bullet (•) for
+  each character, as a Windows password box does. The caret and the selection move
+  by characters. Copy and cut do nothing, so the text stays off the clipboard, while
+  paste works. Its words are not shown, so a word is the whole text: a double-click
+  selects it all, and Ctrl+Left, Ctrl+Right, Ctrl+Backspace and Ctrl+Delete go to
+  the start or the end. An input method's composition is not shown in the field;
+  the text it confirms is typed, as in a one-time code input. `Revealable()` adds an
+  eye button at the end of the field that shows the text and masks it again; Alt+F8
+  does the same, as in a WinUI PasswordBox. The button is not a Tab stop, and a
+  press on it leaves the focus in the field. A shown text is drawn and read as it is,
+  but copy and cut still do nothing. The button comes before the field's own
+  `Trailing` element, in the `Trailing` part, and its look is the `Button` part of
+  the field (see Styling). A masked field works in a `Field` and a `Form` as any
+  text input does.
+
+```go
+ui.TextInput(password).Masked().Revealable().Label("Password") // bullets, with a reveal button
+```
+
 ![Inline spin buttons inside the field, with the pointer over the plus button](screenshots/spin-buttons-inline.png)
 
 ![Stacked spin buttons, with the pointer over the up button](screenshots/spin-buttons-stacked.png)
@@ -151,7 +170,11 @@ control type describes
 A one-time code input is one text field named by its label, whose value is the
 code; its boxes are not separate nodes. A masked one reports IsPassword, and its
 value is a dot for each character, so the code is never exposed. Assistive
-technology can set the code, which is filled from the first box.
+technology can set the code, which is filled from the first box. A masked text
+input is a text field with IsPassword, whose value and text are a bullet for each
+character, unless its text is shown. Its reveal button is a button named "Show
+password", or "Hide password" while the text is shown (`Strings.ShowPassword` and
+`Strings.HidePassword`); its name says what a press does, so it has no pressed state.
 
 ## Color picker
 

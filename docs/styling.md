@@ -265,6 +265,9 @@ ui.TextInput(query).Icon(icons.Search).Trailing(clearButton).Styles(ui.FieldStyl
   the text, in the `Leading` and `Trailing` parts. The `Icon` of a `TextInput` is in
   `Leading` too, and it takes the `Leading` part's text color, as text does. A part
   is drawn only when the field has content for it.
+- The buttons that a `TextInput` adds itself, the reveal button of a `Revealable`
+  field, are in the `Trailing` part before the `Trailing` element. Each is a `Button`
+  part, with `ButtonHover` while the pointer is over it. A `TextArea` has none.
 - A borderless field (`Borderless()`) draws no `Frame` part, so its frame styles and
   states do not apply. Its `Text`, `Placeholder`, `Selection`, `Leading` and `Trailing`
   parts still apply.
@@ -544,7 +547,8 @@ parts that the code applies.
 | `NumberInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
 | `OTPInput` | `Root`, `Group`, `Box`, `BoxFilled`, `BoxFocused`, `BoxDisabled`, `BoxInvalid`, `Text`, `Dot` | `Masked()`, `Alphanumeric()`, `Groups(...)` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |
-| `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
+| `TextInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing`, `Button`, `ButtonHover` (see "The text frame") | `Masked()`, `Revealable()` | `Leading`, `Trailing` (elements) | done |
+| `TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
 | `Checkbox`, `CheckboxTri` | `Control`, `ControlFocusVisible`, `ControlDisabled`, `Box`, `BoxHover`, `BoxChecked`, `BoxMixed`, `BoxDisabled`, `BoxInvalid`, `Mark`, `Dash`, `Label`, `LabelDisabled` | none | none | done |
 | `Switch` | `Track`, `TrackChecked`, `TrackHover`, `TrackFocusVisible`, `TrackDisabled`, `Knob`, `KnobChecked`, `KnobDisabled` | none | none | done |
 | `Toggle` | `Root`, `RootChecked`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Ghost`, `Secondary` (the looks of those buttons) | none | done |

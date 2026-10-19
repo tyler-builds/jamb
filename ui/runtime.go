@@ -60,11 +60,12 @@ type nodeState struct {
 	animReady      bool
 	bg, border, fg Color
 
-	edit    *editState
-	focus   *FocusHandle // default handle of a text field
-	list    *listState   // rows of a UniformList's scroll container
-	varList *varState    // rows of a ListOf's scroll container
-	anim    *animState   // progress of an Animate instance
+	edit     *editState
+	focus    *FocusHandle  // default handle of a text field
+	revealed *Signal[bool] // whether a masked text field shows its text (see Revealable)
+	list     *listState    // rows of a UniformList's scroll container
+	varList  *varState     // rows of a ListOf's scroll container
+	anim     *animState    // progress of an Animate instance
 
 	// Paint-only values the transitions last showed, and the times an
 	// entrance or an exit began (zero when there is none).

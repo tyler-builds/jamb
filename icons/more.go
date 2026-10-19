@@ -58,6 +58,14 @@ var (
 		b.Circle(12, 12, 3)
 	})
 
+	// EyeOff is Eye struck through, for a hidden password (see ui.TextInputElement.Revealable).
+	EyeOff = newIcon("eye-off", func(b *builder) {
+		b.M(2, 12).Arc(12, 15.64, 10.64, -160, -20)
+		b.M(2, 12).Arc(12, 8.36, 10.64, 160, 20)
+		b.Circle(12, 12, 3)
+		b.Line(3, 3, 21, 21)
+	})
+
 	Menu = newIcon("menu", func(b *builder) {
 		b.Line(4, 6, 20, 6).Line(4, 12, 20, 12).Line(4, 18, 20, 18)
 	})
@@ -144,7 +152,7 @@ var (
 var All = []*Icon{
 	ArrowLeft, ArrowRight, ArrowUpRight, Activity, Alert, Archive, Bell, Bookmark, Box,
 	Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Clock, Copy, Maximize, Minimize, Restore,
-	Dashboard, Download, Eye, File, Filter, Folder, GitBranch, Hash, Heart, Home, Inbox, Info,
+	Dashboard, Download, Eye, EyeOff, File, Filter, Folder, GitBranch, Hash, Heart, Home, Inbox, Info,
 	Layers, Link, Lock, Menu, Minus, Moon, MoreHorizontal, Pause, Pencil, Pin, Play, Plus, Refresh, Search,
 	Settings, Star, StarFilled, Sun, Tag, Trash, Upload, Users, X, Zap,
 }

@@ -3,6 +3,7 @@ package ui
 import (
 	"image"
 	"math"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -132,6 +133,40 @@ type editorElement struct {
 	// changed. disabled also takes the field out of the tab order and ignores
 	// the pointer.
 	readOnly, disabled bool
+	// password is set on a masked field (see TextInputElement.Masked): copy and
+	// cut do nothing, a word is the whole text, an input method's composition is
+	// not shown, and assistive technology reads it as a password field. Unless
+	// revealed is set too, the text is drawn, and read, as a bullet for each
+	// character (see hidden).
+	password, revealed bool
+}
+
+// hidden reports whether the editor draws its text as bullets (see maskedText).
+func (e *editorElement) hidden() bool { return e.password && !e.revealed }
+
+// maskBullet is what a masked field draws for each character of its text, as a
+// Windows password box does.
+const maskBullet = "•"
+
+// maskedText returns what a masked field shows for its text v: a bullet for each
+// character (grapheme cluster), so that the caret and the selection move by the
+// characters of v.
+func (rt *Runtime) maskedText(v string) string {
+	return strings.Repeat(maskBullet, len(rt.text.GraphemeStops(v))-1)
+}
+
+// maskOffset returns the byte offset in the masked text of v (see maskedText) of
+// the byte offset p of v.
+func (rt *Runtime) maskOffset(v string, p int) int {
+	i, _ := slices.BinarySearch(rt.text.GraphemeStops(v), p)
+	return i * len(maskBullet)
+}
+
+// unmaskOffset returns the byte offset in v of the byte offset q of its masked
+// text: the start of the character whose bullet q is at.
+func (rt *Runtime) unmaskOffset(v string, q int) int {
+	stops := rt.text.GraphemeStops(v)
+	return stops[min(max(q/len(maskBullet), 0), len(stops)-1)]
 }
 
 // locked reports whether the text can't be changed by the user or by
@@ -155,8 +190,11 @@ const fieldMinChars = "000000"
 func (n *node) measureEditor(maxWidth float32) (float32, float32) {
 	e := n.editor
 	v := e.value.Peek()
-	if v == "" {
+	switch {
+	case v == "":
 		v = e.placeholder
+	case e.hidden():
+		v = n.rt.maskedText(v)
 	}
 	w := maxWidth
 	if !e.multiline {
@@ -384,7 +422,12 @@ func (rt *Runtime) editorHit(n *node, es *editState, ev *MouseEvent) int {
 	if es.layout == nil {
 		return es.caret
 	}
-	return es.layout.HitTest(ev.LocalX-es.originX, ev.LocalY-es.originY)
+	p := es.layout.HitTest(ev.LocalX-es.originX, ev.LocalY-es.originY)
+	if n.editor.hidden() {
+		// The layout is of the bullets.
+		p = rt.unmaskOffset(n.editor.value.Peek(), p)
+	}
+	return p
 }
 
 func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
@@ -404,6 +447,9 @@ func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
 	es.lastClick, es.lastX, es.lastY = now, ev.X, ev.Y
 	es.havePrefX = false
 	switch {
+	case es.clicks >= 2 && n.editor.password:
+		// The words of a password are not shown, so a double-click selects it all.
+		es.anchor, es.caret = 0, len(v)
 	case es.clicks == 2:
 		es.anchor, es.caret = text.WordAt(v, p)
 	case es.clicks >= 3:
@@ -479,9 +525,15 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	// the caret, and the caret is the input method's.
 	composing := focused && rt.composing == n.id && es.comp.text != ""
 	shown, at, caretAt := v, 0, es.caret
-	if composing {
+	// pos maps an offset of v to one of the text shown.
+	pos := func(p int) int { return p }
+	switch {
+	case composing:
 		shown, at = composedText(v, es)
 		caretAt = at + es.comp.cursor
+	case e.hidden():
+		shown, caretAt = rt.maskedText(v), rt.maskOffset(v, es.caret)
+		pos = func(p int) int { return rt.maskOffset(v, p) }
 	}
 	l := rt.text.Layout(shown, st, wrap)
 	es.layout = l
@@ -520,7 +572,7 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	if selected {
 		a, b := es.selection()
 		sel := e.selection.Alpha(opacity)
-		rt.selRects = l.SelectionRects(a, b, rt.selRects[:0])
+		rt.selRects = l.SelectionRects(pos(a), pos(b), rt.selRects[:0])
 		for _, r := range rt.selRects {
 			if !e.selection.IsZero() {
 				rt.scene.AddQuad(scene.Quad{

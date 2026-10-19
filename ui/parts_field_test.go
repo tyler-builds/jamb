@@ -14,8 +14,8 @@ func partTextInput(sig *Signal[string], st FieldStyle) Element {
 
 // partField is a text field of widget ("TextInput" or "TextArea") with the
 // instance style st. With slots, it has a Leading and a Trailing element, and a
-// TextInput also has an icon before its text. state is "", "disabled" or
-// "readonly".
+// TextInput also has an icon before its text. state is "", "disabled",
+// "readonly", or "buttons" for a TextInput with its own buttons (see Revealable).
 func partField(widget string, sig *Signal[string], st FieldStyle, slots bool, state string) Element {
 	if widget == "TextArea" {
 		ta := TextArea(sig).Label("Notes").Placeholder("Write here").Styles(st).
@@ -27,6 +27,9 @@ func partField(widget string, sig *Signal[string], st FieldStyle, slots bool, st
 	}
 	ti := TextInput(sig).Label("Name").Placeholder("Your name").Styles(st).
 		Disabled(state == "disabled").ReadOnly(state == "readonly")
+	if state == "buttons" {
+		ti.Masked().Revealable()
+	}
 	if slots {
 		ti.Icon(icons.Check).Leading(Text("lead")).Trailing(Text("trail"))
 	}
@@ -42,7 +45,7 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 		part  string // the part's name, without the widget
 		set   func(*FieldStyle, Style)
 		slots bool   // the field has a Leading and a Trailing element
-		state string // "disabled" or "readonly" builds the field in that state
+		state string // "disabled", "readonly" or "buttons" builds the field in that state
 		act   func(*testing.T, *accessRig)
 	}
 	cases := []fieldCase{
@@ -59,13 +62,23 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 		{part: "Leading", set: func(s *FieldStyle, m Style) { s.Leading = m }, slots: true},
 		{part: "Trailing", set: func(s *FieldStyle, m Style) { s.Trailing = m }, slots: true},
 	}
+	if widget == "TextInput" {
+		cases = append(cases,
+			fieldCase{part: "Button", set: func(s *FieldStyle, m Style) { s.Button = m }, state: "buttons"},
+			fieldCase{part: "ButtonHover", set: func(s *FieldStyle, m Style) { s.ButtonHover = m }, state: "buttons",
+				act: func(t *testing.T, r *accessRig) { hoverNode(r, partNodes(r.rt, widget+".Button")[0]) }})
+	}
 	for _, c := range cases {
 		name := widget + "." + c.part
 		applied[name] = true
 		t.Run(name, func(t *testing.T) {
 			var st FieldStyle
 			c.set(&st, Style{Background: markBG, TextColor: markFG})
-			r := newAccessRig(func(ctx *Context) Element { return partField(widget, NewSignal(""), st, c.slots, c.state) })
+			value := ""
+			if c.state == "buttons" {
+				value = "x" // a field shows its clear button while it has text
+			}
+			r := newAccessRig(func(ctx *Context) Element { return partField(widget, NewSignal(value), st, c.slots, c.state) })
 			if c.act != nil {
 				c.act(t, r)
 			}
@@ -80,6 +93,12 @@ func testFieldParts(t *testing.T, widget string, applied map[string]bool) {
 				if got := editorNode(t, r.rt).editor.selection; got != markBG {
 					t.Errorf("%s: selection color %v, want %v", name, got, markBG)
 				}
+			case "Button":
+				for _, n := range partNodes(r.rt, name) {
+					wantBackground(t, n, name, markBG)
+				}
+			case "ButtonHover":
+				wantBackground(t, partNodes(r.rt, widget+".Button")[0], name, markBG)
 			default:
 				wantBackground(t, partNode(t, r.rt, drawnBy(name), ""), name, markBG)
 			}
