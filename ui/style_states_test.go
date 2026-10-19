@@ -107,6 +107,7 @@ var layerStateNotDrawn = map[string]string{
 	"RadioGroup.RingInvalid":          "the invalid ring needs a failed validation",
 	"Checkbox.BoxInvalid":             "the invalid box needs a failed validation",
 	"CheckboxTri.BoxInvalid":          "the invalid box needs a failed validation",
+	"OTPInput.BoxInvalid":             "the invalid boxes need a failed validation",
 }
 
 // checkStateLayers checks the state layers of every element in the tree. A field whose

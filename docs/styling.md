@@ -42,7 +42,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    Some defaults depend on the state of the widget, such as a disabled select.
 2. **The theme.** Set on the `ui.Theme` for every widget of that kind in the app:
    `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.DateRangePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Dock`, `Theme.Field` (the frame of every
-   `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.Button`
+   `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.OTPInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.ProgressBar`, `Theme.ProgressRing`,
@@ -315,6 +315,7 @@ the Text size of 100 percent:
 | `Switch` | 38 px track (the knob stays 3 px from its end) |
 | `TextInput`, `TextArea` | 240 px, a fixed size like a CSS input's; `Full` stretches it |
 | `NumberInput` | 120 px, a fixed size for its column (the frame and the message row); `Full` stretches it, and `Grow` and the limits apply to the column |
+| `OTPInput` | as wide as its boxes, each 40 px at the Text size of 100 percent, with the gaps between them and between their groups |
 | `Field` | fills its container, as a column does; its control keeps its own width (see below) |
 | `Select` | 220 px, a fixed size; `Full` stretches it, and the list is at least as wide as the field |
 | `Combobox` | 240 px at the Text size of 100 percent, like a text field; `Full` stretches it, and the list is at least as wide as the field |
@@ -533,6 +534,7 @@ parts that the code applies.
 | `Split` | `Divider`, `DividerHover`, `DividerActive`, `DividerFocusVisible`, `Grip`, `Pane` | none | none | done |
 | `Dock` | `Group`, `Strip`, `Tab`, `TabHover`, `TabSelected`, `TabFocusVisible`, `Indicator`, `Panel`, `Preview` | none | none | done |
 | `NumberInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
+| `OTPInput` | `Root`, `Group`, `Box`, `BoxFilled`, `BoxFocused`, `BoxDisabled`, `BoxInvalid`, `Text`, `Dot` | `Masked()`, `Alphanumeric()`, `Groups(...)` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |
 | `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
 | `Checkbox`, `CheckboxTri` | `Control`, `ControlFocusVisible`, `ControlDisabled`, `Box`, `BoxHover`, `BoxChecked`, `BoxMixed`, `BoxDisabled`, `BoxInvalid`, `Mark`, `Dash`, `Label`, `LabelDisabled` | none | none | done |

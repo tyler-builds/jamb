@@ -174,6 +174,8 @@ type Theme struct {
 	Pagination PaginationStyle
 	// Stepper is the look of every stepper.
 	Stepper StepperStyle
+	// OTPInput is the look of every one-time code input.
+	OTPInput OTPInputStyle
 	// DateRangePicker is the look of every date range picker and its calendar. It is not
 	// DatePicker: a range has its own parts, such as DayInRange.
 	DateRangePicker DateRangePickerStyle

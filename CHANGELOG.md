@@ -43,6 +43,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   out horizontally or with `Vertical()`, and `OnSelect` makes the steps choosable with a click or
   the keyboard. Each step is named for assistive technology by its position, title and state, such
   as "Step 2 of 4: Shipping, current". It is styled through `ui.StepperStyle` and `Theme.Stepper`.
+- `ui.OTPInput(label, code, length)` takes a one-time code in a row of single-character boxes, as
+  one control with a caret: typing moves on, Backspace and Delete clear, the arrows move, and a
+  paste fills the boxes with the characters it takes. It has `Masked`, `Alphanumeric`, `Groups`,
+  `OnComplete` and `Validate`, works in a `Field` and a `Form`, and is one text field for assistive
+  technology, reported as a password field when masked. It is styled through `ui.OTPInputStyle`
+  and `Theme.OTPInput`.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.
 - The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a
