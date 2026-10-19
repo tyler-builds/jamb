@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 )
 
@@ -205,6 +206,18 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				r.rt.PointerMove(rc.X+rc.W/2, rc.Y+rc.H/2, 0)
 				r.now = r.now.Add(600 * time.Millisecond)
 				r.frame()
+			}},
+		{name: "Carousel", animates: true,
+			root: func(open *Signal[bool]) func(*Context) Element {
+				index := NewSignal(0)
+				return func(ctx *Context) Element {
+					return Div().Column().Child(Carousel(index, Text("One"), Text("Two")).Label("Photos"))
+				}
+			},
+			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) {
+				n := accessNode(t, r, access.RoleButton, "Next slide")
+				rc := r.rt.nodeRect(n)
+				r.clickAt(rc.X+rc.W/2, rc.Y+rc.H/2)
 			}},
 		{name: "ColorPicker", animates: true,
 			root: func(open *Signal[bool]) func(*Context) Element {

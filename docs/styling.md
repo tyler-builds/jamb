@@ -47,7 +47,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Theme.Switch`, `Theme.Toggle`, `Theme.ToggleGroup`, `Theme.Rating`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.CommandPalette`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
-   (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.Sidebar`, `Theme.Breadcrumbs`, `Theme.Pagination`, `Theme.Stepper`, `Theme.ColorPicker`, and `Theme.FormField` (the label, help text and error
+   (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.Sidebar`, `Theme.Breadcrumbs`, `Theme.Pagination`, `Theme.Stepper`, `Theme.Carousel`, `Theme.ColorPicker`, and `Theme.FormField` (the label, help text and error
    of every field) and `Theme.Form` (the error summary of every form). Each is a field of `ui.Theme`, and the
    high-contrast theme takes it from the base theme.
 3. **The instance.** Set on one widget with `.Styles(...)`. Calling `.Styles` again
@@ -332,6 +332,7 @@ the Text size of 100 percent:
 | `StatusBar` | fills the container; the start items take the free room, and the end items keep their width |
 | `Toolbar` | fills the container, as a row does; its controls keep their own widths |
 | `Empty` | fills the container, with its parts centered in it |
+| `Carousel` | fills the container's width, and is as high as its slide and its controls; with a `Height`, the viewport takes the room the controls leave |
 | `Collapsible`, `Accordion` | fills the container |
 | `DataGrid`, `Tree`, `ListOf`, `UniformList` | fills the container's width; give a height (`Height`, `MaxHeight`, or `Grow` in a column) so the rows scroll inside it |
 | `Split` | fills the container's width; its height is the container's, as `Full` gives (set `Height` or `Grow` in a column with other children) |
@@ -579,6 +580,7 @@ parts that the code applies.
 | `StatusBar` | `Bar`, `Start`, `End` | none | `Start`, `End` (elements) | done |
 | `Toolbar` | `Bar`, `Separator` | none | none | done |
 | `Empty` | `Empty`, `Icon`, `Title`, `Description`, `Action` | none | none | done |
+| `Carousel` | `Root`, `RootDisabled`, `Viewport`, `Slide`, `Controls`, `NavButton`, `PlayPause`, `Dots`, `Dot`, `DotCurrent`, `DotHover`, `DotFocusVisible`, `DotDisabled` | none | none | done |
 
 ## Examples
 
@@ -666,6 +668,10 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
   always does.
 - A Switch draws no text, so its label position is the app's. There is no label
   position option.
+- A Carousel's previous, next and play buttons are `IconButton`s: `NavButton` and
+  `PlayPause` are the boxes around them, and the buttons themselves take the theme's
+  `Button`. The slide comes
+  in with a fixed motion, which reduced motion turns off; it is not a part.
 - A Rating's `StarHover` is not paint-only: it applies to every star up to the one
   under the pointer, so the rating is built again as the pointer moves. Its stars
   are a fixed 20 px icon, and a `Star` style sets their box and color, not the

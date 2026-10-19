@@ -52,6 +52,14 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   steps. They take the pickers' `Min`, `Max`, `DisableDays` and `FirstDay`, their keys (Enter
   chooses, and Escape and Tab are left to the page) and their accessible grid, and are styled
   through `ui.CalendarStyle` and `Theme.Calendar`, with the part names of the pickers' calendars.
+- `ui.Carousel(index, slides...)` shows slides one at a time, with previous and next buttons
+  and a dot for each slide. `Loop` wraps around, Left and Right move while focus is on the
+  controls, and `AutoPlay(d)` moves on by the window's clock, waiting while the pointer or focus
+  is on the carousel, with a play button first in the controls that stops and starts it
+  ("Pause slides", "Play slides"); under reduced motion it starts stopped. Each slide comes in
+  with a short motion. The carousel is a group described as a carousel, the slide shown a group named
+  "Slide 2 of 5", and a change the user makes is announced. It is styled through
+  `ui.CarouselStyle` and `Theme.Carousel`.
 - `ui.LinkSegs` makes one link of several styled segments.
 - `ui.Stepper(current, steps...)` shows the progress through the steps of a process: complete
   steps show a check mark, the current one is highlighted, and the later ones are muted. It lays

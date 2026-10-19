@@ -192,6 +192,9 @@ type Theme struct {
 	// Calendar is the look of every calendar on the page, Calendar and CalendarRange. It is
 	// not DatePicker: the calendar of a picker is its popup, and its parts are the picker's.
 	Calendar CalendarStyle
+	// Carousel is the look of every carousel. Its previous and next buttons are
+	// IconButtons, which Button styles.
+	Carousel CarouselStyle
 	// ColorPicker is the look of every color picker: its trigger, its panel and the
 	// sliders of the panel.
 	ColorPicker ColorPickerStyle

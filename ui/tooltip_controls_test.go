@@ -82,6 +82,7 @@ func TestWidgetsTakeATooltip(t *testing.T) {
 		{"OTPInput", access.RoleTextField, "Code", OTPInput("Code", NewSignal(""), 4).Tooltip("Help")},
 		{"Stepper", access.RoleList, "C", Stepper(NewSignal(1), Step{Title: "One"}, Step{Title: "Two"}).Label("C").Tooltip("Help")},
 		{"Avatar", access.RoleImage, "Sample User", Avatar("Sample User").Tooltip("Help")},
+		{"Carousel", access.RoleGroup, "C", Carousel(NewSignal(0), Text("One"), Text("Two")).Label("C").Tooltip("Help")},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

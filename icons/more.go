@@ -126,6 +126,17 @@ var (
 		b.Line(12, 15, 12, 3).M(7, 8).L(12, 3).L(17, 8)
 		b.M(4, 17).L(4, 21).L(20, 21).L(20, 17)
 	})
+
+	// Pause and Play are the two looks of a control that stops and starts something
+	// that moves by itself, such as a carousel's AutoPlay.
+	Pause = newIcon("pause", func(b *builder) {
+		b.RoundRect(6, 4, 4, 16, 1)
+		b.RoundRect(14, 4, 4, 16, 1)
+	})
+
+	Play = newIcon("play", func(b *builder) {
+		b.M(6, 4).L(20, 12).L(6, 20).Z()
+	})
 )
 
 // All lists every built-in icon, for discovery (print their names) and for
@@ -134,6 +145,6 @@ var All = []*Icon{
 	ArrowLeft, ArrowRight, ArrowUpRight, Activity, Alert, Archive, Bell, Bookmark, Box,
 	Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Clock, Copy, Maximize, Minimize, Restore,
 	Dashboard, Download, Eye, File, Filter, Folder, GitBranch, Hash, Heart, Home, Inbox, Info,
-	Layers, Link, Lock, Menu, Minus, Moon, MoreHorizontal, Pencil, Pin, Plus, Refresh, Search,
+	Layers, Link, Lock, Menu, Minus, Moon, MoreHorizontal, Pause, Pencil, Pin, Play, Plus, Refresh, Search,
 	Settings, Star, StarFilled, Sun, Tag, Trash, Upload, Users, X, Zap,
 }

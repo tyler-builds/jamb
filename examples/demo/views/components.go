@@ -172,8 +172,8 @@ var componentSections = []componentSection{
 	{"Drawing and layout", "Canvas Painter NewPath LinearPaint SVG MustSVG Selectable Grid Fr Auto " +
 		"drawing paint pinch zoom illustration icon selectable text grid",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return drawingSection(t) }},
-	{"More widgets", "Stepper GroupBox DescriptionList StatusBar Toolbar ToolbarSeparator Pagination Breadcrumbs Sidebar SidebarHeading Avatar Tag Skeleton " +
-		"ColorPicker DateRangePicker steps pages initials loading placeholder color date range status bar toolbar",
+	{"More widgets", "Stepper Carousel GroupBox DescriptionList StatusBar Toolbar ToolbarSeparator Pagination Breadcrumbs Sidebar SidebarHeading Avatar Tag Skeleton " +
+		"ColorPicker DateRangePicker steps slides slideshow autoplay pages initials loading placeholder color date range status bar toolbar",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return widgetsSection(t) }},
 	{"Clipboard images", "ClipboardImage SetClipboardImage ClipboardHasImage OnPasteImage ImageFromImage TextArea " +
 		"clipboard copy paste screenshot image transparency",

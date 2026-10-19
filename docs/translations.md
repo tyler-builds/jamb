@@ -26,7 +26,8 @@ phrases that have an unambiguous translation, such as the page buttons, "Require
 and the window buttons, and some short messages that take a value, such as "Remove
 Sales". The longer sentences, such as the date and range messages, are English in
 every language, and so is the value of a rating (`RatingValue`, "3 of 5 stars"),
-whose plural depends on the number. A field that a pack leaves empty is English,
+whose plural depends on the number, and so are the names of a carousel's slides and
+dots (`SlideOf`, "Slide 2 of 5", and `GoToSlide`, "Go to slide 3"). A field that a pack leaves empty is English,
 so a partial pack is never incomplete.
 
 The words of the charts (package `charts`) are the `Chart…` fields: the names of the
