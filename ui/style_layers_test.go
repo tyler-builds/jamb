@@ -213,6 +213,10 @@ var layerBuilders = []layerBuilder{
 			v := dayOf(time.Unix(1_000_000, 0))
 			return CalendarRange(NewSignal(v), NewSignal(v.AddDate(0, 0, 3))).Styles(st.(CalendarStyle))
 		}},
+	{"Carousel", func(th *Theme) any { return &th.Carousel },
+		func(st any) Element { return partCarousel(st.(CarouselStyle), false) }},
+	{"Carousel", func(th *Theme) any { return &th.Carousel },
+		func(st any) Element { return partCarousel(st.(CarouselStyle), true) }},
 	{"DataGrid", func(th *Theme) any { return &th.DataGrid },
 		func(st any) Element {
 			return Component(partDataGrid(3, st.(DataGridStyle), NewSignal([]string{}), NewSignal(SortState{})))

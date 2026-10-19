@@ -338,3 +338,58 @@ ui.Toolbar("Formatting").
   controls that do not fit into a menu; keep it short enough for the window.
 - **Accessibility.** The toolbar is a tool bar (UI Automation's ToolBar control type) named
   by its label, with its controls and separators inside it.
+
+## Carousels
+
+`ui.Carousel(index, slides...)` shows slides one at a time, such as featured items or the
+steps of a tour. `index` is a `*ui.Signal[int]`, the slide shown, from 0. Its look is
+`ui.CarouselStyle`: per app in `Theme.Carousel`, or per instance with `Styles`. It follows
+high contrast, the Text size and reduced motion.
+
+```go
+ui.Carousel(slide, first, second, third). // any elements as the slides
+	Label("Featured products").
+	Loop().                      // the buttons, the keys and AutoPlay wrap around
+	AutoPlay(5 * time.Second).   // moves on by itself, on the window's clock
+	Height(ui.Px(240)).          // the viewport takes the room the controls leave
+	OnChange(func(i int) { ... })
+```
+
+- **Controls.** Under the slide are a previous and a next `IconButton` and a dot for each
+  slide, which goes to that slide. Without `Loop` the buttons are disabled at the first
+  and the last slide. Left and Right go to the previous and the next slide while focus is
+  on the buttons or the dots, and keep the focus on the dot of the slide shown when it was
+  on a dot. Only that dot is a Tab stop, so the carousel takes three Tab stops whatever
+  the number of slides (four with the play button of `AutoPlay`). The dot of the slide shown is a pill in the accent color, wider
+  than the others, so it is not told by its color alone.
+- **Slides.** Only the slide shown is built, as only a tab's selected panel is, so a slide
+  that keeps state of its own keeps it in signals outside the carousel. A new slide comes
+  in from the side it is on with a short slide and fade; reduced motion turns it off. An
+  index out of range shows the nearest slide, and an index set from outside is shown
+  without `OnChange` or an announcement.
+- **AutoPlay.** `AutoPlay(d)` moves to the next slide every `d`, on the window's clock (see
+  `Context.After`), and runs `OnChange`. It waits while the pointer is over the carousel or
+  focus is inside it, and goes on once they leave; it stops at the last slide unless the
+  carousel loops. It does not run in a `Disabled` carousel.
+- **Play button.** With `AutoPlay`, the controls start with a button that stops and starts
+  it, as WCAG's Pause, Stop, Hide asks. It is the first of the controls in the Tab order,
+  as the WAI-ARIA pattern places its rotation control, and a button named "Pause slides"
+  while the slides move and "Play slides" while they are stopped (`Strings.PauseSlides`,
+  `Strings.PlaySlides`). Its name says what it does, so it reports no pressed state. A press
+  stops AutoPlay until the next press. While the user asks for reduced motion, AutoPlay
+  starts stopped and the button shows Play, so the user can still start it; the slides
+  then change without their motion. The app does not control the button: there is no
+  signal for it.
+- **Accessibility.** The carousel follows the WAI-ARIA carousel pattern as far as jamb's
+  roles go: it is a group named by its `Label` and described as a carousel
+  (`Strings.Carousel`; an unnamed carousel is named "Carousel"). The slide shown is a
+  group named by its position, such as "Slide 2 of 5" (`Strings.SlideOf`), and the other
+  slides are not in the accessibility tree. The buttons are named "Previous slide" and
+  "Next slide", and the dots, "Go to slide 3" (`Strings.GoToSlide`), are in a group
+  named "Slides" in which the dot of the slide shown is selected. When the user changes
+  the slide, its position is announced politely; AutoPlay changes it without an
+  announcement, so a screen reader is not interrupted. `Tooltip(s)` shows s over the
+  carousel and is read as its description, in place of "Carousel".
+- **Other.** `Disabled(true)` dims the carousel and disables its buttons and dots;
+  `Key`, `FocusHandle` (which focuses the dot of the slide shown) and the sizing methods
+  are as for the other widgets.

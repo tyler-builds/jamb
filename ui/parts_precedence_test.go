@@ -106,6 +106,14 @@ func TestWidgetPartPrecedence(t *testing.T) {
 					return Div().Column().Child(Calendar(NewSignal(time.Time{})).Styles(CalendarStyle{Root: bgStyle(inst)}))
 				})
 			}},
+		{name: "Carousel", part: "Carousel.Root",
+			theme: func(th *Theme, c Color) { th.Carousel.Root.Background = c },
+			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
+				return newThemedRig(th, func(ctx *Context) Element {
+					return Div().Column().Child(Carousel(NewSignal(0), Text("One"), Text("Two")).
+						Styles(CarouselStyle{Root: bgStyle(inst)}))
+				})
+			}},
 		{name: "Collapsible", part: "Collapsible.Section", border: true,
 			theme: func(th *Theme, c Color) { th.Collapsible.Section.BorderColor = c },
 			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {

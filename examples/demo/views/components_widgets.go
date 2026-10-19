@@ -10,8 +10,8 @@ import (
 )
 
 // widgetsSection shows the smaller widgets: a sidebar, breadcrumbs,
-// pagination, a stepper, avatars, tags, skeletons, a color picker, a date range
-// picker, group boxes, description lists, a status bar and a toolbar.
+// pagination, a stepper, a carousel, avatars, tags, skeletons, a color picker, a
+// date range picker, group boxes, description lists, a status bar and a toolbar.
 func widgetsSection(t *ui.Theme) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		nav := ui.Local(ctx, "w.nav", "inbox")
@@ -28,6 +28,7 @@ func widgetsSection(t *ui.Theme) ui.Element {
 		bold := ui.Local(ctx, "w.bold", true)
 		italic := ui.Local(ctx, "w.italic", false)
 		underline := ui.Local(ctx, "w.underline", false)
+		slide := ui.Local(ctx, "w.slide", 0)
 
 		tagRow := ui.Div().Row().Wrap().Gap(6)
 		for i, name := range tags.Get() {
@@ -85,6 +86,8 @@ func widgetsSection(t *ui.Theme) ui.Element {
 					Child(ui.Button("Back").Small().Disabled(step.Get() == 0).OnClick(func() { step.Set(max(step.Peek()-1, 0)) })).
 					Child(ui.Button("Next").Small().Primary().Disabled(step.Get() >= len(demoSteps)).
 						OnClick(func() { step.Set(min(step.Peek()+1, len(demoSteps))) })))),
+			sample(t, "Carousel, with Loop and AutoPlay", ui.Div().Width(ui.Px(420)).
+				Child(carouselSample(t, slide))),
 			sample(t, "Avatars: initials, sizes, and AccessHidden", ui.Div().Row().Gap(8).Align(ui.Center).
 				Child(ui.Avatar("Dana Lee")).
 				Child(ui.Avatar("Sam Ortiz").Size(40)).
@@ -134,6 +137,23 @@ func widgetsSection(t *ui.Theme) ui.Element {
 					Child(ui.Button("Redo").Ghost().Small().OnClick(pressed("Redo")))).
 				Child(formatPreview(bold.Get(), italic.Get(), underline.Get()))))
 	})
+}
+
+// carouselSample is a looping carousel of four slides over slide, which moves on by itself
+// every 4 seconds until its play button stops it.
+func carouselSample(t *ui.Theme, slide *ui.Signal[int]) ui.Element {
+	card := func(title, text string, fill ui.Color) ui.Element {
+		return ui.Div().Gap(6).Padding(16).Height(ui.Px(120)).Background(fill).Radius(8).
+			Child(ui.Text(title).FontSize(16).Semibold()).
+			Child(ui.Text(text).FontSize(13).TextColor(t.TextMuted))
+	}
+	c := ui.Carousel(slide,
+		card("Plan", "Collect the ideas for the next release.", t.AccentSoft),
+		card("Build", "Turn the chosen ideas into features.", t.SurfaceHover),
+		card("Review", "Check the work with the team.", t.AccentSoft),
+		card("Ship", "Publish the release and its notes.", t.SurfaceHover),
+	).Key("demo-carousel").Label("Release stages").Loop().AutoPlay(4 * time.Second)
+	return c
 }
 
 // demoSteps are the steps of the stepper samples.

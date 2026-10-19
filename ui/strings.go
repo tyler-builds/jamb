@@ -58,6 +58,11 @@ type Strings struct {
 	Steps string
 	// CommandPalette is the name of a command palette.
 	CommandPalette string
+	// Carousel is the default name of a carousel, and the description of one that has a
+	// name, which tells assistive technology what the group is.
+	Carousel string
+	// Slides is the name of the group of a carousel's dots.
+	Slides string
 
 	// The labels of the controls that jamb draws.
 	LoadingEllipsis string
@@ -94,6 +99,14 @@ type Strings struct {
 	PreviousPage string
 	// NextPage is the name of the button that goes to the next page.
 	NextPage string
+	// PreviousSlide is the name of the button that goes to the previous slide of a carousel.
+	PreviousSlide string
+	// NextSlide is the name of the button that goes to the next slide of a carousel.
+	NextSlide string
+	// PauseSlides is the name of the button that stops a carousel's AutoPlay.
+	PauseSlides string
+	// PlaySlides is the name of the button that starts a carousel's AutoPlay again.
+	PlaySlides string
 	// PreviousYear is the name of the button that goes to the previous year.
 	PreviousYear string
 	// PreviousMonth is the name of the button that goes to the previous month.
@@ -151,6 +164,11 @@ type Strings struct {
 	CurrentPage func(n int) string
 	// PageOf builds the name of a page, from its number and the number of pages.
 	PageOf func(page, pages int) string
+	// SlideOf names the slide a carousel shows, and is announced when the user changes it,
+	// such as "Slide 2 of 5".
+	SlideOf func(n, slides int) string
+	// GoToSlide names the dot of a carousel's slide, such as "Go to slide 3".
+	GoToSlide func(n int) string
 	// StepCompleted, StepCurrent and StepUpcoming name a step of a stepper, from its
 	// number, the number of steps and its title, such as "Step 2 of 4: Shipping,
 	// current". StepCompleted names a step before the current one.
@@ -408,6 +426,8 @@ func englishStrings() *Strings {
 		DateRangeField: "Date range",
 		Steps:          "Steps",
 		CommandPalette: "Command palette",
+		Carousel:       "Carousel",
+		Slides:         "Slides",
 
 		LoadingEllipsis:           "Loading…",
 		LoadingSuggestions:        "Loading suggestions",
@@ -428,6 +448,10 @@ func englishStrings() *Strings {
 		DismissNotification: "Dismiss notification",
 		PreviousPage:        "Previous page",
 		NextPage:            "Next page",
+		PreviousSlide:       "Previous slide",
+		NextSlide:           "Next slide",
+		PauseSlides:         "Pause slides",
+		PlaySlides:          "Play slides",
 		PreviousYear:        "Previous year",
 		PreviousMonth:       "Previous month",
 		NextMonth:           "Next month",
@@ -455,6 +479,8 @@ func englishStrings() *Strings {
 		Page:          func(n int) string { return fmt.Sprintf("Page %d", n) },
 		CurrentPage:   func(n int) string { return fmt.Sprintf("Page %d, current page", n) },
 		PageOf:        func(page, pages int) string { return fmt.Sprintf("Page %d of %d", page, pages) },
+		SlideOf:       func(n, slides int) string { return fmt.Sprintf("Slide %d of %d", n, slides) },
+		GoToSlide:     func(n int) string { return fmt.Sprintf("Go to slide %d", n) },
 		RatingValue: func(value, max int) string {
 			if max == 1 {
 				return fmt.Sprintf("%d of 1 star", value)

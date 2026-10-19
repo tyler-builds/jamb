@@ -145,7 +145,7 @@ of icons does not redraw when its component renders.
 > bookmark, box, calendar, check, chevron-down, chevron-left, chevron-right,
 > chevron-up, circle, clock, copy, dashboard, download, eye, file, filter,
 > folder, git-branch, hash, heart, home, inbox, info, layers, link, lock,
-> maximize, menu, minimize, minus, moon, more-horizontal, pencil, pin, plus,
+> maximize, menu, minimize, minus, moon, more-horizontal, pause, pencil, pin, play, plus,
 > refresh, restore, search, settings, star, star-filled, sun, tag, trash, upload, users, x, zap
 
 The Go names are the CamelCase forms: `icons.ArrowLeft`, `icons.GitBranch`,
