@@ -70,7 +70,7 @@ Start `go run ./examples/notes` with `JAMB_NOTES_FILE` set as above.
 | 8 | Press Down in the body. | The line is spoken. Repeat to read the next line. |
 | 9 | Type a letter at the end of the body. | "Saved" is spoken when the save finishes, once per save. It is not repeated for each keystroke. |
 | 10 | Tab to "New tag", type `draft`, and press Enter. | A tag chip "draft" appears, with its button "Remove tag draft". |
-| 11 | Press Ctrl + Shift + P. | The command palette opens. Its search field is spoken as an edit field named "Command". Down moves through the commands, each with its shortcut, for example "New note Ctrl+N". |
+| 11 | Press Ctrl + Shift + P. | The command palette opens. Its search field is spoken as an edit field named "Command palette". Down moves through the commands, each with its shortcut, for example "New note Ctrl+N". |
 | 12 | Escape. Press Ctrl + Shift + P, type `theme`, and press Enter. | The command runs and the theme changes. Focus returns to the body. |
 
 ## Keyboard-only use

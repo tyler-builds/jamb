@@ -2,8 +2,9 @@ package views
 
 import "github.com/tyler-builds/jamb/ui"
 
-// The notes app's actions. Key bindings and the command palette run them;
-// App.Root handles the window-wide ones and the palette handles its own.
+// The notes app's actions. Key bindings and the command palette run them, and
+// App.Root handles the window-wide ones. The palette (ui.CommandPalette) has keys of
+// its own.
 var (
 	NewNote     = ui.NewAction("notes.new", "New note")
 	Search      = ui.NewAction("notes.search", "Search notes")
@@ -19,12 +20,6 @@ var (
 	ZoomIn    = ui.NewAction("notes.zoom-in", "Zoom in")
 	ZoomOut   = ui.NewAction("notes.zoom-out", "Zoom out")
 	ZoomReset = ui.NewAction("notes.zoom-reset", "Reset zoom")
-
-	// The palette's own actions. They are hidden, so the palette does not list them.
-	PaletteUp    = ui.NewAction("palette.up", "Up").Hide()
-	PaletteDown  = ui.NewAction("palette.down", "Down").Hide()
-	PaletteRun   = ui.NewAction("palette.run", "Run").Hide()
-	PaletteClose = ui.NewAction("palette.close", "Close").Hide()
 )
 
 // Actions lists every action of the notes app, for app.Window.Actions, so a
@@ -33,7 +28,6 @@ func Actions() []*ui.Action {
 	return []*ui.Action{
 		NewNote, Search, PrevNote, NextNote, TogglePin, ToggleTheme, TogglePreview, Palette,
 		ZoomIn, ZoomOut, ZoomReset,
-		PaletteUp, PaletteDown, PaletteRun, PaletteClose,
 	}
 }
 
@@ -50,12 +44,5 @@ func Bindings() []ui.Binding {
 		ui.Bind("ctrl+=", ZoomIn),
 		ui.Bind("ctrl+-", ZoomOut),
 		ui.Bind("ctrl+0", ZoomReset),
-		// The palette's search field is an Editor inside the palette, so these
-		// bindings must name both: "Palette > Editor" is deeper than the
-		// field's own bindings for the same keys, as in Zed's "Picker > Editor".
-		ui.BindIn("Palette > Editor", "up", PaletteUp),
-		ui.BindIn("Palette > Editor", "down", PaletteDown),
-		ui.BindIn("Palette > Editor", "enter", PaletteRun),
-		ui.BindIn("Palette > Editor", "escape", PaletteClose),
 	}
 }

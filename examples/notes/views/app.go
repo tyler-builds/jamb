@@ -52,13 +52,9 @@ type App struct {
 	confirm *ui.Signal[string] // ID of the note awaiting delete confirmation
 	preview *ui.Signal[bool]   // the Markdown preview is shown beside the editor
 
-	paletteOpen    *ui.Signal[bool]
-	paletteQuery   *ui.Signal[string]
-	paletteSel     *ui.Signal[int]
-	paletteActions []*ui.Action    // the commands listed when the palette opened
-	paletteFocus   *ui.FocusHandle // what had focus when the palette opened
-	list           *ui.ListHandle  // the sidebar's note list, scrolled to the selection
-	onImport       func(path string)
+	paletteOpen *ui.Signal[bool] // the command palette is open
+	list        *ui.ListHandle   // the sidebar's note list, scrolled to the selection
+	onImport    func(path string)
 }
 
 // DefaultSidebarWidth is the width of the sidebar, in logical pixels, when the app
@@ -90,17 +86,15 @@ func RootWith(s *store.Store, layout Layout) func(*ui.Context) ui.Element {
 	// The split owns the sidebar's size as a pixel length; OnChange copies it to sidebar.
 	sidebarSize := ui.NewSignal(ui.Px(float32(sidebar.Peek())))
 	a := &App{
-		s:            s,
-		search:       ui.NewFocusHandle(),
-		title:        ui.NewFocusHandle(),
-		body:         ui.NewFocusHandle(),
-		confirm:      ui.NewSignal(""),
-		preview:      ui.NewSignal(false),
-		paletteOpen:  ui.NewSignal(false),
-		paletteQuery: ui.NewSignal(""),
-		paletteSel:   ui.NewSignal(0),
-		list:         ui.NewListHandle(),
-		onImport:     layout.OnImport,
+		s:           s,
+		search:      ui.NewFocusHandle(),
+		title:       ui.NewFocusHandle(),
+		body:        ui.NewFocusHandle(),
+		confirm:     ui.NewSignal(""),
+		preview:     ui.NewSignal(false),
+		paletteOpen: ui.NewSignal(false),
+		list:        ui.NewListHandle(),
+		onImport:    layout.OnImport,
 	}
 	return func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
@@ -113,7 +107,7 @@ func RootWith(s *store.Store, layout Layout) func(*ui.Context) ui.Element {
 			OnAction(TogglePin, a.togglePin).
 			OnAction(ToggleTheme, func() { toggleTheme(ctx) }).
 			OnAction(TogglePreview, a.togglePreview).
-			OnAction(Palette, func() { a.openPalette(ctx) }).
+			OnAction(Palette, func() { a.paletteOpen.Set(true) }).
 			OnAction(ZoomIn, func() { zoomStep(ctx, 1) }).
 			OnAction(ZoomOut, func() { zoomStep(ctx, -1) }).
 			OnAction(ZoomReset, func() { ctx.SetZoom(1) }).
