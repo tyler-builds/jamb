@@ -209,7 +209,7 @@ The first pass showed GPUI ahead on startup, memory and binary size. Investigati
 
 ## Components: jamb and GPUI Kit
 
-jamb's predefined themes and some of its translated strings come from gpui-component (see `NOTICE`). The project is now [GPUI Kit](https://gpui-kit.com/) ([longbridge/gpui-kit](https://github.com/longbridge/gpui-kit); the old repository URL redirects there). This section compares the two component sets. It was checked on 2026-10-19 against GPUI Kit v0.8.0, released that day, and jamb with the widgets added the same day (Alert, DescriptionList, GroupBox, Kbd, OTPInput, Rating, Stepper, Toggle and ToggleGroup). It compares coverage only: it does not compare features within a component, quality or accessibility behaviour.
+jamb's predefined themes and some of its translated strings come from gpui-component (see `NOTICE`). The project is now [GPUI Kit](https://gpui-kit.com/) ([longbridge/gpui-kit](https://github.com/longbridge/gpui-kit); the old repository URL redirects there). This section compares the two component sets. It was checked on 2026-10-19 against GPUI Kit v0.8.0, released that day, and jamb with the widgets added the same day (Alert, CommandPalette, DescriptionList, GroupBox, Kbd, OTPInput, Rating, Stepper, Toggle and ToggleGroup). It compares coverage only: it does not compare features within a component, quality or accessibility behaviour.
 
 ### What changed upstream
 
@@ -255,13 +255,14 @@ GPUI Kit's component page lists 69 components in four groups. The jamb column na
 | Menu | `DropdownMenu`, `MenuBar`, `Div.ContextMenu` |
 | Chart | `charts`: line, area, bar, scatter, pie, donut, radar, candlestick and Sankey |
 | Calendar | Inside the date pickers only |
-| Carousel, Command, Diff, Settings | None |
+| Command | `CommandPalette` |
+| Carousel, Diff, Settings | None |
 
 The component page also links AlertDialog, Clipboard, Empty, Focus Trap, HoverCard, Input Group, Plot, Shimmer, Table and TitleBar from its sidebar. jamb has text and image clipboard access, an empty-state slot on `DataGrid`, `Canvas` for custom plots and `TitleBarButtons`.
 
 jamb has some widgets GPUI Kit does not list: `MenuBar`, `Breadcrumbs`, `DateRangePicker` and `CheckboxTri`. It also has Windows shell integration (`NewTray`, jump lists, taskbar progress and badges), native file and message dialogs (`dialog`), `Canvas` and `SVG` drawing, and the inspector.
 
-In total, 13 of GPUI Kit's 69 listed components have no jamb equivalent, six of them the chat and survey components, and jamb has a calendar only inside its date pickers.
+In total, 12 of GPUI Kit's 69 listed components have no jamb equivalent, six of them the chat and survey components, and jamb has a calendar only inside its date pickers.
 
 ## Open items
 

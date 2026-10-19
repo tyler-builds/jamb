@@ -327,7 +327,9 @@ Ctrl+Shift+Tab to its tabs (see Navigation and layout).
 `KeyContext("Palette")`. Its keys therefore belong to `"Palette > Editor"`:
 `BindIn("Palette", "up", ...)` would lose to the field's own Up, because the
 field's context is deeper, and the caret would move instead. This is GPUI's
-rule; Zed writes `Picker > Editor` for the same reason.
+rule; Zed writes `Picker > Editor` for the same reason. `ui.CommandPalette` binds
+its own keys this way, in `"CommandPalette > Editor"` (see
+[Command palette](widgets-overlays.md#command-palette)).
 
 ## Events
 

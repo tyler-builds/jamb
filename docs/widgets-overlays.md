@@ -1,6 +1,6 @@
 # Overlays and menus
 
-Menus, dropdowns, popovers, drawers and modal dialogs.
+Menus, dropdowns, popovers, drawers, modal dialogs and the command palette.
 
 ## Menus
 
@@ -177,3 +177,52 @@ ui.If(open.Get(), ui.Modal("New project", form).
   handlers and typed text outside the modal don't reach anything behind it, and
   Alt doesn't activate a menu bar. Keys handled inside the modal (a field's
   editing keys, the modal's own bindings) work as usual.
+
+## Command palette
+
+`ui.CommandPalette(open)` is a searchable list of commands, as in an editor's
+Ctrl+Shift+P: a field, and under it the commands whose names match what is typed,
+each with its key binding. It is open while `open` is true, and sets it to false
+when it closes itself. Place it last in the window's root element, which must fill
+the window, as a modal is placed; its panel floats 48 px below the top of the
+window, centered. Its look is `ui.CommandPaletteStyle` (`Theme.CommandPalette` or
+`.Styles(...)`).
+
+```go
+open := ui.NewSignal(false)
+ui.Div().Size(ui.Full, ui.Full).
+	OnAction(showPalette, func() { open.Set(true) }). // bound to "ctrl+shift+p"
+	Child(page).
+	Child(ui.CommandPalette(open).
+		Placeholder("Search commands").   // default: Strings.CommandPalettePlaceholder
+		MaxRows(10).                      // rows shown before the list scrolls; 8 by default
+		Commands(func() []*ui.Action {    // optional; runs each time the palette opens
+			return appCommands
+		}))
+```
+
+- When it opens it lists the actions available where focus is
+  (`ctx.AvailableActions()`), or what `Commands` returns, without hidden actions,
+  and its field takes focus. The action that opens it should be hidden, so that
+  the palette does not list itself.
+- A command matches when every word of the query occurs in its name, ignoring case
+  and in any order: "note new" finds "New note". The matches are highlighted in the
+  names, as in a `Combobox`.
+- Up and Down move the highlight and stop at the ends of the list; PageUp and
+  PageDown move it by `MaxRows`. Home and End stay with the field. Typing moves the
+  highlight back to the first match. The pointer highlights the row it is over.
+- Enter, or a click on a row, closes the palette, gives focus back to the element
+  that had it before the palette opened, and runs the command there (see
+  `ctx.Dispatch`), so a command that acts on the focused element acts on that one.
+  A command that no element there handles does nothing.
+- Escape closes the palette and gives focus back. A click outside closes it and
+  leaves focus where the click put it.
+- It enters and leaves with the motion of a menu (a fade with a short slide), and
+  without motion when the system asks for reduced motion.
+- Assistive technology sees a dialog named "Command palette"
+  (`Strings.CommandPalette`) holding a combo box: the field keeps focus, and the
+  highlighted command is reported as the focused, selected item of its list, as in
+  a `Combobox`. Each command is read by its name, with its key binding as the
+  description. The empty message is `Strings.NoMatchingCommands`.
+- Its keys are the actions bound in `"CommandPalette > Editor"` (see
+  [Palettes](input.md#actions-and-key-bindings)).

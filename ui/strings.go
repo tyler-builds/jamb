@@ -56,11 +56,15 @@ type Strings struct {
 	DateRangeField string
 	// Steps is the default name of a stepper.
 	Steps string
+	// CommandPalette is the name of a command palette.
+	CommandPalette string
 
 	// The labels of the controls that jamb draws.
 	LoadingEllipsis string
 	// LoadingSuggestions is the text shown while suggestions load.
 	LoadingSuggestions string
+	// CommandPalettePlaceholder is the text shown in a command palette's empty field.
+	CommandPalettePlaceholder string
 	// SaturationBrightness is the name of the area of a color picker that sets saturation and brightness.
 	SaturationBrightness string
 	// SaturationBrightnessValue is the value of the color area, read by assistive technology,
@@ -172,6 +176,8 @@ type Strings struct {
 	NoResults string
 	// NoRows is the message shown when a grid has no rows.
 	NoRows string
+	// NoMatchingCommands is the message shown when no command of a command palette matches.
+	NoMatchingCommands string
 	// CouldNotLoadSuggestions is the message shown when suggestions cannot be loaded.
 	CouldNotLoadSuggestions string
 	// SuggestionCount builds the message that gives the number of suggestions.
@@ -401,10 +407,12 @@ func englishStrings() *Strings {
 		DateField:      "Date",
 		DateRangeField: "Date range",
 		Steps:          "Steps",
+		CommandPalette: "Command palette",
 
-		LoadingEllipsis:      "Loading…",
-		LoadingSuggestions:   "Loading suggestions",
-		SaturationBrightness: "Saturation and brightness",
+		LoadingEllipsis:           "Loading…",
+		LoadingSuggestions:        "Loading suggestions",
+		CommandPalettePlaceholder: "Type a command",
+		SaturationBrightness:      "Saturation and brightness",
 		SaturationBrightnessValue: func(saturation, brightness int) string {
 			return fmt.Sprintf("Saturation %d%%, brightness %d%%", saturation, brightness)
 		},
@@ -475,6 +483,7 @@ func englishStrings() *Strings {
 
 		NoResults:               "No results",
 		NoRows:                  "No rows",
+		NoMatchingCommands:      "No matching commands",
 		CouldNotLoadSuggestions: "Couldn't load suggestions",
 		SuggestionCount: func(n int) string {
 			if n == 1 {

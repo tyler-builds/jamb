@@ -45,7 +45,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.OTPInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Toggle`, `Theme.ToggleGroup`, `Theme.Rating`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
-   `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.ProgressBar`, `Theme.ProgressRing`,
+   `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.CommandPalette`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
    (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.Sidebar`, `Theme.Breadcrumbs`, `Theme.Pagination`, `Theme.Stepper`, `Theme.ColorPicker`, and `Theme.FormField` (the label, help text and error
    of every field) and `Theme.Form` (the error summary of every form). Each is a field of `ui.Theme`, and the
@@ -553,6 +553,7 @@ parts that the code applies.
 | `Modal` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | none | none | done |
 | `Drawer` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | `Side` (`DrawerRight`, `DrawerLeft`, `DrawerTop`, `DrawerBottom`) | none | done |
 | `Popover` | `Panel` | `Placement` | none | done |
+| `CommandPalette` | `Panel`, `Input`, `List`, `Item`, `ItemHighlighted`, `Label`, `Match`, `Keys`, `Empty` | none | none | done |
 | `ProgressBar` | `Track`, `Fill`, `Label` | `Indeterminate()` (the sliding segment is `Fill`) | none | done |
 | `ProgressRing` | `Ring`, `Dot` | sizes (`RingSmall`, `RingMedium`, `RingLarge`) | none | done |
 | `Badge` | `Badge`, `Label`, `Dot` | `Neutral`, `Accent`, `Success`, `Warning`, `Danger` (style per variant in `Theme.Badges`) | none | done |

@@ -199,6 +199,14 @@ func builtinBindings() []Binding {
 		BindIn("Combobox > Editor", "up", comboboxUp),
 		BindIn("Combobox > Editor", "enter", comboboxEnter),
 		BindIn("Combobox > Editor", "escape", comboboxEscape),
+		// A command palette's keys, in the context of its search field (see
+		// commandpalette.go).
+		BindIn("CommandPalette > Editor", "up", commandPaletteUp),
+		BindIn("CommandPalette > Editor", "down", commandPaletteDown),
+		BindIn("CommandPalette > Editor", "pageup", commandPalettePageUp),
+		BindIn("CommandPalette > Editor", "pagedown", commandPalettePageDown),
+		BindIn("CommandPalette > Editor", "enter", commandPaletteRun),
+		BindIn("CommandPalette > Editor", "escape", commandPaletteClose),
 	}, selectableTextBindings()...)
 }
 

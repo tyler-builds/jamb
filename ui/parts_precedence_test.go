@@ -141,6 +141,14 @@ func TestWidgetPartPrecedence(t *testing.T) {
 					return Div().Column().Child(Modal("Settings", Text("Body")).Styles(ModalStyle{Panel: bgStyle(inst)}))
 				})
 			}},
+		{name: "CommandPalette", part: "CommandPalette.Panel",
+			theme: func(th *Theme, c Color) { th.CommandPalette.Panel.Background = c },
+			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
+				return newThemedRig(th, func(ctx *Context) Element {
+					return Div().Column().Size(Full, Full).
+						Child(CommandPalette(NewSignal(true)).Styles(CommandPaletteStyle{Panel: bgStyle(inst)}))
+				})
+			}},
 		{name: "ProgressBar", part: "ProgressBar.Track",
 			theme: func(th *Theme, c Color) { th.ProgressBar.Track.Background = c },
 			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
