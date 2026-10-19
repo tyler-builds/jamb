@@ -11,7 +11,7 @@ import (
 
 // widgetsSection shows the smaller widgets: a sidebar, breadcrumbs,
 // pagination, a stepper, avatars, tags, skeletons, a color picker, a date range
-// picker, group boxes and description lists.
+// picker, group boxes, description lists and a status bar.
 func widgetsSection(t *ui.Theme) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		nav := ui.Local(ctx, "w.nav", "inbox")
@@ -115,7 +115,12 @@ func widgetsSection(t *ui.Theme) ui.Element {
 					ItemText("Created", "May 4").
 					ItemText("Updated", "June 12").
 					ItemText("Members", "8").
-					ItemText("Visibility", "Team"))))
+					ItemText("Visibility", "Team"))),
+			sample(t, "StatusBar, with Start and End", ui.Div().Width(ui.Px(420)).Border(1, t.Border).Radius(8).ClipContent().
+				Child(ui.Div().Height(ui.Px(60)).Padding(12).Child(ui.Text("Document").TextColor(t.TextMuted))).
+				Child(ui.StatusBar().Label("Editor status").
+					Start(ui.Text("Saved")).
+					End(ui.Text("Ln 12, Col 4"), ui.Text("UTF-8")))))
 	})
 }
 

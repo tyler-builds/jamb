@@ -67,6 +67,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   technology sees a dialog with a combo box whose highlighted command is the focus. It is styled
   through `ui.CommandPaletteStyle` and `Theme.CommandPalette`, and its texts are
   `Strings.CommandPalette`, `CommandPalettePlaceholder` and `NoMatchingCommands`.
+- `ui.StatusBar()` is the bar along the bottom of a window, with items at its `Start` and its
+  `End`, a top border and small muted text. Assistive technology sees a status bar (the new
+  `access.RoleStatusBar`, UI Automation's StatusBar control type). It is styled through
+  `ui.StatusBarStyle` and `Theme.StatusBar`. The demo's main window has one.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.
 - The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a

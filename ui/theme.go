@@ -190,6 +190,8 @@ type Theme struct {
 	// ColorPicker is the look of every color picker: its trigger, its panel and the
 	// sliders of the panel.
 	ColorPicker ColorPickerStyle
+	// StatusBar is the look of every status bar.
+	StatusBar StatusBarStyle
 
 	// styles is the values that SetThemeStyle stores, keyed by their type (see
 	// themeStyleKey). The map is never changed in place: SetThemeStyle stores a new

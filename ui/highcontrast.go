@@ -101,6 +101,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Popover:         base.Popover,
 		CommandPalette:  base.CommandPalette,
 		DescriptionList: base.DescriptionList,
+		StatusBar:       base.StatusBar,
 
 		styles: base.styles, // never changed in place (see SetThemeStyle)
 	}

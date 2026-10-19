@@ -231,6 +231,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("OTPInput", func(t *testing.T) { testOTPInputParts(t, applied) })
 	t.Run("DateRangePicker", func(t *testing.T) { testDateRangePickerParts(t, applied) })
 	t.Run("ColorPicker", func(t *testing.T) { testColorPickerParts(t, applied) })
+	t.Run("StatusBar", func(t *testing.T) { testStatusBarParts(t, applied) })
 
 	// The table and docs/styling.md list the same parts, in both directions.
 	documented := documentedParts(t)
