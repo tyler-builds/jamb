@@ -185,13 +185,14 @@ func starColor(t *ui.Theme, on bool) ui.Color {
 	return ui.Color{}
 }
 
+// emptyState is what the project cards show when the search and the filter
+// match no project, with a button that clears them.
 func emptyState(t *ui.Theme, s *Store) ui.Element {
-	return ui.Div().Padding(48).Gap(10).Align(ui.Center).Radius(12).Border(1, t.Border).
-		Child(IconTile(t, icons.Search, t.TextMuted, 48)).
-		Child(ui.Text("No projects match").FontSize(15).Semibold()).
-		Child(ui.Text("Try a different search or filter.").TextColor(t.TextMuted)).
-		Child(ui.Button("Clear filters").Secondary().Small().Style(ui.Style{Margin: ui.Edges{Top: 6}}).OnClick(func() {
-			s.Query.Set("")
-			s.Filter.Set(-1)
-		}))
+	return ui.Div().Padding(24).Radius(12).Border(1, t.Border).
+		Child(ui.Empty("No projects match").Icon(icons.Search).
+			Description("Try a different search or filter.").
+			Action(ui.Button("Clear filters").Secondary().Small().OnClick(func() {
+				s.Query.Set("")
+				s.Filter.Set(-1)
+			})))
 }

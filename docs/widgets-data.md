@@ -116,7 +116,7 @@ The grid's methods:
 - The look of the states is a fill or a line, not a change of weight: a selected row has the `RowSelected` fill, a sorted column has its arrow (`SortIndicator`), and the text keeps its weight.
 - `Density(d)`: `ui.DataGridComfortable` (36 logical pixels a row, the default) or `ui.DataGridCompact` (26). `Striped()` draws every other row in `RowAlternate`.
 - `Loading(on)`: shows a progress ring over the rows. The rows, the focus and the selection stay.
-- `Empty(el)`: what the grid shows with no rows. The default is "No rows".
+- `Empty(el)`: what the grid shows with no rows. The default is "No rows". A `ui.Empty` state fits here (see [widgets-feedback.md](widgets-feedback.md#empty-states)).
 - `Label(name)`, `Key(k)`, `Style(s)` and `Styles(st)`: as for the other widgets. `Styles` takes a `ui.DataGridStyle`; see [docs/styling.md](styling.md).
 
 Rows are identified by their keys, which must be unique and stable. The focus, the selection and the sort follow the key, so a sort, a scroll or new rows keep the focused cell and the selected rows on the same data.

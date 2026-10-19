@@ -194,6 +194,8 @@ type Theme struct {
 	StatusBar StatusBarStyle
 	// Toolbar is the look of every toolbar and its separators.
 	Toolbar ToolbarStyle
+	// Empty is the look of every empty state.
+	Empty EmptyStyle
 
 	// styles is the values that SetThemeStyle stores, keyed by their type (see
 	// themeStyleKey). The map is never changed in place: SetThemeStyle stores a new

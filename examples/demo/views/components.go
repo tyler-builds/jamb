@@ -185,8 +185,8 @@ var componentSections = []componentSection{
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return motionSection(t) }},
 	{"Focus and scrolling", "FocusWithin Focused FocusVisible Focusable TabIndex TabStop ScrollX focus ring keyboard Tab order scroll",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return focusSection(t) }},
-	{"Feedback", "Kbd Alert Badge BadgeText BadgeDot Toast ProgressBar ProgressRing Notify " +
-		"keyboard shortcut spinner busy progress toast badge alert OS notification",
+	{"Feedback", "Kbd Alert Empty Badge BadgeText BadgeDot Toast ProgressBar ProgressRing Notify " +
+		"keyboard shortcut spinner busy progress toast badge alert empty state OS notification",
 		func(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element { return feedbackSection(ctx, t, s) }},
 	{"Notification area and taskbar", "TaskbarProgress SetTaskbarBadge NewTray tray icon taskbar badge progress system tray",
 		func(ctx *ui.Context, _ *ui.Theme, s *Store) ui.Element { return shellSection(ctx, s) }},

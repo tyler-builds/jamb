@@ -7,7 +7,7 @@ import (
 )
 
 // feedbackSection is the Feedback part of the Components page: progress bars,
-// busy rings, toasts, badges, alerts and keyboard shortcuts. Its toasts appear in the window's Toaster and
+// busy rings, toasts, badges, alerts, keyboard shortcuts and an empty state. Its toasts appear in the window's Toaster and
 // are also listed by the bell (see notify).
 func feedbackSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 	count := ui.Local(ctx, "feedback-count", 0)
@@ -63,6 +63,9 @@ func feedbackSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 			Child(ui.Kbd("ctrl+shift+p")).
 			Child(ui.Kbd("ctrl+k ctrl+t")).
 			Child(ui.Kbd("f2").Tooltip("Rename"))),
+		sample(t, "Empty state, with an action", ui.Div().Width(ui.Px(420)).Radius(8).Border(1, t.Border).
+			Child(ui.Empty("No notifications").Description("Updates about your projects appear here.").
+				Action(ui.Button("Notification settings").Secondary().Small().OnClick(func() { s.Page.Set(PageSettings) })))),
 	)
 }
 

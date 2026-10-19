@@ -258,7 +258,7 @@ GPUI Kit's component page lists 69 components in four groups. The jamb column na
 | Command | `CommandPalette` |
 | Carousel, Diff, Settings | None |
 
-The component page also links AlertDialog, Clipboard, Empty, Focus Trap, HoverCard, Input Group, Plot, Shimmer, Table and TitleBar from its sidebar. jamb has text and image clipboard access, an empty-state slot on `DataGrid`, `Canvas` for custom plots and `TitleBarButtons`.
+The component page also links AlertDialog, Clipboard, Empty, Focus Trap, HoverCard, Input Group, Plot, Shimmer, Table and TitleBar from its sidebar. jamb has text and image clipboard access, `Empty` for empty states, `Canvas` for custom plots and `TitleBarButtons`.
 
 jamb has some widgets GPUI Kit does not list: `MenuBar`, `Breadcrumbs`, `DateRangePicker` and `CheckboxTri`. It also has Windows shell integration (`NewTray`, jump lists, taskbar progress and badges), native file and message dialogs (`dialog`), `Canvas` and `SVG` drawing, and the inspector.
 

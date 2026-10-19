@@ -1,6 +1,7 @@
 # Feedback widgets
 
-Feedback and status indicators, alerts, avatars, tags, skeleton placeholders and keyboard shortcuts.
+Feedback and status indicators, alerts, empty states, avatars, tags, skeleton placeholders and
+keyboard shortcuts.
 
 ## Feedback
 
@@ -107,6 +108,31 @@ ui.Alert("Read only").Icon(icons.Lock)              // another icon; Icon(nil) s
   description. An alert with no title is named by its description. An alert is not a live
   region: it is not announced when it appears. An app that shows one after an action the
   user should hear about announces it too, with `ui.Announce`.
+
+## Empty states
+
+`ui.Empty(title)` is what a list, a table or a page shows when it has nothing to show: an
+icon, a title, an optional description and an optional action, centered and muted. It
+fits the empty slots of the widgets, such as `DataGrid.Empty(...)`, and the place of a
+list or a set of cards with no items. Its look is `ui.EmptyStyle`: per app in
+`Theme.Empty`, or per instance with `Styles`. It follows high contrast and the Text size.
+
+```go
+ui.Empty("No projects").Description("Create a project to get started.").
+	Action(ui.Button("New project").OnClick(create))
+ui.DataGrid(rows, key, cols...).
+	Empty(ui.Empty("No matches").Icon(icons.Search).Description("Try another search."))
+ui.Empty("Nothing here").Icon(nil)                  // no icon
+```
+
+- **Look.** The parts are centered in a column with 24 pixels of padding: a 32-pixel icon
+  (an inbox by default; `Icon` replaces it) in the muted text color, the title semibold,
+  the description muted and centered, and the action under them. Under high contrast the
+  icon and the description are the text color.
+- **Accessibility.** The empty state is a group named by its title, with the description as
+  its description, and its action inside it. The icon is not exposed. An empty state is
+  not announced when it appears; an app that empties a list after an action, such as a
+  search, can say so with `ui.Announce`.
 
 ## Avatars, tags and skeletons
 
