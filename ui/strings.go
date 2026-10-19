@@ -155,6 +155,9 @@ type Strings struct {
 	StepCurrent func(n, steps int, title string) string
 	// StepUpcoming names a step after the current one.
 	StepUpcoming func(n, steps int, title string) string
+	// RatingValue is the value of a rating that assistive technology reads, such as
+	// "3 of 5 stars".
+	RatingValue func(value, max int) string
 
 	// The notes of a calendar's days: Today, and the ends and the middle of a range.
 	Today string
@@ -444,6 +447,12 @@ func englishStrings() *Strings {
 		Page:          func(n int) string { return fmt.Sprintf("Page %d", n) },
 		CurrentPage:   func(n int) string { return fmt.Sprintf("Page %d, current page", n) },
 		PageOf:        func(page, pages int) string { return fmt.Sprintf("Page %d of %d", page, pages) },
+		RatingValue: func(value, max int) string {
+			if max == 1 {
+				return fmt.Sprintf("%d of 1 star", value)
+			}
+			return fmt.Sprintf("%d of %d stars", value, max)
+		},
 
 		StepCompleted: func(n, steps int, title string) string {
 			return fmt.Sprintf("Step %d of %d: %s, completed", n, steps, title)

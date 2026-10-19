@@ -4,7 +4,7 @@ Form controls, the color picker, and forms with validation and submission.
 
 ## Form controls
 
-Checkboxes, switches, toggles, toggle groups, radio groups, selects, sliders and
+Checkboxes, switches, toggles, toggle groups, radio groups, ratings, selects, sliders and
 number inputs are bound to signals, as `TextInput` is. Each reads its signal when
 it renders and writes it when the user changes it. They use the theme's colors,
 follow high contrast and the Text size, and show their state by a shape as well as
@@ -28,6 +28,7 @@ ui.RadioGroup(freq,                               // *ui.Signal[T], for any comp
 	ui.Option[string]{Value: "weekly", Label: "Weekly digest", Disabled: true},
 ).Label("Frequency").OnChange(func(v string) { ... })
 ui.Select(channel, ui.Option[string]{Value: "email", Label: "Email"}).Label("Channel").Placeholder("Choose").Width(ui.Px(240)).OnChange(func(v string) { ... })
+ui.Rating("Rating", stars).Max(5).OnChange(func(n int) { ... }) // *ui.Signal[int], 0 to Max; ReadOnly() to show it
 ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percent).OnChange(fn).Width(ui.Full)
 ui.NumberInput(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStacked).Precision(2) // int or float64
 // every control also takes .Key("id") and .Disabled(true), and every control with a value takes
@@ -65,6 +66,16 @@ ui.NumberInput(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStac
   the form, as for a check box.
   `OnChange` runs with the new value when the user selects an option, by a click,
   Space or the arrows.
+- A rating is a row of stars for a whole number from 0 to `Max` (5 by default).
+  Filled stars are the value, in the Warning color, and the others are outlines,
+  so the value is shown by the shape as well. The pointer over a star previews
+  that value, a click sets it, and a click on the star of the current value clears
+  the rating to 0. Left and Down lower it by one, Right and Up raise it, Home sets
+  0, End sets `Max`, and a digit key sets that number when it is not above `Max`.
+  `ReadOnly()` shows the value at full contrast with no focus, pointer or keys;
+  `Disabled(true)` dims it. In a `Field`, `Validate(ui.Required[int]())` asks for a
+  rating, since 0 is no rating. The look is `ui.RatingStyle`, set in `Theme.Rating`
+  or with `.Styles(...)`.
 - A select opens with a click, Enter, Space, Alt+Down or F4, and its list opens
   below the field, or above it when there is no room. While the list is closed,
   Up and Down choose the previous and next option, Home and End the first and
@@ -131,6 +142,9 @@ check box with the Toggle pattern (as Phase B chose), a toggle as a button with
 the Toggle pattern (as a `Button` with `AccessChecked` is), a radio group and a
 toggle group as a selection container of radio buttons named by its label, and a select as a combo box whose Value is the
 chosen label. A slider and a number input report their range (RangeValue). A
+rating is a slider from 0 to its maximum, whose Value is a text such as "3 of 5
+stars" (`Strings.RatingValue`), as the WinUI rating control reports it; a
+read-only rating is a read-only slider. A
 number input is a spin box that holds its text field, as Microsoft's Spinner
 control type describes
 ([Spinner control type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).

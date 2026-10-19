@@ -465,7 +465,7 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 		}
 	case propIsReadOnly:
 		if hasValueNode(n) {
-			return variantBool(n.States.Has(access.StateReadOnly))
+			return variantBool(valueReadOnly(n))
 		}
 	case propRangeValue:
 		if n.Range != nil {
@@ -539,8 +539,11 @@ func hasValue(r access.Role) bool { return isText(r) || r == access.RoleComboBox
 // item does: Microsoft's DataItem guidance requires the Value pattern when the
 // item's primary text is editable (uiauto-supportdataitemcontroltype). A data item
 // that cannot be edited has no Value pattern, which that guidance does not require.
+// A slider with a value text, such as a Rating's "3 of 5 stars", has a read-only
+// Value pattern beside its RangeValue, as the Slider control type allows and the
+// WinUI RatingControl does (see valueReadOnly).
 func hasValueNode(n *access.Node) bool {
-	if hasValue(n.Role) {
+	if hasValue(n.Role) || sliderText(n) {
 		return true
 	}
 	for _, a := range n.Actions {
@@ -550,6 +553,13 @@ func hasValueNode(n *access.Node) bool {
 	}
 	return false
 }
+
+// sliderText reports whether n is a slider with a value text.
+func sliderText(n *access.Node) bool { return n.Role == access.RoleSlider && n.Value != "" }
+
+// valueReadOnly reports whether the Value of n can only be read: a read-only node,
+// or the value text of a slider, which is set through RangeValue.
+func valueReadOnly(n *access.Node) bool { return n.States.Has(access.StateReadOnly) || sliderText(n) }
 
 // toggleStateOf returns the ToggleState of a node: on when checked, indeterminate
 // when mixed, off otherwise.
@@ -1228,7 +1238,7 @@ func (c *core) isReadOnly() (bool, uintptr) {
 	if !ok {
 		return false, hrElementNotAvailable
 	}
-	return n.States.Has(access.StateReadOnly), hrOK
+	return valueReadOnly(n), hrOK
 }
 
 // setRangeValue sets the number of the slider or spin box c. The runtime sets it

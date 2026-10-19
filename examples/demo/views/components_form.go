@@ -22,6 +22,7 @@ func formControlsSection() ui.Element {
 		sync := ui.Local(ctx, "form.sync", false)
 		pinned := ui.Local(ctx, "form.pinned", true)
 		view := ui.Local(ctx, "form.view", "list")
+		stars := ui.Local(ctx, "form.stars", 3)
 		freq := ui.Local(ctx, "form.freq", "daily")
 		channel := ui.Local(ctx, "form.channel", "email")
 		picked := ui.Local(ctx, "form.picked", "red")
@@ -74,6 +75,10 @@ func formControlsSection() ui.Element {
 			formSample(t, "Switch, disabled", ui.Switch("Unavailable sync", off).Disabled(true), onOff(off.Get())),
 			formSample(t, "Toggle", toggleSample(pinned), onOff(pinned.Get())),
 			formSample(t, "Toggle group", viewSample(view), view.Get()),
+			formSample(t, "Rating", ui.Rating("Sample rating", stars), fmt.Sprintf("%d of 5", stars.Get())),
+			formSample(t, "Rating, read-only and disabled", ui.Div().Gap(6).Align(ui.Start).
+				Child(ui.Rating("Average rating", stars).ReadOnly()).
+				Child(ui.Rating("Rating, disabled", stars).Disabled(true)), fmt.Sprintf("%d of 5", stars.Get())),
 			formSample(t, "Radio group", radioSample(freq), freq.Get()),
 			formSample(t, "Select", selectSample(channel, false), channelName(channel.Get())),
 			formSample(t, "Select, disabled", selectSample(picked, true), channelName(picked.Get())),

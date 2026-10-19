@@ -92,6 +92,13 @@ func TestWidgetPartPrecedence(t *testing.T) {
 						Label("Letters").Styles(ToggleGroupStyle{Group: bgStyle(inst)}))
 				})
 			}},
+		{name: "Rating", part: "Rating.Root",
+			theme: func(th *Theme, c Color) { th.Rating.Root.Background = c },
+			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
+				return newThemedRig(th, func(ctx *Context) Element {
+					return Div().Column().Child(Rating("Score", NewSignal(2)).Styles(RatingStyle{Root: bgStyle(inst)}))
+				})
+			}},
 		{name: "Collapsible", part: "Collapsible.Section", border: true,
 			theme: func(th *Theme, c Color) { th.Collapsible.Section.BorderColor = c },
 			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {

@@ -117,6 +117,9 @@ func contrastPairs(th *Theme) []contrastPair {
 			// marks the state beside the fill.
 			contrastPair{name: "ToggleOn_Text_on_" + s.name, role: "on toggle label (Text on AccentSoft)", fg: th.Text, bg: over(th.AccentSoft, s.c), min: minText},
 			contrastPair{name: "ToggleOn_Border_on_" + s.name, role: "on toggle border (Accent)", fg: th.Accent, bg: s.c, min: minNonText},
+			// rating.go: a filled star is Warning (ratingStarColor) and an empty one a TextSubtle outline.
+			contrastPair{name: "RatingStar_on_" + s.name, role: "filled rating star (Warning, ratingStarColor)", fg: ratingStarColor(th), bg: s.c, min: minNonText},
+			contrastPair{name: "RatingEmptyStar_on_" + s.name, role: "empty rating star (TextSubtle)", fg: th.TextSubtle, bg: s.c, min: minNonText},
 		)
 	}
 	ps = append(ps, badgePairs(th)...)

@@ -26,11 +26,26 @@ func TestValuePatternFollowsTheNodeOrItsRole(t *testing.T) {
 		{"read-only data item", access.Node{Role: access.RoleDataItem,
 			Actions: []access.Action{access.ActionFocus}}, false},
 		{"button", access.Node{Role: access.RoleButton}, false},
+		{"slider", access.Node{Role: access.RoleSlider, Range: &access.Range{Max: 10}}, false},
+		{"slider with a value text", access.Node{Role: access.RoleSlider, Range: &access.Range{Max: 5}, Value: "3 of 5 stars"}, true},
 	}
 	for _, c := range cases {
 		n := c.n
 		if got := hasValueNode(&n); got != c.want {
 			t.Errorf("%s: Value pattern %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+// TestSliderValueTextIsReadOnly checks that the Value of a slider with a value text
+// is read-only: the slider is set through RangeValue, and its RangeValue stays
+// writable unless the slider itself is read-only.
+func TestSliderValueTextIsReadOnly(t *testing.T) {
+	n := access.Node{Role: access.RoleSlider, Range: &access.Range{Max: 5}, Value: "3 of 5 stars"}
+	if !valueReadOnly(&n) || n.States.Has(access.StateReadOnly) {
+		t.Fatalf("the value text of a slider is not read-only, or the slider is")
+	}
+	if field := (access.Node{Role: access.RoleTextField}); valueReadOnly(&field) {
+		t.Fatalf("an editable text field is read-only")
 	}
 }

@@ -63,6 +63,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Switch:        base.Switch,
 		Toggle:        base.Toggle,
 		ToggleGroup:   base.ToggleGroup,
+		Rating:        base.Rating,
 		Collapsible:   base.Collapsible,
 		Tree:          base.Tree,
 		DataGrid:      base.DataGrid,

@@ -43,6 +43,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - `ui.ToggleGroup(value, options...)` is a row of joined toggles of which one is selected. It takes
   the options of a radio group, which now have an `Icon`, and behaves as a radio group for the
   keyboard, for assistive technology and in a `Field`.
+- `ui.Rating(label, value)` is a row of stars for a whole number from 0 to `Max` (5 by default):
+  the pointer previews and a click sets the value, a click on the current star clears it, and
+  the arrows, Home, End and the digit keys set it. `ReadOnly` shows it without input. Assistive
+  technology reads it as a slider with a value such as "3 of 5 stars" (`Strings.RatingValue`).
 - `ui.LinkSegs` makes one link of several styled segments.
 - `ui.Stepper(current, steps...)` shows the progress through the steps of a process: complete
   steps show a check mark, the current one is highlighted, and the later ones are muted. It lays
