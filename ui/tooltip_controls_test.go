@@ -30,6 +30,8 @@ func TestControlsTakeATooltip(t *testing.T) {
 		{"Checkbox", access.RoleCheckBox, Checkbox("C", NewSignal(false)).Tooltip("Help")},
 		{"Checkbox disabled", access.RoleCheckBox, Checkbox("C", NewSignal(false)).Disabled(true).Tooltip("Help")},
 		{"Switch", access.RoleSwitch, Switch("C", NewSignal(false)).Tooltip("Help")},
+		{"Toggle", access.RoleButton, Toggle("C", NewSignal(false)).Tooltip("Help")},
+		{"ToggleGroup", access.RoleGroup, ToggleGroup(NewSignal("a"), opts...).Label("C").Tooltip("Help")},
 		{"Slider", access.RoleSlider, Slider(NewSignal(1.0), 0, 9, 1).Label("C").Tooltip("Help")},
 		{"RadioGroup", access.RoleGroup, RadioGroup(NewSignal("a"), opts...).Label("C").Tooltip("Help")},
 	}

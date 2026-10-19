@@ -44,7 +44,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.DateRangePicker`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Dock`, `Theme.Field` (the frame of every
    `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.OTPInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
-   `Theme.Switch`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
+   `Theme.Switch`, `Theme.Toggle`, `Theme.ToggleGroup`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
    (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.Sidebar`, `Theme.Breadcrumbs`, `Theme.Pagination`, `Theme.Stepper`, `Theme.ColorPicker`, and `Theme.FormField` (the label, help text and error
@@ -156,8 +156,8 @@ the value further.
 | `Selected` | the part is the selected one | the part's selected style |
 | `Disabled` | the part cannot be used | the part's disabled style |
 | `Highlighted` | the option is highlighted in an open list | the option's highlight style |
-| `Invalid` | the field's value is not valid: a NumberInput's text, or a control that a Field shows an error for (TextInput, TextArea, NumberInput, DatePicker, DateRangePicker, TimePicker, Select, RadioGroup, Checkbox) | the part's invalid style |
-| `Checked` | the check box is on, or the switch is on, or the ring is the selected one | the part's checked style |
+| `Invalid` | the field's value is not valid: a NumberInput's text, or a control that a Field shows an error for (TextInput, TextArea, NumberInput, DatePicker, DateRangePicker, TimePicker, Select, RadioGroup, ToggleGroup, Checkbox) | the part's invalid style |
+| `Checked` | the check box, the switch or the toggle is on, or the ring is the selected one | the part's checked style |
 | `Mixed` | the check box is in the mixed (indeterminate) state | the part's mixed style |
 | `Open` | the collapsible section is open | the part's open style |
 
@@ -313,6 +313,7 @@ the Text size of 100 percent:
 | `Button`, `IconButton` | as wide as its label; `Width(ui.Full)` fills the container |
 | `Checkbox`, `CheckboxTri`, `RadioGroup`, `Badge` | as wide as their content, also in a column |
 | `Switch` | 38 px track (the knob stays 3 px from its end) |
+| `Toggle`, `ToggleGroup` | as wide as their label or items, as a button is |
 | `TextInput`, `TextArea` | 240 px, a fixed size like a CSS input's; `Full` stretches it |
 | `NumberInput` | 120 px, a fixed size for its column (the frame and the message row); `Full` stretches it, and `Grow` and the limits apply to the column |
 | `OTPInput` | as wide as its boxes, each 40 px at the Text size of 100 percent, with the gaps between them and between their groups |
@@ -539,6 +540,8 @@ parts that the code applies.
 | `TextInput, TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
 | `Checkbox`, `CheckboxTri` | `Control`, `ControlFocusVisible`, `ControlDisabled`, `Box`, `BoxHover`, `BoxChecked`, `BoxMixed`, `BoxDisabled`, `BoxInvalid`, `Mark`, `Dash`, `Label`, `LabelDisabled` | none | none | done |
 | `Switch` | `Track`, `TrackChecked`, `TrackHover`, `TrackFocusVisible`, `TrackDisabled`, `Knob`, `KnobChecked`, `KnobDisabled` | none | none | done |
+| `Toggle` | `Root`, `RootChecked`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Ghost`, `Secondary` (the looks of those buttons) | none | done |
+| `ToggleGroup` | `Group`, `GroupInvalid`, `Item`, `ItemSelected`, `ItemHover`, `ItemPressed`, `ItemFocusVisible`, `ItemDisabled`, `Label`, `Icon` | none | none | done |
 | `RadioGroup` | `Group`, `Radio`, `RadioFocusVisible`, `RadioDisabled`, `Ring`, `RingChecked`, `RingDisabled`, `RingInvalid`, `Dot`, `DotDisabled`, `Label`, `LabelDisabled` | none | none | done |
 | `Collapsible`, `Accordion` | `Section`, `Header`, `HeaderHover`, `HeaderOpen`, `HeaderFocusVisible`, `HeaderDisabled`, `Chevron`, `Content` | none | `RenderHeader` | done |
 | `Tree` | `Row`, `RowHover`, `RowSelected`, `Chevron`, `Icon`, `Label`, `TreeFocusVisible` | none | `RenderRow`, `RenderLabel` | done |

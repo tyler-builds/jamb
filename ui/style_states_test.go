@@ -105,6 +105,7 @@ var layerStateNotDrawn = map[string]string{
 	"TimePicker.FrameInvalid":         "the invalid frame needs a failed validation",
 	"DateRangePicker.FrameInvalid":    "the invalid frame needs a failed validation",
 	"RadioGroup.RingInvalid":          "the invalid ring needs a failed validation",
+	"ToggleGroup.GroupInvalid":        "the invalid group needs a failed validation",
 	"Checkbox.BoxInvalid":             "the invalid box needs a failed validation",
 	"CheckboxTri.BoxInvalid":          "the invalid box needs a failed validation",
 	"OTPInput.BoxInvalid":             "the invalid boxes need a failed validation",
