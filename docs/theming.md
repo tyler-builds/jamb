@@ -126,7 +126,7 @@ WCAG 2 ratios of each pair the built-in widgets use, in both themes.
 ## Predefined themes
 
 Predefined themes: `ui.Themes()` lists the built-in Dark and Light themes, then 37
-themes converted from gpui-component (Apache-2.0), in 22 families. `ui.NewTheme(name)`
+themes converted from GPUI Kit, formerly gpui-component (Apache-2.0), in 22 families. `ui.NewTheme(name)`
 returns a new copy of one of them by its exact name, which is the `Theme.Name` of the copy.
 Each theme also has syntax colors for a code editor (`Theme.Syntax`, keyed by the tree-sitter
 capture name) and its editor colors (`Theme.CodeEditor`).

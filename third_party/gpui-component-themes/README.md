@@ -1,11 +1,15 @@
-# gpui-component themes
+# GPUI Kit themes
 
 The JSON files in this directory are the theme sets of
-[gpui-component](https://github.com/longbridge/gpui-component), copied from its
-`themes/` directory at commit `f2f0f563292114fecf55fb8ab92a97e14989dbd0`. The
-schema is gpui-component's `.theme-schema.json` at the same commit.
-gpui-component is Copyright 2024-2025 Longbridge and is licensed under the Apache
-License, Version 2.0; the license text is in [LICENSE-APACHE](LICENSE-APACHE).
+[GPUI Kit](https://github.com/longbridge/gpui-kit), formerly gpui-component, copied
+from its `themes/` directory at tag `v0.8.0` (commit
+`1676826d9d49b90f4d7b6808b69924f58796f6f1`). The schema is GPUI Kit's
+`.theme-schema.json` at the same tag. The directory keeps the project's earlier name.
+`matrix.json` is from gpui-component at commit
+`f2f0f563292114fecf55fb8ab92a97e14989dbd0`; it was removed upstream after that
+commit, and jamb keeps it.
+GPUI Kit is Copyright 2024-2026 Longbridge and is licensed under the Apache License,
+Version 2.0; the license text is in [LICENSE-APACHE](LICENSE-APACHE).
 
 Each file names the color scheme it is taken from in its `name`, `author` and
 `url` fields. The schemes are the work of their authors, for example Catppuccin
