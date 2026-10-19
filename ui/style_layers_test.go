@@ -214,6 +214,10 @@ var layerBuilders = []layerBuilder{
 		func(st any) Element { return Badge(3).Styles(st.(BadgeStyle)) }},
 	{"Badge", func(th *Theme) any { return &th.Badge },
 		func(st any) Element { return Badge(3).StatusDot().Styles(st.(BadgeStyle)) }},
+	{"Alert", func(th *Theme) any { return &th.Alert },
+		func(st any) Element {
+			return Alert("Sample").Description("Details").OnClose(func() {}).Styles(st.(AlertStyle))
+		}},
 	{"Avatar", func(th *Theme) any { return &th.Avatar },
 		func(st any) Element { return Avatar("Sample User").Styles(st.(AvatarStyle)) }},
 	{"Tag", func(th *Theme) any { return &th.Tag },

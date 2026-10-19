@@ -7,10 +7,11 @@ import (
 )
 
 // feedbackSection is the Feedback part of the Components page: progress bars,
-// busy rings, toasts, badges and keyboard shortcuts. Its toasts appear in the window's Toaster and
+// busy rings, toasts, badges, alerts and keyboard shortcuts. Its toasts appear in the window's Toaster and
 // are also listed by the bell (see notify).
 func feedbackSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 	count := ui.Local(ctx, "feedback-count", 0)
+	alertShown := ui.Local(ctx, "feedback-alert", true)
 	// Undo puts the count back, so the toast's action does real work.
 	increment := func() {
 		before := count.Peek()
@@ -57,9 +58,26 @@ func feedbackSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 		sample(t, "Badge on a row", ui.Div().Row().Align(ui.Center).Gap(10).Radius(8).PaddingX(10).PaddingY(6).
 			Border(1, t.Border).Label("Projects").Badged(ui.Badge(6).Noun("items")).
 			Child(ui.Text("Projects").Medium())),
+		sample(t, "Alerts: variants, action and OnClose", alertSamples(alertShown)),
 		sample(t, "Keyboard shortcuts", ui.Div().Row().Wrap().Gap(12).Align(ui.Center).
 			Child(ui.Kbd("ctrl+shift+p")).
 			Child(ui.Kbd("ctrl+k ctrl+t")).
 			Child(ui.Kbd("f2").Tooltip("Rename"))),
 	)
+}
+
+// alertSamples shows an alert of each variant. The success alert has a close
+// button, and a button brings it back once it is closed.
+func alertSamples(shown *ui.Signal[bool]) ui.Element {
+	col := ui.Div().Gap(8).Width(ui.Px(420)).
+		Child(ui.Alert("Sync paused").Description("Reconnect to resume syncing.")).
+		Child(ui.Alert("Disk nearly full").Warning().Description("Free some space to keep saving drafts.")).
+		Child(ui.Alert("Upload failed").Danger().Description("The file is larger than 25 MB.").
+			Action(ui.Button("Choose another file").Small().Secondary().OnClick(pressed("Choose another file"))))
+	if shown.Get() {
+		col.Child(ui.Alert("Changes saved").Success().OnClose(func() { shown.Set(false) }))
+	} else {
+		col.Child(ui.Button("Show the success alert").Small().Secondary().OnClick(func() { shown.Set(true) }))
+	}
+	return col
 }

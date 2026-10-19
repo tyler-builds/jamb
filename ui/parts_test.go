@@ -207,6 +207,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Progress", func(t *testing.T) { testProgressParts(t, applied) })
 	t.Run("Badge", func(t *testing.T) { testBadgeParts(t, applied) })
 	t.Run("Toast", func(t *testing.T) { testToastParts(t, applied) })
+	t.Run("Alert", func(t *testing.T) { testAlertParts(t, applied) })
 	t.Run("Tooltip", func(t *testing.T) { testTooltipParts(t, applied) })
 	t.Run("DataGrid", func(t *testing.T) { testDataGridParts(t, applied) })
 	t.Run("Forms", func(t *testing.T) { testFormParts(t, applied) })

@@ -75,6 +75,8 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Badges:        base.Badges,
 		Toast:         base.Toast,
 		Toasts:        base.Toasts,
+		Alert:         base.Alert,
+		Alerts:        base.Alerts,
 		Tooltip:       base.Tooltip,
 		Avatar:        base.Avatar,
 		Tag:           base.Tag,

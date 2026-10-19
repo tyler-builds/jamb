@@ -1,6 +1,6 @@
 # Feedback widgets
 
-Feedback and status indicators, avatars, tags, skeleton placeholders and keyboard shortcuts.
+Feedback and status indicators, alerts, avatars, tags, skeleton placeholders and keyboard shortcuts.
 
 ## Feedback
 
@@ -77,6 +77,36 @@ ctx.Toast(ui.ToastSuccess, "Project created").Action("Undo", undo) // in a handl
 - **Toast announcements.** Each toast is announced through `Announce`: politely for
   info and success, and assertively for warning and error, as the existing
   announcements are. Its group is named by its text.
+
+## Alerts
+
+An alert is a message box in the flow of the page, such as a note above a form or the
+result of an action: an icon, a title, an optional description and action, and an
+optional close button. Its look is `ui.AlertStyle`: per app in `Theme.Alert`, per variant
+in `Theme.Alerts`, or per instance with `Styles`.
+
+```go
+ui.Alert("Sync paused").Description("Reconnect to resume.") // info, the default
+ui.Alert("Payment failed").Danger().Description("Check the card details.").
+	Action(ui.Button("Retry").Small().Secondary().OnClick(retry))
+ui.Alert("Update ready").Success().OnClose(func() { shown.Set(false) }) // a close button
+ui.Alert("Read only").Icon(icons.Lock)              // another icon; Icon(nil) shows none
+```
+
+- **Variants.** `Info()` (the default), `Success()`, `Warning()` and `Danger()`, or
+  `Variant(v)`. Each has its icon: info, a check, and the alert icon for warning and danger.
+  The box is tinted with the variant's color (Accent, Success, Warning or Danger), and the
+  icon is drawn in that color. The title and the description are 4.5:1 or more on every
+  variant's fill in both themes, and the icon 3:1 or more. Under high contrast the box is
+  the window color outlined in the text color, and the icon is the text color, so the
+  icon's shape and the text tell the variant.
+- **Close.** `OnClose` adds a close button at the end, named with the `Close` text of the
+  window's Strings. It works with the mouse, Enter and Space. The app removes the alert in
+  `fn`, by changing the state it is built from.
+- **Accessibility.** The alert is a group named by its title, with the description as its
+  description. An alert with no title is named by its description. An alert is not a live
+  region: it is not announced when it appears. An app that shows one after an action the
+  user should hear about announces it too, with `ui.Announce`.
 
 ## Avatars, tags and skeletons
 

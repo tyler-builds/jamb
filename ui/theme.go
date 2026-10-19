@@ -146,6 +146,11 @@ type Theme struct {
 	Toast ToastStyle
 	// Toasts is the look of each toast kind, and merges over Toast.
 	Toasts ToastVariants
+	// Alert is the look of every alert, whatever its variant. Alerts is the look
+	// of each variant, and merges over Alert.
+	Alert AlertStyle
+	// Alerts is the look of each alert variant, and merges over Alert.
+	Alerts AlertVariants
 	// Tooltip is the look of every tooltip.
 	Tooltip TooltipStyle
 	// Avatar is the look of every avatar.

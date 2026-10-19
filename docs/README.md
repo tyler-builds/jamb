@@ -27,7 +27,7 @@ jamb to an app; the other pages cover one topic each.
 - [Form widgets](widgets-forms.md): form controls, the color picker, and forms with validation and submission.
 - [Selection and date widgets](widgets-selection.md): the combobox and the date and time pickers.
 - [Navigation widgets](widgets-navigation.md): tabs, collapsible sections, trees, and the sidebar.
-- [Feedback widgets](widgets-feedback.md): feedback and status indicators, avatars, tags, skeleton placeholders, and keyboard shortcuts.
+- [Feedback widgets](widgets-feedback.md): feedback and status indicators, alerts, avatars, tags, skeleton placeholders, and keyboard shortcuts.
 - [Data widgets](widgets-data.md): variable-height lists, uniform lists, and data grids.
 - [Overlays and menus](widgets-overlays.md): menus, dropdowns, popovers, drawers, and modal dialogs.
 - [Charts](charts.md): building charts, data and axes, interaction, and accessibility.

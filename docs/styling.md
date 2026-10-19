@@ -549,6 +549,7 @@ parts that the code applies.
 | `ProgressRing` | `Ring`, `Dot` | sizes (`RingSmall`, `RingMedium`, `RingLarge`) | none | done |
 | `Badge` | `Badge`, `Label`, `Dot` | `Neutral`, `Accent`, `Success`, `Warning`, `Danger` (style per variant in `Theme.Badges`) | none | done |
 | `Toast` | `Container`, `Icon`, `Text`, `Action`, `Close` | `Info`, `Success`, `Warning`, `Error` (style per kind in `Theme.Toasts`; placement with `Toaster.Placement`) | none | done |
+| `Alert` | `Alert`, `Icon`, `Title`, `Description`, `Close` | `Info`, `Success`, `Warning`, `Danger` (style per variant in `Theme.Alerts`) | none | done |
 | `Tooltip` | `Panel`, `Text` | none | none | done |
 | `Avatar` | `Avatar`, `Initials` | none | none | done |
 | `Tag` | `Tag`, `Label`, `Remove` | none | none | done |
