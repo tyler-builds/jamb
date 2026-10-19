@@ -85,6 +85,47 @@ func TestInspectorWindowShowsTheSelectedElementWithoutAccessibilityWarnings(t *t
 	}
 }
 
+// hoverTarget records the Hover calls that the inspector makes on its target.
+type hoverTarget struct {
+	inspect.Target
+	hover []uint64
+}
+
+func (h *hoverTarget) Hover(id uint64) {
+	h.hover = append(h.hover, id)
+	h.Target.Hover(id)
+}
+
+// TestInspectorTreeHoverOutlinesTheElement checks that the pointer over a row of
+// the tree asks the window to outline that row's element, and that leaving the
+// tree clears the outline.
+func TestInspectorTreeHoverOutlinesTheElement(t *testing.T) {
+	h, _, tg := inspSampleWindow(t)
+	rec := &hoverTarget{Target: tg}
+	ins := newInspector(h, rec)
+	tg.Attach(ins.changed)
+	root, _ := tg.Element(tg.Root())
+	first := root.Children[0]
+
+	irt := ui.NewRuntime(ins.root, ui.DarkTheme(), nil)
+	irt.SetViewport(1100, 760, 1)
+	irt.Frame(time.Now())
+	r, ok := irt.Find(keyOf(first))
+	if !ok {
+		t.Fatalf("no tree row keyed %s", keyOf(first))
+	}
+	irt.PointerMove(r.X+r.W/2, r.Y+r.H/2, 0)
+	irt.Frame(time.Now())
+	if n := len(rec.hover); n == 0 || rec.hover[n-1] != first {
+		t.Fatalf("hovering the row of element %d called Hover with %v", first, rec.hover)
+	}
+	irt.PointerMove(1090, 750, 0) // out of the tree
+	irt.Frame(time.Now())
+	if n := len(rec.hover); rec.hover[n-1] != 0 {
+		t.Fatalf("leaving the tree did not clear the hover: %v", rec.hover)
+	}
+}
+
 // TestInspectorFrameSamplesTheTiming checks that a frame of the inspected window
 // records its timings, and that the inspector is asked to read the window again.
 func TestInspectorFrameSamplesTheTiming(t *testing.T) {

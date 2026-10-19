@@ -80,6 +80,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - The predefined themes are converted from GPUI Kit v0.8.0 (formerly gpui-component). Panel and
   border colors of Asciinema and macOS Classic, and the syntax colors of macOS Classic Dark,
   follow upstream. The Matrix theme, which GPUI Kit no longer has, stays.
+- The inspector outlines the element of the tree row under the pointer in the inspected window,
+  more lightly than the selection. The selected element shows its margin, border and padding as
+  tinted bands and its content box filled, as browsers' developer tools do, under an accent outline
+  and a label with its kind, key and size.
 
 ### Fixed
 

@@ -133,6 +133,10 @@ type Target interface {
 	// Zero clears the selection.
 	Select(id uint64)
 	Selected() uint64
+	// Hover outlines the element lightly in the window, as the inspector's tree
+	// does for the row under the pointer; zero clears it. Pick mode moves it with
+	// the pointer in the window.
+	Hover(id uint64)
 }
 
 // Sample is the cost of one frame of an inspected window, as the frame reported it.
