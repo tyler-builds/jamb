@@ -11,9 +11,12 @@ parts that depend on it.
 
 ## Highlights
 
-- Widgets: buttons, text fields, checkboxes, switches, sliders, selects, comboboxes, date and time
-  pickers, color pickers, menus, tabs, trees, data grids, forms with validation, toasts, and modal dialogs.
-- Layout: flexbox, grid, sidebars, split panes, docking, and variable-height and uniform lists.
+- Widgets: buttons, split buttons and toggles, text fields (masked and clearable), one-time code
+  inputs, checkboxes, switches, sliders and range sliders, ratings, selects, comboboxes, date and time
+  pickers, calendars, color pickers, menus, a command palette, tabs, trees, steppers, carousels, data
+  grids, forms with validation, alerts, toasts, hover cards, and modal dialogs.
+- Layout: flexbox, grid, sidebars, toolbars, status bars, split panes, docking, and variable-height
+  and uniform lists.
 - Theming: light and dark themes that follow the system's light or dark mode, 37 converted predefined
   themes in 22 families, and automatic high contrast.
 - Accessibility: a UI Automation tree for screen readers, keyboard navigation, reduced motion, and a
