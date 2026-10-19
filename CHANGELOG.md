@@ -73,6 +73,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   border colors of Asciinema and macOS Classic, and the syntax colors of macOS Classic Dark,
   follow upstream. The Matrix theme, which GPUI Kit no longer has, stays.
 
+### Fixed
+
+- The fonts parsed for a window stayed in memory after the window closed, because a process-wide
+  map held every parsed font. A closed window, such as a dock window or the inspector, now gives
+  its fonts back, and the `ui` tests peak at about 0.5 GB instead of 8 GB.
+
 ## [0.2.0] - 2026-10-15
 
 The additions from the API review of v0.1.0. No API is removed or renamed; the changes below are

@@ -10,9 +10,11 @@ package text
 import (
 	"bytes"
 	"fmt"
+	"runtime"
 	"slices"
 	"sync"
 	"unicode"
+	"weak"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
@@ -57,8 +59,11 @@ type Font struct {
 	dw        dwFace
 }
 
-// faces maps shaping faces back to fonts, for rasterization.
-var faces sync.Map // *tsfont.Face -> *Font
+// faces maps shaping faces back to fonts, for rasterization. It holds both
+// weakly, and a font's entry is removed when the font is freed: each System
+// parses its own fonts, so a strong map kept every font of every System, such
+// as those of a closed window, for the life of the process.
+var faces sync.Map // weak.Pointer[tsfont.Face] -> weak.Pointer[Font]
 
 // ParseFont parses TrueType/OpenType data.
 func ParseFont(name string, data []byte) (*Font, error) {
@@ -95,7 +100,9 @@ func ParseFont(name string, data []byte) (*Font, error) {
 	}
 	f.ascent = float32(m.Ascent) / 64
 	f.descent = float32(m.Descent) / 64
-	faces.Store(face, f)
+	key := weak.Make(face)
+	faces.Store(key, weak.Make(f))
+	runtime.AddCleanup(f, func(k weak.Pointer[tsfont.Face]) { faces.Delete(k) }, key)
 	return f, nil
 }
 
@@ -106,8 +113,8 @@ func (f *Font) has(r rune) bool {
 }
 
 func fontOf(face *tsfont.Face) *Font {
-	if v, ok := faces.Load(face); ok {
-		return v.(*Font)
+	if v, ok := faces.Load(weak.Make(face)); ok {
+		return v.(weak.Pointer[Font]).Value()
 	}
 	return nil
 }
