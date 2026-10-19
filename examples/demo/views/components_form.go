@@ -24,6 +24,9 @@ func formControlsSection() ui.Element {
 		picked := ui.Local(ctx, "form.picked", "red")
 		volume := ui.Local(ctx, "form.volume", 40.0)
 		quiet := ui.Local(ctx, "form.quiet", 22)
+		otp := ui.Local(ctx, "form.otp", "")
+		pin := ui.Local(ctx, "form.pin", "")
+		verified := ui.Local(ctx, "form.verified", "")
 		// The preferences form.
 		email := ui.Local(ctx, "form.email", true)
 		text := ui.Local(ctx, "form.text", false)
@@ -72,6 +75,12 @@ func formControlsSection() ui.Element {
 			formSample(t, "Slider", ui.Slider(volume, 0, 100, 5).Label("Volume").Format(percentOf).Width(ui.Px(200)), percentOf(volume.Get())),
 			formSample(t, "Slider, disabled", ui.Slider(volume, 0, 100, 5).Label("Volume, disabled").Format(percentOf).Width(ui.Px(200)).Disabled(true), percentOf(volume.Get())),
 			formSample(t, "Number input", ui.NumberInput(quiet, 0, 23, 1).Label("Sample quiet hours").SpinButtons(ui.SpinInline), fmt.Sprintf("%02d:00", quiet.Get())),
+			formSample(t, "One-time code, in groups", ui.OTPInput("Sample verification code", otp, 6).Groups(3, 3).
+				// Narrower boxes, so the six of them fit the sample's column.
+				Styles(ui.OTPInputStyle{Box: ui.Style{Width: ui.Px(32)}}).
+				OnChange(func(string) { verified.Set("") }).
+				OnComplete(func(code string) { verified.Set("Code " + code + " complete") }), otpStatus(verified.Get())),
+			formSample(t, "One-time code, masked", ui.OTPInput("Sample PIN", pin, 4).Masked(), fmt.Sprintf("%d of 4 digits", len(pin.Get()))),
 			formSample(t, "Number input, disabled", ui.NumberInput(quiet, 0, 23, 1).Label("Sample quiet hours, disabled").Disabled(true), fmt.Sprintf("%02d:00", quiet.Get())),
 			formSample(t, "Text input, read-only", ui.TextInput(token).Label("Access token").ReadOnly(true).Width(ui.Px(200)), "select and copy it"),
 			formSample(t, "Text input, disabled", ui.TextInput(lockedNote).Label("Project name, disabled").Disabled(true).Width(ui.Px(200)), lockedNote.Get()),
@@ -247,4 +256,12 @@ func channelLabel(disabled bool) string {
 		return "Channel, disabled"
 	}
 	return "Channel"
+}
+
+// otpStatus is the note under the one-time code sample.
+func otpStatus(verified string) string {
+	if verified == "" {
+		return "type or paste a code"
+	}
+	return verified
 }

@@ -148,7 +148,7 @@ const (
 	StateSelectable                           // the node is one item of a selection; StateSelected says whether it is chosen
 	StateSelectionContainer                   // the node holds selection items, such as the chips of a filter
 	StateToggle                               // the node has an on or off state; StateChecked says whether it is on
-	StatePassword                             // a password field: its text is hidden (UI Automation IsPassword); no API sets it yet
+	StatePassword                             // a password field: its text is hidden (UI Automation IsPassword), as in a masked OTPInput
 	StateMultiSelectable                      // the selection container takes more than one item (see StateSelectionContainer)
 )
 

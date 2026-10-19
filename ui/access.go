@@ -62,6 +62,8 @@ type accessInfo struct {
 	// readOnly is set on a control whose value is shown but not typed, such as a
 	// Select.
 	readOnly bool
+	// password is set on a field whose text is hidden, such as a masked OTPInput.
+	password bool
 	// value is the value of a combo box: the text it shows.
 	value string
 	// rng is the number of a slider or spin box, and setRange sets it, for the
@@ -985,6 +987,9 @@ func (b *accessBuilder) states(n *node, id access.ID, role access.Role) access.S
 	}
 	if a != nil && a.readOnly {
 		s |= access.StateReadOnly
+	}
+	if a != nil && a.password {
+		s |= access.StatePassword
 	}
 	if id == b.focus {
 		s |= access.StateFocused

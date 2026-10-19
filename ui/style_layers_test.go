@@ -61,7 +61,7 @@ var layerDocAlias = map[string]string{"CheckboxTri": "Checkbox", "Accordion": "C
 // not drawn by an element of its own: its style is the state layer of its base part.
 var layerStateSuffixes = []string{"Hover", "Pressed", "FocusVisible", "FocusWithin", "Focused", "Selected",
 	"Disabled", "Highlighted", "Invalid", "Checked", "Mixed", "Open", "ReadOnly", "Sorted", "Alternate",
-	"Editing", "InRange", "Today", "OutsideMonth", "Active", "Current", "Complete"}
+	"Editing", "InRange", "Today", "OutsideMonth", "Active", "Current", "Complete", "Filled"}
 
 // isStatePart reports whether the part p is the state of a documented base part.
 func isStatePart(p string, documented []string) bool {
@@ -219,6 +219,14 @@ var layerBuilders = []layerBuilder{
 	{"Stepper", func(th *Theme) any { return &th.Stepper },
 		func(st any) Element {
 			return Stepper(NewSignal(1), checkoutSteps...).Vertical().Styles(st.(StepperStyle))
+		}},
+	{"OTPInput", func(th *Theme) any { return &th.OTPInput },
+		func(st any) Element {
+			return OTPInput("Code", NewSignal("12"), 4).Groups(2, 2).Styles(st.(OTPInputStyle))
+		}},
+	{"OTPInput", func(th *Theme) any { return &th.OTPInput },
+		func(st any) Element {
+			return OTPInput("Code", NewSignal("12"), 4).Masked().Disabled(true).Styles(st.(OTPInputStyle))
 		}},
 	{"ProgressBar", func(th *Theme) any { return &th.ProgressBar },
 		func(st any) Element { return ProgressBar(0.4).Styles(st.(ProgressBarStyle)) }},

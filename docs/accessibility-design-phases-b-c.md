@@ -519,7 +519,7 @@ frees them when destroyed.
   framework has no embedded objects.
 - **Attributes.** Colours, per-span attributes and mixed values are NotSupported.
   No field is read-only, so IsReadOnly is false. A password flag exists
-  (`access.StatePassword`, reported as IsPassword) and no API sets it yet.
+  (`access.StatePassword`, reported as IsPassword); a masked `OTPInput` sets it.
 - **Cost.** Building the content is linear in the text, about 2.4 ms for a 22 KB
   wrapped text, and runs on each change to the text; grapheme segmentation is most
   of it. A large text that changes on every keystroke may need incremental

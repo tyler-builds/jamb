@@ -74,6 +74,34 @@ ui.NumberInput(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStac
   buttons' hover and pressed fills are inset from the border by a small gap, so they
   never touch or cover it.
 
+- A one-time code input, `ui.OTPInput(label, code, length)`, is a row of `length`
+  boxes that each take one character, bound to a `*ui.Signal[string]`. It is one
+  control with a caret, not a field per box. Typing fills the box at the caret and
+  moves to the next one, Backspace clears the box before the caret and moves back,
+  and Delete clears the box at the caret; the code has no gaps, so the characters
+  after a cleared box move up. Left, Right, Home and End move the caret, never past
+  the first empty box, and a click on a box moves it there. Focus puts the caret at
+  the first empty box. Ctrl+V, or the Paste action, pastes the clipboard's text from
+  the caret, keeping only the characters the input takes, so "Code: 482 916" fills
+  six boxes. These keys are the actions of a text field, so a binding that changes
+  them for fields changes them here too. It takes the digits 0 to 9, and with
+  `Alphanumeric()` the letters A to Z and a to z as well, kept as typed. An input
+  method's composition is not shown in the boxes; the text it confirms is typed.
+  `Masked()` draws a dot in place of each character. `Groups(3, 3)` splits the boxes
+  into groups with a wider gap between them; the sizes must add up to the length.
+  `OnChange` runs after each change, and `OnComplete(fn)` when a change fills every
+  box, after it. In a `Field` it is named by the field's label, shows the field's
+  error with invalid boxes, and Enter submits the form; `Validate(ui.Required[string](),
+  ui.MinLength(6))` asks for a complete code. Its look is `ui.OTPInputStyle`, set
+  with `Theme.OTPInput` or `.Styles(...)`.
+
+```go
+ui.OTPInput("Verification code", code, 6).Groups(3, 3).
+	OnComplete(func(code string) { verify(code) })
+ui.OTPInput("PIN", pin, 4).Masked()                 // dots, reported as a password field
+ui.OTPInput("Recovery code", rec, 8).Alphanumeric() // letters and digits
+```
+
 ![Inline spin buttons inside the field, with the pointer over the plus button](screenshots/spin-buttons-inline.png)
 
 ![Stacked spin buttons, with the pointer over the up button](screenshots/spin-buttons-stacked.png)
@@ -85,6 +113,10 @@ chosen label. A slider and a number input report their range (RangeValue). A
 number input is a spin box that holds its text field, as Microsoft's Spinner
 control type describes
 ([Spinner control type](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportspinnercontroltype)).
+A one-time code input is one text field named by its label, whose value is the
+code; its boxes are not separate nodes. A masked one reports IsPassword, and its
+value is a dot for each character, so the code is never exposed. Assistive
+technology can set the code, which is filled from the first box.
 
 ## Color picker
 
