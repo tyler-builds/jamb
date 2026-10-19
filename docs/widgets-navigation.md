@@ -1,6 +1,6 @@
 # Navigation widgets
 
-Tabs, collapsible sections, trees, the sidebar, and the other navigation controls.
+Tabs, collapsible sections, trees, the sidebar, the other navigation controls, and group boxes.
 
 ## Navigation and layout
 
@@ -192,3 +192,24 @@ ui.Sidebar(page, // *ui.Signal[string]: the selected item's key
 - **Layout.** The pane takes the height of its row, so put it in a row beside the
   content. Its items scroll when they do not fit, and the header and the footer stay
   in place.
+
+## Group boxes
+
+`ui.GroupBox(title)` is a titled section that holds related content, such as the settings
+of one feature. Its look is `ui.GroupBoxStyle`: per app in `Theme.GroupBox`, or per
+instance with `Styles`. It follows high contrast and the Text size.
+
+```go
+ui.GroupBox("Notifications").Description("How you hear about changes.").
+	Child(ui.Checkbox("Email", email)).
+	Child(ui.Checkbox("Desktop", desktop))
+ui.GroupBox("Storage").Fill().Children(usageBar, cleanButton) // filled, without a border
+```
+
+- **Look.** The box is outlined in the border color by default; `Fill()` fills it with a
+  raised surface color instead, without a border. The title is semibold and the
+  description muted, in the `Header` part, and the children are laid out in a column in the
+  `Content` part. A box with neither a title nor a description has no header. Under high
+  contrast both looks are the window color outlined in the text color.
+- **Accessibility.** The box is a group named by its title, with the description as its
+  description, so assistive technology reads the title as it enters the group.

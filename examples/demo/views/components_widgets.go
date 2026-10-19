@@ -10,7 +10,8 @@ import (
 )
 
 // widgetsSection shows the smaller widgets: a sidebar, breadcrumbs,
-// pagination, avatars, tags, skeletons, a color picker and a date range picker.
+// pagination, avatars, tags, skeletons, a color picker, a date range picker and
+// group boxes.
 func widgetsSection(t *ui.Theme) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		nav := ui.Local(ctx, "w.nav", "inbox")
@@ -21,6 +22,8 @@ func widgetsSection(t *ui.Theme) ui.Element {
 		to := ui.Local(ctx, "w.to", time.Time{})
 		tags := ui.Local(ctx, "w.tags", []string{"Design", "Backend", "Urgent"})
 		loading := ui.Local(ctx, "w.loading", true)
+		email := ui.Local(ctx, "w.email", true)
+		desktop := ui.Local(ctx, "w.desktop", false)
 
 		tagRow := ui.Div().Row().Wrap().Gap(6)
 		for i, name := range tags.Get() {
@@ -86,7 +89,14 @@ func widgetsSection(t *ui.Theme) ui.Element {
 				Child(ui.Div().Size(ui.Px(28), ui.Px(28)).Radius(6).Background(color.Get()).Border(1, t.Border))),
 			sample(t, "DateRangePicker", ui.Div().Gap(6).
 				Child(ui.DateRangePicker(from, to).Label("Report period")).
-				Child(ui.Text(rangeText(from.Get(), to.Get())).FontSize(12).TextColor(t.TextMuted))))
+				Child(ui.Text(rangeText(from.Get(), to.Get())).FontSize(12).TextColor(t.TextMuted))),
+			sample(t, "GroupBox, outlined and Fill", ui.Div().Row().Wrap().Gap(12).Align(ui.Start).
+				Child(ui.GroupBox("Notifications").Description("How you hear about changes.").Width(ui.Px(240)).
+					Child(ui.Checkbox("Email", email)).
+					Child(ui.Checkbox("Desktop", desktop))).
+				Child(ui.GroupBox("Storage").Fill().Width(ui.Px(240)).
+					Child(ui.ProgressBar(0.7).Label("Storage used")).
+					Child(ui.Text("7 of 10 GB used").FontSize(12).TextColor(t.TextMuted)))))
 	})
 }
 

@@ -554,6 +554,7 @@ parts that the code applies.
 | `Avatar` | `Avatar`, `Initials` | none | none | done |
 | `Tag` | `Tag`, `Label`, `Remove` | none | none | done |
 | `Kbd` | `Kbd`, `Key` | none | none | done |
+| `GroupBox` | `GroupBox`, `Header`, `Title`, `Description`, `Content` | `Fill()` | none | done |
 | `Skeleton` | `Bone` | none | none | done |
 | `Sidebar` | `Pane`, `Item`, `ItemHover`, `ItemSelected`, `ItemFocusVisible`, `ItemDisabled`, `Indicator`, `Heading`, `Toggle` | none | `Header`, `Footer` (elements) | done |
 | `Breadcrumbs` | `Bar`, `Item`, `ItemHover`, `Current`, `Separator`, `Overflow` | none | none | done |

@@ -157,6 +157,8 @@ type Theme struct {
 	Avatar AvatarStyle
 	// Tag is the look of every tag.
 	Tag TagStyle
+	// GroupBox is the look of every group box, outlined or filled.
+	GroupBox GroupBoxStyle
 	// Kbd is the look of every keyboard shortcut drawn as key caps.
 	Kbd KbdStyle
 	// Skeleton is the look of every skeleton placeholder.
