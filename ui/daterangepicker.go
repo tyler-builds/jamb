@@ -650,17 +650,8 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 
 		// The days shaded are the range that is set, or, while the end is being chosen, the range
 		// from the start to the day under the pointer or the keys, when that day can be chosen.
-		from, to := orderedSpan(cur.start, cur.end)
-		if p := pending.Get(); !p.IsZero() {
-			day := hover.Get()
-			if day.IsZero() {
-				day = focus.Get()
-			}
-			if !d.enabled(day, s) {
-				day = time.Time{}
-			}
-			from, to = orderedSpan(p, day)
-		}
+		from, to := rangeShade(cur.start, cur.end, pending.Get(), hover.Get(), focus.Get(),
+			func(day time.Time) bool { return d.enabled(day, s) })
 
 		fst := resolveField(ctx, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, st.Field)
 		if d.disabled {

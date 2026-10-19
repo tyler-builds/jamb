@@ -119,13 +119,25 @@ func calendarKeys(e *KeyEvent, f time.Time, first time.Weekday, move, pick func(
 	e.StopPropagation()
 }
 
-// calendarPanel returns the open calendar: an overlay below the field (above it when there is no
-// room). It is a calendar for assistive technology, a grid of six week rows, each with seven days,
-// under a header of the weekday names (see docs/widgets-selection.md, Date and time). It takes focus when it
-// opens, and the day the keys have reached is its highlighted cell, which the screen reader reads.
-// The navigation buttons are for a pointer; the keys are PageUp and PageDown for a month, and Shift
-// with them for a year.
+// calendarPanel returns the open calendar of a picker: an overlay below the field (above it when
+// there is no room), which holds the month of calendarGrid. It takes focus when it opens, and the
+// day the keys have reached is its highlighted cell, which the screen reader reads.
 func calendarPanel(c calendarView, s *Strings) Element {
+	panel := Div().asPart(c.widget+".Popup").Key("jamb.calendar").Style(c.st.Popup).
+		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
+		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
+		Overlay(BelowStart).OverlayGap(4).
+		AutoFocus().TabStop(false).OnKeyDown(c.keys).
+		OnClickOutside(func() { c.shut(false) }).
+		OnClick(func() {}) // a press on the calendar's padding must not reach the field
+	return calendarGrid(panel, c, s)
+}
+
+// calendarGrid fills panel with the month that c shows, and returns it. The panel is a calendar for
+// assistive technology, a grid of six week rows, each with seven days, under a header of the weekday
+// names (see docs/widgets-selection.md, Date and time). The navigation buttons are for a pointer; the
+// keys are PageUp and PageDown for a month, and Shift with them for a year.
+func calendarGrid(panel *DivElement, c calendarView, s *Strings) *DivElement {
 	first := c.loc.firstDay
 	if c.firstSet {
 		first = c.firstDay
@@ -137,14 +149,7 @@ func calendarPanel(c calendarView, s *Strings) Element {
 		name = c.fallback
 	}
 	st := c.st
-	panel := Div().asPart(c.widget+".Popup").Key("jamb.calendar").Style(st.Popup).
-		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
-		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
-		Overlay(BelowStart).OverlayGap(4).
-		Role(access.RoleCalendar).SelectionContainer().Label(name).
-		AutoFocus().TabStop(false).OnKeyDown(c.keys).
-		OnClickOutside(func() { c.shut(false) }).
-		OnClick(func() {}) // a press on the calendar's padding must not reach the field
+	panel.Role(access.RoleCalendar).SelectionContainer().Label(name)
 	if c.hover != nil {
 		panel.OnMouseLeave(func() { c.hover(time.Time{}) })
 	}
@@ -189,6 +194,24 @@ func calendarPanel(c calendarView, s *Strings) Element {
 		panel.Child(week)
 	}
 	return panel
+}
+
+// rangeShade returns the first and the last day that a range calendar shades: the range from start
+// to end, or, while the end is being chosen after the start pending, the range from pending to the
+// day under the pointer (hover), or to the day the keys have reached (focus) when the pointer is not
+// over a day. A day that enabled rules out shades the start alone.
+func rangeShade(start, end, pending, hover, focus time.Time, enabled func(day time.Time) bool) (time.Time, time.Time) {
+	if pending.IsZero() {
+		return orderedSpan(start, end)
+	}
+	day := hover
+	if day.IsZero() {
+		day = focus
+	}
+	if !enabled(day) {
+		day = time.Time{}
+	}
+	return orderedSpan(pending, day)
 }
 
 // calendarDay returns the cell of one day of a calendar, at the grid position row and column (both
