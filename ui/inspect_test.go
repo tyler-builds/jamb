@@ -334,11 +334,16 @@ func TestInspectPickingDoesNotChangeLayoutOrHitTesting(t *testing.T) {
 func TestInspectEscapeEndsPickMode(t *testing.T) {
 	clicks, checked, tick := 0, NewSignal(false), NewSignal(0)
 	rt, tg := inspRuntime(t, DarkTheme(), inspSample(&clicks, checked, tick))
-	tg.Attach(func() {})
+	changes := 0
+	tg.Attach(func() { changes++ })
 	tg.Pick(true)
+	changes = 0
 	rt.KeyDown(input.KeyEscape, 0, false)
 	if tg.Picking() {
 		t.Fatal("Escape did not end pick mode")
+	}
+	if changes == 0 {
+		t.Fatal("the inspector was not told that Escape ended pick mode")
 	}
 	if tg.Selected() != 0 {
 		t.Fatal("Escape selected an element")

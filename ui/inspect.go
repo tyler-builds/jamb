@@ -662,18 +662,20 @@ func (h *runtimeHost) Pick(on bool) {
 	}
 	rt.insp.picking, rt.insp.hover = true, 0
 	rt.setInspectPaint()
+	rt.changedInspect()
 }
 
 // Picking reports whether pick mode is on.
 func (h *runtimeHost) Picking() bool { return h.rt().picking() }
 
-// endPick ends pick mode without selecting anything.
+// endPick ends pick mode, and tells the inspector, whose pick button follows it.
 func (rt *Runtime) endPick() {
 	if rt.insp == nil {
 		return
 	}
 	rt.insp.picking, rt.insp.hover = false, 0
 	rt.setInspectPaint()
+	rt.changedInspect()
 }
 
 // pickMove outlines the element under the pointer, deepest first.
@@ -693,8 +695,7 @@ func (rt *Runtime) pickMove(x, y float32) {
 func (rt *Runtime) pickPress(x, y float32) {
 	rt.pickMove(x, y)
 	rt.insp.selected = rt.insp.hover
-	rt.endPick()
-	rt.changedInspect()
+	rt.endPick() // which tells the inspector about the selection too
 }
 
 // changedInspect calls the inspector's changed function, on the UI thread.
