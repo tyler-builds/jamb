@@ -75,6 +75,11 @@ func sizeCases() []sizeCase {
 			set: func(w, minW, maxW Length, g float32) Element {
 				return Button("Save").Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
 			}},
+		{name: "SplitButton", part: "SplitButton.Root", box: 400, auto: autoContent,
+			def: func() Element { return SplitButton("Save", nil, nil) },
+			set: func(w, minW, maxW Length, g float32) Element {
+				return SplitButton("Save", nil, nil).Width(w).MinWidth(minW).MaxWidth(maxW).Grow(g)
+			}},
 		{name: "TextInput", part: "TextInput.Frame", box: 400, auto: autoFill,
 			def: func() Element { return TextInput(NewSignal("")).Placeholder("Search") },
 			set: func(w, minW, maxW Length, g float32) Element {

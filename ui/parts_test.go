@@ -195,6 +195,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("NumberInput inline", func(t *testing.T) { testNumberInputParts(t, SpinInline, applied) })
 	t.Run("NumberInput stacked", func(t *testing.T) { testNumberInputParts(t, SpinStacked, applied) })
 	t.Run("Button", func(t *testing.T) { testButtonParts(t, applied) })
+	t.Run("SplitButton", func(t *testing.T) { testSplitButtonParts(t, applied) })
 	t.Run("Checkbox", func(t *testing.T) { testCheckboxParts(t, applied) })
 	t.Run("RadioGroup", func(t *testing.T) { testRadioGroupParts(t, applied) })
 	t.Run("Switch", func(t *testing.T) { testSwitchParts(t, applied) })

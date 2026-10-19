@@ -315,6 +315,7 @@ the Text size of 100 percent:
 | Widget | Default width |
 | --- | --- |
 | `Button`, `IconButton` | as wide as its label; `Width(ui.Full)` fills the container |
+| `SplitButton` | as wide as its label and arrow, as a button is; a wider box widens the action segment |
 | `Checkbox`, `CheckboxTri`, `RadioGroup`, `Badge` | as wide as their content, also in a column |
 | `Switch` | 38 px track (the knob stays 3 px from its end) |
 | `Toggle`, `ToggleGroup` | as wide as their label or items, as a button is |
@@ -549,6 +550,7 @@ parts that the code applies.
 | `NumberInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameInvalid`, `Text`, `Selection`, `Message`, `SpinButtons`, `SpinButton`, `SpinButtonHover`, `SpinButtonPressed`, `SpinButtonFocusVisible`, `SpinButtonDisabled` | `SpinInline`, `SpinStacked` | none | done |
 | `OTPInput` | `Root`, `Group`, `Box`, `BoxFilled`, `BoxFocused`, `BoxDisabled`, `BoxInvalid`, `Text`, `Dot` | `Masked()`, `Alphanumeric()`, `Groups(...)` | none | done |
 | `Button` | `Root`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Primary`, `Secondary`, `Ghost`, `Danger` (style per variant in `Theme.Buttons`) | none | done |
+| `SplitButton` | `Root`, `Main`, `MainHover`, `MainPressed`, `MainDisabled`, `MainFocusVisible`, `Arrow`, `ArrowHover`, `ArrowPressed`, `ArrowDisabled`, `ArrowFocusVisible`, `Label`, `Icon`, `Chevron` | `Primary`, `Secondary`, `Ghost`, `Danger` (the looks of those buttons) | none | done |
 | `TextInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing`, `Button`, `ButtonHover` (see "The text frame") | `Masked()`, `Revealable()`, `Clearable()` | `Leading`, `Trailing` (elements) | done |
 | `TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
 | `Checkbox`, `CheckboxTri` | `Control`, `ControlFocusVisible`, `ControlDisabled`, `Box`, `BoxHover`, `BoxChecked`, `BoxMixed`, `BoxDisabled`, `BoxInvalid`, `Mark`, `Dash`, `Label`, `LabelDisabled` | none | none | done |

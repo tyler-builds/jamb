@@ -15,6 +15,7 @@ func TestEveryControlTakesAFocusHandle(t *testing.T) {
 		build func(h *FocusHandle) Element
 	}{
 		{"Button", func(h *FocusHandle) Element { return Button("Save").FocusHandle(h) }},
+		{"SplitButton", func(h *FocusHandle) Element { return SplitButton("Save", nil, nil).FocusHandle(h) }},
 		{"Checkbox", func(h *FocusHandle) Element { return Checkbox("On", NewSignal(false)).FocusHandle(h) }},
 		{"Switch", func(h *FocusHandle) Element { return Switch("On", NewSignal(false)).FocusHandle(h) }},
 		{"Toggle", func(h *FocusHandle) Element { return Toggle("Bold", NewSignal(false)).FocusHandle(h) }},

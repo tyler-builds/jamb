@@ -67,6 +67,7 @@ func chineseMainlandStrings() *Strings {
 		Clear:               "清除",
 		Minimum:             "最小值",
 		Maximum:             "最大值",
+		MoreOptions:         "更多选项",
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移动",
@@ -173,6 +174,7 @@ func chineseTaiwanStrings() *Strings {
 		Clear:               "清除",
 		Minimum:             "最小值",
 		Maximum:             "最大值",
+		MoreOptions:         "更多選項",
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移動",
@@ -279,6 +281,7 @@ func chineseHongKongStrings() *Strings {
 		Clear:               "清除",
 		Minimum:             "最小值",
 		Maximum:             "最大值",
+		MoreOptions:         "更多選項",
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移動",

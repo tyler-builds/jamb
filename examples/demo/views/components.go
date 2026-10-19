@@ -102,7 +102,7 @@ var componentSections = []componentSection{
 				sample(t, "Highlight: Background", wordHighlight("Background", ui.Highlight{Background: t.AccentSoft, Color: t.Text})),
 				clickSample(t))
 		}},
-	{"Buttons", "Button Primary Secondary Ghost Danger Small Disabled click press",
+	{"Buttons", "Button Primary Secondary Ghost Danger Small Disabled click press SplitButton split menu arrow",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {
 			return section(t, "Buttons",
 				sample(t, "Primary", ui.Button("Primary").Primary().OnClick(pressed("Primary"))),
@@ -110,7 +110,13 @@ var componentSections = []componentSection{
 				sample(t, "Ghost", ui.Button("Ghost").Ghost().OnClick(pressed("Ghost"))),
 				sample(t, "Danger", ui.Button("Danger").Danger().OnClick(pressed("Danger"))),
 				sample(t, "Small", ui.Button("Small").Small().OnClick(pressed("Small"))),
-				sample(t, "Disabled", ui.Button("Disabled").Disabled(true)))
+				sample(t, "Disabled", ui.Button("Disabled").Disabled(true)),
+				sample(t, "Split button", ui.SplitButton("Save", pressed("Save"), func() []ui.MenuItem {
+					return []ui.MenuItem{
+						{Label: "Save as…", OnClick: pressed("Save as")},
+						{Label: "Save a copy", OnClick: pressed("Save a copy")},
+					}
+				}).Secondary().Icon(icons.Download)))
 		}},
 	{"Overlays", "Overlay Placement OverlayGap OnClickOutside Popover HoverCard popup popover hover card filters " +
 		"BelowStart BelowCenter BelowEnd AboveStart AboveCenter AboveEnd RightStart RightCenter RightEnd LeftStart LeftCenter LeftEnd",

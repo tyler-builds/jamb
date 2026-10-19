@@ -85,6 +85,13 @@ func TestWidgetPartPrecedence(t *testing.T) {
 						Styles(RangeSliderStyle{Fill: bgStyle(inst)}))
 				})
 			}},
+		{name: "SplitButton", part: "SplitButton.Main",
+			theme: func(th *Theme, c Color) { th.SplitButton.Main.Background = c },
+			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
+				return newThemedRig(th, func(ctx *Context) Element {
+					return Div().Column().Child(SplitButton("Save", nil, nil).Styles(SplitButtonStyle{Main: bgStyle(inst)}))
+				})
+			}},
 		{name: "Toggle", part: "Toggle.Root",
 			theme: func(th *Theme, c Color) { th.Toggle.Root.Background = c },
 			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {

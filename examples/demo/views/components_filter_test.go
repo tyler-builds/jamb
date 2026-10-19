@@ -38,6 +38,7 @@ func TestMatchingSections(t *testing.T) {
 		{"password", []string{"Form controls"}},
 		{"clearable", []string{"Form controls"}},
 		{"rangeslider", []string{"Form controls"}},
+		{"split button", []string{"Buttons"}},
 		{"chart", []string{"Charts"}},
 		{"spinner", []string{"Feedback"}},
 		{"sheet", []string{"Dialogs"}},
