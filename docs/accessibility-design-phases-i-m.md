@@ -299,3 +299,38 @@ that control, or the first one, so a screen reader's Tab navigation matches the 
 remembered control and a text field that keeps its keys, and the control type mapping is
 in `internal/platform/windows/uia_test.go`. A screen reader pass and the live scripted
 checks in `scripts/a11y-check.ps1` have not been run for this change.
+
+## Hover cards: what changed from this design
+
+`ui.HoverCard` shows rich content while the pointer rests on a trigger or keyboard focus
+is on it. WAI-ARIA has no hover card pattern; the closest are the tooltip pattern
+(https://www.w3.org/WAI/ARIA/apg/patterns/tooltip/), which opens on hover and on focus
+and closes on Escape, and WCAG 1.4.13 Content on Hover or Focus
+(https://www.w3.org/TR/WCAG21/#content-on-hover-or-focus), which asks that such content be
+dismissible without moving the pointer or focus, hoverable, and persistent until the user
+dismisses it or moves away. The card follows both: Escape closes it, the pointer can move
+onto it across the gap within the close delay, and it stays while the pointer or the
+focus is on the trigger or the card.
+
+**Exposed as a tooltip that describes the trigger.** The open card has the role
+`access.RoleTooltip`, as a tooltip does, so its name is its text. The trigger is
+described by it: its `DescribedBy` holds the card, and its description is the card's
+text unless it has one of its own, as a tooltip's text is. The wrapper that holds the
+trigger and the card is not exposed; the access builder relates the two through the
+card's key (`describeTrigger` in `ui/access.go`). The trigger is the wrapper's first
+exposed child, so a trigger should be one control, such as a button or a link.
+
+**No focus.** The card never takes focus, and the trigger keeps it while the card opens.
+The card's content is in the Tab order after the trigger while it is open, and the card
+stays open while focus is inside it. Focus leaving both closes it, unless the pointer is
+over them. The runtime tells the wrapper that focus entered or left it (`focusIn`, from
+`setFocus`); the card opens on focus only when focus came from the keyboard, so a click
+on the trigger does not start a second timer.
+
+**Verification.** The unit tests check the delays, the grace period across the gap,
+keyboard focus, Escape, the tooltip role, the description and `DescribedBy`, that the
+card is not focusable, and reduced motion (`ui/hovercard_test.go`,
+`ui/reduced_motion_widgets_test.go`). Whether Narrator and NVDA read the description
+when the card opens after the trigger already has focus is not verified: the
+description changes while focus stays, and no property change event is raised for it.
+A screen reader pass and the live scripted checks have not been run for this change.

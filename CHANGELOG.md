@@ -81,6 +81,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `Description` and an optional `Action`, centered and muted, for `DataGrid.Empty` and lists
   with no items. It is a group named by its title. It is styled through `ui.EmptyStyle` and
   `Theme.Empty`. The demo's Projects page uses it for its cards and its table.
+- `ui.HoverCard(trigger, content)` shows a floating card of rich content once the pointer
+  rests on the trigger or keyboard focus reaches it (`OpenDelay`, 500 ms by default). It stays
+  open while the pointer is over the trigger or the card, closes `CloseDelay` (300 ms) after it
+  leaves, and closes at once on Escape, a click outside or focus leaving. It never takes focus;
+  assistive technology reads it as the trigger's description, as a tooltip. It has the look of
+  a popover's panel, through `ui.HoverCardStyle` and `Theme.HoverCard`, and `Placement`.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.
 - The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a

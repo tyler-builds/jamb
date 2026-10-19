@@ -120,7 +120,7 @@ var componentSections = []componentSection{
 				sample(t, "Small", ui.Button("Small").Small().OnClick(pressed("Small"))),
 				sample(t, "Disabled", ui.Button("Disabled").Disabled(true)))
 		}},
-	{"Overlays", "Overlay Placement OverlayGap OnClickOutside Popover popup popover filters " +
+	{"Overlays", "Overlay Placement OverlayGap OnClickOutside Popover HoverCard popup popover hover card filters " +
 		"BelowStart BelowCenter BelowEnd AboveStart AboveCenter AboveEnd RightStart RightCenter RightEnd LeftStart LeftCenter LeftEnd",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return section(t, "Overlays", placements(t)) }},
 	{"Menus", "DropdownMenu ContextMenu MenuItem MenuSeparator Submenu MenuCheckBox MenuCheckRadio dropdown context menu right-click Shift+F10",
@@ -285,7 +285,8 @@ func placements(t *ui.Theme) ui.Element {
 		}
 		return ui.Div().Gap(12).Child(row).
 			Child(ui.Text("Escape closes an open popover, as a click outside it does.").FontSize(12).TextColor(t.TextMuted)).
-			Child(popoverSample(t))
+			Child(popoverSample(t)).
+			Child(hoverCardSample(t))
 	})
 }
 
@@ -477,4 +478,18 @@ func popoverSample(t *ui.Theme) ui.Element {
 				Child(ui.Checkbox("Only my projects", mine))
 		}))
 	})
+}
+
+// hoverCardSample is a HoverCard: a name that shows a profile card when the
+// pointer rests on it or keyboard focus reaches it, without taking focus.
+func hoverCardSample(t *ui.Theme) ui.Element {
+	return sample(t, "HoverCard: rest the pointer on the name, or Tab to it",
+		ui.HoverCard(ui.Button("Dana Lee").Key("hover-card-trigger").Ghost().Small(), func() ui.Element {
+			return ui.Div().Row().Gap(12).Width(ui.Px(260)).
+				Child(ui.Avatar("Dana Lee").Size(40).AccessHidden()).
+				Child(ui.Div().Column().Gap(4).Grow(1).MinWidth(ui.Px(0)).
+					Child(ui.Text("Dana Lee").Semibold()).
+					Child(ui.Text("Product designer, Design team").FontSize(13).TextColor(t.TextMuted)).
+					Child(ui.Text("Joined in March").FontSize(12).TextColor(t.TextMuted)))
+		}))
 }

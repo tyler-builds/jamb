@@ -931,6 +931,7 @@ func (rt *Runtime) setFocus(id uint64) {
 	}
 	rt.focusID, rt.focusLink = id, 0
 	rt.rovingFocused(id)
+	rt.focusInChanged(oldID, id)
 	if n := rt.byID[id]; n != nil && n.div != nil && n.div.h.onFocus != nil {
 		n.div.h.onFocus()
 	}

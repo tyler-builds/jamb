@@ -133,6 +133,8 @@ type Theme struct {
 	Drawer DrawerStyle
 	// Popover is the look of the panel of every popover.
 	Popover PopoverStyle
+	// HoverCard is the look of the panel of every hover card.
+	HoverCard HoverCardStyle
 	// CommandPalette is the look of every command palette.
 	CommandPalette CommandPaletteStyle
 	// FormField is the look of every field (its label, help text and error), and Form

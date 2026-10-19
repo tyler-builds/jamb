@@ -42,6 +42,10 @@ type accessInfo struct {
 	container   bool // the element holds selection items
 	labelledBy  []string
 	describedBy []string
+	// details is the key of a hover card's panel, set on the element that wraps the
+	// card's trigger and the panel: while the panel is open, it describes the
+	// trigger (see describeTrigger).
+	details string
 	// inert leaves the element out of the tree while its children stay in it.
 	// A DropdownMenu's trigger is inert, since the menu's wrapper is the control.
 	inert bool
@@ -608,7 +612,8 @@ func (rt *Runtime) buildAccessIssues() (*access.Tree, map[access.ID]accessTarget
 	}
 	for _, r := range b.rels {
 		r.node.LabelledBy = b.resolve(r.node, r.labelledBy, "LabelledBy")
-		r.node.DescribedBy = b.resolve(r.node, r.describedBy, "DescribedBy")
+		// A hover card may have described the node already (see describeTrigger).
+		r.node.DescribedBy = append(r.node.DescribedBy, b.resolve(r.node, r.describedBy, "DescribedBy")...)
 	}
 	nodes := make([]*access.Node, 0, len(b.byID))
 	for _, n := range b.byID {
@@ -721,6 +726,9 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 		kids = append(kids, b.emit(c, absorbed || absorbs)...)
 	}
 	if !ok {
+		if d.acc != nil && d.acc.details != "" {
+			b.describeTrigger(kids, d.acc.details)
+		}
 		return kids
 	}
 	id := accID(n.id)
@@ -805,6 +813,29 @@ func (b *accessBuilder) gridPlace(an *access.Node, a *accessInfo, role access.Ro
 func (b *accessBuilder) relate(an *access.Node, a *accessInfo) {
 	if a != nil && (len(a.labelledBy) > 0 || len(a.describedBy) > 0) {
 		b.rels = append(b.rels, accessRelation{node: an, labelledBy: a.labelledBy, describedBy: a.describedBy})
+	}
+}
+
+// describeTrigger makes the open panel of a hover card, the node with the key
+// among kids, describe the trigger, the first of the other kids: the trigger is
+// described by the panel, and the panel's text is its description when it has
+// none, as a tooltip's is. A closed card describes nothing.
+func (b *accessBuilder) describeTrigger(kids []access.ID, key string) {
+	var panel, trigger *access.Node
+	for _, k := range kids {
+		switch n := b.byID[k]; {
+		case n.Key == key:
+			panel = n
+		case trigger == nil:
+			trigger = n
+		}
+	}
+	if panel == nil || trigger == nil {
+		return
+	}
+	trigger.DescribedBy = append(trigger.DescribedBy, panel.ID)
+	if trigger.Description == "" && panel.Name != trigger.Name {
+		trigger.Description = panel.Name
 	}
 }
 

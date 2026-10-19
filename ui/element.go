@@ -121,6 +121,7 @@ type DivElement struct {
 	contextMenu  func() []MenuItem // see ContextMenu
 	menuBar      bool              // set by MenuBar on the bar
 	roving       *rovingGroup      // set by Toolbar: the focusable elements inside are one Tab stop
+	focusIn      func(in bool)     // set by HoverCard: focus entered (true) or left the element and its descendants
 	modal        *modalSpec        // set on the backdrop of a Modal (see modal.go)
 	modalFooter  bool              // set on a Modal's footer, which the initial focus skips
 	acc          *accessInfo       // accessibility role, name and states (see access.go)

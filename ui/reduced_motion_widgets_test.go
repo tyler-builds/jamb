@@ -194,6 +194,18 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				r.now = r.now.Add(600 * time.Millisecond)
 				r.frame()
 			}},
+		{name: "HoverCard", animates: true,
+			root: func(open *Signal[bool]) func(*Context) Element {
+				return func(ctx *Context) Element {
+					return Div().Column().Child(HoverCard(Button("Dana Lee").Key("t"), func() Element { return Text("Designer") }))
+				}
+			},
+			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) {
+				rc := r.rt.nodeRect(keyNode(t, r.rt, "t"))
+				r.rt.PointerMove(rc.X+rc.W/2, rc.Y+rc.H/2, 0)
+				r.now = r.now.Add(600 * time.Millisecond)
+				r.frame()
+			}},
 		{name: "ColorPicker", animates: true,
 			root: func(open *Signal[bool]) func(*Context) Element {
 				fill := NewSignal(Hex("#3B82F6"))

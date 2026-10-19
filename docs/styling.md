@@ -556,6 +556,7 @@ parts that the code applies.
 | `Modal` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | none | none | done |
 | `Drawer` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | `Side` (`DrawerRight`, `DrawerLeft`, `DrawerTop`, `DrawerBottom`) | none | done |
 | `Popover` | `Panel` | `Placement` | none | done |
+| `HoverCard` | `Panel` | `Placement` | none | done |
 | `CommandPalette` | `Panel`, `Input`, `List`, `Item`, `ItemHighlighted`, `Label`, `Match`, `Keys`, `Empty` | none | none | done |
 | `ProgressBar` | `Track`, `Fill`, `Label` | `Indeterminate()` (the sliding segment is `Fill`) | none | done |
 | `ProgressRing` | `Ring`, `Dot` | sizes (`RingSmall`, `RingMedium`, `RingLarge`) | none | done |
