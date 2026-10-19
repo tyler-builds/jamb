@@ -1,13 +1,13 @@
 # jamb and GPUI: hello-world comparison
 
-This document compares two builds of the same small app on one Windows machine: jamb (Go) and GPUI (Rust, the UI framework from Zed). The app is a window with a centered greeting and a button that counts its clicks. It measures project size, binary size, build times, startup, idle CPU and memory, and the CPU cost of pointer movement and window resizing.
+This document compares two builds of the same small app on one Windows machine: jamb (Go) and GPUI (Rust, the UI framework from Zed). The app is a window with a centered greeting and a button that counts its clicks. It measures project size, binary size, build times, startup, idle CPU and memory, and the CPU cost of pointer movement and window resizing. [Components: jamb and GPUI Kit](#components-jamb-and-gpui-kit) compares jamb's widgets with GPUI Kit's, the component library for GPUI from Longbridge (named gpui-component until September 2026).
 
 Measured with `scripts/compare-gpui.ps1`, three runs per measurement, in two passes on 2026-10-12 (see [Measurement passes](#measurement-passes)). Results are shown as median [minimum–maximum].
 
 ## Summary
 
 - **Startup.** jamb paints its first frame sooner. On a warm launch (the executable has been started before), jamb painted at 266 ms and GPUI at 387 ms. On the first launch of a new copy of the executable, which Windows Defender scans before it runs, jamb painted at 496 ms and GPUI at 611 ms.
-- **Binary size.** jamb's stripped release binary is 8.41 MB at commit `f13b6c5` (7.18 MB in the second pass, before the features added since). GPUI's release binary is 9.21 MB, and 15.28 MB for the same app built with gpui-component (see [Binary size, updated](#binary-size-updated)).
+- **Binary size.** jamb's stripped release binary is 8.41 MB at commit `f13b6c5` (7.18 MB in the second pass, before the features added since). GPUI's release binary is 9.21 MB, and 15.28 MB for the same app built with gpui-component, now GPUI Kit, at its August 2026 revision (see [Binary size, updated](#binary-size-updated)).
 - **Build time.** Incremental builds take 2 s for jamb and 4 s (release) or 6 s (debug) for GPUI. A clean build from an empty cache took about 9 s for jamb, and 138 s (release) or 100 s (debug) for GPUI.
 - **Idle CPU.** jamb used 0.29% of one core while idle and focused (median), with about 185 context switches per second. GPUI used 1.85%, with about 530 per second.
 - **Memory.** GPUI uses slightly less: 75.3 MB private bytes and 52.5 MB working set, against jamb's 78.2 MB and 58.8 MB. jamb uses less GPU memory (13.8 MB dedicated, against 17.5 MB).
@@ -107,9 +107,11 @@ Measured on 2026-10-14, one build each, on the same machine. The other figures i
 | jamb hello, `ff9b98a` (after the clipboard, IME, color emoji, Canvas, SVG and tier-2 widget work) | 7.74 MB |
 | jamb hello, `f13b6c5` (after the themes, translations, dock, inspector and other tier-3 work) | 8.41 MB |
 | GPUI hello (`gpui` at `cc053a4`, release) | 9.21 MB |
-| gpui-component's `hello_world` example (gpui-component at `f2f0f56`, the same `gpui` revision, release) | 15.28 MB |
+| gpui-component's `hello_world` example (gpui-component 0.5.2 at `f2f0f56`, 2026-08-12, the same `gpui` revision, release) | 15.28 MB |
 
 All jamb builds are `go build -trimpath -ldflags "-s -w -H windowsgui"`, and both Rust builds are `cargo build --release` with the default profile. gpui-component's `hello_world` is the same kind of app as the others: a centered greeting and a primary button. It shows what linking gpui-component adds to a GPUI app, about 6 MB.
+
+The project was renamed GPUI Kit in v0.6.0 (2026-09-03), and its `hello_world` example now depends on the `gpui-kit` crate and on the `gpui-pre` 0.3.9 snapshot of GPUI rather than a zed git revision. The 15.28 MB figure is from before the rename and was not measured again; GPUI Kit's binary size today may differ.
 
 A hello app uses only part of jamb, and the Go linker drops the rest. Larger apps:
 
@@ -117,7 +119,7 @@ A hello app uses only part of jamb, and the Go linker drops the rest. Larger app
 |---|---|
 | jamb demo (`examples/demo`: every widget, charts, the code editor with the Go grammar, the dock) | 15.99 MB |
 | jamb notes (`examples/notes`) | 8.80 MB |
-| A gpui-component application on the same machine: a database workbench with a tree-sitter SQL editor, a database driver and TLS | 26.3 MB |
+| A gpui-component (pre-rename) application on the same machine: a database workbench with a tree-sitter SQL editor, a database driver and TLS | 26.3 MB |
 
 gpui-component's own gallery app was not built: its dependencies were not in the local Cargo cache, and downloading them would have added about 1 GB. The database workbench is not the same app as the jamb demo, and its driver and TLS add to its size, so it is an indication, not a like-for-like comparison.
 
@@ -185,7 +187,7 @@ The first pass showed GPUI ahead on startup, memory and binary size. Investigati
 ## Caveats
 
 - **GPUI's dependency tree is larger than a hello world needs.** The 673 packages include text shaping, accessibility, font, image and platform crates that this app does not use directly. `Cargo.lock` lists packages for every platform (for example, `freetype-sys` is locked but is not built for Windows), so the registry and git sizes overstate what a Windows build compiles.
-- **Platform scope differs.** jamb is Windows-only today. GPUI targets macOS, Linux and Windows. jamb's Linux and macOS platform packages are placeholders (per [architecture.md](architecture.md)), so the example was only compiled for them (`GOOS=linux` and `GOOS=darwin GOARCH=arm64`), not run. Cross-compiling GPUI from Windows was not tested, because it would need the rustup target and its system libraries.
+- **Platform scope differs.** jamb is Windows-only today. GPUI targets macOS, Linux and Windows, and GPUI Kit adds WebAssembly, iOS and Android hosting. jamb's Linux and macOS platform packages are placeholders (per [architecture.md](architecture.md)), so the example was only compiled for them (`GOOS=linux` and `GOOS=darwin GOARCH=arm64`), not run. Cross-compiling GPUI from Windows was not tested, because it would need the rustup target and its system libraries.
 - **GPUI on Windows.** This comparison measures GPUI's Windows backend on this machine and nothing else. It does not assess that backend's maturity or stability.
 - **Driver threads.** The Direct3D driver's threads run in the app's process. Process CPU time and context switches include them, and they could not be separated.
 - **Startup method.** Times include process creation and the script's polling, and are measured from the launch call. jamb's own trace (`JAMB_TRACE=1`) puts its first frame about 195 ms after process start on this machine; the external warm figure (266 ms) adds process creation and polling. First-launch times depend on the antivirus and its settings.
@@ -204,6 +206,62 @@ The first pass showed GPUI ahead on startup, memory and binary size. Investigati
 | Network on first build | `go mod download` of about 94 MB | About 1.8 GB, including a clone of the zed repository |
 | Build steps | `go build` (one command) | `cargo build` (one command) |
 | Cross-compiling from Windows | Compiles for linux/amd64 and darwin/arm64 (compile only, see Caveats) | Not tested |
+
+## Components: jamb and GPUI Kit
+
+jamb's predefined themes and some of its translated strings come from gpui-component (see `NOTICE`). The project is now [GPUI Kit](https://gpui-kit.com/) ([longbridge/gpui-kit](https://github.com/longbridge/gpui-kit); the old repository URL redirects there). This section compares the two component sets. It was checked on 2026-10-19 against GPUI Kit v0.8.0, released that day, and jamb with the widgets added the same day (Alert, DescriptionList, GroupBox, Kbd, OTPInput, Rating, Stepper, Toggle and ToggleGroup). It compares coverage only: it does not compare features within a component, quality or accessibility behaviour.
+
+### What changed upstream
+
+- **Rename and crates (v0.6.0, 2026-09-03).** Apps now depend on one crate, `gpui-kit`, which re-exports GPUI and these layers: `gpui-base` (unstyled behaviour and state), `gpui-component` (the styled components, still published under that name, now in `crates/component`), and `gpui-kit-assets` (icons, replacing `gpui-component-assets`). `gpui-shell` is a JavaScript runtime for GPUI apps built on QuickJS, still a preview.
+- **GPUI dependency.** GPUI Kit pins a published GPUI snapshot, `gpui-pre` 0.3.9 (v0.8.0), instead of following the zed repository. An optional alternative backend, GPUI Fast, came in v0.7.3.
+- **Platforms.** macOS, Windows, Linux (X11 and Wayland) and WebAssembly, with iOS and Android hosting since v0.6.2. Accessibility comes from AccessKit through GPUI.
+- **Renamed APIs (v0.6.0).** `Table` became `DataTable` (a new, declarative `Table` took its name), `Divider` became `Separator`, and `InputState` is single-line only, with `TextareaState` and `EditorState` split out. The Dock API was redesigned.
+- **Themes.** The theme files are the same JSON format and schema as before. Since `f2f0f56`, `matrix.json` was removed upstream, and the schema gained `chart.bullish`, `chart.bearish` and `chart.grid` and lost `tiles.background`. jamb's copies in `third_party/gpui-component-themes` are from v0.8.0, except Matrix, which jamb keeps from `f2f0f56`. jamb's charts take their colors from its own tokens, so the new chart keys are not converted.
+- **Locales.** The strings moved from `crates/ui/locales/ui.yml` to `crates/component/locales/ui.yml`. `NOTICE` cites the old path at the commit it was taken from, which is still accurate for that commit.
+
+### Coverage
+
+GPUI Kit's component page lists 69 components in four groups. The jamb column names the closest jamb widget; "None" means jamb has no equivalent.
+
+| GPUI Kit | jamb |
+|---|---|
+| **Basic** | |
+| Accordion, Alert, Avatar, Badge, Button, Checkbox, Collapsible, Icon, Image, Kbd, Pagination, Rating, Skeleton, Slider, Stepper, Switch, Tag, Toggle, Tooltip | Same names (`Tooltip` is a method on most widgets; `ToggleGroup` is a joined row of toggles) |
+| Radio | `RadioGroup` |
+| Progress, Spinner | `ProgressBar`, `ProgressRing` |
+| DropdownButton | `DropdownMenu` with a button trigger |
+| TextView | `markdown.View` (Markdown only) and `Text.Selectable` |
+| Label | `Text` (no separate label widget) |
+| Attachment, Bubble, Marker, Message, MessageScroller, Questionnaire | None (chat and survey components, added in v0.6.0 and v0.7.0) |
+| **Form** | |
+| Input, Textarea, NumberInput, Select, Combobox, ColorPicker, DatePicker | `TextInput`, `TextArea`, `NumberInput`, `Select`, `Combobox`, `ColorPicker`, `DatePicker` |
+| TimeField | `TimePicker` |
+| Editor | `codeedit.Editor` |
+| Form | `NewForm`, `Field` and the validators |
+| OtpInput | `OTPInput` |
+| Speech | None |
+| **Layout** | |
+| Dialog, Sheet, Notification | `Modal`, `Drawer`, `Toaster` (and `app.Notify` for system notifications) |
+| Popover, Sidebar | Same names |
+| Resizable, Scrollable | `Split` and `Pane`, `Div` with `ScrollX` and `ScrollY` |
+| Root, Theme | The app window, `ui.Theme` |
+| DescriptionList, GroupBox | Same names |
+| StatusBar, Toolbar | None |
+| **Advanced** | |
+| Dock, Tabs, Tree | Same names |
+| DataTable | `DataGrid` |
+| List, VirtualList | `ListOf`, `UniformList` (both virtualized) |
+| Menu | `DropdownMenu`, `MenuBar`, `Div.ContextMenu` |
+| Chart | `charts`: line, area, bar, scatter, pie, donut, radar, candlestick and Sankey |
+| Calendar | Inside the date pickers only |
+| Carousel, Command, Diff, Settings | None |
+
+The component page also links AlertDialog, Clipboard, Empty, Focus Trap, HoverCard, Input Group, Plot, Shimmer, Table and TitleBar from its sidebar. jamb has text and image clipboard access, an empty-state slot on `DataGrid`, `Canvas` for custom plots and `TitleBarButtons`.
+
+jamb has some widgets GPUI Kit does not list: `MenuBar`, `Breadcrumbs`, `DateRangePicker` and `CheckboxTri`. It also has Windows shell integration (`NewTray`, jump lists, taskbar progress and badges), native file and message dialogs (`dialog`), `Canvas` and `SVG` drawing, and the inspector.
+
+In total, 13 of GPUI Kit's 69 listed components have no jamb equivalent, six of them the chat and survey components, and jamb has a calendar only inside its date pickers.
 
 ## Open items
 
