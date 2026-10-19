@@ -113,6 +113,7 @@ func contrastPairs(th *Theme) []contrastPair {
 	)
 	ps = append(ps, badgePairs(th)...)
 	ps = append(ps, progressPairs(th)...)
+	ps = append(ps, alertPairs(th)...)
 	// kbd.go: a key cap's text is TextMuted on Surface, at 12 px.
 	ps = append(ps, contrastPair{name: "Kbd_text_on_Surface", role: "key cap text (kbd.go, TextMuted on Surface)", fg: th.TextMuted, bg: th.Surface, min: minText})
 	for _, s := range surfaces[:3] {
@@ -188,16 +189,16 @@ func badgePairs(th *Theme) []contrastPair {
 	return ps
 }
 
-// TestBadgeContrastHighContrast checks the badge pairs under the two
-// representative high contrast schemes. A badge is outlined there, so its text
-// is the text color on the surface.
+// TestBadgeContrastHighContrast checks the badge pairs, and the progress and
+// alert pairs, under the two representative high contrast schemes. A badge and
+// an alert are outlined there, so their text is the text color on the surface.
 func TestBadgeContrastHighContrast(t *testing.T) {
 	for _, sc := range []struct {
 		name string
 		c    SystemColors
 	}{{"black", HighContrastBlack()}, {"white", HighContrastWhite()}} {
 		th := HighContrastTheme(sc.c, DarkTheme())
-		for _, p := range append(badgePairs(th), progressPairs(th)...) {
+		for _, p := range append(append(badgePairs(th), progressPairs(th)...), alertPairs(th)...) {
 			r := contrastRatio(p.fg, p.bg)
 			t.Logf("high contrast %s: %s %.2f", sc.name, p.name, r)
 			if r < p.min {
@@ -218,4 +219,24 @@ func progressPairs(th *Theme) []contrastPair {
 	return []contrastPair{
 		{name: "ProgressFill_on_Track", role: "determinate bar fill (Accent) on its track (SurfaceActive)", fg: fill, bg: track, min: minNonText},
 	}
+}
+
+// alertPairs lists the texts and the icon of each alert variant on its tinted
+// fill (alert.go alertColors). The title and the description are text, so they
+// need 4.5:1; the icon is a graphical object, so it needs 3:1.
+func alertPairs(th *Theme) []contrastPair {
+	var ps []contrastPair
+	for _, v := range []struct {
+		name string
+		v    AlertVariant
+	}{{"Info", AlertInfo}, {"Success", AlertSuccess}, {"Warning", AlertWarning}, {"Danger", AlertDanger}} {
+		d := alertDefaults(th, v.v)
+		fill := d.Alert.Background
+		ps = append(ps,
+			contrastPair{name: "Alert_" + v.name + "_title", role: "alert title (alert.go) on its fill", fg: d.Title.TextColor, bg: fill, min: minText},
+			contrastPair{name: "Alert_" + v.name + "_description", role: "alert description (alert.go) on its fill", fg: d.Description.TextColor, bg: fill, min: minText},
+			contrastPair{name: "Alert_" + v.name + "_icon", role: "alert icon (alert.go) on its fill", fg: d.Icon.TextColor, bg: fill, min: minNonText},
+		)
+	}
+	return ps
 }

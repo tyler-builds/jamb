@@ -28,6 +28,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - `Tabs.Reorderable` lets the user move tabs by dragging them or with Ctrl+Shift+Left and Right,
   with the new position announced, and `OnReorder` reports the new order. The drop line is the
   `DropLine` part of `TabsStyle`.
+- `ui.Alert` is a message box in the flow of the page, with a title, a description, an icon per
+  variant (`Info`, `Success`, `Warning`, `Danger`), an optional action and an optional close button.
+  It is a group named by its title; it is not announced, so an app calls `Announce` when it should be.
 - `ui.Kbd` shows a keyboard shortcut as key caps, from keys written as for `Bind`, with the key
   names a menu shows. It is one static text for assistive technology, such as "Ctrl+Shift+P".
 - `ui.LinkSegs` makes one link of several styled segments.
