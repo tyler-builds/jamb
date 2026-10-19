@@ -262,3 +262,25 @@ Narrator) and the live scripted checks in `scripts/a11y-check.ps1` have not been
 for this change. The divider's Range minimum and maximum are updated at the split's
 next render, so after a window resize they can lag by a render until the next
 interaction; the value is not affected.
+
+## Status bars: what changed from this design
+
+`ui.StatusBar` adds the role `access.RoleStatusBar`, which maps to UI Automation's
+StatusBar control type (`UIA_StatusBarControlTypeId`, 50017, from `UIAutomationClient.h`
+in the 10.0.26100.0 SDK). No existing role fitted: a group would hide what the bar is,
+and the StatusBar control type is the one UI Automation defines for this bar. The bar has no pattern of its own, and its items are exposed as
+its children, each with its own role. Microsoft's page for the control type
+(https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportstatusbarcontroltype)
+was not re-read for this change; the optional Grid pattern it may describe for a bar of
+cells is not implemented.
+
+**Names.** The bar has no name by default, and `Label` gives it one. A name such as
+"Status bar" would repeat the control type, which AxeWindowsCLI reports (see Phase M).
+
+**Not a live region.** A change to the bar's text is not announced. An app that changes
+it after an action announces the change with `Announce`, as for an alert.
+
+**Verification.** The unit tests check the role, the order of the items inside the bar,
+and the name (`ui/statusbar_test.go`), and the control type mapping is in
+`internal/platform/windows/uia_test.go`. A screen reader pass and the live scripted
+checks in `scripts/a11y-check.ps1` have not been run for this change.

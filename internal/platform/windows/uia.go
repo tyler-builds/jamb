@@ -34,6 +34,7 @@ const (
 	ctRadioButton = 50013
 	ctSlider      = 50015
 	ctSpinner     = 50016
+	ctStatusBar   = 50017 // UIA_StatusBarControlTypeId
 	ctTab         = 50018
 	ctTabItem     = 50019
 	ctText        = 50020
@@ -224,6 +225,7 @@ const (
 //	tree item                 TreeItem          tree item
 //	calendar                  Calendar          calendar (Grid and Table patterns)
 //	progress bar, busy ring   ProgressBar      progress bar (read-only RangeValue when determinate)
+//	status bar                StatusBar         status bar
 //	unknown                   Pane              unknown
 //
 // A text area is an Edit, not a Document: a Document is for read-only rich
@@ -289,6 +291,8 @@ func controlType(r access.Role) int32 {
 		return ctDataItem
 	case access.RoleHeaderItem:
 		return ctHeaderItem
+	case access.RoleStatusBar:
+		return ctStatusBar
 	}
 	return ctPane
 }

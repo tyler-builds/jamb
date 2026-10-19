@@ -1,6 +1,7 @@
 package views
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/tyler-builds/jamb/icons"
@@ -216,7 +217,25 @@ func Main(s *Store) ui.Element {
 			Child(titleBar(t, focused, "")).
 			Child(header(ctx, s, page, focused)).
 			Child(ui.Div().Height(ui.Px(1)).Background(t.Border)).
-			Child(content)
+			Child(content).
+			Child(statusBar(s))
+	})
+}
+
+// statusBar is the bar along the bottom of the main column: the page, and the
+// number of projects and starred projects. It re-renders only when they change.
+func statusBar(s *Store) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		projects := s.Projects.Get()
+		starred := 0
+		for _, p := range projects {
+			if p.Starred {
+				starred++
+			}
+		}
+		return ui.StatusBar().
+			Start(ui.Text(pageTitles[s.Page.Get()]).Truncate()).
+			End(ui.Text(fmt.Sprintf("%d projects", len(projects))), ui.Text(fmt.Sprintf("%d starred", starred)))
 	})
 }
 

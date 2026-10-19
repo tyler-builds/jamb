@@ -1,7 +1,7 @@
 # Navigation widgets
 
-Tabs, collapsible sections, trees, the sidebar, the other navigation controls, group boxes and
-description lists.
+Tabs, collapsible sections, trees, the sidebar, the other navigation controls, group boxes,
+description lists and status bars.
 
 ## Navigation and layout
 
@@ -281,3 +281,29 @@ ui.DescriptionList().Columns(2).Vertical().Bordered(). // two columns, terms abo
   the text color.
 - **Accessibility.** Each item is a group named by its term, with the value inside it, so
   assistive technology reads the value with its term.
+
+## Status bars
+
+`ui.StatusBar()` is the bar along the bottom of a window, which shows the state of what
+the window holds, such as the current page, a count or the position of the caret. Its
+look is `ui.StatusBarStyle`: per app in `Theme.StatusBar`, or per instance with `Styles`.
+It follows high contrast and the Text size.
+
+```go
+ui.Div().Column().Size(ui.Full, ui.Full).
+	Child(page).                                        // content that grows, such as Grow(1)
+	Child(ui.StatusBar().
+		Start(ui.Text("Saved")).                        // at the left, taking the free room
+		End(ui.Text("Ln 12, Col 4"), ui.Text("UTF-8"))) // at the right
+```
+
+- **Look.** A compact strip in the panel color with a border along its top, and 12-pixel
+  muted text that its items inherit. The `Start` items are in a row that takes the free
+  room, and the `End` items in a row at the right, 12 pixels apart. Under high contrast the
+  strip is the window color, and its border and text are the text color.
+- **Layout.** The bar fills the width of its container and does not shrink. Put it last in
+  the window's column, after content that grows.
+- **Accessibility.** The bar is a status bar (UI Automation's StatusBar control type) that
+  holds its items, so a screen reader can find it by its type. It needs no name; `Label`
+  names it when a window has two. It is not a live region: a change to its text is not
+  announced, so an app announces a change the user should hear about with `Announce`.
