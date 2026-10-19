@@ -151,8 +151,10 @@ func TestChatSendAndTeammateReply(t *testing.T) {
 	}
 	c.rt.Type("Looks good")
 	c.rt.Press(input.KeyEnter, 0)
-	if got := c.thread(); len(got) != before+1 || got[before].Author != me || got[before].Body != "Looks good" {
-		t.Fatalf("after Enter the thread has %d messages, want %d with the comment last", len(got), before+1)
+	// With no reply delay, the reply can already have landed by now, after the
+	// comment, so the comment is checked by its place rather than as the last one.
+	if got := c.thread(); len(got) < before+1 || got[before].Author != me || got[before].Body != "Looks good" {
+		t.Fatalf("after Enter the thread has %d messages, want the comment at %d", len(got), before)
 	}
 
 	for i := 0; i < 500 && len(c.thread()) < before+2; i++ {
