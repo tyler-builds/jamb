@@ -207,6 +207,13 @@ var layerBuilders = []layerBuilder{
 			closed := false
 			return partDrawer(DrawerLeft, st.(DrawerStyle), &closed)
 		}},
+	{"CommandPalette", func(th *Theme) any { return &th.CommandPalette },
+		func(st any) Element {
+			return CommandPalette(NewSignal(true)).Styles(st.(CommandPaletteStyle)).
+				Commands(func() []*Action { return []*Action{NewAction("test.open", "Open file")} })
+		}},
+	{"CommandPalette", func(th *Theme) any { return &th.CommandPalette },
+		func(st any) Element { return CommandPalette(NewSignal(true)).Styles(st.(CommandPaletteStyle)) }},
 	{"Sidebar", func(th *Theme) any { return &th.Sidebar },
 		func(st any) Element { return partSidebar(st.(SidebarStyle)) }},
 	{"Breadcrumbs", func(th *Theme) any { return &th.Breadcrumbs },
@@ -283,6 +290,7 @@ var layerNotDrawn = map[string]string{
 	"Menu":            "the menu's parts are drawn while it is open",
 	"MenuBar":         "the menu bar's parts are drawn with an open menu",
 	"Popover":         "the popover is drawn while it is open",
+	"CommandPalette":  "the match is a highlight of a command's name, not an element; the keys need a binding",
 	"Toast":           "the toasts are drawn once notified",
 	"Tooltip":         "the tooltip is drawn while the pointer rests on its element",
 	"Form":            "the form's summary is drawn while the form has errors",

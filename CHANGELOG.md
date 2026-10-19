@@ -59,6 +59,14 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `OnComplete` and `Validate`, works in a `Field` and a `Form`, and is one text field for assistive
   technology, reported as a password field when masked. It is styled through `ui.OTPInputStyle`
   and `Theme.OTPInput`.
+- `ui.CommandPalette(open)` is a searchable list of commands, open while its signal is true. It
+  lists the actions available where focus was (or what `Commands` returns), without hidden ones,
+  and keeps those whose names contain every word typed, with the matches highlighted and each
+  command's key binding beside it. Up, Down, PageUp and PageDown move the highlight, Enter or a
+  click runs the command where focus was and gives focus back, and Escape closes it. Assistive
+  technology sees a dialog with a combo box whose highlighted command is the focus. It is styled
+  through `ui.CommandPaletteStyle` and `Theme.CommandPalette`, and its texts are
+  `Strings.CommandPalette`, `CommandPalettePlaceholder` and `NoMatchingCommands`.
 - `Context.After` runs a function on the UI thread after a delay on the window's clock, which
   `ui/uitest` can advance.
 - The notes example shows a Markdown preview beside the editor (Ctrl+Shift+V), and the demo has a

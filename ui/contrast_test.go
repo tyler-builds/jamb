@@ -125,6 +125,10 @@ func contrastPairs(th *Theme) []contrastPair {
 	ps = append(ps, badgePairs(th)...)
 	ps = append(ps, progressPairs(th)...)
 	ps = append(ps, alertPairs(th)...)
+	// commandpalette.go: the keys of the highlighted command are TextSubtle on AccentSoft
+	// over the panel's Surface, at 12 px.
+	ps = append(ps, contrastPair{name: "PaletteKeys_on_AccentSoft", role: "highlighted command's keys (TextSubtle on AccentSoft)",
+		fg: th.TextSubtle, bg: over(th.AccentSoft, th.Surface), min: minText})
 	// kbd.go: a key cap's text is TextMuted on Surface, at 12 px.
 	ps = append(ps, contrastPair{name: "Kbd_text_on_Surface", role: "key cap text (kbd.go, TextMuted on Surface)", fg: th.TextMuted, bg: th.Surface, min: minText})
 	for _, s := range surfaces[:3] {

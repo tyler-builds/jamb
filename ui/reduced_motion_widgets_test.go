@@ -147,6 +147,13 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				}
 			},
 			act: func(t *testing.T, r *accessRig, open *Signal[bool]) { open.Set(true); r.frame() }},
+		{name: "CommandPalette", animates: true,
+			root: func(open *Signal[bool]) func(*Context) Element {
+				return func(ctx *Context) Element {
+					return Div().Column().Size(Full, Full).Child(Text("page")).Child(CommandPalette(open))
+				}
+			},
+			act: func(t *testing.T, r *accessRig, open *Signal[bool]) { open.Set(true); r.frame() }},
 		{name: "ProgressBar", animates: true,
 			root: func(open *Signal[bool]) func(*Context) Element {
 				return func(ctx *Context) Element {
