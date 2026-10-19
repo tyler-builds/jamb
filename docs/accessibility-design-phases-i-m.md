@@ -263,24 +263,39 @@ for this change. The divider's Range minimum and maximum are updated at the spli
 next render, so after a window resize they can lag by a render until the next
 interaction; the value is not affected.
 
-## Status bars: what changed from this design
+## Status bars and toolbars: what changed from this design
 
-`ui.StatusBar` adds the role `access.RoleStatusBar`, which maps to UI Automation's
-StatusBar control type (`UIA_StatusBarControlTypeId`, 50017, from `UIAutomationClient.h`
-in the 10.0.26100.0 SDK). No existing role fitted: a group would hide what the bar is,
-and the StatusBar control type is the one UI Automation defines for this bar. The bar has no pattern of its own, and its items are exposed as
-its children, each with its own role. Microsoft's page for the control type
-(https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportstatusbarcontroltype)
-was not re-read for this change; the optional Grid pattern it may describe for a bar of
-cells is not implemented.
+`ui.StatusBar` and `ui.Toolbar` add two roles. `access.RoleStatusBar` maps to UI
+Automation's StatusBar control type (`UIA_StatusBarControlTypeId`, 50017), and
+`access.RoleToolBar` to its ToolBar control type (`UIA_ToolBarControlTypeId`, 50021). No
+existing role fitted: a group would hide what each bar is, and these are the control
+types UI Automation defines for them. Neither bar has a pattern of its own; their items
+are their children, each with its own role, and a toolbar's separators are separators.
+Microsoft's pages for the two control types
+(https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supportstatusbarcontroltype
+and https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-supporttoolbarcontroltype)
+were not re-read for this change; the optional Grid pattern of a status bar of cells is
+not implemented.
 
-**Names.** The bar has no name by default, and `Label` gives it one. A name such as
-"Status bar" would repeat the control type, which AxeWindowsCLI reports (see Phase M).
+**Names.** A status bar has no name by default, and `Label` gives it one. A name such as
+"Status bar" would repeat the control type, which AxeWindowsCLI reports (see Phase M). A
+toolbar is named by the label it is built with, such as "Formatting".
 
-**Not a live region.** A change to the bar's text is not announced. An app that changes
-it after an action announces the change with `Announce`, as for an alert.
+**A status bar is not a live region.** A change to its text is not announced. An app that
+changes it after an action announces the change with `Announce`, as for an alert.
 
-**Verification.** The unit tests check the role, the order of the items inside the bar,
-and the name (`ui/statusbar_test.go`), and the control type mapping is in
-`internal/platform/windows/uia_test.go`. A screen reader pass and the live scripted
+**Toolbar keys.** The toolbar follows the WAI-ARIA toolbar pattern
+(https://www.w3.org/WAI/ARIA/apg/patterns/toolbar/): one Tab stop, Left and Right between
+its controls with wrapping, Home and End to the ends, and Tab back to the control that
+had focus last. The pattern's guidance that a control which needs the arrow keys keeps
+them is followed by dispatch order: a text field's caret keys are bindings, which run
+before the toolbar's key handler, and a slider or a toggle group stops the keys it uses.
+The remembered control is the last one that had focus by any means, including a click.
+The runtime keeps it on the toolbar's element (`rovingGroup`); the Tab order lists only
+that control, or the first one, so a screen reader's Tab navigation matches the keys.
+
+**Verification.** The unit tests check the roles, names and children of both bars
+(`ui/statusbar_test.go`, `ui/toolbar_test.go`), the Tab stop, the arrow keys, the
+remembered control and a text field that keeps its keys, and the control type mapping is
+in `internal/platform/windows/uia_test.go`. A screen reader pass and the live scripted
 checks in `scripts/a11y-check.ps1` have not been run for this change.

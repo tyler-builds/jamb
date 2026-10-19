@@ -192,6 +192,8 @@ type Theme struct {
 	ColorPicker ColorPickerStyle
 	// StatusBar is the look of every status bar.
 	StatusBar StatusBarStyle
+	// Toolbar is the look of every toolbar and its separators.
+	Toolbar ToolbarStyle
 
 	// styles is the values that SetThemeStyle stores, keyed by their type (see
 	// themeStyleKey). The map is never changed in place: SetThemeStyle stores a new

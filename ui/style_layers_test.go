@@ -271,6 +271,10 @@ var layerBuilders = []layerBuilder{
 		func(st any) Element {
 			return StatusBar().Start(Text("Ready")).End(Text("Ln 1")).Styles(st.(StatusBarStyle))
 		}},
+	{"Toolbar", func(th *Theme) any { return &th.Toolbar },
+		func(st any) Element {
+			return Toolbar("Tools").Child(Button("A")).Child(ToolbarSeparator()).Child(Button("B")).Styles(st.(ToolbarStyle))
+		}},
 	{"DescriptionList", func(th *Theme) any { return &th.DescriptionList },
 		func(st any) Element {
 			return DescriptionList().ItemText("Owner", "Sample").Styles(st.(DescriptionListStyle))

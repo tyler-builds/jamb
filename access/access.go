@@ -67,6 +67,7 @@ const (
 	RoleHeaderItem                // a column header of a data grid, with its sort state in its name
 	RoleCalendar                  // a month of days, a grid with a header of weekday names (see DatePicker)
 	RoleStatusBar                 // the bar along the bottom of a window that shows its status (see StatusBar)
+	RoleToolBar                   // a row of controls that is one Tab stop, named by its label (see Toolbar)
 )
 
 var roleNames = [...]string{
@@ -108,6 +109,7 @@ var roleNames = [...]string{
 	RoleHeaderItem:    "header item",
 	RoleCalendar:      "calendar",
 	RoleStatusBar:     "status bar",
+	RoleToolBar:       "tool bar",
 }
 
 // String returns the role's name, such as "check box".

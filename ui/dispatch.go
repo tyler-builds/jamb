@@ -930,6 +930,7 @@ func (rt *Runtime) setFocus(id uint64) {
 		}
 	}
 	rt.focusID, rt.focusLink = id, 0
+	rt.rovingFocused(id)
 	if n := rt.byID[id]; n != nil && n.div != nil && n.div.h.onFocus != nil {
 		n.div.h.onFocus()
 	}
@@ -991,6 +992,13 @@ func (rt *Runtime) tabStops() []tabPlace {
 		}
 		if d := n.div; d != nil && d.tabSkip {
 			return // the controls of a grid cell are reached by the grid, not by Tab
+		}
+		if d := n.div; d != nil && d.roving != nil {
+			// A toolbar is one stop, at one of its controls (see rovingStop).
+			if id := rt.rovingStop(n); id != 0 {
+				rest = append(rest, tabPlace{id: id})
+			}
+			return
 		}
 		if d := n.div; d != nil && d.focusable && !d.noTabStop && d.tabIndex >= 0 {
 			if d.tabIndex > 0 {
