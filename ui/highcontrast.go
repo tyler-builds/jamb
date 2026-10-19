@@ -53,6 +53,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		Select:        base.Select,
 		Slider:        base.Slider,
 		RangeSlider:   base.RangeSlider,
+		SplitButton:   base.SplitButton,
 		Split:         base.Split,
 		Dock:          base.Dock,
 		Field:         base.Field,

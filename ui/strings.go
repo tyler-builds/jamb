@@ -137,6 +137,8 @@ type Strings struct {
 	Minimum string
 	// Maximum is the name of the high thumb of a range slider.
 	Maximum string
+	// MoreOptions is the name of the arrow of a split button, which opens its menu.
+	MoreOptions string
 
 	// The names of a dock's tab strip and of the commands of its tabs' menus.
 	PanelGroup string
@@ -477,6 +479,7 @@ func englishStrings() *Strings {
 		Clear:               "Clear",
 		Minimum:             "Minimum",
 		Maximum:             "Maximum",
+		MoreOptions:         "More options",
 
 		PanelGroup:      "Panels",
 		MovePanelLeft:   "Move left",

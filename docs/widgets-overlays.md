@@ -20,7 +20,7 @@ ui.MenuSeparator()
 ui.MenuSection("Status")                           // a group label; runs nothing
 ```
 
-Three elements open a menu. Each takes a function that builds the items when
+Four elements open a menu. Each takes a function that builds the items when
 the menu opens:
 
 ```go
@@ -29,6 +29,9 @@ ui.Div().Focusable().ContextMenu(func() []ui.MenuItem { return rowMenu(p) })
 
 // A click, or Enter, Space or Down while the trigger has focus, opens a menu below it.
 ui.DropdownMenu(ui.Button("Actions").Secondary(), func() []ui.MenuItem { return actions() })
+
+// A button with an action and an arrow that opens a menu of related actions.
+ui.SplitButton("Save", save, func() []ui.MenuItem { return saveMenu() }).Secondary()
 
 // A row of top-level menus. Pressing and releasing Alt by itself focuses the bar.
 ui.MenuBar(
@@ -70,6 +73,20 @@ ui.MenuBar(
   the first label takes focus. Without a menu bar F10 does nothing. Shift+F10 is the
   context-menu key, not the bar's. The application takes F10 from Windows, so that
   Windows' menu mode does not swallow the keys that follow.
+- **Split button.** `ui.SplitButton(label, onClick, build)` is two joined
+  segments with the look of a `Button` of the same variant (`Primary`, the default,
+  `Secondary`, `Ghost` or `Danger`) and size (`Small`, `Large`): the action, with
+  the label and an optional `Icon`, and an arrow that opens the menu below the whole
+  button. The segments share the line between them, and only the outer corners are
+  rounded. A click, Enter or Space on the action runs `onClick`. A click on the
+  arrow, Enter, Space or Down while it has focus, or Alt+Down while either segment
+  has focus, opens the menu; it closes and returns focus as a dropdown's does.
+  Each segment is a Tab stop. Assistive technology sees a group named by the label
+  with two buttons, the action and the arrow, which is named "More options"
+  (`Strings.MoreOptions`) and reports whether the menu is expanded; UI Automation's
+  SplitButton control type would be one element with both patterns, which the
+  access tree has no role for. `Disabled(true)` disables both segments. Its look is
+  `ui.SplitButtonStyle`, set with `Theme.SplitButton` or `.Styles(...)`.
 - **Look.** Menus use the theme's surface, border, shadow and highlight colors.
   They enter and leave with the same motion as the command palette.
 - **Roles.** Entries take the WAI-ARIA menu roles in the access tree: menu item,

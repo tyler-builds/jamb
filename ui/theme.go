@@ -91,6 +91,8 @@ type Theme struct {
 	Slider SliderStyle
 	// RangeSlider is the look of every range slider.
 	RangeSlider RangeSliderStyle
+	// SplitButton is the look of every split button.
+	SplitButton SplitButtonStyle
 	// Split is the look of every split, including its dividers and grips.
 	Split SplitStyle
 	// Dock is the look of every dock: its tab groups, tabs, panels and drop preview.

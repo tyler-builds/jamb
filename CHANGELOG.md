@@ -119,6 +119,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   track moves the nearer thumb, and each thumb is a Tab stop with a slider's keys. Assistive
   technology sees a group named by the label with two sliders, named by `Strings.Minimum` and
   `Maximum`. It is styled through `ui.RangeSliderStyle` and `Theme.RangeSlider`.
+- `ui.SplitButton(label, onClick, menu)` is a button with an action and an arrow that opens a menu,
+  as two joined segments with a button's variants and sizes and an optional `Icon`. The arrow opens
+  the menu on a click, Enter, Space or Down, and Alt+Down opens it from either segment. Assistive
+  technology sees a group with two buttons: the action and the arrow, named by
+  `Strings.MoreOptions`, with its expanded state. It is styled through `ui.SplitButtonStyle` and
+  `Theme.SplitButton`.
 
 ### Changed
 

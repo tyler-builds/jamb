@@ -62,6 +62,7 @@ func italianStrings() *Strings {
 		Clear:                     "Cancella",
 		Minimum:                   "Minimo",
 		Maximum:                   "Massimo",
+		MoreOptions:               "Altre opzioni",
 
 		PanelGroup:      "Pannelli",
 		MovePanelLeft:   "Sposta a sinistra",
