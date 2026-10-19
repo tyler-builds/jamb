@@ -86,6 +86,11 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - The fonts parsed for a window stayed in memory after the window closed, because a process-wide
   map held every parsed font. A closed window, such as a dock window or the inspector, now gives
   its fonts back, and the `ui` tests peak at about 0.5 GB instead of 8 GB.
+- An element selected in the inspector's tree is outlined in the inspected window at once, not only
+  after the pointer or the focus reaches that window.
+- The inspector marks an element with no width or no height with a 2-pixel line and its label,
+  where it drew nothing visible before. Its label stays inside the window.
+- The inspector shortens long texts by characters, so it no longer cuts a character in two.
 
 ## [0.2.0] - 2026-10-15
 

@@ -368,6 +368,56 @@ func TestInspectAccessReportsTheWarningsOfAnElement(t *testing.T) {
 	}
 }
 
+// TestInspectSelectRepaintsTheWindow checks that a selection made in the
+// inspector asks the inspected window for a frame that paints the outline, so
+// the outline shows before the window gets input of its own.
+func TestInspectSelectRepaintsTheWindow(t *testing.T) {
+	clicks, checked, tick := 0, NewSignal(false), NewSignal(0)
+	rt, tg := inspRuntime(t, DarkTheme(), inspSample(&clicks, checked, tick))
+	rt.Frame(time.Now())
+	if rt.NeedsFrame() || rt.framePending.Load() {
+		t.Fatal("the window is not at rest before the selection")
+	}
+	tg.Select(inspByKey(t, tg, "card"))
+	if !rt.needPaint || !rt.framePending.Load() {
+		t.Fatalf("Select did not ask for a paint: needPaint %v, framePending %v", rt.needPaint, rt.framePending.Load())
+	}
+}
+
+// TestInspectOutlinesAnElementWithNoHeight checks that an element with no height
+// still gets a visible mark: a filled line 2 pixels thick across its width.
+func TestInspectOutlinesAnElementWithNoHeight(t *testing.T) {
+	rt, tg := inspRuntime(t, DarkTheme(), func(ctx *Context) Element {
+		return Div().Key("root").Column().Children(
+			Div().Key("flat").Width(Px(300)).Height(Px(0)),
+			Text("below"),
+		)
+	})
+	flat := inspByKey(t, tg, "flat")
+	if e, _ := tg.Element(flat); e.Box.H != 0 || e.Box.W != 300 {
+		t.Fatalf("the flat element is %v x %v, want 300 x 0", e.Box.W, e.Box.H)
+	}
+	tg.Select(flat)
+	found := false
+	for _, q := range rt.frame(time.Now()).Quads {
+		if q.Bounds.W == 300 && q.Bounds.H == 2 && q.Background.A > 0 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("no 300 x 2 marker was painted for the element with no height")
+	}
+}
+
+func TestInspectShortenKeepsWholeCharacters(t *testing.T) {
+	if got := shorten("héllo wörld", 4); got != "héll…" {
+		t.Errorf("shorten = %q, want héll…", got)
+	}
+	if got := shorten("abc", 3); got != "abc" {
+		t.Errorf("shorten of a short text = %q, want it unchanged", got)
+	}
+}
+
 func TestInspectParsesEditValues(t *testing.T) {
 	if l, err := parseLength("50%"); err != nil || l != Percent(50) {
 		t.Errorf("parseLength(50%%) = %v, %v", l, err)
