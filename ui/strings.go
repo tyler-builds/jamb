@@ -131,6 +131,8 @@ type Strings struct {
 	ShowPassword string
 	// HidePassword is the name of that button while the text is shown.
 	HidePassword string
+	// Clear is the name of the button that clears the text of a field.
+	Clear string
 
 	// The names of a dock's tab strip and of the commands of its tabs' menus.
 	PanelGroup string
@@ -468,6 +470,7 @@ func englishStrings() *Strings {
 		Decrease:            "Decrease",
 		ShowPassword:        "Show password",
 		HidePassword:        "Hide password",
+		Clear:               "Clear",
 
 		PanelGroup:      "Panels",
 		MovePanelLeft:   "Move left",

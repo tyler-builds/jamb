@@ -57,19 +57,11 @@ func componentsFilterBar(ctx *ui.Context, s *Store, query string, shown int) ui.
 		Placeholder("Filter components…").Icon(icons.Search).FocusHandle(s.SectionField).
 		Tooltip(tip(ctx, "Filter components", FilterComponents)).
 		Width(ui.Px(320 * layoutScale(ctx))).MinWidth(ui.Px(140)).
+		// The clear button and Escape clear the query, which runs OnChange with "".
+		Clearable().
 		OnChange(func(q string) {
 			s.announceQuiet(PageComponents, componentCountText(len(matchingSections(q)), q))
 		})
-	if query != "" {
-		// TextInput has no clear button of its own, so the bar puts one in the field.
-		field.Trailing(ui.IconButton(icons.X).Key("components-filter-clear").Small().
-			Label("Clear filter").Tooltip("Clear filter").
-			OnClick(func() {
-				s.SectionQuery.Set("")
-				s.SectionField.Focus()
-				s.announceQuiet(PageComponents, componentCountText(len(componentSections), ""))
-			}))
-	}
 	row := ui.Div().Row().Wrap().Align(ui.Center).Gap(12).PaddingX(32).PaddingY(12).MaxWidth(ui.Px(1100)).
 		Child(field)
 	if strings.TrimSpace(query) != "" {
@@ -134,7 +126,7 @@ var componentSections = []componentSection{
 	{"Docking", "Dock DockLayout DockPanel OpenDockWindow panels tabs float drag layout window",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return dockSection() }},
 	{"Form controls", "Checkbox CheckboxTri Switch Toggle ToggleGroup segmented Rating stars RadioGroup radio Select " +
-		"Slider NumberInput spin OTPInput one-time code PIN TextInput Masked Revealable password ReadOnly read-only Disabled Form Field " +
+		"Slider NumberInput spin OTPInput one-time code PIN TextInput Masked Revealable password Clearable clear ReadOnly read-only Disabled Form Field " +
 		"Notification preferences validation",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return formControlsSection() }},
 	{"Forms", "Form Field TextInput Validate Required MaxLength Pattern email error summary submit async ProgressRing validation",

@@ -36,6 +36,7 @@ func TestMatchingSections(t *testing.T) {
 		{"one-time code", []string{"Form controls"}},
 		{"toggle", []string{"Form controls"}},
 		{"password", []string{"Form controls"}},
+		{"clearable", []string{"Form controls"}},
 		{"chart", []string{"Charts"}},
 		{"spinner", []string{"Feedback"}},
 		{"sheet", []string{"Dialogs"}},
@@ -139,6 +140,24 @@ func TestCtrlFFocusesComponentsFilter(t *testing.T) {
 	if !s.SectionField.Focused() {
 		t.Error("Ctrl+F did not focus the filter of the Components page")
 	}
+}
+
+// The filter is a clearable field: its clear button shows while it has a query,
+// and clearing it shows every section and keeps the focus in the field.
+func TestComponentsFilterClears(t *testing.T) {
+	r := newDemoRig(t)
+	showComponents(r)
+	r.s.SectionQuery.Set("stepper")
+	clear := accesstest.Find(t, r.tree(), access.RoleButton, "Clear")
+	r.bridge.Perform(clear.ID, access.ActionClick)
+	r.frame()
+	if q := r.s.SectionQuery.Get(); q != "" {
+		t.Fatalf("the clear button left the query %q", q)
+	}
+	if !r.s.SectionField.Focused() {
+		t.Error("the clear button did not leave the focus in the filter")
+	}
+	accesstest.Find(t, r.tree(), access.RoleHeading, "Notification area and taskbar")
 }
 
 // Ctrl+F in the code editor opens the editor's find bar, and Ctrl+F in that bar

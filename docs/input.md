@@ -210,6 +210,8 @@ binding or handler for Escape takes it first; the notes palette binds Escape
 to close itself and return focus to the note. While an overlay or tooltip
 would take Escape, the field's built-in Cancel (which blurs a text field) does
 not run, so one Escape closes an overlay even when its text field has focus.
+The Cancel of a `Clearable` text input clears its text while it has text, and
+the next Escape blurs it.
 With nothing open, Escape does what it did before. An overlay without
 `OnClickOutside` is not closed by Escape. Holding Escape closes one overlay:
 the auto-repeats of the press that closed it are ignored, so they neither close

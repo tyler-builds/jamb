@@ -392,7 +392,8 @@ func (dividerElement) expand(ctx *Context) Element {
 // content before and after the text: the icon (see Icon) and the element of
 // Leading, and the element of Trailing. A number input has no placeholder, icon
 // or element, so Placeholder, Leading and Trailing do not apply to it. Button is
-// each button that a TextInput puts in its Trailing part (see Revealable), and
+// each button that a TextInput puts in its Trailing part (see Clearable and
+// Revealable), and
 // ButtonHover such a button while the pointer is over it; a TextArea has none. The
 // caret is drawn in the text color, and its width and blink follow the system
 // settings.
@@ -408,7 +409,7 @@ type FieldStyle struct {
 	Selection        Style // the background of the selected text
 	Leading          Style // the container of the icon and the Leading element, before the text
 	Trailing         Style // the container of the Trailing element, after the text
-	Button           Style // each button of a TextInput in the Trailing part: the reveal button
+	Button           Style // each button of a TextInput in the Trailing part: the clear and reveal buttons
 	ButtonHover      Style // such a button while the pointer is over it (paint only)
 }
 
@@ -555,6 +556,7 @@ type fieldOptions struct {
 	readOnly    bool              // see ReadOnly
 	masked      bool              // see TextInputElement.Masked
 	revealable  bool              // see TextInputElement.Revealable
+	clearable   bool              // see TextInputElement.Clearable
 	tooltip     string            // shown over the frame; the field's description when it has none
 	disabled    bool              // see Disabled
 	styles      FieldStyle        // the instance's parts: from Styles, and the frame's Style
@@ -657,6 +659,16 @@ func (ti *TextInputElement) Masked() *TextInputElement { ti.masked = true; retur
 // field. The button is drawn in the Button part, inside the Trailing part and
 // before the Trailing element. Without Masked, Revealable does nothing.
 func (ti *TextInputElement) Revealable() *TextInputElement { ti.revealable = true; return ti }
+
+// Clearable adds a small X button after the text while the field has text. A
+// click on it clears the text, runs OnChange with "", and leaves the focus in the
+// field. Escape clears the text too, when the field has text; with the field
+// empty, Escape does what it does in any field (it leaves the field, or closes the
+// modal). The button is not a Tab stop, and assistive technology reads it as a
+// button named Strings.Clear. A read-only or disabled field shows no button. The
+// button is drawn in the Button part, inside the Trailing part: the clear button,
+// then the reveal button (see Revealable), then the Trailing element.
+func (ti *TextInputElement) Clearable() *TextInputElement { ti.clearable = true; return ti }
 
 // OnPasteImage runs fn with the image on the clipboard when the user pastes
 // (Ctrl+V or the Paste action) and the clipboard holds an image but no text,
@@ -984,7 +996,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
 		readOnly: f.readOnly, disabled: f.disabled, onPasteImage: f.onPasteImg,
-		password: f.masked, revealed: revealed,
+		password: f.masked, revealed: revealed, clearable: f.clearable,
 	}
 	if multiline && minRows > 0 {
 		size := t.FontSize
@@ -1031,8 +1043,20 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		box.Child(lead)
 	}
 	box.Child(ed)
-	// The field's own buttons come before the Trailing element, in the Trailing part.
+	// The field's own buttons come before the Trailing element, in the Trailing part:
+	// the clear button, then the reveal button.
 	var buttons []Element
+	if f.clearable && !f.disabled && !f.readOnly && f.value.Peek() != "" {
+		buttons = append(buttons, f.button(st, icons.X, ctx.Strings().Clear, func() {
+			if f.value.Peek() != "" {
+				f.value.Set("")
+				if onChange != nil {
+					onChange("")
+				}
+			}
+			h.Focus()
+		}))
+	}
 	if revealable {
 		strs := ctx.Strings()
 		name, ic := strs.ShowPassword, icons.Eye

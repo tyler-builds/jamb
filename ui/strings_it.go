@@ -59,6 +59,7 @@ func italianStrings() *Strings {
 		Decrease:                  "Diminuisci",
 		ShowPassword:              "Mostra password",
 		HidePassword:              "Nascondi password",
+		Clear:                     "Cancella",
 
 		PanelGroup:      "Pannelli",
 		MovePanelLeft:   "Sposta a sinistra",

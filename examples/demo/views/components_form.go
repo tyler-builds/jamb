@@ -51,6 +51,7 @@ func formControlsSection() ui.Element {
 		token := ui.Local(ctx, "form.token", "jmb_live_7f3a9c21")
 		lockedNote := ui.Local(ctx, "form.lockedNote", "Archived project")
 		secret := ui.Local(ctx, "form.secret", "")
+		draft := ui.Local(ctx, "form.draft", "Quarterly report")
 		prefs.OnSubmit(func() error {
 			saved.Set("Preferences saved: sends by " + channelsOf(email.Peek(), text.Peek(), push.Peek()) +
 				fmt.Sprintf(", quiet from %02d:00 to %02d:00.", fromHour.Peek(), toHour.Peek()))
@@ -95,6 +96,8 @@ func formControlsSection() ui.Element {
 			formSample(t, "Number input, disabled", ui.NumberInput(quiet, 0, 23, 1).Label("Sample quiet hours, disabled").Disabled(true), fmt.Sprintf("%02d:00", quiet.Get())),
 			formSample(t, "Text input, masked", ui.TextInput(secret).Label("Sample password").Masked().Revealable().Width(ui.Px(200)),
 				fmt.Sprintf("%d characters", len([]rune(secret.Get())))),
+			formSample(t, "Text input, clearable", ui.TextInput(draft).Label("Sample title").Clearable().Width(ui.Px(200)),
+				"Escape or the X clears it"),
 			formSample(t, "Text input, read-only", ui.TextInput(token).Label("Access token").ReadOnly(true).Width(ui.Px(200)), "select and copy it"),
 			formSample(t, "Text input, disabled", ui.TextInput(lockedNote).Label("Project name, disabled").Disabled(true).Width(ui.Px(200)), lockedNote.Get()),
 		}

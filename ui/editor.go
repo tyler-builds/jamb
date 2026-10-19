@@ -139,6 +139,8 @@ type editorElement struct {
 	// revealed is set too, the text is drawn, and read, as a bullet for each
 	// character (see hidden).
 	password, revealed bool
+	// clearable is set on a field that Escape clears (see TextInputElement.Clearable).
+	clearable bool
 }
 
 // hidden reports whether the editor draws its text as bullets (see maskedText).

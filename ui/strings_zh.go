@@ -64,6 +64,7 @@ func chineseMainlandStrings() *Strings {
 		Decrease:            "减少",
 		ShowPassword:        "显示密码",
 		HidePassword:        "隐藏密码",
+		Clear:               "清除",
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移动",
@@ -167,6 +168,7 @@ func chineseTaiwanStrings() *Strings {
 		Decrease:            "減少",
 		ShowPassword:        "顯示密碼",
 		HidePassword:        "隱藏密碼",
+		Clear:               "清除",
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移動",
@@ -270,6 +272,7 @@ func chineseHongKongStrings() *Strings {
 		Decrease:            "減少",
 		ShowPassword:        "顯示密碼",
 		HidePassword:        "隱藏密碼",
+		Clear:               "清除",
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移動",

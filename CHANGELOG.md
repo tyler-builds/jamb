@@ -110,6 +110,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   the keyboard), a toggle button named by `Strings.ShowPassword` and `HidePassword` that leaves the
   focus in the field. Its look is the new `Button` and `ButtonHover` parts of `ui.FieldStyle`, and
   `icons.EyeOff` is new.
+- `TextInput.Clearable()` shows an X button while the field has text: a click clears the text,
+  runs `OnChange` and leaves the focus in the field, and Escape clears a field that has text
+  before it does anything else. The button is named by `Strings.Clear`, and the demo's
+  Components filter uses it in place of its own button.
 
 ### Changed
 
