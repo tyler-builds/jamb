@@ -38,6 +38,7 @@ func TestMatchingSections(t *testing.T) {
 		{"chart", []string{"Charts"}},
 		{"spinner", []string{"Feedback"}},
 		{"sheet", []string{"Dialogs"}},
+		{"command palette", []string{"Dialogs"}},
 		{"motion", []string{"Motion"}},
 		{"zzz", nil},
 		{"stepper zzz", nil},

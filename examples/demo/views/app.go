@@ -33,6 +33,7 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 					s.SectionField.Focus()
 				}
 			}).
+			OnAction(ShowPalette, func() { s.PaletteOpen.Set(true) }).
 			OnAction(ToggleTheme, func() {
 				if ctx.Theme().Dark {
 					ctx.SetTheme(DemoLightTheme)
@@ -48,6 +49,9 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			Child(newProjectModal(s)).
 			Child(sampleModal(s)).
 			Child(sampleDrawer(s)).
+			// The command palette lists the actions available where focus is: the
+			// shortcuts above, and those of the focused element.
+			Child(ui.CommandPalette(s.PaletteOpen)).
 			// Last of all, so the toasts sit above the modals. One Toaster shows every toast.
 			Child(ui.Toaster().Key("toaster"))
 	}

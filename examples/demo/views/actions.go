@@ -16,6 +16,9 @@ var (
 	// FilterComponents focuses the filter of the Components page. It does
 	// nothing on the other pages.
 	FilterComponents = ui.NewAction("components.filter", "Filter components")
+	// ShowPalette opens the command palette. It is hidden, so the palette does not
+	// list itself.
+	ShowPalette = ui.NewAction("palette.show", "Command palette").Hide()
 )
 
 // Bindings returns the main window's key bindings for app.Window.Bindings.
@@ -30,6 +33,7 @@ func Bindings() []ui.Binding {
 		ui.Bind("ctrl+k", FocusSearch),
 		ui.Bind("ctrl+shift+l", ToggleTheme),
 		ui.Bind("ctrl+f", FilterComponents),
+		ui.Bind("ctrl+shift+p", ShowPalette),
 		// The code editor's own Ctrl+F (find) wins on its text, which is in a
 		// deeper key context; in its find bar, which is outside that context,
 		// Ctrl+F does nothing rather than leave the editor for the filter.
@@ -41,7 +45,7 @@ func Bindings() []ui.Binding {
 // they show there. The window's own list (AvailableActions) is not used: it
 // only sees the actions on the focus path, which a page does not have while
 // it renders.
-var shortcutActions = []*ui.Action{GoDashboard, GoProjects, GoActivity, GoComponents, GoSettings, GoMarkdown, FocusSearch, FilterComponents, ToggleTheme}
+var shortcutActions = []*ui.Action{GoDashboard, GoProjects, GoActivity, GoComponents, GoSettings, GoMarkdown, FocusSearch, FilterComponents, ToggleTheme, ShowPalette}
 
 // tip is label with the keys of a, for a tooltip: "Projects (Ctrl+2)". It is
 // just the label when a has no binding.

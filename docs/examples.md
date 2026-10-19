@@ -101,7 +101,8 @@ On the Projects page:
   without adding a project.
 - The Components page's **Dialogs** section opens each native dialog and shows
   what it returned, by file name only, never by folder. Its Clipboard buttons
-  copy and paste plain text, and **Form in a modal** opens a modal form.
+  copy and paste plain text, **Form in a modal** opens a modal form, and **Open
+  command palette** opens the command palette.
 
 ![The Dialogs section of the Components page](screenshots/components-dialogs.png)
 
@@ -114,7 +115,9 @@ On the Projects page:
 - Keyboard: Ctrl+1 to Ctrl+6 open the Dashboard, Projects, Activity, Components,
   Settings and Markdown pages, Ctrl+K moves focus to the search field, Ctrl+F
   to the Components page's filter (the code editor keeps Ctrl+F for its find
-  bar), and Ctrl+Shift+L toggles the theme.
+  bar), Ctrl+Shift+L toggles the theme, and Ctrl+Shift+P opens a command palette
+  (`ui.CommandPalette`) that lists the actions available where focus is: type to
+  filter, Up/Down to choose, Enter runs, Escape closes.
 
 ## The notes app
 
