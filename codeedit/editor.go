@@ -370,6 +370,7 @@ func (vs *viewState) attachDoc(doc *Document) {
 			}
 		}),
 		doc.OnEdit(func(c Change) { vs.wc.edit(doc, c) }),
+		doc.onRedraw(vs.touch),
 	}
 	vs.wc = wrapCache{}
 	vs.dragging = false

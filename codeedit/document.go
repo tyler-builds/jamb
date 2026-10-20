@@ -55,6 +55,13 @@ type Document struct {
 	listeners []listener
 	nextID    int
 	edits     []editHook
+
+	// diags are the diagnostics, sorted by start (see SetDiagnostics); diagSet is whether any
+	// were ever set, which gives the editors a column of markers. redraws are the editors that
+	// draw them, told when they change, which is not a change of the version.
+	diags   []Diagnostic
+	diagSet bool
+	redraws []listener
 }
 
 // A Selection is a range of the text with a caret. Anchor is where the selection
@@ -143,7 +150,7 @@ func (d *Document) load(s string) {
 
 // SetText replaces the text and the selections, and clears the undo history, as
 // when a file is loaded. The caret goes to the beginning of the text, and the
-// folds are removed. It is not an undo step.
+// folds and the diagnostics are removed. It is not an undo step.
 func (d *Document) SetText(s string) {
 	old := d.Text()
 	d.load(s)
@@ -153,7 +160,7 @@ func (d *Document) SetText(s string) {
 			h.fn(Change{From: from, To: to, Text: text})
 		}
 	}
-	d.sels, d.primary, d.folds = []Selection{{}}, 0, nil
+	d.sels, d.primary, d.folds, d.diags = []Selection{{}}, 0, nil, nil
 	d.undo, d.redo, d.last = nil, nil, stepOther
 	d.textVer++
 	d.changed()
@@ -384,6 +391,7 @@ func (d *Document) apply(k stepKind, changes []Change, post *selectionPost) erro
 	}
 	d.sels, d.primary = d.normalize(sels, primary)
 	d.folds = mapFolds(d.folds, changes)
+	d.diags = mapDiagnostics(d.diags, changes)
 	d.clampFolds()
 	d.textVer++
 	d.changed()
@@ -489,6 +497,7 @@ func (d *Document) restore(st state, other *[]state) {
 		for _, h := range slices.Clone(d.edits) {
 			h.fn(c)
 		}
+		d.diags = mapDiagnostics(d.diags, []Change{c})
 	}
 	d.sels, d.primary, d.folds = st.sels, st.primary, st.folds
 	d.last = stepOther
