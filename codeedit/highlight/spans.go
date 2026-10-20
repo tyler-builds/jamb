@@ -1,6 +1,6 @@
 package highlight
 
-import "strings"
+import "github.com/tyler-builds/jamb/internal/syntaxname"
 
 // shift returns the spans moved by the edit e. A span that lies inside the
 // replaced range vanishes. A span that starts or ends inside it is cut at the
@@ -36,18 +36,10 @@ func moved(p int, e EditRecord, delta int) int {
 // Closest finds the style for a capture name in a theme's syntax map. It tries
 // the name itself, then the name with its last dotted part removed, and so on,
 // so "function.method.builtin" falls back to "function.method" and then to
-// "function". It returns the key it matched, and false when no key matches.
+// "function". When none is in the map, it tries the same for the few names that
+// Zed's themes do not style, such as "selector.class" for CSS, with the name
+// whose style they take instead ("property"). It returns the key it matched, and
+// false when no key matches.
 func Closest[V any](styles map[string]V, capture string) (string, V, bool) {
-	for name := capture; name != ""; {
-		if v, ok := styles[name]; ok {
-			return name, v, true
-		}
-		i := strings.LastIndexByte(name, '.')
-		if i < 0 {
-			break
-		}
-		name = name[:i]
-	}
-	var zero V
-	return "", zero, false
+	return syntaxname.Closest(styles, capture)
 }

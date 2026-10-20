@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tyler-builds/jamb-grammars/golang"
 	"github.com/tyler-builds/jamb/codeedit/highlight"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -14,10 +13,10 @@ import (
 // closed when the editor's component is removed from the tree, and that the editor drops it.
 func TestRemovingTheEditorClosesItsSession(t *testing.T) {
 	if testing.Short() {
-		t.Skip("compiles the Go grammar")
+		t.Skip("compiles the highlighter's module")
 	}
 	doc := NewDocument("package main\n")
-	ed := Editor(doc).Language(golang.Grammar)
+	ed := Editor(doc).Language("go")
 	shown := ui.NewSignal(true)
 	root := func(ctx *ui.Context) ui.Element {
 		if !shown.Get() {

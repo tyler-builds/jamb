@@ -2,62 +2,102 @@ package mdcode
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
-
-	"github.com/tyler-builds/jamb-grammars/golang"
 
 	"github.com/tyler-builds/jamb/markdown"
 	"github.com/tyler-builds/jamb/ui"
 	"github.com/tyler-builds/jamb/ui/uitest"
 )
 
+// TestMain keeps the compiled-module cache of the highlighter in a temporary
+// directory, so that the tests do not write to the user's cache.
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "jamb-mdcode-test-cache")
+	if err != nil {
+		panic(err)
+	}
+	for _, k := range []string{"LOCALAPPDATA", "XDG_CACHE_HOME", "HOME"} {
+		os.Setenv(k, dir)
+	}
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
+}
+
 const goCode = "package main\n\nfunc main() {\n\treturn\n}"
 
-// The first request queues the block; once ready is called, the block's ranges are
-// there, with "func" a keyword. An alias of the language finds the same grammar.
+// A Go block has its ranges at once, with "func" a keyword, and an alias of the
+// language, in another case, finds the same language.
 func TestHighlightAGoFence(t *testing.T) {
-	h := Highlight(golang.Grammar)
-	done := make(chan struct{}, 1)
-	if _, ok := h.HighlightCode(context.Background(), "golang", goCode, func() { done <- struct{}{} }); ok {
-		t.Fatal("the first request returned ranges at once")
-	}
-	select {
-	case <-done:
-	case <-time.After(30 * time.Second):
-		t.Fatal("ready was not called")
-	}
-	spans, ok := h.HighlightCode(context.Background(), "Go", goCode, func() { t.Error("ready called for a block that is done") })
-	if !ok {
-		t.Fatal("no ranges after ready")
-	}
-	at := strings.Index(goCode, "func")
-	keyword := false
-	for _, sp := range spans {
-		if sp.Start == at && sp.End == at+4 && strings.HasPrefix(sp.Capture, "keyword") {
-			keyword = true
+	h := Highlight()
+	for _, lang := range []string{"go", "golang", "Go"} {
+		spans, ok := h.HighlightCode(context.Background(), lang, goCode, func() { t.Error("ready called") })
+		if !ok {
+			t.Fatalf("%s: no ranges", lang)
 		}
-		if sp.Start < 0 || sp.End > len(goCode) || sp.Start > sp.End {
-			t.Errorf("span %+v is outside the code", sp)
+		at := strings.Index(goCode, "func")
+		keyword := false
+		for _, sp := range spans {
+			if sp.Start == at && sp.End == at+4 && strings.HasPrefix(sp.Capture, "keyword") {
+				keyword = true
+			}
+			if sp.Start < 0 || sp.End > len(goCode) || sp.Start >= sp.End {
+				t.Errorf("span %+v is outside the code", sp)
+			}
 		}
-	}
-	if !keyword {
-		t.Errorf("no keyword span over func in %+v", spans)
+		if !keyword {
+			t.Errorf("%s: no keyword span over func in %+v", lang, spans)
+		}
 	}
 }
 
-// A language without a grammar is plain, and nothing is queued for it.
+// Other languages work without setup.
+func TestEveryLanguageWithoutSetup(t *testing.T) {
+	h := Highlight()
+	for lang, code := range map[string]string{
+		"rust": "fn main() { let x = 1; }", "python3": "def f(): pass", "ts": "const x: number = 1",
+		"yaml": "a: 1", "sh": "echo hi # c", "zig": "const x = 1;", "c#": "class A {}",
+	} {
+		if spans, ok := h.HighlightCode(context.Background(), lang, code, nil); !ok || len(spans) == 0 {
+			t.Errorf("%s: ok %v, %d ranges", lang, ok, len(spans))
+		}
+	}
+}
+
+// A block without a fence, or in a language that the highlighter does not know, is
+// plain, and nothing is kept for it.
 func TestUnknownLanguageStaysPlain(t *testing.T) {
-	h := Highlight(golang.Grammar)
-	for _, lang := range []string{"", "rust", "text"} {
-		if _, ok := h.HighlightCode(context.Background(), lang, "fn main() {}", func() { t.Errorf("ready called for %q", lang) }); ok {
+	h := Highlight()
+	for _, lang := range []string{"", " ", "klingon"} {
+		if _, ok := h.HighlightCode(context.Background(), lang, "fn main() {}", nil); ok {
 			t.Errorf("%q has ranges", lang)
 		}
 	}
 	if len(h.cache) != 0 {
-		t.Errorf("%d blocks were queued", len(h.cache))
+		t.Errorf("%d blocks were kept", len(h.cache))
+	}
+}
+
+// A block is lexed once, and the oldest blocks are dropped past maxCached.
+func TestCache(t *testing.T) {
+	h := Highlight()
+	h.HighlightCode(context.Background(), "go", goCode, nil)
+	h.HighlightCode(context.Background(), "go", goCode, nil)
+	if h.lexed != 1 {
+		t.Fatalf("one block was lexed %d times", h.lexed)
+	}
+	for i := range maxCached + 10 {
+		h.HighlightCode(context.Background(), "go", fmt.Sprintf("var x = %d", i), nil)
+	}
+	if len(h.cache) != maxCached || len(h.order) != maxCached {
+		t.Fatalf("the cache holds %d blocks (%d in order), want %d", len(h.cache), len(h.order), maxCached)
+	}
+	if _, ok := h.cache["go\x00"+goCode]; ok {
+		t.Fatal("the oldest block was not dropped")
 	}
 }
 
@@ -75,10 +115,9 @@ func (c *counting) HighlightCode(ctx context.Context, lang, code string, ready f
 	return spans, ok
 }
 
-// A view with the highlighter renders again when the block's colors are ready, and
-// colors it then.
-func TestViewColorsTheBlockWhenReady(t *testing.T) {
-	c := &counting{h: Highlight(golang.Grammar)}
+// A view with the highlighter colors its block.
+func TestViewColorsTheBlock(t *testing.T) {
+	c := &counting{h: Highlight()}
 	u := uitest.New(t, func(ctx *ui.Context) ui.Element {
 		return markdown.View("```go\n" + goCode + "\n```\n").Code(c)
 	})

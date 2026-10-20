@@ -7,12 +7,13 @@ import (
 
 	"github.com/yuin/goldmark/text"
 
+	"github.com/tyler-builds/jamb/internal/syntaxname"
 	"github.com/tyler-builds/jamb/ui"
 )
 
 // CodeHighlighter colors the code blocks of a view (see ViewElement.Code). The mdcode
-// package provides one built on the tree-sitter grammars of jamb's code editor; an app
-// can write its own.
+// package provides one built on the highlighter of jamb's code editor; an app can
+// write its own.
 type CodeHighlighter interface {
 	// HighlightCode returns the colored ranges of code, which is written in the
 	// language lang: the first word of the code block's fence, as it is written, such
@@ -29,7 +30,7 @@ type CodeHighlighter interface {
 }
 
 // CodeSpan is a range of code, [Start, End) in bytes, and its syntax capture: a
-// tree-sitter capture name, such as "keyword" or "string.escape". The view colors it
+// token name, as in Zed's themes, such as "keyword" or "string.escape". The view colors it
 // with the theme's Syntax style for the name, or for the name without its last dotted
 // parts when the theme has no style for it, as the code editor does. A span later in
 // the list wins over an earlier one where they overlap.
@@ -139,17 +140,8 @@ func (s *codeScope) done() {
 
 // closestSyntax returns the theme's style for a capture name: the name's own, or else
 // that of the name without its last dotted part, and so on, so "function.method"
-// falls back to "function".
+// falls back to "function" (see syntaxname.Closest).
 func closestSyntax(syntax map[string]ui.SyntaxStyle, capture string) (ui.SyntaxStyle, bool) {
-	for name := capture; name != ""; {
-		if st, ok := syntax[name]; ok {
-			return st, true
-		}
-		i := strings.LastIndexByte(name, '.')
-		if i < 0 {
-			break
-		}
-		name = name[:i]
-	}
-	return ui.SyntaxStyle{}, false
+	_, st, ok := syntaxname.Closest(syntax, capture)
+	return st, ok
 }

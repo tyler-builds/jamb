@@ -1,46 +1,47 @@
-// Package highlight colors the text of a code editor with tree-sitter.
+// Package highlight colors the text of a code editor with @pierre/highlights, a
+// syntax highlighter of the Pierre Computer Company with a lexer for each of 76
+// languages, which runs in WebAssembly (see codeedit/internal/lexer). Languages
+// are named as code fences name them, such as "go", "python" or "ts"; Languages
+// lists the names.
 //
 // A Session holds one open document. The typing thread calls Edit for every
 // change and SetViewport when the visible range moves. Edit returns at once: it
 // shifts the spans it has, so colors stay in place, and queues the change for a
-// background worker. The worker owns the document's WebAssembly instance (see
-// codeedit/internal/treesitter). It applies every queued change, reparses once,
-// computes the spans of the visible range, and publishes them. Spans reports
-// the latest published spans, and Options.Notify tells the editor when new ones
-// arrive, so it can request a frame.
+// background worker. The worker owns the document's WebAssembly instance. It
+// applies every queued change, relexes the changed lines and the lines after them
+// that the change affects, up to the end of the visible range, and publishes the
+// spans of that range; it relexes the rest of the document afterwards, a slice at
+// a time. Spans reports the latest published spans, and Options.Notify tells the
+// editor when new ones arrive, so it can request a frame.
 //
-// Grammars come from the packages of github.com/tyler-builds/jamb-grammars.
-// Each one embeds its module and highlight query.
+// Highlight colors a text that is not edited, such as a code block, in one call.
 package highlight
 
 import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	"github.com/tyler-builds/jamb/codeedit/internal/treesitter"
+	"github.com/tyler-builds/jamb/codeedit/internal/lexer"
 )
 
 // DefaultMaxBytes is the largest document a Session highlights when
-// Options.MaxBytes is zero.
-const DefaultMaxBytes = 5 << 20
+// Options.MaxBytes is zero. The lexer's copy of a document takes about five
+// times its size in memory.
+const DefaultMaxBytes = 16 << 20
 
 // margin is how far beyond the visible range the worker computes spans, in
 // bytes, so that a short scroll shows colors at once.
 const margin = 4096
 
-// refreshDelay is how long the text must be idle before the worker replaces an
-// incremental tree that has syntax errors with a fresh parse. A fresh parse of a
-// large file takes about a second, so it waits for a pause in typing.
-const refreshDelay = 250 * time.Millisecond
-
-// refreshLimit is the largest document whose tree is refreshed. A fresh parse
-// takes about half a millisecond per kilobyte, so above this size it would hold
-// up the colors of the next edits for too long, and the incremental tree is kept.
-const refreshLimit = 256 << 10
+// sliceLines is how many lines the worker relexes in one step of the work it
+// does after publishing, outside the visible range: about a millisecond, so a
+// new edit or Close waits no longer than that.
+const sliceLines = 2048
 
 // ErrTooLarge is returned by NewSession for a document over the size limit. The
 // editor then shows the document without highlighting.
@@ -49,45 +50,59 @@ var ErrTooLarge = errors.New("highlight: document is larger than the highlightin
 // ErrClosed is returned by Edit and SetViewport after Close.
 var ErrClosed = errors.New("highlight: session is closed")
 
-// ABI is the version of the interface between the editor and a grammar's module:
-// the functions that the module's shim exports, and the host function it imports.
-// A grammar reports the version it was built with, and NewSession refuses another.
-const ABI = 1
+// ErrUnknownLanguage is returned, wrapped with the name, by NewSession and
+// Highlight for a language that the highlighter does not know.
+var ErrUnknownLanguage = errors.New("highlight: unknown language")
 
-// Grammar is a tree-sitter grammar compiled for the editor: a WebAssembly module
-// with the tree-sitter runtime, the grammar and the shim, and the highlight query
-// for that grammar. The packages of github.com/tyler-builds/jamb-grammars provide
-// them, such as golang.Grammar, and NewGrammar makes one from a module of your
-// own. Grammars are compared by identity, so an implementation should be a pointer.
-// Methods may be added to Grammar in later versions.
-type Grammar interface {
-	Name() string  // a short name for diagnostics, such as "go"
-	Wasm() []byte  // the module
-	Query() []byte // the highlight query, with inherited queries already merged
-	ABI() int      // the interface version the module was built with (see ABI)
+// extraAliases are names that code fences use for a language, in addition to the
+// highlighter's own names and aliases.
+var extraAliases = map[string]string{
+	"node": "javascript", "python3": "python", "console": "bash", "h++": "cpp", "xhtml": "html",
 }
 
-// NewGrammar returns the Grammar of a module built for this version of the
-// interface, such as one built with the build command of jamb-grammars.
-func NewGrammar(name string, wasm, query []byte) Grammar {
-	return &grammar{name: name, wasm: wasm, query: query}
+// languageID returns the lexer's ID for a language name, in any case.
+func languageID(lang string) (int, error) {
+	name := strings.ToLower(strings.TrimSpace(lang))
+	if alias, ok := extraAliases[name]; ok {
+		name = alias
+	}
+	if id, ok := lexer.LanguageID(name); ok {
+		return id, nil
+	}
+	return 0, fmt.Errorf("%w %q", ErrUnknownLanguage, lang)
 }
 
-// grammar is the Grammar that NewGrammar returns.
-type grammar struct {
-	name        string
-	wasm, query []byte
+// Languages returns the names that NewSession and Highlight accept, sorted: the
+// names of the languages and their aliases, in lower case, such as "go",
+// "golang", "python", "py", "typescript" and "ts". Names are matched in any case.
+// "plain" (or "text") highlights nothing.
+func Languages() []string {
+	names := lexer.LanguageNames()
+	for n := range extraAliases {
+		names = append(names, n)
+	}
+	slices.Sort(names)
+	return names
 }
 
-func (g *grammar) Name() string  { return g.name }
-func (g *grammar) Wasm() []byte  { return g.wasm }
-func (g *grammar) Query() []byte { return g.query }
-func (g *grammar) ABI() int      { return ABI }
+// Supported reports whether lang names a language that NewSession and Highlight
+// accept.
+func Supported(lang string) bool {
+	_, err := languageID(lang)
+	return err == nil
+}
+
+// CaptureNames returns the names of the tokens, indexed by Span.Capture: the
+// highlighter's token names, which are the syntax names of Zed's themes, such as
+// "keyword", "string.escape" or "function.method", with a few of its own, such as
+// "selector.class" for CSS. Map them to theme keys with Closest. Every language
+// uses the same names. The caller must not change the slice.
+func CaptureNames() []string { return lexer.TokenNames() }
 
 // Span is a highlighted byte range [Start, End) and the index of its capture
-// name in Session.CaptureNames. Spans may overlap, when several patterns capture
-// the same text. A span later in the slice takes precedence over an earlier
-// one that overlaps it.
+// name in CaptureNames. The spans of a session do not overlap; for
+// highlighters that make spans that do, a span later in the slice takes
+// precedence over an earlier one that overlaps it.
 type Span struct {
 	// Start and End are the byte offsets of the span.
 	Start, End int
@@ -121,8 +136,9 @@ type EditRecord struct {
 // Session highlights one document. Its methods are safe for concurrent use,
 // although Edit and SetViewport are meant for the typing thread.
 type Session struct {
-	inst   *treesitter.Instance // owned by the worker from NewSession on
-	names  []string
+	in     *lexer.Instance // owned by the worker from NewSession on
+	lines  []int           // owned by the worker: the byte offset of each line of its text
+	toks   []lexer.LineToken
 	notify func()
 	wake   chan struct{} // capacity one: a pending wake-up for the worker
 	quit   chan struct{}
@@ -137,30 +153,27 @@ type Session struct {
 	rev       uint64       // changes whenever spans does: at each accepted edit and each publish
 	spans     []Span       // the spans to paint; replaced, never modified in place
 	queue     []EditRecord // edits the worker has not applied yet; Text is owned here
-	first     bool         // the worker has not parsed the document yet
+	first     bool         // the worker has not published spans yet
 	view      [2]int       // the range the worker computes spans for, with margin
 	viewDirty bool         // view changed since the worker last computed spans
 	busy      bool         // the worker has taken a round whose result is not published yet
-	refresh   bool         // the last incremental parse left errors; a fresh parse follows once the text is idle
-	lastEdit  time.Time    // when Edit last accepted a change
-	timer     *time.Timer  // wakes the worker when a pending refresh becomes due
-	reparses  atomic.Int64 // the number of parses the worker has run
+	behind    bool         // lines outside the view wait to be relexed
+	rounds    atomic.Int64 // the number of rounds that applied edits
 }
 
 // workHook, when set, runs in the worker before each round. Tests use it to hold
 // the worker, so that they can check what the typing thread sees in between.
 var workHook func()
 
-// NewSession opens a document with the given grammar and starts its worker. The
-// worker parses the text and publishes the first spans in the background.
-// NewSession returns ErrTooLarge for a document over Options.MaxBytes, and an
-// error for a grammar built for another version of the interface (see ABI).
-func NewSession(lang Grammar, text []byte, opts Options) (*Session, error) {
-	if lang == nil {
-		return nil, errors.New("highlight: nil grammar")
-	}
-	if v := lang.ABI(); v != ABI {
-		return nil, fmt.Errorf("highlight: %s: the grammar was built for interface version %d, and this version of jamb supports version %d; use a release of jamb-grammars that matches", lang.Name(), v, ABI)
+// NewSession opens a document in the language lang, such as "go" (see
+// Languages), and starts its worker. The worker lexes the text and publishes the
+// first spans in the background. NewSession returns ErrTooLarge for a document
+// over Options.MaxBytes, and an error wrapping ErrUnknownLanguage for a language
+// it does not know.
+func NewSession(lang string, text []byte, opts Options) (*Session, error) {
+	id, err := languageID(lang)
+	if err != nil {
+		return nil, err
 	}
 	limit := opts.MaxBytes
 	if limit == 0 {
@@ -169,30 +182,17 @@ func NewSession(lang Grammar, text []byte, opts Options) (*Session, error) {
 	if limit > 0 && len(text) > limit {
 		return nil, ErrTooLarge
 	}
-	mod, err := treesitter.Compile(lang.Wasm())
+	in, err := lexer.New()
 	if err != nil {
-		return nil, fmt.Errorf("highlight: %s: %w", lang.Name(), err)
+		return nil, fmt.Errorf("highlight: %w", err)
 	}
-	inst, err := mod.Instantiate()
-	if err != nil {
-		return nil, fmt.Errorf("highlight: %s: %w", lang.Name(), err)
-	}
-	if err := inst.Init(text); err != nil {
-		inst.Close()
-		return nil, fmt.Errorf("highlight: %s: %w", lang.Name(), err)
-	}
-	if err := inst.SetQuery(lang.Query()); err != nil {
-		inst.Close()
-		return nil, fmt.Errorf("highlight: %s: %w", lang.Name(), err)
-	}
-	names, err := inst.CaptureNames()
-	if err != nil {
-		inst.Close()
-		return nil, fmt.Errorf("highlight: %s: %w", lang.Name(), err)
+	if err := in.Open(id, lexer.Sanitize(text)); err != nil {
+		in.Close()
+		return nil, fmt.Errorf("highlight: %w", err)
 	}
 	s := &Session{
-		inst:      inst,
-		names:     names,
+		in:        in,
+		lines:     lineStarts(text),
 		notify:    opts.Notify,
 		wake:      make(chan struct{}, 1),
 		quit:      make(chan struct{}),
@@ -202,16 +202,26 @@ func NewSession(lang Grammar, text []byte, opts Options) (*Session, error) {
 		view:      [2]int{0, min(len(text), margin)},
 		viewDirty: true,
 	}
-	s.timer = time.AfterFunc(refreshDelay, s.signal)
-	s.timer.Stop()
 	s.signal()
 	go s.run()
 	return s, nil
 }
 
+// lineStarts returns the byte offset of each line of text: 0, and each offset
+// after a line feed.
+func lineStarts(text []byte) []int {
+	starts := []int{0}
+	for i, c := range text {
+		if c == '\n' {
+			starts = append(starts, i+1)
+		}
+	}
+	return starts
+}
+
 // Edit applies a change to the document. It never waits for the worker: the
 // existing spans are shifted at once, and the change is queued for the worker,
-// which applies every queued change before one reparse. Edit returns an error,
+// which applies every queued change before it relexes. Edit returns an error,
 // without changing anything, when the range is not inside the document.
 func (s *Session) Edit(e EditRecord) error {
 	s.mu.Lock()
@@ -228,7 +238,6 @@ func (s *Session) Edit(e EditRecord) error {
 	e.Text = slices.Clone(e.Text)
 	s.version++
 	s.rev++
-	s.lastEdit = time.Now()
 	s.spans = shift(s.spans, e)
 	s.length += len(e.Text) - (e.OldEnd - e.Start)
 	s.queue = append(s.queue, e)
@@ -238,9 +247,7 @@ func (s *Session) Edit(e EditRecord) error {
 
 // SetViewport tells the session which bytes are visible, [lo, hi). The worker
 // computes spans for that range with a margin on each side. Until it publishes
-// them, Spans shows the old spans, shifted by the edits. The cost of a round
-// grows with the range, so pass the visible lines, not the whole document: spans
-// for half of a 2.5 MB Go file take about a second.
+// them, Spans shows the old spans, shifted by the edits.
 func (s *Session) SetViewport(lo, hi int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -281,10 +288,10 @@ func (s *Session) Synced() uint64 {
 	return s.synced
 }
 
-// CaptureNames returns the capture names of the language's query, indexed by
-// Span.Capture. Map them to theme keys with Closest.
+// CaptureNames returns the names that Span.Capture indexes, the same for every
+// session (see the package's CaptureNames). Map them to theme keys with Closest.
 func (s *Session) CaptureNames() []string {
-	return s.names
+	return lexer.TokenNames()
 }
 
 // Err returns the error that stopped highlighting, or nil. After an error the
@@ -296,8 +303,9 @@ func (s *Session) Err() error {
 }
 
 // Close stops the worker and releases the document's instance. It waits for the
-// worker to finish its current step, which takes a few milliseconds at most.
-// Calls after Close return ErrClosed. Close is safe to call more than once.
+// worker to finish its current step, which takes about a millisecond at most
+// once the first spans are published. Calls after Close return ErrClosed. Close
+// is safe to call more than once.
 func (s *Session) Close() error {
 	s.mu.Lock()
 	if s.closed {
@@ -305,7 +313,6 @@ func (s *Session) Close() error {
 		return nil
 	}
 	s.closed = true
-	s.timer.Stop()
 	close(s.quit)
 	s.mu.Unlock()
 	<-s.done
@@ -324,7 +331,7 @@ func (s *Session) signal() {
 // run is the worker goroutine. It owns the instance and closes it on exit.
 func (s *Session) run() {
 	defer close(s.done)
-	defer s.inst.Close()
+	defer s.in.Close()
 	for {
 		select {
 		case <-s.quit:
@@ -335,10 +342,11 @@ func (s *Session) run() {
 	}
 }
 
-// work applies the queued edits, reparses once if needed, computes the spans of
-// the viewport and publishes them. Edits that arrive during the work stay
-// queued, and they shift the published spans before the worker's result is
-// swapped in.
+// work applies the queued edits, relexes up to the end of the viewport and
+// publishes its spans. Edits that arrive during the work stay queued, and they
+// shift the published spans before the worker's result is swapped in. With
+// nothing new to do, it relexes a slice of the lines outside the viewport that
+// still wait.
 func (s *Session) work() {
 	if workHook != nil {
 		workHook()
@@ -350,28 +358,21 @@ func (s *Session) work() {
 	}
 	edits := s.queue
 	s.queue = nil
-	// A refresh waits until the text has been idle for refreshDelay, so that
-	// typing is not held up by a full parse.
-	refresh := false
-	if s.refresh && len(edits) == 0 {
-		if idle := time.Since(s.lastEdit); idle >= refreshDelay {
-			refresh = true
-		} else {
-			s.timer.Reset(refreshDelay - idle)
-		}
-	}
-	parse, full := len(edits) > 0 || s.first || refresh, s.first || refresh
-	dirty := s.viewDirty
+	dirty := s.viewDirty || s.first
 	s.viewDirty = false
 	view := s.view
-	if !parse && !dirty {
+	if len(edits) == 0 && !dirty {
+		behind := s.behind
 		s.mu.Unlock()
+		if behind {
+			s.catchUp()
+		}
 		return
 	}
 	s.busy = true
 	s.mu.Unlock()
 
-	err := s.compute(edits, parse, full, view)
+	err := s.compute(edits, view)
 
 	s.mu.Lock()
 	s.busy = false
@@ -382,8 +383,9 @@ func (s *Session) work() {
 	if err != nil {
 		s.err = err
 		s.spans = nil
-	} else if s.refresh {
-		s.signal() // arm the timer for the refresh in the next round
+		s.rev++
+	} else if s.behind {
+		s.signal() // relex the rest in the next rounds
 	}
 	s.mu.Unlock()
 	if s.notify != nil {
@@ -391,45 +393,64 @@ func (s *Session) work() {
 	}
 }
 
-// compute runs the instance's steps for one round and publishes the result. It
-// is called only from the worker.
-func (s *Session) compute(edits []EditRecord, parse, full bool, view [2]int) error {
-	for _, e := range edits {
-		if err := s.inst.Edit(e.Start, e.OldEnd, e.Text); err != nil {
-			return fmt.Errorf("highlight: apply edit: %w", err)
-		}
+// catchUp relexes a slice of the lines that wait, outside the viewport. It is
+// called only from the worker.
+func (s *Session) catchUp() {
+	err := s.in.RunLines(sliceLines)
+	var behind bool
+	if err == nil {
+		behind, _, err = s.in.Pending()
 	}
-	refresh := false
-	if parse {
-		if err := s.inst.Parse(full); err != nil {
-			return fmt.Errorf("highlight: parse: %w", err)
-		}
-		s.reparses.Add(1)
-		if !full {
-			// Incremental parsing can give a different tree from a fresh parse
-			// while the text has syntax errors. Such a tree is replaced by a
-			// fresh parse when the worker is idle.
-			hasErr, err := s.inst.TreeHasError()
-			if err != nil {
-				return fmt.Errorf("highlight: parse: %w", err)
-			}
-			refresh = hasErr
-		}
-	}
-	raw, err := s.inst.Spans(view[0], view[1], nil)
+	s.mu.Lock()
 	if err != nil {
-		return fmt.Errorf("highlight: spans: %w", err)
+		s.err = fmt.Errorf("highlight: %w", err)
+		s.spans = nil
+		s.rev++
+		s.mu.Unlock()
+		if s.notify != nil {
+			s.notify() // the editor paints the text without colors
+		}
+		return
 	}
-	spans := make([]Span, 0, len(raw)/3)
-	for i := 0; i+2 < len(raw); i += 3 {
-		spans = append(spans, Span{Start: int(raw[i]), End: int(raw[i+1]), Capture: int(raw[i+2])})
+	s.behind = behind
+	if behind {
+		s.signal()
+	}
+	s.mu.Unlock()
+}
+
+// compute applies edits, relexes to the end of the view, and publishes the
+// view's spans. It is called only from the worker.
+func (s *Session) compute(edits []EditRecord, view [2]int) error {
+	for _, e := range edits {
+		if e.Start == e.OldEnd && len(e.Text) == 0 {
+			continue
+		}
+		if err := s.apply(e); err != nil {
+			return err
+		}
+	}
+	if len(edits) > 0 {
+		s.rounds.Add(1)
+	}
+	first, last := s.lineOf(view[0]), s.lineOf(view[1])
+	if err := s.in.Run(last + 1); err != nil {
+		return fmt.Errorf("highlight: %w", err)
+	}
+	spans, err := s.lineSpans(first, last)
+	if err != nil {
+		return err
+	}
+	behind, _, err := s.in.Pending()
+	if err != nil {
+		return fmt.Errorf("highlight: %w", err)
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.err == nil {
 		s.first = false
-		s.refresh = refresh && s.length <= refreshLimit
+		s.behind = behind
 		// Spans are for the version the worker started with. Edits made since
 		// then are still in the queue, and they shift the spans into place.
 		for _, e := range s.queue {
@@ -441,3 +462,156 @@ func (s *Session) compute(edits []EditRecord, parse, full bool, view [2]int) err
 	}
 	return nil
 }
+
+// lineOf returns the line that holds byte offset off of the worker's text.
+func (s *Session) lineOf(off int) int {
+	return sort.Search(len(s.lines), func(i int) bool { return s.lines[i] > off }) - 1
+}
+
+// position returns the line of byte offset off and its column in UTF-16 units,
+// as the lexer counts them.
+func (s *Session) position(off int) (int, int, error) {
+	line := s.lineOf(off)
+	text, err := s.in.LineText(line)
+	if err != nil {
+		return 0, 0, fmt.Errorf("highlight: %w", err)
+	}
+	col := min(off-s.lines[line], len(text))
+	return line, lexer.UTF16Len(text[:col]), nil
+}
+
+// apply sends e to the instance and updates the line offsets. It is called only
+// from the worker.
+func (s *Session) apply(e EditRecord) error {
+	sl, sc, err := s.position(e.Start)
+	if err != nil {
+		return err
+	}
+	el, ec, err := s.position(e.OldEnd)
+	if err != nil {
+		return err
+	}
+	if err := s.in.Edit(sl, sc, el, ec, lexer.Sanitize(e.Text)); err != nil {
+		return fmt.Errorf("highlight: %w", err)
+	}
+	// The lines that start inside the old range go; those that start inside the
+	// new text come; the later ones move by the change in length.
+	delta := len(e.Text) - (e.OldEnd - e.Start)
+	lines := make([]int, 0, len(s.lines)+8)
+	lines = append(lines, s.lines[:sl+1]...)
+	for i, c := range e.Text {
+		if c == '\n' {
+			lines = append(lines, e.Start+i+1)
+		}
+	}
+	for _, start := range s.lines[el+1:] {
+		lines = append(lines, start+delta)
+	}
+	s.lines = lines
+	return nil
+}
+
+// lineSpans returns the spans of lines first to last. It is called only from the
+// worker.
+func (s *Session) lineSpans(first, last int) ([]Span, error) {
+	var spans []Span
+	for line := first; line <= last && line < len(s.lines); line++ {
+		var err error
+		if s.toks, err = s.in.LineTokens(line, s.toks[:0]); err != nil {
+			return nil, fmt.Errorf("highlight: %w", err)
+		}
+		if len(s.toks) == 0 {
+			continue
+		}
+		text, err := s.in.LineText(line)
+		if err != nil {
+			return nil, fmt.Errorf("highlight: %w", err)
+		}
+		base := s.lines[line]
+		start, units := 0, 0
+		for _, tk := range s.toks {
+			end := start + lexer.ByteOffset(text[start:], tk.End-units)
+			if lo, hi := trim(text, start, end); tk.ID != 0 && hi > lo {
+				spans = append(spans, Span{Start: base + lo, End: base + hi, Capture: tk.ID})
+			}
+			if tk.End > units {
+				units = tk.End
+			}
+			start = end
+		}
+	}
+	return spans, nil
+}
+
+// pool holds idle instances for Highlight.
+var pool struct {
+	sync.Mutex
+	idle []*lexer.Instance
+}
+
+// poolSize is how many idle instances Highlight keeps, and poolMemory the most
+// memory an instance may hold to be kept: one that grew for a large text is
+// closed.
+const (
+	poolSize   = 2
+	poolMemory = 4 << 20
+)
+
+// Highlight returns the spans of code in the language lang, such as "go" (see
+// Languages), lexed as a whole. It is for text that is not edited, such as the
+// code blocks of a Markdown view, and takes about 10 ms per megabyte. It returns
+// an error wrapping ErrUnknownLanguage for a language it does not know. It is safe
+// for concurrent use.
+func Highlight(lang string, code []byte) ([]Span, error) {
+	id, err := languageID(lang)
+	if err != nil {
+		return nil, err
+	}
+	pool.Lock()
+	var in *lexer.Instance
+	if n := len(pool.idle); n > 0 {
+		in, pool.idle = pool.idle[n-1], pool.idle[:n-1]
+	}
+	pool.Unlock()
+	if in == nil {
+		if in, err = lexer.New(); err != nil {
+			return nil, fmt.Errorf("highlight: %w", err)
+		}
+	}
+	toks, err := in.Lex(id, lexer.Sanitize(code), nil)
+	if err != nil {
+		in.Close() // its state is unknown
+		return nil, fmt.Errorf("highlight: %w", err)
+	}
+	pool.Lock()
+	if len(pool.idle) < poolSize && in.MemorySize() <= poolMemory {
+		pool.idle = append(pool.idle, in)
+		in = nil
+	}
+	pool.Unlock()
+	if in != nil {
+		in.Close()
+	}
+	spans := make([]Span, 0, len(toks))
+	for _, tk := range toks {
+		if lo, hi := trim(code, tk.Start, tk.End); hi > lo {
+			spans = append(spans, Span{Start: lo, End: hi, Capture: tk.ID})
+		}
+	}
+	return spans, nil
+}
+
+// trim returns the range [lo, hi) of text without its leading and trailing
+// spaces, tabs and line ends. The lexer gives the space between two tokens to the
+// first, so "package " is a keyword; the spans hold only the word.
+func trim(text []byte, lo, hi int) (int, int) {
+	for lo < hi && isSpace(text[lo]) {
+		lo++
+	}
+	for hi > lo && isSpace(text[hi-1]) {
+		hi--
+	}
+	return lo, hi
+}
+
+func isSpace(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' }

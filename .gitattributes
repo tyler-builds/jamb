@@ -1,3 +1,4 @@
 # Keep LF line endings in the repository and working tree on every platform.
 * text=auto eol=lf
 *.png binary
+*.wasm binary
