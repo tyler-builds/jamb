@@ -80,10 +80,66 @@ it has no velocity, and it ends at the animation's `Duration`, exactly at 1.
 ui.Div().Enter(ui.Grow(0.9), ui.Animation{Duration: 400 * time.Millisecond, Easing: ease.Spring(0.3)})
 ```
 
+## Keyframes (Play)
+
+`.Play(key, frames, a)` runs an element through keyframes: at each stop's `At`
+(0..1 of `a.Duration`) it has the look of the stop's `Motion`, and between stops
+it moves from one look to the next. `Motion.Opacity(o)` lets a stop rest at a
+partial opacity.
+
+```go
+ui.Div().Play("pulse", []ui.Keyframe{
+	{At: 0.5, Motion: ui.Grow(1.06).Opacity(0.8)},
+}, ui.Animation{Duration: 600 * time.Millisecond, Repeat: true})
+```
+
+- A missing stop at 0 or 1 is the element's normal look, so the pulse above
+  rises from the element as it is and returns to it.
+- `Keyframe.Easing` shapes the segment that arrives at that stop; nil uses
+  `a.Easing` (and nil there is ease-out cubic).
+- It plays when the element first appears and again whenever `key` changes
+  (`key` must be comparable, as a map key is). `Repeat` loops it.
+- It is paint-only, like `Enter`: it costs no layout, and an element that is not
+  drawn asks for no frames. The progress is time based, so an element drawn
+  again shows the progress of that moment, with no jump.
+- Keyframes animate opacity, offset and scale only; colors and shadows do not
+  take keyframes.
+
+## Sequences (Timeline)
+
+A `Timeline` arranges `Animation`s in time, and `ui.AnimateTimeline` re-renders
+a function with the progress of each of them, as `Animate` does with one:
+
+```go
+tl := ui.Sequence(
+	ui.Animation{Duration: 200 * time.Millisecond}, // p[0]
+	ui.Animation{Duration: 300 * time.Millisecond, Easing: ease.Spring(0.3)}, // p[1]
+).Then(ui.Parallel(
+	ui.Sequence(ui.Animation{Duration: 150 * time.Millisecond}), // p[2]
+	ui.Sequence(ui.Animation{Duration: 400 * time.Millisecond}), // p[3]
+))
+ui.AnimateTimeline("intro", tl, func(p []float32) ui.Element {
+	return ui.Div().Opacity(p[0]).Width(ui.Px(100 + 100*p[1]))
+})
+```
+
+- `Sequence(steps...)` runs the steps one after another; `Parallel(parts...)`
+  runs timelines together and lasts as long as the longest; `t.Then(next)` runs
+  `next` after `t`; `t.Repeat()` loops it when `AnimateTimeline` plays it (a
+  timeline made from it with `Then` or `Parallel` plays it once);
+  `t.Duration()` is how long it lasts.
+- `p[i]` is the eased progress of the i-th `Animation` given, in declaration
+  order, whatever the nesting: 0 before it starts and 1 once it has ended. Each
+  step's `Easing` shapes its own progress.
+- It is an `Animate` underneath, with the timeline's duration, so it pauses out
+  of view, restarts when its key changes and settles as `Animate` does.
+
 ## Cost
 
-`Opacity`, `Offset`, `Scale`, transitions, springs and enter and exit are paint-only,
-so they cost no layout. A property that changes the layout (`Width`,
+`Opacity`, `Offset`, `Scale`, transitions, springs, enter and exit and keyframes
+are paint-only, so they cost no layout. A timeline costs what `Animate` costs:
+a render of its function per frame, and a re-layout if what it changes is
+layout. A property that changes the layout (`Width`,
 `Padding`, ...) costs a re-layout of the path to the root on each frame of its
 animation. An exiting element leaves the layout at once, so its siblings move
 straight away. It is drawn above its former siblings while it exits. It is a
@@ -95,7 +151,7 @@ Showing it again during its exit drops the ghost.
 With Windows' Animation effects turned off (Settings, Accessibility, Visual
 effects), jamb asks for reduced motion (`ctx.ReducedMotion()`). Then `Transition`,
 `Enter` and `Exit` jump to their end, a spring jumps to its target and stops, and
-smooth scrolling jumps to its target. An
-`Animate` that is finite jumps to its last frame, and a repeating one stops at its
-first frame, so nothing asks for more frames. Apps should check `ctx.ReducedMotion()`
+smooth scrolling jumps to its target. An `Animate`, `Play` or `AnimateTimeline`
+that is finite jumps to its last frame (the last stop, every step at 1), and a
+repeating one stops at its first frame, so nothing asks for more frames. Apps should check `ctx.ReducedMotion()`
 before they run their own motion.

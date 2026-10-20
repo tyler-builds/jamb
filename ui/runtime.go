@@ -71,6 +71,10 @@ type nodeState struct {
 	// entrance or an exit began (zero when there is none).
 	shown            visual
 	enterAt, leaveAt time.Time
+	// playAt is when the keyframes of Play began (zero when there are none),
+	// and playKey is the key they began with.
+	playAt  time.Time
+	playKey any
 	// vel is the velocity of a spring's opacity, offset X and Y and scale,
 	// per second (see Runtime.spring).
 	vel [4]float32
@@ -1318,7 +1322,8 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		n.lay.Style.Hidden = e.noDisplay
 		n.ts = inh.inherit(&n.style)
 		if e.hover != nil || e.pressed != nil || e.focused != nil || e.focusWithin != nil || n.style.Transition > 0 ||
-			n.style.Spring.Duration > 0 || n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil {
+			n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil ||
+			n.style.Spring.Duration > 0 || e.play != nil {
 			n.st = rt.state(id)
 			if n.fresh {
 				// A new element forgets any exit its ID had, and enters now.
@@ -1326,6 +1331,13 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 				if e.enter != nil {
 					n.st.enterAt = rt.now()
 				}
+			}
+			// Keyframes play from the start when the element appears and when
+			// their key changes.
+			if e.play == nil {
+				n.st.playAt = time.Time{}
+			} else if n.fresh || n.st.playAt.IsZero() || n.st.playKey != e.play.key {
+				n.st.playAt, n.st.playKey = rt.now(), e.play.key
 			}
 		}
 		rt.setOverhang(n)
@@ -1514,11 +1526,11 @@ func (rt *Runtime) focusInside(id uint64) bool {
 const glyphOverhang = 2
 
 // inkOverhang returns how far a node's drawing can reach beyond its box on
-// each side, and how far it is scaled up beyond 1, from its style and its
-// entrance and exit motions. Offsets and motion slides move the drawing, so
+// each side, and how far it is scaled up beyond 1, from its style, its
+// entrance and exit motions and its keyframes. Offsets and motion slides move the drawing, so
 // they add to the reach. The values bound what paint draws, which is what
 // culling relies on.
-func inkOverhang(s *Style, enter, exit *motionSpec) (over, grow float32) {
+func inkOverhang(s *Style, enter, exit *motionSpec, play *playSpec) (over, grow float32) {
 	for _, sh := range s.Shadows {
 		// A blur of sigma Blur/2 is drawn out to about four sigmas.
 		reach := max(abs32(sh.X), abs32(sh.Y)) + 2*sh.Blur + max(sh.Spread, 0)
@@ -1532,6 +1544,15 @@ func inkOverhang(s *Style, enter, exit *motionSpec) (over, grow float32) {
 		}
 		over += abs32(sp.m.x) + abs32(sp.m.y)
 		grow = max(grow, growth(sp.m.scale))
+	}
+	if play != nil {
+		// Keyframes reach no further than their farthest stop.
+		var reach float32
+		for _, f := range play.frames {
+			reach = max(reach, abs32(f.Motion.x)+abs32(f.Motion.y))
+			grow = max(grow, growth(f.Motion.scale))
+		}
+		over += reach
 	}
 	return over, grow
 }
@@ -1554,10 +1575,11 @@ func growth(s float32) float32 {
 // widened by that much.
 func (rt *Runtime) setOverhang(n *node) bool {
 	var enter, exit *motionSpec
+	var play *playSpec
 	if n.div != nil {
-		enter, exit = n.div.enter, n.div.exit
+		enter, exit, play = n.div.enter, n.div.exit, n.div.play
 	}
-	over, grow := inkOverhang(&n.style, enter, exit)
+	over, grow := inkOverhang(&n.style, enter, exit, play)
 	if n.kind == kindText || n.kind == kindIcon {
 		over += glyphOverhang
 	}

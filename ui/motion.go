@@ -1,17 +1,21 @@
 package ui
 
 import (
+	"cmp"
+	"math"
 	"slices"
 	"time"
 )
 
-// Motion is a paint-only state an element enters from or exits to: an opacity,
-// an offset and a scale. Build one with Fade, Slide and Grow, and combine them
-// with the methods of the same names:
+// Motion is a paint-only state an element enters from or exits to, or passes
+// through in keyframes (see Play): an opacity, an offset and a scale. Build one
+// with Fade, Slide and Grow, and combine them with the methods of the same
+// names and Opacity:
 //
 //	ui.Fade().Slide(0, -6).Grow(0.98)
 type Motion struct {
-	fade  bool
+	fade  bool    // the opacity is set, to alpha
+	alpha float32 // the opacity when fade is set: 0 for Fade
 	x, y  float32
 	scale float32 // 0 = unset (1)
 }
@@ -27,7 +31,11 @@ func Slide(x, y float32) Motion { return Motion{}.Slide(x, y) }
 func Grow(s float32) Motion { return Motion{}.Grow(s) }
 
 // Fade also makes the motion start or end transparent.
-func (m Motion) Fade() Motion { m.fade = true; return m }
+func (m Motion) Fade() Motion { m.fade, m.alpha = true, 0; return m }
+
+// Opacity also gives the motion the opacity o, from 0 (transparent, as Fade)
+// to 1 (opaque), so a keyframe can stop at a partial opacity.
+func (m Motion) Opacity(o float32) Motion { m.fade, m.alpha = true, min(max(o, 0), 1); return m }
 
 // Slide also offsets the motion by (x, y).
 func (m Motion) Slide(x, y float32) Motion { m.x, m.y = x, y; return m }
@@ -40,7 +48,7 @@ func (m Motion) Grow(s float32) Motion { m.scale = s; return m }
 func (m Motion) pose(t float32) (opacity, x, y, scale float32) {
 	opacity = 1
 	if m.fade {
-		opacity = 0
+		opacity = m.alpha
 	}
 	s := m.scale
 	if s == 0 {
@@ -90,8 +98,108 @@ func (d *DivElement) Exit(m Motion, a Animation) *DivElement {
 	return d
 }
 
-// motion applies the entrance or exit of n to v. An entrance runs from the
-// Motion to the normal look; an exit runs from the normal look to the Motion.
+// Keyframe is one stop of keyframed motion (see Play): at progress At, from 0
+// (the start) to 1 (the end), the element has the look of Motion. Easing shapes
+// the segment that arrives at this stop; nil uses the Animation's easing.
+type Keyframe struct {
+	At     float32
+	Motion Motion
+	Easing func(t float32) float32
+}
+
+// playSpec is keyframed motion: the key it plays for, its stops in order of At
+// from a stop at 0 to one at 1, and its timing.
+type playSpec struct {
+	key    any
+	frames []Keyframe
+	a      Animation
+}
+
+// Play runs the element through keyframes over a: at each stop's At it has
+// the look of the stop's Motion, and between stops it moves from one look to
+// the next. A missing stop at 0 or at 1 is the element's normal look, so a
+// single stop at 0.5 rises from and returns to the element as it is. It plays
+// when the element first appears and again whenever key changes; key must be
+// comparable, as a map key is. With Repeat it loops for as long as it is drawn.
+//
+//	ui.Div().Play("pulse", []ui.Keyframe{{At: 0.5, Motion: ui.Grow(1.06).Opacity(0.8)}},
+//	    ui.Animation{Duration: 600 * time.Millisecond, Repeat: true})
+//
+// Like Enter, it is paint-only: it costs no layout, and an element that is not
+// drawn (scrolled or clipped out of view, or hidden by Display) asks for no
+// frames. The progress is time based, so when it is drawn again it shows the
+// progress of that moment.
+func (d *DivElement) Play(key any, frames []Keyframe, a Animation) *DivElement {
+	fs := make([]Keyframe, 0, len(frames)+2)
+	for _, f := range frames {
+		f.At = min(max(f.At, 0), 1)
+		fs = append(fs, f)
+	}
+	slices.SortStableFunc(fs, func(a, b Keyframe) int { return cmp.Compare(a.At, b.At) })
+	if len(fs) == 0 || fs[0].At > 0 {
+		fs = slices.Insert(fs, 0, Keyframe{})
+	}
+	if fs[len(fs)-1].At < 1 {
+		fs = append(fs, Keyframe{At: 1})
+	}
+	d.play = &playSpec{key: key, frames: fs, a: a}
+	return d
+}
+
+// pose returns the paint values of the keyframes at linear progress p: the
+// looks of the stops around p, mixed by the eased progress between them.
+func (sp *playSpec) pose(p float32) (opacity, x, y, scale float32) {
+	fs := sp.frames
+	i := 1
+	for i < len(fs)-1 && p > fs[i].At {
+		i++
+	}
+	from, to := &fs[i-1], &fs[i]
+	t := float32(1)
+	if span := to.At - from.At; span > 0 {
+		t = min(max((p-from.At)/span, 0), 1)
+	}
+	ease := to.Easing
+	if ease == nil {
+		ease = sp.a.easing()
+	}
+	e := ease(t)
+	o0, x0, y0, s0 := from.Motion.pose(0)
+	o1, x1, y1, s1 := to.Motion.pose(0)
+	return lerpF(o0, o1, e), lerpF(x0, x1, e), lerpF(y0, y1, e), lerpF(s0, s1, e)
+}
+
+// playProgress returns the linear progress of keyframes that began at from,
+// and asks for the next frame while they run. With reduced motion keyframes
+// that end show their end, and repeating ones hold their first frame.
+func (rt *Runtime) playProgress(sp *playSpec, now, from time.Time) float32 {
+	a := &sp.a
+	if rt.sys.ReducedMotion {
+		if a.looping() {
+			return 0
+		}
+		return 1
+	}
+	d := a.Duration
+	if d <= 0 {
+		return 1
+	}
+	p := float32(now.Sub(from).Seconds() / d.Seconds())
+	if a.looping() {
+		rt.looping = true
+		p = max(p, 0)
+		return p - float32(math.Floor(float64(p)))
+	}
+	if p >= 1 {
+		return 1
+	}
+	rt.animating = true
+	return max(p, 0)
+}
+
+// motion applies the entrance, exit and keyframes of n to v. An entrance runs
+// from the Motion to the normal look; an exit runs from the normal look to the
+// Motion.
 func (rt *Runtime) motion(n *node, v *visual) {
 	st := n.st
 	if n.div == nil || st == nil {
@@ -112,6 +220,13 @@ func (rt *Runtime) motion(n *node, v *visual) {
 		rt.animating = rt.animating || running
 		// The exit runs the pose backwards: eased progress 0 is the normal look.
 		op, x, y, sc := sp.m.pose(1 - sp.a.easing()(p))
+		v.opacity *= op
+		v.offX += x
+		v.offY += y
+		v.scale *= sc
+	}
+	if sp := n.div.play; sp != nil && !st.playAt.IsZero() {
+		op, x, y, sc := sp.pose(rt.playProgress(sp, now, st.playAt))
 		v.opacity *= op
 		v.offX += x
 		v.offY += y
