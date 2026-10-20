@@ -2,7 +2,6 @@ package ui
 
 import (
 	"slices"
-	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
@@ -330,7 +329,7 @@ func toggleGroupDefaults(t *Theme, size controlSize, iconOnly bool) ToggleGroupS
 		// than a button and the group is as tall as one.
 		Item: Style{Direction: Row, Align: Center, Justify: Center, Gap: 7, MinHeight: Px(h - 2),
 			Padding: XY(px, 0), FontSize: fs, FontWeight: FontMedium, TextColor: t.Text, BorderColor: line,
-			NoShrink: true, Transition: 110 * time.Millisecond},
+			NoShrink: true, Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		ItemSelected:     Style{Background: t.Accent, TextColor: t.AccentText},
 		ItemHover:        Style{Background: t.SurfaceHover},
 		ItemPressed:      Style{Background: t.SurfaceActive},

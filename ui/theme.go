@@ -1,6 +1,9 @@
 package ui
 
-import "maps"
+import (
+	"maps"
+	"time"
+)
 
 // Theme is a set of semantic colors and metrics used by built-in widgets and
 // available to applications through Context.Theme.
@@ -63,6 +66,9 @@ type Theme struct {
 	Radius float32
 	// FontSize is the default text size, in logical pixels.
 	FontSize float32
+	// Motion is the timing of the built-in widgets' motion. Its zero value
+	// keeps the built-in timings.
+	Motion MotionTokens
 
 	// Syntax is the look of each syntax token of a code editor, keyed by the
 	// token name (see SyntaxStyle). Under high contrast it keeps the
@@ -215,6 +221,51 @@ type Theme struct {
 	// themeStyleKey). The map is never changed in place: SetThemeStyle stores a new
 	// one, so copies of the theme can share it.
 	styles map[any]any
+}
+
+// MotionTokens are the timings of the built-in widgets' motion, for a theme
+// to make them faster, slower or springier. A zero field keeps the built-in
+// default. Reduced motion still turns the motion off.
+type MotionTokens struct {
+	// Hover is how long the colors of the built-in controls ease on hover and
+	// press: 110 ms by default.
+	Hover time.Duration
+	// Enter is how long menus, lists, dialogs, popovers and tooltips take to
+	// appear. By default menus, lists and dialogs take 140 ms, and popovers,
+	// hover cards and tooltips 120 ms.
+	Enter time.Duration
+	// Exit is how long they take to go: by default 90 ms for menus, lists and
+	// dialogs, and 80 ms for popovers, hover cards and tooltips.
+	Exit time.Duration
+	// Spring, when set, moves the opacity, offset and scale of the built-in
+	// controls whose colors ease on hover (as a theme's hover style that lifts
+	// or grows them would change them) as this spring. The zero Spring keeps
+	// their transitions.
+	Spring Spring
+}
+
+// hover returns the duration of the built-in controls' hover transitions.
+func (m MotionTokens) hover() time.Duration {
+	if m.Hover > 0 {
+		return m.Hover
+	}
+	return 110 * time.Millisecond
+}
+
+// enter returns the duration of a built-in entrance whose default is def.
+func (m MotionTokens) enter(def time.Duration) time.Duration {
+	if m.Enter > 0 {
+		return m.Enter
+	}
+	return def
+}
+
+// exit returns the duration of a built-in exit whose default is def.
+func (m MotionTokens) exit(def time.Duration) time.Duration {
+	if m.Exit > 0 {
+		return m.Exit
+	}
+	return def
 }
 
 // darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme

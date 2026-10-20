@@ -93,7 +93,7 @@ func colorPickerDefaults(t *Theme) ColorPickerStyle {
 	d := ColorPickerStyle{
 		Trigger: Style{Direction: Row, Align: Center, Gap: 8, Radius: t.Radius, Background: t.Surface,
 			BorderWidth: 1, BorderColor: t.BorderStrong, TextColor: t.Text, Cursor: CursorPointer,
-			Transition: 110 * time.Millisecond},
+			Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		TriggerHover:        Style{BorderColor: t.TextMuted},
 		TriggerFocusVisible: Style{Shadows: []Shadow{ring}},
 		Swatch:              Style{NoShrink: true, Radius: 4, BorderWidth: 1, BorderColor: t.BorderStrong},
@@ -536,8 +536,8 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 					}
 				}).
 				OnClickOutside(closeFn).
-				Enter(Fade().Slide(0, -4), Animation{Duration: 120 * time.Millisecond}).
-				Exit(Fade(), Animation{Duration: 80 * time.Millisecond})
+				Enter(Fade().Slide(0, -4), Animation{Duration: t.Motion.enter(120 * time.Millisecond)}).
+				Exit(Fade(), Animation{Duration: t.Motion.exit(80 * time.Millisecond)})
 
 			// The area: the hue at full saturation and value, a white to the hue layer from
 			// the left, and a transparent to black layer from the top. Under high contrast the

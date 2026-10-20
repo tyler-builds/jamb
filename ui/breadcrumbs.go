@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
@@ -68,7 +67,7 @@ func breadcrumbsDefaults(t *Theme) BreadcrumbsStyle {
 	return BreadcrumbsStyle{
 		Bar: Style{Direction: Row, Align: Center, Gap: 2, fitWidth: true},
 		Item: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(28), Padding: XY(6, 0),
-			Radius: t.Radius / 2, NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond},
+			Radius: t.Radius / 2, NoShrink: true, TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		ItemHover: Style{Background: t.SurfaceHover, TextColor: t.Text},
 		Current: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(28), Padding: XY(6, 0),
 			NoShrink: true, TextColor: t.Text},

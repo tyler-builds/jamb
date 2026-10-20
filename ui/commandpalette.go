@@ -364,8 +364,8 @@ func (p *CommandPaletteElement) expand(ctx *Context) Element {
 		panel := Div().asPart("CommandPalette.Panel").Key("jamb.palette").KeyContext("CommandPalette").
 			Overlay(BelowCenter).Style(st.Panel).
 			Role(access.RoleDialog).Label(strs.CommandPalette).
-			Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
-			Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
+			Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: t.Motion.enter(140 * time.Millisecond)}).
+			Exit(Fade().Grow(0.98), Animation{Duration: t.Motion.exit(90 * time.Millisecond)}).
 			// A press in the panel leaves the field focused, so a click on a row runs
 			// it with the field's focus intact.
 			KeepFocus().

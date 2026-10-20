@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"sync/atomic"
-	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
@@ -222,7 +221,7 @@ func formDefaults(t *Theme) FormStyle {
 			BorderWidth: 2, BorderColor: border},
 		SummaryTitle: Style{Direction: Row, Align: Center, Gap: 6, FontSize: 14, FontWeight: FontSemibold, TextColor: t.Text},
 		SummaryItem: Style{FontSize: 13, TextColor: t.Accent, Padding: XY(4, 2), Radius: t.Radius,
-			Transition: 110 * time.Millisecond},
+			Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		SummaryItemHover:        Style{Background: t.SurfaceHover},
 		SummaryItemFocusVisible: Style{Shadows: []Shadow{ring}},
 	}

@@ -452,8 +452,8 @@ func (m *menuView) box(k int, items []MenuItem, path []int) *DivElement {
 		gutter = gutter || it.Icon != nil || it.Check != MenuCheckNone
 	}
 	d := Div().asPart("Menu.Panel").Style(m.st.Panel).
-		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
-		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
+		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: m.t.Motion.enter(140 * time.Millisecond)}).
+		Exit(Fade().Grow(0.98), Animation{Duration: m.t.Motion.exit(90 * time.Millisecond)}).
 		Role(access.RoleMenu)
 	d.access().level = k + 1
 	for i, it := range items {

@@ -117,7 +117,7 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 		Bar:  Style{Direction: Row, Align: Center, Gap: 4},
 		List: Style{Direction: Row, Gap: 4, BorderEdges: Edges{Bottom: 1}, BorderColor: th.Border},
 		Tab: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(36), Padding: XY(12, 0),
-			NoShrink: true, Radius: th.Radius / 2, TextColor: th.TextMuted, Transition: 110 * time.Millisecond},
+			NoShrink: true, Radius: th.Radius / 2, TextColor: th.TextMuted, Transition: th.Motion.hover(), Spring: th.Motion.Spring},
 		TabHover:        Style{Background: th.SurfaceHover},
 		TabSelected:     Style{TextColor: th.Text},
 		TabFocusVisible: Style{Shadows: []Shadow{ring}},
@@ -824,8 +824,8 @@ func (t *TabsElement[T]) popupPanel(ctx *Context, tb Tab[T], h *FocusHandle, ent
 			}
 		}).
 		OnClickOutside(closeFn).
-		Enter(Fade().Slide(0, -4), Animation{Duration: 120 * time.Millisecond}).
-		Exit(Fade(), Animation{Duration: 80 * time.Millisecond}).
+		Enter(Fade().Slide(0, -4), Animation{Duration: ctx.Theme().Motion.enter(120 * time.Millisecond)}).
+		Exit(Fade(), Animation{Duration: ctx.Theme().Motion.exit(80 * time.Millisecond)}).
 		Child(tb.Popup(closeFn))
 }
 

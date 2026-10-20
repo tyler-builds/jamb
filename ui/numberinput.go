@@ -4,7 +4,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
@@ -102,7 +101,7 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 	h, _, _ := size.field()
 	d := NumberInputStyle{
 		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled, size: size}),
-		SpinButton:             Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond},
+		SpinButton:             Style{NoShrink: true, TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		SpinButtonHover:        Style{Background: t.SurfaceHover, TextColor: t.Text},
 		SpinButtonPressed:      Style{Background: t.SurfaceActive},
 		SpinButtonFocusVisible: Style{Shadows: []Shadow{ring}},
@@ -129,7 +128,7 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 			Padding: Edges{Top: gap, Right: gap, Bottom: gap}, Gap: 2 * gap}
 		// The two buttons share the column's height (see stackedSpin). They may be
 		// shorter than their icon, inside the thicker border of an invalid field.
-		d.SpinButton = Style{TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Full, Grow: 1, MinHeight: Px(0)}
+		d.SpinButton = Style{TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring, Width: Full, Grow: 1, MinHeight: Px(0)}
 		// A ring would be drawn outside the buttons, into the frame's clipped edge,
 		// so the focus is an inner outline.
 		d.SpinButtonFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
@@ -139,7 +138,7 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 		// keeps the middle. Both scale with the Text size, and so does the field's width.
 		w := spinInlineWidth * scale
 		d.Frame.Padding = Edges{Left: w + 4, Right: w + 4}
-		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond, Width: Px(w)}
+		d.SpinButton = Style{NoShrink: true, TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring, Width: Px(w)}
 		// As in the stacked column, the focus is an inner outline, inside the border.
 		d.SpinButtonFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
 	}

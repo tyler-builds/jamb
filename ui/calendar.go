@@ -75,6 +75,8 @@ type calendarView struct {
 	shut     func(restore bool)
 	enabled  func(day time.Time) bool
 	hover    func(day time.Time) // the pointer is over day, or zero when it leaves the calendar
+	// motion is the theme's motion, for the panel's entrance and exit.
+	motion MotionTokens
 }
 
 // calendarKeys handles a key that reaches a calendar, while its focus is on the day f. move moves
@@ -132,8 +134,8 @@ func calendarKeys(e *KeyEvent, f time.Time, first time.Weekday, move, pick func(
 // day the keys have reached is its highlighted cell, which the screen reader reads.
 func calendarPanel(c calendarView, s *Strings) Element {
 	panel := Div().asPart(c.widget+".Popup").Key("jamb.calendar").Style(c.st.Root).
-		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
-		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
+		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: c.motion.enter(140 * time.Millisecond)}).
+		Exit(Fade().Grow(0.98), Animation{Duration: c.motion.exit(90 * time.Millisecond)}).
 		Overlay(BelowStart).OverlayGap(4).
 		AutoFocus().TabStop(false).OnKeyDown(c.keys).
 		OnClickOutside(func() { c.shut(false) }).
@@ -381,7 +383,7 @@ func calendarDefaults(t *Theme, scale float32) CalendarStyle {
 		WeekdayLabel: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(cell), Height: Px(24 * scale),
 			NoShrink: true, FontSize: 12, TextColor: t.TextMuted},
 		Day: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(cell), Height: Px(cell),
-			NoShrink: true, Radius: 4, FontSize: 13, TextColor: t.Text, Transition: 110 * time.Millisecond},
+			NoShrink: true, Radius: 4, FontSize: 13, TextColor: t.Text, Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		DayHover:    Style{Background: t.SurfaceHover},
 		DaySelected: Style{Background: t.Accent, TextColor: t.AccentText},
 		DayInRange: Style{Clear: ClearRadius, BorderColor: t.Accent, BorderEdges: Edges{Top: 1, Bottom: 1},

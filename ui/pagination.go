@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
@@ -52,7 +51,7 @@ func (s PaginationStyle) plain() PaginationStyle {
 // colors of t. The current page is filled with Accent, as a selected segment is.
 func paginationDefaults(t *Theme) PaginationStyle {
 	cell := Style{Direction: Row, Align: Center, Justify: Center, MinWidth: Px(32), MinHeight: Px(32),
-		Padding: XY(6, 0), Radius: t.Radius, NoShrink: true, TextColor: t.TextMuted, Transition: 110 * time.Millisecond}
+		Padding: XY(6, 0), Radius: t.Radius, NoShrink: true, TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring}
 	return PaginationStyle{
 		Bar:         Style{Direction: Row, Align: Center, Gap: 4, fitWidth: true, TextColor: t.Text},
 		Page:        cell,

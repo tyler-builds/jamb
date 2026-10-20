@@ -702,7 +702,8 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 			root.Child(calendarPanel(calendarView{st: st.calendar(rs.DayInRange), widget: "DateRangePicker", loc: loc,
 				scale: scale, from: from, to: to, focus: focus.Get(), ring: true, today: dayOf(rt.now()),
 				name: name, fallback: s.DateRangeField, move: moveTo, pick: pick, keys: keys, shut: shut,
-				enabled: enabled, hover: hovered, firstSet: d.firstSet, firstDay: d.firstDay}, s))
+				enabled: enabled, hover: hovered, firstSet: d.firstSet, firstDay: d.firstDay,
+				motion: ctx.Theme().Motion}, s))
 		}
 		return d.size.apply(root)
 	})

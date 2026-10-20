@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/tyler-builds/jamb/access"
 )
@@ -81,7 +80,7 @@ func otpInputDefaults(t *Theme, scale float32, disabled bool) OTPInputStyle {
 		Box: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(otpBoxWidth * scale),
 			Height: Px(otpBoxHeight * scale), NoShrink: true, Radius: t.Radius, BorderWidth: 1,
 			BorderColor: t.BorderStrong, Background: t.Surface, FontSize: 18, TextColor: t.Text,
-			Transition: 110 * time.Millisecond},
+			Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		BoxFilled:  Style{BorderColor: t.TextMuted},
 		BoxFocused: Style{BorderColor: t.Accent, Shadows: []Shadow{ring}},
 		BoxInvalid: Style{BorderWidth: 2, BorderColor: t.Danger},

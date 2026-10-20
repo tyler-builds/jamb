@@ -91,7 +91,7 @@ func selectDefaults(t *Theme, width float32, disabled bool, size controlSize) Se
 	d := SelectStyle{
 		Trigger: Style{Direction: Row, Align: Center, Gap: 8, Width: Px(width), MinHeight: Px(34),
 			Padding: XY(10, 0), Radius: t.Radius, Background: t.Surface, BorderWidth: 1, BorderColor: t.BorderStrong,
-			Transition: 110 * time.Millisecond, TextColor: t.Text},
+			Transition: t.Motion.hover(), Spring: t.Motion.Spring, TextColor: t.Text},
 		TriggerHover:        Style{BorderColor: t.TextMuted},
 		TriggerFocusVisible: Style{Shadows: []Shadow{ring}},
 		// The invalid trigger is drawn with a thicker border in the danger color, as an
@@ -544,8 +544,8 @@ func (s *SelectElement[T]) list(st SelectStyle, t *Theme, sel, hl int, shut func
 		e.StopPropagation()
 	}
 	panel := Div().asPart("Select.Popup").Key("jamb.listbox").Column().Style(st.Popup).
-		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
-		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
+		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: t.Motion.enter(140 * time.Millisecond)}).
+		Exit(Fade().Grow(0.98), Animation{Duration: t.Motion.exit(90 * time.Millisecond)}).
 		Overlay(BelowStart).OverlayGap(4).
 		Role(access.RoleList).SelectionContainer().Label(name).
 		AutoFocus().TabStop(false).OnKeyDown(keys).

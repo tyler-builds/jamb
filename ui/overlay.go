@@ -173,8 +173,8 @@ func resolveTooltip(t *Theme) TooltipStyle {
 func (rt *Runtime) tooltipElement(s string) Element {
 	st := resolveTooltip(rt.theme)
 	return Div().asPart("Tooltip.Panel").Key("jamb.tooltip").Overlay(BelowCenter).OverlayGap(6).Style(st.Panel).
-		Enter(Fade(), Animation{Duration: 120 * time.Millisecond}).
-		Exit(Fade(), Animation{Duration: 80 * time.Millisecond}).
+		Enter(Fade(), Animation{Duration: rt.theme.Motion.enter(120 * time.Millisecond)}).
+		Exit(Fade(), Animation{Duration: rt.theme.Motion.exit(80 * time.Millisecond)}).
 		Child(Div().asPart("Tooltip.Text").Style(st.Text).Child(Text(s).NoWrap())).Role(access.RoleTooltip)
 }
 

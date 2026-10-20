@@ -177,6 +177,28 @@ thread at a frame, never while rendering, so it can set signals.
 ui.Div().Exit(ui.Fade(), ui.Animation{Duration: 90 * time.Millisecond, OnDone: func() { closed.Set(true) }})
 ```
 
+## Theme motion tokens
+
+`Theme.Motion` sets the timing of the built-in widgets' motion for the whole
+app. A zero field keeps the built-in default, so the zero `MotionTokens` is
+today's timing:
+
+| Field | Default | Used by |
+| --- | --- | --- |
+| `Hover` | 110 ms | the color transitions of the built-in controls on hover and press |
+| `Enter` | 140 ms; 120 ms | menus, lists, dialogs and drawers; popovers, hover cards and tooltips |
+| `Exit` | 90 ms; 80 ms | the same, as they go |
+| `Spring` | unset | when set, the opacity, offset and scale of those controls move as this spring |
+
+```go
+t := ui.DarkTheme()
+t.Motion.Enter = 200 * time.Millisecond // every built-in entrance, whatever its default
+t.Motion.Exit = 120 * time.Millisecond
+```
+
+Setting `Enter` or `Exit` gives every built-in entrance or exit that duration.
+Reduced motion still turns the motion off.
+
 ## Cost
 
 `Opacity`, `Offset`, `Scale`, transitions, springs, enter and exit and keyframes
