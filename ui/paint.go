@@ -109,7 +109,7 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	n.hit = scene.Rect{X: bx + own.OffsetX, Y: by + own.OffsetY, W: w, H: h}
 	n.clip = clip
 	opacity *= v.opacity
-	n.opacity = opacity
+	n.opacity, n.scale = opacity, v.scale
 	bg, border, fg := v.bg, v.border, v.fg
 	n.shownBG = bg
 	if v.scale != 1 {
@@ -519,7 +519,9 @@ func (rt *Runtime) visual(n *node, fg Color, dt float32) visual {
 		v.scale = s.Scale
 	}
 	if n.st != nil {
-		if s.Transition > 0 {
+		if s.Spring.Duration > 0 {
+			v = rt.spring(n.st, v, s, dt)
+		} else if s.Transition > 0 {
 			v = rt.animate(n.st, v, float32(s.Transition.Seconds()), dt)
 		}
 		rt.motion(n, &v)
@@ -535,6 +537,7 @@ func (rt *Runtime) animate(st *nodeState, to visual, dur, dt float32) visual {
 		st.shown, st.animReady = to, true
 		return to
 	}
+	st.vel = [4]float32{} // a spring that becomes a transition forgets its velocity
 	k := 1 - float32(math.Exp(float64(-dt/(dur/3))))
 	cur := &st.shown
 	cur.bg = rt.approach(cur.bg, to.bg, k)
@@ -555,6 +558,79 @@ func (rt *Runtime) approachF(cur, target, k float32) float32 {
 	}
 	rt.animating = true
 	return cur + (target-cur)*k
+}
+
+// spring moves the node's displayed opacity, offset and scale toward their
+// targets as the style's spring, from where they are and at the velocity they
+// have. Colors cannot overshoot, so they ease as a transition does. The first
+// paint shows the targets at once.
+func (rt *Runtime) spring(st *nodeState, to visual, s *Style, dt float32) visual {
+	if !st.animReady || rt.sys.ReducedMotion {
+		// With reduced motion a spring jumps to its target and stops.
+		st.shown, st.animReady, st.vel = to, true, [4]float32{}
+		return to
+	}
+	dur := s.Spring.Duration
+	if s.Transition > 0 {
+		dur = s.Transition
+	}
+	k := 1 - float32(math.Exp(-float64(dt)/(dur.Seconds()/3)))
+	cur := &st.shown
+	cur.bg = rt.approach(cur.bg, to.bg, k)
+	cur.border = rt.approach(cur.border, to.border, k)
+	cur.fg = rt.approach(cur.fg, to.fg, k)
+	omega, zeta := s.Spring.params()
+	cur.opacity, st.vel[0] = rt.springF(cur.opacity, st.vel[0], to.opacity, 1e-3, dt, omega, zeta)
+	cur.offX, st.vel[1] = rt.springF(cur.offX, st.vel[1], to.offX, 0.05, dt, omega, zeta)
+	cur.offY, st.vel[2] = rt.springF(cur.offY, st.vel[2], to.offY, 0.05, dt, omega, zeta)
+	cur.scale, st.vel[3] = rt.springF(cur.scale, st.vel[3], to.scale, 1e-3, dt, omega, zeta)
+	// Opacity stays in 0..1 and scale at 0 or more; a value that reaches a
+	// limit stops there.
+	if cur.opacity < 0 || cur.opacity > 1 {
+		cur.opacity, st.vel[0] = min(max(cur.opacity, 0), 1), 0
+	}
+	if cur.scale < 0 {
+		cur.scale, st.vel[3] = 0, 0
+	}
+	return *cur
+}
+
+// springF moves one value as a spring for dt, and asks for another frame
+// until it rests: within eps of its target and nearly still.
+func (rt *Runtime) springF(x, v, target, eps, dt float32, omega, zeta float64) (float32, float32) {
+	if x == target && v == 0 {
+		return x, 0
+	}
+	x, v = springStep(x, v, target, dt, omega, zeta)
+	if abs32(x-target) < eps && abs32(v) < eps*float32(omega) {
+		return target, 0
+	}
+	rt.animating = true
+	return x, v
+}
+
+// springStep advances a spring at x with velocity v toward target over dt
+// seconds. It is the closed-form solution of the damped oscillator, so it is
+// exact for any step: the motion does not depend on the frame rate.
+func springStep(x, v, target, dt float32, omega, zeta float64) (float32, float32) {
+	y0, v0, t := float64(x-target), float64(v), float64(dt)
+	var y, vel float64
+	if zeta >= 1 {
+		// Critically damped: y = e^(-ωt) (y0 + (v0 + ω y0) t).
+		e := math.Exp(-omega * t)
+		b := v0 + omega*y0
+		y = e * (y0 + b*t)
+		vel = e * (v0 - omega*b*t)
+	} else {
+		// Underdamped: an oscillation at the damped frequency in a decaying envelope.
+		a := zeta * omega
+		wd := omega * math.Sqrt(1-zeta*zeta)
+		e := math.Exp(-a * t)
+		c, s := math.Cos(wd*t), math.Sin(wd*t)
+		y = e * (y0*c + (v0+a*y0)/wd*s)
+		vel = e * (v0*c - (a*v0+omega*omega*y0)/wd*s)
+	}
+	return target + float32(y), float32(vel)
 }
 
 func (rt *Runtime) approach(cur, target Color, k float32) Color {

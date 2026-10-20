@@ -87,3 +87,38 @@ func TestReverseMirrors(t *testing.T) {
 		}
 	}
 }
+
+// A critically damped spring rises without overshooting; one with a bounce
+// overshoots 1 and comes back. Both start at 0 and end exactly at 1.
+func TestSpring(t *testing.T) {
+	for _, b := range []float32{0, 0.3, 0.9, -1, 2} {
+		f := Spring(b)
+		if v := f(0); v != 0 {
+			t.Errorf("Spring(%v)(0) = %v, want 0", b, v)
+		}
+		if v := f(1); v != 1 {
+			t.Errorf("Spring(%v)(1) = %v, want 1", b, v)
+		}
+	}
+	critical := Spring(0)
+	prev := float32(0)
+	for i := 1; i <= 1000; i++ {
+		x := float32(i) / 1000
+		v := critical(x)
+		if v < prev {
+			t.Fatalf("Spring(0) decreases at %v: %v < %v", x, v, prev)
+		}
+		if v > 1 {
+			t.Fatalf("Spring(0) overshoots at %v: %v", x, v)
+		}
+		prev = v
+	}
+	bouncy := Spring(0.3)
+	var peak float32
+	for i := 0; i <= 1000; i++ {
+		peak = max(peak, bouncy(float32(i)/1000))
+	}
+	if peak <= 1.01 {
+		t.Errorf("Spring(0.3) peaks at %v, want an overshoot past 1", peak)
+	}
+}

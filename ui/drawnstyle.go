@@ -31,6 +31,10 @@ type DrawnStyle struct {
 	// Opacity is the opacity the element was drawn with, its ancestors'
 	// included, and an entrance motion's too: 1 is opaque.
 	Opacity float32
+	// Scale is the element's own scale, drawn about its center, with its
+	// transition, spring, entrance, exit and keyframes at the point they had
+	// reached: 1 is none. Its ancestors' scales are not included.
+	Scale float32
 	// Ring and RingWidth are a ring drawn around the element: a shadow with a
 	// spread and no offset or blur, which is how the built-in controls draw
 	// their focus ring. RingWidth is in logical pixels, and 0 when there is no
@@ -52,12 +56,12 @@ func (rt *Runtime) StyleOf(key string) (DrawnStyle, bool) {
 		return DrawnStyle{}, true
 	}
 	s := &n.style
-	d := DrawnStyle{Painted: true, Bounds: n.abs, Opacity: n.opacity}
+	d := DrawnStyle{Painted: true, Bounds: n.abs, Opacity: n.opacity, Scale: n.scale}
 	bg, border, fg := s.Background, s.BorderColor, n.inFg
 	if !s.TextColor.IsZero() {
 		fg = s.TextColor
 	}
-	if n.st != nil && s.Transition > 0 && n.st.animReady {
+	if n.st != nil && (s.Transition > 0 || s.Spring.Duration > 0) && n.st.animReady {
 		bg, border, fg = n.st.shown.bg, n.st.shown.border, n.st.shown.fg
 	}
 	d.TextColor = fg
