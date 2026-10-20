@@ -134,6 +134,49 @@ ui.AnimateTimeline("intro", tl, func(p []float32) ui.Element {
 - It is an `Animate` underneath, with the timeline's duration, so it pauses out
   of view, restarts when its key changes and settles as `Animate` does.
 
+## Delay and stagger
+
+`Animation.Delay` holds an animation back before it starts. Meanwhile it shows
+its first frame: an entrance has the look of its `Motion`, keyframes their
+first stop, an `Animate` its frame at 0, and an exit the element's normal look.
+A delay asks for no frames: the window is woken when the delay ends. `Settled`
+is false until then, so `uitest.Settle` waits through it. A delayed entrance
+that fades is invisible but can still be hit while it waits. In a timeline a
+step's `Delay` adds to its start, and the timeline waits without frames until
+its first step starts.
+
+`Animation.Stagger`, on an `Enter`, delays the elements that enter together:
+siblings that appear in the same render, under one parent and with the same
+`Stagger`, start `Stagger` apart in the order they were built, up to 16
+`Stagger`s (the 17th and later start with the 16th). A row appended later
+enters at once, and a virtual list staggers only the rows it realizes.
+
+```go
+for i, item := range items {
+	list.Child(row(item).Keyf("row%d", i).
+		Enter(ui.Fade().Slide(0, 8), ui.Animation{Duration: 160 * time.Millisecond, Stagger: 30 * time.Millisecond}))
+}
+```
+
+## Completion
+
+`Animation.OnDone` runs once when an animation ends by itself, `Delay` plus
+`Duration` after it started, whether or not it is drawn then. It runs on the UI
+thread at a frame, never while rendering, so it can set signals.
+
+- It does not run for an animation that restarts first (its key changed, or
+  the element entered again) or whose element is removed first, nor for a
+  repeating one.
+- An `Exit`'s `OnDone` runs once the element has finished exiting. An element
+  removed without its exit (off screen, or with reduced motion) has finished at
+  once, and its `OnDone` runs at the next frame. A ghost dropped because the
+  element was shown again does not run it.
+- In a timeline each step's `OnDone` runs when that step ends.
+
+```go
+ui.Div().Exit(ui.Fade(), ui.Animation{Duration: 90 * time.Millisecond, OnDone: func() { closed.Set(true) }})
+```
+
 ## Cost
 
 `Opacity`, `Offset`, `Scale`, transitions, springs, enter and exit and keyframes
@@ -144,7 +187,8 @@ layout. A property that changes the layout (`Width`,
 animation. An exiting element leaves the layout at once, so its siblings move
 straight away. It is drawn above its former siblings while it exits. It is a
 ghost: it cannot be hit, focused or found, and it disappears when its exit ends.
-Showing it again during its exit drops the ghost.
+Showing it again during its exit drops the ghost. A delay costs nothing while
+it waits: no frames are drawn until it ends.
 
 ## Reduced motion
 
@@ -153,5 +197,6 @@ effects), jamb asks for reduced motion (`ctx.ReducedMotion()`). Then `Transition
 `Enter` and `Exit` jump to their end, a spring jumps to its target and stops, and
 smooth scrolling jumps to its target. An `Animate`, `Play` or `AnimateTimeline`
 that is finite jumps to its last frame (the last stop, every step at 1), and a
-repeating one stops at its first frame, so nothing asks for more frames. Apps should check `ctx.ReducedMotion()`
+repeating one stops at its first frame, so nothing asks for more frames. Delays
+and stagger are ignored, and an `OnDone` runs at the next frame. Apps should check `ctx.ReducedMotion()`
 before they run their own motion.

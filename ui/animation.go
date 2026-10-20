@@ -12,7 +12,26 @@ type Animation struct {
 	Duration time.Duration
 	// Easing maps the linear progress of the animation to its eased progress, such as ease.OutCubic.
 	Easing func(t float32) float32
-	Repeat bool // Animate only: loop forever
+	Repeat bool // Animate and Play: loop forever
+	// Delay is how long the animation waits before it starts. Meanwhile it
+	// shows its first frame (an entrance its Motion, keyframes their first
+	// stop) and asks for no frames: the window is woken when it is due. A
+	// delayed entrance is invisible when its Motion fades, but it can be hit.
+	Delay time.Duration
+	// Stagger, on an Enter, delays the elements that enter together, in one
+	// render, under one parent with the same Stagger: each starts Stagger after
+	// the one before it, in the order they were built, up to 16 Staggers. An
+	// element that enters later, as a row appended to a list, enters at once.
+	Stagger time.Duration
+	// OnDone runs once when the animation ends by itself: Delay plus Duration
+	// after it started, whether or not it is drawn then. It runs on the UI
+	// thread at the next frame, never while rendering. It does not run for an
+	// animation that is restarted (its key changed) or removed first, nor for
+	// a repeating one. An Exit's runs when the element has finished exiting,
+	// or at the next frame when it is removed without its exit (off screen, or
+	// with reduced motion). In a Timeline a step's OnDone runs when the step
+	// ends. With reduced motion it runs at the next frame.
+	OnDone func()
 }
 
 // Spring is a damped spring that moves an element's opacity, offset and scale
@@ -69,6 +88,70 @@ func (*AnimateElement) isElement() {}
 type animState struct {
 	key   string
 	start time.Time
+	el    *AnimateElement // the latest render's element, whose OnDone runs
+	wait  *timer          // wakes the instance when its delay ends
+	done  []*timer        // run the OnDone of the animation or of its steps
+}
+
+// stop cancels the timers of an animation that restarts or is removed. It is
+// safe on nil.
+func (as *animState) stop() {
+	if as == nil {
+		return
+	}
+	as.wait.cancel()
+	for _, tm := range as.done {
+		tm.cancel()
+	}
+	as.wait, as.done = nil, nil
+}
+
+// delay returns how long a waits before anything moves: its Delay, or for a
+// timeline the start of its first step.
+func (a *AnimateElement) delay() time.Duration {
+	if a.tl == nil {
+		return max(a.anim.Delay, 0)
+	}
+	if len(a.tl.steps) == 0 {
+		return 0
+	}
+	first := a.tl.steps[0].start
+	for _, s := range a.tl.steps[1:] {
+		first = min(first, s.start)
+	}
+	return first
+}
+
+// schedule registers the OnDone of an animation that starts now: the
+// animation's, or each of its timeline's steps', at their natural end.
+func (a *AnimateElement) schedule(rt *Runtime, inst *componentInstance, as *animState) {
+	if a.anim.Repeat {
+		return
+	}
+	at := func(end time.Duration, pick func(*AnimateElement) func()) {
+		as.done = append(as.done, rt.done(as.start.Add(end), func() func() {
+			if inst.disposed {
+				return nil
+			}
+			return pick(as.el)
+		}))
+	}
+	if a.tl == nil {
+		if a.anim.OnDone != nil {
+			at(max(a.anim.Delay, 0)+max(a.anim.Duration, 0), func(e *AnimateElement) func() { return e.anim.OnDone })
+		}
+		return
+	}
+	for i, s := range a.tl.steps {
+		if s.a.OnDone != nil {
+			at(s.start+max(s.a.Duration, 0), func(e *AnimateElement) func() {
+				if e.tl == nil || i >= len(e.tl.steps) {
+					return nil
+				}
+				return e.tl.steps[i].a.OnDone
+			})
+		}
+	}
 }
 
 // expand renders fn for the progress now. An animation that is still running
@@ -84,12 +167,35 @@ func (a *AnimateElement) expand(ctx *Context) Element {
 	st := ctx.state()
 	now := rt.now()
 	if st.anim == nil || st.anim.key != a.key {
+		if st.anim == nil {
+			// The timers of the animation go with the instance.
+			ctx.OnDispose(func() { st.anim.stop() })
+		}
+		st.anim.stop()
 		st.anim = &animState{key: a.key, start: now}
+		a.schedule(rt, ctx.inst, st.anim)
 	}
-	// p counts durations: 1 is the end. A zero duration ends at once.
+	as := st.anim
+	as.el = a
+	if due := as.start.Add(a.delay()); now.Before(due) && !rt.sys.ReducedMotion {
+		// In its delay the animation shows its first frame and asks for no
+		// frames; a timer renders it again when it is due.
+		if as.wait == nil {
+			inst := ctx.inst
+			as.wait = rt.at(due, func() {
+				if !inst.disposed {
+					inst.invalidate()
+				}
+			})
+			as.wait.motion = true
+		}
+		return a.render(0)
+	}
+	// p counts durations from the end of the delay: 1 is the end. A zero
+	// duration ends at once.
 	p := float32(1)
 	if d := a.anim.Duration; d > 0 {
-		p = float32(now.Sub(st.anim.start).Seconds() / d.Seconds())
+		p = float32(now.Sub(as.start.Add(max(a.anim.Delay, 0))).Seconds() / d.Seconds())
 	}
 	running := p < 1
 	if a.anim.looping() {
@@ -109,6 +215,11 @@ func (a *AnimateElement) expand(ctx *Context) Element {
 	if running {
 		rt.animInsts = append(rt.animInsts, ctx.inst)
 	}
+	return a.render(p)
+}
+
+// render returns the element of a at linear progress p.
+func (a *AnimateElement) render(p float32) Element {
 	if a.tl != nil {
 		if a.tfn == nil {
 			return nil

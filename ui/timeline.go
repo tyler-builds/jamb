@@ -26,13 +26,15 @@ type timelineStep struct {
 }
 
 // Sequence is a timeline of the steps one after another: each starts when the
-// one before it ends. A step's Easing shapes its own progress; its Repeat and
-// OnDone are not used.
+// one before it ends, after its own Delay. A step's Easing shapes its own
+// progress, and its OnDone runs when it ends; its Repeat and Stagger are not
+// used.
 func Sequence(steps ...Animation) Timeline {
 	var t Timeline
 	for _, a := range steps {
-		t.steps = append(t.steps, timelineStep{start: t.length, a: a})
-		t.length += max(a.Duration, 0)
+		start := t.length + max(a.Delay, 0)
+		t.steps = append(t.steps, timelineStep{start: start, a: a})
+		t.length = start + max(a.Duration, 0)
 	}
 	return t
 }
