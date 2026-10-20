@@ -371,7 +371,8 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 // The columns are shown in the order of ColumnOrder, and assistive technology numbers
 // them in that order. The order and the widths the user sets can be kept in signals
 // (ColumnOrder and ColumnWidths), and OnColumnsChange reports each change the user
-// makes to them, so that an app can save and restore them.
+// makes to them, so that an app can save and restore them. A DataGridHandle scrolls
+// to a row or a column, and focuses a cell, by their keys.
 //
 // Sorting orders the rows without changing their keys, and the focus and the
 // selection follow their rows by key, so a sort, a scroll, new rows or a saved
@@ -403,6 +404,7 @@ type DataGridElement[T any] struct {
 	order       *Signal[[]string]
 	widths      *Signal[map[string]float32]
 	onColumns   func(ColumnState)
+	gridHandle  *DataGridHandle
 }
 
 // The sizing methods give the grid's outer box a size, over its Style. See Sizing
@@ -509,6 +511,54 @@ func (g *DataGridElement[T]) Empty(el Element) *DataGridElement[T] { g.empty = e
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (g *DataGridElement[T]) Styles(st DataGridStyle) *DataGridElement[T] {
 	g.styles = g.styles.merge(st)
+	return g
+}
+
+// DataGridHandle scrolls a DataGrid and moves its focus from code, by the keys of
+// the rows and the columns. Create one with NewDataGridHandle and pass it to
+// DataGrid.Handle. A request takes effect when the grid is next built, on the next
+// frame; a key that names no row or column does nothing. Call it on the UI thread.
+type DataGridHandle struct {
+	inst           *componentInstance
+	row, col       string
+	hasRow, hasCol bool
+	focus          bool
+}
+
+// NewDataGridHandle creates a handle to pass to DataGrid.Handle.
+func NewDataGridHandle() *DataGridHandle { return &DataGridHandle{} }
+
+// ScrollToRow scrolls the least amount that shows the row with the key key, in
+// the order the rows are sorted in.
+func (h *DataGridHandle) ScrollToRow(key string) {
+	h.row, h.hasRow = key, true
+	h.request()
+}
+
+// ScrollToColumn scrolls sideways the least amount that shows the column with the
+// key key.
+func (h *DataGridHandle) ScrollToColumn(key string) {
+	h.col, h.hasCol = key, true
+	h.request()
+}
+
+// FocusCell moves the grid's focused cell to the row with the key rowKey, in the
+// column with the key colKey (the focused column when colKey names none), scrolls
+// it into view and gives the grid keyboard focus. It does not change the selection.
+func (h *DataGridHandle) FocusCell(rowKey, colKey string) {
+	h.row, h.hasRow, h.col, h.hasCol, h.focus = rowKey, true, colKey, true, true
+	h.request()
+}
+
+func (h *DataGridHandle) request() {
+	if h.inst != nil {
+		h.inst.invalidate()
+	}
+}
+
+// Handle connects h, so that code can scroll the grid and move its focus.
+func (g *DataGridElement[T]) Handle(h *DataGridHandle) *DataGridElement[T] {
+	g.gridHandle = h
 	return g
 }
 
@@ -981,6 +1031,35 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		} else {
 			handle.request()
 		}
+	}
+	// A request of the grid's handle is applied now, with the rows and columns of
+	// this build. A focus request moves the cursor after the build, as a key would.
+	if h := g.gridHandle; h != nil {
+		h.inst = inst
+		q, rowOK := sh.pos[h.row]
+		c, colOK := colPos[h.col]
+		rowOK, colOK = rowOK && h.hasRow, colOK && h.hasCol
+		switch {
+		case h.focus && rowOK:
+			if !colOK {
+				c = col
+			}
+			rt.Post(func() {
+				place(q, c, false)
+				sh.focus.Focus()
+			})
+		case h.focus:
+		default:
+			if rowOK {
+				handle.ScrollToItem(q)
+			}
+			if colOK {
+				sh.reveal = true
+				sh.revealX0, sh.revealX1 = xs[c], xs[c+1]
+				handle.request()
+			}
+		}
+		h.hasRow, h.hasCol, h.focus = false, false, false
 	}
 	// moveRow moves to row q and column cl, and selects as the selection mode and
 	// the modifiers say: a plain move selects the row, Ctrl moves the focus only,
