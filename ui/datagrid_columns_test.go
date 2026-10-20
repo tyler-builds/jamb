@@ -169,3 +169,31 @@ func TestDataGridColumnWidthsSignalIsApplied(t *testing.T) {
 		t.Errorf("after the signal changed the N header is %v wide, want 70", got)
 	}
 }
+
+// TestDataGridResizeReleaseDoesNotSort checks that the release of a drag of a
+// sortable column's edge, which lands on its header cell, does not sort, and that
+// a click on the header cell after it still does.
+func TestDataGridResizeReleaseDoesNotSort(t *testing.T) {
+	sort := NewSignal(SortState{})
+	r := dgRig(dgItems(5), SelectionSingle, nil, sort, nil)
+	rc := r.rt.nodeRect(dgResizeHandle(t, r, "N"))
+	x, y := rc.X+rc.W/2, rc.Y+rc.H/2
+	r.rt.PointerMove(x, y, 0)
+	r.rt.PointerDown(x, y, input.ButtonLeft, 1, 0)
+	r.rt.PointerMove(x-20, y, 0)
+	r.frame()
+	r.rt.PointerUp(x-20, y, input.ButtonLeft, 0)
+	r.frame()
+	if got := sort.Peek(); got.Key != "" {
+		t.Fatalf("releasing the edge sorted by %q", got.Key)
+	}
+	rc = r.rt.nodeRect(dgResizeHandle(t, r, "N"))
+	x, y = rc.X-15, rc.Y+rc.H/2
+	r.rt.PointerMove(x, y, 0)
+	r.rt.PointerDown(x, y, input.ButtonLeft, 1, 0)
+	r.rt.PointerUp(x, y, input.ButtonLeft, 0)
+	r.frame()
+	if got := sort.Peek(); got.Key != "N" {
+		t.Errorf("a click on the header after the resize sorted by %q, want N", got.Key)
+	}
+}
