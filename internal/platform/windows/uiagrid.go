@@ -19,7 +19,8 @@ import (
 //
 // A grid's row count and column count are of the whole data, built or not. GetItem
 // answers only for the cells that are built: a client that asks for a row that is
-// off screen gets nothing, and scrolls the grid to it with its Scroll pattern.
+// off screen, or for a column that is off screen in a grid wider than its view,
+// gets nothing, and scrolls the grid to it with its Scroll pattern.
 
 // Control types, patterns and properties of a data grid.
 const (
