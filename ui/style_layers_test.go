@@ -45,6 +45,7 @@ var layerSetByMethod = map[string]string{
 	"DataGrid.Grid Padding":         "the grid sets the padding of its frame",
 	"Modal.Scrim Padding":           "the scrim is a full-window layer, padded by the element",
 	"Drawer.Scrim Padding":          "the scrim is a full-window layer, padded by the element",
+	"AlertDialog.Scrim Padding":     "the scrim is a full-window layer, padded by the element",
 	"FormField.Label Gap":           "the label's gap is set by the field, not by the layers",
 	"Tabs.Indicator Background":     "the line of an unselected tab is transparent, set by the element",
 	"Dock.Indicator Background":     "the line of an unselected tab is transparent, set by the element",
@@ -231,6 +232,8 @@ var layerBuilders = []layerBuilder{
 		}},
 	{"Modal", func(th *Theme) any { return &th.Modal },
 		func(st any) Element { return partModal(st.(ModalStyle)) }},
+	{"AlertDialog", func(th *Theme) any { return &th.AlertDialog },
+		func(st any) Element { return partAlertDialog(st.(AlertDialogStyle)) }},
 	{"Drawer", func(th *Theme) any { return &th.Drawer },
 		func(st any) Element {
 			closed := false

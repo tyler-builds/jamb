@@ -135,6 +135,8 @@ type Theme struct {
 	Modal ModalStyle
 	// Drawer is the look of every drawer.
 	Drawer DrawerStyle
+	// AlertDialog is the look of every alert dialog.
+	AlertDialog AlertDialogStyle
 	// Popover is the look of the panel of every popover.
 	Popover PopoverStyle
 	// HoverCard is the look of the panel of every hover card.

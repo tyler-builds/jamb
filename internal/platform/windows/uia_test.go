@@ -115,6 +115,7 @@ func TestControlTypeMapping(t *testing.T) {
 	}{
 		{access.RoleWindow, ctWindow},
 		{access.RoleDialog, ctWindow},
+		{access.RoleAlertDialog, ctWindow},
 		{access.RoleGroup, ctGroup},
 		{access.RoleButton, ctButton},
 		{access.RoleCheckBox, ctCheckBox},
@@ -190,6 +191,29 @@ func TestNodeProperties(t *testing.T) {
 	lct := nodeProperty(propLocalizedControlType, n, false)
 	if lct.vt != vtBSTR || bstrString(variantBSTROf(lct)) != "dialog" {
 		t.Errorf("LocalizedControlType tag %d, want a BSTR holding %q", lct.vt, "dialog")
+	}
+	win32.SysFreeString(variantBSTROf(lct))
+}
+
+// An alert dialog is a Window (50032) that is a dialog and modal, with the
+// Window pattern, as a dialog is, and its own localized control type.
+func TestAlertDialogProperties(t *testing.T) {
+	n := &access.Node{ID: 7, Role: access.RoleAlertDialog, Name: "Delete 3 files?"}
+	if v := nodeProperty(propControlType, n, false); v.vt != vtI4 || variantI4Of(v) != 50032 {
+		t.Errorf("ControlType = tag %d value %d, want Window (50032)", v.vt, variantI4Of(v))
+	}
+	if v := nodeProperty(propIsDialog, n, false); v.vt != vtBool || variantBoolOf(v) != -1 {
+		t.Errorf("IsDialog for an alert dialog is not VARIANT_TRUE")
+	}
+	if v := nodeProperty(propWindowIsModal, n, false); v.vt != vtBool || variantBoolOf(v) != -1 {
+		t.Errorf("Window.IsModal for an alert dialog is not VARIANT_TRUE")
+	}
+	if !supports(kindWindow, n) {
+		t.Errorf("an alert dialog has no Window pattern")
+	}
+	lct := nodeProperty(propLocalizedControlType, n, false)
+	if lct.vt != vtBSTR || bstrString(variantBSTROf(lct)) != "alert dialog" {
+		t.Errorf("LocalizedControlType tag %d, want a BSTR holding %q", lct.vt, "alert dialog")
 	}
 	win32.SysFreeString(variantBSTROf(lct))
 }

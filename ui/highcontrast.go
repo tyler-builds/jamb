@@ -102,6 +102,7 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 		TimePicker:      base.TimePicker,
 		ColorPicker:     base.ColorPicker,
 		Drawer:          base.Drawer,
+		AlertDialog:     base.AlertDialog,
 		Popover:         base.Popover,
 		CommandPalette:  base.CommandPalette,
 		DescriptionList: base.DescriptionList,

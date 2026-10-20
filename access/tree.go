@@ -182,7 +182,7 @@ func Diff(prev, next *Tree) Update {
 		case old == nil:
 			u.Added = append(u.Added, n.ID)
 			u.Structure = true
-			if n.Role == RoleDialog || n.Role == RoleMenu {
+			if n.Role.IsDialog() || n.Role == RoleMenu {
 				u.Opened = append(u.Opened, Popup{n.ID, n.Role})
 			}
 		case old.Parent != n.Parent:
@@ -201,7 +201,7 @@ func Diff(prev, next *Tree) Update {
 		if next.Node(n.ID) == nil {
 			u.Removed = append(u.Removed, n.ID)
 			u.Structure = true
-			if n.Role == RoleDialog || n.Role == RoleMenu {
+			if n.Role.IsDialog() || n.Role == RoleMenu {
 				u.Closed = append(u.Closed, Popup{n.ID, n.Role})
 			}
 		}

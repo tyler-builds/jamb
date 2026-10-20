@@ -2,6 +2,7 @@ package views
 
 import (
 	"strings"
+	"time"
 
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
@@ -62,6 +63,30 @@ func labeledField(t *ui.Theme, label string, field ui.Element) ui.Element {
 	return ui.Div().Column().Gap(6).
 		Child(ui.Text(label).FontSize(12).Medium().TextColor(t.TextMuted).Key(fieldLabel(label))).
 		Child(field)
+}
+
+// sampleAlertDialog is the alert dialog of the Components page: it asks before
+// deleting a sample, and the delete takes a moment, during which its button is
+// loading. The answer is written to SampleResult, which the page shows.
+func sampleAlertDialog(s *Store) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		deleting := ui.Local(ctx, "deleting", false)
+		if !s.AlertOpen.Get() {
+			return nil
+		}
+		return ui.AlertDialog("Delete the sample?", "The sample is removed from this page. This cannot be undone.").
+			Intent(ui.AlertDialogDestructive).
+			Cancel("", func() { s.AlertOpen.Set(false) }).
+			Confirm("Delete", func() {
+				deleting.Set(true)
+				ctx.After(time.Second, func() {
+					deleting.Set(false)
+					s.SampleResult.Set("Deleted the sample")
+					s.AlertOpen.Set(false)
+				})
+			}).
+			ConfirmLoading(deleting.Get())
+	})
 }
 
 // sampleDrawer is the drawer of the Components page: display settings that

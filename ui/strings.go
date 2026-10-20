@@ -117,6 +117,10 @@ type Strings struct {
 	NextYear string
 	// Close is the name of a close button.
 	Close string
+	// OK is the label of the button that confirms an alert dialog (see AlertDialog).
+	OK string
+	// Cancel is the label of the button that cancels an alert dialog.
+	Cancel string
 	// Minimize is the name of the button that minimizes a window.
 	Minimize string
 	// Maximize is the name of the button that maximizes a window.
@@ -493,6 +497,8 @@ func englishStrings() *Strings {
 		NextMonth:           "Next month",
 		NextYear:            "Next year",
 		Close:               "Close",
+		OK:                  "OK",
+		Cancel:              "Cancel",
 		Minimize:            "Minimize",
 		Maximize:            "Maximize",
 		Restore:             "Restore",

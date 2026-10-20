@@ -45,7 +45,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.OTPInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
    `Theme.Switch`, `Theme.Toggle`, `Theme.ToggleGroup`, `Theme.Rating`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
-   `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.Popover`, `Theme.CommandPalette`, `Theme.ProgressBar`, `Theme.ProgressRing`,
+   `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.AlertDialog`, `Theme.Popover`, `Theme.CommandPalette`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
    (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.Sidebar`, `Theme.Breadcrumbs`, `Theme.Pagination`, `Theme.Stepper`, `Theme.Carousel`, `Theme.ColorPicker`, and `Theme.FormField` (the label, help text and error
    of every field) and `Theme.Form` (the error summary of every form). Each is a field of `ui.Theme`, and the
@@ -566,6 +566,7 @@ parts that the code applies.
 | `MenuBar` | `BarItem`, `BarItemHover`, `BarItemFocusVisible`, `BarItemOpen` | none | none | done |
 | `Modal` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | none | none | done |
 | `Drawer` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | `Side` (`DrawerRight`, `DrawerLeft`, `DrawerTop`, `DrawerBottom`) | none | done |
+| `AlertDialog` | `Scrim`, `Panel`, `Header`, `Icon`, `Title`, `Message`, `Body`, `Footer` | `Intent` (`AlertDialogInfo`, `AlertDialogConfirm`, `AlertDialogWarning`, `AlertDialogDestructive`) | `Body`, `Action` (elements) | done |
 | `Popover` | `Panel` | `Placement` | none | done |
 | `HoverCard` | `Panel` | `Placement` | none | done |
 | `CommandPalette` | `Panel`, `Input`, `List`, `Item`, `ItemHighlighted`, `Label`, `Match`, `Keys`, `Empty` | none | none | done |

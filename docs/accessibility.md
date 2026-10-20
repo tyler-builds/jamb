@@ -18,7 +18,8 @@ What is automatic, with no app code:
   alone. Decorative icons and layout containers with no role or name are left
   out, so their children sit in the parent.
 - Menus, menu bars and menu items carry their roles, checked and disabled
-  states, and nesting level. A `Modal` is a dialog named by its title.
+  states, and nesting level. A `Modal` is a dialog named by its title, and an
+  `AlertDialog` an alert dialog named by its title and described by its message.
 - A `UniformList` or `ListOf` exposes its built rows as list items, each with
   its position in the full list ("40 of 10,000"). Only the rows that are built
   are in the tree.

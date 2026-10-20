@@ -50,6 +50,7 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			Child(newProjectModal(s)).
 			Child(sampleModal(s)).
 			Child(sampleDrawer(s)).
+			Child(sampleAlertDialog(s)).
 			// The command palette lists the actions available where focus is: the
 			// shortcuts above, and those of the focused element.
 			Child(ui.CommandPalette(s.PaletteOpen)).
