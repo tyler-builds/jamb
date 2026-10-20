@@ -56,7 +56,7 @@ func containsTab(s string) bool {
 	return false
 }
 
-// paint draws the editor into the canvas of w by h: the rows that are shown, from the
+// paint draws the editor into the canvas of w by h: the display rows that are shown, from the
 // scroll position, with the gutter, the selections, the matches, the text and the carets.
 // It records the geometry for the pointer, and asks the highlighter for the rows shown.
 func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
@@ -81,23 +81,32 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	foldX := numW
 	textX := numW + foldW + 4
 	textW := max(w-textX, 0)
-	rows := doc.VisibleRows()
+	x := vs.rowIndex()
+	rows := x.count()
 
 	// The scroll position: the caret is kept in view after a move, and the position stays in
 	// the content.
+	vs.geo = geometry{lineH: lineH, charW: charW, gutterW: textX, textX: textX, foldX: foldX, viewW: w, viewH: h, painted: true}
 	if vs.reveal {
 		vs.reveal = false
-		vs.revealCaret(lineH, charW, h, textW, tab)
+		vs.revealCaret(x, lineH, charW, h, textW)
 	}
 	maxY := max(float32(rows)*lineH-h, 0)
 	maxX := max(float32(vs.maxCells)*charW+charW*2-textW, 0)
 	vs.scrollY = min(max(vs.scrollY, 0), maxY)
 	vs.scrollX = min(max(vs.scrollX, 0), maxX)
-	vs.geo = geometry{lineH: lineH, charW: charW, gutterW: textX, textX: textX, foldX: foldX, viewW: w, viewH: h, painted: true}
 
 	first := int(vs.scrollY / lineH)
 	last := min(first+int(h/lineH)+2, rows)
-	vs.syncHighlighter(first, last)
+	shown := make([]displayRow, 0, max(last-first, 0))
+	for i := first; i < last; i++ {
+		dr, ok := vs.rowAt(x, i)
+		if !ok {
+			break
+		}
+		shown = append(shown, dr)
+	}
+	vs.syncHighlighter(shown)
 
 	carets := make(map[int]bool)
 	for _, s := range doc.sels {
@@ -114,25 +123,29 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	fg := st.Text.TextColor
 	maxCells := 0
 	tx := textX - vs.scrollX
-	for vi := first; vi < last; vi++ {
-		row, ok := doc.RowAtVisible(vi)
-		if !ok {
-			break
-		}
-		y := float32(vi)*lineH - vs.scrollY
+	line, lineRow := "", -1 // the text of the row of the last segment, read once for its segments
+	for k, dr := range shown {
+		row := dr.row
+		y := float32(first+k)*lineH - vs.scrollY
 		ls, le := doc.LineStart(row), doc.LineEnd(row)
-		line := doc.Line(row)
-		shown, at, composing := vs.composedRow(row, line)
-		maxCells = max(maxCells, cellOfCol(shown, len(shown), tab))
+		if row != lineRow {
+			line, lineRow = doc.Line(row), row
+		}
+		text, at, composing := vs.composedRow(row, line)
+		if composing {
+			maxCells = max(maxCells, cellOfCol(text, len(text), tab))
+		} else {
+			maxCells = max(maxCells, dr.endCell(line, ls, tab))
+		}
 		if carets[row] && !st.ActiveLine.Background.IsZero() {
 			p.FillRect(0, y, w, lineH, st.ActiveLine.Background)
 		}
 		for _, s := range doc.sels {
 			from, to := s.Range()
-			if from == to || to < ls || from > le+1 || st.Selection.Background.IsZero() {
+			if from == to || !dr.covers(from, to, le) || st.Selection.Background.IsZero() {
 				continue
 			}
-			x0, x1 := selectionSpan(line, ls, le, from, to, tab)
+			x0, x1 := selectionCells(dr, line, ls, le, from, to, tab)
 			p.FillRect(tx+float32(x0)*charW, y, float32(x1-x0)*charW, lineH, st.Selection.Background)
 		}
 		for _, k := range matchesOnRow(matches, ls, le) {
@@ -141,33 +154,33 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 			if k == cur {
 				bg = st.CurrentMatch.Background
 			}
-			x0 := cellOfCol(line, max(m.From-ls, 0), tab)
-			x1 := cellOfCol(line, min(m.To-ls, len(line)), tab)
+			x0 := dr.cellOf(line, ls, ls+max(m.From-ls, 0), tab)
+			x1 := dr.cellOf(line, ls, ls+min(m.To-ls, len(line)), tab)
 			if !bg.IsZero() {
 				p.FillRect(tx+float32(x0)*charW, y, float32(x1-x0)*charW, lineH, bg)
 			}
 		}
 		switch {
 		case composing:
-			vs.drawComposition(p, ts, shown, at, tx, y, charW, lineH, tab, fg)
-		case line != "":
-			vs.drawLine(p, ts, line, ls, tx, y, charW, tab, fg)
+			vs.drawComposition(p, ts, text, at, tx, y, charW, lineH, tab, fg)
+		case dr.from < dr.to:
+			vs.drawSegment(p, ts, line, ls, dr, tx, y, charW, tab, fg)
 		}
 	}
 	// The gutter covers the text that is scrolled under it, and the numbers and the fold
-	// markers are drawn over it.
+	// markers are drawn over it, on the first segment of each row.
 	if !st.Gutter.Background.IsZero() {
 		p.FillRect(0, 0, textX, h, st.Gutter.Background)
 	}
 	vs.maxCells = maxCells
 	gutterFg := st.Gutter.TextColor
 	nts := ui.TextFormat{FontSize: st.Gutter.FontSize, Mono: true, Color: gutterFg, Align: ui.End}
-	for vi := first; vi < last; vi++ {
-		row, ok := doc.RowAtVisible(vi)
-		if !ok {
-			break
+	for k, dr := range shown {
+		if dr.seg != 0 {
+			continue
 		}
-		y := float32(vi)*lineH - vs.scrollY
+		row := dr.row
+		y := float32(first+k)*lineH - vs.scrollY
 		if ps.numbers {
 			nts.Color = gutterFg
 			if carets[row] && !ps.t.CodeEditor.ActiveLineNumber.IsZero() {
@@ -185,34 +198,34 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	}
 	if ps.focused {
 		for _, s := range doc.sels {
-			row := doc.RowOf(s.Head)
-			vi := doc.VisibleIndex(row)
+			r, vi := vs.caretRectIn(x, s.Head)
 			if vi < first || vi >= last || !p.CaretVisible(vs.activity) {
 				continue
 			}
-			line := doc.Line(row)
-			cell := cellOfCol(line, s.Head-doc.LineStart(row), tab)
-			if shown, at, ok := vs.composedRow(row, line); ok && s.Head == doc.Caret() {
-				// The caret of the primary selection is at the input method's caret.
-				cell = cellOfCol(shown, at+vs.comp.Cursor, tab)
-			}
-			x := tx + float32(cell)*charW
-			cy := float32(vi)*lineH - vs.scrollY
-			p.FillRect(x, cy, 2, lineH, fg)
+			p.FillRect(r.X, r.Y, 2, lineH, fg)
 		}
 	}
-	vs.drawBrackets(p, ts, tx, charW, lineH, first, last, tab, st)
+	vs.drawBrackets(p, x, tx, charW, lineH, first, last, st)
 }
 
-// selectionSpan returns the cells where the selection [from, to) covers the row that runs
-// from ls to le. A selection that goes past the line feed covers one more cell there, so the
-// break shows as selected.
-func selectionSpan(line string, ls, le, from, to, tab int) (int, int) {
-	a := max(from-ls, 0)
-	b := min(to-ls, len(line))
-	x0 := cellOfCol(line, min(a, len(line)), tab)
-	x1 := cellOfCol(line, b, tab)
-	if to > le {
+// covers reports whether the range [from, to) of a row that ends at le shows on the segment: it
+// overlaps the segment, or on the last segment it reaches the line feed, where the break shows.
+func (dr displayRow) covers(from, to, le int) bool {
+	if dr.to == le {
+		return to >= dr.from && from <= le+1
+	}
+	return to > dr.from && from < dr.to
+}
+
+// selectionCells returns the cells of the view where the selection [from, to) covers the segment
+// dr of the row line, which runs from ls to le. A selection that goes past the line feed covers
+// one more cell on the last segment, so the break shows as selected.
+func selectionCells(dr displayRow, line string, ls, le, from, to, tab int) (int, int) {
+	a := min(max(from, dr.from), dr.to)
+	b := min(max(to, dr.from), dr.to)
+	x0 := dr.cellOf(line, ls, a, tab)
+	x1 := dr.cellOf(line, ls, b, tab)
+	if to > le && dr.to == le {
 		x1++
 	}
 	return x0, x1
@@ -233,36 +246,38 @@ func matchesOnRow(matches []Match, ls, le int) []int {
 	return out
 }
 
-// drawLine draws the text of the row line, which starts at byte ls, at tx, with its rows
-// at y. The spans of the highlighter color the runs; a run with no span takes fg.
-func (vs *viewState) drawLine(p *ui.Painter, ts ui.TextFormat, line string, ls int, tx, y, charW float32, tab int, fg ui.Color) {
+// drawSegment draws the text of the segment dr of the row line, which starts at byte ls, at tx,
+// with its rows at y. The spans of the highlighter color the runs; a run with no span takes fg.
+func (vs *viewState) drawSegment(p *ui.Painter, ts ui.TextFormat, line string, ls int, dr displayRow, tx, y, charW float32, tab int, fg ui.Color) {
 	ts.Color = fg
+	a, b := dr.from-ls, dr.to-ls
+	x0 := tx + float32(dr.indent)*charW // the x of the segment's first cell
 	if vs.hl == nil || vs.spans.list == nil {
-		p.Text(tx, y, expandRun(line, 0, tab), ts)
+		p.Text(x0, y, expandRun(line[a:b], dr.startCell, tab), ts)
 		return
 	}
-	le := ls + len(line)
-	idx := vs.spans.around(ls, le)
+	idx := vs.spans.around(dr.from, dr.to)
 	if len(idx) == 0 {
-		p.Text(tx, y, expandRun(line, 0, tab), ts)
+		p.Text(x0, y, expandRun(line[a:b], dr.startCell, tab), ts)
 		return
 	}
-	// The segments are cut at every span edge, and each takes the last span that covers it.
-	cuts := []int{0, len(line)}
+	// The pieces are cut at every span edge, and each takes the last span that covers it.
+	cuts := []int{a, b}
 	for _, k := range idx {
 		s := vs.spans.list[k]
-		cuts = append(cuts, min(max(s.Start-ls, 0), len(line)), min(max(s.End-ls, 0), len(line)))
+		cuts = append(cuts, min(max(s.Start-ls, a), b), min(max(s.End-ls, a), b))
 	}
 	slices.Sort(cuts)
 	cuts = slices.Compact(cuts)
+	cell, at := dr.startCell, a // the cell of the row at the byte at, counted from the segment's start
 	for i := 0; i+1 < len(cuts); i++ {
-		a, b := cuts[i], cuts[i+1]
-		if a == b || !utf8.RuneStart(line[a]) || (b < len(line) && !utf8.RuneStart(line[b])) {
+		ca, cb := cuts[i], cuts[i+1]
+		if ca == cb || !utf8.RuneStart(line[ca]) || (cb < len(line) && !utf8.RuneStart(line[cb])) {
 			continue
 		}
-		seg := vs.segmentStyle(ts, fg, idx, ls, a, b)
-		cell := cellOfCol(line, a, tab)
-		p.Text(tx+float32(cell)*charW, y, expandRun(line[a:b], cell, tab), seg)
+		cell, at = cellIn(line, at, cell, ca, tab), ca
+		seg := vs.segmentStyle(ts, fg, idx, ls, ca, cb)
+		p.Text(x0+float32(cell-dr.startCell)*charW, y, expandRun(line[ca:cb], cell, tab), seg)
 	}
 }
 
@@ -325,8 +340,8 @@ func (vs *viewState) drawFoldMarker(p *ui.Painter, row int, foldX, foldW, y, lin
 }
 
 // drawBrackets outlines the bracket at the primary caret and the one that pairs with it, when
-// the caret is at a bracket and there is one caret.
-func (vs *viewState) drawBrackets(p *ui.Painter, ts ui.TextFormat, tx, charW, lineH float32, first, last, tab int, st Style) {
+// the caret is at a bracket and there is one caret. x is the index of the display rows.
+func (vs *viewState) drawBrackets(p *ui.Painter, x rowIndex, tx, charW, lineH float32, first, last int, st Style) {
 	doc := vs.doc
 	if len(doc.sels) != 1 || st.CurrentMatch.Background.IsZero() {
 		return
@@ -337,36 +352,30 @@ func (vs *viewState) drawBrackets(p *ui.Painter, ts ui.TextFormat, tx, charW, li
 		return
 	}
 	for _, at := range []int{head, q} {
-		row := doc.RowOf(at)
-		vi := doc.VisibleIndex(row)
+		if at >= doc.LineEnd(doc.RowOf(at)) {
+			continue
+		}
+		vi, cell := vs.displayOfIn(x, at, false)
 		if vi < first || vi >= last {
 			continue
 		}
-		line := doc.Line(row)
-		col := at - doc.LineStart(row)
-		if col >= len(line) {
-			continue
-		}
-		x := tx + float32(cellOfCol(line, col, tab))*charW
 		y := float32(vi)*lineH - vs.scrollY
-		p.FillRect(x, y, charW, lineH, st.CurrentMatch.Background)
+		p.FillRect(tx+float32(cell)*charW, y, charW, lineH, st.CurrentMatch.Background)
 	}
 }
 
 // revealCaret scrolls the view so that the primary caret is in it, with a margin on the
-// sides, as the caret moves.
-func (vs *viewState) revealCaret(lineH, charW, h, textW float32, tab int) {
-	doc := vs.doc
-	head := doc.Caret()
-	row := doc.RowOf(head)
-	top := float32(doc.VisibleIndex(row)) * lineH
+// sides, as the caret moves. x is the index of the display rows.
+func (vs *viewState) revealCaret(x rowIndex, lineH, charW, h, textW float32) {
+	head := vs.doc.Caret()
+	vi, cell := vs.displayOfIn(x, head, vs.upstreamNow())
+	top := float32(vi) * lineH
 	if top < vs.scrollY {
 		vs.scrollY = top
 	} else if top+lineH > vs.scrollY+h {
 		vs.scrollY = top + lineH - h
 	}
-	line := doc.Line(row)
-	cx := float32(cellOfCol(line, head-doc.LineStart(row), tab)) * charW
+	cx := float32(cell) * charW
 	if cx < vs.scrollX {
 		vs.scrollX = max(cx-charW*4, 0)
 	} else if cx+charW > vs.scrollX+textW {
@@ -374,17 +383,15 @@ func (vs *viewState) revealCaret(lineH, charW, h, textW float32, tab int) {
 	}
 }
 
-// syncHighlighter tells the highlighter which bytes the rows from first to last show, when
-// they changed, and refreshes the sorted spans and the capture styles when the highlighter's
-// spans changed.
-func (vs *viewState) syncHighlighter(first, last int) {
+// syncHighlighter tells the highlighter which bytes the display rows shown cover, when they
+// changed, and refreshes the sorted spans and the capture styles when the highlighter's spans
+// changed.
+func (vs *viewState) syncHighlighter(shown []displayRow) {
 	if vs.hl == nil {
 		return
 	}
-	doc := vs.doc
-	if first < last {
-		lo := doc.LineStart(mustRow(doc, first))
-		hi := doc.LineEnd(mustRow(doc, last-1))
+	if len(shown) > 0 {
+		lo, hi := shown[0].from, shown[len(shown)-1].to
 		if !vs.vpSet || lo != vs.vpLo || hi != vs.vpHi {
 			vs.vpLo, vs.vpHi, vs.vpSet = lo, hi, true
 			_ = vs.hl.SetViewport(lo, hi) // the highlighter reports its own errors
@@ -402,12 +409,6 @@ func (vs *viewState) syncHighlighter(first, last int) {
 			vs.capStyle = append(vs.capStyle, capStyle{st: styles[i], ok: ok[i]})
 		}
 	}
-}
-
-// mustRow returns the row of the i-th shown row. Callers pass rows in range.
-func mustRow(doc *Document, i int) int {
-	row, _ := doc.RowAtVisible(i)
-	return row
 }
 
 // ctxTheme returns the theme of the latest render, or the built-in dark theme before one.
