@@ -169,6 +169,9 @@ type Strings struct {
 	// TabMoved is announced after the user moves a tab (see Tabs.Reorderable), such as
 	// "Sales moved to position 2 of 3".
 	TabMoved func(tab string, position, count int) string
+	// ColumnMoved is announced after the user moves a column of a grid (see
+	// DataColumn.Movable), such as "Status moved to position 2 of 5".
+	ColumnMoved func(column string, position, count int) string
 	// Page is the name of a page button, such as "Page 3". CurrentPage names the page
 	// that is shown, and PageOf is the text of a compact pagination, such as "Page 3 of 9".
 	Page func(n int) string
@@ -521,6 +524,9 @@ func englishStrings() *Strings {
 
 		TabMoved: func(tab string, position, count int) string {
 			return fmt.Sprintf("%s moved to position %d of %d", tab, position, count)
+		},
+		ColumnMoved: func(column string, position, count int) string {
+			return fmt.Sprintf("%s moved to position %d of %d", column, position, count)
 		},
 
 		Today:        "Today",
