@@ -116,6 +116,7 @@ type DivElement struct {
 	h            handlers
 	enter        *motionSpec       // see Enter
 	exit         *motionSpec       // see Exit
+	play         *playSpec         // see Play
 	dragSpec     *DragSpec         // see OnDrag
 	dragging     *Style            // see Dragging
 	drops        []DropTarget      // see OnDrop

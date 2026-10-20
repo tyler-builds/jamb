@@ -59,6 +59,8 @@ type AnimateElement struct {
 	key  string
 	anim Animation
 	fn   func(t float32) Element
+	tl   *Timeline // set by AnimateTimeline, which renders tfn
+	tfn  func(p []float32) Element
 }
 
 func (*AnimateElement) isElement() {}
@@ -75,7 +77,7 @@ type animState struct {
 // keeps asking for frames is decided after the paint (see settleAnims), since
 // an instance the paint does not draw has no need of them.
 func (a *AnimateElement) expand(ctx *Context) Element {
-	if a.fn == nil {
+	if a.fn == nil && a.tfn == nil {
 		return nil
 	}
 	rt := ctx.rt
@@ -106,6 +108,20 @@ func (a *AnimateElement) expand(ctx *Context) Element {
 	}
 	if running {
 		rt.animInsts = append(rt.animInsts, ctx.inst)
+	}
+	if a.tl != nil {
+		if a.tfn == nil {
+			return nil
+		}
+		// The timeline's own steps ease their progress; p is the linear
+		// progress through the whole of it.
+		elapsed := a.anim.Duration
+		if p < 1 {
+			elapsed = time.Duration(float64(p) * float64(a.anim.Duration))
+		}
+		ps := make([]float32, len(a.tl.steps))
+		a.tl.progress(elapsed, ps)
+		return a.tfn(ps)
 	}
 	return a.fn(a.anim.easing()(p))
 }
