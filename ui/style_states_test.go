@@ -71,6 +71,7 @@ var layerStateNotDrawn = map[string]string{
 	"Split.DividerActive":             "the active state is a drag of the divider, which the table does not start",
 	"DataGrid.CellFocused":            "a focused cell is not reached by focusing the grid headlessly",
 	"DataGrid.CellEditing":            "the editor of a cell is open only after an edit starts",
+	"DataGrid.CellSelected":           "a cell is selected only in a grid that selects cells, which the table's grid does not",
 	"DropdownMenu.ItemHighlighted":    "the menu's items are drawn while the menu is open",
 	"DropdownMenu.ItemDisabled":       "the menu's items are drawn while the menu is open",
 	"ContextMenu.ItemHighlighted":     "the menu's items are drawn while the menu is open",
