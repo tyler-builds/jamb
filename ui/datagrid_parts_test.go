@@ -57,4 +57,15 @@ func testDataGridColumnParts(t *testing.T, applied map[string]bool) {
 			t.Error("the style does not reach the cell of a group of columns")
 		}
 	})
+	t.Run("CellSelected", func(t *testing.T) {
+		applied["DataGrid.CellSelected"] = true
+		r := newAccessRig(func(ctx *Context) Element {
+			return DataGrid(dgItems(3), func(x dgItem) string { return x.ID }, dgColumns()...).Label("Runs").
+				CellSelection(SelectionMultiple, NewSignal([]CellKey{{Row: "i1", Column: "N"}})).
+				Styles(DataGridStyle{CellSelected: Style{Background: markBG}})
+		})
+		if !anyMarked(r.rt, "DataGrid.Cell", false) {
+			t.Error("the style does not reach a selected cell")
+		}
+	})
 }

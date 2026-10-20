@@ -240,6 +240,8 @@ type DataGridStyle struct {
 	// HeaderGroup is the cell of a group of columns, above their header cells (see
 	// DataColumn.Group).
 	HeaderGroup Style
+	// CellSelected is a selected cell, when the grid selects cells (see CellSelection).
+	CellSelected Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -267,6 +269,7 @@ func (s DataGridStyle) merge(o DataGridStyle) DataGridStyle {
 		CellPinned:       s.CellPinned.Merge(o.CellPinned),
 		PinnedEdge:       s.PinnedEdge.Merge(o.PinnedEdge),
 		HeaderGroup:      s.HeaderGroup.Merge(o.HeaderGroup),
+		CellSelected:     s.CellSelected.Merge(o.CellSelected),
 	}
 }
 
@@ -295,6 +298,7 @@ func (s DataGridStyle) plain() DataGridStyle {
 		CellPinned:       plainStyle(s.CellPinned),
 		PinnedEdge:       plainStyle(s.PinnedEdge),
 		HeaderGroup:      plainStyle(s.HeaderGroup),
+		CellSelected:     plainStyle(s.CellSelected),
 	}
 }
 
@@ -349,9 +353,11 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 		PinnedEdge:    Style{BorderColor: t.Border},
 		HeaderGroup: Style{Direction: Row, Align: Center, Justify: Center, AlignSelf: Stretch, Padding: Edges{Left: 8, Right: 8},
 			NoShrink: true, OverflowX: OverflowHidden, BorderEdges: Edges{Bottom: 1}, BorderColor: t.Border},
+		CellSelected: Style{Background: t.AccentSoft},
 	}
 	if t.HighContrast {
 		st.RowSelected = Style{Background: t.Accent, TextColor: t.AccentText}
+		st.CellSelected = Style{Background: t.Accent, TextColor: t.AccentText}
 		st.EditorMessage.BorderColor, st.EditorMessage.TextColor = t.Text, t.Text
 	}
 	return st
@@ -390,6 +396,11 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 //     row (multiple selection only).
 //   - Space toggles the focused row (multiple selection), or selects it (single).
 //     Shift+Space extends the selection to the row, and Ctrl+A selects every row.
+//   - When the grid selects cells (see CellSelection), the moves select cells in the
+//     same way: a plain move selects the cell, Ctrl moves the focus only, and Shift
+//     with an arrow, Home, End, PageUp or PageDown extends a rectangle from the
+//     anchor cell. Space toggles the focused cell, Shift+Space selects the cells of
+//     its row, Ctrl+Space those of its column, and Ctrl+A every cell.
 //   - Enter activates the focused row, and calls OnActivate with it.
 //   - On a header cell, Enter and Space sort by its column (see Sort). On a
 //     resizable header cell, Ctrl+Left and Ctrl+Right narrow and widen the column by
@@ -412,7 +423,8 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 //     moving on, saves the edit, as a spreadsheet does; a save that fails keeps the
 //     editor open with its error. Only Escape cancels.
 //
-// A click selects a row (Ctrl toggles it, Shift extends the selection), and a
+// A click selects a row (Ctrl toggles it, Shift extends the selection), or a cell
+// when the grid selects cells (Shift selects the rectangle from the anchor), and a
 // double-click activates it, except on an editable cell, where a double-click
 // starts an edit. A click on a control in a cell (see DataColumn.Interactive)
 // focuses and operates the control; it moves the cursor to the cell but does not
@@ -473,6 +485,10 @@ type DataGridElement[T any] struct {
 	loadMore    func()
 	loadingMore bool
 	movable     bool
+	cellOn      bool // the user selects cells (see CellSelection)
+	cellMode    SelectionMode
+	cells       *Signal[[]CellKey]
+	selBoth     bool // both Selection and CellSelection were called, for the warning
 }
 
 // Movable lets the user move every column of the grid, as DataColumn.Movable does
@@ -630,7 +646,36 @@ func (g *DataGridElement[T]) Striped() *DataGridElement[T] { g.striped = true; r
 // rows in keys: the grid sets it when the selection changes, and a value set in
 // keys selects those rows. A nil keys keeps the selection inside the grid.
 func (g *DataGridElement[T]) Selection(mode SelectionMode, keys *Signal[[]string]) *DataGridElement[T] {
+	if g.cellOn {
+		g.selBoth = true
+		g.cellOn, g.cellMode, g.cells = false, SelectionNone, nil
+	}
 	g.mode, g.sel = mode, keys
+	return g
+}
+
+// CellKey names a cell of a DataGrid: the key of its row and the key of its column.
+type CellKey struct {
+	// Row is the key of the cell's row.
+	Row string
+	// Column is the key of the cell's column.
+	Column string
+}
+
+// CellSelection lets the user select cells rather than rows, and keeps the selected
+// cells in cells: the grid sets it when the selection changes, and a value set in
+// cells selects those cells. A nil cells keeps the selection inside the grid. The
+// cells follow their rows and columns by key, through a sort or a move.
+//
+// It replaces Selection: the grid selects rows or cells, not both, and the later of
+// the two calls is the one that applies (the development warnings say so). Ctrl+A
+// selects every cell, so with many rows cells holds a key for each cell of each row.
+func (g *DataGridElement[T]) CellSelection(mode SelectionMode, cells *Signal[[]CellKey]) *DataGridElement[T] {
+	if g.mode != SelectionNone || g.sel != nil {
+		g.selBoth = true
+		g.mode, g.sel = SelectionNone, nil
+	}
+	g.cellOn, g.cellMode, g.cells = true, mode, cells
 	return g
 }
 
@@ -853,8 +898,9 @@ type dgRowCtx[T any] struct {
 	rowH                 float32
 	cursorPos, cursorCol int
 	onHeader, hasFocus   bool
-	startN, endN         int    // the numbers of the columns pinned to the start and the end
-	built                []bool // the columns whose cells are built, or nil for all of them
+	startN, endN         int              // the numbers of the columns pinned to the start and the end
+	built                []bool           // the columns whose cells are built, or nil for all of them
+	cells                map[CellKey]bool // the selected cells, when the grid selects cells
 	ed                   dgEdit
 	click                func(q, cl int, mods input.Modifiers)
 	colAt                func(q int, x float32) int
@@ -890,6 +936,15 @@ type dgShared[T any] struct {
 	selIdent unsafe.Pointer
 	selN     int
 	selSet   map[string]bool
+
+	// The set of the selected cells, made again only when the cells change (see
+	// cellSelection), and whether the warning about Selection and CellSelection has
+	// been given.
+	cellOK    bool
+	cellIdent unsafe.Pointer
+	cellN     int
+	cellSet   map[CellKey]bool
+	warnedSel bool
 
 	// The displayed positions built by the last frame: [builtLo, builtHi).
 	builtLo, builtHi int
@@ -986,6 +1041,21 @@ func (sh *dgShared[T]) selection(sel []string) map[string]bool {
 	return set
 }
 
+// cellSelection returns the set of the cells in cells, made again only when cells
+// changes.
+func (sh *dgShared[T]) cellSelection(cells []CellKey) map[CellKey]bool {
+	ident := unsafe.Pointer(unsafe.SliceData(cells))
+	if sh.cellOK && sh.cellIdent == ident && sh.cellN == len(cells) {
+		return sh.cellSet
+	}
+	set := make(map[CellKey]bool, len(cells))
+	for _, k := range cells {
+		set[k] = true
+	}
+	sh.cellOK, sh.cellIdent, sh.cellN, sh.cellSet = true, ident, len(cells), set
+	return set
+}
+
 // expand builds the grid when it is placed in the tree.
 func (g *DataGridElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
@@ -1050,6 +1120,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	if by == nil {
 		by = Local(ctx, "sort", SortState{})
 	}
+	cellSel := g.cells
+	if cellSel == nil {
+		cellSel = Local(ctx, "cells", []CellKey(nil))
+	}
+	anchorCol := Local(ctx, "anchorCol", "")
 
 	// The columns are in the order they are shown, so that a column's index is its
 	// place on the screen and its column for assistive technology.
@@ -1076,6 +1151,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	if g.focusHandle != nil {
 		sh.focus = g.focusHandle
 	}
+	if g.selBoth && !sh.warnedSel && rt.warn != nil {
+		sh.warnedSel = true
+		rt.warn("a DataGrid has both Selection and CellSelection; it selects rows or cells, " +
+			"and the later call applies. Call one of them.")
+	}
 	if sh.dup != "" && !sh.warned && rt.warn != nil {
 		sh.warned = true
 		rt.warn(fmt.Sprintf("duplicate key %q among the rows of a DataGrid; keys must be unique. "+
@@ -1084,6 +1164,10 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	order := sh.order
 	keyAt := func(q int) string { return sh.keys[order[q]] }
 	selected := sh.selection(sel.Get())
+	var cellsOn map[CellKey]bool
+	if g.cellOn {
+		cellsOn = sh.cellSelection(cellSel.Get())
+	}
 	rowH := dataGridRowHeight(g.density) * rt.textFactor
 	// The header is a row high, or two with a row of the groups of columns above it.
 	headerH := rowH
@@ -1354,10 +1438,73 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		h.hasRow, h.hasCol, h.focus = false, false, false
 	}
+	// The cells of a cell selection (see CellSelection). cellAt names the cell at
+	// (q, c); the anchor of the cells is the anchor row and anchorCol.
+	cellKeyAt := func(q, c int) CellKey { return CellKey{Row: keyAt(q), Column: cols[c].key()} }
+	setAnchor := func(q, c int) {
+		anchor.Set(keyAt(q))
+		anchorCol.Set(cols[c].key())
+	}
+	selectCells := func(ks []CellKey) {
+		if g.cellMode != SelectionNone {
+			cellSel.Set(ks)
+		}
+	}
+	// rectCells returns the cells of the rectangle from (q0, c0) to (q1, c1), in the
+	// order they are shown, row by row.
+	rectCells := func(q0, c0, q1, c1 int) []CellKey {
+		qa, qb, ca, cb := min(q0, q1), max(q0, q1), min(c0, c1), max(c0, c1)
+		out := make([]CellKey, 0, (qb-qa+1)*(cb-ca+1))
+		for q := qa; q <= qb; q++ {
+			for c := ca; c <= cb; c++ {
+				out = append(out, cellKeyAt(q, c))
+			}
+		}
+		return out
+	}
+	// fromAnchor returns the cells from the anchor cell to (q, c).
+	fromAnchor := func(q, c int) []CellKey {
+		return rectCells(anchorPos(), colOf(anchorCol.Peek(), c), q, c)
+	}
+	toggleCell := func(k CellKey) {
+		cur := cellSel.Peek()
+		next := make([]CellKey, 0, len(cur)+1)
+		found := false
+		for _, x := range cur {
+			if x == k {
+				found = true
+				continue
+			}
+			next = append(next, x)
+		}
+		if !found {
+			next = append(next, k)
+		}
+		cellSel.Set(next)
+	}
+	// moveCell moves to the cell at (q, c) and selects as moveRow does for rows: a
+	// plain move selects the cell, Ctrl moves the focus only, and Shift extends the
+	// rectangle from the anchor cell.
+	moveCell := func(q, c int, ctrl, shift bool) {
+		switch {
+		case shift && g.cellMode == SelectionMultiple:
+			selectCells(fromAnchor(q, c))
+		case ctrl:
+			// The anchor stays where it is.
+		case g.cellMode != SelectionNone:
+			selectCells([]CellKey{cellKeyAt(q, c)})
+			setAnchor(q, c)
+		}
+		place(q, c, false)
+	}
 	// moveRow moves to row q and column cl, and selects as the selection mode and
 	// the modifiers say: a plain move selects the row, Ctrl moves the focus only,
 	// and Shift extends the selection from the anchor.
 	moveRow := func(q, cl int, ctrl, shift bool) {
+		if g.cellOn {
+			moveCell(q, cl, ctrl, shift)
+			return
+		}
 		k := keyAt(q)
 		switch {
 		case shift && g.mode == SelectionMultiple:
@@ -1370,8 +1517,24 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		place(q, cl, false)
 	}
-	// click selects the row at q for a press with the modifiers mods.
+	// click selects the row at q for a press with the modifiers mods, or the cell at
+	// (q, cl) when the grid selects cells.
 	click := func(q, cl int, mods input.Modifiers) {
+		if g.cellOn {
+			k := cellKeyAt(q, cl)
+			switch {
+			case g.cellMode == SelectionMultiple && mods&input.ModShift != 0:
+				selectCells(fromAnchor(q, cl))
+			case g.cellMode == SelectionMultiple && mods&input.ModCtrl != 0:
+				toggleCell(k)
+				setAnchor(q, cl)
+			case g.cellMode != SelectionNone:
+				selectCells([]CellKey{k})
+				setAnchor(q, cl)
+			}
+			place(q, cl, false)
+			return
+		}
 		k := keyAt(q)
 		switch {
 		case g.mode == SelectionMultiple && mods&input.ModShift != 0:
@@ -1649,7 +1812,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				}
 				return true
 			}
-			if nc > 0 {
+			switch {
+			case nc == 0:
+			case g.cellOn && !onHeader && n > 0:
+				moveCell(p, min(max(col+dir, 0), nc-1), ctrl, shift)
+			default:
 				place(p, min(max(col+dir, 0), nc-1), onHeader)
 			}
 		case input.KeyHome, input.KeyEnd:
@@ -1662,9 +1829,13 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				if !onHeader && p == n-1 {
 					askMore()
 				}
-				moveRow(n-1, nc-1, ctrl, false)
+				moveRow(n-1, nc-1, ctrl, shift && g.cellOn)
 			case ctrl && n > 0:
-				moveRow(0, 0, ctrl, false)
+				moveRow(0, 0, ctrl, shift && g.cellOn)
+			case g.cellOn && !onHeader && n > 0 && last:
+				moveCell(p, nc-1, false, shift)
+			case g.cellOn && !onHeader && n > 0:
+				moveCell(p, 0, false, shift)
 			case last:
 				place(p, nc-1, onHeader)
 			default:
@@ -1724,6 +1895,17 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			switch {
 			case e.Key == input.KeyEnter:
 				activate(p)
+			case g.cellOn && g.cellMode == SelectionMultiple && shift:
+				selectCells(rectCells(p, 0, p, nc-1)) // the cells of the row
+			case g.cellOn && g.cellMode == SelectionMultiple && ctrl:
+				selectCells(rectCells(0, col, n-1, col)) // the cells of the column
+			case g.cellOn && g.cellMode == SelectionMultiple:
+				toggleCell(cellKeyAt(p, col))
+				setAnchor(p, col)
+			case g.cellOn && g.cellMode == SelectionSingle:
+				selectCells([]CellKey{cellKeyAt(p, col)})
+				setAnchor(p, col)
+			case g.cellOn:
 			case g.mode == SelectionMultiple && shift:
 				selectKeys(rangeKeys(anchorPos(), p))
 			case g.mode == SelectionMultiple:
@@ -1734,6 +1916,10 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				anchor.Set(k)
 			}
 		case input.KeyA:
+			if g.cellOn && ctrl && g.cellMode == SelectionMultiple && n > 0 && nc > 0 {
+				selectCells(rectCells(0, 0, n-1, nc-1))
+				return true
+			}
 			if !ctrl || g.mode != SelectionMultiple || n == 0 {
 				return false
 			}
@@ -1820,9 +2006,12 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			if !ok || g.rowMenu == nil || q >= n {
 				return nil
 			}
-			if g.mode != SelectionNone && !sh.selection(sel.Peek())[keyAt(q)] {
+			switch {
+			case g.cellOn && g.cellMode != SelectionNone && !sh.cellSelection(cellSel.Peek())[cellKeyAt(q, c)]:
 				click(q, c, 0)
-			} else {
+			case !g.cellOn && g.mode != SelectionNone && !sh.selection(sel.Peek())[keyAt(q)]:
+				click(q, c, 0)
+			default:
 				place(q, c, false)
 			}
 			return g.rowMenu(rows[order[q]], cols[c].key())
@@ -1838,7 +2027,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	rc := dgRowCtx[T]{t: t, ctx: ctx, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed, startN: startN, endN: endN,
-		built: built, click: click, colAt: colAt, activate: activate, ops: ops}
+		built: built, cells: cellsOn, click: click, colAt: colAt, activate: activate, ops: ops}
 	// A row within a viewport of rows of the end asks for more rows when it is built.
 	near := n - max(int(sh.viewH/rowH), 1)
 	list := UniformList(n, func(q int) Element {
@@ -1880,14 +2069,14 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			OnFocus(func() { focused.Set(true) }).
 			OnBlur(func() { focused.Set(false) }).
 			OnTextInput(typeText)
-		if g.mode != SelectionNone {
+		if g.mode != SelectionNone || (g.cellOn && g.cellMode != SelectionNone) {
 			el.SelectionContainer()
 		}
 		if g.name != "" {
 			el.Label(g.name)
 		}
 		el.AccessGrid(n, nc)
-		el.access().multiSelect = g.mode == SelectionMultiple
+		el.access().multiSelect = g.mode == SelectionMultiple || (g.cellOn && g.cellMode == SelectionMultiple)
 	}
 	list.before = func(nd *node) {
 		sh.viewH = nd.lay.H
@@ -2144,6 +2333,30 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		if cl.Pin != PinNone {
 			cell.Style(st.CellPinned)
 			pinCell(cell, st, cl.Pin, c == rc.startN-1 || c == len(cols)-rc.endN)
+		}
+		if g.cellOn && g.cellMode != SelectionNone {
+			// When the grid selects cells, the cells are the items of the selection, and
+			// a selected cell is drawn in CellSelected: its fill is the selection.
+			ci, picked := c, rc.cells[CellKey{Row: k, Column: cl.key()}]
+			if picked {
+				cell.Style(st.CellSelected)
+			}
+			cell.AccessSelected(picked)
+			cell.access().selectWith = func(ctrl bool) {
+				mods := input.Modifiers(0)
+				if ctrl {
+					mods = input.ModCtrl
+				}
+				click(q, ci, mods)
+			}
+			cell.OnClick(func() {
+				if sh.pressed {
+					sh.pressed = false
+					return
+				}
+				// A click from an assistive technology selects the cell.
+				click(q, ci, 0)
+			})
 		}
 		a := cell.access()
 		if !onHeader && q == cursorPos && c == cursorCol {
