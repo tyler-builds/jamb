@@ -31,7 +31,7 @@ func (e *EditorElement) wireIME(canvas *ui.DivElement, vs *viewState) {
 			}
 			vs.edit(func(d *Document) error { return d.TypeText(text) })
 		},
-		Caret: vs.compositionCaret,
+		Caret: func() scene.Rect { return vs.caretRect(vs.doc.Caret()) },
 	})
 }
 
@@ -58,19 +58,26 @@ func (vs *viewState) composedRow(row int, line string) (shown string, at int, ok
 	return line[:at] + vs.comp.Text + line[at:], at, true
 }
 
-// compositionCaret returns the primary caret in the canvas's pixels, for the input method's
-// candidate window. While a composition shows, it is at the input method's caret. It uses the
-// geometry of the last paint.
-func (vs *viewState) compositionCaret() scene.Rect {
+// caretRect returns the caret at the byte offset off in the canvas's pixels, as the geometry of
+// the last paint places it. The primary caret is the input method's caret while a composition
+// shows, so its rectangle is where the candidate window opens.
+func (vs *viewState) caretRect(off int) scene.Rect {
+	r, _ := vs.caretRectIn(vs.rowIndex(), off)
+	return r
+}
+
+// caretRectIn is caretRect on the index x of the display rows, with the display row of the caret.
+func (vs *viewState) caretRectIn(x rowIndex, off int) (scene.Rect, int) {
 	g := vs.geo
-	head := vs.doc.Caret()
-	row := vs.doc.RowOf(head)
-	line := vs.doc.Line(row)
-	text, col := line, head-vs.doc.LineStart(row)
-	if shown, at, ok := vs.composedRow(row, line); ok {
-		text, col = shown, at+vs.comp.Cursor
+	primary := off == vs.doc.Caret()
+	vi, cell := vs.displayOfIn(x, off, primary && vs.upstreamNow())
+	if primary {
+		row := vs.doc.RowOf(off)
+		if shown, at, ok := vs.composedRow(row, vs.doc.Line(row)); ok {
+			vi, cell = x.indexOf(row), cellOfCol(shown, at+vs.comp.Cursor, vs.tab)
+		}
 	}
-	x := g.textX - vs.scrollX + float32(cellOfCol(text, col, vs.tab))*g.charW
-	y := float32(vs.doc.VisibleIndex(row))*g.lineH - vs.scrollY
-	return scene.Rect{X: x, Y: y, W: 2, H: g.lineH}
+	px := g.textX - vs.scrollX + float32(cell)*g.charW
+	py := float32(vi)*g.lineH - vs.scrollY
+	return scene.Rect{X: px, Y: py, W: 2, H: g.lineH}, vi
 }

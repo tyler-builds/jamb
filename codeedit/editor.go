@@ -406,21 +406,30 @@ func (vs *viewState) scroll(dx, dy float32) {
 // hit returns the row and the byte offset under the canvas point (x, y), from the last paint,
 // and reports whether there was a paint to hit against.
 func (vs *viewState) hit(x, y float32) (row, p int, ok bool) {
+	dr, p, _, ok := vs.hitAt(x, y)
+	return dr.row, p, ok
+}
+
+// hitAt returns the display row under the canvas point (x, y), from the last paint, and the byte
+// offset there. A point below the text is on the last display row, and a point in the indent of
+// a segment is at its start. upstream is true when the offset is the end of a segment that is
+// not the last of its row, where the caret shows at the end of that segment rather than at the
+// start of the next. ok is false when there was no paint to hit against.
+func (vs *viewState) hitAt(x, y float32) (dr displayRow, p int, upstream, ok bool) {
 	g := vs.geo
 	if !g.painted || g.lineH <= 0 {
-		return 0, 0, false
+		return displayRow{}, 0, false, false
 	}
-	vis := int((y + vs.scrollY) / g.lineH)
-	if vis < 0 {
-		vis = 0
-	}
-	row, found := vs.doc.RowAtVisible(vis)
+	ix := vs.rowIndex()
+	dr, found := vs.rowAt(ix, max(int((y+vs.scrollY)/g.lineH), 0))
 	if !found {
-		row = vs.doc.RowOf(vs.doc.Len())
+		dr, _ = vs.rowAt(ix, max(ix.count()-1, 0))
 	}
-	line := vs.doc.Line(row)
+	doc := vs.doc
+	ls, le := doc.LineStart(dr.row), doc.LineEnd(dr.row)
 	cell := int((x - g.textX + vs.scrollX + g.charW/2) / g.charW)
-	return row, vs.doc.LineStart(row) + colOfCell(line, max(cell, 0), vs.tab), true
+	p = dr.offsetAt(doc.Line(dr.row), ls, max(cell, 0), vs.tab)
+	return dr, p, p == dr.to && dr.to != le, true
 }
 
 // mouseDown handles a press: a fold marker folds or unfolds its row, a line number selects
@@ -432,13 +441,14 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 	}
 	vs.commitComposition() // a click types what is composed first: the layout it hits shows it
 	g := vs.geo
-	row, p, ok := vs.hit(ev.LocalX, ev.LocalY)
+	dr, p, _, ok := vs.hitAt(ev.LocalX, ev.LocalY)
 	if !ok {
 		return
 	}
+	row := dr.row
 	vs.restart = true
 	switch {
-	case ev.LocalX >= g.foldX && ev.LocalX < g.textX && vs.doc.opensBlock(row, vs.tab):
+	case ev.LocalX >= g.foldX && ev.LocalX < g.textX && dr.seg == 0 && vs.doc.opensBlock(row, vs.tab):
 		if !vs.doc.Unfold(row) {
 			vs.doc.Fold(row)
 		}
