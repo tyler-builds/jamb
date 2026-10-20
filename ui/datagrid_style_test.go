@@ -20,6 +20,7 @@ func partDataGrid(n int, st DataGridStyle, sel *Signal[[]string], sort *Signal[S
 // it, and it records each part in applied, for the drift test.
 func testDataGridParts(t *testing.T, applied map[string]bool) {
 	testDataGridEditParts(t, applied)
+	testDataGridColumnParts(t, applied)
 	type dgCase struct {
 		part  string
 		set   func(*DataGridStyle, Style)

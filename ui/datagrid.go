@@ -48,6 +48,10 @@ type DataColumn[T any] struct {
 	// Resizable lets the user resize the column, by the edge of its header and
 	// with Ctrl+Left and Ctrl+Right on its header (see DataGrid).
 	Resizable bool
+	// Movable lets the user move the column, by dragging its header and with
+	// Ctrl+Shift+Left and Ctrl+Shift+Right on its header (see DataGrid and
+	// DataGridElement.ColumnOrder).
+	Movable bool
 	// Align places the text of the column's cells and header: Start (the zero
 	// value), Center or End.
 	Align Alignment
@@ -206,6 +210,8 @@ type DataGridStyle struct {
 	Editor FieldStyle
 	// EditorMessage is the message of the cell editor, such as an error.
 	EditorMessage Style
+	// DropIndicator is the line that shows where a dragged column lands.
+	DropIndicator Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -229,6 +235,7 @@ func (s DataGridStyle) merge(o DataGridStyle) DataGridStyle {
 		CellEditing:      s.CellEditing.Merge(o.CellEditing),
 		Editor:           s.Editor.merge(o.Editor),
 		EditorMessage:    s.EditorMessage.Merge(o.EditorMessage),
+		DropIndicator:    s.DropIndicator.Merge(o.DropIndicator),
 	}
 }
 
@@ -253,6 +260,7 @@ func (s DataGridStyle) plain() DataGridStyle {
 		CellEditing:      plainStyle(s.CellEditing),
 		Editor:           s.Editor.plain(),
 		EditorMessage:    plainStyle(s.EditorMessage),
+		DropIndicator:    plainStyle(s.DropIndicator),
 	}
 }
 
@@ -303,6 +311,7 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 		CellEditing: Style{Background: t.Surface},
 		EditorMessage: Style{Direction: Row, Align: Center, Padding: XY(8, 3), Radius: t.Radius,
 			Background: t.Surface, BorderWidth: 1, BorderColor: t.Danger, TextColor: t.Danger},
+		DropIndicator: Style{Width: Px(2), Background: t.Accent},
 	}
 	if t.HighContrast {
 		st.RowSelected = Style{Background: t.Accent, TextColor: t.AccentText}
@@ -343,7 +352,9 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 //   - Enter activates the focused row, and calls OnActivate with it.
 //   - On a header cell, Enter and Space sort by its column (see Sort). On a
 //     resizable header cell, Ctrl+Left and Ctrl+Right narrow and widen the column by
-//     8 logical pixels.
+//     8 logical pixels. On a movable header cell (see DataColumn.Movable),
+//     Ctrl+Shift+Left and Ctrl+Shift+Right move the column one place, and its new
+//     place is announced; on other header cells they resize, as Ctrl does.
 //   - Shift+F10 or the Menu key opens the context menu of the focused cell, or of
 //     the header cell (see ContextMenu and HeaderContextMenu). Alt is not used by
 //     the grid, so that the host keeps its menu and navigation keys.
@@ -367,8 +378,10 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 // select or activate the row. A click on a header sorts by its column: ascending,
 // then descending, then not sorted. Dragging the edge of a resizable header
 // resizes its column, and a double-click on the edge fits the column to the rows
-// in view. A column header stays at the top of the rows as they scroll, and the
-// header scrolls with the rows when the columns are wider than the grid.
+// in view. Dragging a movable header moves its column: a line shows the side of the
+// header under the pointer that it lands on. A column header stays at the top of
+// the rows as they scroll, and the header scrolls with the rows when the columns are
+// wider than the grid.
 //
 // The columns are shown in the order of ColumnOrder, and assistive technology numbers
 // them in that order. The order and the widths the user sets can be kept in signals
@@ -414,6 +427,42 @@ type DataGridElement[T any] struct {
 	hasMore     bool
 	loadMore    func()
 	loadingMore bool
+	movable     bool
+}
+
+// Movable lets the user move every column of the grid, as DataColumn.Movable does
+// for one column.
+func (g *DataGridElement[T]) Movable() *DataGridElement[T] { g.movable = true; return g }
+
+// dgColDrag is the payload of a column's header that is dragged: the grid it
+// belongs to, and the key of the column.
+type dgColDrag struct {
+	grid any
+	key  string
+}
+
+// dgHeadOps are the actions of the header cells beyond the sort and the resize:
+// changed reports a change of the layout of the columns, widthOf is the width of a
+// column at the Text size setting 100 percent, movable says whether a column can be
+// moved, accepts whether the column from can be put beside the column to, and drop
+// puts it there (after it when after is set). mark is where a dragged column would
+// land, setMark sets it, and stopDrag stops a press from dragging the header.
+type dgHeadOps[T any] struct {
+	changed  func()
+	widthOf  func(cl DataColumn[T]) float32
+	movable  func(cl DataColumn[T]) bool
+	accepts  func(from, to string) bool
+	drop     func(from, to string, after bool)
+	mark     dgColMark
+	setMark  func(dgColMark)
+	stopDrag func()
+}
+
+// dgColMark is where a dragged column would land: beside the column with the key,
+// after it when after is set. It draws the drop indicator on that side.
+type dgColMark struct {
+	key   string
+	after bool
 }
 
 // LoadMore asks fn for more rows while hasMore is true: fn runs when the rows near
@@ -898,6 +947,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		colOrder = Local(ctx, "order", []string(nil))
 	}
 	handle := Local(ctx, "handle", NewListHandle()).Peek()
+	colMark := Local(ctx, "colMark", dgColMark{})
 	sel := g.sel
 	if sel == nil {
 		sel = Local(ctx, "selection", []string(nil))
@@ -1092,6 +1142,61 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		} else {
 			handle.request()
 		}
+	}
+	movable := func(cl DataColumn[T]) bool { return cl.Movable || g.movable }
+	// moveColumn moves the column at from of vc, the columns in the order they are
+	// shown, to the index to, and announces where it is now.
+	moveColumn := func(vc []DataColumn[T], from, to int) bool {
+		if from < 0 || from >= len(vc) || to < 0 || to >= len(vc) || to == from {
+			return false
+		}
+		keys := make([]string, 0, len(vc))
+		for i, cl := range vc {
+			if i != from {
+				keys = append(keys, cl.key())
+			}
+		}
+		keys = slices.Insert(keys, to, vc[from].key())
+		colOrder.Set(keys)
+		columnsChanged()
+		Announce(strs.ColumnMoved(vc[from].Header, to+1, len(vc)), access.Polite)
+		return true
+	}
+	// indexOf is the index of the column with key among vc, or -1.
+	indexOf := func(vc []DataColumn[T], key string) int {
+		return slices.IndexFunc(vc, func(cl DataColumn[T]) bool { return cl.key() == key })
+	}
+	// dropColumn puts the dragged column from beside the column to, after it when
+	// after is set. The columns are read from the signal, as a key handler reads them.
+	dropColumn := func(from, to string, after bool) {
+		vc := g.viewCols(colOrder.Peek())
+		f, t := indexOf(vc, from), indexOf(vc, to)
+		if f < 0 || t < 0 {
+			return
+		}
+		if after {
+			t++
+		}
+		if f < t {
+			t-- // the column leaves its place before it is put back
+		}
+		moveColumn(vc, f, t)
+	}
+	// stepColumn moves the column with key one place in direction dir, and scrolls it
+	// into view at its new place.
+	stepColumn := func(key string, dir int) {
+		vc := g.viewCols(colOrder.Peek())
+		f := indexOf(vc, key)
+		if !moveColumn(vc, f, f+dir) {
+			return
+		}
+		var x float32
+		for _, k := range colOrder.Peek()[:f+dir] {
+			x += cw[colPos[k]]
+		}
+		sh.reveal = true
+		sh.revealX0, sh.revealX1 = x, x+cw[colPos[key]]
+		handle.request()
 	}
 	// A request of the grid's handle is applied now, with the rows and columns of
 	// this build. A focus request moves the cursor after the build, as a key would.
@@ -1407,6 +1512,10 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			if e.Key == input.KeyLeft {
 				dir = -1
 			}
+			if onHeader && ctrl && shift && nc > 0 && movable(cols[col]) {
+				stepColumn(cols[col].key(), dir)
+				return true
+			}
 			if onHeader && ctrl {
 				if nc > 0 && cols[col].Resizable && setWidth(col, cw[col]+8*float32(dir)) {
 					columnsChanged()
@@ -1671,9 +1780,27 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		rt.animating = true
 	}
+	ho := dgHeadOps[T]{
+		changed: columnsChanged,
+		widthOf: func(cl DataColumn[T]) float32 { return cl.width(widths.Peek()) },
+		movable: movable,
+		accepts: func(from, to string) bool { return from != to },
+		drop:    dropColumn,
+		mark:    colMark.Get(),
+		setMark: func(m dgColMark) {
+			if colMark.Peek() != m {
+				colMark.Set(m)
+			}
+		},
+		// A press on the edge of a column resizes it: it does not drag the header.
+		stopDrag: func() {
+			if !rt.drag.active {
+				rt.drag = dragState{}
+			}
+		},
+	}
 	list.header = g.headerRow(st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
-		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) }, columnsChanged,
-		func(cl DataColumn[T]) float32 { return cl.width(widths.Peek()) }, strs)
+		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) }, ho, strs)
 
 	root := g.size.apply(Div().Column().Style(g.style)).Child(list)
 	if g.rowMenu != nil || g.headerMenu != nil {
@@ -1900,8 +2027,9 @@ func dgControls(n *node, out []*node) []*node {
 // list keeps it at the top of its viewport, and it scrolls with the columns.
 func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows []T, cols []DataColumn[T], cw []float32,
 	width float32, sorted SortState, sortCol, col int, onHeader, hasFocus, highContrast bool,
-	sortBy func(i int), setWidth func(i int, v float32) bool, fit func(i int) float32, changed func(),
-	widthOf func(cl DataColumn[T]) float32, strs *Strings) *DivElement {
+	sortBy func(i int), setWidth func(i int, v float32) bool, fit func(i int) float32, ho dgHeadOps[T],
+	strs *Strings) *DivElement {
+	changed, widthOf := ho.changed, ho.widthOf
 	h := Div().asPart("DataGrid.Header").Style(st.Header).Absolute().Top(0).Left(0).Width(Px(width))
 	for c, cl := range cols {
 		sortable := cl.Compare != nil
@@ -1952,6 +2080,39 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 			key := cl.key()
 			hc.ContextMenu(func() []MenuItem { return g.headerMenu(key) })
 		}
+		// Every header cell is a drop target for a moved column, a fixed one too, so a
+		// column can be put beside it; the half of the cell under the pointer picks the
+		// side. The line that shows the side changes no weight.
+		key := cl.key()
+		if m := ho.mark; m.key == key {
+			line := Div().asPart("DataGrid.DropIndicator").Absolute().Top(0).Bottom(0).Style(st.DropIndicator)
+			if m.after {
+				line.Right(-1)
+			} else {
+				line.Left(-1)
+			}
+			hc.Child(line)
+		}
+		hc.OnDrop(Drop(func(p dgColDrag, e *DropEvent) {
+			ho.setMark(dgColMark{})
+			ho.drop(p.key, key, e.LocalX > e.Width/2)
+		}).
+			Accept(func(p dgColDrag) bool { return p.grid == any(sh) && ho.accepts(p.key, key) }).
+			Move(func(p dgColDrag, e *DropEvent) { ho.setMark(dgColMark{key: key, after: e.LocalX > e.Width/2}) }).
+			Leave(func() { ho.setMark(dgColMark{}) }))
+		if ho.movable(cl) {
+			// The dragged header is dimmed, except under high contrast, where it keeps
+			// its colors.
+			source := Style{Opacity: 0.5}
+			if highContrast {
+				source = Style{}
+			}
+			label := cl.Header
+			hc.Dragging(source).OnDrag(Drag(dgColDrag{grid: sh, key: key}).Preview(func() Element {
+				return Div().Padding(6).Style(st.HeaderCell).Background(st.Header.Background).Border(1, st.Header.BorderColor).
+					Child(Text(label))
+			}).End(func(DragEnd) { ho.setMark(dgColMark{}) }))
+		}
 		if cl.Resizable {
 			ci, key, cl := c, cl.key(), cl
 			hc.Child(Div().asPart("DataGrid.ResizeHandle").Style(st.ResizeHandle).Absolute().Top(0).Bottom(0).Right(0).
@@ -1960,6 +2121,7 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 					if e.Button == input.ButtonLeft {
 						sh.dragging, sh.dragKey, sh.dragX, sh.dragW = true, key, e.X, cw[ci]
 						sh.dragFrom = widthOf(cl)
+						ho.stopDrag()
 						e.StopPropagation()
 					}
 				}).
