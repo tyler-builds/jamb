@@ -105,12 +105,21 @@ ui.DataGrid(runs, func(r run) string { return r.ID },
 | `Edit` | Makes the cells editable: `Edit(row, value) error` saves the value, or returns the error that keeps the editor open. Set Value (assistive technology) runs it too |
 | `Editor` | Replaces the text field of an edit with a custom editor, such as a `ui.Select` (see Custom editors below) |
 | `Value` | The text an edit starts with, when it differs from `Text` (a raw number for a formatted one). Nil means `Text` |
+| `Movable` | Lets the user move the column, by dragging its header or with Ctrl+Shift+Left and Right on it (see the keyboard and mouse below) |
+| `Pin` | `ui.PinStart` or `ui.PinEnd` keeps the column at the start or the end of the grid as the other columns scroll sideways. The pinned columns are shown before and after the others; a column moves only among the columns of its pin |
+| `Group` | Columns next to each other with the same group share one cell, of their width, in a row above the header (`HeaderGroup`). A group that a pin or a move splits is drawn in pieces. For assistive technology the group is the description of each column's header, and the row of groups is hidden |
 
 The `Compare` of a column is easier to write with `ui.SortBy(key)`, which orders by any `cmp.Ordered` key, and `ui.SortByText(key)`, which orders text without regard to case. `SortState.Desc` reverses the order, so there is no descending helper.
 
 The grid's methods:
 
 - `Selection(mode, keys)`: `ui.SelectionNone`, `ui.SelectionSingle` or `ui.SelectionMultiple`. The keys of the selected rows are kept in `keys`, so the app reads the selection and can set it. A nil `keys` keeps the selection in the grid.
+- `CellSelection(mode, cells)`: selects cells instead of rows, kept in `cells` as `ui.CellKey{Row, Column}` keys, which follow their rows and columns through a sort or a move. It replaces `Selection`: the later of the two calls applies, and the development warnings say so. The cells are the items of the selection for assistive technology, and a selected cell has the `CellSelected` fill. Ctrl+A makes a key for every cell, so with 100,000 rows `cells` is a large slice.
+- `ColumnOrder(keys)`, `ColumnWidths(ws)` and `OnColumnsChange(fn)`: the order of the columns (by key) and the widths the user sets (by key, at the 100 percent Text size) kept in signals, so an app can save and restore them. A saved order survives new columns: an unknown key is dropped and the columns it does not name follow in their given order. `fn` gets a `ui.ColumnState{Order, Widths}` after each change the user makes: the end of a drag of a column's edge, each keyboard resize step, an auto-fit, and a move. It does not run on each move of a drag. The focus and an open edit follow their column when it moves.
+- `Movable()`: lets the user move every column, as `DataColumn.Movable` does for one.
+- `Handle(h)`: a `ui.NewDataGridHandle()` scrolls the grid from code by key: `ScrollToRow(key)` in the sorted order, `ScrollToColumn(key)`, and `FocusCell(rowKey, colKey)`, which moves the focused cell, scrolls it into view and focuses the grid without changing the selection. A request applies at the grid's next build; a key that names nothing does nothing.
+- `ContextMenu(build)` and `HeaderContextMenu(build)`: menus built with the row and the column key, or the column key of a header. A right-press on a row that is not selected moves the focus there and selects the row; on a selected row it keeps the selection, as File Explorer does. Shift+F10 or the Menu key opens the menu of the focused cell, or of the header cell while the focus is on the header. An empty result opens nothing.
+- `LoadMore(hasMore, fn)` and `LoadingMore(on)`: while `hasMore` is true, `fn` runs once when the rows within a viewport of the end are built, or when Down, PageDown or Ctrl+End is pressed on the last row, and again only after the number of rows changes. It runs after the frame, never while the grid is built. `LoadingMore(true)` shows a row after the last one with a small progress ring and "Loading more rows" (`Strings.LoadingMore`), announced politely; it is not one of the grid's rows for assistive technology.
 - `Sort(s)`: the `ui.SortState` (`Key` and `Desc`) in `s`. A click on a header cycles the column through ascending, descending and not sorted. A nil `s` keeps the sort in the grid.
 - `OnActivate(fn)`: runs `fn` with the row, on Enter or a double-click.
 - The look of the states is a fill or a line, not a change of weight: a selected row has the `RowSelected` fill, a sorted column has its arrow (`SortIndicator`), and the text keeps its weight.
@@ -141,6 +150,20 @@ Rows are identified by their keys, which must be unique and stable. The focus, t
 | Escape | In a control of an interactive cell, returns to the grid. In an edit, cancels it |
 | A printable character | On an editable cell with the text field, starts an edit with the character, which replaces the text as in a spreadsheet |
 | Ctrl+Left, Ctrl+Right | On a resizable header cell, narrows or widens the column by 8 logical pixels |
+| Ctrl+Shift+Left, Ctrl+Shift+Right | On a movable header cell, moves the column one place among the columns of its pin, and announces its new place ("Status moved to position 2 of 5", `Strings.ColumnMoved`). On a header cell that cannot move, resizes as Ctrl does |
+| Shift+F10, Menu | Opens the context menu of the focused cell, or of the header cell (`ContextMenu`, `HeaderContextMenu`) |
+
+With `CellSelection` the keys select cells:
+
+| Key | Action |
+| --- | --- |
+| Arrows, Home, End, PageDown, PageUp | Move to the cell and select it |
+| Ctrl with a move | Moves the focus without selecting. The anchor stays |
+| Shift with a move | Selects the rectangle of cells from the anchor cell to the focused one (multiple) |
+| Space | Toggles the focused cell (multiple), or selects it (single) |
+| Shift+Space | Selects the cells of the focused row (multiple) |
+| Ctrl+Space | Selects the cells of the focused column (multiple) |
+| Ctrl+A | Selects every cell (multiple) |
 
 **Interactive and editable cells.** A cell that holds controls, or an editor, is still the grid's one Tab stop: the controls and the editor are not in the Tab order, and the grid's keys reach them through the focus. The model follows the WAI-ARIA grid pattern (https://www.w3.org/WAI/ARIA/apg/patterns/grid/), which describes two states without naming them: grid navigation, in which the grid holds focus, and the cell's own widgets, which Enter or F2 move focus into. In the second state Tab and Shift+Tab move to the next and previous widget, which the pattern lets wrap inside the cell or leave the grid; this grid wraps inside the cell. Escape (the pattern's "restores grid navigation") or F2 returns to grid navigation on the same cell. The keys a control uses (the arrows of a text field, Enter on a button) belong to the control. An edit saves on Enter and on Tab, and when focus leaves its editor (a click elsewhere in the grid), as a spreadsheet does. Escape is the only cancel. This blur save is a choice of this grid, not a rule of the pattern.
 
@@ -170,8 +193,12 @@ The cell's `Text`, when it is set, is still the cell's accessible name in an int
 
 Alt is not used by the grid, so the host keeps its menu and navigation keys.
 
-**Mouse.** A click selects a row: Ctrl toggles it and Shift extends the selection from the anchor. A double-click activates the row. A click on a header cell sorts. Dragging the edge of a resizable header cell resizes its column, and the cursor is the east-west resize cursor over the edge. A double-click on the edge fits the column to the text of the rows in view.
+**Mouse.** A click selects a row: Ctrl toggles it and Shift extends the selection from the anchor. With `CellSelection` a click selects a cell, Ctrl+click toggles it, and Shift+click selects the rectangle from the anchor cell. A double-click activates the row. A click on a header cell sorts. Dragging the edge of a resizable header cell resizes its column, and the cursor is the east-west resize cursor over the edge. A double-click on the edge fits the column to the text of the rows in view. Dragging a movable header cell moves its column: a line (`DropIndicator`) shows the side of the header under the pointer that it lands on, and a press that does not move 4 px is still a click that sorts. A right-press opens the context menu (see `ContextMenu`).
+
+**Pinned columns.** A pinned column stays at its end of the grid while the others scroll under it. Its cells are filled with the grid's background and then their row's fill, so a hovered, selected or striped row shows through them; `CellPinned` styles them, and `PinnedEdge` is the cell at the inner edge of the pinned columns, with a 1 px border by default. A column that the focus moves to, or that `ScrollToColumn` names, is scrolled clear of the pinned columns.
+
+**Many columns.** When the columns are wider than the grid, the rows build only the columns in view, two more on each side, the pinned columns, the focused column and the one being edited; the rest of each row is a spacer hidden from assistive technology. The header is built whole, so every column header is reported. This does not apply while the columns are narrower than the grid, where `Grow` shares out the spare width.
 
 **Sorting.** A sort of 100,000 rows takes about 8 ms in the benchmark (`BenchmarkDataGridSort100k`), which is under the 50 ms at which a sort would move to a worker thread, so the sort runs on the UI thread. Only one column sorts at a time: Shift+click does not add a second sort (see `docs/accessibility-design-phases-i-m.md`, Phase I).
 
-**Accessibility.** The grid is a `DataGrid` control with the Grid and Table patterns. Its `RowCount` is every row of the data, built or not, and its `ColumnCount` is the number of columns. Each cell is a `DataItem` with the GridItem and TableItem patterns, and each row is a `ListItem` with the SelectionItem pattern. Each header cell is a `HeaderItem` that Invoke sorts, with its sort state in its name ("Duration, sorted descending") and in its ItemStatus. Selection uses the Selection pattern, which says whether it takes many items. See `docs/accessibility-design-phases-i-m.md`, Phase I.
+**Accessibility.** The grid is a `DataGrid` control with the Grid and Table patterns. Its `RowCount` is every row of the data, built or not, and its `ColumnCount` is the number of columns. Each cell is a `DataItem` with the GridItem and TableItem patterns, and each row is a `ListItem` with the SelectionItem pattern. Each header cell is a `HeaderItem` that Invoke sorts, with its sort state in its name ("Duration, sorted descending") and in its ItemStatus. Selection uses the Selection pattern, which says whether it takes many items; with `CellSelection` the cells are its items, and the rows are not. The columns are numbered in the order they are shown, so a moved or pinned column changes its column number. GetItem answers only for the cells that are built: a row out of view, or a column out of view in a grid wider than its view, gives nothing, and the client scrolls the grid to it. See `docs/accessibility-design-phases-i-m.md`, Phase I.
