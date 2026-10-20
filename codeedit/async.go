@@ -83,4 +83,5 @@ func (vs *viewState) stopRequests() {
 	vs.closePopups()
 	vs.hover.slot.stop()
 	vs.completion.slot.stop()
+	vs.define.stop()
 }
