@@ -343,8 +343,10 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 //   - Enter activates the focused row, and calls OnActivate with it.
 //   - On a header cell, Enter and Space sort by its column (see Sort). On a
 //     resizable header cell, Ctrl+Left and Ctrl+Right narrow and widen the column by
-//     8 logical pixels. Alt is not used by the grid, so that the host keeps its
-//     menu and navigation keys.
+//     8 logical pixels.
+//   - Shift+F10 or the Menu key opens the context menu of the focused cell, or of
+//     the header cell (see ContextMenu and HeaderContextMenu). Alt is not used by
+//     the grid, so that the host keeps its menu and navigation keys.
 //   - On an interactive cell (see DataColumn.Interactive), Enter or F2 moves focus
 //     to its first control. In the cell, Tab and Shift+Tab move through its
 //     controls and wrap at the ends, as the WAI-ARIA grid pattern allows; Escape or
@@ -405,6 +407,8 @@ type DataGridElement[T any] struct {
 	widths      *Signal[map[string]float32]
 	onColumns   func(ColumnState)
 	gridHandle  *DataGridHandle
+	rowMenu     func(row T, column string) []MenuItem
+	headerMenu  func(column string) []MenuItem
 }
 
 // The sizing methods give the grid's outer box a size, over its Style. See Sizing
@@ -511,6 +515,24 @@ func (g *DataGridElement[T]) Empty(el Element) *DataGridElement[T] { g.empty = e
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (g *DataGridElement[T]) Styles(st DataGridStyle) *DataGridElement[T] {
 	g.styles = g.styles.merge(st)
+	return g
+}
+
+// ContextMenu opens a menu on the cells of the grid, built by build with the row and
+// the key of the column. A right-press opens it at the pointer: on a row that is not
+// selected it first moves the focus to the cell and selects the row, and on a selected
+// row it moves the focus and keeps the selection, as in File Explorer. Shift+F10 or
+// the Menu key opens it for the focused cell. An empty result opens nothing.
+func (g *DataGridElement[T]) ContextMenu(build func(row T, column string) []MenuItem) *DataGridElement[T] {
+	g.rowMenu = build
+	return g
+}
+
+// HeaderContextMenu opens a menu on the header cells, built by build with the key of
+// the column: on a right-press on a header cell, and with Shift+F10 or the Menu key
+// while the focus is on the header. An empty result opens nothing.
+func (g *DataGridElement[T]) HeaderContextMenu(build func(column string) []MenuItem) *DataGridElement[T] {
+	g.headerMenu = build
 	return g
 }
 
@@ -1465,6 +1487,50 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		return max(nc-1, 0)
 	}
+	// cellAt returns the displayed position and the column of the cell under the
+	// window's (x, y), and reports whether there is one.
+	cellAt := func(x, y float32) (q, c int, ok bool) {
+		for _, nd := range rt.hitTest(x, y) {
+			d := nd.div
+			switch {
+			case d == nil || d.acc == nil:
+			case d.part == "DataGrid.Cell" && d.acc.gridRow > 0:
+				return d.acc.gridRow - 1, d.acc.gridCol - 1, true
+			case d.part == "DataGrid.Row" && d.acc.setPos > 0:
+				return d.acc.setPos - 1, colAt(d.acc.setPos-1, x), true
+			}
+		}
+		return 0, 0, false
+	}
+	// menu builds the context menu of the grid. The menu is built before the press
+	// reaches the rows, so a press finds its cell itself, and moves the cursor there
+	// and selects the row as the rule of File Explorer says. The keyboard opens the
+	// menu of the cell, or the header cell, that the cursor is on.
+	menu := func() []MenuItem {
+		if nc == 0 {
+			return nil
+		}
+		if !rt.keyboardModality {
+			q, c, ok := cellAt(rt.mouseX, rt.mouseY)
+			if !ok || g.rowMenu == nil || q >= n {
+				return nil
+			}
+			if g.mode != SelectionNone && !sh.selection(sel.Peek())[keyAt(q)] {
+				click(q, c, 0)
+			} else {
+				place(q, c, false)
+			}
+			return g.rowMenu(rows[order[q]], cols[c].key())
+		}
+		p, c, onHeader := cursorNow()
+		switch {
+		case onHeader && g.headerMenu != nil:
+			return g.headerMenu(cols[c].key())
+		case onHeader || g.rowMenu == nil || n == 0:
+			return nil
+		}
+		return g.rowMenu(rows[order[p]], cols[c].key())
+	}
 	rc := dgRowCtx[T]{t: t, ctx: ctx, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed,
 		click: click, colAt: colAt, activate: activate, ops: ops}
@@ -1547,6 +1613,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		func(cl DataColumn[T]) float32 { return cl.width(widths.Peek()) }, strs)
 
 	root := g.size.apply(Div().Column().Style(g.style)).Child(list)
+	if g.rowMenu != nil || g.headerMenu != nil {
+		// The menu hangs from the grid's outer box, which does not scroll, so that it
+		// opens at the pointer however far the rows are scrolled.
+		root.ContextMenu(menu)
+	}
 	if n == 0 {
 		msg := g.empty
 		if msg == nil {
@@ -1813,6 +1884,10 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 		if sortable {
 			ci := c
 			hc.OnClick(func() { sortBy(ci) })
+		}
+		if g.headerMenu != nil {
+			key := cl.key()
+			hc.ContextMenu(func() []MenuItem { return g.headerMenu(key) })
 		}
 		if cl.Resizable {
 			ci, key, cl := c, cl.key(), cl
