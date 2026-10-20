@@ -356,6 +356,10 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 
 // DataGridElement is a table of rows and columns, for business data. Only the rows
 // in view are built, so a grid of 100,000 rows costs what its visible part costs.
+// When the columns are wider than the grid, the rows build only the columns in view
+// as well, with the pinned columns, the focused one and the one being edited; the
+// header is built whole. As for the rows, assistive technology finds by row and
+// column only the cells that are built, and the grid reports all its columns.
 // Create one with DataGrid.
 //
 // The grid is one Tab stop. Its keys act on the focused cell, and they follow the
@@ -811,7 +815,8 @@ type dgRowCtx[T any] struct {
 	rowH                 float32
 	cursorPos, cursorCol int
 	onHeader, hasFocus   bool
-	startN, endN         int // the numbers of the columns pinned to the start and the end
+	startN, endN         int    // the numbers of the columns pinned to the start and the end
+	built                []bool // the columns whose cells are built, or nil for all of them
 	ed                   dgEdit
 	click                func(q, cl int, mods input.Modifiers)
 	colAt                func(q int, x float32) int
@@ -867,6 +872,14 @@ type dgShared[T any] struct {
 	revealX0, revealX1 float32
 	viewH              float32 // the height of the viewport at the last paint
 	warned             bool
+
+	// When the columns are wider than the view, only the columns that scroll in
+	// [colFrom, colTo) are built in the rows (colSet once it is known), with the
+	// pinned columns, the cursor's and the editing one. visW is the width of the
+	// rows the view shows, at the last paint.
+	colFrom, colTo int
+	colSet         bool
+	visW           float32
 
 	// asked is set once LoadMore has asked for rows, when there were askedN of them;
 	// loadingMore is whether the last build showed the LoadingMore row.
@@ -1076,6 +1089,23 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 	}
 	startW, endW := xs[startN], total-xs[nc-endN]
+	// When the columns are wider than the view, the rows build only the columns in
+	// view (see dgShared.colFrom), so that a grid of many columns costs what its
+	// visible part costs. The header is built whole.
+	virtual := sh.colSet && sh.visW > 0 && total > sh.visW
+	var built []bool
+	if virtual {
+		built = make([]bool, nc)
+		for c, cl := range cols {
+			built[c] = cl.Pin != PinNone || (c >= sh.colFrom && c < sh.colTo)
+		}
+		if nc > 0 {
+			built[col] = true
+			if ed.key != "" {
+				built[ed.col] = true
+			}
+		}
+	}
 	sortCol := -1
 	for i, cl := range cols {
 		if sortState.Key != "" && cl.key() == sortState.Key && cl.Compare != nil {
@@ -1699,6 +1729,19 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				return c
 			}
 		}
+		if virtual {
+			// Not every cell is built, and no column grows, so the column is found from
+			// the widths.
+			b := rt.nodeRect(body)
+			be := body.style.borderEdges()
+			cx := x - b.X - be.Left - body.style.Padding.Left + body.st.scrollX
+			for c := startN; c < nc-1; c++ {
+				if cx < xs[c+1] {
+					return c
+				}
+			}
+			return max(nc-1, 0)
+		}
 		for c := startN; c < nc-1; c++ {
 			if r, ok := rect(c); ok && x < r.X+r.W {
 				return c
@@ -1752,7 +1795,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	rc := dgRowCtx[T]{t: t, ctx: ctx, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed, startN: startN, endN: endN,
-		click: click, colAt: colAt, activate: activate, ops: ops}
+		built: built, click: click, colAt: colAt, activate: activate, ops: ops}
 	// A row within a viewport of rows of the end asks for more rows when it is built.
 	near := n - max(int(sh.viewH/rowH), 1)
 	list := UniformList(n, func(q int) Element {
@@ -1830,21 +1873,42 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			inst.invalidate()
 			rt.listStale = true
 		}
-		if !sh.reveal {
+		sh.visW = dgVisibleWidth(nd)
+		if sh.reveal {
+			sh.reveal = false
+			// The column is brought into the part of the view that the pinned columns
+			// leave free.
+			x0, x1 := sh.revealX0, sh.revealX1
+			switch {
+			case x0 < nd.st.targetX+startW:
+				nd.st.targetX = x0 - startW
+			case x1 > nd.st.targetX+sh.visW-endW:
+				nd.st.targetX = x1 - sh.visW + endW
+			}
+			rt.animating = true
+		}
+		// The columns in view, at the current offset and at the scroll target, with two
+		// more on each side. When the built columns do not cover them, the rows are
+		// built again.
+		if total <= sh.visW || nc-endN <= startN {
 			return
 		}
-		sh.reveal = false
-		// The column is brought into the part of the view that the pinned columns
-		// leave free.
-		x0, x1 := sh.revealX0, sh.revealX1
-		vis := dgVisibleWidth(nd)
-		switch {
-		case x0 < nd.st.targetX+startW:
-			nd.st.targetX = x0 - startW
-		case x1 > nd.st.targetX+vis-endW:
-			nd.st.targetX = x1 - vis + endW
+		lo := min(nd.st.scrollX, nd.st.targetX) + startW
+		hi := max(nd.st.scrollX, nd.st.targetX) + sh.visW - endW
+		vf := startN
+		for vf < nc-endN-1 && xs[vf+1] <= lo {
+			vf++
 		}
-		rt.animating = true
+		vt := vf
+		for vt < nc-endN && xs[vt] < hi {
+			vt++
+		}
+		const ov = 2
+		if !virtual || vf < sh.colFrom || vt > sh.colTo || sh.colFrom < vf-3*ov || sh.colTo > vt+3*ov {
+			sh.colFrom, sh.colTo, sh.colSet = max(vf-ov, startN), min(vt+ov, nc-endN), true
+			inst.invalidate()
+			rt.listStale = true
+		}
 	}
 	if startN+endN > 0 {
 		// The pinned cells, and the row of LoadingMore, are moved by the sideways
@@ -1994,12 +2058,26 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		}
 	}
 	var names []string
+	// skip is the width of the columns not built since the last cell, which a spacer
+	// hidden from assistive technology takes.
+	var skip float32
+	spacer := func() {
+		if skip > 0 {
+			r.Child(Div().AccessHidden().Style(Style{Basis: Px(skip), NoShrink: true}))
+			skip = 0
+		}
+	}
 	for c, cl := range cols {
 		s := ""
 		if cl.Text != nil {
 			s = cl.Text(v)
 			names = append(names, s)
 		}
+		if rc.built != nil && !rc.built[c] {
+			skip += xs[c+1] - xs[c]
+			continue
+		}
+		spacer()
 		cell := Div().asPart("DataGrid.Cell").Style(st.Cell).
 			Style(Style{Basis: Px(xs[c+1] - xs[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
 		cell.Role(access.RoleDataItem).Label(s).AccessCell(q+1, c+1)
@@ -2078,6 +2156,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		}
 		r.Child(cell)
 	}
+	spacer()
 	if len(names) > 0 {
 		r.Label(strings.Join(names, ", "))
 	}
