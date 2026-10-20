@@ -17,7 +17,8 @@ import "github.com/tyler-builds/jamb/ui"
 // of the find and replace bar. DiagnosticError, DiagnosticWarning, DiagnosticInfo and
 // DiagnosticHint are the marks of the diagnostics of each severity: their TextColor colors the
 // wavy underline and the gutter marker, which the theme's Danger, Warning, Accent and TextMuted
-// colors are by default.
+// colors are by default. Popup is the panel of the hover and of the completions, PopupItem one
+// entry of it, and PopupItemSelected the completion that Enter accepts.
 //
 // Under high contrast the colors of these parts are the system colors, whatever is set
 // here or in the theme; their sizes and spacing still apply.
@@ -48,6 +49,12 @@ type Style struct {
 	DiagnosticInfo ui.Style
 	// DiagnosticHint is the look of the marks of a hint: its TextColor.
 	DiagnosticHint ui.Style
+	// Popup is the panel of the hover and of the list of completions.
+	Popup ui.Style
+	// PopupItem is one entry of a popup: a message of the hover, or a completion.
+	PopupItem ui.Style
+	// PopupItemSelected is the completion that Enter accepts.
+	PopupItemSelected ui.Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -67,6 +74,10 @@ func (s Style) merge(o Style) Style {
 		DiagnosticWarning: s.DiagnosticWarning.Merge(o.DiagnosticWarning),
 		DiagnosticInfo:    s.DiagnosticInfo.Merge(o.DiagnosticInfo),
 		DiagnosticHint:    s.DiagnosticHint.Merge(o.DiagnosticHint),
+
+		Popup:             s.Popup.Merge(o.Popup),
+		PopupItem:         s.PopupItem.Merge(o.PopupItem),
+		PopupItemSelected: s.PopupItemSelected.Merge(o.PopupItemSelected),
 	}
 }
 
@@ -100,6 +111,11 @@ func editorDefaults(t *ui.Theme) Style {
 		DiagnosticWarning: ui.Style{TextColor: t.Warning},
 		DiagnosticInfo:    ui.Style{TextColor: t.Accent},
 		DiagnosticHint:    ui.Style{TextColor: t.TextMuted},
+
+		Popup: ui.Style{Background: t.Surface, TextColor: t.Text, BorderWidth: 1, BorderColor: t.Border,
+			Radius: t.Radius, Padding: ui.All(4), Gap: 2, FontSize: t.FontSize},
+		PopupItem:         ui.Style{Padding: ui.Edges{Top: 2, Right: 6, Bottom: 2, Left: 6}, Radius: t.Radius},
+		PopupItemSelected: ui.Style{Background: t.Accent, TextColor: t.AccentText},
 	}
 }
 
@@ -120,6 +136,10 @@ func (s Style) plain() Style {
 		DiagnosticWarning: plainPart(s.DiagnosticWarning),
 		DiagnosticInfo:    plainPart(s.DiagnosticInfo),
 		DiagnosticHint:    plainPart(s.DiagnosticHint),
+
+		Popup:             plainPart(s.Popup),
+		PopupItem:         plainPart(s.PopupItem),
+		PopupItemSelected: plainPart(s.PopupItemSelected),
 	}
 }
 

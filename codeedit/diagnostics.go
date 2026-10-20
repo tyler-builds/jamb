@@ -234,14 +234,12 @@ func (vs *viewState) goToDiagnostic(forward bool) {
 	vs.restart = true
 	vs.touch()
 	vs.announceDiagnostic(g)
+	vs.openHover(g.From, false) // announced above
 }
 
 // announceDiagnostic says the severity, the line and the message of g, politely.
 func (vs *viewState) announceDiagnostic(g Diagnostic) {
-	strs := ui.EnglishStrings()
-	if vs.ctx != nil {
-		strs = vs.ctx.Strings()
-	}
+	strs := vs.uiStrings()
 	ui.Announce(strs.CodeEditorDiagnostic(severityName(g.Severity, strs), vs.doc.RowOf(g.From)+1, g.Message), access.Polite)
 }
 
