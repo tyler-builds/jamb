@@ -44,7 +44,7 @@ func (rt *Runtime) hostCompose(c composition) {
 		rt.hostComposeHook(n, c)
 		return
 	}
-	n, es, v := rt.editorOf(rt.focusID)
+	n, es, _ := rt.editorOf(rt.focusID)
 	if n == nil || n.editor.locked() || n.editor.password {
 		// A read-only field, or no field, shows nothing. A masked field does not show
 		// the composition either, as a one-time code input does not: the text that the
@@ -61,7 +61,7 @@ func (rt *Runtime) hostCompose(c composition) {
 	if rt.composing == 0 && es.hasSelection() {
 		// The composition replaces the selection, as typing does.
 		a, b := es.selection()
-		rt.editorSet(n.id, v[:a]+v[b:], a, editOther)
+		rt.editorRemove(n.id, a, b, editOther)
 	}
 	es.comp = c.clamped()
 	rt.composing = n.id
@@ -146,11 +146,12 @@ func (rt *Runtime) editorTyped(id uint64, s string) {
 }
 
 // composedText returns what an editor shows while it has a composition: the
-// value with the composition at the caret. at is where the composition
-// starts in the result.
-func composedText(v string, es *editState) (shown string, at int) {
-	at = clampToRune(v, es.caret)
-	return v[:at] + es.comp.text + v[at:], at
+// text it shows (the value, or the value in its format) with the composition at
+// the caret, which is at caret in that text. at is where the composition starts
+// in the result.
+func composedText(text string, caret int, es *editState) (shown string, at int) {
+	at = clampToRune(text, caret)
+	return text[:at] + es.comp.text + text[at:], at
 }
 
 // paintComposition underlines the composition, which starts at byte at of the

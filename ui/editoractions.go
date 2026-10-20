@@ -255,6 +255,9 @@ func (rt *Runtime) editorHorizontal(id uint64, dir int, word, extend bool) {
 		if dir < 0 {
 			p = 0
 		}
+	case word && n.editor.format != nil:
+		// A word of a format is a group of slots between literals (see InputFormat.words).
+		p = n.editor.format.wordStep(v, p, dir)
 	case word && dir < 0:
 		p = wordBackward(v, p)
 	case word:
@@ -344,6 +347,8 @@ func (rt *Runtime) editorDeleteStep(id uint64, dir int, word bool) {
 		} else {
 			rt.editorDelete(id, a, len(v))
 		}
+	case word && n.editor.format != nil:
+		rt.editorDelete(id, a, n.editor.format.wordStep(v, a, dir))
 	case dir < 0 && word:
 		rt.editorDelete(id, wordBackward(v, a), a)
 	case dir < 0:
@@ -377,30 +382,32 @@ func (rt *Runtime) editorSelectAll(id uint64) {
 	rt.editorTouched(id)
 }
 
-// editorCopy copies the selection. A masked field keeps its text off the
-// clipboard: it copies nothing, and cuts nothing either.
+// editorCopy copies the selection, as the field shows it: a field with a format
+// copies the selected part of the text in its format. A masked field keeps its
+// text off the clipboard: it copies nothing, and cuts nothing either.
 func (rt *Runtime) editorCopy(id uint64) {
 	n, es, v := rt.editorOf(id)
 	if n == nil || !es.hasSelection() || n.editor.password {
 		return
 	}
 	a, b := es.selection()
-	rt.setClipboard(v[a:b])
+	pr := rt.present(n.editor, v)
+	rt.setClipboard(pr.shown[pr.toShown(a):pr.endShown(b)])
 }
 
 func (rt *Runtime) editorCut(id uint64) {
 	rt.editorCopy(id)
-	n, es, v := rt.editorOf(id)
+	n, es, _ := rt.editorOf(id)
 	if n == nil || !es.hasSelection() || n.editor.password {
 		return
 	}
 	a, b := es.selection()
-	rt.editorSet(id, v[:a]+v[b:], a, editOther)
+	rt.editorRemove(id, a, b, editOther)
 }
 
 func (rt *Runtime) editorPaste(id uint64) {
 	if s, ok := rt.clipboard(); ok && s != "" {
-		rt.editorInsert(id, s, editOther)
+		rt.editorInput(id, s, editOther, true)
 		return
 	}
 	n := rt.byID[id]

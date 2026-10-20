@@ -3,7 +3,6 @@ package ui
 import (
 	"image"
 	"math"
-	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -141,34 +140,49 @@ type editorElement struct {
 	password, revealed bool
 	// clearable is set on a field that Escape clears (see TextInputElement.Clearable).
 	clearable bool
+	// format is the shape the field shows its text in, and accept decides whether an
+	// edit by the user may change the text (see TextInputElement.Format and Accept).
+	format *InputFormat
+	accept func(string) bool
 }
 
-// hidden reports whether the editor draws its text as bullets (see maskedText).
+// hidden reports whether the editor draws its text as bullets (see present).
 func (e *editorElement) hidden() bool { return e.password && !e.revealed }
 
 // maskBullet is what a masked field draws for each character of its text, as a
 // Windows password box does.
 const maskBullet = "•"
 
-// maskedText returns what a masked field shows for its text v: a bullet for each
-// character (grapheme cluster), so that the caret and the selection move by the
-// characters of v.
-func (rt *Runtime) maskedText(v string) string {
-	return strings.Repeat(maskBullet, len(rt.text.GraphemeStops(v))-1)
+// present returns what the editor shows for its text v, and how offsets map between
+// them. A masked field shows a bullet for each character (grapheme cluster), so
+// that the caret and the selection move by the characters of v, and shows no
+// literals of its format. A field with a format shows v in its shape (see
+// InputFormat.present). Any other field shows v as it is.
+func (rt *Runtime) present(e *editorElement, v string) presented {
+	switch {
+	case e.hidden():
+		stops := rt.text.GraphemeStops(v)
+		at := make([]int, len(stops))
+		for i := range at {
+			at[i] = i * len(maskBullet)
+		}
+		return presented{shown: strings.Repeat(maskBullet, len(stops)-1), raw: stops, at: at}
+	case e.format != nil:
+		return e.format.present(v)
+	}
+	return presented{shown: v}
 }
 
-// maskOffset returns the byte offset in the masked text of v (see maskedText) of
-// the byte offset p of v.
-func (rt *Runtime) maskOffset(v string, p int) int {
-	i, _ := slices.BinarySearch(rt.text.GraphemeStops(v), p)
-	return i * len(maskBullet)
-}
-
-// unmaskOffset returns the byte offset in v of the byte offset q of its masked
-// text: the start of the character whose bullet q is at.
-func (rt *Runtime) unmaskOffset(v string, q int) int {
-	stops := rt.text.GraphemeStops(v)
-	return stops[min(max(q/len(maskBullet), 0), len(stops)-1)]
+// prompt returns what the editor draws after its text v for the slots of its
+// template not filled yet, in the placeholder's color (see InputFormat.prompt), or
+// "". It is drawn only: it is not in the value, the layout or what assistive
+// technology reads. An empty field shows it while it has focus, and while it has
+// not, its placeholder when it has one. A masked field shows none.
+func (e *editorElement) prompt(v string, focused bool) string {
+	if e.format == nil || e.hidden() || (v == "" && !focused && e.placeholder != "") {
+		return ""
+	}
+	return e.format.prompt(v)
 }
 
 // locked reports whether the text can't be changed by the user or by
@@ -192,11 +206,10 @@ const fieldMinChars = "000000"
 func (n *node) measureEditor(maxWidth float32) (float32, float32) {
 	e := n.editor
 	v := e.value.Peek()
-	switch {
-	case v == "":
+	if v == "" {
 		v = e.placeholder
-	case e.hidden():
-		v = n.rt.maskedText(v)
+	} else {
+		v = n.rt.present(e, v).shown
 	}
 	w := maxWidth
 	if !e.multiline {
@@ -264,6 +277,17 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	d.h.onTextInput = func(s string) { rt.editorTyped(id, s) }
 	d.h.onFocus = func() { rt.editorTouched(id) }
 	d.h.onBlur = e.onBlur
+	if e.format != nil {
+		// Leaving the field puts its value in its shortest form first, so that the
+		// field's own onBlur (a Field's check) sees it.
+		blur := e.onBlur
+		d.h.onBlur = func() {
+			rt.editorNormalize(id)
+			if blur != nil {
+				blur()
+			}
+		}
+	}
 	if len(e.labelledBy) > 0 || len(e.describedBy) > 0 {
 		d.access().labelledBy, d.access().describedBy = e.labelledBy, e.describedBy
 	}
@@ -307,8 +331,22 @@ func (rt *Runtime) now() time.Time {
 // ---- edits ----
 
 // editorSet replaces the value, recording undo history. Consecutive typing
-// (or deleting) within a second forms one undo step; a typed space ends it.
+// (or deleting) within a second forms one undo step; a typed space ends it. A
+// field with Accept refuses a value it does not accept: nothing changes, not
+// even the caret. The empty value is always accepted.
 func (rt *Runtime) editorSet(id uint64, nv string, caret int, kind editKind) {
+	n, _, v := rt.editorOf(id)
+	if n == nil {
+		return
+	}
+	if nv != v && nv != "" && n.editor.accept != nil && !n.editor.accept(nv) {
+		return
+	}
+	rt.editorApply(id, nv, caret, kind)
+}
+
+// editorApply is editorSet without the field's Accept.
+func (rt *Runtime) editorApply(id uint64, nv string, caret int, kind editKind) {
 	n, es, v := rt.editorOf(id)
 	if n == nil || (nv != v && n.editor.locked()) {
 		return
@@ -338,6 +376,13 @@ func (rt *Runtime) editorSet(id uint64, nv string, caret int, kind editKind) {
 }
 
 func (rt *Runtime) editorInsert(id uint64, s string, kind editKind) {
+	rt.editorInput(id, s, kind, false)
+}
+
+// editorInput types s in place of the selection, or pastes it (paste set). A field
+// with a format changes its value as the format says (see InputFormat.edit), and
+// an edit the format refuses changes nothing.
+func (rt *Runtime) editorInput(id uint64, s string, kind editKind, paste bool) {
 	n, es, v := rt.editorOf(id)
 	if n == nil {
 		return
@@ -349,19 +394,69 @@ func (rt *Runtime) editorInsert(id uint64, s string, kind editKind) {
 	if a != b {
 		kind = editOther // replacing a selection is its own undo step
 	}
-	rt.editorSet(id, v[:a]+s+v[b:], a+len(s), kind)
+	nv, caret := v[:a]+s+v[b:], a+len(s)
+	if f := n.editor.format; f != nil {
+		var ok bool
+		if nv, caret, ok = f.edit(v, a, b, s, paste); !ok {
+			return
+		}
+	}
+	rt.editorSet(id, nv, caret, kind)
 	if s == " " {
 		es.lastKind = editOther // words are undo steps
 	}
 }
 
 func (rt *Runtime) editorDelete(id uint64, from, to int) {
-	_, _, v := rt.editorOf(id)
+	rt.editorRemove(id, from, to, editDeleting)
+}
+
+// editorRemove deletes the bytes from to to of the value, as an edit of the kind.
+// The characters after them move to the slots before in a field with a format
+// (see InputFormat.del).
+func (rt *Runtime) editorRemove(id uint64, from, to int, kind editKind) {
+	n, _, v := rt.editorOf(id)
 	from, to = min(from, to), max(from, to)
-	if from == to {
+	if n == nil || from == to {
 		return
 	}
-	rt.editorSet(id, v[:from]+v[to:], from, editDeleting)
+	nv, caret := v[:from]+v[to:], from
+	if f := n.editor.format; f != nil {
+		nv, caret = f.del(v, from, to)
+	}
+	rt.editorSet(id, nv, caret, kind)
+}
+
+// editorReplaceAll replaces the whole value with s, as assistive technology sets
+// it. A field with a format takes s as pasted text, so "(555) 123-4567" gives a
+// phone number its digits; a text that gives nothing the format takes changes
+// nothing.
+func (rt *Runtime) editorReplaceAll(id uint64, s string) {
+	n, _, v := rt.editorOf(id)
+	if n == nil {
+		return
+	}
+	nv, caret := s, len(s)
+	if f := n.editor.format; f != nil && s != "" {
+		var ok bool
+		if nv, caret, ok = f.edit(v, 0, len(v), s, true); !ok {
+			return
+		}
+	}
+	rt.editorSet(id, nv, caret, editOther)
+}
+
+// editorNormalize puts the value of a field with a format in its shortest form, as
+// leaving the field does (see InputFormat.normalize), as an undo step of its own.
+// The field's Accept is not asked.
+func (rt *Runtime) editorNormalize(id uint64) {
+	n, es, v := rt.editorOf(id)
+	if n == nil || n.editor.format == nil || n.editor.locked() {
+		return
+	}
+	if nv := n.editor.format.normalize(v); nv != v {
+		rt.editorApply(id, nv, min(es.caret, len(nv)), editOther)
+	}
 }
 
 func (rt *Runtime) editorUndo(id uint64, redo bool) {
@@ -425,11 +520,9 @@ func (rt *Runtime) editorHit(n *node, es *editState, ev *MouseEvent) int {
 		return es.caret
 	}
 	p := es.layout.HitTest(ev.LocalX-es.originX, ev.LocalY-es.originY)
-	if n.editor.hidden() {
-		// The layout is of the bullets.
-		p = rt.unmaskOffset(n.editor.value.Peek(), p)
-	}
-	return p
+	// The layout is of the text shown: the bullets, or the text in its format, where
+	// a click on a literal puts the caret before the slot after it.
+	return rt.present(n.editor, n.editor.value.Peek()).fromShown(p)
 }
 
 func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
@@ -452,6 +545,9 @@ func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
 	case es.clicks >= 2 && n.editor.password:
 		// The words of a password are not shown, so a double-click selects it all.
 		es.anchor, es.caret = 0, len(v)
+	case es.clicks == 2 && n.editor.format != nil:
+		// A word of a format is a group of slots between literals (see InputFormat.words).
+		es.anchor, es.caret = n.editor.format.wordAt(v, p)
 	case es.clicks == 2:
 		es.anchor, es.caret = text.WordAt(v, p)
 	case es.clicks >= 3:
@@ -526,16 +622,13 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	// While an input method composes, the text shown has the composition at
 	// the caret, and the caret is the input method's.
 	composing := focused && rt.composing == n.id && es.comp.text != ""
-	shown, at, caretAt := v, 0, es.caret
+	pr := rt.present(e, v)
 	// pos maps an offset of v to one of the text shown.
-	pos := func(p int) int { return p }
-	switch {
-	case composing:
-		shown, at = composedText(v, es)
+	pos := pr.toShown
+	shown, at, caretAt := pr.shown, 0, pos(es.caret)
+	if composing {
+		shown, at = composedText(pr.shown, caretAt, es)
 		caretAt = at + es.comp.cursor
-	case e.hidden():
-		shown, caretAt = rt.maskedText(v), rt.maskOffset(v, es.caret)
-		pos = func(p int) int { return rt.maskOffset(v, p) }
 	}
 	l := rt.text.Layout(shown, st, wrap)
 	es.layout = l
@@ -574,7 +667,7 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	if selected {
 		a, b := es.selection()
 		sel := e.selection.Alpha(opacity)
-		rt.selRects = l.SelectionRects(pos(a), pos(b), rt.selRects[:0])
+		rt.selRects = l.SelectionRects(pos(a), pr.endShown(b), rt.selRects[:0])
 		for _, r := range rt.selRects {
 			if !e.selection.IsZero() {
 				rt.scene.AddQuad(scene.Quad{
@@ -585,12 +678,21 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 			}
 		}
 	}
+	pc := fg
+	if !e.placeholderColor.IsZero() {
+		pc = e.placeholderColor
+	}
+	var prompt string
+	if !composing {
+		prompt = e.prompt(v, focused)
+	}
+	if prompt != "" {
+		endX, _ := l.Caret(len(shown))
+		pl := rt.text.Layout(prompt, st, wrap)
+		rt.text.Draw(&rt.scene, pl, tx+endX, cy, cw, rt.scale, 0, pc.Alpha(opacity).scene())
+	}
 	if shown == "" {
-		if e.placeholder != "" {
-			pc := fg
-			if !e.placeholderColor.IsZero() {
-				pc = e.placeholderColor
-			}
+		if e.placeholder != "" && prompt == "" {
 			pl := rt.text.Layout(e.placeholder, st, wrap)
 			rt.text.Draw(&rt.scene, pl, tx, cy, cw, rt.scale, 0, pc.Alpha(opacity).scene())
 		}
