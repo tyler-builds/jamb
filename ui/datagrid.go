@@ -56,6 +56,11 @@ type DataColumn[T any] struct {
 	// Pin keeps the column at the start or the end of the grid as the other columns
 	// scroll sideways. Zero (PinNone) lets it scroll.
 	Pin ColumnPin
+	// Group names a group of columns, such as "Address" over Street and City. Columns
+	// next to each other with the same Group share one cell, of their width, in a row
+	// above the header; a group that a pin or a move splits is drawn in pieces. It is
+	// the description of each column's header for assistive technology.
+	Group string
 	// Align places the text of the column's cells and header: Start (the zero
 	// value), Center or End.
 	Align Alignment
@@ -232,6 +237,9 @@ type DataGridStyle struct {
 	// PinnedEdge is the cell, in the body or the header, at the inner edge of the
 	// pinned columns, whose border separates them from the columns that scroll.
 	PinnedEdge Style
+	// HeaderGroup is the cell of a group of columns, above their header cells (see
+	// DataColumn.Group).
+	HeaderGroup Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -258,6 +266,7 @@ func (s DataGridStyle) merge(o DataGridStyle) DataGridStyle {
 		DropIndicator:    s.DropIndicator.Merge(o.DropIndicator),
 		CellPinned:       s.CellPinned.Merge(o.CellPinned),
 		PinnedEdge:       s.PinnedEdge.Merge(o.PinnedEdge),
+		HeaderGroup:      s.HeaderGroup.Merge(o.HeaderGroup),
 	}
 }
 
@@ -285,6 +294,7 @@ func (s DataGridStyle) plain() DataGridStyle {
 		DropIndicator:    plainStyle(s.DropIndicator),
 		CellPinned:       plainStyle(s.CellPinned),
 		PinnedEdge:       plainStyle(s.PinnedEdge),
+		HeaderGroup:      plainStyle(s.HeaderGroup),
 	}
 }
 
@@ -337,6 +347,8 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 			Background: t.Surface, BorderWidth: 1, BorderColor: t.Danger, TextColor: t.Danger},
 		DropIndicator: Style{Width: Px(2), Background: t.Accent},
 		PinnedEdge:    Style{BorderColor: t.Border},
+		HeaderGroup: Style{Direction: Row, Align: Center, Justify: Center, AlignSelf: Stretch, Padding: Edges{Left: 8, Right: 8},
+			NoShrink: true, OverflowX: OverflowHidden, BorderEdges: Edges{Bottom: 1}, BorderColor: t.Border},
 	}
 	if t.HighContrast {
 		st.RowSelected = Style{Background: t.Accent, TextColor: t.AccentText}
@@ -412,7 +424,9 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 // the rows as they scroll, and the header scrolls with the rows when the columns are
 // wider than the grid. A pinned column (see DataColumn.Pin) stays at the start or
 // the end of the grid as the others scroll under it, and a column that the focus
-// moves to is scrolled clear of the pinned ones.
+// moves to is scrolled clear of the pinned ones. Columns with a Group share a cell in
+// a row above the header; the keys do not reach that row, and assistive technology
+// reads the group as the description of each column's header.
 //
 // The columns are shown in the order of ColumnOrder, and assistive technology numbers
 // them in that order. The order and the widths the user sets can be kept in signals
@@ -489,6 +503,30 @@ type dgHeadOps[T any] struct {
 	stopDrag func()
 	// startN and endN are the numbers of the columns pinned to the start and the end.
 	startN, endN int
+	// runs are the pieces of the row of the groups of columns, or nil without it.
+	runs []dgGroupRun
+}
+
+// dgGroupRun is a piece of the row of the groups of columns: the columns [from, to)
+// that are next to each other with the same group (empty for columns with none)
+// and the same pin.
+type dgGroupRun struct {
+	group    string
+	pin      ColumnPin
+	from, to int
+}
+
+// groupRuns returns the pieces of the row of the groups of the columns cols.
+func groupRuns[T any](cols []DataColumn[T]) []dgGroupRun {
+	var runs []dgGroupRun
+	for c, cl := range cols {
+		if k := len(runs) - 1; k >= 0 && runs[k].group == cl.Group && runs[k].pin == cl.Pin {
+			runs[k].to = c + 1
+			continue
+		}
+		runs = append(runs, dgGroupRun{group: cl.Group, pin: cl.Pin, from: c, to: c + 1})
+	}
+	return runs
 }
 
 // dgColMark is where a dragged column would land: beside the column with the key,
@@ -1047,6 +1085,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	keyAt := func(q int) string { return sh.keys[order[q]] }
 	selected := sh.selection(sel.Get())
 	rowH := dataGridRowHeight(g.density) * rt.textFactor
+	// The header is a row high, or two with a row of the groups of columns above it.
+	headerH := rowH
+	if slices.ContainsFunc(g.cols, func(c DataColumn[T]) bool { return c.Group != "" }) {
+		headerH = 2 * rowH
+	}
 
 	// The cursor follows its row by key, so that a sort or new rows keep it on
 	// the same cell.
@@ -1589,7 +1632,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		ctrl := e.Mods&input.ModCtrl != 0
 		shift := e.Mods&input.ModShift != 0
-		step := max(int((sh.viewH-rowH)/rowH), 1)
+		step := max(int((sh.viewH-headerH)/rowH), 1)
 		switch e.Key {
 		case input.KeyLeft, input.KeyRight:
 			dir := 1
@@ -1827,7 +1870,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	list.decorate = func(el *DivElement) {
 		focus := Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}.Merge(st.GridFocusVisible)
 		el.asPart("DataGrid.Grid").Role(access.RoleDataGrid).ScrollX().
-			Style(st.Grid).Style(Style{Padding: Edges{Top: rowH, Right: dataGridGutter}}).
+			Style(st.Grid).Style(Style{Padding: Edges{Top: headerH, Right: dataGridGutter}}).
 			FocusHandle(sh.focus).FocusVisible(focus).
 			OnKeyDown(func(e *KeyEvent) {
 				if keys(e) {
@@ -1910,6 +1953,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			rt.listStale = true
 		}
 	}
+	// The pieces of the row of the groups of columns.
+	var runs []dgGroupRun
+	if headerH > rowH {
+		runs = groupRuns(cols)
+	}
 	if startN+endN > 0 {
 		// The pinned cells, and the row of LoadingMore, are moved by the sideways
 		// scroll before they are painted, so that they stay where they are on the
@@ -1936,8 +1984,19 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				}
 			}
 			if len(nd.children) > 1 {
+				// The header is the row of header cells, or a column of the row of the
+				// groups, whose pieces are those of groupRuns, and that row.
+				hdr := nd.children[1]
+				if headerH > rowH && len(hdr.children) == 2 {
+					for i, c := range hdr.children[0].children {
+						if i < len(runs) {
+							offset(c, runs[i].pin)
+						}
+					}
+					hdr = hdr.children[1]
+				}
 				i := 0
-				for _, c := range nd.children[1].children {
+				for _, c := range hdr.children {
 					if c.div != nil && c.div.part == "DataGrid.HeaderCell" {
 						offset(c, pinOf(i))
 						i++
@@ -1981,6 +2040,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		},
 		startN: startN,
 		endN:   endN,
+		runs:   runs,
 	}
 	list.header = g.headerRow(st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
 		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) }, ho, strs)
@@ -1996,7 +2056,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if msg == nil {
 			msg = Text(strs.NoRows)
 		}
-		root.Child(Div().asPart("DataGrid.Empty").Absolute().Top(rowH).Left(0).Right(0).Style(st.Empty).Child(msg))
+		root.Child(Div().asPart("DataGrid.Empty").Absolute().Top(headerH).Left(0).Right(0).Style(st.Empty).Child(msg))
 	}
 	if g.loading {
 		root.Child(Div().Absolute().Top(0).Right(0).Bottom(0).Left(0).Column().Align(Center).Justify(Center).
@@ -2263,7 +2323,7 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 	sortBy func(i int), setWidth func(i int, v float32) bool, fit func(i int) float32, ho dgHeadOps[T],
 	strs *Strings) *DivElement {
 	changed, widthOf := ho.changed, ho.widthOf
-	h := Div().asPart("DataGrid.Header").Style(st.Header).Absolute().Top(0).Left(0).Width(Px(width))
+	h := Div().asPart("DataGrid.Header").Style(st.Header).Width(Px(width))
 	for c, cl := range cols {
 		sortable := cl.Compare != nil
 		isSorted := c == sortCol
@@ -2279,6 +2339,9 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 		hc := Div().asPart("DataGrid.HeaderCell").Style(st.HeaderCell).
 			Style(Style{Basis: Px(cw[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
 		hc.Role(access.RoleHeaderItem).Label(name)
+		if cl.Group != "" {
+			hc.Description(cl.Group)
+		}
 		if cl.Pin != PinNone {
 			pinCell(hc, st, cl.Pin, c == ho.startN-1 || c == len(cols)-ho.endN)
 		}
@@ -2382,5 +2445,27 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 		}
 		h.Child(hc)
 	}
-	return h
+	if ho.runs == nil {
+		return h.Absolute().Top(0).Left(0)
+	}
+	// The row of the groups is above the header cells. Its pieces are as wide as their
+	// columns: each takes their widths and their shares of the spare width. It is
+	// for sighted users: each header cell is described by its group.
+	gr := Div().Style(st.Header).AccessHidden()
+	for _, run := range ho.runs {
+		var basis, grow float32
+		for c := run.from; c < run.to; c++ {
+			basis += cw[c]
+			grow += cols[c].Grow
+		}
+		piece := Div().Style(Style{Basis: Px(basis), Grow: grow, NoShrink: true, AlignSelf: Stretch})
+		if run.group != "" {
+			piece.asPart("DataGrid.HeaderGroup").Style(st.HeaderGroup).Child(Text(run.group).Truncate())
+		}
+		if run.pin != PinNone {
+			pinCell(piece, st, run.pin, run.to-1 == ho.startN-1 || run.from == len(cols)-ho.endN)
+		}
+		gr.Child(piece)
+	}
+	return Div().Column().Absolute().Top(0).Left(0).Width(Px(width)).Child(gr).Child(h)
 }

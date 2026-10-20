@@ -47,4 +47,14 @@ func testDataGridColumnParts(t *testing.T, applied map[string]bool) {
 			t.Error("the style does not reach the cells and the header cells at the edge of the pinned columns")
 		}
 	})
+	t.Run("HeaderGroup", func(t *testing.T) {
+		applied["DataGrid.HeaderGroup"] = true
+		r := newAccessRig(func(ctx *Context) Element {
+			return DataGrid(dgItems(3), func(x dgItem) string { return x.ID }, dgGroupColumns()...).Label("Runs").
+				Styles(DataGridStyle{HeaderGroup: Style{Background: markBG}})
+		})
+		if !anyMarked(r.rt, "DataGrid.HeaderGroup", false) {
+			t.Error("the style does not reach the cell of a group of columns")
+		}
+	})
 }
