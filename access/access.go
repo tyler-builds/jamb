@@ -68,6 +68,7 @@ const (
 	RoleCalendar                  // a month of days, a grid with a header of weekday names (see DatePicker)
 	RoleStatusBar                 // the bar along the bottom of a window that shows its status (see StatusBar)
 	RoleToolBar                   // a row of controls that is one Tab stop, named by its label (see Toolbar)
+	RoleAlertDialog               // a modal dialog that asks for a response to a message, named by its title (see AlertDialog)
 )
 
 var roleNames = [...]string{
@@ -110,6 +111,7 @@ var roleNames = [...]string{
 	RoleCalendar:      "calendar",
 	RoleStatusBar:     "status bar",
 	RoleToolBar:       "tool bar",
+	RoleAlertDialog:   "alert dialog",
 }
 
 // String returns the role's name, such as "check box".
@@ -119,6 +121,10 @@ func (r Role) String() string {
 	}
 	return fmt.Sprintf("role(%d)", uint8(r))
 }
+
+// IsDialog reports whether the role is a modal dialog, RoleDialog or
+// RoleAlertDialog: a window of its own to assistive technology.
+func (r Role) IsDialog() bool { return r == RoleDialog || r == RoleAlertDialog }
 
 // Interactive reports whether a user operates a node of this role, so that it
 // needs an accessible name (see the development warnings).

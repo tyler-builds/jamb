@@ -44,6 +44,13 @@ type ModalElement struct {
 	// edge, with the Drawer parts and styles.
 	drawer bool
 	side   DrawerSide
+	// The fields an AlertDialog sets (see alertdialog.go): the role of the panel,
+	// the header that replaces the title, the key of the message that describes
+	// the panel, and the resolved look of the parts, whose names are AlertDialog's.
+	role        access.Role
+	header      Element
+	describedBy string
+	alert       *ModalStyle
 }
 
 // Key identifies the modal among its siblings, so it keeps its state when the
@@ -191,11 +198,22 @@ func (*ModalElement) isElement() {}
 func (m *ModalElement) expand(ctx *Context) Element {
 	part := "Modal"
 	var st ModalStyle
-	if m.drawer {
+	switch {
+	case m.alert != nil:
+		part, st = "AlertDialog", *m.alert
+	case m.drawer:
 		part = "Drawer"
 		st = resolveDrawer(ctx, m.side, m.styles)
-	} else {
+	default:
 		st = resolveModal(ctx, m.styles)
+	}
+	var title Element = Div().asPart(part + ".Title").Style(st.Title).Shrink(0).Child(Text(m.title))
+	if m.header != nil {
+		title = m.header
+	}
+	role := access.RoleDialog
+	if m.role != access.RoleUnknown {
+		role = m.role
 	}
 	closeFn := func() {
 		if m.onClose != nil {
@@ -240,10 +258,13 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		// the backdrop, which the panel counts as its parent, so it does not
 		// reach this.
 		OnClickOutside(closeFn).
-		Child(Div().asPart(part + ".Title").Style(st.Title).Shrink(0).Child(Text(m.title))).
+		Child(title).
 		Child(Div().asPart(part + ".Body").Style(st.Body).Grow(1).ScrollY().Child(m.body)).
 		Child(footer).
-		Role(access.RoleDialog).Label(m.title)
+		Role(role).Label(m.title)
+	if m.describedBy != "" {
+		panel.DescribedBy(m.describedBy)
+	}
 
 	if !m.drawer {
 		panel.MaxHeight(Px(winH - 2*margin))

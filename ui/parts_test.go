@@ -208,6 +208,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("MenuBar", func(t *testing.T) { testMenuBarParts(t, applied) })
 	t.Run("Modal", func(t *testing.T) { testModalParts(t, applied) })
 	t.Run("Drawer", func(t *testing.T) { testDrawerParts(t, applied) })
+	t.Run("AlertDialog", func(t *testing.T) { testAlertDialogParts(t, applied) })
 	t.Run("Popover", func(t *testing.T) { testPopoverParts(t, applied) })
 	t.Run("CommandPalette", func(t *testing.T) { testCommandPaletteParts(t, applied) })
 	t.Run("Progress", func(t *testing.T) { testProgressParts(t, applied) })

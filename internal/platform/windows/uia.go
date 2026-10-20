@@ -204,6 +204,7 @@ const (
 //	role                      control type      LocalizedControlType
 //	window                    Window            window
 //	dialog                    Window            dialog (IsDialog is set)
+//	alert dialog              Window            alert dialog (IsDialog is set)
 //	group                     Group             group
 //	button                    Button            button
 //	check box, switch         CheckBox          check box, switch
@@ -234,8 +235,11 @@ const (
 // text, and the ui runtime's text areas are editable. Unknown roles are Panes,
 // which carry no pattern and so no behavior a client would expect.
 func controlType(r access.Role) int32 {
+	if r.IsDialog() {
+		return ctWindow
+	}
 	switch r {
-	case access.RoleWindow, access.RoleDialog:
+	case access.RoleWindow:
 		return ctWindow
 	case access.RoleGroup:
 		return ctGroup
@@ -460,7 +464,7 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 			return variantI4(int32(n.Level))
 		}
 	case propIsDialog:
-		if n.Role == access.RoleDialog {
+		if n.Role.IsDialog() {
 			return variantBool(true)
 		}
 	case propValue:
@@ -516,7 +520,7 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 			return variantBSTR(n.ItemStatus)
 		}
 	case propWindowIsModal:
-		if n.Role == access.RoleDialog {
+		if n.Role.IsDialog() {
 			return variantBool(true)
 		}
 	case propHeadingLevel:
@@ -704,7 +708,7 @@ func supports(k coreKind, n *access.Node) bool {
 	case kindText:
 		return isText(n.Role)
 	case kindWindow:
-		return n.Role == access.RoleDialog
+		return n.Role.IsDialog()
 	}
 	return false
 }
@@ -1414,7 +1418,7 @@ func (w *window) onAccess(b *access.Bridge, u access.Update) {
 	}
 	for _, p := range u.Opened {
 		event := int32(eventMenuOpened)
-		if p.Role == access.RoleDialog {
+		if p.Role.IsDialog() {
 			event = eventWindowOpened
 		}
 		w.raiseOn(b, p.ID, event)
@@ -1422,7 +1426,7 @@ func (w *window) onAccess(b *access.Bridge, u access.Update) {
 	for _, p := range u.Closed {
 		// The popup has left the tree, so its closing is raised on the window.
 		event := int32(eventMenuClosed)
-		if p.Role == access.RoleDialog {
+		if p.Role.IsDialog() {
 			event = eventWindowClosed
 		}
 		win32.UiaRaiseAutomationEvent(w.uiaRoot, event)

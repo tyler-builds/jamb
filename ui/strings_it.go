@@ -52,6 +52,8 @@ func italianStrings() *Strings {
 		NextMonth:                 "Mese successivo",
 		NextYear:                  "Anno successivo",
 		Close:                     "Chiudi",
+		OK:                        "OK",
+		Cancel:                    "Annulla",
 		Minimize:                  "Riduci a icona",
 		Maximize:                  "Ingrandisci",
 		Restore:                   "Ripristina",

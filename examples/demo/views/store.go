@@ -110,6 +110,7 @@ type Store struct {
 	// field, and SampleResult is what it last saved.
 	SampleOpen   *ui.Signal[bool]
 	DrawerOpen   *ui.Signal[bool] // the drawer sample of the Components page
+	AlertOpen    *ui.Signal[bool] // the alert dialog sample of the Components page
 	PaletteOpen  *ui.Signal[bool] // the command palette (Ctrl+Shift+P)
 	SampleName   *ui.Signal[string]
 	SampleResult *ui.Signal[string]
@@ -174,6 +175,7 @@ func NewStore() *Store {
 		NewForm:      ui.NewForm(),
 		SampleOpen:   ui.NewSignal(false),
 		DrawerOpen:   ui.NewSignal(false),
+		AlertOpen:    ui.NewSignal(false),
 		PaletteOpen:  ui.NewSignal(false),
 		SampleName:   ui.NewSignal(""),
 		SampleResult: ui.NewSignal(""),

@@ -1265,7 +1265,7 @@ func uiaCanMinimize(this, out uintptr) uintptr {
 }
 
 func uiaIsModal(this, out uintptr) uintptr {
-	return windowOut(this, out, func(n *access.Node) int32 { return boolOf(n.Role == access.RoleDialog) })
+	return windowOut(this, out, func(n *access.Node) int32 { return boolOf(n.Role.IsDialog()) })
 }
 
 func uiaWindowVisualState(this, out uintptr) uintptr {
@@ -1277,5 +1277,5 @@ func uiaWindowInteractionState(this, out uintptr) uintptr {
 }
 
 func uiaIsTopmost(this, out uintptr) uintptr {
-	return windowOut(this, out, func(n *access.Node) int32 { return boolOf(n.Role == access.RoleDialog) })
+	return windowOut(this, out, func(n *access.Node) int32 { return boolOf(n.Role.IsDialog()) })
 }

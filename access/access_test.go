@@ -254,6 +254,32 @@ func TestDiffReportsDialogsAndMenusOpenedAndClosed(t *testing.T) {
 	}
 }
 
+func TestAlertDialogIsADialog(t *testing.T) {
+	if got := RoleAlertDialog.String(); got != "alert dialog" {
+		t.Fatalf("role %q", got)
+	}
+	for _, r := range []Role{RoleDialog, RoleAlertDialog} {
+		if !r.IsDialog() {
+			t.Errorf("%s is not a dialog", r)
+		}
+	}
+	for _, r := range []Role{RoleWindow, RoleMenu, RoleGroup} {
+		if r.IsDialog() {
+			t.Errorf("%s is a dialog", r)
+		}
+	}
+	window := &Node{ID: RootID, Role: RoleWindow}
+	alert := &Node{ID: 6, Role: RoleAlertDialog, Parent: RootID}
+	closed := NewTree(0, []*Node{window})
+	open := NewTree(0, []*Node{{ID: RootID, Role: RoleWindow, Children: []ID{6}}, alert})
+	if u := Diff(closed, open); len(u.Opened) != 1 || u.Opened[0] != (Popup{6, RoleAlertDialog}) {
+		t.Fatalf("opening reported %v", u.Opened)
+	}
+	if u := Diff(open, closed); len(u.Closed) != 1 || u.Closed[0] != (Popup{6, RoleAlertDialog}) {
+		t.Fatalf("closing reported %v", u.Closed)
+	}
+}
+
 func TestNodeEqualComparesScroll(t *testing.T) {
 	a := &Node{ID: 1, Scroll: Scroll{Container: true, CanY: true, Y: 10}}
 	b := &Node{ID: 1, Scroll: Scroll{Container: true, CanY: true, Y: 10}}

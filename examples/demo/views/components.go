@@ -151,8 +151,8 @@ var componentSections = []componentSection{
 	{"Customizing", "Styles Theme Variant RenderTab Tabs Segmented Indicator Checkbox Collapsible NumberInput SpinButtons " +
 		"Select Button Badge render slot styling",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return customizingSection() }},
-	{"Dialogs", "MessageBox OpenFiles SaveFile PickFolder Modal Drawer CommandPalette Clipboard SetClipboard dialog file open " +
-		"save folder message box modal sheet command palette Ctrl+Shift+P copy paste",
+	{"Dialogs", "MessageBox OpenFiles SaveFile PickFolder Modal Drawer AlertDialog CommandPalette Clipboard SetClipboard dialog file open " +
+		"save folder message box modal sheet alert confirm delete command palette Ctrl+Shift+P copy paste",
 		func(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element { return dialogsSection(ctx, t, s) }},
 	{"Images", "Image ImageFit FitCover FitContain FitFill picture photo",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {

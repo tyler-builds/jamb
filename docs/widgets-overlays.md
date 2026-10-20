@@ -233,6 +233,44 @@ ui.If(open.Get(), ui.Modal("New project", form).
   Alt doesn't activate a menu bar. Keys handled inside the modal (a field's
   editing keys, the modal's own bindings) work as usual.
 
+### Alert dialogs
+
+`ui.AlertDialog` is a modal that asks the user to respond to a message, with a
+fixed layout: an icon and the title, the message, an optional `Body`, and the
+buttons at the end of the footer: the app's `Action` buttons, then Cancel, then the
+confirm button. It is a `Modal` underneath, so the backdrop, the focus trap, the
+return of focus, the motion and the maximum height are the same. Build it only
+while it is open, and remove it in its functions:
+
+```go
+ui.If(asking.Get(), ui.AlertDialog("Delete 3 files?", "They cannot be restored.").
+	Intent(ui.AlertDialogDestructive).  // AlertDialogInfo (default), Confirm, Warning, Destructive
+	Confirm("Delete", deleteFiles).     // "" is "OK" (Strings.OK)
+	Cancel("", closeFn).                // "" is "Cancel" (Strings.Cancel); Escape runs it
+	ConfirmLoading(deleting.Get()))     // the confirm button is Loading while the work runs
+```
+
+- The intent picks the icon and the confirm button: `AlertDialogInfo` (the Info
+  icon, as a rule with OK alone), `AlertDialogConfirm` (Info, in the accent color),
+  `AlertDialogWarning` (Alert, in the warning colors) and `AlertDialogDestructive`
+  (Alert, in the danger colors, with a Danger confirm button). `Icon` replaces the
+  icon, and `Icon(nil)` hides it. Under high contrast the icon and the message are
+  in the text color.
+- The focus starts on the confirm button, or on Cancel for a destructive dialog, so
+  that a stray Enter never deletes. Enter presses the focused button; elsewhere in
+  the dialog, such as in a field of the `Body`, it confirms, except in a destructive
+  dialog, which has no default button.
+- Escape runs Cancel, or the confirm function when there is no Cancel (and not while
+  the confirm button is loading). A press on the backdrop does nothing: the dialog
+  waits for an answer.
+- Assistive technology hears an alert dialog (`access.RoleAlertDialog`, a UI
+  Automation Window with IsDialog and IsModal set, and "alert dialog" as its
+  localized control type) named by the title and described by the message. Its
+  opening and closing raise the window events, as a Modal's do.
+- Its look is `ui.AlertDialogStyle`, with the parts `Scrim`, `Panel`, `Header`,
+  `Icon`, `Title`, `Message`, `Body` and `Footer` (`Theme.AlertDialog` or
+  `.Styles(...)`), and the sizing methods set the panel's width, 420 px by default.
+
 ## Command palette
 
 `ui.CommandPalette(open)` is a searchable list of commands, as in an editor's
