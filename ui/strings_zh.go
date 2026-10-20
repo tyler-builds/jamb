@@ -93,6 +93,7 @@ func chineseMainlandStrings() *Strings {
 
 		NoResults:               "暂无数据",
 		NoRows:                  "暂无数据",
+		LoadingMore:             "正在加载更多数据",
 		NoMatchingCommands:      "没有匹配的命令",
 		CouldNotLoadSuggestions: "无法加载建议",
 		SuggestionCount:         func(n int) string { return fmt.Sprintf("%d 条建议", n) },
@@ -200,6 +201,7 @@ func chineseTaiwanStrings() *Strings {
 
 		NoResults:               "沒有結果",
 		NoRows:                  "暫無資料",
+		LoadingMore:             "正在載入更多資料",
 		NoMatchingCommands:      "沒有相符的命令",
 		CouldNotLoadSuggestions: "無法載入建議",
 		SuggestionCount:         func(n int) string { return fmt.Sprintf("%d 條建議", n) },
@@ -307,6 +309,7 @@ func chineseHongKongStrings() *Strings {
 
 		NoResults:               "暫無數據",
 		NoRows:                  "暫無數據",
+		LoadingMore:             "正在載入更多數據",
 		NoMatchingCommands:      "沒有相符的命令",
 		CouldNotLoadSuggestions: "無法載入建議",
 

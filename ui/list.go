@@ -31,7 +31,10 @@ type UniformListElement struct {
 	rowWidth float32
 	// before, when set, runs at paint before the offset of the list is stepped.
 	before func(n *node)
-	size   sizing // see the sizing methods
+	// tail, when set, is drawn after the rows, as one more row of their height. It is
+	// not one of the items: it has no position in the list (see DataGrid.LoadingMore).
+	tail Element
+	size sizing // see the sizing methods
 }
 
 // The sizing methods give the list's outer box a size, over its Style. See Sizing
@@ -217,7 +220,11 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 		from = min(max(ls.from, 0), l.count)
 		to = max(min(ls.to, l.count), from)
 	}
-	spacer := Div().Key("jamb.list.spacer").Shrink(0).Height(Px(float32(l.count) * ls.rowH))
+	slots := l.count
+	if l.tail != nil {
+		slots++
+	}
+	spacer := Div().Key("jamb.list.spacer").Shrink(0).Height(Px(float32(slots) * ls.rowH))
 	if l.rowWidth > 0 {
 		spacer.Width(Px(l.rowWidth))
 	}
@@ -232,6 +239,9 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 			setListPosition(wrap, r, i+1, l.count)
 		}
 		spacer.Child(wrap)
+	}
+	if l.tail != nil && to == l.count {
+		spacer.Child(Div().Key("jamb.list.tail").Absolute().Top(float32(l.count) * ls.rowH).Left(0).Right(0).Child(l.tail))
 	}
 	container := l.size.apply(Div().ScrollY().Style(l.style)).Role(access.RoleList)
 	container.access().container = l.selectable

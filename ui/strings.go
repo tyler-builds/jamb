@@ -206,6 +206,9 @@ type Strings struct {
 	NoResults string
 	// NoRows is the message shown when a grid has no rows.
 	NoRows string
+	// LoadingMore names the row at the end of a grid while it loads more rows, and is
+	// announced when the loading starts (see DataGrid.LoadingMore).
+	LoadingMore string
 	// NoMatchingCommands is the message shown when no command of a command palette matches.
 	NoMatchingCommands string
 	// CouldNotLoadSuggestions is the message shown when suggestions cannot be loaded.
@@ -527,6 +530,7 @@ func englishStrings() *Strings {
 
 		NoResults:               "No results",
 		NoRows:                  "No rows",
+		LoadingMore:             "Loading more rows",
 		NoMatchingCommands:      "No matching commands",
 		CouldNotLoadSuggestions: "Couldn't load suggestions",
 		SuggestionCount: func(n int) string {
