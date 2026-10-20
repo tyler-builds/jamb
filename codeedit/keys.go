@@ -146,8 +146,8 @@ func buildActions() []editorAction {
 			vs.edit(func(d *Document) error { return d.ToggleComment(e.comment) })
 		})},
 		{CmdAddNextOccurrence, func(e *EditorElement, vs *viewState) { vs.doc.AddNextOccurrence(); vs.reveal = true; vs.touch() }},
-		{CmdAddCaretAbove, func(e *EditorElement, vs *viewState) { vs.doc.AddCaretVertical(-1); vs.reveal = true; vs.touch() }},
-		{CmdAddCaretBelow, func(e *EditorElement, vs *viewState) { vs.doc.AddCaretVertical(1); vs.reveal = true; vs.touch() }},
+		{CmdAddCaretAbove, func(e *EditorElement, vs *viewState) { vs.addCaretVertical(-1); vs.reveal = true; vs.touch() }},
+		{CmdAddCaretBelow, func(e *EditorElement, vs *viewState) { vs.addCaretVertical(1); vs.reveal = true; vs.touch() }},
 		{CmdFind, func(e *EditorElement, vs *viewState) { vs.openBar(barFind) }},
 		{CmdReplace, writable(func(e *EditorElement, vs *viewState) { vs.openBar(barReplace) })},
 		{CmdFindNext, func(e *EditorElement, vs *viewState) { vs.findStep(true) }},

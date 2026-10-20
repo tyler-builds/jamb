@@ -20,6 +20,9 @@ var wideRanges = [][2]rune{
 
 // runeCells returns how many cells r takes, not counting a tab.
 func runeCells(r rune) int {
+	if r < wideRanges[0][0] {
+		return 1 // below every wide block, as most text is
+	}
 	for _, w := range wideRanges {
 		if r >= w[0] && r <= w[1] {
 			return 2

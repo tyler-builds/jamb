@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/ui"
 )
 
 // sourceText returns n lines of Go-like source, with indented blocks, so that folding and the
@@ -50,6 +51,55 @@ func BenchmarkKeystroke50kLines(b *testing.B) {
 // after each scroll.
 func BenchmarkScrollFrame50kLines(b *testing.B) {
 	h := newHarness(b, sourceText(50000))
+	r, _ := h.rt.Find("wrap")
+	x, y := r.X+100, r.Y+100
+	h.frame()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		h.rt.Scroll(x, y, 0, 40, true, input.Modifiers(0))
+		h.frame()
+	}
+}
+
+// wrapped is an option of the harness that wraps the rows at the width of the editor, which fills
+// the window's width.
+func wrapped(e *EditorElement) *EditorElement { return e.SoftWrap(WrapViewport).Width(ui.Full) }
+
+// BenchmarkWrapWidthChange100kLines resizes the window of an editor that wraps a document of
+// 100,000 lines at its width, and draws the frame after it: the layout, the wrap of every row at
+// the new width and the paint.
+func BenchmarkWrapWidthChange100kLines(b *testing.B) {
+	h := newHarness(b, sourceText(100000), wrapped)
+	widths := []float32{400, 360}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		h.rt.SetViewport(widths[i%2], 600, 1)
+		h.frame()
+	}
+}
+
+// BenchmarkKeystrokeWrapped50kLines is BenchmarkKeystroke50kLines with the rows wrapped at the
+// editor's width: the edit wraps its row again and the frame lays out the display rows.
+func BenchmarkKeystrokeWrapped50kLines(b *testing.B) {
+	h := newHarness(b, sourceText(50000), wrapped)
+	h.rt.SetViewport(360, 600, 1)
+	h.doc.SetCaret(h.doc.Len() / 2)
+	h.frame()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		h.rt.TextInput("x")
+		h.frame()
+	}
+}
+
+// BenchmarkScrollFrameWrapped50kLines is BenchmarkScrollFrame50kLines with the rows wrapped at the
+// editor's width.
+func BenchmarkScrollFrameWrapped50kLines(b *testing.B) {
+	h := newHarness(b, sourceText(50000), wrapped)
+	h.rt.SetViewport(360, 600, 1)
 	r, _ := h.rt.Find("wrap")
 	x, y := r.X+100, r.Y+100
 	h.frame()

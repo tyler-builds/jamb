@@ -264,6 +264,41 @@ func (d *Document) Move(m Move, extend bool, page int) {
 	d.setSels(sels, d.primary)
 }
 
+// moveEach moves every caret to where fn puts it, as Move does: with extend the selections grow
+// from their anchors, and without it they collapse to the caret. fn gets a caret's head and the
+// goal cell of a run of vertical moves, or -1 when there is none, and returns the new head and
+// the goal cell the move kept. A vertical move with one selection keeps the goal for the next one,
+// and any other move forgets it.
+func (d *Document) moveEach(extend, vertical bool, fn func(head, goal int) (int, int)) {
+	sels := slices.Clone(d.sels)
+	goal := -1
+	if len(sels) == 1 && vertical && d.goalOK {
+		goal = d.goal
+	}
+	kept := -1
+	for i, s := range sels {
+		h, g := fn(s.Head, goal)
+		if i == 0 {
+			kept = g
+		}
+		if extend {
+			sels[i] = Selection{s.Anchor, h}
+		} else {
+			sels[i] = Selection{h, h}
+		}
+	}
+	if len(sels) == 1 && vertical {
+		if !d.goalOK {
+			d.goal, d.goalOK = kept, true
+		}
+		d.sels, d.primary = d.normalize(sels, 0)
+		d.clampFolds()
+		d.changed()
+		return
+	}
+	d.setSels(sels, d.primary)
+}
+
 // moveHead returns where a caret at p goes for m. goal is the cell a vertical move
 // keeps, or -1 to use p's cell.
 func (d *Document) moveHead(t textReader, p int, m Move, page, goal int) int {

@@ -58,6 +58,35 @@ func (vs *viewState) composedRow(row int, line string) (shown string, at int, ok
 	return line[:at] + vs.comp.Text + line[at:], at, true
 }
 
+// composedWrap returns the wrap of shown, the row with the composition, at the width the rows
+// wrap at, or nil when the view does not wrap. The row is wrapped as it shows while it is composed.
+func (vs *viewState) composedWrap(shown string) rowWrap {
+	if !vs.wrapping() {
+		return nil
+	}
+	k := vs.wc.key
+	return wrapSegments(shown, k.cols, k.tab, k.indent)
+}
+
+// composedSegment returns the bytes [a, b) of the row with the composition, n bytes long and
+// wrapped as cw, that the display row dr shows, with the cell of the row where they start and
+// their indent. The row keeps the segs display rows it has without the composition until the
+// composition is typed, so its last display row shows the rest of it.
+func composedSegment(cw rowWrap, dr displayRow, n, segs int) (a, b, sc, ind int) {
+	if dr.seg >= cw.segs() {
+		return n, n, 0, 0
+	}
+	a, sc = cw.start(dr.seg)
+	b = n
+	if dr.seg+1 < cw.segs() && dr.seg+1 < segs {
+		b, _ = cw.start(dr.seg + 1)
+	}
+	if dr.seg > 0 {
+		ind = cw.indentCells()
+	}
+	return a, b, sc, ind
+}
+
 // caretRect returns the caret at the byte offset off in the canvas's pixels, as the geometry of
 // the last paint places it. The primary caret is the input method's caret while a composition
 // shows, so its rectangle is where the candidate window opens.
@@ -74,7 +103,15 @@ func (vs *viewState) caretRectIn(x rowIndex, off int) (scene.Rect, int) {
 	if primary {
 		row := vs.doc.RowOf(off)
 		if shown, at, ok := vs.composedRow(row, vs.doc.Line(row)); ok {
-			vi, cell = x.indexOf(row), cellOfCol(shown, at+vs.comp.Cursor, vs.tab)
+			col := at + vs.comp.Cursor
+			cw := vs.composedWrap(shown)
+			k := min(cw.segmentOf(col, false), vs.wrapOf(row).segs()-1)
+			a, sc := cw.start(k)
+			ind := 0
+			if k > 0 {
+				ind = cw.indentCells()
+			}
+			vi, cell = x.indexOf(row)+k, cellIn(shown, a, sc, col, vs.tab)-sc+ind
 		}
 	}
 	px := g.textX - vs.scrollX + float32(cell)*g.charW

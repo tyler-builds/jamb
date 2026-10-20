@@ -2,7 +2,8 @@
 
 The `codeedit` package is a code editor for source files: a multi-line text area with a
 line-indexed buffer, undo and redo, several selections, find and replace, folding by indentation,
-syntax highlighting for 76 languages, input-method composition, and an accessibility Text pattern. It is pure
+soft wrap, syntax highlighting for 76 languages, input-method composition, and an accessibility
+Text pattern. It is pure
 Go and draws on the Canvas of the `ui` package. It is built with
 `codeedit.Editor(codeedit.NewDocument(text))`. Its keys are actions with default bindings, so they
 work without setup, and an app can rebind them. The sections below cover the keys, the document,
@@ -46,8 +47,8 @@ rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+d", ui.Unbind(codeedit.CmdAddNextOc
 `Editor` returns an element. Its options chain: `Key`, `Label`, `LineNumbers`, `ReadOnly`,
 `TabSize` (4 by default), `CommentPrefix`, `Size`, the sizing methods (`Width`, `Height`,
 `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow` and `GridSpan`, as on the `ui` widgets;
-Full by 300 pixels by default), `Styles`, `Language` and `Highlighter`.
-Word wrap is not offered (see Limits).
+Full by 300 pixels by default), `Styles`, `Language`, `Highlighter`, and `SoftWrap`, `WrapColumn`
+and `WrappingIndent` (see Soft wrap).
 
 ## Document
 
@@ -88,7 +89,7 @@ value, so an app can rebind it with `ui.BindIn("CodeEditor", keys, action)` or t
 
 | Key | Action |
 |---|---|
-| Arrows, Home, End, Ctrl+Left/Right, Ctrl+Home/End, PageUp, PageDown | Move the caret. Up and Down keep the screen column, counting tab stops and wide characters. Home goes to the first non-blank character, then to column 0. |
+| Arrows, Home, End, Ctrl+Left/Right, Ctrl+Home/End, PageUp, PageDown | Move the caret. Up and Down keep the screen column, counting tab stops and wide characters. Home goes to the first non-blank character, then to column 0. With soft wrap, Up, Down and the page keys move by the rows shown, and Home and End go to the edges of the segment first (see Soft wrap). |
 | Shift with any of those | Extend the selection. |
 | Ctrl+A | Select all. |
 | Escape | Keep the primary caret only. |
@@ -134,6 +135,46 @@ A row with lines under it that are indented past it has a fold marker in the gut
 the marker folds or unfolds it, and Ctrl+Shift+[ and Ctrl+Shift+] do the same at the caret. Folded
 rows are not drawn, and the caret and Up and Down skip them. A caret inside a fold moves to the
 end of its header. Folds follow the text when lines are inserted above them.
+
+## Soft wrap
+
+`SoftWrap` wraps the lines that are too long for the editor:
+
+```go
+codeedit.Editor(doc).SoftWrap(codeedit.WrapViewport)                     // at the editor's width
+codeedit.Editor(doc).SoftWrap(codeedit.WrapBounded).WrapColumn(100)      // at 100 columns, or narrower
+codeedit.Editor(doc).SoftWrap(codeedit.WrapColumn).WrappingIndent(codeedit.IndentNone)
+```
+
+| Mode | Wraps at |
+|---|---|
+| `WrapNone` | Nowhere; long lines scroll horizontally. The default. |
+| `WrapViewport` | The width of the editor's text, less one cell for the caret, and at least 8 cells. |
+| `WrapColumn` | The column set with `WrapColumn` (80 by default). A narrower editor scrolls horizontally to it. |
+| `WrapBounded` | The column, or the width of the editor when that is narrower. |
+
+A line is cut after the last space or punctuation that fits, or else between two characters; a tab
+or a wide character is never cut. Each segment of a wrapped line is drawn on a row of its own. The
+continuation segments start under the line's first non-blank character (`IndentSame`, the default),
+at the left edge (`IndentNone`), or one tab stop further (`IndentOneLevel`); an indent that would
+leave fewer than 8 cells of text is dropped. The line number and the fold marker are on the first
+segment, and the row of a caret is highlighted on every segment. With `WrapViewport` and
+`WrapBounded` the editor does not scroll horizontally.
+
+The wrap belongs to the editor, not to the document: two editors can show one document at different
+widths, and the text, its line count and the document's moves do not change. Up, Down, PageUp and
+PageDown move by the rows shown and keep the column within the segment. Home goes to the start of
+the segment, and on the first segment it toggles between the first non-blank character and column 0
+as on an unwrapped line; a second Home on a later segment goes to the line's first non-blank
+character. End goes to the end of the segment, and a second End to the end of the line. A caret at
+the edge of two segments shows at the end of the first after End or a click past the end of a
+segment, and at the start of the next otherwise. Ctrl+Alt+Up and Ctrl+Alt+Down add a caret on the
+row shown above or below.
+
+Each edit wraps again only the rows it touches, and a change of the width in cells wraps every row
+again, keeping the row at the top of the view where it was. Folding hides the segments of the rows
+under the header, and the header keeps its own. The Text pattern reports each segment as a line and
+each row as a paragraph.
 
 ## Highlighting
 
@@ -262,13 +303,29 @@ without a window), with 20 iterations:
 | Type a character at 50,000 lines, with the frame | about 0.8 ms |
 | Scroll by a few rows at 50,000 lines, with the frame | about 0.7 ms |
 
+With soft wrap at the editor's width, in a window 360 pixels wide (about 34 columns, where one row
+in six wraps), measured on 2026-10-20 on an Intel Core i5-11600K, with 20 iterations:
+
+| Benchmark | Time |
+|---|---|
+| Change the width at 100,000 lines: wrap every row again, with the frame | about 4.2 ms, of which the wrap takes about 3 ms |
+| Type a character at 50,000 lines, with the frame | about 0.8 ms |
+| Scroll by a few rows at 50,000 lines, with the frame | about 0.7 ms |
+
 The paint draws only the rows shown. The text of a row is shaped by the `ui` text system, which
 caches shaped paragraphs; the editor does not keep its own shaping cache. Frame time with
 highlighting depends on the spans shown and is not included in these figures.
 
 ## Limits
 
-- No word wrap. The option is not offered; long lines scroll horizontally.
+- Soft wrap wraps an edited line again from its start, so each keystroke on a line of several
+  megabytes measures the whole line. A width change wraps every row at once, which takes about 3 ms
+  at 100,000 lines (see Performance) and grows with the text.
+- While an input method composes on a wrapped line, the line keeps the rows it had: the composed
+  text is wrapped within them, and the last of them shows the rest. The rows are wrapped again when
+  the composition is typed.
+- The column that Up and Down keep is kept by the document, so two editors at different widths that
+  show one document share it.
 - With the find bar open, a change runs the search again over the whole text. The bar is the only
   path that copies the text on a keystroke.
 - A wide character takes two cells in the editor's grid. If the font draws it at another width,
