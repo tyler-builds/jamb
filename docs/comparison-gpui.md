@@ -1,6 +1,6 @@
 # jamb and GPUI: hello-world comparison
 
-This document compares two builds of the same small app on one Windows machine: jamb (Go) and GPUI (Rust, the UI framework from Zed). The app is a window with a centered greeting and a button that counts its clicks. It measures project size, binary size, build times, startup, idle CPU and memory, and the CPU cost of pointer movement and window resizing. [Components: jamb and GPUI Kit](#components-jamb-and-gpui-kit) compares jamb's widgets with GPUI Kit's, the component library for GPUI from Longbridge (named gpui-component until September 2026).
+This document compares two builds of the same small app on one Windows machine: jamb (Go) and GPUI (Rust, the UI framework from Zed). The app is a window with a centered greeting and a button that counts its clicks. It measures project size, binary size, build times, startup, idle CPU and memory, and the CPU cost of pointer movement and window resizing. [Components: jamb and GPUI Kit](#components-jamb-and-gpui-kit) compares jamb's widgets, their options and the framework features around them with GPUI Kit's, the component library for GPUI from Longbridge (named gpui-component until September 2026).
 
 Measured with `scripts/compare-gpui.ps1`, three runs per measurement, in two passes on 2026-10-12 (see [Measurement passes](#measurement-passes)). Results are shown as median [minimum–maximum].
 
@@ -209,7 +209,7 @@ The first pass showed GPUI ahead on startup, memory and binary size. Investigati
 
 ## Components: jamb and GPUI Kit
 
-jamb's predefined themes and some of its translated strings come from gpui-component (see `NOTICE`). The project is now [GPUI Kit](https://gpui-kit.com/) ([longbridge/gpui-kit](https://github.com/longbridge/gpui-kit); the old repository URL redirects there). This section compares the two component sets. It was checked on 2026-10-19 against GPUI Kit v0.8.0, released that day, and jamb with the widgets added that day and the next (Alert, Calendar, Carousel, CommandPalette, DescriptionList, Empty, GroupBox, HoverCard, Kbd, OTPInput, RangeSlider, Rating, SplitButton, StatusBar, Stepper, Toggle, ToggleGroup and Toolbar, and masked and clearable text inputs). It compares coverage only: it does not compare features within a component, quality or accessibility behaviour.
+jamb's predefined themes and some of its translated strings come from gpui-component (see `NOTICE`). The project is now [GPUI Kit](https://gpui-kit.com/) ([longbridge/gpui-kit](https://github.com/longbridge/gpui-kit); the old repository URL redirects there). This section compares the two component sets, the options each component offers, and the framework features around them. It was checked on 2026-10-20 against GPUI Kit v0.8.0 (released 2026-10-19; its `main` branch had six bug fixes since, with no API changes) and jamb at `dba3577`. Both sides were compared by reading their public source: GPUI Kit's builder methods, state types and events, and jamb's exported methods. Nothing was built or run, so the tables compare what the APIs offer, not quality, performance or behaviour in use.
 
 ### What changed upstream
 
@@ -230,12 +230,12 @@ GPUI Kit's component page lists 69 components in four groups. The jamb column na
 | Accordion, Alert, Avatar, Badge, Button, Checkbox, Collapsible, Icon, Image, Kbd, Pagination, Rating, Skeleton, Slider, Stepper, Switch, Tag, Toggle, Tooltip | Same names (`Tooltip` is a method on most widgets; `ToggleGroup` is a joined row of toggles) |
 | Radio | `RadioGroup` |
 | Progress, Spinner | `ProgressBar`, `ProgressRing` |
-| DropdownButton | `DropdownMenu` with a button trigger |
+| DropdownButton (a button with a separate menu trigger) | `SplitButton` |
 | TextView | `markdown.View` (Markdown only) and `Text.Selectable` |
 | Label | `Text` (no separate label widget) |
 | Attachment, Bubble, Marker, Message, MessageScroller, Questionnaire | None (chat and survey components, added in v0.6.0 and v0.7.0) |
 | **Form** | |
-| Input, Textarea, NumberInput, Select, Combobox, ColorPicker, DatePicker | `TextInput`, `TextArea`, `NumberInput`, `Select`, `Combobox`, `ColorPicker`, `DatePicker` |
+| Input, Textarea, NumberInput, Select, Combobox, ColorPicker, DatePicker | `TextInput`, `TextArea`, `NumberInput`, `Select`, `Combobox`, `ColorPicker`, `DatePicker` and `DateRangePicker` |
 | TimeField | `TimePicker` |
 | Editor | `codeedit.Editor` |
 | Form | `NewForm`, `Field` and the validators |
@@ -259,11 +259,123 @@ GPUI Kit's component page lists 69 components in four groups. The jamb column na
 | Carousel | Same name |
 | Diff, Settings | None |
 
-The component page also links AlertDialog, Clipboard, Empty, Focus Trap, HoverCard, Input Group, Plot, Shimmer, Table and TitleBar from its sidebar. jamb has text and image clipboard access, `Empty` for empty states, `HoverCard`, `Canvas` for custom plots and `TitleBarButtons`.
+In total, 9 of the 69 listed components have no jamb equivalent, six of them the chat and survey components.
 
-jamb has some widgets GPUI Kit does not list: `MenuBar`, `Breadcrumbs`, `DateRangePicker`, `CheckboxTri`, `RangeSlider` and `SplitButton`. It also has Windows shell integration (`NewTray`, jump lists, taskbar progress and badges), native file and message dialogs (`dialog`), `Canvas` and `SVG` drawing, and the inspector.
+The component page also links AlertDialog, Clipboard, Empty, Focus Trap, HoverCard, Input Group, Plot, Shimmer, Table and TitleBar from its sidebar. jamb has `Empty`, `HoverCard`, `Canvas` for custom plots and `TitleBarButtons`. It has no in-app alert dialog (only the native `dialog.MessageBox`), no copy-to-clipboard button (it has clipboard access), no public focus trap (`Modal` and `Drawer` trap focus internally), no input group, no shimmer text and no declarative table (a grid `Div` with `AccessGrid` comes closest).
 
-In total, 9 of GPUI Kit's 69 listed components have no jamb equivalent, six of them the chat and survey components.
+GPUI Kit's source has more than the component page lists: `ButtonGroup`, a standalone `Link`, `Breadcrumb`, `AppMenuBar` and `NativeMenu`, a searchable list engine, `History` and `UndoHistory`, and an indeterminate checkbox and a range slider in `gpui-base`. jamb's `Breadcrumbs`, `MenuBar`, `CheckboxTri` and `RangeSlider` correspond to some of these. What jamb has and GPUI Kit does not is mostly Windows integration: the tray (`NewTray`), jump lists, taskbar progress and badges, single instance, native file and message dialogs (`dialog`), and a title bar with Windows 11 caption buttons and Snap Layouts.
+
+### Options within components
+
+Each row lists options that one side has and the other lacks; options both have are left out.
+
+**Basic**
+
+| Component | GPUI Kit has, jamb lacks | jamb has, GPUI Kit lacks |
+|---|---|---|
+| Button | `loading` state; Info, Success, Warning, Link, Text and custom variants; outline, rounded, compact and extra-small; a selected state; a dropdown caret; tooltips with a shortcut and placement; `ButtonGroup` with multiple selection | `AccessChecked` (toggle-button role); per-part, per-variant styles |
+| Tooltip | Rich content, shortcut display, placement, delay per widget | None (text only, fixed 500 ms delay) |
+| Slider | Vertical, reversed, logarithmic scale, an event on release | `Format` for the value text, labels; `RangeSlider.MinGap` |
+| Toggle, ToggleGroup | Multi-select group; segmented and outline looks | Typed single value with `Validate`, per-option `Disabled`, icon-only |
+| Progress, Spinner | A determinate progress circle; spinner icon and color | `Min`, `Max`, `Format` and `Label` on the bar |
+| Accordion, Collapsible | Bordered, per-item icons, sizes, animated open and close | `KeepMounted`, custom headers, `Disabled`, open state bound to a signal |
+| Alert | Banner style, sizes | `Action` slot, `Description` |
+| Avatar | `AvatarGroup` with a limit, icon placeholder, image from a URL | `Tooltip`; can be hidden from screen readers |
+| Badge, Tag | Any color, outline and rounded tags, sizes, icon badges | Five badge variants, `StatusDot`, a spoken noun after the count, `Tag.OnRemove` |
+| Checkbox, Radio, Switch | Sizes, child content, a standalone radio, horizontal radio layout | Typed radio values, `Validate`, per-option `Disabled`, a tri-state checkbox among the styled widgets |
+| Rating | Color, sizes | Keyboard focus, `ReadOnly`, `Validate`, a slider role for screen readers |
+| Kbd, Label, Image | Kbd built from an action's binding; secondary and masked labels; images from URLs with loading and fallback content | Chord sequences; `MaxLines`, `Truncate`, `HighlightMatches`; `Alt`, `Radius`, animated GIF, tinted `SVG` |
+| Stepper, Pagination, Breadcrumbs | Disabled steps, pages and crumbs | Step descriptions and arrow-key navigation; `Breadcrumbs.MaxItems` with an overflow menu |
+| TextView | HTML, selection across the whole view, streaming text, plugins, range highlights | Task-list toggles (`OnTaskToggle`); jamb selects within one block |
+
+**Form**
+
+| Component | GPUI Kit has, jamb lacks | jamb has, GPUI Kit lacks |
+|---|---|---|
+| TextInput | Masks applied while typing (`999-AA`, numbers with separators); keystrokes rejected by pattern; loading state; text alignment; autofill and autocorrect hints; inline token events; a context menu | Validators that show error messages; image paste; masked text kept off the clipboard; label and description links |
+| TextArea | Auto-grow between a minimum and maximum number of rows | `Validate`, leading and trailing slots, image paste |
+| Code editor | Completion, hover, code-action, go-to-definition and document-color providers; diagnostics; semantic tokens; soft wrap; whitespace and indent guides; indent rules per language | Add next occurrence, toggle comment, go to line, bracket matching, find with case, whole-word and regex options |
+| NumberInput | Prefix and suffix, a dynamic step, thousands separators | `Precision`, `Align`, optional spin buttons, `Validate` |
+| Select | Search in the list, grouped options, a clear button, menu size limits, empty-state content | Type-ahead, custom option and value rendering, `Validate`, disabled options |
+| Combobox | A fixed-list picker with multi-select and a footer | Free-text autocomplete with async suggestions, debounce and a minimum length |
+| ColorPicker | Hover preview, a featured palette, HSL sliders, app-defined tabs | Alpha as an option |
+| DatePicker, Calendar | Presets, date and time in one picker, several months side by side, month and year views, custom formats | Typed entry in the locale's format, `Min`, `Max`, `Validate` |
+| TimeField / TimePicker | Segmented editing, seconds, an hour-cycle override | A list at a minute step, `Min`, `Max`, `Validate` |
+| Form | Layout: horizontal labels, label width, columns and column spans | Submission and validation: `OnSubmit`, `OnSubmitAsync`, `Reset`, an error summary, required fields |
+| OTPInput | None | Alphanumeric codes, `Validate` |
+| InputGroup | Addons above or below the field, group buttons with loading, group-wide invalid and disabled states | None (jamb has leading and trailing slots on one field) |
+
+**Layout and overlays**
+
+| Component | GPUI Kit has, jamb lacks | jamb has, GPUI Kit lacks |
+|---|---|---|
+| Dialog / Modal | A close button, no-backdrop mode, an Escape switch, built-in OK and Cancel, a description slot, entrance animations, opening from anywhere, AlertDialog | A default button on Enter, `InitialFocus`, focus restored on close, height capped to the window with a scrolling body |
+| Sheet / Drawer | Resizable, non-modal, a backdrop-click switch | A default button, initial focus, minimum and maximum sizes |
+| Notification / Toast | Title, icon and custom content; click and close events; replace or remove by ID; placement per toast; one call for in-app and system | F6 moves focus into toasts; announced by severity; timers pause on hover and focus; system toasts with images, up to five actions and activation arguments |
+| Popover, HoverCard | Controlled open state, an arrow, offset, a right-click trigger, open-change events | An accessible name, 13 placements, hover cards that open on keyboard focus |
+| Sidebar | Nested submenus, item context menus and suffixes, the right side, off-canvas and animated collapse | Selection bound to a signal, arrow-key navigation, badges read by screen readers, disabled items |
+| Resizable / Split | Panels added, removed and reset at run time; hidden and fixed panels; custom handles | Keyboard resizing, collapsible panes, percent sizes, sizes bound to a signal for saving |
+| Scrolling | Scrollbar modes (on scroll, on hover, always), a scroll handle for any area, a horizontal virtual list | `ListOf` with rows of any height that keeps its anchor, chat-style bottom anchoring, `OnAtEnd` |
+| Theme | JSON themes loaded at run time and reloaded from a watched folder; about 135 color tokens plus radius, spacing, shadow, font and motion tokens | A high-contrast theme from the Windows system colors, light and dark that follow Windows live, theme styles per widget |
+| GroupBox, DescriptionList, Toolbar | A group-box footer and borderless variant; item spans and label width; toolbar groups, a disabled toolbar, one size for all items | A group-box description; toolbar separators |
+| TitleBar, FocusTrap | A title-bar container that pads for each platform; `.focus_trap()` on any element | Windows 11 caption buttons with Snap Layouts, native resize borders |
+| Settings | A settings component: pages, groups and items with search keywords, reset, and built-in field types | None |
+
+**Advanced**
+
+| Component | GPUI Kit has, jamb lacks | jamb has, GPUI Kit lacks |
+|---|---|---|
+| DataTable / DataGrid | Pinned columns, column reorder, cell and column selection, a context menu, load more, header groups, row headers, virtualized columns, scrolling to a row or column | Multiple-row selection, inline cell editing with custom editors, interactive cells, density, a sort comparer per column, keyboard column resizing |
+| Dock | Collapsible side docks with toggle and size, zoom, lock, per-panel state saved through a registry, panel toolbar buttons and tab menus, lifecycle hooks | Panels torn off into floating windows, keyboard panel moves, layout operations as plain values |
+| Tabs | Pill, outline and folder variants; overflow by scrolling or a menu; prefix and suffix on the bar and each tab; label truncation | Reordering, reselect events, built-in panels kept mounted, tab popups, custom tab rendering |
+| Tree | Disabled items, context menus, expand and collapse events, selecting or revealing an item from code | Children loaded on demand, type-ahead, custom row rendering |
+| List | Search, sections with headers and footers, selection with confirm and cancel, load more, empty and loading states | Rows of any height without given sizes, chat-style bottom anchoring |
+| Menu | Native menus drawn by the OS, links, custom element items, scrollable menus with size limits | Radio items, type-ahead, Shift+F10 and the Menu key, Alt to focus the menu bar |
+| Charts | Reference lines, custom tooltips, step curves, bar labels and gradients, pie padding and labels with leader lines, public scale and shape primitives | Scatter, several series in line and bar charts, horizontal bars, legends that hide series, time axes and axis titles, keyboard navigation with announcements, a data-table view, downsampling, high-contrast hatching |
+| Command palette | Groups, icons, keywords, async results, header and footer, embedding outside a modal | Lists the actions available where focus was, with their shortcuts, runs them there and restores focus; highlights matches |
+| Carousel | Vertical axis; drag, swipe and wheel; separate controls | Auto-play with a pause button, `Disabled` |
+| Diff | A read-only diff view: split or unified, changed words highlighted, syntax highlighting, merge conflicts, annotations | None |
+
+### Framework features
+
+| Area | GPUI Kit | jamb |
+|---|---|---|
+| Platforms | macOS, Windows, Linux; WebAssembly (described as a showcase) and iOS (experimental) | Windows only |
+| Theming | JSON files, hot reload, many design tokens | Go values (2 built in, 37 converted); follows the Windows light, dark, high-contrast and text-size settings |
+| Translations | YAML through rust-i18n, also for app strings | Typed `ui.Strings`, chosen from the Windows display language |
+| Actions and keybindings | Typed actions and context predicates; the app supplies any user keymap file | Typed actions and contexts; a built-in JSON keymap file with hot reload |
+| Focus | Focus handles, tab order, a focus trap for any element | Focus handles, tab order, focus-visible and focus-within styles; traps only in `Modal` and `Drawer` |
+| Animation | Transitions, springs, keyframes, sequences, presence, stagger, motion tokens | Transitions, enter and exit animations, easing functions; reduced motion honoured |
+| Icons | 101 icons, plus the Lucide set (about 1,800) on request | 58 icons and an `SVG` element |
+| Text selection | Across the text elements of a window; touch selection | Within one text element |
+| Undo history | Public `History` and `UndoHistory` types | Inside text fields and the code editor only |
+| Unstyled layer | `gpui-base`: about 40 primitives with behaviour and no styles | None; widgets are styled, with per-part styles and render slots |
+| Window kinds | Popup, floating and other kinds; transparency and blur | Normal windows, with fullscreen and a custom title bar |
+| WebView | Experimental, through Wry | None |
+| Packaging | Guides for DMG, Inno Setup and DEB | `jamb package`: zip, installer, MSIX and signing |
+| Testing | Queries by ID, label and role; pointer steps; an IME helper; offscreen rendering | A virtual clock; queries by key, name and role; rendered text and drawn styles; accessibility warnings |
+| Dev tools | An inspector with live style editing; an in-window FPS panel | An inspector in its own window that shows where each style value came from; `JAMB_TRACE` |
+| Accessibility | AccessKit on every platform | A native UI Automation provider with Text, Grid, Value and Selection patterns, checked with Axe.Windows |
+
+### Summary of the gaps
+
+Where GPUI Kit offers more:
+
+- **Platforms.** jamb runs on Windows only.
+- **Data-heavy widgets.** `DataGrid` has no pinned or reorderable columns, cell selection or load more. Tabs do not overflow, lists have no built-in search or sections, and trees cannot be opened from code.
+- **Text input and editing.** Input masks, and the code editor's language-server hooks (completion, hover, diagnostics) and soft wrap.
+- **Theming and motion.** Runtime JSON themes with hot reload and a larger token set; springs, keyframes and staggered animation.
+- **Dialogs and overlays.** An alert dialog, close buttons, non-modal dialogs and sheets, and notifications with titles and IDs.
+- **An unstyled layer** for apps with their own design system.
+
+Where jamb offers more:
+
+- **Accessibility on Windows.** UI Automation patterns, keyboard support across widgets, and the system's high-contrast and text-size settings.
+- **Forms.** Form-level submission and validation, and `Validate` on every field.
+- **Grid editing.** Inline cell editing and multiple-row selection.
+- **Windows integration.** The tray, jump lists, the taskbar, single instance and system notifications with actions.
+- **Shipping.** Packaging, installers and signing from the CLI.
+- **Charts.** More chart types and series, legends and keyboard navigation.
 
 ## Open items
 
