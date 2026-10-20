@@ -179,6 +179,30 @@ func revealRange(n *node, top, bottom float32) bool {
 	return seekY(n, y)
 }
 
+// revealPeek is how much of the content beside a range revealRangeX shows, so that
+// the next tab of a strip can be seen to be there.
+const revealPeek = 32
+
+// revealRangeX scrolls the horizontal scroll container n the least amount that
+// shows the content from left to right, and up to revealPeek of the content on
+// each side of it when the view is wide enough. Nothing moves if it is already
+// shown. The scroll eases, and jumps with reduced motion (see scrollStep).
+func revealRangeX(n *node, left, right float32) {
+	st := n.st
+	be := n.style.borderEdges()
+	l0 := be.Left + n.style.Padding.Left
+	r0 := be.Right + n.style.Padding.Right
+	view := n.lay.W - l0 - r0
+	peek := min(float32(revealPeek), max((view-(right-left))/2, 0))
+	x := st.targetX
+	if left-peek < x+l0 {
+		x = left - peek - l0
+	} else if right+peek > x+n.lay.W-r0 {
+		x = right + peek - n.lay.W + r0
+	}
+	st.targetX = min(max(x, 0), max(n.lay.ContentW-n.lay.W, 0))
+}
+
 // viewSpan is the span of content whose rows are built: the viewport at offset
 // sy, and also the scroll target when a scroll is heading there. After a
 // snapped seek the span is the target alone, so the rows between are not

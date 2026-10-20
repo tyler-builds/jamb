@@ -68,6 +68,7 @@ func chineseMainlandStrings() *Strings {
 		Minimum:             "最小值",
 		Maximum:             "最大值",
 		MoreOptions:         "更多选项",
+		AllTabs:             "所有标签页",
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移动",
@@ -176,6 +177,7 @@ func chineseTaiwanStrings() *Strings {
 		Minimum:             "最小值",
 		Maximum:             "最大值",
 		MoreOptions:         "更多選項",
+		AllTabs:             "所有分頁",
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移動",
@@ -284,6 +286,7 @@ func chineseHongKongStrings() *Strings {
 		Minimum:             "最小值",
 		Maximum:             "最大值",
 		MoreOptions:         "更多選項",
+		AllTabs:             "所有分頁",
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移動",

@@ -408,6 +408,34 @@ func testTabsParts(t *testing.T, v TabsVariant, applied map[string]bool) {
 		dragHover(t, r, "settings/tab:a", "settings/tab:c")
 		wantBackground(t, partNode(t, r.rt, "Tabs.DropLine", ""), "Tabs.DropLine", markBG)
 	})
+	// The bar, the scroll buttons and the menu's button are drawn while the tabs
+	// overflow a narrow window, with an overflow menu.
+	for _, c := range []struct {
+		part string
+		set  func(*TabsStyle, Style)
+		key  string // the element whose node draws the part, "" for the bar
+	}{
+		{"Tabs.Bar", func(s *TabsStyle, m Style) { s.Bar = m }, ""},
+		{"Tabs.ScrollButton", func(s *TabsStyle, m Style) { s.ScrollButton = m }, "forward"},
+		{"Tabs.MenuButton", func(s *TabsStyle, m Style) { s.MenuButton = m }, "all"},
+	} {
+		applied[c.part] = true
+		t.Run(c.part, func(t *testing.T) {
+			var st TabsStyle
+			c.set(&st, Style{Background: markBG})
+			r := newAccessRig(func(ctx *Context) Element {
+				return Div().Column().Child(Tabs(NewSignal("a"), manyTabs()...).Key("settings").
+					Variant(v).Styles(st).OverflowMenu())
+			})
+			r.rt.SetViewport(300, 400, 1)
+			r.frame()
+			n := partNode(t, r.rt, "Tabs.Bar", "")
+			if c.key != "" {
+				n = keyNode(t, r.rt, c.key)
+			}
+			wantBackground(t, n, c.part, markBG)
+		})
+	}
 	if v == TabsSegmented {
 		r := newAccessRig(func(ctx *Context) Element { return partTabs(NewSignal("a"), v, TabsStyle{}) })
 		if got := len(partNodes(r.rt, "Tabs.Indicator")); got != 0 {

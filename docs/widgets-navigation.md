@@ -22,6 +22,8 @@ ui.Tabs(view, tabs...).Styles(ui.TabsStyle{Indicator: ui.Style{Height: ui.Px(3)}
 ui.Tabs(count, tabs...).RenderTab(func(tab ui.Tab[int], s ui.PartState) ui.Element { ... }) // your content in each tab
 ui.Tabs(view, tabs...).OnReselect(func(v string) { refresh(v) }) // the selected tab clicked again
 ui.Tabs(view, tabs...).Reorderable().OnReorder(func(order []string) { save(order) }) // the user moves tabs
+ui.Tabs(doc, tabs...).OverflowMenu().TabMaxWidth(ui.Px(180)). // a menu of every tab; long labels cut short
+	Suffix(ui.IconButton(icons.Plus).Label("New tab").OnClick(newTab)) // beside the strip, not scrolled
 ui.Tab[string]{Value: "sales", Label: "Sales", Panel: salesPanel,
 	Popup: func(close func()) ui.Element { return tabActions(close) }} // anything, in a panel under the tab
 
@@ -62,8 +64,8 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
   `Variant(ui.TabsSegmented)` draws the tabs as one row of segments instead, with
   the selected segment filled in Accent (Highlight under high contrast). Both
   variants keep the same keys, keyboard behavior and accessible names. The parts
-  of a tab list (`List`, `Tab`, `TabSelected`, `TabHover`, `TabDisabled`,
-  `TabFocusVisible`, `Indicator`, `Panel`, `DropLine`) are set with `Styles` or the theme, and
+  of a tab list (`Bar`, `List`, `Tab`, `TabSelected`, `TabHover`, `TabDisabled`,
+  `TabFocusVisible`, `Indicator`, `Panel`, `DropLine`, `ScrollButton`, `MenuButton`) are set with `Styles` or the theme, and
   `RenderTab` draws each tab's content yourself. A tab's accessible name stays its
   `Label`, so a count the user must hear belongs in the label.
   `OnReselect` runs when the selected tab is activated again, by a click, Enter
@@ -86,6 +88,28 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
   others. `OnReorder` gets the values in their new order, so an app can save
   it and pass the tabs in that order next time. A disabled tab cannot be
   dragged, but a tab can be put beside it.
+  When the tabs are wider than the strip, the strip scrolls sideways, as
+  TabView's does, and tabs that fit are drawn exactly as before. Two scroll
+  buttons appear after the strip ("Scroll tabs back" and "Scroll tabs forward",
+  `Strings.ScrollTabsBack` and `ScrollTabsForward`): each scrolls by three
+  quarters of the strip, is disabled at its end, and takes no focus, so Tab
+  does not reach it and the arrow keys, Home and End move the strip as they move
+  the selection. They work under high contrast, where a fade at the edges would
+  be lost, and without a wheel. `ScrollButtons(false)` leaves them out. A
+  vertical wheel over the strip scrolls it sideways until it reaches an end, and
+  then the page scrolls on. Whenever the selection changes, by a click, a key,
+  the menu or code, the selected tab is scrolled into view with a little of the
+  next one showing; with reduced motion the strip jumps. An open `Popup` closes
+  when the wheel scrolls the strip. `OverflowMenu()` adds a button ("All tabs",
+  `Strings.AllTabs`) that opens a menu of every tab in order, with its whole
+  label: the selected tab is checked and a disabled tab cannot be chosen.
+  Choosing a tab selects it as a click does, then scrolls to it and focuses it;
+  the button is one Tab stop after the tab list. `TabMaxWidth` caps each tab's
+  width: a longer label ends with an ellipsis and shows whole in its tooltip,
+  and its accessible name stays the whole label (with `RenderTab` only the width
+  applies). `Prefix` and `Suffix` put elements before and after the strip, in
+  the same row (the `Bar` part), outside the tab list and outside what scrolls.
+  A segmented strip stays as wide as its tabs until it reaches the width it has.
 - **Collapsible.** The header is a button with the Expanded state. Space and
   Enter open and close it, as a click does, and its chevron points right when closed
   and down when open. The content is not built while the section is closed. With

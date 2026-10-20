@@ -533,7 +533,7 @@ parts that the code applies.
 
 | Widget | Parts | Variants | Render slots | Status |
 | --- | --- | --- | --- | --- |
-| `Tabs` | `List`, `Tab`, `TabHover`, `TabSelected`, `TabDisabled`, `TabFocusVisible`, `Indicator`, `Panel`, `DropLine` | `TabsUnderline`, `TabsSegmented` | `RenderTab` | done |
+| `Tabs` | `Bar`, `List`, `Tab`, `TabHover`, `TabSelected`, `TabDisabled`, `TabFocusVisible`, `Indicator`, `Panel`, `DropLine`, `ScrollButton`, `MenuButton` | `TabsUnderline`, `TabsSegmented` | `RenderTab` | done |
 | `FormField` | `Root`, `Label`, `InlineLabel`, `Required`, `Description`, `Error` | none | none | done |
 | `Form` | `Summary`, `SummaryTitle`, `SummaryItem`, `SummaryItemHover`, `SummaryItemFocusVisible` | none | none | done |
 | `Select` | `Trigger`, `TriggerHover`, `TriggerFocusVisible`, `TriggerDisabled`, `TriggerInvalid`, `Value`, `Placeholder`, `Chevron`, `Popup`, `Option`, `OptionHighlighted`, `OptionSelected`, `OptionDisabled` | none | `RenderValue`, `RenderOption` | done |
