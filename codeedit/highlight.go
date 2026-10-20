@@ -12,9 +12,9 @@ import (
 //
 // The contract, which the session keeps:
 //   - Edit is called on the UI thread for each change, with the bytes it replaces, and returns
-//     at once. The spans shift with the text until the highlighter parses again, so a keystroke
-//     never waits for a parse.
-//   - SetViewport tells the highlighter which bytes are shown, so that it parses those first.
+//     at once. The spans shift with the text until the highlighter has new ones, so a keystroke
+//     never waits for the highlighter.
+//   - SetViewport tells the highlighter which bytes are shown, so that it colors those first.
 //   - Spans returns the spans as they are now, and a version that changes when they do. The
 //     editor draws whatever it has.
 //   - CaptureNames returns the names that highlight.Span.Capture indexes.
@@ -23,7 +23,7 @@ import (
 type Highlighter interface {
 	// Edit tells the highlighter about one change of the text, with the bytes it replaces.
 	Edit(e highlight.EditRecord) error
-	// SetViewport tells the highlighter which bytes are shown, so that it parses those first.
+	// SetViewport tells the highlighter which bytes are shown, so that it colors those first.
 	SetViewport(lo, hi int) error
 	// Spans returns the spans as they are now, and a version that changes when they do.
 	Spans() ([]highlight.Span, uint64)

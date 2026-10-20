@@ -14,9 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tyler-builds/jamb-grammars/golang"
-	"github.com/tyler-builds/jamb-grammars/python"
-	"github.com/tyler-builds/jamb-grammars/typescript"
 	"github.com/tyler-builds/jamb/codeedit/highlight"
 )
 
@@ -34,11 +31,11 @@ func TestPipelineReport(t *testing.T) {
 	}
 	inputs := []struct {
 		file string
-		lang highlight.Grammar
+		lang string
 	}{
-		{"go4k.go", golang.Grammar}, {"go110k.go", golang.Grammar},
-		{"color.ts", typescript.TypeScript}, {"markdown.ts", typescript.TypeScript}, {"libdom.ts", typescript.TypeScript},
-		{"typing.py", python.Grammar}, {"pydecimal.py", python.Grammar},
+		{"go4k.go", "go"}, {"go110k.go", "go"},
+		{"color.ts", "typescript"}, {"markdown.ts", "typescript"}, {"libdom.ts", "typescript"},
+		{"typing.py", "python"}, {"pydecimal.py", "python"},
 	}
 	for _, in := range inputs {
 		src, err := os.ReadFile(filepath.Join(dir, in.file))
@@ -54,7 +51,7 @@ func TestPipelineReport(t *testing.T) {
 
 // pipeline types the benchmark's keys into a session on src and returns a report
 // line. It also prints the heap used by the session.
-func pipeline(t *testing.T, lang highlight.Grammar, src []byte, interval float64) string {
+func pipeline(t *testing.T, lang string, src []byte, interval float64) string {
 	t.Helper()
 	var mu sync.Mutex
 	var pendingAt []float64 // key times, by version

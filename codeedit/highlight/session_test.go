@@ -5,27 +5,12 @@ import (
 	"errors"
 	"math/rand"
 	"os"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/tyler-builds/jamb-grammars/bash"
-	"github.com/tyler-builds/jamb-grammars/c"
-	"github.com/tyler-builds/jamb-grammars/cpp"
-	"github.com/tyler-builds/jamb-grammars/csharp"
-	"github.com/tyler-builds/jamb-grammars/css"
-	"github.com/tyler-builds/jamb-grammars/golang"
-	"github.com/tyler-builds/jamb-grammars/html"
-	"github.com/tyler-builds/jamb-grammars/java"
-	"github.com/tyler-builds/jamb-grammars/javascript"
-	"github.com/tyler-builds/jamb-grammars/json"
-	"github.com/tyler-builds/jamb-grammars/markdown"
-	"github.com/tyler-builds/jamb-grammars/python"
-	"github.com/tyler-builds/jamb-grammars/rust"
-	"github.com/tyler-builds/jamb-grammars/toml"
-	"github.com/tyler-builds/jamb-grammars/typescript"
-	"github.com/tyler-builds/jamb-grammars/yaml"
 	"github.com/tyler-builds/jamb/codeedit/highlight"
 )
 
@@ -46,7 +31,7 @@ func TestMain(m *testing.M) {
 
 // open starts a session on text with the whole text in view, and waits for its
 // first spans.
-func open(t *testing.T, lang highlight.Grammar, text []byte) *highlight.Session {
+func open(t *testing.T, lang string, text []byte) *highlight.Session {
 	t.Helper()
 	notify := make(chan struct{}, 1)
 	s, err := highlight.NewSession(lang, text, highlight.Options{Notify: func() {
@@ -73,59 +58,70 @@ func open(t *testing.T, lang highlight.Grammar, text []byte) *highlight.Session 
 // wantCapture is a highlighted text and the capture it should carry.
 type wantCapture struct{ text, capture string }
 
-func TestSpansMatchExpectedCaptures(t *testing.T) {
-	tests := []struct {
-		name string
-		lang highlight.Grammar
-		text string
-		want []wantCapture
-	}{
-		{"go", golang.Grammar,
-			"package main\n\n// Hi is a comment.\nfunc main() {\n\tx := \"s\" + 1\n\tprintln(x, true)\n}\n",
-			[]wantCapture{
-				{"package", "keyword"},
-				{"// Hi is a comment.", "comment"},
-				{"func", "keyword"},
-				{"\"s\"", "string"},
-				{"1", "number"},
-				{"true", "constant.builtin"},
-			}},
-		{"typescript", typescript.TypeScript,
-			"const n: number = 42; // note\nfunction greet(name: string) { return \"hi \" + name; }\n",
-			[]wantCapture{
-				{"const", "keyword"},
-				{"number", "type.builtin"},
-				{"42", "number"},
-				{"// note", "comment"},
-				{"function", "keyword"},
-				{"greet", "function"},
-				{"\"hi \"", "string"},
-			}},
-		{"python", python.Grammar,
-			"def add(a, b):\n    # sum\n    return a + 1 if True else None\n",
-			[]wantCapture{
-				{"def", "keyword"},
-				{"# sum", "comment"},
-				{"return", "keyword"},
-				{"1", "number"},
-				{"None", "constant.builtin"},
-			}},
+var captureTests = []struct {
+	lang string
+	text string
+	want []wantCapture
+}{
+	{"go",
+		"package main\n\n// Hi is a comment.\nfunc main() {\n\tx := \"s\" + 1\n\tprintln(x, true)\n}\n",
+		[]wantCapture{
+			{"package", "keyword.declaration"},
+			{"// Hi is a comment.", "comment"},
+			{"func", "keyword.declaration"},
+			{"main", "function.definition"},
+			{"\"s\"", "string"},
+			{"1", "number"},
+			{"true", "boolean"},
+		}},
+	{"typescript",
+		"const n: number = 42; // note\nfunction greet(name: string) { return \"hi \" + name; }\n",
+		[]wantCapture{
+			{"const", "keyword.declaration"},
+			{"number", "type.builtin"},
+			{"42", "number"},
+			{"// note", "comment"},
+			{"function", "keyword.declaration"},
+			{"greet", "function"},
+			{"name", "variable.parameter"},
+			{"\"hi \"", "string"},
+		}},
+	{"py",
+		"def add(a, b):\n    # sum\n    return a + 1 if True else None\n",
+		[]wantCapture{
+			{"def", "keyword.declaration"},
+			{"# sum", "comment"},
+			{"return", "keyword.control"},
+			{"1", "number"},
+			{"None", "constant.builtin"},
+		}},
+	{"CSS",
+		".app #id a:hover { color: red; }\n",
+		[]wantCapture{
+			{".app", "selector.class"},
+			{"#id", "selector.id"},
+			{"color", "property"},
+		}},
+}
+
+// hasCapture reports whether a span covers exactly text and carries capture.
+func hasCapture(src []byte, spans []highlight.Span, names []string, w wantCapture) bool {
+	for _, sp := range spans {
+		if string(src[sp.Start:sp.End]) == w.text && names[sp.Capture] == w.capture {
+			return true
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	return false
+}
+
+func TestSpansMatchExpectedCaptures(t *testing.T) {
+	for _, tt := range captureTests {
+		t.Run(tt.lang, func(t *testing.T) {
 			text := []byte(tt.text)
 			s := open(t, tt.lang, text)
 			spans, _ := s.Spans()
-			names := s.CaptureNames()
 			for _, w := range tt.want {
-				found := false
-				for _, sp := range spans {
-					if string(text[sp.Start:sp.End]) == w.text && names[sp.Capture] == w.capture {
-						found = true
-						break
-					}
-				}
-				if !found {
+				if !hasCapture(text, spans, s.CaptureNames(), w) {
 					t.Errorf("no %q capture on %q", w.capture, w.text)
 				}
 			}
@@ -133,51 +129,100 @@ func TestSpansMatchExpectedCaptures(t *testing.T) {
 	}
 }
 
-// TestLanguagesCompile checks that every language's module and query load, and
-// that each highlights a short sample without error.
-func TestLanguagesCompile(t *testing.T) {
-	langs := []highlight.Grammar{
-		golang.Grammar, javascript.Grammar, typescript.TypeScript, typescript.TSX,
-		python.Grammar, json.Grammar, css.Grammar, html.Grammar, rust.Grammar,
-		c.Grammar, cpp.Grammar, csharp.Grammar, java.Grammar, bash.Grammar,
-		yaml.Grammar, toml.Grammar, markdown.Markdown, markdown.MarkdownInline,
-	}
-	for _, lang := range langs {
-		t.Run(lang.Name(), func(t *testing.T) {
-			s := open(t, lang, []byte("x\n"))
-			if err := s.Err(); err != nil {
+func TestHighlight(t *testing.T) {
+	for _, tt := range captureTests {
+		t.Run(tt.lang, func(t *testing.T) {
+			text := []byte(tt.text)
+			spans, err := highlight.Highlight(tt.lang, text)
+			if err != nil {
 				t.Fatal(err)
 			}
-			if len(s.CaptureNames()) == 0 {
-				t.Fatal("no capture names")
+			for _, w := range tt.want {
+				if !hasCapture(text, spans, highlight.CaptureNames(), w) {
+					t.Errorf("no %q capture on %q", w.capture, w.text)
+				}
+			}
+			// A session on the same text publishes the same spans.
+			s := open(t, tt.lang, text)
+			if got, _ := s.Spans(); !slices.Equal(got, spans) {
+				t.Errorf("the session's spans differ from Highlight's:\n session %v\nHighlight %v", got, spans)
 			}
 		})
 	}
 }
 
-func TestBadQueryIsAnError(t *testing.T) {
-	lang := highlight.NewGrammar("go", golang.Grammar.Wasm(), []byte("(no_such_node) @x"))
-	if _, err := highlight.NewSession(lang, []byte("package p\n"), highlight.Options{}); err == nil {
-		t.Fatal("NewSession accepted a query that does not match the grammar")
+func TestHighlightConcurrent(t *testing.T) {
+	text := bytes.Repeat([]byte("func f() { return \"x\" }\n"), 50)
+	want, err := highlight.Highlight("go", text)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := highlight.NewSession(highlight.NewGrammar("none", nil, nil), []byte("x"), highlight.Options{}); err == nil {
-		t.Fatal("NewSession accepted a language without a module")
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			for range 20 {
+				got, err := highlight.Highlight("go", text)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				if !slices.Equal(got, want) {
+					t.Error("concurrent Highlight calls gave different spans")
+					return
+				}
+			}
+		})
 	}
-	if _, err := highlight.NewSession(nil, []byte("x"), highlight.Options{}); err == nil {
-		t.Fatal("NewSession accepted a nil language")
+	wg.Wait()
+}
+
+func TestLanguages(t *testing.T) {
+	names := highlight.Languages()
+	if !slices.IsSorted(names) || len(names) < 150 {
+		t.Fatalf("Languages: %d names, sorted %v", len(names), slices.IsSorted(names))
+	}
+	for _, n := range []string{"go", "golang", "rust", "python", "python3", "ts", "tsx", "node", "console", "jsonc", "yml", "md", "c#", "plain"} {
+		if !slices.Contains(names, n) || !highlight.Supported(n) {
+			t.Errorf("%q is not a supported language", n)
+		}
+	}
+	if !highlight.Supported(" Go ") {
+		t.Error("language names are not matched in any case")
+	}
+	for _, n := range names {
+		s, err := highlight.NewSession(n, []byte("x = 1 // y\n"), highlight.Options{})
+		if err != nil {
+			t.Fatalf("%s: %v", n, err)
+		}
+		s.Close()
+	}
+}
+
+func TestUnknownLanguage(t *testing.T) {
+	if _, err := highlight.NewSession("klingon", []byte("x"), highlight.Options{}); !errors.Is(err, highlight.ErrUnknownLanguage) {
+		t.Fatalf("NewSession(klingon): err = %v, want ErrUnknownLanguage", err)
+	}
+	if _, err := highlight.NewSession("", []byte("x"), highlight.Options{}); !errors.Is(err, highlight.ErrUnknownLanguage) {
+		t.Fatalf("NewSession(\"\"): err = %v, want ErrUnknownLanguage", err)
+	}
+	if _, err := highlight.Highlight("klingon", []byte("x")); !errors.Is(err, highlight.ErrUnknownLanguage) {
+		t.Fatalf("Highlight(klingon): err = %v, want ErrUnknownLanguage", err)
+	}
+	if highlight.Supported("klingon") {
+		t.Fatal("klingon is supported")
 	}
 }
 
 func TestSizeLimit(t *testing.T) {
 	text := bytes.Repeat([]byte("a"), 101)
-	if _, err := highlight.NewSession(golang.Grammar, text, highlight.Options{MaxBytes: 100}); !errors.Is(err, highlight.ErrTooLarge) {
+	if _, err := highlight.NewSession("go", text, highlight.Options{MaxBytes: 100}); !errors.Is(err, highlight.ErrTooLarge) {
 		t.Fatalf("101 bytes with MaxBytes 100: err = %v, want ErrTooLarge", err)
 	}
 	big := make([]byte, highlight.DefaultMaxBytes+1)
-	if _, err := highlight.NewSession(golang.Grammar, big, highlight.Options{}); !errors.Is(err, highlight.ErrTooLarge) {
+	if _, err := highlight.NewSession("go", big, highlight.Options{}); !errors.Is(err, highlight.ErrTooLarge) {
 		t.Fatalf("over DefaultMaxBytes: err = %v, want ErrTooLarge", err)
 	}
-	s := open(t, golang.Grammar, text[:100])
+	s := open(t, "go", text[:100])
 	if err := s.Err(); err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +230,7 @@ func TestSizeLimit(t *testing.T) {
 
 func TestEditValidationAndClose(t *testing.T) {
 	text := []byte("package p\n")
-	s := open(t, golang.Grammar, text)
+	s := open(t, "go", text)
 	if err := s.Edit(highlight.EditRecord{Start: 5, OldEnd: 50}); err == nil {
 		t.Fatal("Edit accepted a range past the end of the document")
 	}
@@ -221,7 +266,7 @@ func TestEditValidationAndClose(t *testing.T) {
 func TestConcurrentUse(t *testing.T) {
 	text := bytes.Repeat([]byte("func f() { return 1 }\n"), 200)
 	var notifies atomic.Int64
-	s, err := highlight.NewSession(golang.Grammar, text, highlight.Options{Notify: func() { notifies.Add(1) }})
+	s, err := highlight.NewSession("go", text, highlight.Options{Notify: func() { notifies.Add(1) }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,15 +314,3 @@ func TestConcurrentUse(t *testing.T) {
 		t.Fatal("no notification")
 	}
 }
-
-// A grammar built for another version of the editor interface is refused.
-func TestGrammarOfAnotherABIIsRefused(t *testing.T) {
-	if _, err := highlight.NewSession(otherABI{golang.Grammar}, []byte("package p"), highlight.Options{}); err == nil {
-		t.Fatal("NewSession took a grammar of another interface version")
-	}
-}
-
-// otherABI is a grammar that reports the next interface version.
-type otherABI struct{ highlight.Grammar }
-
-func (otherABI) ABI() int { return highlight.ABI + 1 }

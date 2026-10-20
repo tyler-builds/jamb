@@ -25,7 +25,7 @@ type EditorElement struct {
 	size        sizes // see Size
 	styles      Style
 	hl          Highlighter
-	lang        highlight.Grammar
+	lang        string
 	// view is the state of the editor's latest render, which the tests read.
 	view *viewState
 }
@@ -112,11 +112,12 @@ func (e *EditorElement) Styles(st Style) *EditorElement {
 // and the editor sends it each later change. A nil highlighter shows plain text.
 func (e *EditorElement) Highlighter(h Highlighter) *EditorElement { e.hl = h; return e }
 
-// Language highlights the document with the tree-sitter language l, such as golang.Grammar.
-// The editor starts a highlight session on the document's text, sends it each change, and paints
-// the spans it has. It closes the session when the language or the document changes. A document
-// over the highlight limit is shown without colors, and a nil language shows plain text.
-func (e *EditorElement) Language(l highlight.Grammar) *EditorElement { e.lang = l; return e }
+// Language highlights the document in the language named lang, as a code fence names it, such
+// as "go", "python" or "ts" (see highlight.Languages). The editor starts a highlight session on
+// the document's text, sends it each change, and paints the spans it has. It closes the session
+// when the language or the document changes. A document over the highlight limit, or in a
+// language the highlighter does not know, is shown without colors, and "" shows plain text.
+func (e *EditorElement) Language(lang string) *EditorElement { e.lang = lang; return e }
 
 // Document returns the document the editor shows.
 func (e *EditorElement) Document() *Document { return e.doc }
@@ -250,7 +251,7 @@ type viewState struct {
 	// comp is what an input method composes at the primary caret, shown but not typed (see ime.go).
 	comp ui.Composition
 	// session is the highlight session started for sessionKey, when Language set one; langErr is
-	// why a session could not be started (highlight.ErrTooLarge, for one).
+	// why a session could not be started (highlight.ErrTooLarge or highlight.ErrUnknownLanguage).
 	session        *highlight.Session
 	sessionKey     sessionKey
 	langErr        error
@@ -264,23 +265,23 @@ type viewState struct {
 
 // sessionKey is what a highlight session was started for: its language, and its document.
 type sessionKey struct {
-	lang highlight.Grammar
+	lang string
 	doc  *Document
 }
 
 // syncSession starts a highlight session for lang on the document, or closes the one it has when
 // lang or the document changed. The session's worker asks for a frame through ctx.Post when it
 // has new spans, so the call is safe from the worker. A failure to start (a document over the
-// size limit, for one) leaves the text uncolored and is kept in langErr.
-func (vs *viewState) syncSession(lang highlight.Grammar) {
+// size limit, or an unknown language) leaves the text uncolored and is kept in langErr.
+func (vs *viewState) syncSession(lang string) {
 	key := sessionKey{lang: lang, doc: vs.doc}
-	if key == vs.sessionKey && (lang == nil || vs.session != nil || vs.langErr != nil) {
+	if key == vs.sessionKey && (lang == "" || vs.session != nil || vs.langErr != nil) {
 		return
 	}
 	vs.closeSession()
 	vs.sessionKey = key
 	vs.langErr = nil
-	if lang == nil {
+	if lang == "" {
 		return
 	}
 	rev := vs.rev

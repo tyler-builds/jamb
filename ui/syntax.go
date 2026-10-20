@@ -1,9 +1,10 @@
 package ui
 
-// SyntaxStyle is the look of one syntax capture in a code editor: its color, and
-// whether its text is italic or bold. Theme.Syntax is keyed by the tree-sitter
-// capture name, such as "keyword" or "string.escape". A capture that is not in
-// the map takes the editor foreground.
+// SyntaxStyle is the look of one syntax token in a code editor: its color, and
+// whether its text is italic or bold. Theme.Syntax is keyed by the token name, as
+// in Zed's themes, such as "keyword" or "string.escape". A token whose name is not
+// in the map, nor a shorter form of it ("keyword" for "keyword.control"), takes
+// the editor foreground.
 type SyntaxStyle struct {
 	// Color is the color of the text for the capture.
 	Color Color

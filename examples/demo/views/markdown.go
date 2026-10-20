@@ -4,12 +4,6 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/tyler-builds/jamb-grammars/bash"
-	"github.com/tyler-builds/jamb-grammars/golang"
-	"github.com/tyler-builds/jamb-grammars/javascript"
-	"github.com/tyler-builds/jamb-grammars/json"
-	"github.com/tyler-builds/jamb-grammars/python"
-	"github.com/tyler-builds/jamb-grammars/rust"
 	"github.com/tyler-builds/jamb/markdown"
 	"github.com/tyler-builds/jamb/markdown/mdcode"
 	"github.com/tyler-builds/jamb/ui"
@@ -28,7 +22,7 @@ const markdownSample = "# Markdown\n\n" +
 	"## Quotes and rules\n\n" +
 	"> A block quote.\n>\n> > And a quote inside it.\n\n---\n\n" +
 	"## Code\n\n" +
-	"Fenced blocks are highlighted by the grammar their fence names:\n\n" +
+	"Fenced blocks are highlighted in the language their fence names:\n\n" +
 	"```go\npackage main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"hello, world\") // a comment\n}\n```\n\n" +
 	"```python\ndef greet(name: str) -> str:\n    return f\"hello, {name}\"\n```\n\n" +
 	"```json\n{\"name\": \"jamb\", \"version\": \"0.2.0\", \"pure_go\": true}\n```\n\n" +
@@ -45,8 +39,8 @@ const markdownSample = "# Markdown\n\n" +
 	"[^1]: The footnote, listed at the end of the document.\n"
 
 // demoCode colors the code blocks of the Markdown page. One highlighter serves every
-// render: it keeps the colors of the blocks it has parsed.
-var demoCode = mdcode.Highlight(golang.Grammar, python.Grammar, javascript.Grammar, rust.Grammar, bash.Grammar, json.Grammar)
+// render: it keeps the colors of the blocks it has lexed.
+var demoCode = mdcode.Highlight()
 
 // Markdown is the page that shows a Markdown document with every element, its code
 // highlighted. Its task list is live: a click on a task's box changes the text.

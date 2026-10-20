@@ -1,6 +1,7 @@
 package highlight
 
 import (
+	"bytes"
 	"math/rand"
 	"os"
 	"slices"
@@ -8,31 +9,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/tyler-builds/jamb-grammars/golang"
-	"github.com/tyler-builds/jamb-grammars/python"
-	"github.com/tyler-builds/jamb-grammars/typescript"
 )
-
-// testLanguage returns the grammar of the jamb-grammars package pkg whose module
-// is file.
-func testLanguage(t *testing.T, pkg, file string) Grammar {
-	t.Helper()
-	switch pkg + "/" + file {
-	case "golang/go":
-		return golang.Grammar
-	case "typescript/typescript":
-		return typescript.TypeScript
-	case "python/python":
-		return python.Grammar
-	}
-	t.Fatalf("no test grammar %s/%s", pkg, file)
-	return nil
-}
 
 // openTest opens a session on text, with a notification channel for each
 // publish, and sets the viewport to the whole text.
-func openTest(t *testing.T, lang Grammar, text []byte, notify chan struct{}) *Session {
+func openTest(t *testing.T, lang string, text []byte, notify chan struct{}) *Session {
 	t.Helper()
 	s, err := NewSession(lang, text, Options{Notify: func() {
 		select {
@@ -57,7 +38,7 @@ func settle(t *testing.T, s *Session, notify <-chan struct{}) {
 	deadline := time.After(30 * time.Second)
 	for {
 		s.mu.Lock()
-		done := !s.busy && len(s.queue) == 0 && !s.viewDirty && !s.first && !s.refresh && s.synced == s.version
+		done := !s.busy && len(s.queue) == 0 && !s.viewDirty && !s.first && s.synced == s.version
 		err := s.err
 		s.mu.Unlock()
 		if err != nil {
@@ -68,21 +49,32 @@ func settle(t *testing.T, s *Session, notify <-chan struct{}) {
 		}
 		select {
 		case <-notify:
+		case <-time.After(5 * time.Millisecond): // a round that publishes nothing new does not notify
 		case <-deadline:
 			t.Fatal("worker did not catch up")
 		}
 	}
 }
 
-// freshSpans returns the spans of a new session on text, parsed from scratch.
-func freshSpans(t *testing.T, lang Grammar, text []byte) []Span {
+// freshSpans returns the spans of text lexed as a whole.
+func freshSpans(t *testing.T, lang string, text []byte) []Span {
 	t.Helper()
-	notify := make(chan struct{}, 1)
-	s := openTest(t, lang, text, notify)
-	defer s.Close()
-	settle(t, s, notify)
-	sp, _ := s.Spans()
+	sp, err := Highlight(lang, text)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return sp
+}
+
+// inRange returns the spans that intersect [lo, hi).
+func inRange(spans []Span, lo, hi int) []Span {
+	var out []Span
+	for _, sp := range spans {
+		if sp.End > lo && sp.Start < hi {
+			out = append(out, sp)
+		}
+	}
+	return out
 }
 
 // holdWorker makes the worker wait before each round while hold is set. The
@@ -107,11 +99,10 @@ func holdWorker(t *testing.T) (hold *atomic.Bool, release func()) {
 }
 
 func TestEditShiftsBeforeWorkerAnswers(t *testing.T) {
-	lang := testLanguage(t, "golang", "go")
 	text := []byte("package main\n\nfunc main() {\n\tprintln(1)\n}\n")
 	hold, release := holdWorker(t)
 	notify := make(chan struct{}, 100)
-	s := openTest(t, lang, text, notify)
+	s := openTest(t, "go", text, notify)
 	defer s.Close()
 	defer release()
 	settle(t, s, notify)
@@ -132,10 +123,10 @@ func TestEditShiftsBeforeWorkerAnswers(t *testing.T) {
 	release()
 	settle(t, s, notify)
 
-	final := append(slices.Clone(text[:31]), append([]byte("xy"), text[31:]...)...)
+	final := slices.Concat(text[:31], []byte("xy"), text[31:])
 	got, v2 := s.Spans()
-	if want := freshSpans(t, lang, final); !slices.Equal(got, want) {
-		t.Fatalf("spans after the worker answered differ from a fresh parse:\n got %v\nwant %v", got, want)
+	if want := freshSpans(t, "go", final); !slices.Equal(got, want) {
+		t.Fatalf("spans after the worker answered differ from a fresh lex:\n got %v\nwant %v", got, want)
 	}
 	// The worker's answer is a new revision with no new edit, so an editor that keeps an
 	// index of the spans by revision rebuilds it and paints the new colors at once.
@@ -144,17 +135,16 @@ func TestEditShiftsBeforeWorkerAnswers(t *testing.T) {
 	}
 }
 
-func TestBurstIsCoalescedIntoOneParse(t *testing.T) {
-	lang := testLanguage(t, "python", "python")
+func TestBurstIsCoalescedIntoOneRound(t *testing.T) {
 	text := []byte("def f(a, b):\n    return a + b\n")
 	hold, release := holdWorker(t)
 	notify := make(chan struct{}, 1000)
-	s := openTest(t, lang, text, notify)
+	s := openTest(t, "python", text, notify)
 	defer s.Close()
 	defer release()
 	settle(t, s, notify)
 
-	before := s.reparses.Load()
+	before := s.rounds.Load()
 	hold.Store(true)
 	for range 200 {
 		if err := s.Edit(EditRecord{Start: 0, OldEnd: 0, Text: []byte("#")}); err != nil {
@@ -168,50 +158,59 @@ func TestBurstIsCoalescedIntoOneParse(t *testing.T) {
 	}
 	release()
 	settle(t, s, notify)
-	if n := s.reparses.Load() - before; n != 1 {
-		t.Fatalf("200 queued edits caused %d parses, want 1", n)
+	if n := s.rounds.Load() - before; n != 1 {
+		t.Fatalf("200 queued edits took %d rounds, want 1", n)
 	}
 	got, _ := s.Spans()
-	if want := freshSpans(t, lang, final); !slices.Equal(got, want) {
-		t.Fatalf("spans after the burst differ from a fresh parse")
+	if want := freshSpans(t, "python", final); !slices.Equal(got, want) {
+		t.Fatalf("spans after the burst differ from a fresh lex")
 	}
 }
 
-// editSample is text with characters that the grammars treat differently, for
-// random edits.
-const editSample = "xyz _(){}[]\n\"'=;:.,+-*/<>!&|1\t#"
+// editSample is text with characters that the lexers treat differently, for
+// random edits, with multi-byte characters and a carriage return.
+const editSample = "xyz _(){}[]\n\"'`=;:.,+-*/<>!&|1\t#é😀\r"
 
-// randomEdit returns a random edit of text, inserting or deleting a few bytes.
+// randomEdit returns a random edit of text at character boundaries, inserting or
+// deleting a few bytes.
 func randomEdit(rng *rand.Rand, text []byte) EditRecord {
+	sample := []rune(editSample)
+	boundary := func(at int) int {
+		for at > 0 && at < len(text) && text[at]&0xC0 == 0x80 {
+			at--
+		}
+		return at
+	}
 	if len(text) == 0 || rng.Intn(2) == 0 {
-		at := rng.Intn(len(text) + 1)
-		ins := make([]byte, 1+rng.Intn(6))
-		for i := range ins {
-			ins[i] = editSample[rng.Intn(len(editSample))]
+		at := boundary(rng.Intn(len(text) + 1))
+		var ins []byte
+		for range 1 + rng.Intn(6) {
+			ins = append(ins, string(sample[rng.Intn(len(sample))])...)
 		}
 		return EditRecord{Start: at, OldEnd: at, Text: ins}
 	}
-	at := rng.Intn(len(text))
-	n := min(1+rng.Intn(8), len(text)-at)
-	return EditRecord{Start: at, OldEnd: at + n}
+	at := boundary(rng.Intn(len(text)))
+	end := min(at+1+rng.Intn(8), len(text))
+	for end < len(text) && text[end]&0xC0 == 0x80 {
+		end++
+	}
+	return EditRecord{Start: at, OldEnd: end}
 }
 
 // apply returns text with e applied.
 func apply(text []byte, e EditRecord) []byte {
-	out := slices.Clone(text[:e.Start])
-	out = append(out, e.Text...)
-	return append(out, text[e.OldEnd:]...)
+	return slices.Concat(text[:e.Start], e.Text, text[e.OldEnd:])
 }
 
-func TestSpansMatchFreshParseAfterRandomEdits(t *testing.T) {
+func TestSpansMatchFreshLexAfterRandomEdits(t *testing.T) {
 	samples := []struct {
-		name string
-		lang Grammar
-		text []byte
+		name, lang string
+		text       []byte
 	}{
-		{"go", testLanguage(t, "golang", "go"), mustRead(t, "session.go")},
-		{"typescript", testLanguage(t, "typescript", "typescript"), []byte(tsSample)},
-		{"python", testLanguage(t, "python", "python"), []byte(pySample)},
+		{"go", "go", mustRead(t, "session.go")},
+		{"typescript", "typescript", []byte(tsSample)},
+		{"python", "python", []byte(pySample)},
+		{"markdown", "markdown", mustRead(t, "../../docs/codeedit.md")},
 	}
 	for _, sm := range samples {
 		t.Run(sm.name, func(t *testing.T) {
@@ -221,7 +220,7 @@ func TestSpansMatchFreshParseAfterRandomEdits(t *testing.T) {
 			s := openTest(t, sm.lang, text, notify)
 			defer s.Close()
 			settle(t, s, notify)
-			for batch := range 15 {
+			for batch := range 30 {
 				for range 10 {
 					e := randomEdit(rng, text)
 					if err := s.Edit(e); err != nil {
@@ -229,16 +228,74 @@ func TestSpansMatchFreshParseAfterRandomEdits(t *testing.T) {
 					}
 					text = apply(text, e)
 				}
-				if err := s.SetViewport(0, len(text)); err != nil {
+				// Alternate between the whole text and a window of it in view.
+				lo, hi := 0, len(text)
+				if batch%2 == 1 {
+					lo = rng.Intn(len(text) + 1)
+					hi = min(len(text), lo+rng.Intn(20000))
+				}
+				if err := s.SetViewport(lo, hi); err != nil {
 					t.Fatal(err)
 				}
 				settle(t, s, notify)
+				if want := lineStarts(text); !slices.Equal(s.lines, want) {
+					t.Fatalf("batch %d: the worker's line offsets differ from the text's", batch)
+				}
 				got, _ := s.Spans()
-				if want := freshSpans(t, sm.lang, text); !slices.Equal(got, want) {
-					t.Fatalf("batch %d: spans differ from a fresh parse of %d bytes", batch, len(text))
+				s.mu.Lock()
+				view := s.view
+				s.mu.Unlock()
+				want := inRange(freshSpans(t, sm.lang, text), view[0], view[1])
+				if len(want) == 0 && view[1]-view[0] > 1000 {
+					t.Fatalf("batch %d: no spans in [%d, %d)", batch, view[0], view[1])
+				}
+				if got = inRange(got, view[0], view[1]); !slices.Equal(got, want) {
+					t.Fatalf("batch %d: spans of [%d, %d) differ from a fresh lex of %d bytes", batch, view[0], view[1], len(text))
 				}
 			}
 		})
+	}
+}
+
+// TestOpenerRecolorsTheRest types a comment opener at the top of a long file
+// with the end in view: the spans of the end become a comment, and the worker
+// goes on to relex the lines outside the view until none wait.
+func TestOpenerRecolorsTheRest(t *testing.T) {
+	text := bytes.Repeat([]byte("func f() int { return 1 }\n"), 20000)
+	notify := make(chan struct{}, 1000)
+	s := openTest(t, "go", text, notify)
+	defer s.Close()
+	end := len(text)
+	if err := s.SetViewport(end-2000, end); err != nil {
+		t.Fatal(err)
+	}
+	settle(t, s, notify)
+	if err := s.Edit(EditRecord{Start: 0, OldEnd: 0, Text: []byte("/*")}); err != nil {
+		t.Fatal(err)
+	}
+	settle(t, s, notify)
+	got, _ := s.Spans()
+	names := s.CaptureNames()
+	tail := inRange(got, end-1000, end+2)
+	if len(tail) == 0 {
+		t.Fatal("no spans at the end")
+	}
+	for _, sp := range tail {
+		if names[sp.Capture] != "comment" {
+			t.Fatalf("after /* at the top, %q at the end is %s", text[sp.Start-2:sp.End-2], names[sp.Capture])
+		}
+	}
+	for deadline := time.Now().Add(30 * time.Second); ; {
+		s.mu.Lock()
+		behind := s.behind
+		s.mu.Unlock()
+		if !behind {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("lines outside the view still wait")
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
 
@@ -271,7 +328,7 @@ func TestShiftSpans(t *testing.T) {
 }
 
 func TestClosest(t *testing.T) {
-	styles := map[string]int{"function": 1, "function.method": 2, "keyword": 3}
+	styles := map[string]int{"function": 1, "function.method": 2, "keyword": 3, "property": 4}
 	tests := []struct {
 		capture string
 		key     string
@@ -279,8 +336,8 @@ func TestClosest(t *testing.T) {
 	}{
 		{"function.method.builtin", "function.method", true},
 		{"function.builtin", "function", true},
-		{"function.method", "function.method", true},
 		{"keyword.control.import", "keyword", true},
+		{"selector.class", "property", true},
 		{"variable", "", false},
 		{"", "", false},
 	}

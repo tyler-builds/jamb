@@ -64,8 +64,8 @@ type Theme struct {
 	// FontSize is the default text size, in logical pixels.
 	FontSize float32
 
-	// Syntax is the look of each syntax capture of a code editor, keyed by the
-	// tree-sitter capture name (see SyntaxStyle). Under high contrast it keeps the
+	// Syntax is the look of each syntax token of a code editor, keyed by the
+	// token name (see SyntaxStyle). Under high contrast it keeps the
 	// same names, with system colors.
 	Syntax map[string]SyntaxStyle
 	// CodeEditor is the colors of a code editor.

@@ -5,7 +5,6 @@ go 1.27.1
 require (
 	github.com/go-text/typesetting v0.3.5
 	github.com/tetratelabs/wazero v1.12.0
-	github.com/tyler-builds/jamb-grammars v0.1.0
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/image v0.47.0
 )

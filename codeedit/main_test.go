@@ -1,11 +1,12 @@
 package codeedit
 
 import (
+	"errors"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/tyler-builds/jamb-grammars/golang"
+	"github.com/tyler-builds/jamb/codeedit/highlight"
 )
 
 // TestMain keeps the compiled-module cache of the highlighter in a temporary directory, so that
@@ -23,14 +24,14 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// TestLanguageHighlightsWithRealSession checks the wiring of a tree-sitter session: the spans
+// TestLanguageHighlightsWithRealSession checks the wiring of a highlight session: the spans
 // arrive in the background and are painted, and a keystroke reaches the session at once.
 func TestLanguageHighlightsWithRealSession(t *testing.T) {
 	if testing.Short() {
-		t.Skip("compiles the Go grammar")
+		t.Skip("compiles the highlighter's module")
 	}
 	h := newHarness(t, "package main\n\nfunc main() {}\n", func(e *EditorElement) *EditorElement {
-		return e.Language(golang.Grammar)
+		return e.Language("go")
 	})
 	deadline := time.Now().Add(30 * time.Second)
 	for {
@@ -52,5 +53,24 @@ func TestLanguageHighlightsWithRealSession(t *testing.T) {
 	}
 	if got := h.doc.Text(); got != "package main\n\nfunc main() {}\nx" {
 		t.Fatalf("text after typing = %q", got)
+	}
+}
+
+// TestUnknownLanguageIsPlain checks that a language the highlighter does not know leaves the
+// text uncolored, with the reason kept, and that clearing the language drops it.
+func TestUnknownLanguageIsPlain(t *testing.T) {
+	lang := "klingon"
+	h := newHarness(t, "x := 1\n", func(e *EditorElement) *EditorElement { return e.Language(lang) })
+	h.frame()
+	vs := h.ed.view
+	if vs.session != nil || vs.hl != nil {
+		t.Fatal("a session was started for an unknown language")
+	}
+	if !errors.Is(vs.langErr, highlight.ErrUnknownLanguage) {
+		t.Fatalf("langErr = %v, want ErrUnknownLanguage", vs.langErr)
+	}
+	vs.syncSession("")
+	if vs.langErr != nil || vs.session != nil {
+		t.Fatalf("after clearing the language: langErr = %v, session = %v", vs.langErr, vs.session)
 	}
 }

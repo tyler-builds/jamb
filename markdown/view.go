@@ -128,7 +128,7 @@ func (v *ViewElement) BaseDir(dir string) *ViewElement { v.baseDir = dir; return
 
 // Code sets the highlighter of the view's code blocks. Without one, code blocks are
 // plain. See CodeHighlighter, and the mdcode package for one built on the code
-// editor's grammars.
+// editor's highlighter.
 func (v *ViewElement) Code(h CodeHighlighter) *ViewElement { v.code = h; return v }
 
 // The sizing methods give the view's box a size, as they do for the widgets of the ui

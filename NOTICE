@@ -27,12 +27,20 @@ They are converted for jamb: their colors are mapped to jamb's tokens, and some 
 moved in lightness for contrast. Each theme credits the color scheme it is taken
 from, and that scheme's author; see third_party/gpui-component-themes/README.md.
 
+Third-party software: @pierre/highlights
+
+The code editor's syntax highlighter, codeedit/internal/lexer/highlights.wasm, is the
+WebAssembly module of @pierre/highlights 0.1.3
+(https://github.com/pierrecomputer/pierre/tree/main/packages/highlights), copied
+unchanged from its npm package. @pierre/highlights is Copyright 2025 Pierre Computer
+Company, licensed under the Apache License, Version 2.0; the license text is in
+codeedit/internal/lexer/LICENSE-APACHE. Only apps that import codeedit contain it.
+
 Third-party software: wazero
 
-The runtime that executes the code editor's grammar modules
-(github.com/tyler-builds/jamb-grammars, which carries the notices of the
-tree-sitter runtime and grammars) is github.com/tetratelabs/wazero v1.12.0,
-licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+The runtime that executes the highlighter's module is github.com/tetratelabs/wazero
+v1.12.0, licensed under the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0).
 
 Third-party software: goldmark
 
