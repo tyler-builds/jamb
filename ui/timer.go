@@ -11,6 +11,9 @@ type timer struct {
 	rt *Runtime
 	at time.Time
 	fn func()
+	// motion marks the end of an animation's delay or its OnDone: the UI has
+	// not settled while it is pending (see Runtime.Settled).
+	motion bool
 }
 
 // at schedules fn to run at the first frame at or after t, and asks the host to wake the
@@ -19,6 +22,23 @@ func (rt *Runtime) at(t time.Time, fn func()) *timer {
 	tm := &timer{rt: rt, at: t, fn: fn}
 	rt.timers = append(rt.timers, tm)
 	rt.wakeAt(t)
+	return tm
+}
+
+// done schedules the OnDone of an animation that ends at end, or at the next
+// frame under reduced motion. pick returns the callback to run then, nil when
+// the animation has gone. It returns the timer, nil when there is nothing to
+// run.
+func (rt *Runtime) done(end time.Time, pick func() func()) *timer {
+	if rt.sys.ReducedMotion {
+		end = rt.now()
+	}
+	tm := rt.at(end, func() {
+		if fn := pick(); fn != nil {
+			fn()
+		}
+	})
+	tm.motion = true
 	return tm
 }
 

@@ -75,6 +75,10 @@ type nodeState struct {
 	// and playKey is the key they began with.
 	playAt  time.Time
 	playKey any
+	// enterDone and playDone run the OnDone of the entrance and of the
+	// keyframes; they are cancelled when the element goes or the keyframes
+	// restart.
+	enterDone, playDone *timer
 	// vel is the velocity of a spring's opacity, offset X and Y and scale,
 	// per second (see Runtime.spring).
 	vel [4]float32
@@ -320,6 +324,13 @@ type Runtime struct {
 	warn                  func(string)
 	lastFrame             time.Time
 	timers                []*timer // functions due at a time, run by Frame (see at)
+
+	// motionDue is when the first delayed motion that the last paint drew
+	// starts (see waitFor). staggers counts the elements that entered with a
+	// Stagger under each parent in build staggerGen (see staggered).
+	motionDue  time.Time
+	staggers   map[staggerKey]int
+	staggerGen uint32
 
 	mouseX, mouseY float32
 	mouseIn        bool
@@ -723,17 +734,39 @@ func (rt *Runtime) hostCursor() input.Cursor { return rt.cursor }
 // Stats returns statistics about the last frame.
 func (rt *Runtime) Stats() FrameStats { return rt.stats }
 
-// NeedsFrame reports whether something changed since the last Frame.
+// NeedsFrame reports whether something changed since the last Frame. An
+// animation waiting out its Delay asks for no frame: the window is woken when
+// it is due.
 func (rt *Runtime) NeedsFrame() bool {
-	return rt.looping || !rt.Settled()
+	return rt.looping || rt.busy()
 }
 
 // Settled reports whether the UI has come to rest: nothing changed since the
-// last Frame and nothing animates toward an end. Repeating animations (see
+// last Frame, nothing animates toward an end, and no animation waits out its
+// Delay or has an OnDone still to run. Repeating animations (see
 // Animation.Repeat) never end, so they do not count; NeedsFrame still reports
 // them.
 func (rt *Runtime) Settled() bool {
-	return !(rt.rootInst == nil || rt.animating || rt.needLayout || rt.needPaint || rt.hasDirty.Load())
+	return !rt.busy() && !rt.delayed()
+}
+
+// busy reports whether the next frame has work to do.
+func (rt *Runtime) busy() bool {
+	return rt.rootInst == nil || rt.animating || rt.needLayout || rt.needPaint || rt.hasDirty.Load()
+}
+
+// delayed reports whether an animation waits to start or to report its end:
+// a drawn motion in its delay, or a pending delay or OnDone timer.
+func (rt *Runtime) delayed() bool {
+	if !rt.motionDue.IsZero() {
+		return true
+	}
+	for _, tm := range rt.timers {
+		if tm.motion {
+			return true
+		}
+	}
+	return false
 }
 
 // Frame brings the scene up to date, as the window host does before it draws.
@@ -763,6 +796,9 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 	rt.runPosted()
 	if !rt.imageDue.IsZero() && !now.Before(rt.imageDue) {
 		rt.needPaint = true
+	}
+	if !rt.motionDue.IsZero() && !now.Before(rt.motionDue) {
+		rt.needPaint = true // a delayed motion starts
 	}
 	rt.expirePending(now)
 	rt.runTimers(now, false)
@@ -870,6 +906,8 @@ func (rt *Runtime) paintFrame(dt float32) {
 	rt.markAccess() // paint moves nodes (scrolling) and records which are drawn
 	rt.hasTextInput = false
 	rt.imageDue = time.Time{} // the animated images drawn now set it again
+	// So do the delayed motions.
+	rt.motionDue = time.Time{}
 	rt.paint(dt)
 	if rt.revealCaret() {
 		rt.paint(0) // the caret's scroll container moved; repaint at the new offset
@@ -1132,6 +1170,11 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	leaving := rt.byID[n.id] == n
 	if leaving {
 		delete(rt.byID, n.id)
+		if n.st != nil {
+			// What the element would have reported at its end will not come.
+			n.st.enterDone.cancel()
+			n.st.playDone.cancel()
+		}
 		if st := rt.states[n.id]; st != nil && st.gen != rt.gen {
 			delete(rt.states, n.id)
 		}
@@ -1151,6 +1194,9 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	if exits {
 		n.st.leaveAt = rt.now()
 		rt.ghosts = append(rt.ghosts, n)
+	} else if mayExit && leaving && n.div != nil && n.div.exit != nil && n.div.exit.a.OnDone != nil {
+		// Removed without its exit, the element has finished leaving at once.
+		rt.done(rt.now(), func() func() { return n.div.exit.a.OnDone })
 	}
 	for _, c := range n.children {
 		rt.retireNode(c, !exits)
@@ -1326,18 +1372,40 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 			n.style.Spring.Duration > 0 || e.play != nil {
 			n.st = rt.state(id)
 			if n.fresh {
-				// A new element forgets any exit its ID had, and enters now.
+				// A new element forgets any exit its ID had, and enters now, or
+				// later when it is staggered.
 				n.st.leaveAt, n.st.enterAt = time.Time{}, time.Time{}
+				n.st.enterDone.cancel()
+				n.st.enterDone = nil
 				if e.enter != nil {
-					n.st.enterAt = rt.now()
+					n.st.enterAt = rt.now().Add(rt.staggered(parent, e.enter.a.Stagger))
+					if a := &e.enter.a; a.OnDone != nil {
+						n.st.enterDone = rt.done(n.st.enterAt.Add(max(a.Delay, 0)+a.Duration), func() func() {
+							if n := rt.byID[id]; n != nil && n.div != nil && n.div.enter != nil {
+								return n.div.enter.a.OnDone
+							}
+							return nil
+						})
+					}
 				}
 			}
 			// Keyframes play from the start when the element appears and when
 			// their key changes.
 			if e.play == nil {
 				n.st.playAt = time.Time{}
+				n.st.playDone.cancel()
 			} else if n.fresh || n.st.playAt.IsZero() || n.st.playKey != e.play.key {
 				n.st.playAt, n.st.playKey = rt.now(), e.play.key
+				n.st.playDone.cancel()
+				n.st.playDone = nil
+				if a := &e.play.a; a.OnDone != nil && !a.Repeat {
+					n.st.playDone = rt.done(n.st.playAt.Add(max(a.Delay, 0)+a.Duration), func() func() {
+						if n := rt.byID[id]; n != nil && n.div != nil && n.div.play != nil {
+							return n.div.play.a.OnDone
+						}
+						return nil
+					})
+				}
 			}
 		}
 		rt.setOverhang(n)

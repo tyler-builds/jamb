@@ -66,17 +66,57 @@ type motionSpec struct {
 }
 
 // progress returns the linear progress (0..1) of a motion that began at from,
-// and whether it is still running.
-func (s *motionSpec) progress(now, from time.Time) (float32, bool) {
+// and whether it is still running. A motion in its Delay is at 0 and not
+// running, and wait is when it starts.
+func (s *motionSpec) progress(now, from time.Time) (p float32, running bool, wait time.Time) {
+	if from = from.Add(max(s.a.Delay, 0)); now.Before(from) {
+		return 0, false, from
+	}
 	d := s.a.Duration
 	if d <= 0 {
-		return 1, false
+		return 1, false, time.Time{}
 	}
-	p := float32(now.Sub(from).Seconds() / d.Seconds())
+	p = float32(now.Sub(from).Seconds() / d.Seconds())
 	if p >= 1 {
-		return 1, false
+		return 1, false, time.Time{}
 	}
-	return max(p, 0), true
+	return max(p, 0), true, time.Time{}
+}
+
+// waitFor records that a motion the paint drew starts at t, after its delay.
+// The window is woken then, and until then the UI has not settled, though it
+// asks for no frames.
+func (rt *Runtime) waitFor(t time.Time) {
+	if rt.motionDue.IsZero() || t.Before(rt.motionDue) {
+		rt.motionDue = t
+	}
+	rt.wakeAt(t)
+}
+
+// staggerKey groups the elements that enter together with the same Stagger
+// under one parent.
+type staggerKey struct {
+	parent  uint64
+	stagger time.Duration
+}
+
+// staggered returns how much later than now an element that enters under
+// parent with Stagger s starts: s for each element of its group that entered
+// before it in this build, up to 16. Reduced motion has no stagger.
+func (rt *Runtime) staggered(parent *node, s time.Duration) time.Duration {
+	if s <= 0 || rt.sys.ReducedMotion {
+		return 0
+	}
+	if rt.staggers == nil || rt.staggerGen != rt.gen {
+		rt.staggers, rt.staggerGen = map[staggerKey]int{}, rt.gen
+	}
+	k := staggerKey{stagger: s}
+	if parent != nil {
+		k.parent = parent.id
+	}
+	i := rt.staggers[k]
+	rt.staggers[k] = i + 1
+	return time.Duration(min(i, 16)) * s
 }
 
 // Enter makes the element animate into place when it first appears: it starts
@@ -170,8 +210,9 @@ func (sp *playSpec) pose(p float32) (opacity, x, y, scale float32) {
 }
 
 // playProgress returns the linear progress of keyframes that began at from,
-// and asks for the next frame while they run. With reduced motion keyframes
-// that end show their end, and repeating ones hold their first frame.
+// and asks for the next frame while they run; in their delay they are at 0 and
+// wait. With reduced motion, which has no delays, keyframes that end show
+// their end, and repeating ones hold their first frame.
 func (rt *Runtime) playProgress(sp *playSpec, now, from time.Time) float32 {
 	a := &sp.a
 	if rt.sys.ReducedMotion {
@@ -179,6 +220,10 @@ func (rt *Runtime) playProgress(sp *playSpec, now, from time.Time) float32 {
 			return 0
 		}
 		return 1
+	}
+	if from = from.Add(max(a.Delay, 0)); now.Before(from) {
+		rt.waitFor(from)
+		return 0
 	}
 	d := a.Duration
 	if d <= 0 {
@@ -207,8 +252,11 @@ func (rt *Runtime) motion(n *node, v *visual) {
 	}
 	now := rt.now()
 	if sp := n.div.enter; sp != nil && !st.enterAt.IsZero() && !rt.sys.ReducedMotion {
-		p, running := sp.progress(now, st.enterAt)
+		p, running, wait := sp.progress(now, st.enterAt)
 		rt.animating = rt.animating || running
+		if !wait.IsZero() {
+			rt.waitFor(wait)
+		}
 		op, x, y, sc := sp.m.pose(sp.a.easing()(p))
 		v.opacity *= op
 		v.offX += x
@@ -216,8 +264,11 @@ func (rt *Runtime) motion(n *node, v *visual) {
 		v.scale *= sc
 	}
 	if sp := n.div.exit; sp != nil && !st.leaveAt.IsZero() && !rt.sys.ReducedMotion {
-		p, running := sp.progress(now, st.leaveAt)
+		p, running, wait := sp.progress(now, st.leaveAt)
 		rt.animating = rt.animating || running
+		if !wait.IsZero() {
+			rt.waitFor(wait)
+		}
 		// The exit runs the pose backwards: eased progress 0 is the normal look.
 		op, x, y, sc := sp.m.pose(1 - sp.a.easing()(p))
 		v.opacity *= op
@@ -236,11 +287,19 @@ func (rt *Runtime) motion(n *node, v *visual) {
 
 // paintGhosts paints the elements that left the tree and are still exiting.
 // Those that are not overlays are painted now, after the tree; overlays are
-// queued after the other overlays. Exits that have ended are dropped.
+// queued after the other overlays. Exits that have ended are dropped, and
+// their OnDone runs at the next frame.
 func (rt *Runtime) paintGhosts(dt float32) {
 	now := rt.now()
 	rt.ghosts = slices.DeleteFunc(rt.ghosts, func(n *node) bool {
-		return now.Sub(n.st.leaveAt) >= n.div.exit.a.Duration
+		a := &n.div.exit.a
+		if now.Sub(n.st.leaveAt) < max(a.Delay, 0)+a.Duration {
+			return false
+		}
+		if a.OnDone != nil {
+			rt.done(now, func() func() { return a.OnDone })
+		}
+		return true
 	})
 	for _, n := range rt.ghosts {
 		if n.div.overlay != 0 {
