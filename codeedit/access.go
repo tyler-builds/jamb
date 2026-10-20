@@ -1,6 +1,7 @@
 package codeedit
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -13,8 +14,9 @@ import (
 
 // The Text pattern of an editor. The access tree is built on the UI thread, and the
 // tree is read from any thread, so the pattern reads the editor through an editorModel:
-// a copy of the text (a rope snapshot), of the hidden rows and of the layout of the last
-// paint. The model never reads the Document, which the UI thread keeps changing.
+// a copy of the text (a rope snapshot), of the hidden rows, of the display rows before each
+// row when the lines wrap, and of the layout of the last paint. The model never reads the
+// Document, which the UI thread keeps changing.
 //
 // The points of the model are byte offsets, as the positions of the document are. A
 // unit is measured on the line around a point, never on the whole text: a line feed
@@ -34,6 +36,12 @@ type editorModel struct {
 	scrollX float32    // the scroll position of the last paint
 	scrollY float32
 	tab     int
+	// wrapped is whether the rows wrap, at wrap; prefix is then a copy of the display rows before
+	// each row (see rowIndex), and the model wraps a row again from its text when it needs its
+	// segments.
+	wrapped bool
+	wrap    wrapKey
+	prefix  []int32
 }
 
 // textModel returns the model of the editor's text and of its last paint. It is made
@@ -41,12 +49,19 @@ type editorModel struct {
 // content while the text is the same (see access.TextRange.Same).
 func (vs *viewState) textModel() *editorModel {
 	d := vs.doc
+	wrapped := vs.wrapping()
 	if m := vs.model; m != nil && m.doc == d && m.version == d.version && m.geo == vs.geo &&
-		m.scrollX == vs.scrollX && m.scrollY == vs.scrollY && m.tab == vs.tab {
+		m.scrollX == vs.scrollX && m.scrollY == vs.scrollY && m.tab == vs.tab &&
+		m.wrapped == wrapped && m.wrap == vs.wc.key {
 		return m
 	}
 	vs.model = &editorModel{doc: d, version: d.version, textVer: d.textVer, t: d.text.Snapshot(),
-		hidden: d.hiddenRanges(), geo: vs.geo, scrollX: vs.scrollX, scrollY: vs.scrollY, tab: vs.tab}
+		hidden: d.hiddenRanges(), geo: vs.geo, scrollX: vs.scrollX, scrollY: vs.scrollY, tab: vs.tab,
+		wrapped: wrapped, wrap: vs.wc.key}
+	if wrapped {
+		// The prefix is copied only here, when assistive technology reads the text.
+		vs.model.prefix = slices.Clone(vs.wc.index())
+	}
 	return vs.model
 }
 
@@ -162,9 +177,12 @@ func (m *editorModel) Span(u access.TextUnit, p int) (int, int) {
 		stops, _ := m.graphemes(p)
 		i := sort.SearchInts(stops, p+1) // the first boundary after p
 		return stops[max(i-1, 0)], stops[min(i, len(stops)-1)]
-	case access.UnitLine, access.UnitParagraph:
+	case access.UnitLine:
 		ln, end := m.Line(p)
 		return ln.Start, end
+	case access.UnitParagraph:
+		row := m.rowOf(p)
+		return m.t.LineStart(row), m.lineEnd(row)
 	case access.UnitWord:
 		starts, we := m.words(p)
 		i := sort.SearchInts(starts, p+1)
@@ -187,9 +205,11 @@ func (m *editorModel) Next(u access.TextUnit, p int) int {
 	case access.UnitCharacter:
 		stops, _ := m.graphemes(p)
 		return stops[min(sort.SearchInts(stops, p+1), len(stops)-1)]
-	case access.UnitLine, access.UnitParagraph:
+	case access.UnitLine:
 		_, end := m.Line(p)
 		return end
+	case access.UnitParagraph:
+		return m.lineEnd(m.rowOf(p))
 	case access.UnitWord:
 		starts, we := m.words(p)
 		if i := sort.SearchInts(starts, p+1); i < len(starts) {
@@ -209,7 +229,10 @@ func (m *editorModel) Prev(u access.TextUnit, p int) int {
 	case access.UnitCharacter:
 		stops, _ := m.graphemes(p)
 		return stops[max(sort.SearchInts(stops, p)-1, 0)]
-	case access.UnitLine, access.UnitParagraph:
+	case access.UnitLine:
+		ln, _ := m.Line(p - 1)
+		return ln.Start
+	case access.UnitParagraph:
 		return m.t.LineStart(m.rowOf(p - 1))
 	case access.UnitWord:
 		starts, _ := m.words(p)
@@ -218,31 +241,37 @@ func (m *editorModel) Prev(u access.TextUnit, p int) int {
 	return 0
 }
 
-// Line returns the visual line that holds point p, and the point where it ends. The
-// editor does not wrap, so a visual line is a row. A hidden row has no height, so it has
-// no rectangle.
+// Line returns the visual line that holds point p, and the point where it ends: a display row,
+// which is a row, or one segment of a row when the lines wrap. A segment ends where the next one
+// starts, and the last segment of a row ends after its line feed. A hidden row has no height,
+// so it has no rectangle.
 func (m *editorModel) Line(p int) (access.TextLine, int) {
-	row := m.rowOf(p)
+	row, dr, line := m.segmentAt(p)
+	ls := m.t.LineStart(row)
 	ln := access.TextLine{
-		Start: m.t.LineStart(row),
-		Top:   float32(m.visibleIndex(row))*m.geo.lineH - m.scrollY,
+		Start: dr.from,
+		Top:   float32(m.index().indexOf(row)+dr.seg)*m.geo.lineH - m.scrollY,
 	}
 	if !m.hiddenRow(row) {
 		ln.Height = m.geo.lineH
 	}
-	line := strings.TrimRight(m.lineText(row), " \t")
-	ln.Right = m.cellX(cellOfCol(line, len(line), m.tab))
-	return ln, m.lineEnd(row)
+	text := strings.TrimRight(line[dr.from-ls:dr.to-ls], " 	")
+	ln.Right = m.cellX(dr.cellOf(line, ls, dr.from+len(text), m.tab))
+	end := dr.to
+	if dr.last(ls + len(line)) {
+		end = m.lineEnd(row)
+	}
+	return ln, end
 }
 
-// CaretX returns the x of point p in layout units, on its row.
+// CaretX returns the x of point p in layout units, on its display row.
 func (m *editorModel) CaretX(p int) float32 {
-	row := m.rowOf(p)
-	return m.cellX(cellOfCol(m.lineText(row), p-m.t.LineStart(row), m.tab))
+	row, dr, line := m.segmentAt(p)
+	return m.cellX(dr.cellOf(line, m.t.LineStart(row), p, m.tab))
 }
 
-// cellX returns the x of a cell of a row in layout units. The layout starts at the top-left
-// of the canvas, so the text is at the gutter's edge less the horizontal scroll.
+// cellX returns the x of a cell of a display row in layout units. The layout starts at the
+// top-left of the canvas, so the text is at the gutter's edge less the horizontal scroll.
 func (m *editorModel) cellX(cell int) float32 {
 	return m.geo.textX - m.scrollX + float32(cell)*m.geo.charW
 }
@@ -254,12 +283,53 @@ func (m *editorModel) Nearest(x, y float32) int {
 	if !g.painted || g.lineH <= 0 || g.charW <= 0 {
 		return 0
 	}
-	row, found := m.rowAtVisible(max(int((y+m.scrollY)/g.lineH), 0))
+	ix := m.index()
+	row, seg, found := ix.at(max(int((y+m.scrollY)/g.lineH), 0))
 	if !found {
-		row = m.rowOf(m.Len())
+		row, seg, _ = ix.at(max(ix.count()-1, 0))
 	}
+	line := m.lineText(row)
+	dr := m.segment(row, line, m.wrapOf(line), seg)
 	cell := int((x - g.textX + m.scrollX + g.charW/2) / g.charW)
-	return m.t.LineStart(row) + colOfCell(m.lineText(row), max(cell, 0), m.tab)
+	return dr.offsetAt(line, m.t.LineStart(row), max(cell, 0), m.tab)
+}
+
+// index returns the index of the display rows, on the copies of the folds and of the prefix.
+func (m *editorModel) index() rowIndex {
+	return rowIndex{prefix: m.prefix, hidden: m.hidden, lines: m.t.LineCount()}
+}
+
+// wrapOf returns the wrap of a row whose text is line. The model wraps the row again, as the view
+// did, since it keeps no copy of the view's wrap of the rows.
+func (m *editorModel) wrapOf(line string) rowWrap {
+	if !m.wrapped {
+		return nil
+	}
+	return wrapSegments(line, m.wrap.cols, m.wrap.tab, m.wrap.indent)
+}
+
+// segment returns the display row of segment seg of row, whose text is line and whose wrap is w.
+func (m *editorModel) segment(row int, line string, w rowWrap, seg int) displayRow {
+	ls := m.t.LineStart(row)
+	seg = min(seg, w.segs()-1)
+	b, cell := w.start(seg)
+	dr := displayRow{row: row, seg: seg, from: ls + b, to: ls + len(line), startCell: cell}
+	if seg+1 < w.segs() {
+		next, _ := w.start(seg + 1)
+		dr.to = ls + next
+	}
+	if seg > 0 {
+		dr.indent = w.indentCells()
+	}
+	return dr
+}
+
+// segmentAt returns the row that holds point p, the display row of p on it, and the row's text.
+func (m *editorModel) segmentAt(p int) (int, displayRow, string) {
+	row := m.rowOf(p)
+	line := m.lineText(row)
+	w := m.wrapOf(line)
+	return row, m.segment(row, line, w, w.segmentOf(p-m.t.LineStart(row), false)), line
 }
 
 // Read returns the text of the points [from, to), cut to at most limit UTF-16 code units. It
@@ -293,31 +363,4 @@ func (m *editorModel) hiddenRow(row int) bool {
 		}
 	}
 	return false
-}
-
-// visibleIndex returns the position of row among the shown rows, as Document.VisibleIndex
-// does, on the copy of the folds.
-func (m *editorModel) visibleIndex(row int) int {
-	i := row
-	for _, r := range m.hidden {
-		switch {
-		case row >= r.to:
-			i -= r.to - r.from + 1
-		case row >= r.from:
-			i -= row - r.from + 1
-		}
-	}
-	return i
-}
-
-// rowAtVisible returns the row of the i-th shown row, as Document.RowAtVisible does, on the
-// copy of the folds, and reports whether there is one.
-func (m *editorModel) rowAtVisible(i int) (int, bool) {
-	row := i
-	for _, r := range m.hidden {
-		if r.from <= row {
-			row += r.to - r.from + 1
-		}
-	}
-	return row, row < m.t.LineCount()
 }

@@ -2,6 +2,7 @@ package codeedit
 
 import (
 	"slices"
+	"sort"
 	"strconv"
 	"unicode/utf8"
 
@@ -81,11 +82,12 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	foldX := numW
 	textX := numW + foldW + 4
 	textW := max(w-textX, 0)
+	vs.syncWrap(textW, charW, lineH)
 	x := vs.rowIndex()
 	rows := x.count()
 
 	// The scroll position: the caret is kept in view after a move, and the position stays in
-	// the content.
+	// the content. Rows wrapped to the view's width do not scroll horizontally.
 	vs.geo = geometry{lineH: lineH, charW: charW, gutterW: textX, textX: textX, foldX: foldX, viewW: w, viewH: h, painted: true}
 	if vs.reveal {
 		vs.reveal = false
@@ -93,6 +95,9 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	}
 	maxY := max(float32(rows)*lineH-h, 0)
 	maxX := max(float32(vs.maxCells)*charW+charW*2-textW, 0)
+	if vs.fitsView() {
+		maxX = 0
+	}
 	vs.scrollY = min(max(vs.scrollY, 0), maxY)
 	vs.scrollX = min(max(vs.scrollX, 0), maxX)
 
@@ -124,14 +129,21 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	maxCells := 0
 	tx := textX - vs.scrollX
 	line, lineRow := "", -1 // the text of the row of the last segment, read once for its segments
+	var text string         // the row with the composition, when it shows on the row
+	var at int
+	var composing bool
+	var cw rowWrap // the wrap of text
 	for k, dr := range shown {
 		row := dr.row
 		y := float32(first+k)*lineH - vs.scrollY
 		ls, le := doc.LineStart(row), doc.LineEnd(row)
 		if row != lineRow {
 			line, lineRow = doc.Line(row), row
+			text, at, composing = vs.composedRow(row, line)
+			if composing {
+				cw = vs.composedWrap(text)
+			}
 		}
-		text, at, composing := vs.composedRow(row, line)
 		if composing {
 			maxCells = max(maxCells, cellOfCol(text, len(text), tab))
 		} else {
@@ -148,21 +160,22 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 			x0, x1 := selectionCells(dr, line, ls, le, from, to, tab)
 			p.FillRect(tx+float32(x0)*charW, y, float32(x1-x0)*charW, lineH, st.Selection.Background)
 		}
-		for _, k := range matchesOnRow(matches, ls, le) {
+		for _, k := range matchesOverlapping(matches, dr.from, dr.end(le)) {
 			m := matches[k]
 			bg := st.Match.Background
 			if k == cur {
 				bg = st.CurrentMatch.Background
 			}
-			x0 := dr.cellOf(line, ls, ls+max(m.From-ls, 0), tab)
-			x1 := dr.cellOf(line, ls, ls+min(m.To-ls, len(line)), tab)
+			x0 := dr.cellOf(line, ls, min(max(m.From, dr.from), dr.to), tab)
+			x1 := dr.cellOf(line, ls, min(max(m.To, dr.from), dr.to), tab)
 			if !bg.IsZero() {
 				p.FillRect(tx+float32(x0)*charW, y, float32(x1-x0)*charW, lineH, bg)
 			}
 		}
 		switch {
 		case composing:
-			vs.drawComposition(p, ts, text, at, tx, y, charW, lineH, tab, fg)
+			a, b, sc, ind := composedSegment(cw, dr, len(text), vs.wrapOf(row).segs())
+			vs.drawComposition(p, ts, text, at, a, b, sc, ind, tx, y, charW, lineH, tab, fg)
 		case dr.from < dr.to:
 			vs.drawSegment(p, ts, line, ls, dr, tx, y, charW, tab, fg)
 		}
@@ -231,17 +244,26 @@ func selectionCells(dr displayRow, line string, ls, le, from, to, tab int) (int,
 	return x0, x1
 }
 
-// matchesOnRow returns the indices of the matches that begin on the row from ls to le.
-func matchesOnRow(matches []Match, ls, le int) []int {
+// end returns the end of the bytes the segment shows: its end, or past the line feed of its row,
+// which ends at le, on the last segment, where a selection or a match shows the break.
+func (dr displayRow) end(le int) int {
+	if dr.last(le) {
+		return le + 1
+	}
+	return dr.to
+}
+
+// matchesOverlapping returns the indices of the matches that overlap the bytes [from, to), with
+// an empty match at from or after it. A match that spans display rows is on each of them.
+func matchesOverlapping(matches []Match, from, to int) []int {
 	if len(matches) == 0 {
 		return nil
 	}
-	i, _ := slices.BinarySearchFunc(matches, ls, func(m Match, t int) int { return m.From - t })
+	// The matches are sorted and do not overlap, so their ends are sorted too.
+	i := sort.Search(len(matches), func(i int) bool { return matches[i].To > from || matches[i].From >= from })
 	var out []int
-	for k := i; k < len(matches) && matches[k].From <= le; k++ {
-		if matches[k].From >= ls {
-			out = append(out, k)
-		}
+	for k := i; k < len(matches) && matches[k].From < to; k++ {
+		out = append(out, k)
 	}
 	return out
 }
@@ -281,17 +303,23 @@ func (vs *viewState) drawSegment(p *ui.Painter, ts ui.TextFormat, line string, l
 	}
 }
 
-// drawComposition draws the row shown, which has the composition at byte at, in fg. The
-// composition is underlined with a thin line, and the clause being converted with a thick one.
-// The row takes no syntax colors, since the spans of the highlighter do not follow the text
-// inserted into it.
-func (vs *viewState) drawComposition(p *ui.Painter, ts ui.TextFormat, shown string, at int, tx, y, charW, lineH float32, tab int, fg ui.Color) {
+// drawComposition draws the bytes [a, b) of the row shown, which has the composition at byte at,
+// in fg: the part of it on one display row, which starts at the cell sc of the row and is drawn
+// after ind cells of indent. The composition is underlined with a thin line, and the clause being
+// converted with a thick one. The row takes no syntax colors, since the spans of the highlighter
+// do not follow the text inserted into it.
+func (vs *viewState) drawComposition(p *ui.Painter, ts ui.TextFormat, shown string, at, a, b, sc, ind int, tx, y, charW, lineH float32, tab int, fg ui.Color) {
 	ts.Color = fg
-	p.Text(tx, y, expandRun(shown, 0, tab), ts)
+	x0 := tx + float32(ind)*charW
+	p.Text(x0, y, expandRun(shown[a:b], sc, tab), ts)
 	underline := func(from, to int, h float32) {
-		x0 := tx + float32(cellOfCol(shown, from, tab))*charW
-		x1 := tx + float32(cellOfCol(shown, to, tab))*charW
-		p.FillRect(x0, y+lineH-h, x1-x0, h, fg)
+		from, to = min(max(from, a), b), min(max(to, a), b)
+		if from >= to {
+			return
+		}
+		u0 := x0 + float32(cellIn(shown, a, sc, from, tab)-sc)*charW
+		u1 := x0 + float32(cellIn(shown, a, sc, to, tab)-sc)*charW
+		p.FillRect(u0, y+lineH-h, u1-u0, h, fg)
 	}
 	c := vs.comp
 	underline(at, at+len(c.Text), 1)
@@ -374,6 +402,9 @@ func (vs *viewState) revealCaret(x rowIndex, lineH, charW, h, textW float32) {
 		vs.scrollY = top
 	} else if top+lineH > vs.scrollY+h {
 		vs.scrollY = top + lineH - h
+	}
+	if vs.fitsView() {
+		return
 	}
 	cx := float32(cell) * charW
 	if cx < vs.scrollX {

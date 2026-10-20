@@ -22,6 +22,7 @@ type EditorElement struct {
 	readOnly    bool
 	tabSize     int
 	comment     string
+	wrap        wrapSettings
 	size        sizes // see Size
 	styles      Style
 	hl          Highlighter
@@ -31,9 +32,10 @@ type EditorElement struct {
 }
 
 // Editor returns an editor that shows doc. Line numbers are on, tabs are four columns wide,
-// and the editor is writable with no comment prefix.
+// lines do not wrap, and the editor is writable with no comment prefix.
 func Editor(doc *Document) *EditorElement {
-	return &EditorElement{doc: doc, lineNumbers: true, tabSize: 4}
+	return &EditorElement{doc: doc, lineNumbers: true, tabSize: 4,
+		wrap: wrapSettings{col: defaultWrapColumn, indent: IndentSame}}
 }
 
 // Key gives the editor a stable identity among its siblings, so its state (the scroll
@@ -154,6 +156,7 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 		vs.vpSet = false
 	}
 	vs.tab = e.tabSize
+	vs.wrap = e.wrap
 	vs.doc.SetTabSize(e.tabSize)
 	t := ctx.Theme()
 	st := e.styles.resolve(ctx)
@@ -258,6 +261,14 @@ type viewState struct {
 	langErr        error
 	closeOnDispose bool // closeSession is registered with the component's OnDispose
 
+	// wrap is how the editor wraps its rows, and wc the wrap of the rows at the width of the last
+	// paint. upstream is the affinity of the primary caret at the edge of two segments, as of the
+	// document's version upVer (see setUpstream).
+	wrap     wrapSettings
+	wc       wrapCache
+	upstream bool
+	upVer    uint64
+
 	// activity is the time of the latest edit, move or click, from which the caret blinks. restart
 	// asks the next paint to set it to that paint's time (see Painter.Now).
 	activity time.Time
@@ -343,7 +354,7 @@ func (vs *viewState) touch() { vs.rev.Set(vs.rev.Peek() + 1) }
 
 // attachDoc makes the editor show doc. It cancels the subscriptions to the document it had,
 // and subscribes to its changes: each change renders the editor again, and each edit is
-// sent to the highlighter at once.
+// sent to the highlighter and to the wrap of the rows at once.
 func (vs *viewState) attachDoc(doc *Document) {
 	for _, c := range vs.cancelDoc {
 		c()
@@ -358,7 +369,9 @@ func (vs *viewState) attachDoc(doc *Document) {
 				_ = vs.hl.Edit(highlight.EditRecord{Start: c.From, OldEnd: c.To, Text: []byte(c.Text)})
 			}
 		}),
+		doc.OnEdit(func(c Change) { vs.wc.edit(doc, c) }),
 	}
+	vs.wc = wrapCache{}
 	vs.dragging = false
 	vs.vpSet = false
 	vs.spans = spanIndex{}
@@ -374,9 +387,12 @@ func (vs *viewState) edit(fn func(*Document) error) {
 	vs.touch()
 }
 
-// move runs a caret movement on the document, and scrolls the caret into view.
+// move runs a caret movement on the document, and scrolls the caret into view. While the rows
+// wrap, the vertical moves and Home and End go by display rows (see moveWrapped).
 func (vs *viewState) move(m Move, extend bool) {
-	vs.doc.Move(m, extend, vs.pageRows())
+	if !vs.wrapping() || !vs.moveWrapped(m, extend) {
+		vs.doc.Move(m, extend, vs.pageRows())
+	}
 	vs.reveal = true
 	vs.restart = true
 	vs.touch()
@@ -390,8 +406,12 @@ func (vs *viewState) pageRows() int {
 	return max(int(vs.geo.viewH/vs.geo.lineH)-1, 1)
 }
 
-// scroll moves the view by dx and dy canvas pixels. The paint clamps the position.
+// scroll moves the view by dx and dy canvas pixels. The paint clamps the position. A view that
+// wraps its rows to its width does not scroll horizontally.
 func (vs *viewState) scroll(dx, dy float32) {
+	if vs.fitsView() {
+		dx = 0
+	}
 	vs.scrollX += dx
 	vs.scrollY += dy
 	if vs.scrollX < 0 {
@@ -425,11 +445,9 @@ func (vs *viewState) hitAt(x, y float32) (dr displayRow, p int, upstream, ok boo
 	if !found {
 		dr, _ = vs.rowAt(ix, max(ix.count()-1, 0))
 	}
-	doc := vs.doc
-	ls, le := doc.LineStart(dr.row), doc.LineEnd(dr.row)
 	cell := int((x - g.textX + vs.scrollX + g.charW/2) / g.charW)
-	p = dr.offsetAt(doc.Line(dr.row), ls, max(cell, 0), vs.tab)
-	return dr, p, p == dr.to && dr.to != le, true
+	p, upstream = vs.offsetOn(dr, max(cell, 0))
+	return dr, p, upstream, true
 }
 
 // mouseDown handles a press: a fold marker folds or unfolds its row, a line number selects
@@ -441,7 +459,7 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 	}
 	vs.commitComposition() // a click types what is composed first: the layout it hits shows it
 	g := vs.geo
-	dr, p, _, ok := vs.hitAt(ev.LocalX, ev.LocalY)
+	dr, p, up, ok := vs.hitAt(ev.LocalX, ev.LocalY)
 	if !ok {
 		return
 	}
@@ -458,12 +476,14 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 		vs.doc.AddCaret(p)
 	case ev.Mods.Has(input.ModShift):
 		vs.doc.extendPrimary(p)
+		vs.setUpstream(up)
 	case ev.Clicks == 2:
 		vs.doc.SelectWord(p)
 	case ev.Clicks >= 3:
 		vs.doc.SelectRow(row)
 	default:
 		vs.doc.SetCaret(p)
+		vs.setUpstream(up)
 		vs.dragging = true
 	}
 	vs.touch()
@@ -474,8 +494,9 @@ func (vs *viewState) mouseMove(ev *ui.MouseEvent) {
 	if !vs.dragging {
 		return
 	}
-	if _, p, ok := vs.hit(ev.LocalX, ev.LocalY); ok && p != vs.doc.Primary().Head {
+	if _, p, up, ok := vs.hitAt(ev.LocalX, ev.LocalY); ok && (p != vs.doc.Primary().Head || up != vs.upstreamNow()) {
 		vs.doc.extendPrimary(p)
+		vs.setUpstream(up)
 		vs.touch()
 	}
 }

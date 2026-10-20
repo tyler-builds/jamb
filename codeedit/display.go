@@ -81,7 +81,54 @@ func (x rowIndex) at(i int) (row, seg int, ok bool) {
 
 // rowIndex returns the index of the document's display rows, as the view lays them out now.
 func (vs *viewState) rowIndex() rowIndex {
-	return rowIndex{hidden: vs.doc.hiddenRanges(), lines: vs.doc.LineCount()}
+	x := rowIndex{hidden: vs.doc.hiddenRanges(), lines: vs.doc.LineCount()}
+	if vs.wrapping() {
+		x.prefix = vs.wc.index()
+	}
+	return x
+}
+
+// wrapping reports whether the view wraps its rows: wrap is on, and the last paint wrapped the
+// rows at its width. Before the first paint the rows do not wrap.
+func (vs *viewState) wrapping() bool { return vs.wrap.mode != WrapNone && vs.wc.ok }
+
+// fitsView reports whether the view wraps its rows to its width, so that it never scrolls
+// horizontally.
+func (vs *viewState) fitsView() bool { return vs.wrapping() && vs.wrap.fitsView() }
+
+// wrapOf returns the wrap of row, which is nil when the view does not wrap.
+func (vs *viewState) wrapOf(row int) rowWrap {
+	if !vs.wrapping() || row >= len(vs.wc.rows) {
+		return nil
+	}
+	return vs.wc.rows[row]
+}
+
+// syncWrap wraps the rows for a text textW wide with cells of charW, when the width in cells, the
+// tab size or the indent changed, or turns the wrap off. The row at the top of the view stays at
+// the top, so the view does not jump when its width changes.
+func (vs *viewState) syncWrap(textW, charW, lineH float32) {
+	key := wrapKey{cols: vs.wrap.cols(textW, charW), tab: vs.tab, indent: vs.wrap.indent}
+	if vs.wrap.mode == WrapNone {
+		if !vs.wc.ok {
+			return
+		}
+	} else if vs.wc.ok && vs.wc.key == key {
+		return
+	}
+	top := int(vs.scrollY / lineH)
+	frac := vs.scrollY - float32(top)*lineH
+	anchor := 0 // the first byte at the top of the view
+	if dr, ok := vs.displayAt(top); ok {
+		anchor = dr.from
+	}
+	if vs.wrap.mode == WrapNone {
+		vs.wc = wrapCache{}
+	} else {
+		vs.wc.build(vs.doc, key)
+	}
+	i, _ := vs.displayOf(anchor, false)
+	vs.scrollY = float32(i)*lineH + frac
 }
 
 // displayRows returns how many display rows the view has.
@@ -96,8 +143,28 @@ func (vs *viewState) rowAt(x rowIndex, i int) (displayRow, bool) {
 	if !ok {
 		return displayRow{}, false
 	}
-	return displayRow{row: row, seg: seg, from: vs.doc.LineStart(row), to: vs.doc.LineEnd(row)}, true
+	return vs.segment(row, seg), true
 }
+
+// segment returns the display row of segment seg of row.
+func (vs *viewState) segment(row, seg int) displayRow {
+	ls, le := vs.doc.LineStart(row), vs.doc.LineEnd(row)
+	w := vs.wrapOf(row)
+	seg = min(seg, w.segs()-1)
+	b, cell := w.start(seg)
+	dr := displayRow{row: row, seg: seg, from: ls + b, to: le, startCell: cell}
+	if seg+1 < w.segs() {
+		next, _ := w.start(seg + 1)
+		dr.to = ls + next
+	}
+	if seg > 0 {
+		dr.indent = w.indentCells()
+	}
+	return dr
+}
+
+// last reports whether the segment is the last of its row, which ends at le.
+func (dr displayRow) last(le int) bool { return dr.to == le }
 
 // displayOf returns the display row that shows the byte offset off, and the cell of the view
 // where off is drawn on it. upstream puts an offset at the edge of two segments at the end of
@@ -106,16 +173,36 @@ func (vs *viewState) displayOf(off int, upstream bool) (i, cell int) {
 	return vs.displayOfIn(vs.rowIndex(), off, upstream)
 }
 
+// setUpstream sets the affinity of the primary caret where it is now: on, the caret shows at the
+// end of its segment when it is at the edge of two (see displayOf). Any later change of the
+// selections or the text clears it, since the document's version changes.
+func (vs *viewState) setUpstream(on bool) {
+	vs.upstream, vs.upVer = on, vs.doc.version
+}
+
 // upstreamNow reports whether the primary caret shows at the end of a segment rather than at
-// the start of the next one. Rows do not wrap, so it is never.
-func (vs *viewState) upstreamNow() bool { return false }
+// the start of the next one: a move to the end of a segment or a click past it put it there, and
+// nothing has moved it since.
+func (vs *viewState) upstreamNow() bool {
+	return vs.upstream && vs.upVer == vs.doc.version && vs.wrapping()
+}
 
 // displayOfIn is displayOf on the index x.
 func (vs *viewState) displayOfIn(x rowIndex, off int, upstream bool) (i, cell int) {
 	doc := vs.doc
 	row := doc.RowOf(off)
-	line := doc.Line(row)
-	return x.indexOf(row), cellOfCol(line, off-doc.LineStart(row), vs.tab)
+	ls := doc.LineStart(row)
+	dr := vs.segment(row, vs.wrapOf(row).segmentOf(off-ls, upstream))
+	text := string(doc.textSlice(dr.from, dr.to)) // the segment, not the whole of a long row
+	return x.indexOf(row) + dr.seg, dr.cellOf(text, dr.from, off, vs.tab)
+}
+
+// offsetOn returns the byte offset nearest to the cell of the view on the display row dr, and
+// whether it is the end of a segment that is not its row's last, where the caret shows upstream.
+func (vs *viewState) offsetOn(dr displayRow, cell int) (int, bool) {
+	text := string(vs.doc.textSlice(dr.from, dr.to))
+	p := dr.offsetAt(text, dr.from, cell, vs.tab)
+	return p, p == dr.to && !dr.last(vs.doc.LineEnd(dr.row))
 }
 
 // cellOf returns the cell of the view where the byte offset off of the segment is drawn. line is
