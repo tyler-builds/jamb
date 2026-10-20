@@ -44,6 +44,12 @@ without the jamb-grammars module. This changes the highlighting API.
   language names and the token names, and `highlight.Highlight(lang, code)` colors a text that is
   not edited in one call.
 
+### Fixed
+
+- The code editor kept the syntax colors of the theme it first painted with: after a switch from
+  the dark theme to the light one, its text stayed in the dark theme's pale colors. It now recolors
+  the text when the theme changes.
+
 ### Removed
 
 - **Breaking:** `highlight.Grammar`, `highlight.NewGrammar` and `highlight.ABI`, and jamb's

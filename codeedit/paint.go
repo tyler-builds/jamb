@@ -391,9 +391,12 @@ func (vs *viewState) syncHighlighter(first, last int) {
 		}
 	}
 	spans, ver := vs.hl.Spans()
-	if !vs.spans.ok || vs.spans.ver != ver {
+	// The styles of the captures follow the theme too: a switch to the light theme recolors the
+	// text without new spans.
+	if th := vs.ctxTheme(); !vs.spans.ok || vs.spans.ver != ver || vs.capTheme != th {
 		vs.spans.build(spans, ver)
-		styles, ok := captureStyles(vs.hl.CaptureNames(), vs.ctxTheme().Syntax)
+		vs.capTheme = th
+		styles, ok := captureStyles(vs.hl.CaptureNames(), th.Syntax)
 		vs.capStyle = vs.capStyle[:0]
 		for i := range styles {
 			vs.capStyle = append(vs.capStyle, capStyle{st: styles[i], ok: ok[i]})
