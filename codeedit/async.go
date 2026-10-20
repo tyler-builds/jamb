@@ -73,11 +73,14 @@ func (s *asyncSlot[T]) pending() bool { return s.cancel != nil }
 
 // closePopups closes the popups of the editor, and reports whether one was open, for Escape.
 func (vs *viewState) closePopups() bool {
-	return vs.closeHover()
+	hover := vs.closeHover()
+	list := vs.closeCompletion()
+	return hover || list
 }
 
 // stopRequests cancels every request of the editor, for a removed editor or another document.
 func (vs *viewState) stopRequests() {
 	vs.closePopups()
 	vs.hover.slot.stop()
+	vs.completion.slot.stop()
 }

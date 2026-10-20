@@ -25,6 +25,7 @@ type EditorElement struct {
 	wrap        wrapSettings
 	hoverP      HoverProvider
 	hoverDelay  time.Duration
+	complete    CompletionProvider
 	size        sizes // see Size
 	styles      Style
 	hl          Highlighter
@@ -163,6 +164,10 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	vs.tab = e.tabSize
 	vs.wrap = e.wrap
 	vs.hoverP, vs.hoverDelay = e.hoverP, e.hoverDelay
+	vs.completeP = e.complete
+	if e.readOnly {
+		vs.completeP = nil // nothing to complete in a text that does not change
+	}
 	vs.doc.SetTabSize(e.tabSize)
 	t := ctx.Theme()
 	st := e.styles.resolve(ctx)
@@ -195,6 +200,9 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	if vs.hover.open {
 		area.Child(vs.hoverPopup(st))
 	}
+	if vs.completion.open {
+		area.Child(vs.completionPopup(st))
+	}
 	root.Child(area)
 	return root
 }
@@ -213,6 +221,7 @@ func (e *EditorElement) wire(canvas *ui.DivElement, vs *viewState) {
 	canvas.OnTextInput(func(s string) {
 		if !e.readOnly {
 			vs.edit(func(d *Document) error { return d.TypeText(s) })
+			vs.typedCompletion(s)
 		}
 	})
 	e.wireIME(canvas, vs)
@@ -280,10 +289,13 @@ type viewState struct {
 	upstream bool
 	upVer    uint64
 
-	// The hooks of a language server: the hover's provider and delay, and the hover popup.
+	// The hooks of a language server: the hover's provider and delay, and the hover popup; the
+	// provider of the completions, and the completion list.
 	hoverP     HoverProvider
 	hoverDelay time.Duration
 	hover      hoverState
+	completeP  CompletionProvider
+	completion completionState
 
 	// activity is the time of the latest edit, move or click, from which the caret blinks. restart
 	// asks the next paint to set it to that paint's time (see Painter.Now).
@@ -387,7 +399,7 @@ func (vs *viewState) attachDoc(doc *Document) {
 		}),
 		doc.OnEdit(func(c Change) { vs.wc.edit(doc, c) }),
 		doc.onRedraw(vs.touch),
-		doc.OnEdit(func(Change) { vs.closePopups() }),
+		doc.OnEdit(func(c Change) { vs.closeHover(); vs.completionEdited(c) }),
 	}
 	vs.stopRequests()
 	vs.wc = wrapCache{}
@@ -401,6 +413,7 @@ func (vs *viewState) attachDoc(doc *Document) {
 // where a key has nothing to do.
 func (vs *viewState) edit(fn func(*Document) error) {
 	_ = fn(vs.doc)
+	vs.followCompletion()
 	vs.reveal = true
 	vs.restart = true
 	vs.touch()
@@ -412,6 +425,7 @@ func (vs *viewState) move(m Move, extend bool) {
 	if !vs.wrapping() || !vs.moveWrapped(m, extend) {
 		vs.doc.Move(m, extend, vs.pageRows())
 	}
+	vs.movedCompletion()
 	vs.reveal = true
 	vs.restart = true
 	vs.touch()
@@ -477,6 +491,7 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 		return
 	}
 	vs.commitComposition() // a click types what is composed first: the layout it hits shows it
+	vs.closePopups()
 	g := vs.geo
 	dr, p, up, ok := vs.hitAt(ev.LocalX, ev.LocalY)
 	if !ok {

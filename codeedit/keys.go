@@ -93,9 +93,24 @@ func doEdit(fn func(d *Document) error) func(e *EditorElement, vs *viewState) {
 	})
 }
 
-// moveCmd runs the movement m, with or without extending the selection.
+// moveCmd runs the movement m, with or without extending the selection. While the completion
+// list is open, the vertical moves move its highlight instead.
 func moveCmd(m Move, extend bool) func(e *EditorElement, vs *viewState) {
-	return func(e *EditorElement, vs *viewState) { vs.move(m, extend) }
+	return func(e *EditorElement, vs *viewState) {
+		if !extend && vs.completionKey(m) {
+			return
+		}
+		vs.move(m, extend)
+	}
+}
+
+// acceptOr accepts the highlighted completion when the list is open, and otherwise runs fn.
+func acceptOr(fn func(e *EditorElement, vs *viewState)) func(e *EditorElement, vs *viewState) {
+	return func(e *EditorElement, vs *viewState) {
+		if !vs.acceptCompletion() {
+			fn(e, vs)
+		}
+	}
 }
 
 // editorActions says what each command does. buildEditor's canvas gets an OnAction handler
@@ -139,8 +154,8 @@ func buildActions() []editorAction {
 		{CmdDeleteForward, doEdit(func(d *Document) error { return d.DeleteForward() })},
 		{CmdDeleteWordBack, doEdit(func(d *Document) error { return d.DeleteWordBackward() })},
 		{CmdDeleteWordForward, doEdit(func(d *Document) error { return d.DeleteWordForward() })},
-		{CmdNewline, doEdit(func(d *Document) error { return d.Newline() })},
-		{CmdIndent, doEdit(func(d *Document) error { return d.Indent() })},
+		{CmdNewline, acceptOr(doEdit(func(d *Document) error { return d.Newline() }))},
+		{CmdIndent, acceptOr(doEdit(func(d *Document) error { return d.Indent() }))},
 		{CmdOutdent, doEdit(func(d *Document) error { return d.Outdent() })},
 		{CmdUndo, writable(func(e *EditorElement, vs *viewState) { vs.undoRedo(false) })},
 		{CmdRedo, writable(func(e *EditorElement, vs *viewState) { vs.undoRedo(true) })},
@@ -166,6 +181,7 @@ func buildActions() []editorAction {
 		{CmdNextDiagnostic, func(e *EditorElement, vs *viewState) { vs.goToDiagnostic(true) }},
 		{CmdPrevDiagnostic, func(e *EditorElement, vs *viewState) { vs.goToDiagnostic(false) }},
 		{CmdShowHover, func(e *EditorElement, vs *viewState) { vs.openHover(vs.doc.Caret(), true) }},
+		{CmdTriggerSuggest, writable(func(e *EditorElement, vs *viewState) { vs.triggerCompletion(TriggerInvoked, 0) })},
 	}
 	return out
 }
@@ -205,11 +221,13 @@ func Bindings() []ui.Binding {
 		b("f3", CmdFindNext), b("shift+f3", CmdFindPrevious),
 		b("ctrl+/", CmdComment), b("ctrl+shift+[", CmdFold), b("ctrl+shift+]", CmdUnfold),
 		b("f8", CmdNextDiagnostic), b("shift+f8", CmdPrevDiagnostic), b("ctrl+k ctrl+i", CmdShowHover),
+		b("ctrl+space", CmdTriggerSuggest),
 	}
 }
 
 // undoRedo undoes or redoes the latest step of the document, and scrolls to the caret.
 func (vs *viewState) undoRedo(redo bool) {
+	vs.closeCompletion()
 	vs.restart = true
 	if redo {
 		vs.doc.Redo()

@@ -48,7 +48,8 @@ rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+d", ui.Unbind(codeedit.CmdAddNextOc
 `TabSize` (4 by default), `CommentPrefix`, `Size`, the sizing methods (`Width`, `Height`,
 `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow` and `GridSpan`, as on the `ui` widgets;
 Full by 300 pixels by default), `Styles`, `Language`, `Highlighter`, `SoftWrap`, `WrapColumn`
-and `WrappingIndent` (see Soft wrap), and `Hover` and `HoverDelay` (see Language server hooks).
+and `WrappingIndent` (see Soft wrap), and `Hover`, `HoverDelay` and `Completions` (see Language
+server hooks).
 
 ## Document
 
@@ -113,6 +114,7 @@ value, so an app can rebind it with `ui.BindIn("CodeEditor", keys, action)` or t
 | Ctrl+G | Go to line. |
 | F8, Shift+F8 | Select the next or the previous diagnostic, open its hover, and announce it. |
 | Ctrl+K Ctrl+I | Open the hover at the caret, and announce it. |
+| Ctrl+Space | Open the completion list; Up, Down, PageUp and PageDown move its highlight, and Enter and Tab accept it. |
 
 The punctuation keys name their physical position as the US layout prints it: `ctrl+/` is the
 slash key, and `ctrl+shift+[` is the key that prints `[` on a US keyboard (Shift makes it `{`,
@@ -245,6 +247,44 @@ The diagnostics show at once; the provider's answer joins them when it comes. Wi
 the popup shows the diagnostics alone. Escape, an edit, the loss of focus, a click outside the popup
 and a move of the pointer off the range close it. A hover opened from the keyboard is announced
 politely. The popup is a tooltip for assistive technology and does not take the focus.
+
+### Completion
+
+```go
+type completer struct{}
+
+func (completer) Triggers() string { return "." }
+func (completer) Complete(ctx context.Context, q codeedit.CompletionQuery) (codeedit.CompletionList, error) {
+	return codeedit.CompletionList{From: -1, Items: []codeedit.CompletionItem{{Label: "Println", Detail: "func(a ...any)"}}}, nil
+}
+
+codeedit.Editor(doc).Completions(completer{})
+```
+
+The list opens at the caret when one of the provider's `Triggers` is typed (`TriggerCharacter`,
+with the character in `CompletionQuery.Char`), and on Ctrl+Space (`CmdTriggerSuggest`,
+`TriggerInvoked`). It shows that it is loading until the answer comes. A `CompletionList` has the
+items, at most 500 of which are kept, and `From`, the byte offset of the query's text where the
+replaced word starts (-1 for the word before the caret). A `CompletionItem` has a `Label`, a
+`Detail` shown after it, a `Doc`, the `Insert` text (the label when empty), the `Filter` text that
+the typed word is matched against (the label when empty), a `Kind`, and `Edits`: more changes made
+with it, such as an import, in the offsets of the query's text.
+
+Typing filters the list: an item matches when the characters of the typed word appear in its filter
+text in order, ignoring case, and the items that start with the word come first. A list marked
+`Incomplete` is asked for again as the word grows (`TriggerIncomplete`), 100 milliseconds after the
+last keystroke; a keystroke while a request is on its way cancels it and asks again at once. Up,
+Down, PageUp and PageDown move the highlight, Enter and Tab accept it, and Escape, a click, the
+loss of focus, an undo, and a move of the caret before the word or past where typing left it close
+the list. Accepting replaces the word before every caret with the item's text, makes its edits,
+mapped through the text typed since the request, and is one undo step; an edit that overlaps the
+replaced word is dropped. A read-only editor has no completions. The `Doc` of the highlighted item
+shows under the list.
+
+The keyboard focus stays in the editor, as with a combobox: the list is a list for assistive
+technology (`ui.Strings.Suggestions`), its highlighted item is the selected one, the number of
+items is announced when the answer comes (`SuggestionCount`), and each item the highlight moves to
+is announced politely. The list shows up to 10 items at a time around the highlighted one.
 
 ## Highlighting
 
