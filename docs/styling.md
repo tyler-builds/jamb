@@ -561,7 +561,7 @@ parts that the code applies.
 | `RadioGroup` | `Group`, `Radio`, `RadioFocusVisible`, `RadioDisabled`, `Ring`, `RingChecked`, `RingDisabled`, `RingInvalid`, `Dot`, `DotDisabled`, `Label`, `LabelDisabled` | none | none | done |
 | `Collapsible`, `Accordion` | `Section`, `Header`, `HeaderHover`, `HeaderOpen`, `HeaderFocusVisible`, `HeaderDisabled`, `Chevron`, `Content` | none | `RenderHeader` | done |
 | `Tree` | `Row`, `RowHover`, `RowSelected`, `Chevron`, `Icon`, `Label`, `TreeFocusVisible` | none | `RenderRow`, `RenderLabel` | done |
-| `DataGrid` | `Grid`, `GridFocusVisible`, `Header`, `HeaderCell`, `HeaderCellHover`, `HeaderCellSorted`, `SortIndicator`, `ResizeHandle`, `Row`, `RowHover`, `RowSelected`, `RowAlternate`, `Cell`, `CellFocused`, `Empty`, `CellEditing`, `Editor`, `EditorMessage`, `DropIndicator` | `DataGridComfortable`, `DataGridCompact`, `Striped()` | `DataColumn.Cell`, `DataColumn.RenderHeader` | done |
+| `DataGrid` | `Grid`, `GridFocusVisible`, `Header`, `HeaderCell`, `HeaderCellHover`, `HeaderCellSorted`, `SortIndicator`, `ResizeHandle`, `Row`, `RowHover`, `RowSelected`, `RowAlternate`, `Cell`, `CellFocused`, `Empty`, `CellEditing`, `Editor`, `EditorMessage`, `DropIndicator`, `CellPinned`, `PinnedEdge` | `DataGridComfortable`, `DataGridCompact`, `Striped()` | `DataColumn.Cell`, `DataColumn.RenderHeader` | done |
 | `DropdownMenu`, `ContextMenu` | `Panel`, `Item`, `ItemHighlighted`, `ItemDisabled`, `Separator`, `SectionLabel`, `Shortcut`, `Check`, `SubmenuChevron` | none | none | done |
 | `MenuBar` | `BarItem`, `BarItemHover`, `BarItemFocusVisible`, `BarItemOpen` | none | none | done |
 | `Modal` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | none | none | done |
@@ -698,8 +698,12 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
   own.
 - A DataGrid's header and rows are as tall as its density (see Variants). A `Header` or `Row` style that sets
   another `MinHeight` does not move the padding that keeps the header above the rows, so keep the height at the density's.
-- The DataGrid's `Grid` padding is the header's height, which the grid sets. It has no frozen column and no
+- The DataGrid's `Grid` padding is the header's height, which the grid sets. It has no
   multi-column sort. The double-click fit of a column edge measures the `Text` of the rows in view, not a `Cell` slot.
+- A pinned column's cells (`CellPinned`) and header cells are filled with the `Grid` background and then the fill
+  of their row or header, so they hide the cells that scroll under them and still show the row's hover, selection
+  and striping. `PinnedEdge` is the cell at the inner edge of the pinned columns; its default is a 1 px border of
+  the `Border` color on that side.
 - An editing cell is perceivable under high contrast without its colors: the `Editor` frame of a failed save is
   the text color at the invalid width (`FrameInvalid`), and `EditorMessage` is drawn in the text color with a
   text-colored border. `CellEditing` and `Editor` take the plain look of the other parts. The `EditorMessage`

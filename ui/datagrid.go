@@ -12,6 +12,7 @@ import (
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/internal/scene"
 	"github.com/tyler-builds/jamb/internal/text"
 )
 
@@ -50,8 +51,11 @@ type DataColumn[T any] struct {
 	Resizable bool
 	// Movable lets the user move the column, by dragging its header and with
 	// Ctrl+Shift+Left and Ctrl+Shift+Right on its header (see DataGrid and
-	// DataGridElement.ColumnOrder).
+	// DataGridElement.ColumnOrder). A column moves among the columns of its Pin.
 	Movable bool
+	// Pin keeps the column at the start or the end of the grid as the other columns
+	// scroll sideways. Zero (PinNone) lets it scroll.
+	Pin ColumnPin
 	// Align places the text of the column's cells and header: Start (the zero
 	// value), Center or End.
 	Align Alignment
@@ -77,6 +81,17 @@ type DataColumn[T any] struct {
 	// cancels. Give the editor a focusable control, or it cannot take focus.
 	Editor func(row T, value string, change func(string), commit, cancel func()) Element
 }
+
+// ColumnPin keeps a column of a DataGrid in view as the columns scroll sideways:
+// PinStart keeps it at the start of the grid and PinEnd at the end. The pinned
+// columns are shown before and after the others, in their order.
+type ColumnPin uint8
+
+const (
+	PinNone  ColumnPin = iota // the column scrolls with the others
+	PinStart                  // the column stays at the start of the grid
+	PinEnd                    // the column stays at the end of the grid
+)
 
 // key is the column's identity in a SortState and in the widths.
 func (c DataColumn[T]) key() string {
@@ -212,6 +227,11 @@ type DataGridStyle struct {
 	EditorMessage Style
 	// DropIndicator is the line that shows where a dragged column lands.
 	DropIndicator Style
+	// CellPinned is each cell of a pinned column (see DataColumn.Pin).
+	CellPinned Style
+	// PinnedEdge is the cell, in the body or the header, at the inner edge of the
+	// pinned columns, whose border separates them from the columns that scroll.
+	PinnedEdge Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -236,6 +256,8 @@ func (s DataGridStyle) merge(o DataGridStyle) DataGridStyle {
 		Editor:           s.Editor.merge(o.Editor),
 		EditorMessage:    s.EditorMessage.Merge(o.EditorMessage),
 		DropIndicator:    s.DropIndicator.Merge(o.DropIndicator),
+		CellPinned:       s.CellPinned.Merge(o.CellPinned),
+		PinnedEdge:       s.PinnedEdge.Merge(o.PinnedEdge),
 	}
 }
 
@@ -261,6 +283,8 @@ func (s DataGridStyle) plain() DataGridStyle {
 		Editor:           s.Editor.plain(),
 		EditorMessage:    plainStyle(s.EditorMessage),
 		DropIndicator:    plainStyle(s.DropIndicator),
+		CellPinned:       plainStyle(s.CellPinned),
+		PinnedEdge:       plainStyle(s.PinnedEdge),
 	}
 }
 
@@ -312,6 +336,7 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 		EditorMessage: Style{Direction: Row, Align: Center, Padding: XY(8, 3), Radius: t.Radius,
 			Background: t.Surface, BorderWidth: 1, BorderColor: t.Danger, TextColor: t.Danger},
 		DropIndicator: Style{Width: Px(2), Background: t.Accent},
+		PinnedEdge:    Style{BorderColor: t.Border},
 	}
 	if t.HighContrast {
 		st.RowSelected = Style{Background: t.Accent, TextColor: t.AccentText}
@@ -381,7 +406,9 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 // in view. Dragging a movable header moves its column: a line shows the side of the
 // header under the pointer that it lands on. A column header stays at the top of
 // the rows as they scroll, and the header scrolls with the rows when the columns are
-// wider than the grid.
+// wider than the grid. A pinned column (see DataColumn.Pin) stays at the start or
+// the end of the grid as the others scroll under it, and a column that the focus
+// moves to is scrolled clear of the pinned ones.
 //
 // The columns are shown in the order of ColumnOrder, and assistive technology numbers
 // them in that order. The order and the widths the user sets can be kept in signals
@@ -456,6 +483,8 @@ type dgHeadOps[T any] struct {
 	mark     dgColMark
 	setMark  func(dgColMark)
 	stopDrag func()
+	// startN and endN are the numbers of the columns pinned to the start and the end.
+	startN, endN int
 }
 
 // dgColMark is where a dragged column would land: beside the column with the key,
@@ -697,8 +726,21 @@ func (g *DataGridElement[T]) OnColumnsChange(fn func(ColumnState)) *DataGridElem
 }
 
 // viewCols returns the columns in the order they are shown: the order of the keys
-// in order, and then the columns it does not name, in the order they are given.
+// in order, and then the columns it does not name, in the order they are given;
+// the columns pinned to the start come first, and those pinned to the end last.
 func (g *DataGridElement[T]) viewCols(order []string) []DataColumn[T] {
+	out := g.orderCols(order)
+	if slices.ContainsFunc(out, func(c DataColumn[T]) bool { return c.Pin != PinNone }) {
+		rank := func(p ColumnPin) int { return [...]int{PinNone: 1, PinStart: 0, PinEnd: 2}[min(p, PinEnd)] }
+		out = slices.Clone(out)
+		slices.SortStableFunc(out, func(a, b DataColumn[T]) int { return rank(a.Pin) - rank(b.Pin) })
+	}
+	return out
+}
+
+// orderCols returns the columns in the order of the keys in order, and then the
+// columns it does not name, in the order they are given.
+func (g *DataGridElement[T]) orderCols(order []string) []DataColumn[T] {
 	if len(order) == 0 {
 		return g.cols
 	}
@@ -769,6 +811,7 @@ type dgRowCtx[T any] struct {
 	rowH                 float32
 	cursorPos, cursorCol int
 	onHeader, hasFocus   bool
+	startN, endN         int // the numbers of the columns pinned to the start and the end
 	ed                   dgEdit
 	click                func(q, cl int, mods input.Modifiers)
 	colAt                func(q int, x float32) int
@@ -1022,6 +1065,17 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		xs[i+1] = xs[i] + cw[i]
 	}
 	total := xs[nc]
+	// The pinned columns are the first startN and the last endN, startW and endW wide.
+	startN, endN := 0, 0
+	for _, cl := range cols {
+		switch cl.Pin {
+		case PinStart:
+			startN++
+		case PinEnd:
+			endN++
+		}
+	}
+	startW, endW := xs[startN], total-xs[nc-endN]
 	sortCol := -1
 	for i, cl := range cols {
 		if sortState.Key != "" && cl.key() == sortState.Key && cl.Compare != nil {
@@ -1133,7 +1187,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			ck = cols[cl].key()
 		}
 		cur.Set(dgCursor{key: k, pos: q, col: cl, colKey: ck, header: header})
-		if nc > 0 {
+		if nc > 0 && cols[cl].Pin == PinNone { // a pinned column is always in view
 			sh.reveal = true
 			sh.revealX0, sh.revealX1 = xs[cl], xs[cl+1]
 		}
@@ -1147,8 +1201,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	// moveColumn moves the column at from of vc, the columns in the order they are
 	// shown, to the index to, and announces where it is now.
 	moveColumn := func(vc []DataColumn[T], from, to int) bool {
-		if from < 0 || from >= len(vc) || to < 0 || to >= len(vc) || to == from {
-			return false
+		if from < 0 || from >= len(vc) || to < 0 || to >= len(vc) || to == from || vc[to].Pin != vc[from].Pin {
+			return false // a column moves among the columns of its pin only
 		}
 		keys := make([]string, 0, len(vc))
 		for i, cl := range vc {
@@ -1187,7 +1241,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	stepColumn := func(key string, dir int) {
 		vc := g.viewCols(colOrder.Peek())
 		f := indexOf(vc, key)
-		if !moveColumn(vc, f, f+dir) {
+		if !moveColumn(vc, f, f+dir) || vc[f].Pin != PinNone {
 			return
 		}
 		var x float32
@@ -1219,7 +1273,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			if rowOK {
 				handle.ScrollToItem(q)
 			}
-			if colOK {
+			if colOK && cols[c].Pin == PinNone {
 				sh.reveal = true
 				sh.revealX0, sh.revealX1 = xs[c], xs[c+1]
 				handle.request()
@@ -1628,16 +1682,25 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	// colAt returns the column of the cell of row q under the window's x. The cells are
 	// sized by their flex layout, where a Grow column takes the spare width, so the
-	// column is found in the laid-out cells and not from the widths. A point right of
-	// the last cell is in the last column.
+	// column is found in the laid-out cells and not from the widths. The pinned cells
+	// are drawn over the others, so they are looked at first. A point right of the
+	// last cell is in the last column.
 	colAt := func(q int, x float32) int {
 		body := rt.byID[sh.focus.id]
-		for c := range nc - 1 {
+		rect := func(c int) (scene.Rect, bool) {
 			cell := dgCellNode(body, q+1, c+1)
 			if cell == nil {
-				continue
+				return scene.Rect{}, false
 			}
-			if r := rt.nodeRect(cell); x < r.X+r.W {
+			return rt.nodeRect(cell), true
+		}
+		for _, c := range append(seq(nc-endN, nc), seq(0, startN)...) {
+			if r, ok := rect(c); ok && x >= r.X && x < r.X+r.W {
+				return c
+			}
+		}
+		for c := startN; c < nc-1; c++ {
+			if r, ok := rect(c); ok && x < r.X+r.W {
 				return c
 			}
 		}
@@ -1688,7 +1751,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		return g.rowMenu(rows[order[p]], cols[c].key())
 	}
 	rc := dgRowCtx[T]{t: t, ctx: ctx, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
-		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed,
+		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed, startN: startN, endN: endN,
 		click: click, colAt: colAt, activate: activate, ops: ops}
 	// A row within a viewport of rows of the end asks for more rows when it is built.
 	near := n - max(int(sh.viewH/rowH), 1)
@@ -1771,22 +1834,76 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			return
 		}
 		sh.reveal = false
+		// The column is brought into the part of the view that the pinned columns
+		// leave free.
 		x0, x1 := sh.revealX0, sh.revealX1
+		vis := dgVisibleWidth(nd)
 		switch {
-		case x0 < nd.st.targetX:
-			nd.st.targetX = x0
-		case x1 > nd.st.targetX+nd.lay.W:
-			nd.st.targetX = x1 - nd.lay.W
+		case x0 < nd.st.targetX+startW:
+			nd.st.targetX = x0 - startW
+		case x1 > nd.st.targetX+vis-endW:
+			nd.st.targetX = x1 - vis + endW
 		}
 		rt.animating = true
+	}
+	if startN+endN > 0 {
+		// The pinned cells, and the row of LoadingMore, are moved by the sideways
+		// scroll before they are painted, so that they stay where they are on the
+		// screen. The cells are drawn over the cells that scroll under them, and they
+		// are not culled at the place their layout gives them.
+		list.pin = func(nd *node, sx float32) {
+			endOff := sx - max(nd.lay.ContentW-nd.lay.W, 0)
+			move := func(c *node, off float32) {
+				c.style.OffsetX, c.div.style.OffsetX = off, off
+				c.keepGen = rt.paintGen
+			}
+			pinOf := func(c int) ColumnPin {
+				if c < 0 || c >= nc {
+					return PinNone
+				}
+				return cols[c].Pin
+			}
+			offset := func(c *node, p ColumnPin) {
+				switch p {
+				case PinStart:
+					move(c, sx)
+				case PinEnd:
+					move(c, endOff)
+				}
+			}
+			if len(nd.children) > 1 {
+				i := 0
+				for _, c := range nd.children[1].children {
+					if c.div != nil && c.div.part == "DataGrid.HeaderCell" {
+						offset(c, pinOf(i))
+						i++
+					}
+				}
+			}
+			for _, w := range nd.children[0].children {
+				if w.key == "jamb.list.tail" && len(w.children) > 0 {
+					move(w.children[0], sx)
+					continue
+				}
+				for _, r := range w.children {
+					for _, c := range r.children {
+						if d := c.div; d != nil && d.part == "DataGrid.Cell" && d.acc != nil {
+							offset(c, pinOf(d.acc.gridCol-1))
+						}
+					}
+				}
+			}
+		}
 	}
 	ho := dgHeadOps[T]{
 		changed: columnsChanged,
 		widthOf: func(cl DataColumn[T]) float32 { return cl.width(widths.Peek()) },
 		movable: movable,
-		accepts: func(from, to string) bool { return from != to },
-		drop:    dropColumn,
-		mark:    colMark.Get(),
+		accepts: func(from, to string) bool {
+			return from != to && cols[colOf(from, -1)].Pin == cols[colOf(to, -1)].Pin
+		},
+		drop: dropColumn,
+		mark: colMark.Get(),
 		setMark: func(m dgColMark) {
 			if colMark.Peek() != m {
 				colMark.Set(m)
@@ -1798,6 +1915,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				rt.drag = dragState{}
 			}
 		},
+		startN: startN,
+		endN:   endN,
 	}
 	list.header = g.headerRow(st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
 		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) }, ho, strs)
@@ -1884,6 +2003,10 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		cell := Div().asPart("DataGrid.Cell").Style(st.Cell).
 			Style(Style{Basis: Px(xs[c+1] - xs[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
 		cell.Role(access.RoleDataItem).Label(s).AccessCell(q+1, c+1)
+		if cl.Pin != PinNone {
+			cell.Style(st.CellPinned)
+			pinCell(cell, st, cl.Pin, c == rc.startN-1 || c == len(cols)-rc.endN)
+		}
 		a := cell.access()
 		if !onHeader && q == cursorPos && c == cursorCol {
 			a.highlighted = true
@@ -1983,6 +2106,37 @@ func (g *DataGridElement[T]) editor(rc dgRowCtx[T], cl DataColumn[T]) Element {
 	return ti.Style(Style{Grow: 1})
 }
 
+// pinCell makes d, a cell of a pinned column in the body or the header, opaque in
+// the state of its row and drawn over the cells that scroll under it. The cell at
+// the inner edge of its region, edge, has the PinnedEdge border on that side.
+func pinCell(d *DivElement, st DataGridStyle, pin ColumnPin, edge bool) {
+	d.ZIndex(1)
+	d.fillFromParent, d.fillBase = true, st.Grid.Background
+	if edge {
+		side := Edges{Right: 1}
+		if pin == PinEnd {
+			side = Edges{Left: 1}
+		}
+		d.Style(Style{BorderEdges: side}).Style(st.PinnedEdge)
+	}
+}
+
+// dgVisibleWidth is the width of the rows that the grid's body n shows: its width
+// less its border and padding.
+func dgVisibleWidth(n *node) float32 {
+	be := n.style.borderEdges()
+	return n.lay.W - be.Left - be.Right - n.style.Padding.Left - n.style.Padding.Right
+}
+
+// seq returns the integers from lo up to hi, hi not included.
+func seq(lo, hi int) []int {
+	out := make([]int, 0, max(hi-lo, 0))
+	for i := lo; i < hi; i++ {
+		out = append(out, i)
+	}
+	return out
+}
+
 // dgCellNode returns the built cell at the 1-based row and column of the grid whose
 // body is body, or nil when it is not built.
 func dgCellNode(body *node, row, col int) *node {
@@ -2046,6 +2200,9 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 		hc := Div().asPart("DataGrid.HeaderCell").Style(st.HeaderCell).
 			Style(Style{Basis: Px(cw[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
 		hc.Role(access.RoleHeaderItem).Label(name)
+		if cl.Pin != PinNone {
+			pinCell(hc, st, cl.Pin, c == ho.startN-1 || c == len(cols)-ho.endN)
+		}
 		a := hc.access()
 		a.status = status
 		if onHeader && c == col {

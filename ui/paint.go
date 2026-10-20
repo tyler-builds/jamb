@@ -111,6 +111,7 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	opacity *= v.opacity
 	n.opacity = opacity
 	bg, border, fg := v.bg, v.border, v.fg
+	n.shownBG = bg
 	if v.scale != 1 {
 		// Scale about the element's center. Transforms are in device pixels and
 		// compose with the transform of any enclosing element, so the element's
@@ -163,6 +164,16 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 				Radii:      sr,
 				Blur:       max(sh.Blur*rt.scale/2, 0.5),
 			})
+		}
+		if visible && n.div != nil && n.div.fillFromParent && n.parent != nil {
+			// An opaque fill under the element: the base color, then the fill its
+			// parent is drawn with, so that a pinned cell hides what scrolls under it
+			// and still shows the state of its row (see DataGrid).
+			for _, c := range [2]Color{n.div.fillBase, n.parent.shownBG} {
+				if c.A > 0 {
+					sc.AddQuad(scene.Quad{Bounds: rt.px(n.abs), Background: c.Alpha(opacity).scene(), Radii: radii})
+				}
+			}
 		}
 		be := s.borderEdges()
 		grad := s.Gradient
@@ -247,6 +258,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 			// The header is the child after the rows. It is moved to the top of
 			// the viewport before the children are painted.
 			n.children[1].style.OffsetY = sy
+		}
+		if n.div != nil && n.div.vlist != nil && n.div.vlist.pin != nil && !rt.inGhost {
+			n.div.vlist.pin(n, sx)
 		}
 	}
 	for _, c := range n.order {

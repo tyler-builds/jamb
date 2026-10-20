@@ -66,8 +66,8 @@ func TestDataGridHandleScrollsToAColumn(t *testing.T) {
 	}
 	h.ScrollToColumn("C")
 	dgSettle(r)
-	if want := float32(900) - body.lay.W; body.st.targetX != want {
-		t.Errorf("ScrollToColumn(C) scrolled to %v, want %v (the end of C at the right edge)", body.st.targetX, want)
+	if want := body.lay.ContentW - body.lay.W; body.st.targetX != want {
+		t.Errorf("ScrollToColumn(C) scrolled to %v, want %v (the end of C at the right edge of the rows)", body.st.targetX, want)
 	}
 }
 

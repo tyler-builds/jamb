@@ -28,4 +28,23 @@ func testDataGridColumnParts(t *testing.T, applied map[string]bool) {
 		}
 		r.rt.PointerUp(d.X+d.W/4, y, input.ButtonLeft, 0)
 	})
+	pinned := func(st DataGridStyle) *accessRig {
+		return newAccessRig(func(ctx *Context) Element {
+			return DataGrid(dgItems(3), func(x dgItem) string { return x.ID }, dgPinColumns()...).Label("Runs").Styles(st)
+		})
+	}
+	t.Run("CellPinned", func(t *testing.T) {
+		applied["DataGrid.CellPinned"] = true
+		r := pinned(DataGridStyle{CellPinned: Style{Background: markBG}})
+		if !anyMarked(r.rt, "DataGrid.Cell", false) {
+			t.Error("the style does not reach the cells of a pinned column")
+		}
+	})
+	t.Run("PinnedEdge", func(t *testing.T) {
+		applied["DataGrid.PinnedEdge"] = true
+		r := pinned(DataGridStyle{PinnedEdge: Style{Background: markBG}})
+		if !anyMarked(r.rt, "DataGrid.Cell", false) || !anyMarked(r.rt, "DataGrid.HeaderCell", false) {
+			t.Error("the style does not reach the cells and the header cells at the edge of the pinned columns")
+		}
+	})
 }
