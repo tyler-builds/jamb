@@ -126,6 +126,12 @@ type DivElement struct {
 	modalFooter  bool              // set on a Modal's footer, which the initial focus skips
 	acc          *accessInfo       // accessibility role, name and states (see access.go)
 	ime          *IME              // set by DivElement.IME, for an input method (see element_input.go)
+
+	// fillFromParent paints fillBase and then the parent's background under the
+	// element's own, so that the element is opaque in its parent's state (a pinned
+	// cell of a DataGrid; see paintNode).
+	fillFromParent bool
+	fillBase       Color
 }
 
 // Div creates an empty container. Children stack vertically (Column) unless

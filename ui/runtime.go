@@ -122,6 +122,7 @@ type node struct {
 	inOpacity float32
 	opacity   float32
 	inFg      Color
+	shownBG   Color // the background it was painted with, for a child that fills from it (see fillFromParent)
 
 	// paintGen is the paint in which the node was last painted, and painted
 	// lists the children it painted in that paint, in paint order. Only

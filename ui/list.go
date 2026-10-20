@@ -31,6 +31,10 @@ type UniformListElement struct {
 	rowWidth float32
 	// before, when set, runs at paint before the offset of the list is stepped.
 	before func(n *node)
+	// pin, when set, runs at paint after the offset of the list is stepped to sx,
+	// before the rows are painted, so that it can keep cells in place as the rows
+	// scroll sideways (see DataGrid's pinned columns).
+	pin func(n *node, sx float32)
 	// tail, when set, is drawn after the rows, as one more row of their height. It is
 	// not one of the items: it has no position in the list (see DataGrid.LoadingMore).
 	tail Element
@@ -198,6 +202,7 @@ type listState struct {
 	inst     *componentInstance
 	sticky   bool // the header is kept at the top of the viewport
 	before   func(n *node)
+	pin      func(n *node, sx float32)
 }
 
 // listOverscan is the number of rows built beyond the viewport on each side.
@@ -210,7 +215,7 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 	}
 	ls := st.list
 	ls.count, ls.inst, ls.handle = l.count, ctx.inst, l.handle
-	ls.sticky, ls.before = l.header != nil, l.before
+	ls.sticky, ls.before, ls.pin = l.header != nil, l.before, l.pin
 	if l.handle != nil {
 		l.handle.rt, l.handle.id = ctx.rt, expandedID(ctx.id)
 	}
