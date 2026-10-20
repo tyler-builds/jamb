@@ -449,7 +449,7 @@ func (rt *Runtime) runAccess(id access.ID, req access.Request) {
 		}
 	case access.ActionSetValue:
 		if n.kind == kindEditor {
-			rt.editorSet(n.id, req.Value, len(req.Value), editOther)
+			rt.editorReplaceAll(n.id, req.Value)
 		} else if n.div != nil && n.div.acc != nil && n.div.acc.setValue != nil {
 			n.div.acc.setValue(req.Value)
 		}
@@ -1243,10 +1243,9 @@ func (b *accessBuilder) emitField(n *node) []access.ID {
 		role = access.RoleTextArea
 	}
 	v := n.editor.value.Peek()
-	value := v
-	if n.editor.hidden() {
-		value = b.rt.maskedText(v) // a bullet for each character, as the field draws it
-	}
+	// The value is the text as the field draws it: a bullet for each character of a
+	// masked field, or the text in its format, such as "(555) 123-4567".
+	value := b.rt.present(n.editor, v).shown
 	an := &access.Node{ID: id, Role: role, Name: n.editor.name, Key: n.key, Bounds: b.bounds(n),
 		Value:   value,
 		Actions: []access.Action{access.ActionFocus, access.ActionSetValue, access.ActionSetTextSelection}}

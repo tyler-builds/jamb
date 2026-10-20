@@ -173,6 +173,67 @@ ui.TextInput(password).Masked().Revealable().Label("Password") // bullets, with 
 ui.TextInput(query).Icon(icons.Search).Clearable().Label("Search") // an X while it has text, and Escape clears
 ```
 
+- A `TextInput` with `Format(f)` shows its text in a fixed shape as the user types
+  it. `ui.TemplateFormat(spec)` is a template such as `"(999) 999-9999"`, and
+  `ui.NumberFormat(ui.NumberOptions{...})` a number with the decimal point, group
+  separators and minus sign of the user's locale (1,234.5 in en-US, 1.234,5 in
+  de-DE). The signal holds the raw value: the slot characters of a template
+  (`"5551234567"`), or the number in ASCII digits with `.` and a leading `-` and no
+  groups (`"-1234.5"`), which `strconv.ParseFloat` parses. `f.Display(raw)` gives the
+  shown text, for a grid cell or a label.
+
+  | Template character | Takes |
+  |---|---|
+  | `9` | a digit (full-width digits are taken as ASCII) |
+  | `A` | a letter |
+  | `#` | a letter or a digit |
+  | `*` | any character but a control character |
+  | `\x` | the literal `x` |
+  | anything else | a literal |
+
+  A literal shows once the slot before it is filled: typing 555 shows `(555) `. The
+  slots not filled yet are drawn after the text as `_`, in the placeholder's color;
+  they are not in the value or what assistive technology reads. An empty field draws
+  them while it has focus, and its `Placeholder`, when it has one, while it has not.
+  Typing a character a slot does not take, or into a full field, does nothing, and
+  typing the literal that comes next is skipped. Left, Right, Home and End move over
+  the slots, never stopping between literals, and a click on a literal puts the caret
+  before the next slot. Ctrl+Left, Ctrl+Right and a double-click take a group of slots
+  between literals as a word. A paste takes the characters that fit, in order, so both
+  `(555) 123-4567` and `555.123.4567` fill a phone number; what doesn't fit is
+  skipped. A delete in a template with slots of different classes (`"AA-9999"`) keeps
+  the longest start that still fits. Copy copies the selection as shown.
+
+  A number field places the group separators itself, and ignores a typed one. The
+  locale's decimal key types the decimal point, once, and no more digits than
+  `Decimals` follow it. With `Signed`, `-` anywhere toggles the sign and `+` clears
+  it. A paste must be a whole number in the locale (`1 234,56` in fr-FR), or it is
+  refused. While the user types, the value can be `"-"`, `"12."` or `"007"`, which
+  `OnChange` sees; leaving the field makes them `""`, `"12"` and `"7"`, as an undo
+  step. `Validate` and a `Form` see the raw value; `f.Complete(msg)` rejects a template
+  with a slot not filled, or a number that does not parse, and passes the empty
+  value, so pair it with `Required`. A value the app sets that does not fit is shown
+  as it is, and fails `Complete`. With `Masked`, the field draws a bullet for each
+  character, without the literals. Assistive technology reads the text as shown, such
+  as "(555) 123-4567", and a value it sets is taken as a paste of the whole text; say
+  what the format is in the `Tooltip` or the label too.
+
+- `Accept(fn)` decides whether an edit by the user may change the text: `fn` gets the
+  raw value the edit would make (after the format took it), and when it returns false
+  nothing changes, with no `OnChange` and no undo step. It runs on typing, an input
+  method's result, paste, delete, cut and a value set by assistive technology; the
+  empty text is always accepted, and undo, redo and the app's own `Set` are not
+  checked. Since it sees the text while it is typed, a regular expression used with
+  it must match a partial text: `^[0-9]{0,5}$`, not `^[0-9]{5}$`.
+
+```go
+phone := ui.TemplateFormat("(999) 999-9999")
+ui.TextInput(tel).Format(phone).Label("Phone").Tooltip("10 digits").
+	Validate(ui.Required[string](), phone.Complete("Enter the whole phone number."))
+ui.TextInput(amount).Format(ui.NumberFormat(ui.NumberOptions{Decimals: 2, Signed: true})).Label("Amount")
+ui.TextInput(code).Accept(func(next string) bool { return len(next) <= 5 }).Label("Code") // at most 5 bytes
+```
+
 ![Inline spin buttons inside the field, with the pointer over the plus button](screenshots/spin-buttons-inline.png)
 
 ![Stacked spin buttons, with the pointer over the up button](screenshots/spin-buttons-stacked.png)

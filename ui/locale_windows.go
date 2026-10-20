@@ -8,8 +8,9 @@ import (
 	"unsafe"
 )
 
-// The date and time pickers read the user's locale settings. These calls only read
-// them: GetLocaleInfoEx for the patterns and the clock, and GetDateFormatEx for the
+// The date and time pickers, and the number format, read the user's locale settings.
+// These calls only read them: GetLocaleInfoEx for the patterns, the clock and the
+// symbols of numbers, and GetDateFormatEx for the
 // names of the days and the months, so that they are in the user's language.
 var (
 	kernel32Locale                  = syscall.NewLazyDLL("kernel32.dll")
@@ -27,6 +28,10 @@ const (
 	lcAM              = 0x0028 // LOCALE_S1159
 	lcPM              = 0x0029 // LOCALE_S2359
 	lcFirstDayOfWeek  = 0x100C // LOCALE_IFIRSTDAYOFWEEK: 0 is Monday, 6 is Sunday
+	lcDecimal         = 0x000E // LOCALE_SDECIMAL
+	lcThousand        = 0x000F // LOCALE_STHOUSAND: the group separator
+	lcGrouping        = 0x0010 // LOCALE_SGROUPING, such as "3;0" (see parseGrouping)
+	lcNegativeSign    = 0x0051 // LOCALE_SNEGATIVESIGN
 	lcReturnNumber    = 0x20000000
 	dateLongDate      = 0x0002 // DATE_LONGDATE
 	muiLanguageName   = 0x0008 // MUI_LANGUAGE_NAME: the languages as tags such as "it-IT"
@@ -80,6 +85,18 @@ func readSystemLocale() *dateLocale {
 	}
 	if s := localeString(lcTimeSep); s != "" {
 		l.timeSep = s
+	}
+	if s := localeString(lcDecimal); s != "" {
+		l.decimal = s
+	}
+	if s := localeString(lcThousand); s != "" {
+		l.group = s
+	}
+	if g, ok := parseGrouping(localeString(lcGrouping)); ok {
+		l.grouping = g
+	}
+	if s := localeString(lcNegativeSign); s != "" {
+		l.minus = s
 	}
 	english := englishLocale()
 	l.longDate = func(t time.Time) string {

@@ -623,6 +623,8 @@ type fieldOptions struct {
 	masked      bool              // see TextInputElement.Masked
 	revealable  bool              // see TextInputElement.Revealable
 	clearable   bool              // see TextInputElement.Clearable
+	format      *InputFormat      // see TextInputElement.Format
+	accept      func(string) bool // see TextInputElement.Accept
 	tooltip     string            // shown over the frame; the field's description when it has none
 	disabled    bool              // see Disabled
 	styles      FieldStyle        // the instance's parts: from Styles, and the frame's Style
@@ -735,6 +737,39 @@ func (ti *TextInputElement) Revealable() *TextInputElement { ti.revealable = tru
 // button is drawn in the Button part, inside the Trailing part: the clear button,
 // then the reveal button (see Revealable), then the Trailing element.
 func (ti *TextInputElement) Clearable() *TextInputElement { ti.clearable = true; return ti }
+
+// Format shows the text in the shape f as the user types it, such as a phone number
+// (TemplateFormat("(999) 999-9999")) or a number with the locale's separators
+// (NumberFormat). The signal holds the raw value: "5551234567" for (555) 123-4567,
+// and "-1234.5" for -1,234.5. Characters the format does not take are not typed, a
+// paste takes what fits, and the caret moves over the slots, not the literals. A
+// template draws its slots not filled yet as _ after the text, in the placeholder's
+// color; an empty field draws them while it has focus, and its placeholder, when it
+// has one, while it has not. Leaving the field puts a number in its shortest form
+// ("12." becomes "12"). Copy copies the text as shown, and assistive technology
+// reads it as shown, so say what the format is in the Tooltip or the Label too.
+// Validate sees the raw value; Complete checks that it is complete. With Masked,
+// the field draws a bullet for each character, without the literals.
+func (ti *TextInputElement) Format(f InputFormat) *TextInputElement {
+	ti.format = nil
+	if !f.zero() {
+		ti.format = &f
+	}
+	return ti
+}
+
+// Accept sets the function that decides whether an edit by the user may change the
+// text: fn gets the raw value the edit would make (after the Format took the edit),
+// and when it returns false nothing changes: no OnChange and no undo step, and the
+// caret stays where it was. It runs on typing, an input method's result, paste,
+// delete, cut and a value set by assistive technology. The empty text is always
+// accepted, and undo, redo and the app's own Set are not checked. Since fn sees the
+// text as it is being typed, a regular expression used here must match the start of
+// a valid text too: ^[0-9]{0,5}$, not ^[0-9]{5}$ (use Validate for the whole text).
+func (ti *TextInputElement) Accept(fn func(next string) bool) *TextInputElement {
+	ti.accept = fn
+	return ti
+}
 
 // OnPasteImage runs fn with the image on the clipboard when the user pastes
 // (Ctrl+V or the Paste action) and the clipboard holds an image but no text,
@@ -1062,7 +1097,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
 		readOnly: f.readOnly, disabled: f.disabled, onPasteImage: f.onPasteImg,
-		password: f.masked, revealed: revealed, clearable: f.clearable,
+		password: f.masked, revealed: revealed, clearable: f.clearable, format: f.format, accept: f.accept,
 	}
 	if multiline && minRows > 0 {
 		size := t.FontSize
