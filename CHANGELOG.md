@@ -8,7 +8,11 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 ## [Unreleased]
 
 The code editor highlights with @pierre/highlights instead of tree-sitter: 76 languages built in,
-without the jamb-grammars module. This changes the highlighting API.
+without the jamb-grammars module. This changes the highlighting API. The data grid gains movable,
+pinned and grouped columns, cell selection, context menus and loading more rows; tabs scroll when
+they overflow; buttons get a loading state; `AlertDialog` is new; text inputs format as the user
+types; the code editor wraps lines and takes diagnostics, hovers, completions and definitions from
+the app; and animations gain springs, keyframes, timelines, delays and staggers.
 
 ### Changed
 
@@ -44,11 +48,77 @@ without the jamb-grammars module. This changes the highlighting API.
   language names and the token names, and `highlight.Highlight(lang, code)` colors a text that is
   not edited in one call.
 
+- `DataGrid` keeps the order and widths of its columns in signals (`ColumnOrder`, `ColumnWidths`)
+  and reports each finished change through `OnColumnsChange`, so an app can save the layout. A
+  saved order that names unknown columns, or misses new ones, still applies.
+- `DataColumn.Movable` (or `DataGrid.Movable()` for every column) lets the user move a column by
+  dragging its header, or with Ctrl+Shift+Left and Right on the header, with the new position
+  announced. Columns move only among those with the same pin.
+- `DataColumn.Pin` keeps a column at the start (`PinStart`) or the end (`PinEnd`) of the grid while
+  the other columns scroll sideways. Pinned cells keep the row's hover, selection and stripes.
+- `DataColumn.Group` puts neighbouring columns under a shared header in a row above theirs; screen
+  readers hear the group as each column header's description.
+- `DataGrid.ContextMenu` and `HeaderContextMenu` build menus for a cell and a header, opened by a
+  right-click, Shift+F10 or the Menu key. A right-click on a row that is not selected selects it.
+- `DataGrid.LoadMore(hasMore, fn)` asks for more rows when the user nears the end, and
+  `LoadingMore` shows a row with a busy ring at the end while they load.
+- `DataGrid.CellSelection` selects cells instead of rows: click, Ctrl+click and Shift+click, Shift
+  with the arrow keys for a rectangle, Shift+Space for a row, Ctrl+Space for a column and Ctrl+A
+  for all, as `CellKey` values in a signal.
+- `DataGridHandle` (`NewDataGridHandle`, `DataGrid.Handle`) scrolls a grid to a row or a column, or
+  focuses a cell, from code.
+- A grid whose columns are wider than its viewport builds only the columns in view, plus the pinned
+  ones and the focused and edited cells.
+- Tabs that don't fit scroll sideways, with the wheel and with arrow buttons at the ends of the
+  strip (`ScrollButtons`), and the selected tab is scrolled into view. `OverflowMenu` adds a button
+  that lists every tab, `TabMaxWidth` truncates long labels (the full label stays the tab's name and
+  tooltip), and `Prefix` and `Suffix` put content before and after the strip.
+- `Button.Loading` and `SplitButton.Loading` show a busy ring and ignore clicks, keys and the
+  modal's Enter while keeping focus and their width. Screen readers hear "Loading" as the button's
+  status.
+- `AlertDialog(title, message)` asks the user to confirm or acknowledge something. `Intent` picks
+  info, confirm, warning or destructive, which sets the icon and the confirm button's look; a
+  destructive dialog focuses Cancel and does not confirm on Enter from elsewhere. `Confirm`,
+  `Cancel` and `Action` set the buttons, Escape cancels, a click outside does nothing, and
+  `ConfirmLoading` shows the confirm button busy. Screen readers announce it as an alert dialog
+  (`access.RoleAlertDialog`).
+- `TextInput.Format` formats the text as the user types while the signal keeps the raw value:
+  `TemplateFormat("(999) 999-9999")` fills slots for digits, letters or any character between
+  literals that appear as needed, and `NumberFormat` groups digits and places the decimal point in
+  the user's locale. `InputFormat.Complete` validates a finished value, `Display` formats a value
+  for elsewhere, and `TextInput.Accept` rejects any edit that would make a value it refuses.
+- The code editor wraps long lines with `SoftWrap` (at the view's width, a column, or the
+  narrower of the two), with `WrapColumn` and `WrappingIndent`. Up, Down, Home and End move by the
+  lines as shown, and screen readers read them as lines.
+- `Document.SetDiagnostics` underlines errors, warnings, information and hints in every editor of
+  the document, with a gutter marker whose shape gives the severity. They follow edits, F8 and
+  Shift+F8 go to the next and previous one, and `SetDiagnosticsFor` drops a set computed for an
+  older text.
+- Editors ask an app's providers for hovers (`Hover`, shown after `HoverDelay` or with Ctrl+K
+  Ctrl+I), completions (`Completions`, on a trigger character or Ctrl+Space) and definitions
+  (`Definitions`, with F12 or Ctrl+click; another document goes to `OnOpenLocation`). Requests run
+  on goroutines and are cancelled by the next edit. `Document.TextVersion`, `UTF16Pos` and
+  `OffsetUTF16` help connect a language server.
+- Springs: `Style.Spring` and `Div.Spring` move opacity, offset and scale like a spring, set by a
+  duration and a bounce, keeping their speed when the target changes on the way. `ease.Spring`
+  gives the same feel to any animation.
+- `Div.Play` plays keyframes (`Keyframe`, with `Motion.Opacity` for partial opacity), and
+  `Sequence`, `Parallel`, `Then` and `Repeat` build timelines for `AnimateTimeline`.
+- `Animation.Delay`, `Animation.Stagger` (siblings that appear together enter one after another)
+  and `Animation.OnDone`.
+- `Theme.Motion` sets the durations of the built-in widgets' hover, enter and exit motion, and a
+  spring for their hover transitions; zero values keep today's.
+- Under reduced motion, springs, keyframes, timelines, delays and staggers jump to their end (a
+  repeating one holds its first frame).
+
 ### Fixed
 
 - The code editor kept the syntax colors of the theme it first painted with: after a switch from
   the dark theme to the light one, its text stayed in the dark theme's pale colors. It now recolors
   the text when the theme changes.
+
+- Ending a drag of a `DataGrid` column's edge over its header also sorted the column. It no longer
+  does.
 
 ### Removed
 
