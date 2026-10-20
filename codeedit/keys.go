@@ -181,6 +181,7 @@ func buildActions() []editorAction {
 		{CmdNextDiagnostic, func(e *EditorElement, vs *viewState) { vs.goToDiagnostic(true) }},
 		{CmdPrevDiagnostic, func(e *EditorElement, vs *viewState) { vs.goToDiagnostic(false) }},
 		{CmdShowHover, func(e *EditorElement, vs *viewState) { vs.openHover(vs.doc.Caret(), true) }},
+		{CmdGoToDefinition, func(e *EditorElement, vs *viewState) { vs.goToDefinition(vs.doc.Caret()) }},
 		{CmdTriggerSuggest, writable(func(e *EditorElement, vs *viewState) { vs.triggerCompletion(TriggerInvoked, 0) })},
 	}
 	return out
@@ -221,7 +222,7 @@ func Bindings() []ui.Binding {
 		b("f3", CmdFindNext), b("shift+f3", CmdFindPrevious),
 		b("ctrl+/", CmdComment), b("ctrl+shift+[", CmdFold), b("ctrl+shift+]", CmdUnfold),
 		b("f8", CmdNextDiagnostic), b("shift+f8", CmdPrevDiagnostic), b("ctrl+k ctrl+i", CmdShowHover),
-		b("ctrl+space", CmdTriggerSuggest),
+		b("ctrl+space", CmdTriggerSuggest), b("f12", CmdGoToDefinition),
 	}
 }
 

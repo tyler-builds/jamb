@@ -189,6 +189,12 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 		case dr.from < dr.to:
 			vs.drawSegment(p, ts, line, ls, dr, tx, y, charW, tab, fg)
 		}
+		if l := vs.link; l.on && l.from < dr.to && l.to > dr.from {
+			// The word that a Ctrl+click goes to the definition of.
+			x0 := dr.cellOf(line, ls, max(l.from, dr.from), tab)
+			x1 := dr.cellOf(line, ls, min(l.to, dr.to), tab)
+			p.FillRect(tx+float32(x0)*charW, y+lineH-1, float32(x1-x0)*charW, 1, fg)
+		}
 		for _, g := range diags {
 			c := diagnosticStyle(st, g.Severity).TextColor
 			if !g.onRow(dr, le) || c.IsZero() {

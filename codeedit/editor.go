@@ -26,6 +26,8 @@ type EditorElement struct {
 	hoverP      HoverProvider
 	hoverDelay  time.Duration
 	complete    CompletionProvider
+	define      DefinitionProvider
+	openLoc     func(Location)
 	size        sizes // see Size
 	styles      Style
 	hl          Highlighter
@@ -165,6 +167,7 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	vs.wrap = e.wrap
 	vs.hoverP, vs.hoverDelay = e.hoverP, e.hoverDelay
 	vs.completeP = e.complete
+	vs.defineP, vs.openLoc = e.define, e.openLoc
 	if e.readOnly {
 		vs.completeP = nil // nothing to complete in a text that does not change
 	}
@@ -179,7 +182,11 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	canvas := ui.Canvas(func(p *ui.Painter, w, h float32) {
 		vs.paint(p, w, h, ps)
 	}).Size(ui.Full, ui.Full).Grow(1).Role(access.RoleTextArea).Label(name)
-	canvas.Cursor(ui.CursorText).KeyContext("CodeEditor").Focusable().FocusHandle(vs.canvasFocus)
+	cursor := ui.CursorText
+	if vs.link.on {
+		cursor = ui.CursorPointer // Ctrl+click goes to the definition
+	}
+	canvas.Cursor(cursor).KeyContext("CodeEditor").Focusable().FocusHandle(vs.canvasFocus)
 	e.wire(canvas, vs)
 	canvas.TextAccess(ui.TextAccess{
 		Info:   func() *access.TextInfo { return vs.textAccess(e.readOnly, st.Text.FontSize) },
@@ -210,10 +217,16 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 // wire attaches the pointer, keyboard, text and focus handling to the canvas of the editor.
 func (e *EditorElement) wire(canvas *ui.DivElement, vs *viewState) {
 	canvas.OnFocus(func() { vs.focused = true; vs.restart = true; vs.touch() })
-	canvas.OnBlur(func() { vs.focused = false; vs.dragging = false; vs.closePopups(); vs.touch() })
+	canvas.OnBlur(func() { vs.focused = false; vs.dragging = false; vs.closePopups(); vs.define.stop(); vs.touch() })
 	canvas.OnMouseDown(func(ev *ui.MouseEvent) { vs.mouseDown(ev) })
 	canvas.OnMouseMove(func(ev *ui.MouseEvent) { vs.mouseMove(ev) })
 	canvas.OnMouseUp(func(*ui.MouseEvent) { vs.dragging = false })
+	canvas.OnMouseLeave(func() {
+		if vs.link.on {
+			vs.link = linkState{}
+			vs.touch()
+		}
+	})
 	canvas.OnScroll(func(ev *ui.ScrollEvent) {
 		vs.scroll(ev.DeltaX, ev.DeltaY)
 		ev.StopPropagation()
@@ -296,6 +309,12 @@ type viewState struct {
 	hover      hoverState
 	completeP  CompletionProvider
 	completion completionState
+	// defineP is the provider of definitions, openLoc opens one in another file, define is its
+	// request, and link the word that a Ctrl+click goes to the definition of.
+	defineP DefinitionProvider
+	openLoc func(Location)
+	define  asyncSlot[[]Location]
+	link    linkState
 
 	// activity is the time of the latest edit, move or click, from which the caret blinks. restart
 	// asks the next paint to set it to that paint's time (see Painter.Now).
@@ -399,7 +418,12 @@ func (vs *viewState) attachDoc(doc *Document) {
 		}),
 		doc.OnEdit(func(c Change) { vs.wc.edit(doc, c) }),
 		doc.onRedraw(vs.touch),
-		doc.OnEdit(func(c Change) { vs.closeHover(); vs.completionEdited(c) }),
+		doc.OnEdit(func(c Change) {
+			vs.closeHover()
+			vs.completionEdited(c)
+			vs.define.stop()
+			vs.link = linkState{}
+		}),
 	}
 	vs.stopRequests()
 	vs.wc = wrapCache{}
@@ -484,8 +508,9 @@ func (vs *viewState) hitAt(x, y float32) (dr displayRow, p int, upstream, ok boo
 }
 
 // mouseDown handles a press: a fold marker folds or unfolds its row, a line number selects
-// its row, and a press in the text places the caret. Alt adds a caret, Shift extends the
-// primary selection, and a double or triple click selects a word or a row.
+// its row, and a press in the text places the caret. Ctrl goes to the definition there, when the
+// editor has a provider of definitions, Alt adds a caret, Shift extends the primary selection,
+// and a double or triple click selects a word or a row.
 func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 	if ev.Button != input.ButtonLeft {
 		return
@@ -506,6 +531,9 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 		}
 	case ev.LocalX < g.textX:
 		vs.doc.SelectRow(row)
+	case ev.Mods.Has(input.ModCtrl) && vs.defineP != nil:
+		vs.doc.SetCaret(p)
+		vs.goToDefinition(p)
 	case ev.Mods.Has(input.ModAlt):
 		vs.doc.AddCaret(p)
 	case ev.Mods.Has(input.ModShift):
@@ -527,6 +555,7 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 // the hover at the text under the pointer.
 func (vs *viewState) mouseMove(ev *ui.MouseEvent) {
 	if !vs.dragging {
+		vs.pointerLink(ev)
 		vs.pointerRest(ev)
 		return
 	}

@@ -48,8 +48,8 @@ rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+d", ui.Unbind(codeedit.CmdAddNextOc
 `TabSize` (4 by default), `CommentPrefix`, `Size`, the sizing methods (`Width`, `Height`,
 `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow` and `GridSpan`, as on the `ui` widgets;
 Full by 300 pixels by default), `Styles`, `Language`, `Highlighter`, `SoftWrap`, `WrapColumn`
-and `WrappingIndent` (see Soft wrap), and `Hover`, `HoverDelay` and `Completions` (see Language
-server hooks).
+and `WrappingIndent` (see Soft wrap), and `Hover`, `HoverDelay`, `Completions`, `Definitions` and
+`OnOpenLocation` (see Language server hooks).
 
 ## Document
 
@@ -108,12 +108,13 @@ value, so an app can rebind it with `ui.BindIn("CodeEditor", keys, action)` or t
 | Ctrl+Shift+] | Unfold the row of the caret. |
 | Ctrl+D | Select the word at the caret, then add the next occurrence of the selection. |
 | Ctrl+Alt+Up, Ctrl+Alt+Down | Add a caret above or below the topmost or bottommost caret. |
-| Alt+click | Add a caret. Shift+click extends the primary selection. Double-click selects a word; triple-click selects a row. |
+| Alt+click | Add a caret. Shift+click extends the primary selection. Double-click selects a word; triple-click selects a row. Ctrl+click goes to the definition, with `Definitions`. |
 | Ctrl+F, Ctrl+H | Find, and find and replace. |
 | F3, Shift+F3 | Next and previous match. |
 | Ctrl+G | Go to line. |
 | F8, Shift+F8 | Select the next or the previous diagnostic, open its hover, and announce it. |
 | Ctrl+K Ctrl+I | Open the hover at the caret, and announce it. |
+| F12 | Go to the definition at the caret, with `Definitions`. |
 | Ctrl+Space | Open the completion list; Up, Down, PageUp and PageDown move its highlight, and Enter and Tab accept it. |
 
 The punctuation keys name their physical position as the US layout prints it: `ctrl+/` is the
@@ -285,6 +286,20 @@ The keyboard focus stays in the editor, as with a combobox: the list is a list f
 technology (`ui.Strings.Suggestions`), its highlighted item is the selected one, the number of
 items is announced when the answer comes (`SuggestionCount`), and each item the highlight moves to
 is announced politely. The list shows up to 10 items at a time around the highlighted one.
+
+### Definition
+
+```go
+codeedit.Editor(doc).
+	Definitions(definer). // a codeedit.DefinitionProvider
+	OnOpenLocation(func(l codeedit.Location) { openTab(l.URI, l.Row, l.Col) })
+```
+
+F12 (`CmdGoToDefinition`) and Ctrl+click ask the provider where the symbol at the caret or the click
+is defined, and go to the first `Location` it gives. A location with an empty `URI` is in this
+document: its bytes `[From, To)` are selected and scrolled into view. Any other is handed to the
+function set with `OnOpenLocation`, with the `Row` and `Col` the provider gave; without one it is not
+opened. While Ctrl is held, the word under the pointer is underlined and the pointer is a hand.
 
 ## Highlighting
 
