@@ -263,6 +263,10 @@ type Style struct {
 	// Transition eases colors, opacity, offset and scale (hover, press, theme,
 	// and changes made by a new render) over this duration.
 	Transition time.Duration
+	// Spring moves opacity, offset and scale as a damped spring instead: a
+	// change mid-flight keeps the velocity it had. Colors still ease, over
+	// Transition when it is set. The zero Spring is unset.
+	Spring Spring
 
 	// Clear removes the fields it names from the style it is merged into, before
 	// the set fields of this style are applied, so a style can turn a default off:
@@ -423,6 +427,9 @@ func (s Style) Merge(o Style) Style {
 	mergeA(&s.TextAlign, o.TextAlign)
 	if o.Transition != 0 {
 		s.Transition = o.Transition
+	}
+	if o.Spring.Duration != 0 {
+		s.Spring = o.Spring
 	}
 	if sp != nil || o.prov != nil {
 		s.prov = mergeProv(sp, o.prov, s)

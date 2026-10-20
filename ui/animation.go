@@ -15,6 +15,31 @@ type Animation struct {
 	Repeat bool // Animate only: loop forever
 }
 
+// Spring is a damped spring that moves an element's opacity, offset and scale
+// toward their targets (see DivElement.Spring). Unlike a Transition it has a
+// velocity: a target that changes mid-flight bends the motion rather than
+// restarting it, and with a bounce it overshoots and swings back. The zero
+// Spring is unset.
+type Spring struct {
+	// Duration is the perceived length of the response: the spring's natural
+	// period, which sets its stiffness. A critically damped spring is close to
+	// its target after one Duration.
+	Duration time.Duration
+	// Bounce is how much the spring overshoots: 0 is critically damped and
+	// never passes its target, and larger values swing more. It is clamped to
+	// [0, 0.9]; the damping ratio is 1-Bounce.
+	Bounce float32
+}
+
+// params returns the spring's angular frequency (per second) and damping
+// ratio: a unit mass with stiffness omega² and damping 2·zeta·omega.
+func (s Spring) params() (omega, zeta float64) {
+	return 2 * math.Pi / s.Duration.Seconds(), 1 - float64(s.bounce())
+}
+
+// bounce returns Bounce clamped to the range the spring accepts.
+func (s Spring) bounce() float32 { return min(max(s.Bounce, 0), 0.9) }
+
 // Animate re-renders fn every frame with eased progress t (0..1) until the
 // animation ends (or forever with Repeat), so any property can be animated.
 // It restarts when key changes. Layout properties (Width, Padding...) cost a

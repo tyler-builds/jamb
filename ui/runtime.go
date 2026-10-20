@@ -71,6 +71,9 @@ type nodeState struct {
 	// entrance or an exit began (zero when there is none).
 	shown            visual
 	enterAt, leaveAt time.Time
+	// vel is the velocity of a spring's opacity, offset X and Y and scale,
+	// per second (see Runtime.spring).
+	vel [4]float32
 
 	// The largest ink overhang and scale growth this element has had, kept
 	// for an element with a Transition: its displayed values ease from the
@@ -122,7 +125,8 @@ type node struct {
 	inOpacity float32
 	opacity   float32
 	inFg      Color
-	shownBG   Color // the background it was painted with, for a child that fills from it (see fillFromParent)
+	shownBG   Color   // the background it was painted with, for a child that fills from it (see fillFromParent)
+	scale     float32 // the element's own scale as drawn, read by StyleOf
 
 	// paintGen is the paint in which the node was last painted, and painted
 	// lists the children it painted in that paint, in paint order. Only
@@ -1314,7 +1318,7 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		n.lay.Style.Hidden = e.noDisplay
 		n.ts = inh.inherit(&n.style)
 		if e.hover != nil || e.pressed != nil || e.focused != nil || e.focusWithin != nil || n.style.Transition > 0 ||
-			n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil {
+			n.style.Spring.Duration > 0 || n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil {
 			n.st = rt.state(id)
 			if n.fresh {
 				// A new element forgets any exit its ID had, and enters now.
@@ -1521,20 +1525,33 @@ func inkOverhang(s *Style, enter, exit *motionSpec) (over, grow float32) {
 		over = max(over, reach)
 	}
 	over += abs32(s.OffsetX) + abs32(s.OffsetY)
-	grow = max(s.Scale-1, 0)
+	grow = growth(s.Scale)
 	for _, sp := range [2]*motionSpec{enter, exit} {
 		if sp == nil {
 			continue
 		}
 		over += abs32(sp.m.x) + abs32(sp.m.y)
-		grow = max(grow, sp.m.scale-1)
+		grow = max(grow, growth(sp.m.scale))
 	}
 	return over, grow
 }
 
+// growth is how far a scale s (0 = unset) can draw beyond the element's box.
+// A scale below 1 counts as much as the same scale above it: a spring, or an
+// easing such as ease.Spring, that settles from it to 1 overshoots by up to as
+// much on the other side.
+func growth(s float32) float32 {
+	if s == 0 {
+		return 0
+	}
+	return abs32(s - 1)
+}
+
 // setOverhang sets n's ink overhang from its style and motions and reports
-// whether it changed. An element with a Transition keeps the largest value it
-// has had, since its displayed offset and scale ease from the old target.
+// whether it changed. An element with a Transition or a Spring keeps the
+// largest value it has had, since its displayed offset and scale ease from the
+// old target. A spring overshoots by less than its Bounce, so its values are
+// widened by that much.
 func (rt *Runtime) setOverhang(n *node) bool {
 	var enter, exit *motionSpec
 	if n.div != nil {
@@ -1544,9 +1561,13 @@ func (rt *Runtime) setOverhang(n *node) bool {
 	if n.kind == kindText || n.kind == kindIcon {
 		over += glyphOverhang
 	}
-	if n.st != nil && n.style.Transition > 0 {
+	if n.st != nil && (n.style.Transition > 0 || n.style.Spring.Duration > 0) {
 		over, grow = max(over, n.st.overhang), max(grow, n.st.growOverhang)
 		n.st.overhang, n.st.growOverhang = over, grow
+		if n.style.Spring.Duration > 0 {
+			k := 1 + n.style.Spring.bounce()
+			over, grow = over*k, grow*k
+		}
 	}
 	if over == n.lay.Overhang && grow == n.lay.GrowOverhang {
 		return false

@@ -499,6 +499,16 @@ func (d *DivElement) Cursor(c Cursor) *DivElement { d.style.Cursor = c; return d
 // duration. Paint-only properties ease without a re-layout.
 func (d *DivElement) Transition(t time.Duration) *DivElement { d.style.Transition = t; return d }
 
+// Spring moves changes of Opacity, Offset and Scale as a damped spring (see
+// Spring), so they can overshoot, and a change that comes mid-flight keeps the
+// velocity of the motion. Colors keep easing as a Transition does, never
+// overshooting: over the Transition when one is set, and over the spring's
+// Duration otherwise.
+//
+//	ui.Div().Spring(ui.Spring{Duration: 300 * time.Millisecond, Bounce: 0.2}).
+//	    Hover(ui.Style{Scale: 1.04})
+func (d *DivElement) Spring(s Spring) *DivElement { d.style.Spring = s; return d }
+
 // Offset moves the element by (x, y) logical pixels after layout. Its place in
 // the layout does not change, so siblings stay put; hit testing and Find follow
 // the element. Combine with Transition to slide it.
