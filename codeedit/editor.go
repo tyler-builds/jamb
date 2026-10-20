@@ -232,6 +232,7 @@ type viewState struct {
 	geo         geometry
 	spans       spanIndex
 	capStyle    []capStyle
+	capTheme    *ui.Theme // the theme that capStyle was made from
 	vpLo        int
 	vpHi        int
 	vpSet       bool

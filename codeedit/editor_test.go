@@ -374,6 +374,21 @@ func TestSyntaxStylesMapCaptures(t *testing.T) {
 	}
 }
 
+// TestSyntaxStylesFollowTheTheme checks that a change of theme recolors the captures, though the
+// highlighter's spans stay the same.
+func TestSyntaxStylesFollowTheTheme(t *testing.T) {
+	fake := &fakeHighlighter{names: []string{"keyword"}, spans: []highlight.Span{{Start: 0, End: 2, Capture: 0}}, ver: 1}
+	h := newHarness(t, "if x", func(e *EditorElement) *EditorElement { return e.Highlighter(fake) })
+	h.frame()
+	dark := h.ed.view.capStyle[0].st.Color
+	h.rt.SetTheme(ui.LightTheme())
+	h.frame()
+	light := h.ed.view.capStyle[0].st.Color
+	if want := ui.LightTheme().Syntax["keyword"].Color; light != want || light == dark {
+		t.Fatalf("after the switch to the light theme the keyword is %v, want %v (it was %v)", light, want, dark)
+	}
+}
+
 // The sizing methods size the editor's box as they size a widget of the ui package: Grow
 // takes the free space of a row, MaxWidth caps the width, MinHeight raises the height,
 // and GridSpan covers the columns of a grid.
