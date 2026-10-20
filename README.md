@@ -23,7 +23,7 @@ parts that depend on it.
   text size setting.
 - Text: shaping with HarfBuzz, fallback fonts, rich and selectable text, and input method (IME) composition.
 - Graphics: a canvas, SVG images, gradients, and charts.
-- Code editing: a `codeedit` package with tree-sitter highlighting, undo and redo, and find and replace.
+- Code editing: a `codeedit` package with syntax highlighting for 76 languages, undo and redo, and find and replace.
 - Markdown: a `markdown` package that shows CommonMark with the GitHub extensions as accessible, selectable elements.
 - OS integration: jump lists, single instance, a notification area icon, taskbar progress, and OS notifications.
 - Development tools: `jamb dev` rebuilds and restarts an app on each save, and a visual inspector shows the

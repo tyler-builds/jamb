@@ -291,10 +291,9 @@ An app that imports `codeedit` also contains:
 - `github.com/tetratelabs/wazero`, licensed under the Apache License, Version 2.0. Include its `LICENSE`
   and `NOTICE` files.
 - `golang.org/x/sys/windows`, licensed under the BSD 3-Clause License, as above.
-- `github.com/tyler-builds/jamb-grammars`, the tree-sitter runtime and grammars for highlighting. The
-  module's code is licensed under the Apache License, Version 2.0; the tree-sitter runtime and the
-  grammars it embeds are licensed under the MIT License. Include its `LICENSE` and `NOTICE` files, which
-  hold the MIT notices.
+- The WebAssembly module of @pierre/highlights, the highlighter, which jamb embeds. It is Copyright 2025
+  Pierre Computer Company and licensed under the Apache License, Version 2.0; jamb's `NOTICE` file
+  names it, and its license text is in `codeedit/internal/lexer/LICENSE-APACHE`.
 
 An app that imports `markdown` also contains:
 

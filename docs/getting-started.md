@@ -78,11 +78,5 @@ go install github.com/tyler-builds/jamb/cmd/jamb@v0.2.0
   [Tools for humans and coding agents](tools.md#tools-for-humans-and-coding-agents)).
 - `jamb package` builds the Windows zip, installer and MSIX (see [Packaging](packaging.md#packaging)).
 
-An app that uses `codeedit` also needs the grammars module, whose latest release is `v0.1.0`:
-
-```
-go get github.com/tyler-builds/jamb-grammars@v0.1.0
-go mod tidy
-```
-
-See [Code editor](codeedit.md#code-editor) for the grammars and what `codeedit` adds to a binary.
+The code editor (`codeedit`) highlights 76 languages without another module. See
+[Code editor](codeedit.md#code-editor) for the languages and what `codeedit` adds to a binary.

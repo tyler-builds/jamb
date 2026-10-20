@@ -2,24 +2,22 @@
 
 The `codeedit` package is a code editor for source files: a multi-line text area with a
 line-indexed buffer, undo and redo, several selections, find and replace, folding by indentation,
-tree-sitter highlighting, input-method composition, and an accessibility Text pattern. It is pure
+syntax highlighting for 76 languages, input-method composition, and an accessibility Text pattern. It is pure
 Go and draws on the Canvas of the `ui` package. It is built with
 `codeedit.Editor(codeedit.NewDocument(text))`. Its keys are actions with default bindings, so they
 work without setup, and an app can rebind them. The sections below cover the keys, the document,
 highlighting, the limits and the measured performance.
 
-The grammars for highlighting are in their own module,
-[github.com/tyler-builds/jamb-grammars](https://github.com/tyler-builds/jamb-grammars), one package
-per language, so jamb itself carries none of them:
+Highlighting is built in. The package carries
+[@pierre/highlights](https://github.com/pierrecomputer/pierre/tree/main/packages/highlights), the
+syntax highlighter of the Pierre Computer Company, with a lexer for each of 76 languages in one
+WebAssembly module of about 170 KB. A language is named as a code fence names it:
 
 ```go
-import "github.com/tyler-builds/jamb-grammars/golang"
-
-codeedit.Editor(doc).Language(golang.Grammar)
+codeedit.Editor(doc).Language("go")
 ```
 
-Highlighting runs tree-sitter in WebAssembly through wazero, which adds about 1.1 MB to an app's
-binary, plus each grammar it imports (Go is 0.36 MB). wazero uses Go's SHA-256, which links Go's
+The module runs in wazero, which adds about 1.1 MB to an app's binary. wazero uses Go's SHA-256, which links Go's
 FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `codeedit` uses about
 32 MB more private memory than one that does not (see BENCHMARKS.md). Apps that do not import
 `codeedit` link none of this.
@@ -30,7 +28,7 @@ FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `cod
 doc := codeedit.NewDocument(source)
 ui.Div().Child(codeedit.Editor(doc).
     Label("main.go").
-    Language(golang.Grammar).
+    Language("go").
     CommentPrefix("// ").
     TabSize(4).
     Height(ui.Px(400)))
@@ -139,39 +137,45 @@ end of its header. Folds follow the text when lines are inserted above them.
 
 ## Highlighting
 
-Highlighting uses the tree-sitter session in `codeedit/highlight`. The grammars are in their own
-module, [github.com/tyler-builds/jamb-grammars](https://github.com/tyler-builds/jamb-grammars), with
-one package per language (`golang`, `python`, `typescript` and others), each providing a
-`highlight.Grammar`:
+Highlighting uses the session in `codeedit/highlight`, which runs @pierre/highlights. `Language`
+takes the name of a language or a common alias, in any case: `go`, `python`, `ts`, `tsx`, `rust`,
+`c#`, `sh`, `yml` and so on. `highlight.Languages` lists the names, and `highlight.Supported`
+checks one. A language the highlighter does not know is shown without colors
+(`highlight.ErrUnknownLanguage`).
 
-```go
-import "github.com/tyler-builds/jamb-grammars/golang"
-
-codeedit.Editor(doc).Language(golang.Grammar)
-```
-
-A grammar is a WebAssembly module: the tree-sitter runtime, the grammar, and a shim that the
-editor calls. `highlight.ABI` is the version of that interface, and each grammar reports the
-version it was built with; a grammar of another version is refused with an error that names both,
-so jamb and jamb-grammars must be versions that match. `highlight.NewGrammar` makes a
-`highlight.Grammar` from a module built with jamb-grammars' build command, for a language it does
-not include.
+The highlighter lexes. Each language's lexer classifies the text from the tokens near it and from
+the state that it carries from one line to the next, without building a syntax tree. The session
+keeps that state at the end of each line, so a change relexes the lines it touches and the lines
+after them only until the state is again what it was: relexing after a keystroke inside a line takes about 12 µs (see BENCHMARKS.md),
+and typing `/*` recolors the file down to where the comment ends. A lexer can color some code
+differently from a parser: in Go, for one, `pkg.Name` may take the color of a property where a
+parser knows that it is a type. An app that wants colors from a syntax tree can plug in the
+tree-sitter highlighter of jamb-grammars (see `Highlighter` below).
 
 `Language` starts a session on the document's text when the editor first renders. The session is
 closed when the language or the document changes, and when the editor's component is disposed (the
 close is registered with `ui.Context.OnDispose`). Each change goes to the session at once, with the
-bytes it replaced, so a keystroke never waits for a parse. The editor sends the rows shown to the
-session as the viewport, so the rows on screen are parsed first. The session's worker asks for a
-frame when it has new spans. A document over the highlight limit (`highlight.ErrTooLarge`) is
-shown without colors.
+bytes it replaced, so a keystroke never waits for the highlighter. The editor sends the rows shown
+to the session as the viewport: the session's worker relexes up to the last row shown, publishes
+the spans of the rows, and then relexes the rest of the document in slices of about a millisecond.
+The worker asks for a frame when it has new spans. A document over the highlight limit (16 MB by
+default, `highlight.ErrTooLarge`) is shown without colors.
 
-A capture takes the theme's style of its closest name: `string.escape.go` takes the style of
-`string.escape`, and then of `string` (`highlight.Closest`). Where spans overlap, the later one
-wins. A capture whose style is italic is drawn in the italic face of the monospace family, such
-as Consolas Italic on Windows.
+The tokens are named as the syntax styles of Zed's themes, which jamb's themes use: `keyword`,
+`keyword.control`, `string.escape`, `function.method`, `type.builtin` and so on
+(`highlight.CaptureNames`). A token takes the theme's style of its closest name:
+`keyword.control` takes the style of `keyword` when the theme has none of its own
+(`highlight.Closest`). A few names that Zed's themes do not style take the style of another:
+CSS's `selector` that of `tag`, `selector.class` and `selector.id` that of `property`, and
+`selector.pseudo` that of `attribute`. A token whose style is italic is drawn in the italic face of
+the monospace family, such as Consolas Italic on Windows.
 
 `Highlighter(h)` takes any value with the session's methods (`Edit`, `SetViewport`, `Spans`,
-`CaptureNames`, `Close`), for an app that runs its own highlighter.
+`CaptureNames`, `Close`), for an app that runs its own highlighter. The editor sends it each change
+and the viewport, and paints its spans, where a later span wins over an earlier one that overlaps
+it. It does not close a highlighter that the app gives it. The `treesitter` package of
+[github.com/tyler-builds/jamb-grammars](https://github.com/tyler-builds/jamb-grammars) is one: it
+runs tree-sitter grammars in WebAssembly, for an app that wants colors from a syntax tree.
 
 ## Input method composition
 
@@ -273,8 +277,8 @@ highlighting depends on the spans shown and is not included in these figures.
 - Translations: the find bar's messages are translated for Italian and Chinese where the
   translation is certain. The remaining messages are English in every language, as the `ui.Strings`
   packs describe.
-- Binary size and memory: importing `codeedit` links wazero, the WebAssembly runtime that runs
-  tree-sitter (about 1.1 MB of code), and each jamb-grammars package an app imports adds its
-  grammar (0.15 to 5.5 MB; Go is 0.36 MB). wazero hashes modules with SHA-256, which links Go's
+- Binary size and memory: importing `codeedit` links wazero, the WebAssembly runtime (about 1.1 MB
+  of code), and the highlighter's module (0.17 MB, all 76 languages). The session's copy of a
+  document takes about five times its size in memory. wazero hashes modules with SHA-256, which links Go's
   FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `codeedit` reports
   about 32 MB more private bytes than one that does not (see BENCHMARKS.md).
