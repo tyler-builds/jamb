@@ -3,7 +3,6 @@ package ui
 import (
 	"image"
 	"slices"
-	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
@@ -149,7 +148,7 @@ func buttonDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly bool) 
 	d := ButtonStyle{
 		Root: Style{Direction: Row, Align: Center, Justify: Center, Gap: 7, MinHeight: Px(h),
 			Padding: XY(px, 0), Radius: t.Radius, FontSize: fs, FontWeight: FontMedium,
-			Transition: 110 * time.Millisecond, NoShrink: true, fitWidth: true},
+			Transition: t.Motion.hover(), Spring: t.Motion.Spring, NoShrink: true, fitWidth: true},
 		RootDisabled: Style{Opacity: 0.5},
 		RootLoading:  Style{Opacity: 0.8},
 	}
@@ -538,7 +537,7 @@ func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
 	d := FieldStyle{
 		Frame: Style{Direction: Row, Align: Center, Gap: 8, Padding: XY(10, 0), MinHeight: Px(34),
 			Width: lay.width, contentMin: true, Radius: t.Radius, Background: t.Surface, BorderWidth: 1, BorderColor: t.BorderStrong,
-			Transition: 110 * time.Millisecond},
+			Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		FrameHover:       Style{BorderColor: t.TextMuted},
 		FrameFocusWithin: Style{BorderColor: t.Accent},
 		FrameInvalid:     Style{BorderWidth: 2, BorderColor: t.Danger},

@@ -130,7 +130,7 @@ func datePickerDefaults(t *Theme, scale float32, disabled bool) DatePickerStyle 
 	c := calendarDefaults(t, scale)
 	d := DatePickerStyle{
 		CalendarButton: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(24 * scale),
-			Height: Px(24 * scale), NoShrink: true, Radius: 4, TextColor: t.TextMuted, Transition: 110 * time.Millisecond},
+			Height: Px(24 * scale), NoShrink: true, Radius: 4, TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		Message: messageStyle(t),
 		Popup: Style{Direction: Column, Gap: 4 * scale, Padding: All(8 * scale), Background: t.Surface,
 			BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius, Shadows: []Shadow{ShadowMd}},
@@ -592,7 +592,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 			enabled := func(day time.Time) bool { return d.enabled(day, s) }
 			root.Child(calendarPanel(calendarView{st: st.calendar(Style{}), widget: "DatePicker", loc: loc, scale: scale,
 				value: v, focus: focus.Get(), ring: true, today: dayOf(rt.now()), name: name, fallback: s.DateField, move: moveTo, pick: pick,
-				keys: keys, shut: shut, enabled: enabled, firstSet: d.firstSet, firstDay: d.firstDay}, s))
+				keys: keys, shut: shut, enabled: enabled, firstSet: d.firstSet, firstDay: d.firstDay, motion: ctx.Theme().Motion}, s))
 		}
 		return d.size.apply(root)
 	})

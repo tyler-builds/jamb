@@ -185,8 +185,8 @@ func (h *HoverCardElement) expand(ctx *Context) Element {
 				Role(access.RoleTooltip).
 				// Escape and a click outside close the card; it never takes focus.
 				OnClickOutside(closeNow).
-				Enter(Fade().Slide(0, -4), Animation{Duration: 120 * time.Millisecond}).
-				Exit(Fade(), Animation{Duration: 80 * time.Millisecond}).
+				Enter(Fade().Slide(0, -4), Animation{Duration: ctx.Theme().Motion.enter(120 * time.Millisecond)}).
+				Exit(Fade(), Animation{Duration: ctx.Theme().Motion.exit(80 * time.Millisecond)}).
 				Child(content()))
 		}
 		return d

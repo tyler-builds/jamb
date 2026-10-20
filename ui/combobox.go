@@ -771,8 +771,8 @@ func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], 
 		name = strs.Suggestions
 	}
 	panel := Div().asPart("Combobox.Popup").Key("jamb.listbox").Column().Style(st.Popup).
-		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: 140 * time.Millisecond}).
-		Exit(Fade().Grow(0.98), Animation{Duration: 90 * time.Millisecond}).
+		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: t.Motion.enter(140 * time.Millisecond)}).
+		Exit(Fade().Grow(0.98), Animation{Duration: t.Motion.exit(90 * time.Millisecond)}).
 		Overlay(BelowStart).OverlayGap(4).
 		Role(access.RoleList).SelectionContainer().Label(name).
 		MaxHeight(Px(maxH)).ScrollY().

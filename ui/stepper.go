@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
@@ -97,7 +96,7 @@ func stepperDefaults(t *Theme, vertical bool) StepperStyle {
 		// A horizontal step can shrink, down to its indicator, so the stepper fits its
 		// width; its title and description then end with an ellipsis.
 		Step: Style{Direction: Row, Align: Center, Gap: 10, Padding: XY(6, 4), Radius: t.Radius / 2,
-			MinWidth: Px(0), Transition: 110 * time.Millisecond},
+			MinWidth: Px(0), Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		StepHover:        Style{Background: t.SurfaceHover},
 		StepFocusVisible: Style{Shadows: []Shadow{ring}},
 		Indicator: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(28), Height: Px(28),

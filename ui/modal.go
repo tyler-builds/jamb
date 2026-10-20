@@ -249,8 +249,8 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		// The panel and the backdrop take focus by click, so a click on either
 		// does not leave the modal without focus. Neither is in the Tab order.
 		Focusable().TabStop(false).
-		Enter(enter, Animation{Duration: 140 * time.Millisecond}).
-		Exit(exit, Animation{Duration: 90 * time.Millisecond}).
+		Enter(enter, Animation{Duration: ctx.Theme().Motion.enter(140 * time.Millisecond)}).
+		Exit(exit, Animation{Duration: ctx.Theme().Motion.exit(90 * time.Millisecond)}).
 		// A press on the panel is not a press on the backdrop behind it.
 		OnMouseDown(func(e *MouseEvent) { e.StopPropagation() }).
 		// The overlay's dismiss handler: Escape closes the topmost overlay with
@@ -283,8 +283,8 @@ func (m *ModalElement) expand(ctx *Context) Element {
 	// window less the margin.
 	backdrop := Div().asPart(part+".Scrim").Absolute().Inset(0).Style(st.Scrim).Padding(margin).
 		Focusable().TabStop(false).
-		Enter(Fade(), Animation{Duration: 140 * time.Millisecond}).
-		Exit(Fade(), Animation{Duration: 90 * time.Millisecond}).
+		Enter(Fade(), Animation{Duration: ctx.Theme().Motion.enter(140 * time.Millisecond)}).
+		Exit(Fade(), Animation{Duration: ctx.Theme().Motion.exit(90 * time.Millisecond)}).
 		OnMouseDown(func(e *MouseEvent) {
 			if m.backdrop && e.Button == input.ButtonLeft {
 				closeFn()

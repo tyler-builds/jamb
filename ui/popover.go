@@ -161,8 +161,8 @@ func (p *PopoverElement) expand(ctx *Context) Element {
 					}
 				}).
 				OnClickOutside(closeFn).
-				Enter(Fade().Slide(0, -4), Animation{Duration: 120 * time.Millisecond}).
-				Exit(Fade(), Animation{Duration: 80 * time.Millisecond}).
+				Enter(Fade().Slide(0, -4), Animation{Duration: ctx.Theme().Motion.enter(120 * time.Millisecond)}).
+				Exit(Fade(), Animation{Duration: ctx.Theme().Motion.exit(80 * time.Millisecond)}).
 				Child(content())
 			d.Child(panel)
 		}
