@@ -368,6 +368,11 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 // in view. A column header stays at the top of the rows as they scroll, and the
 // header scrolls with the rows when the columns are wider than the grid.
 //
+// The columns are shown in the order of ColumnOrder, and assistive technology numbers
+// them in that order. The order and the widths the user sets can be kept in signals
+// (ColumnOrder and ColumnWidths), and OnColumnsChange reports each change the user
+// makes to them, so that an app can save and restore them.
+//
 // Sorting orders the rows without changing their keys, and the focus and the
 // selection follow their rows by key, so a sort, a scroll, new rows or a saved
 // edit keep them. Sorting is stable, and it runs on the UI thread: a sort of 100,000
@@ -395,6 +400,9 @@ type DataGridElement[T any] struct {
 	styles      DataGridStyle
 	focusHandle *FocusHandle // see FocusHandle
 	size        sizing       // see the sizing methods
+	order       *Signal[[]string]
+	widths      *Signal[map[string]float32]
+	onColumns   func(ColumnState)
 }
 
 // The sizing methods give the grid's outer box a size, over its Style. See Sizing
@@ -504,22 +512,91 @@ func (g *DataGridElement[T]) Styles(st DataGridStyle) *DataGridElement[T] {
 	return g
 }
 
+// ColumnState is the layout of the columns of a DataGrid that the user can change:
+// the keys of the columns in the order they are shown, and the widths the user has
+// set, by key, in logical pixels at the Text size setting 100 percent. Save it to
+// restore the columns with ColumnOrder and ColumnWidths.
+type ColumnState struct {
+	// Order is the keys of the columns, in the order they are shown.
+	Order []string
+	// Widths is the width of each column the user has resized, by key.
+	Widths map[string]float32
+}
+
+// ColumnOrder keeps the order of the columns in keys: the grid sets it when the
+// user moves a column, and a value set in keys shows the columns in that order.
+// A key that is not a column's is dropped, and the columns that keys does not name
+// follow in the order they are given, so a saved order survives new columns. A nil
+// keys keeps the order inside the grid.
+func (g *DataGridElement[T]) ColumnOrder(keys *Signal[[]string]) *DataGridElement[T] {
+	g.order = keys
+	return g
+}
+
+// ColumnWidths keeps the widths the user sets in ws, by column key, in logical
+// pixels at the Text size setting 100 percent: the grid sets it when the user
+// resizes a column, and a value set in ws sizes the columns it names. A nil ws
+// keeps the widths inside the grid.
+func (g *DataGridElement[T]) ColumnWidths(ws *Signal[map[string]float32]) *DataGridElement[T] {
+	g.widths = ws
+	return g
+}
+
+// OnColumnsChange runs fn with the layout of the columns after the user changes it:
+// when a drag of a column's edge ends, at each step of a resize by the keyboard,
+// after an auto-fit, and after a column is moved. It does not run while the edge is
+// dragged, so fn can save the layout.
+func (g *DataGridElement[T]) OnColumnsChange(fn func(ColumnState)) *DataGridElement[T] {
+	g.onColumns = fn
+	return g
+}
+
+// viewCols returns the columns in the order they are shown: the order of the keys
+// in order, and then the columns it does not name, in the order they are given.
+func (g *DataGridElement[T]) viewCols(order []string) []DataColumn[T] {
+	if len(order) == 0 {
+		return g.cols
+	}
+	at := make(map[string]int, len(g.cols))
+	for i, c := range g.cols {
+		at[c.key()] = i
+	}
+	used := make([]bool, len(g.cols))
+	out := make([]DataColumn[T], 0, len(g.cols))
+	for _, k := range order {
+		if i, ok := at[k]; ok && !used[i] {
+			used[i] = true
+			out = append(out, g.cols[i])
+		}
+	}
+	for i, c := range g.cols {
+		if !used[i] {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 // dgCursor is the focused cell: the key of its row (empty on the header), the
-// position of that row when the key is gone, and the column.
+// position of that row when the key is gone, and the column, by key and by the
+// position it had, for when the key is gone.
 type dgCursor struct {
 	key    string
 	pos    int
 	col    int
+	colKey string
 	header bool
 }
 
 // dgEdit is the edit of a cell: the key of its row ("" when no cell is being
-// edited), its column, and the error of the last save, which keeps the editor open.
+// edited), its column (by key, and by position for when the key is gone), and the
+// error of the last save, which keeps the editor open.
 type dgEdit struct {
-	key string
-	col int
-	err string
-	seq int // the number of the edit, so that a blur from an older editor is ignored
+	key    string
+	col    int
+	colKey string
+	err    string
+	seq    int // the number of the edit, so that a blur from an older editor is ignored
 }
 
 // dgOps are the actions that the cells of a grid call. pick moves the cursor to a
@@ -594,6 +671,7 @@ type dgShared[T any] struct {
 	dragging     bool
 	dragKey      string
 	dragX, dragW float32
+	dragFrom     float32 // the width at the press, at the Text size setting 100 percent
 
 	// A column the cursor moved to is scrolled into view at the next paint, from
 	// revealX0 to revealX1 in the content.
@@ -709,7 +787,14 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	anchor := Local(ctx, "anchor", "")
 	focused := Local(ctx, "focused", false)
 	edit := Local(ctx, "edit", dgEdit{})
-	widths := Local(ctx, "widths", map[string]float32(nil))
+	widths := g.widths
+	if widths == nil {
+		widths = Local(ctx, "widths", map[string]float32(nil))
+	}
+	colOrder := g.order
+	if colOrder == nil {
+		colOrder = Local(ctx, "order", []string(nil))
+	}
 	handle := Local(ctx, "handle", NewListHandle()).Peek()
 	sel := g.sel
 	if sel == nil {
@@ -720,8 +805,22 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		by = Local(ctx, "sort", SortState{})
 	}
 
-	rows, cols, n := g.rows, g.cols, len(g.rows)
+	// The columns are in the order they are shown, so that a column's index is its
+	// place on the screen and its column for assistive technology.
+	rows, cols, n := g.rows, g.viewCols(colOrder.Get()), len(g.rows)
 	nc := len(cols)
+	colPos := make(map[string]int, nc)
+	for i, cl := range cols {
+		colPos[cl.key()] = i
+	}
+	// colOf is the index of the column with key, or of the one at i when the key is
+	// gone, so that the cursor and an edit follow their column when it moves.
+	colOf := func(key string, i int) int {
+		if c, ok := colPos[key]; ok && key != "" {
+			return c
+		}
+		return min(max(i, 0), max(nc-1, 0))
+	}
 	sortState := by.Get()
 	sh.update(rows, g.key, cols, sortState)
 	sh.data = rows
@@ -748,10 +847,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	if q, ok := sh.pos[cursor.key]; ok && cursor.key != "" {
 		p = q
 	}
-	col := min(max(cursor.col, 0), max(nc-1, 0))
+	col := colOf(cursor.colKey, cursor.col)
 	onHeader := cursor.header
 	hasFocus := focused.Get()
 	ed := edit.Get()
+	ed.col = colOf(ed.colKey, ed.col)
 	anchorPos := func() int {
 		if k := anchor.Peek(); k != "" {
 			if q, ok := sh.pos[k]; ok {
@@ -777,16 +877,17 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 	}
 
-	// setWidth sets column i to v pixels wide at the Text size in use. The width is
-	// kept at the size of 100 percent, so that it scales with the text.
-	setWidth := func(i int, v float32) {
+	// setWidth sets column i to v pixels wide at the Text size in use, and reports
+	// whether the width changed. The width is kept at the size of 100 percent, so that
+	// it scales with the text.
+	setWidth := func(i int, v float32) bool {
 		cl := cols[i]
 		u := max(v/rt.textFactor, cl.minWidth())
 		if cl.MaxWidth > 0 {
 			u = min(u, cl.MaxWidth)
 		}
 		if u == cl.width(ws) {
-			return
+			return false
 		}
 		next := make(map[string]float32, nc)
 		for k, x := range ws {
@@ -794,6 +895,20 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		next[cl.key()] = u
 		widths.Set(next)
+		return true
+	}
+	// columnsChanged tells OnColumnsChange the layout of the columns, after a change
+	// that the user has made.
+	columnsChanged := func() {
+		if g.onColumns == nil {
+			return
+		}
+		vc := g.viewCols(colOrder.Peek())
+		keys := make([]string, len(vc))
+		for i, cl := range vc {
+			keys[i] = cl.key()
+		}
+		g.onColumns(ColumnState{Order: keys, Widths: widths.Peek()})
 	}
 	// sortBy turns the sort by column i through ascending, descending and none.
 	sortBy := func(i int) {
@@ -852,7 +967,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if !header && q >= 0 && q < n {
 			k = keyAt(q)
 		}
-		cur.Set(dgCursor{key: k, pos: q, col: cl, header: header})
+		ck := ""
+		if cl >= 0 && cl < nc {
+			ck = cols[cl].key()
+		}
+		cur.Set(dgCursor{key: k, pos: q, col: cl, colKey: ck, header: header})
 		if nc > 0 {
 			sh.reveal = true
 			sh.revealX0, sh.revealX1 = xs[cl], xs[cl+1]
@@ -899,7 +1018,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	startEdit := func(q, cl int, text string) {
 		sh.draft.Set(text)
 		sh.seq++
-		edit.Set(dgEdit{key: keyAt(q), col: cl, seq: sh.seq})
+		edit.Set(dgEdit{key: keyAt(q), col: cl, colKey: cols[cl].key(), seq: sh.seq})
 		if cols[cl].Editor != nil {
 			sh.wantFocus = true
 			rt.requestFrame()
@@ -931,8 +1050,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			edit.Set(dgEdit{})
 			return false
 		}
-		if err := cols[e.col].Edit(sh.data[sh.order[q]], text); err != nil {
-			edit.Set(dgEdit{key: e.key, col: e.col, err: err.Error(), seq: e.seq})
+		c := colOf(e.colKey, e.col)
+		if err := cols[c].Edit(sh.data[sh.order[q]], text); err != nil {
+			edit.Set(dgEdit{key: e.key, col: c, colKey: e.colKey, err: err.Error(), seq: e.seq})
 			Announce(err.Error(), access.Assertive)
 			return false
 		}
@@ -954,7 +1074,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	// refocusEditor gives focus back to the editor of the edit that is open.
 	refocusEditor := func() {
-		if cols[edit.Peek().col].Editor != nil {
+		if e := edit.Peek(); cols[colOf(e.colKey, e.col)].Editor != nil {
 			sh.wantFocus = true
 			rt.requestFrame()
 		} else {
@@ -982,7 +1102,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			return
 		}
 		if q, ok := sh.pos[e.key]; ok {
-			for c := e.col + dir; c >= 0 && c < nc; c += dir {
+			for c := colOf(e.colKey, e.col) + dir; c >= 0 && c < nc; c += dir {
 				if cols[c].Edit != nil {
 					place(q, c, false)
 					editAt(q, c)
@@ -1055,7 +1175,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	// keys before the next frame must move two cells, so the handlers read the signal.
 	cursorNow := func() (p, col int, onHeader bool) {
 		c := cur.Peek()
-		return min(max(c.pos, 0), max(n-1, 0)), min(max(c.col, 0), max(nc-1, 0)), c.header
+		return min(max(c.pos, 0), max(n-1, 0)), colOf(c.colKey, c.col), c.header
 	}
 	cellKeys := func(e *KeyEvent) bool {
 		switch e.Key {
@@ -1148,8 +1268,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				dir = -1
 			}
 			if onHeader && ctrl {
-				if nc > 0 && cols[col].Resizable {
-					setWidth(col, cw[col]+8*float32(dir))
+				if nc > 0 && cols[col].Resizable && setWidth(col, cw[col]+8*float32(dir)) {
+					columnsChanged()
 				}
 				return true
 			}
@@ -1308,9 +1428,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		// A custom editor takes focus when it is painted, on its first control; until
 		// then the focus is not inside the cell, so the blur check below waits. When
 		// focus has left the editing cell, the edit is saved, as a text field's is.
-		if e := edit.Peek(); e.key != "" && cols[e.col].Editor != nil {
+		if e := edit.Peek(); e.key != "" && cols[colOf(e.colKey, e.col)].Editor != nil {
 			if q, ok := sh.pos[e.key]; ok {
-				if cell := dgCellNode(nd, q+1, e.col+1); cell != nil {
+				if cell := dgCellNode(nd, q+1, colOf(e.colKey, e.col)+1); cell != nil {
 					switch {
 					case sh.wantFocus:
 						sh.wantFocus = false
@@ -1344,7 +1464,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		rt.animating = true
 	}
 	list.header = g.headerRow(st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
-		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) }, strs)
+		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) }, columnsChanged,
+		func(cl DataColumn[T]) float32 { return cl.width(widths.Peek()) }, strs)
 
 	root := g.size.apply(Div().Column().Style(g.style)).Child(list)
 	if n == 0 {
@@ -1566,7 +1687,8 @@ func dgControls(n *node, out []*node) []*node {
 // list keeps it at the top of its viewport, and it scrolls with the columns.
 func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows []T, cols []DataColumn[T], cw []float32,
 	width float32, sorted SortState, sortCol, col int, onHeader, hasFocus, highContrast bool,
-	sortBy func(i int), setWidth func(i int, v float32), fit func(i int) float32, strs *Strings) *DivElement {
+	sortBy func(i int), setWidth func(i int, v float32) bool, fit func(i int) float32, changed func(),
+	widthOf func(cl DataColumn[T]) float32, strs *Strings) *DivElement {
 	h := Div().asPart("DataGrid.Header").Style(st.Header).Absolute().Top(0).Left(0).Width(Px(width))
 	for c, cl := range cols {
 		sortable := cl.Compare != nil
@@ -1614,12 +1736,13 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 			hc.OnClick(func() { sortBy(ci) })
 		}
 		if cl.Resizable {
-			ci, key := c, cl.key()
+			ci, key, cl := c, cl.key(), cl
 			hc.Child(Div().asPart("DataGrid.ResizeHandle").Style(st.ResizeHandle).Absolute().Top(0).Bottom(0).Right(0).
 				CapturePointer().
 				OnMouseDown(func(e *MouseEvent) {
 					if e.Button == input.ButtonLeft {
 						sh.dragging, sh.dragKey, sh.dragX, sh.dragW = true, key, e.X, cw[ci]
+						sh.dragFrom = widthOf(cl)
 						e.StopPropagation()
 					}
 				}).
@@ -1628,8 +1751,19 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 						setWidth(ci, sh.dragW+e.X-sh.dragX)
 					}
 				}).
-				OnMouseUp(func(*MouseEvent) { sh.dragging = false }).
-				OnDoubleClick(func() { setWidth(ci, fit(ci)) }))
+				// The end of the drag is the change the layout of the columns reports, not
+				// each move of it.
+				OnMouseUp(func(*MouseEvent) {
+					if sh.dragging && sh.dragKey == key && widthOf(cl) != sh.dragFrom {
+						changed()
+					}
+					sh.dragging = false
+				}).
+				OnDoubleClick(func() {
+					if setWidth(ci, fit(ci)) {
+						changed()
+					}
+				}))
 		}
 		h.Child(hc)
 	}
