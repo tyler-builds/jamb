@@ -23,6 +23,8 @@ type EditorElement struct {
 	tabSize     int
 	comment     string
 	wrap        wrapSettings
+	hoverP      HoverProvider
+	hoverDelay  time.Duration
 	size        sizes // see Size
 	styles      Style
 	hl          Highlighter
@@ -35,7 +37,7 @@ type EditorElement struct {
 // lines do not wrap, and the editor is writable with no comment prefix.
 func Editor(doc *Document) *EditorElement {
 	return &EditorElement{doc: doc, lineNumbers: true, tabSize: 4,
-		wrap: wrapSettings{col: defaultWrapColumn, indent: IndentSame}}
+		wrap: wrapSettings{col: defaultWrapColumn, indent: IndentSame}, hoverDelay: defaultHoverDelay}
 }
 
 // Key gives the editor a stable identity among its siblings, so its state (the scroll
@@ -135,7 +137,10 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 		// The session is closed when the editor's component is removed. Registered once per
 		// view state, which lives as long as the component does.
 		vs.closeOnDispose = true
-		ctx.OnDispose(vs.closeSession)
+		ctx.OnDispose(func() {
+			vs.closeSession()
+			vs.stopRequests()
+		})
 	}
 	e.view = vs
 	if vs.doc != e.doc {
@@ -157,6 +162,7 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	}
 	vs.tab = e.tabSize
 	vs.wrap = e.wrap
+	vs.hoverP, vs.hoverDelay = e.hoverP, e.hoverDelay
 	vs.doc.SetTabSize(e.tabSize)
 	t := ctx.Theme()
 	st := e.styles.resolve(ctx)
@@ -184,14 +190,19 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	if vs.bar != barNone {
 		root.Child(vs.findBar(ctx, st, e.readOnly))
 	}
-	root.Child(canvas)
+	// The canvas sits in a box of its own, which the popups hang from at the text they are about.
+	area := ui.Div().Size(ui.Full, ui.Full).Grow(1).Child(canvas)
+	if vs.hover.open {
+		area.Child(vs.hoverPopup(st))
+	}
+	root.Child(area)
 	return root
 }
 
 // wire attaches the pointer, keyboard, text and focus handling to the canvas of the editor.
 func (e *EditorElement) wire(canvas *ui.DivElement, vs *viewState) {
 	canvas.OnFocus(func() { vs.focused = true; vs.restart = true; vs.touch() })
-	canvas.OnBlur(func() { vs.focused = false; vs.dragging = false; vs.touch() })
+	canvas.OnBlur(func() { vs.focused = false; vs.dragging = false; vs.closePopups(); vs.touch() })
 	canvas.OnMouseDown(func(ev *ui.MouseEvent) { vs.mouseDown(ev) })
 	canvas.OnMouseMove(func(ev *ui.MouseEvent) { vs.mouseMove(ev) })
 	canvas.OnMouseUp(func(*ui.MouseEvent) { vs.dragging = false })
@@ -268,6 +279,11 @@ type viewState struct {
 	wc       wrapCache
 	upstream bool
 	upVer    uint64
+
+	// The hooks of a language server: the hover's provider and delay, and the hover popup.
+	hoverP     HoverProvider
+	hoverDelay time.Duration
+	hover      hoverState
 
 	// activity is the time of the latest edit, move or click, from which the caret blinks. restart
 	// asks the next paint to set it to that paint's time (see Painter.Now).
@@ -371,7 +387,9 @@ func (vs *viewState) attachDoc(doc *Document) {
 		}),
 		doc.OnEdit(func(c Change) { vs.wc.edit(doc, c) }),
 		doc.onRedraw(vs.touch),
+		doc.OnEdit(func(Change) { vs.closePopups() }),
 	}
+	vs.stopRequests()
 	vs.wc = wrapCache{}
 	vs.dragging = false
 	vs.vpSet = false
@@ -490,9 +508,11 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 	vs.touch()
 }
 
-// mouseMove extends the primary selection while the button is held.
+// mouseMove extends the primary selection while the button is held, and otherwise schedules
+// the hover at the text under the pointer.
 func (vs *viewState) mouseMove(ev *ui.MouseEvent) {
 	if !vs.dragging {
+		vs.pointerRest(ev)
 		return
 	}
 	if _, p, up, ok := vs.hitAt(ev.LocalX, ev.LocalY); ok && (p != vs.doc.Primary().Head || up != vs.upstreamNow()) {

@@ -47,8 +47,8 @@ rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+d", ui.Unbind(codeedit.CmdAddNextOc
 `Editor` returns an element. Its options chain: `Key`, `Label`, `LineNumbers`, `ReadOnly`,
 `TabSize` (4 by default), `CommentPrefix`, `Size`, the sizing methods (`Width`, `Height`,
 `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow` and `GridSpan`, as on the `ui` widgets;
-Full by 300 pixels by default), `Styles`, `Language`, `Highlighter`, and `SoftWrap`, `WrapColumn`
-and `WrappingIndent` (see Soft wrap).
+Full by 300 pixels by default), `Styles`, `Language`, `Highlighter`, `SoftWrap`, `WrapColumn`
+and `WrappingIndent` (see Soft wrap), and `Hover` and `HoverDelay` (see Language server hooks).
 
 ## Document
 
@@ -111,7 +111,8 @@ value, so an app can rebind it with `ui.BindIn("CodeEditor", keys, action)` or t
 | Ctrl+F, Ctrl+H | Find, and find and replace. |
 | F3, Shift+F3 | Next and previous match. |
 | Ctrl+G | Go to line. |
-| F8, Shift+F8 | Select the next or the previous diagnostic, and announce it. |
+| F8, Shift+F8 | Select the next or the previous diagnostic, open its hover, and announce it. |
+| Ctrl+K Ctrl+I | Open the hover at the caret, and announce it. |
 
 The punctuation keys name their physical position as the US layout prints it: `ctrl+/` is the
 slash key, and `ctrl+shift+[` is the key that prints `[` on a US keyboard (Shift makes it `{`,
@@ -208,13 +209,42 @@ column of markers, one on each row where a diagnostic starts, for the most serio
 filled circle for an error, a triangle for a warning, an "i" for information and a dot for a hint,
 so that the severity does not rest on color. The column stays while the set is empty, so that the
 text does not shift as diagnostics come and go. F8 and Shift+F8 select the next or the previous
-diagnostic, wrapping around the text, scroll to it, and announce it politely, such as "Error on
+diagnostic, wrapping around the text, scroll to it, open the hover there, and announce it politely, such as "Error on
 line 3: undefined: x" (`ui.Strings.CodeEditorDiagnostic` and the names of the severities,
 `CodeEditorError`, `CodeEditorWarning`, `CodeEditorInfo` and `CodeEditorHint`).
 
 The Document is not safe for concurrent use: an app that gets diagnostics on another goroutine sets
 them on the UI thread, with `ui.Context.Post`. `UTF16Pos` and `OffsetUTF16` convert between byte
 offsets and the positions of the Language Server Protocol, whose columns count UTF-16 code units.
+
+## Language server hooks
+
+The editor asks an app's providers about the text, as a language server answers an editor. Each
+provider is an interface with a function type that implements it, and runs on a goroutine of its
+own: it gets a `context.Context` and a `Query`, which holds a copy of the text as it was when the
+request started, its `TextVersion` and a byte offset. The answer is applied on the UI thread with a
+frame (through `ui.Context.Post`), and only if it is still wanted: a newer request of the same kind,
+an edit of the text, the loss of focus, another document and the removal of the editor each cancel
+the context, and an answer that arrives after that is dropped. A provider that talks to a language
+server converts the offsets with `UTF16Pos` and `OffsetUTF16`.
+
+### Hover
+
+```go
+codeedit.Editor(doc).Hover(codeedit.HoverFunc(func(ctx context.Context, q codeedit.Query) (codeedit.Hover, error) {
+	return codeedit.Hover{Text: describe(q.Text, q.Offset)}, nil
+}))
+```
+
+When the pointer rests on the text for `HoverDelay` (500 milliseconds by default), or on Ctrl+K
+Ctrl+I at the caret, the editor asks the provider about the offset and opens a popup under the text,
+with the messages of the diagnostics there first, each with its severity and its source. A `Hover`
+has the range it is about (`From`, `To`; empty for the word under the pointer), a `Text`, and an
+optional `Content` that builds an element to show instead of the text, such as rendered Markdown.
+The diagnostics show at once; the provider's answer joins them when it comes. Without a provider
+the popup shows the diagnostics alone. Escape, an edit, the loss of focus, a click outside the popup
+and a move of the pointer off the range close it. A hover opened from the keyboard is announced
+politely. The popup is a tooltip for assistive technology and does not take the focus.
 
 ## Highlighting
 
@@ -328,6 +358,7 @@ The parts are:
 | `Selection` | The selected text. |
 | `Match`, `CurrentMatch` | The find matches. |
 | `Find` | The find and replace bar. |
+| `Popup`, `PopupItem`, `PopupItemSelected` | The panel of the hover and of the completions, one entry of it, and the completion that Enter accepts. |
 | `DiagnosticError`, `DiagnosticWarning`, `DiagnosticInfo`, `DiagnosticHint` | The marks of the diagnostics: the `TextColor` of the underline and of the gutter marker. By default the theme's `Danger`, `Warning`, `Accent` and `TextMuted`. |
 
 Under high contrast the colors are the system colors (the theme's `CodeEditor` colors), whatever is set
