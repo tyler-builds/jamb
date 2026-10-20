@@ -86,6 +86,7 @@ func italianStrings() *Strings {
 
 		NoResults:               "Nessun risultato",
 		NoRows:                  "Nessuna riga",
+		LoadingMore:             "Caricamento di altre righe",
 		NoMatchingCommands:      "Nessun comando corrispondente",
 		CouldNotLoadSuggestions: "Impossibile caricare i suggerimenti",
 		SuggestionCount: func(n int) string {

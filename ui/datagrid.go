@@ -374,7 +374,9 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 // them in that order. The order and the widths the user sets can be kept in signals
 // (ColumnOrder and ColumnWidths), and OnColumnsChange reports each change the user
 // makes to them, so that an app can save and restore them. A DataGridHandle scrolls
-// to a row or a column, and focuses a cell, by their keys.
+// to a row or a column, and focuses a cell, by their keys. LoadMore asks for more
+// rows as the user nears the end of them, and LoadingMore shows a row at the end
+// while they load.
 //
 // Sorting orders the rows without changing their keys, and the focus and the
 // selection follow their rows by key, so a sort, a scroll, new rows or a saved
@@ -409,6 +411,28 @@ type DataGridElement[T any] struct {
 	gridHandle  *DataGridHandle
 	rowMenu     func(row T, column string) []MenuItem
 	headerMenu  func(column string) []MenuItem
+	hasMore     bool
+	loadMore    func()
+	loadingMore bool
+}
+
+// LoadMore asks fn for more rows while hasMore is true: fn runs when the rows near
+// the end come into view, within a viewport of rows of the last one, or when Down,
+// PageDown or Ctrl+End is pressed on the last row. It runs once for each number of
+// rows, so it runs again only after the rows have changed, and it runs after the
+// frame, not while the grid is built. fn adds the rows to the data, with LoadingMore
+// shown while they load.
+func (g *DataGridElement[T]) LoadMore(hasMore bool, fn func()) *DataGridElement[T] {
+	g.hasMore, g.loadMore = hasMore, fn
+	return g
+}
+
+// LoadingMore shows a row at the end of the grid, with a progress ring and "Loading
+// more rows", while on is true, and announces it when it starts. The row is not one
+// of the grid's rows for assistive technology.
+func (g *DataGridElement[T]) LoadingMore(on bool) *DataGridElement[T] {
+	g.loadingMore = on
+	return g
 }
 
 // The sizing methods give the grid's outer box a size, over its Style. See Sizing
@@ -751,6 +775,12 @@ type dgShared[T any] struct {
 	revealX0, revealX1 float32
 	viewH              float32 // the height of the viewport at the last paint
 	warned             bool
+
+	// asked is set once LoadMore has asked for rows, when there were askedN of them;
+	// loadingMore is whether the last build showed the LoadingMore row.
+	asked       bool
+	askedN      int
+	loadingMore bool
 }
 
 // update makes the keys of the rows when the rows have changed, and the order of
@@ -1002,6 +1032,15 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if g.onActivate != nil && n > 0 {
 			g.onActivate(rows[order[q]])
 		}
+	}
+	// askMore asks LoadMore for more rows, once for each number of rows. It runs fn
+	// after the frame, since it is called while the rows are built.
+	askMore := func() {
+		if g.loadMore == nil || !g.hasMore || (sh.asked && sh.askedN == n) {
+			return
+		}
+		sh.asked, sh.askedN = true, n
+		rt.Post(g.loadMore)
 	}
 	selectKeys := func(ks []string) {
 		if g.mode != SelectionNone {
@@ -1384,6 +1423,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			last := e.Key == input.KeyEnd
 			switch {
 			case ctrl && n > 0 && last:
+				if !onHeader && p == n-1 {
+					askMore()
+				}
 				moveRow(n-1, nc-1, ctrl, false)
 			case ctrl && n > 0:
 				moveRow(0, 0, ctrl, false)
@@ -1399,6 +1441,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				moveRow(0, col, ctrl, shift)
 			case p+1 < n:
 				moveRow(p+1, col, ctrl, shift)
+			default:
+				askMore() // Down on the last row asks for more
 			}
 		case input.KeyUp:
 			switch {
@@ -1409,6 +1453,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				moveRow(p-1, col, ctrl, shift)
 			}
 		case input.KeyPageDown:
+			if n > 0 && !onHeader && p == n-1 {
+				askMore()
+			}
 			if n > 0 {
 				moveRow(min(p+step, n-1), col, ctrl, shift)
 			}
@@ -1534,13 +1581,29 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	rc := dgRowCtx[T]{t: t, ctx: ctx, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed,
 		click: click, colAt: colAt, activate: activate, ops: ops}
+	// A row within a viewport of rows of the end asks for more rows when it is built.
+	near := n - max(int(sh.viewH/rowH), 1)
 	list := UniformList(n, func(q int) Element {
 		if sh.builtHi == 0 {
 			sh.builtLo = q
 		}
 		sh.builtHi = q + 1
+		if q >= near {
+			askMore()
+		}
 		return g.row(rc, q)
 	}).Key(g.keyStr).Handle(handle)
+	if g.loadingMore && n > 0 {
+		// The row of LoadingMore follows the rows. Its ring names it, and its text is
+		// for sighted users.
+		list.tail = Div().Style(st.Row).Style(Style{Gap: 8, Padding: Edges{Left: 8}}).
+			Child(ProgressRing().Size(RingSmall).Label(strs.LoadingMore)).
+			Child(Div().AccessHidden().Child(Text(strs.LoadingMore).Truncate()))
+		if !sh.loadingMore {
+			Announce(strs.LoadingMore, access.Polite)
+		}
+	}
+	sh.loadingMore = g.loadingMore && n > 0
 	// The scrollbar is drawn over the grid's right edge, so the rows end before it:
 	// the body keeps dataGridGutter of padding there, and the rows are as wide as
 	// the body less its border and that gutter, or as wide as the columns.
