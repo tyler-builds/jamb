@@ -298,7 +298,7 @@ type Runtime struct {
 	animInsts             []*componentInstance               // Animate instances that were running; re-rendered by the next Frame
 	pausedAnims           map[*componentInstance]struct{}    // running Animate instances the last paint did not draw (see settleAnims)
 	graceAnims            map[*componentInstance]struct{}    // Animate instances the last paint did not draw, given one more render first
-	listStale             bool                               // a UniformList must rebuild its rows before the frame ends
+	listStale             bool                               // a UniformList (or a strip whose extent changed) must rebuild before the frame ends
 	splitWatches          map[*componentInstance]*splitWatch // the splits that size their panes from their length (see splitsResized)
 	toasts                []*toastEntry                      // the stack of toasts, oldest first (see Context.Toast)
 	toastNext             uint64                             // the ID of the last toast made

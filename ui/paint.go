@@ -263,6 +263,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 			n.div.vlist.pin(n, sx)
 		}
 	}
+	if n.div != nil && n.div.extent != nil && !rt.inGhost {
+		rt.reportExtent(n)
+	}
 	for _, c := range n.order {
 		if c.flags&flagNoDisplay != 0 {
 			continue // nothing of an element hidden by Display is drawn, or hit
@@ -403,6 +406,62 @@ func (rt *Runtime) paintImage(n *node, opacity float32) {
 		Radii:   rt.corners(img.style.radii()),
 		Opacity: opacity,
 	})
+}
+
+// extentWatch is set on an element by the widget that drives its scrolling, a tab
+// strip: paint reports to fn the element's horizontal scroll target x, its range maxX
+// (how far its content runs past its width, whether it scrolls or not) and its width
+// w, when one of them changes. fn may set signals: the frame is built and painted
+// again before it ends, so a change it makes is never shown a frame late. scrollBy
+// moves the element's scroll target.
+type extentWatch struct {
+	fn   func(x, maxX, w float32)
+	rt   *Runtime
+	id   uint64 // the element's node, from the last paint
+	last [3]float32
+	seen bool
+}
+
+// reportExtent calls n's extentWatch when n's offset, range or width has changed
+// since the last report.
+func (rt *Runtime) reportExtent(n *node) {
+	w := n.div.extent
+	w.rt, w.id = rt, n.id
+	var x float32
+	if n.st != nil && isScroll(n) {
+		x = n.st.targetX
+	}
+	v := [3]float32{x, max(n.lay.ContentW-n.lay.W, 0), n.lay.W}
+	if w.seen && v == w.last {
+		return
+	}
+	w.seen, w.last = true, v
+	if w.fn != nil {
+		w.fn(v[0], v[1], v[2])
+		rt.listStale = true // what fn changed is built before the frame ends
+	}
+}
+
+// scrollBy moves the scroll target of the watched element by dx, clamped to its
+// range, and reports whether it moved.
+func (w *extentWatch) scrollBy(dx float32) bool {
+	if w.rt == nil {
+		return false
+	}
+	n := w.rt.byID[w.id]
+	if n == nil || n.st == nil || n.style.OverflowX != OverflowScroll {
+		return false
+	}
+	maxX := max(n.lay.ContentW-n.lay.W, 0)
+	x := min(max(n.st.targetX+dx, 0), maxX)
+	if x == n.st.targetX {
+		return false
+	}
+	n.st.targetX = x
+	w.rt.needPaint = true
+	w.rt.scrolled = true
+	w.rt.requestFrame()
+	return true
 }
 
 // scrollStep clamps and animates a scroll container's offset.

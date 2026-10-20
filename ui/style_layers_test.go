@@ -327,7 +327,7 @@ var layerBuilders = []layerBuilder{
 // not drawn at all is listed too.
 var layerNotDrawn = map[string]string{
 	"Dock":            "the drop preview (Dock.Preview) is drawn while a tab is dragged",
-	"Tabs":            "the drop line (Tabs.DropLine) is drawn while a tab of a reorderable list is dragged",
+	"Tabs":            "the drop line (Tabs.DropLine) is drawn while a tab of a reorderable list is dragged; the bar and its buttons while the tabs overflow or have a prefix, a suffix or a menu",
 	"Menu":            "the menu's parts are drawn while it is open",
 	"MenuBar":         "the menu bar's parts are drawn with an open menu",
 	"Popover":         "the popover is drawn while it is open",

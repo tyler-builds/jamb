@@ -42,7 +42,7 @@ type scrollDrag struct {
 // scrollbars returns n's visible scrollbars in logical window coordinates.
 func (rt *Runtime) scrollbars(n *node, dst []scrollbar) []scrollbar {
 	st := n.st
-	if st == nil {
+	if st == nil || n.div != nil && n.div.noScrollbar {
 		return dst
 	}
 	s := &n.style

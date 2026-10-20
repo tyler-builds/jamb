@@ -139,6 +139,13 @@ type Strings struct {
 	Maximum string
 	// MoreOptions is the name of the arrow of a split button, which opens its menu.
 	MoreOptions string
+	// AllTabs is the name of the button of a tab list that opens a menu of all its tabs
+	// (see Tabs.OverflowMenu).
+	AllTabs string
+	// ScrollTabsBack is the name of the button that scrolls a tab list toward its first tab.
+	ScrollTabsBack string
+	// ScrollTabsForward is the name of the button that scrolls a tab list toward its last tab.
+	ScrollTabsForward string
 
 	// The names of a dock's tab strip and of the commands of its tabs' menus.
 	PanelGroup string
@@ -486,6 +493,9 @@ func englishStrings() *Strings {
 		Minimum:             "Minimum",
 		Maximum:             "Maximum",
 		MoreOptions:         "More options",
+		AllTabs:             "All tabs",
+		ScrollTabsBack:      "Scroll tabs back",
+		ScrollTabsForward:   "Scroll tabs forward",
 
 		PanelGroup:      "Panels",
 		MovePanelLeft:   "Move left",

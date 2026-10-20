@@ -101,8 +101,10 @@ type DivElement struct {
 	handle       *FocusHandle
 	overlay      Placement
 	overlayGap   float32
-	revealRow    bool // a combo box's highlighted row: the next paint scrolls it into view (see revealRowsNow)
-	matchAnchor  bool // set by a Select's list: at least as wide as the field it opens from
+	revealRow    bool         // a combo box's highlighted row: the next paint scrolls it into view (see revealRowsNow)
+	extent       *extentWatch // set by Tabs: paint reports the element's scroll offset and range (see extentWatch)
+	noScrollbar  bool         // set by Tabs on its strip, which has scroll buttons in place of a bar
+	matchAnchor  bool         // set by a Select's list: at least as wide as the field it opens from
 	tooltip      string
 	part         string          // the widget part this element draws, see asPart
 	sized        sizeSet         // the sizes a sizing method gave the element, for the inspector (see sizing.apply)

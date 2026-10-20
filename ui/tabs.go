@@ -51,8 +51,12 @@ const (
 // the Styles of the instance. The states are parts of their own: TabSelected
 // applies to the selected tab, TabDisabled to a disabled one, TabHover while
 // the pointer is over an enabled tab that is not selected, and TabFocusVisible
-// while the tab has keyboard focus. See docs/styling.md.
+// while the tab has keyboard focus. Bar is the row that holds the strip with the
+// Prefix, the Suffix, the scroll buttons and the overflow menu's button; it is
+// built only when one of them is shown. ScrollButton and MenuButton are the Root
+// of those buttons. See docs/styling.md.
 type TabsStyle struct {
+	Bar             Style // the row of the prefix, the strip, its buttons and the suffix
 	List            Style // the strip that holds the tabs
 	Tab             Style // each tab
 	TabHover        Style // a tab the pointer is over, if it is enabled and not selected
@@ -62,11 +66,14 @@ type TabsStyle struct {
 	Indicator       Style // the line under a tab in TabsUnderline; only the selected one shows it
 	Panel           Style // the panel of the selected tab
 	DropLine        Style // the line that shows where a dragged tab lands (see Reorderable)
+	ScrollButton    Style // each button that scrolls the strip while the tabs overflow it
+	MenuButton      Style // the button that opens the menu of all the tabs (see OverflowMenu)
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
 func (s TabsStyle) merge(o TabsStyle) TabsStyle {
 	return TabsStyle{
+		Bar:             s.Bar.Merge(o.Bar),
 		List:            s.List.Merge(o.List),
 		Tab:             s.Tab.Merge(o.Tab),
 		TabHover:        s.TabHover.Merge(o.TabHover),
@@ -76,6 +83,8 @@ func (s TabsStyle) merge(o TabsStyle) TabsStyle {
 		Indicator:       s.Indicator.Merge(o.Indicator),
 		Panel:           s.Panel.Merge(o.Panel),
 		DropLine:        s.DropLine.Merge(o.DropLine),
+		ScrollButton:    s.ScrollButton.Merge(o.ScrollButton),
+		MenuButton:      s.MenuButton.Merge(o.MenuButton),
 	}
 }
 
@@ -85,6 +94,7 @@ func (s TabsStyle) plain() TabsStyle {
 	ind := plainStyle(s.Indicator)
 	ind.Height = Auto
 	return TabsStyle{
+		Bar:             plainStyle(s.Bar),
 		List:            plainStyle(s.List),
 		Tab:             plainStyle(s.Tab),
 		TabHover:        plainStyle(s.TabHover),
@@ -94,6 +104,8 @@ func (s TabsStyle) plain() TabsStyle {
 		Indicator:       ind,
 		Panel:           plainStyle(s.Panel),
 		DropLine:        plainStyle(s.DropLine),
+		ScrollButton:    plainStyle(s.ScrollButton),
+		MenuButton:      plainStyle(s.MenuButton),
 	}
 }
 
@@ -102,6 +114,7 @@ func (s TabsStyle) plain() TabsStyle {
 func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 	ring := Shadow{Spread: 2, Color: th.FocusRing}
 	d := TabsStyle{
+		Bar:  Style{Direction: Row, Align: Center, Gap: 4},
 		List: Style{Direction: Row, Gap: 4, BorderEdges: Edges{Bottom: 1}, BorderColor: th.Border},
 		Tab: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(36), Padding: XY(12, 0),
 			NoShrink: true, Radius: th.Radius / 2, TextColor: th.TextMuted, Transition: 110 * time.Millisecond},
@@ -152,6 +165,13 @@ func resolveTabs(ctx *Context, v TabsVariant, inst TabsStyle) TabsStyle {
 //
 // The tabs take the space their parent gives them, as a column does, so the panel
 // can fill a window: a list in a panel grows to the height left under the tabs.
+//
+// When the tabs are wider than the strip, the strip scrolls sideways, as WinUI's
+// TabView does: two buttons after it scroll it back and forward (see
+// ScrollButtons), a vertical wheel over it scrolls it sideways, and the selected
+// tab is scrolled into view whenever the selection changes, with a little of the
+// next tab showing. The buttons are not Tab stops: the keys that move between the
+// tabs move the strip too. Tabs that fit are drawn as they are without overflow.
 type TabsElement[T comparable] struct {
 	selected    *Signal[T]
 	tabs        []Tab[T]
@@ -167,6 +187,11 @@ type TabsElement[T comparable] struct {
 	renderTab   func(Tab[T], PartState) Element
 	size        sizing       // the tab list's sizes, from the sizing methods (see Sizing in docs/styling.md)
 	focusHandle *FocusHandle // see FocusHandle
+	prefix      Element      // see Prefix
+	suffix      Element      // see Suffix
+	menu        bool         // see OverflowMenu
+	noScroll    bool         // see ScrollButtons
+	tabMax      Length       // see TabMaxWidth; Auto for none
 }
 
 // FocusHandle lets code focus the selected tab (the tab Tab reaches) (see NewFocusHandle). A Field that wraps
@@ -268,6 +293,32 @@ func (t *TabsElement[T]) RenderTab(fn func(tab Tab[T], state PartState) Element)
 	return t
 }
 
+// Prefix puts e before the strip, in the same row: outside the tab list, and
+// outside what scrolls when the tabs overflow.
+func (t *TabsElement[T]) Prefix(e Element) *TabsElement[T] { t.prefix = e; return t }
+
+// Suffix puts e after the strip and its buttons, in the same row, such as a
+// button that adds a tab. It does not scroll with the tabs.
+func (t *TabsElement[T]) Suffix(e Element) *TabsElement[T] { t.suffix = e; return t }
+
+// OverflowMenu adds a button after the strip that opens a menu of every tab, in
+// order and with its full label: the selected tab is checked and a disabled one
+// cannot be chosen. Choosing a tab selects it as a click does, then scrolls it
+// into view and focuses it. The button is one Tab stop after the tab list.
+func (t *TabsElement[T]) OverflowMenu() *TabsElement[T] { t.menu = true; return t }
+
+// ScrollButtons sets whether buttons that scroll the strip are shown while the
+// tabs overflow it; they are on by default. They are hidden while the tabs fit,
+// and each is disabled at its end of the strip. Without them the strip still
+// scrolls, with the wheel, the keys and the selection.
+func (t *TabsElement[T]) ScrollButtons(on bool) *TabsElement[T] { t.noScroll = !on; return t }
+
+// TabMaxWidth caps the width of each tab at l. A longer label is cut short with
+// an ellipsis, and its tooltip shows it whole; its accessible name is still the
+// whole label. With RenderTab the cap applies to the tab, and the content is the
+// app's to fit.
+func (t *TabsElement[T]) TabMaxWidth(l Length) *TabsElement[T] { t.tabMax = l; return t }
+
 // scope is the prefix of the keys of this tab list.
 func (t *TabsElement[T]) scope() string {
 	if t.key != "" {
@@ -339,6 +390,41 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			}
 			entering.Set(on)
 		}
+		// ext is what the strip's paint reports (see extentWatch): whether the tabs
+		// overflow it, and whether it can scroll back and forward from where it is.
+		// watch reports the strip, and slot the scroll buttons, whose room the strip
+		// must be able to give back before they are hidden.
+		ext := Local(ctx, "extent", tabsExtent{})
+		watch := Local(ctx, "extentWatch", &extentWatch{}).Peek()
+		slot := Local(ctx, "slotWatch", &extentWatch{}).Peek()
+		buttons := !t.noScroll
+		watch.fn = func(x, maxX, _ float32) {
+			e := ext.Peek()
+			n := tabsExtent{over: maxX > 0.5, back: x > 0.5, forward: x < maxX-0.5}
+			if e.over && buttons && slot.seen {
+				// Shown buttons take room from the strip. They go only once the tabs
+				// fit in that room too, so that the strip does not flicker between the
+				// two at one width.
+				n.over = maxX > slot.last[2]+st.Bar.Gap+0.5
+			}
+			if n != e {
+				ext.Set(n)
+			}
+		}
+		e := ext.Get()
+		over := e.over
+		inBar := t.prefix != nil || t.suffix != nil || t.menu || over && buttons
+		// view is what the strip showed last: whether it was in the bar, and the
+		// selected tab it scrolled to. The bar comes and goes with the scroll buttons
+		// when nothing else is in it, and the strip is built anew then: focus in it
+		// goes back to the selected tab, which is scrolled to again.
+		view := Local(ctx, "view", &tabsView[T]{}).Peek()
+		rebuilt := view.built && view.inBar != inBar
+		if rebuilt && (focus.Focused() || inPopup()) {
+			focus.Focus()
+		}
+		reveal := over && (rebuilt || !view.over || view.shown != cur || view.again)
+		view.built, view.inBar, view.over, view.shown, view.again = true, inBar, over, cur, false
 		// choose selects the tab at index i and moves focus to it. Choosing the
 		// selected tab again is a reselect.
 		choose := func(i int) {
@@ -356,6 +442,20 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			t.choose(opts[i].Value)
 			focus.Focus()
 		}
+		// pick chooses the tab at index i from the overflow menu, scrolls it into view
+		// and focuses it, unless its popup opened and took the focus.
+		pick := func(i int) {
+			choose(i)
+			if i == sel && over {
+				// A reselect does not change the selection, which the next render scrolls to.
+				if n := rt.byID[focus.id]; n != nil {
+					rt.scrollIntoView(n)
+				}
+			}
+			if !isOpen() {
+				focus.Focus()
+			}
+		}
 		// move puts the tab at index from at index to, keeps the order, reports it,
 		// and announces the tab's new position.
 		move := func(from, to int) {
@@ -369,6 +469,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			v := vals[from]
 			vals = slices.Insert(slices.Delete(vals, from, from+1), to, v)
 			order.Set(vals)
+			view.again = true // the moved tab, the selected one, is scrolled into view
 			if t.onReorder != nil {
 				t.onReorder(slices.Clone(vals))
 			}
@@ -400,13 +501,22 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			}
 			tab := Div().asPart("Tabs.Tab").Key(t.tabKey(tb.Value)).Style(style).
 				Role(access.RoleTab).Label(tb.Label).AccessSelected(on)
+			tab.revealRow = on && reveal // the next paint scrolls the strip to it
+			capped := !t.tabMax.IsAuto()
+			if capped {
+				tab.MaxWidth(t.tabMax)
+			}
 			if t.renderTab != nil {
 				tab.Child(Div().AccessHidden().Child(t.renderTab(tb, ps)))
 			} else {
 				if tb.Icon != nil {
 					tab.Child(Icon(tb.Icon).Size(16))
 				}
-				tab.Child(Text(tb.Label).NoWrap())
+				if capped {
+					tab.Child(Text(tb.Label).Truncate()).Tooltip(tb.Label)
+				} else {
+					tab.Child(Text(tb.Label).NoWrap())
+				}
 			}
 			if t.variant == TabsUnderline {
 				// The line is drawn under the selected tab only. The others have a
@@ -521,9 +631,36 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			return tab
 		}
 
-		strip := t.size.apply(Div().asPart("Tabs.List").Role(access.RoleTabList).Style(st.List))
+		// The strip is never wider than the room it has: a segmented strip, as wide
+		// as its tabs, stops there, and the tabs overflow it.
+		strip := Div().asPart("Tabs.List").Role(access.RoleTabList).MaxWidth(Full)
+		if inBar {
+			// In the bar's row the strip takes the room the other parts leave, and can
+			// give it all up, so that the tabs overflow the strip and not the row.
+			strip.MinWidth(Px(0))
+			if t.variant == TabsUnderline {
+				strip.Grow(1)
+			}
+		}
+		strip = t.size.apply(strip.Style(st.List))
 		if t.name != "" {
 			strip.Label(t.name)
+		}
+		strip.extent, strip.noScrollbar = watch, true
+		if over {
+			strip.ScrollX().OnScroll(func(e *ScrollEvent) {
+				// A vertical wheel over the strip scrolls it sideways while it can move
+				// that way; at an end the page under it scrolls on. A wheel over an open
+				// popup, which hangs below the strip, is the popup's.
+				n := rt.byID[watch.id]
+				if e.DeltaX != 0 || e.DeltaY == 0 || n == nil || !n.abs.Contains(rt.mouseX, rt.mouseY) {
+					return
+				}
+				if watch.scrollBy(e.DeltaY) {
+					e.StopPropagation()
+					setPopup(false)
+				}
+			})
 		}
 		for i, tb := range tabs {
 			if t.renderTab == nil {
@@ -554,7 +691,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				// nextEnabled wraps around, as TabView does for these keys.
 				choose(nextEnabled(opts, sel, dir, false))
 			}).
-			Child(strip)
+			Child(t.bar(ctx, st, strip, inBar, e, watch, slot, tabs, sel, pick))
 		if t.keep {
 			group.Children(t.keptPanels(ctx, tabs, sel, panels, st.Panel)...)
 		} else if sel >= 0 && tabs[sel].Panel != nil {
@@ -568,6 +705,70 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		}
 		return group
 	})
+}
+
+// tabsExtent is what the paint of a tab strip reports: whether the tabs overflow
+// it, and whether it can scroll back and forward from where it is.
+type tabsExtent struct {
+	over, back, forward bool
+}
+
+// tabsView is what a tab strip showed at its last render: whether it was in the
+// bar, whether it overflowed, and the selected tab it scrolled to. again asks the
+// next render to scroll to the selected tab even though it is the same.
+type tabsView[T comparable] struct {
+	built, inBar, over, again bool
+	shown                     T
+}
+
+// bar returns what the tab list's group holds above the panel: the strip alone, or,
+// when inBar is set, the bar's row of the prefix, the strip, the scroll buttons,
+// the overflow menu's button and the suffix. The scroll buttons stay in the bar
+// while the tabs fit, hidden by Display, so that nothing after them is built anew
+// when they appear.
+func (t *TabsElement[T]) bar(ctx *Context, st TabsStyle, strip *DivElement, inBar bool, e tabsExtent,
+	watch, slot *extentWatch, tabs []Tab[T], sel int, pick func(int)) Element {
+	if !inBar {
+		return strip
+	}
+	strs := ctx.Strings()
+	bar := Div().asPart("Tabs.Bar").Key(t.scope() + "/bar").Style(st.Bar)
+	if t.prefix != nil {
+		bar.Child(t.prefix)
+	}
+	bar.Child(strip)
+	if !t.noScroll {
+		// Each button scrolls the strip by most of its width, so that a tab cut at
+		// one edge is shown whole at the other. They take no focus, so Tab does not
+		// reach them and a press on them leaves the focus where it is.
+		step := func(dir float32) func() {
+			return func() { watch.scrollBy(dir * 0.75 * watch.last[2]) }
+		}
+		back := IconButton(icons.ChevronLeft).Small().Label(strs.ScrollTabsBack).Key("back").
+			Disabled(!e.back).Style(st.ScrollButton).OnClick(step(-1))
+		fwd := IconButton(icons.ChevronRight).Small().Label(strs.ScrollTabsForward).Key("forward").
+			Disabled(!e.forward).Style(st.ScrollButton).OnClick(step(1))
+		back.noFocus, fwd.noFocus = true, true
+		buttons := Div().Key(t.scope() + "/scroll").Row().Align(Center).Gap(2).KeepFocus().
+			Display(e.over).Child(back).Child(fwd)
+		buttons.extent = slot
+		bar.Child(buttons)
+	}
+	if t.menu {
+		trigger := IconButton(icons.MoreHorizontal).Small().Label(strs.AllTabs).Key("all").Style(st.MenuButton)
+		bar.Child(DropdownMenu(trigger, func() []MenuItem {
+			items := make([]MenuItem, len(tabs))
+			for i, tb := range tabs {
+				items[i] = MenuItem{Label: tb.Label, Icon: tb.Icon, Disabled: tb.Disabled,
+					Check: MenuCheckRadio, Checked: i == sel, OnClick: func() { pick(i) }}
+			}
+			return items
+		}).Key(t.scope() + "/menu"))
+	}
+	if t.suffix != nil {
+		bar.Child(t.suffix)
+	}
+	return bar
 }
 
 // tabDrag is the payload of a dragged tab: the value of the tab, and the scope

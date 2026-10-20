@@ -63,6 +63,7 @@ func italianStrings() *Strings {
 		Minimum:                   "Minimo",
 		Maximum:                   "Massimo",
 		MoreOptions:               "Altre opzioni",
+		AllTabs:                   "Tutte le schede",
 
 		PanelGroup:      "Pannelli",
 		MovePanelLeft:   "Sposta a sinistra",

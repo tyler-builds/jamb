@@ -202,6 +202,7 @@ type ButtonElement struct {
 	toggle   bool   // a toggle button, see AccessChecked
 	checked  bool
 	inert    bool         // set by DropdownMenu: the wrapper is exposed instead (see accessRole)
+	noFocus  bool         // set by Tabs on its scroll buttons, which take no focus, as TabView's do
 	handle   *FocusHandle // see FocusHandle; Modal.Default sets one if there is none
 	size     sizing
 }
@@ -336,7 +337,9 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		d.Hover(st.RootHover).Pressed(st.RootPressed)
 		// Enabled buttons take part in Tab navigation and respond to Enter and
 		// Space. The focus ring is a spread shadow, so it adds no layout shift.
-		d.Focusable()
+		if !b.noFocus {
+			d.Focusable()
+		}
 		if b.handle != nil {
 			d.FocusHandle(b.handle)
 		}
@@ -356,7 +359,7 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 	if b.toggle {
 		a.toggle, a.checked, a.checkedSet = true, b.checked, true
 	}
-	if !b.disabled {
+	if !b.disabled && !b.noFocus {
 		// The focus ring is added to the shadows of the button, so it is drawn
 		// with the button's own shadow. RootFocusVisible can replace it.
 		ring := Shadow{Spread: 2, Color: t.FocusRing}

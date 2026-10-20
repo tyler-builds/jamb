@@ -511,17 +511,23 @@ func scrollContainer(n *node) *node {
 
 // scrollIntoView scrolls the nearest scroll container the least amount that
 // shows n completely. The offset of n is the sum of the layout offsets from n up
-// to the container, which the layout gives relative to each parent.
+// to the container, which the layout gives relative to each parent. A container
+// that scrolls horizontally also moves sideways, and shows a little of what is
+// beside n (see revealRangeX).
 func (rt *Runtime) scrollIntoView(n *node) {
 	c := scrollContainer(n)
 	if c == nil || c.st == nil {
 		return
 	}
-	var top float32
+	var left, top float32
 	for p := n; p != nil && p != c; p = p.parent {
+		left += p.lay.X
 		top += p.lay.Y
 	}
 	revealRange(c, top, top+n.lay.H)
+	if c.style.OverflowX == OverflowScroll {
+		revealRangeX(c, left, left+n.lay.W)
+	}
 	rt.needPaint = true
 	rt.scrolled = true
 }
