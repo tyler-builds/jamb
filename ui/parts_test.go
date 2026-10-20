@@ -115,7 +115,7 @@ func drawnBy(part string) string {
 		return "Split.Divider"
 	case "Dock.TabHover", "Dock.TabSelected", "Dock.TabFocusVisible":
 		return "Dock.Tab"
-	case "Button.RootHover", "Button.RootPressed", "Button.RootDisabled", "Button.RootFocusVisible":
+	case "Button.RootHover", "Button.RootPressed", "Button.RootDisabled", "Button.RootLoading", "Button.RootFocusVisible":
 		return "Button.Root"
 	case "NumberInput.SpinButtonHover", "NumberInput.SpinButtonPressed",
 		"NumberInput.SpinButtonFocusVisible", "NumberInput.SpinButtonDisabled":

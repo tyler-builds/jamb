@@ -66,6 +66,7 @@ ui.Image(src).Size(ui.Px(34), ui.Px(34)).Radius(17).Fit(ui.FitCover)
                                                  // GIF plays while drawn, and stays on its first frame under reduced motion
 ui.Button("Save").Icon(icons.Check).Secondary().Small().OnClick(fn)   // Primary|Secondary|Ghost|Danger; Small|Large
 ui.IconButton(icons.Bell)
+ui.Button("Save").Loading(saving)                // a busy ring; inert, but keeps its focus, Tab stop and width
 ui.TextInput(signal).Placeholder("Search…").Icon(icons.Search).OnSubmit(fn).OnChange(fn)
 ui.TextArea(signal).Placeholder("Start writing…").MinRows(10)    // multi-line editor
   // both: .Borderless() .AutoFocus() .FocusHandle(h) .Style(ui.Style{FontSize: 28})

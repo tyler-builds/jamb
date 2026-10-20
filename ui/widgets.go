@@ -29,13 +29,15 @@ const (
 // the theme's Buttons for that variant, then over the Styles of the instance;
 // see docs/styling.md. The states are parts of their own: RootHover while the
 // pointer is over an enabled button, RootPressed while it is pressed,
-// RootDisabled when it is disabled, and RootFocusVisible while it has keyboard
-// focus (its focus ring is added to the shadows of Root).
+// RootDisabled when it is disabled, RootLoading while it is loading (see
+// ButtonElement.Loading), and RootFocusVisible while it has keyboard focus (its
+// focus ring is added to the shadows of Root).
 type ButtonStyle struct {
 	Root             Style // the button: its size, shape, fill, border, font and text color
 	RootHover        Style // the button while the pointer is over it, if enabled
 	RootPressed      Style // the button while it is pressed
 	RootDisabled     Style // the button when it is disabled
+	RootLoading      Style // the button while it is loading
 	RootFocusVisible Style // the button while it has keyboard focus
 	Label            Style // the text of the label
 	Icon             Style // the icon
@@ -48,6 +50,7 @@ func (s ButtonStyle) merge(o ButtonStyle) ButtonStyle {
 		RootHover:        s.RootHover.Merge(o.RootHover),
 		RootPressed:      s.RootPressed.Merge(o.RootPressed),
 		RootDisabled:     s.RootDisabled.Merge(o.RootDisabled),
+		RootLoading:      s.RootLoading.Merge(o.RootLoading),
 		RootFocusVisible: s.RootFocusVisible.Merge(o.RootFocusVisible),
 		Label:            s.Label.Merge(o.Label),
 		Icon:             s.Icon.Merge(o.Icon),
@@ -61,6 +64,7 @@ func (s ButtonStyle) plain() ButtonStyle {
 		RootHover:        plainStyle(s.RootHover),
 		RootPressed:      plainStyle(s.RootPressed),
 		RootDisabled:     plainStyle(s.RootDisabled),
+		RootLoading:      plainStyle(s.RootLoading),
 		RootFocusVisible: plainStyle(s.RootFocusVisible),
 		Label:            plainStyle(s.Label),
 		Icon:             plainStyle(s.Icon),
@@ -147,6 +151,7 @@ func buttonDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly bool) 
 			Padding: XY(px, 0), Radius: t.Radius, FontSize: fs, FontWeight: FontMedium,
 			Transition: 110 * time.Millisecond, NoShrink: true, fitWidth: true},
 		RootDisabled: Style{Opacity: 0.5},
+		RootLoading:  Style{Opacity: 0.8},
 	}
 	switch v {
 	case ButtonPrimary:
@@ -172,8 +177,10 @@ func buttonDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly bool) 
 		d.RootPressed = Style{Background: t.Danger.Darken(0.1)}
 	}
 	if t.HighContrast {
-		// High contrast draws a disabled button in GrayText, not dimmed.
+		// High contrast draws a disabled button in GrayText, not dimmed, and a loading
+		// one in its own colors: the ring says that it is busy.
 		d.RootDisabled = Style{Background: t.Surface, TextColor: t.Disabled, BorderWidth: 1, BorderColor: t.Disabled}
+		d.RootLoading = Style{}
 	}
 	return d
 }
@@ -194,6 +201,7 @@ type ButtonElement struct {
 	variant  ButtonVariant
 	ctlSize  controlSize // see Small and Large
 	disabled bool
+	loading  bool // see Loading
 	onClick  func()
 	tooltip  string
 	styles   ButtonStyle
@@ -251,6 +259,14 @@ func (b *ButtonElement) Large() *ButtonElement { b.ctlSize = sizeLarge; return b
 
 // Disabled sets whether the button is disabled, so that it cannot be pressed.
 func (b *ButtonElement) Disabled(d bool) *ButtonElement { b.disabled = d; return b }
+
+// Loading shows a busy ring and makes the button inert: clicks, Enter, Space,
+// UIA Invoke and a modal's Default do nothing. It keeps focus, its Tab stop and
+// its width: the ring takes the icon's place, or sits over the label, which is
+// hidden. Assistive technology hears the same name, with the status
+// Strings.Loading; announce the wait if it needs to be heard (see Announce).
+// Disabled(true) wins over Loading.
+func (b *ButtonElement) Loading(on bool) *ButtonElement { b.loading = on; return b }
 
 // The sizing methods give the button's outer box a size. A button is as wide as
 // its label by default, and Width(Full) fills its container (see Sizing in
@@ -330,9 +346,21 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 	iconSize := buttonIconSize(b.ctlSize)
 	st := resolveButton(ctx, b.variant, b.ctlSize, b.label == "", b.styles)
 	d := Div().asPart("Button.Root").Style(st.Root)
+	busy := b.loading && !b.disabled
 	if b.disabled {
 		d.Style(st.RootDisabled).Cursor(CursorNotAllowed)
 		d.hover, d.pressed = nil, nil
+	} else if busy {
+		// A loading button keeps the focus it has and its Tab stop, so that the
+		// focus is not lost while the work it started runs. Its click does nothing:
+		// Enter and Space on it are taken, and do not go on to a modal's Default.
+		d.Style(st.RootLoading).OnClick(func() {}).Cursor(CursorDefault)
+		if !b.noFocus {
+			d.Focusable()
+		}
+		if b.handle != nil {
+			d.FocusHandle(b.handle)
+		}
 	} else {
 		d.Hover(st.RootHover).Pressed(st.RootPressed)
 		// Enabled buttons take part in Tab navigation and respond to Enter and
@@ -347,15 +375,37 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 			d.OnClick(b.onClick)
 		}
 	}
+	var ring Element
+	if busy {
+		ring = loadingRing(iconSize, st.Root.Merge(st.RootLoading).TextColor, t)
+	}
 	if b.icon != nil {
-		d.Child(Div().asPart("Button.Icon").Style(st.Icon).Child(Icon(b.icon).Size(iconSize)))
+		ic := Div().asPart("Button.Icon").Style(st.Icon)
+		if ring != nil {
+			ic.Child(ring) // the ring takes the icon's place, at its size
+		} else {
+			ic.Child(Icon(b.icon).Size(iconSize))
+		}
+		d.Child(ic)
 	}
 	if b.label != "" {
-		d.Child(Div().asPart("Button.Label").Style(st.Label).Child(Text(b.label).NoWrap()))
+		label := Div().asPart("Button.Label").Style(st.Label).Child(Text(b.label).NoWrap())
+		if ring != nil && b.icon == nil {
+			// The label keeps its room, so the button keeps its width, and the ring
+			// is drawn over it.
+			label.Opacity(0)
+			d.Child(label).Child(Div().Absolute().Left(0).Right(0).Top(0).Bottom(0).
+				Row().Align(Center).Justify(Center).Child(ring))
+		} else {
+			d.Child(label)
+		}
 	}
 	d.Tooltip(b.tooltip)
 	a := d.access()
 	a.role, a.name, a.disabled, a.inert = access.RoleButton, b.name, b.disabled, b.inert
+	if busy {
+		a.status = ctx.Strings().Loading
+	}
 	if b.toggle {
 		a.toggle, a.checked, a.checkedSet = true, b.checked, true
 	}
@@ -367,6 +417,19 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		d.FocusVisible(focus)
 	}
 	return b.size.apply(d)
+}
+
+// loadingRing is the busy ring of a loading button, of the icon's size and in the
+// button's text color c (the theme's text color when the button has none), which
+// high contrast keeps, so the ring shows on any fill. It is hidden from assistive
+// technology: the button's status says that it is loading.
+func loadingRing(size float32, c Color, t *Theme) Element {
+	if c.IsZero() {
+		c = t.Text
+	}
+	r := ProgressRing().Size(size)
+	r.color = c
+	return Div().AccessHidden().Child(r)
 }
 
 // Divider is a 1px horizontal rule in the theme's border color.

@@ -102,7 +102,7 @@ var componentSections = []componentSection{
 				sample(t, "Highlight: Background", wordHighlight("Background", ui.Highlight{Background: t.AccentSoft, Color: t.Text})),
 				clickSample(t))
 		}},
-	{"Buttons", "Button Primary Secondary Ghost Danger Small Disabled click press SplitButton split menu arrow",
+	{"Buttons", "Button Primary Secondary Ghost Danger Small Disabled Loading click press SplitButton split menu arrow",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {
 			return section(t, "Buttons",
 				sample(t, "Primary", ui.Button("Primary").Primary().OnClick(pressed("Primary"))),
@@ -111,6 +111,7 @@ var componentSections = []componentSection{
 				sample(t, "Danger", ui.Button("Danger").Danger().OnClick(pressed("Danger"))),
 				sample(t, "Small", ui.Button("Small").Small().OnClick(pressed("Small"))),
 				sample(t, "Disabled", ui.Button("Disabled").Disabled(true)),
+				loadingSample(t),
 				sample(t, "Split button", ui.SplitButton("Save", pressed("Save"), func() []ui.MenuItem {
 					return []ui.MenuItem{
 						{Label: "Save as…", OnClick: pressed("Save as")},
@@ -235,6 +236,19 @@ func pressed(label string) func() {
 // wordHighlight is a word styled by one Highlight.
 func wordHighlight(word string, h ui.Highlight) *ui.TextElement {
 	return ui.Text(word).FontSize(15).Highlight(0, len(word), h)
+}
+
+// loadingSample is a button that loads for two seconds after a press: it shows a
+// busy ring and does nothing, but keeps the focus. Its state is kept in the
+// component, so only this sample re-renders.
+func loadingSample(t *ui.Theme) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		busy := ui.Local(ctx, "busy", false)
+		return sample(t, "Loading", ui.Button("Save").Icon(icons.Check).Secondary().Loading(busy.Get()).OnClick(func() {
+			busy.Set(true)
+			ctx.After(2*time.Second, func() { busy.Set(false) })
+		}))
+	})
 }
 
 // clickSample is a rich text with a hover style and a clickable segment. Its

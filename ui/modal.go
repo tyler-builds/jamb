@@ -365,7 +365,7 @@ func (rt *Runtime) modalDefault() bool {
 		return false
 	}
 	b := m.div.modal.def
-	if b == nil || b.disabled || b.onClick == nil {
+	if b == nil || b.disabled || b.loading || b.onClick == nil {
 		return false
 	}
 	b.onClick()

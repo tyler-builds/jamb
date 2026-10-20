@@ -168,6 +168,7 @@ func testSplitButtonParts(t *testing.T, applied map[string]bool) {
 		set      func(*SplitButtonStyle, Style)
 		drawn    string
 		disabled bool
+		loading  bool
 		text     bool
 		act      func(*testing.T, *accessRig)
 	}
@@ -183,6 +184,7 @@ func testSplitButtonParts(t *testing.T, applied map[string]bool) {
 		{part: "SplitButton.MainPressed", set: func(s *SplitButtonStyle, m Style) { s.MainPressed = m }, drawn: "SplitButton.Main",
 			act: func(t *testing.T, r *accessRig) { pressNode(r, main(t, r)) }},
 		{part: "SplitButton.MainDisabled", set: func(s *SplitButtonStyle, m Style) { s.MainDisabled = m }, drawn: "SplitButton.Main", disabled: true},
+		{part: "SplitButton.MainLoading", set: func(s *SplitButtonStyle, m Style) { s.MainLoading = m }, drawn: "SplitButton.Main", loading: true},
 		{part: "SplitButton.MainFocusVisible", set: func(s *SplitButtonStyle, m Style) { s.MainFocusVisible = m }, drawn: "SplitButton.Main",
 			act: func(t *testing.T, r *accessRig) { focusNode(r, main(t, r)) }},
 		{part: "SplitButton.Arrow", set: func(s *SplitButtonStyle, m Style) { s.Arrow = m }, drawn: "SplitButton.Arrow"},
@@ -191,6 +193,7 @@ func testSplitButtonParts(t *testing.T, applied map[string]bool) {
 		{part: "SplitButton.ArrowPressed", set: func(s *SplitButtonStyle, m Style) { s.ArrowPressed = m }, drawn: "SplitButton.Arrow",
 			act: func(t *testing.T, r *accessRig) { pressNode(r, arrow(t, r)) }},
 		{part: "SplitButton.ArrowDisabled", set: func(s *SplitButtonStyle, m Style) { s.ArrowDisabled = m }, drawn: "SplitButton.Arrow", disabled: true},
+		{part: "SplitButton.ArrowLoading", set: func(s *SplitButtonStyle, m Style) { s.ArrowLoading = m }, drawn: "SplitButton.Arrow", loading: true},
 		{part: "SplitButton.ArrowFocusVisible", set: func(s *SplitButtonStyle, m Style) { s.ArrowFocusVisible = m }, drawn: "SplitButton.Arrow",
 			act: func(t *testing.T, r *accessRig) { focusNode(r, arrow(t, r)) }},
 		{part: "SplitButton.Label", set: func(s *SplitButtonStyle, m Style) { s.Label = m }, drawn: "SplitButton.Label", text: true},
@@ -202,7 +205,13 @@ func testSplitButtonParts(t *testing.T, applied map[string]bool) {
 		t.Run(c.part, func(t *testing.T) {
 			var st SplitButtonStyle
 			c.set(&st, Style{Background: markBG, TextColor: markFG})
-			r := newAccessRig(func(ctx *Context) Element { return partSplitButton(st, c.disabled) })
+			r := newAccessRig(func(ctx *Context) Element {
+				if c.loading {
+					return Div().Column().Align(Start).Child(SplitButton("Save", func() {}, nil).
+						Secondary().Icon(icons.Check).Key("save").Loading(true).Styles(st))
+				}
+				return partSplitButton(st, c.disabled)
+			})
 			if c.act != nil {
 				c.act(t, r)
 			}
