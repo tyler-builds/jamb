@@ -7,6 +7,50 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+The code editor highlights with @pierre/highlights instead of tree-sitter: 76 languages built in,
+without the jamb-grammars module. This changes the highlighting API.
+
+### Changed
+
+- **Breaking:** `codeedit.EditorElement.Language` takes the name of a language, as a code fence
+  names it, such as `"go"`, `"python"` or `"ts"`, instead of a `highlight.Grammar`. Replace
+  `Language(golang.Grammar)` with `Language("go")`. An unknown name shows plain text, with
+  `highlight.ErrUnknownLanguage`.
+- **Breaking:** `highlight.NewSession` takes a language name in place of a `highlight.Grammar`.
+- **Breaking:** `mdcode.Highlight()` takes no grammars, and colors every language the highlighter
+  knows. It lexes a block while the view renders (some microseconds for a block of a few
+  kilobytes), so it no longer runs workers or calls `ready`.
+- The code editor highlights with
+  [@pierre/highlights](https://github.com/pierrecomputer/pierre/tree/main/packages/highlights)
+  0.1.3, the syntax highlighter of the Pierre Computer Company: one WebAssembly module of 0.17 MB,
+  embedded in `codeedit`, with a lexer for each of 76 languages. It runs in wazero as tree-sitter
+  did. Measured on real files against the tree-sitter grammars, it highlights a whole file 50 to
+  100 times faster, relexes after a keystroke in about 12 µs, and its copy of a document takes 2.6
+  to 13 times less memory (see BENCHMARKS.md). An app with all languages is 20 MB smaller than one
+  with the 18 grammars. It lexes rather than parses, so some colors differ from tree-sitter's: in Go,
+  for one, it colors method calls as functions, and can color `pkg.Name` as a property where it is
+  a type.
+- Syntax token names are those of Zed's themes, as jamb's themes already use (`keyword.control`,
+  `function.definition`, `property.json_key` and so on). JSON keys take the theme's `property`
+  style, as in Zed, where tree-sitter named them `string.special.key`. `highlight.Closest` (and the
+  Markdown view) gives CSS's `selector`, `selector.class`, `selector.id` and `selector.pseudo` the
+  styles of `tag`, `property` and `attribute` when a theme does not style them.
+- `highlight.DefaultMaxBytes` is 16 MB (was 5 MB).
+- The session's spans no longer overlap, and leave out the spaces around a token.
+
+### Added
+
+- `highlight.Languages`, `highlight.Supported` and `highlight.CaptureNames` list and check the
+  language names and the token names, and `highlight.Highlight(lang, code)` colors a text that is
+  not edited in one call.
+
+### Removed
+
+- **Breaking:** `highlight.Grammar`, `highlight.NewGrammar` and `highlight.ABI`, and jamb's
+  dependency on `github.com/tyler-builds/jamb-grammars`. The tree-sitter highlighter moves to the
+  `treesitter` package of jamb-grammars, for apps that want colors from a syntax tree; it plugs
+  into the editor with `EditorElement.Highlighter`.
+
 ## [0.3.0] - 2026-10-19
 
 Nineteen widgets, a Markdown view, more of `Tabs` and `TextInput`, a new look for the visual

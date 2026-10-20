@@ -520,6 +520,107 @@ go test ./ui     -bench . -run xxx
 | `ui` full rebuild + layout + paint, 251-node list | 146 µs, 559 allocs |
 | Layout after one leaf changes (50-row list) | only the leaf's 4 ancestors re-arranged (`TestIncrementalLayoutSkipsCleanSubtrees`) |
 
+### Code editor highlighting: tree-sitter and @pierre/highlights (2026-10-19)
+
+Before the code editor's highlighting moved from tree-sitter (the grammars of
+jamb-grammars v0.1.0) to @pierre/highlights 0.1.3, both ran side by side in the same
+wazero runtime on an Intel i5-11600K (6 cores, 32 GB), Windows 11, Go 1.27.1, wazero
+1.12.0. The tree-sitter side called the editor's tree-sitter instance directly (no
+worker); the highlights side made the calls its own TypeScript host makes. Times are
+medians of batched runs, each sample at least 25 ms, since the Windows clock moves in
+steps of about 1 ms. The files are real: the Go standard library and jamb's own
+`ui/*.go` (Go), Pierre's benchmark fixtures (TypeScript, CSS, HTML, JSONC), CPython
+3.14's standard library (Python), regex-automata 0.4.14 (Rust), and zlib.h and
+sqlite3.h (C). TS is tree-sitter and HL is highlights.
+
+| Module | wasm size | cold compile | from disk cache |
+|---|--:|--:|--:|
+| tree-sitter go | 349 KB | 74 ms | 8.1 ms |
+| tree-sitter typescript | 1516 KB | 74 ms | 8.6 ms |
+| tree-sitter css | 282 KB | 116 ms | 8.0 ms |
+| tree-sitter html | 163 KB | 68 ms | 8.3 ms |
+| tree-sitter json | 145 KB | 66 ms | 8.4 ms |
+| tree-sitter python | 583 KB | 73 ms | 8.0 ms |
+| tree-sitter rust | 1224 KB | 75 ms | 8.0 ms |
+| tree-sitter c | 762 KB | 99 ms | 8.7 ms |
+| highlights (all 76 languages) | 171 KB | 87 ms | 7.6 ms |
+
+| Document | Size | Lines | TS open | HL open (live init, whole doc) | TS full | HL full (one-shot) | TS MiB/s | HL MiB/s | TS edit | HL edit | TS opener | HL opener (whole file) | HL opener (visible first) | TS memory | HL memory (live) |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| go small (parser.go) | 73 KB | 2957 | 4.0 ms | 2.6 ms | 47 ms | 741 µs | 1.5 | 96.3 | 1.1 ms | 12 µs | 4.2 ms | 1.8 ms | 63 µs | 6.2 MB | 0.8 MB |
+| go large (runtime/proc.go) | 237 KB | 8177 | 4.3 ms | 5.9 ms | 91 ms | 1.6 ms | 2.5 | 149.1 | 5.1 ms | 12 µs | 7.9 ms | 3.6 ms | 89 µs | 11.1 MB | 1.4 MB |
+| go huge (jamb ui/*.go) | 2758 KB | 78003 | 4.8 ms | 71 ms | 1620 ms | 25 ms | 1.7 | 105.7 | 21 ms | 11 µs | 85 ms | 28 ms | 59 µs | 173.9 MB | 14.0 MB |
+| ts small | 30 KB | 826 | 43 ms | 972 µs | 19 ms | 327 µs | 1.6 | 91.4 | 1.5 ms | 12 µs | 2.3 ms | 282 µs | 123 µs | 5.4 MB | 0.4 MB |
+| ts large | 516 KB | 10826 | 45 ms | 12 ms | 293 ms | 4.8 ms | 1.7 | 105.9 | 2.8 ms | 13 µs | 4.3 ms | 9.2 ms | 133 µs | 23.8 MB | 2.3 MB |
+| css small | 23 KB | 1388 | 1.6 ms | 1.2 ms | 15 ms | 271 µs | 1.6 | 84.6 | 2.7 ms | 11 µs | 3.8 ms | 829 µs | 69 µs | 2.4 MB | 0.4 MB |
+| css large | 379 KB | 17455 | 1.1 ms | 13 ms | 167 ms | 3.3 ms | 2.2 | 112.3 | 16 ms | 12 µs | 26 ms | 10 ms | 75 µs | 15.9 MB | 3.3 MB |
+| html small | 27 KB | 809 | 319 µs | 628 µs | 10 ms | 120 µs | 2.6 | 227.3 | 632 µs | 11 µs | 590 µs | 125 µs | 78 µs | 1.9 MB | 0.4 MB |
+| html large | 473 KB | 11329 | 590 µs | 7.2 ms | 105 ms | 1.3 ms | 4.4 | 350.3 | 1.5 ms | 11 µs | 32 ms | 2.4 ms | 103 µs | 10.1 MB | 2.2 MB |
+| json(c) small | 33 KB | 1105 | 297 µs | 810 µs | 12 ms | 140 µs | 2.6 | 231.8 | 2.9 ms | 12 µs | 4.6 ms | 486 µs | 53 µs | 2.4 MB | 0.4 MB |
+| json(c) large | 283 KB | 8561 | 515 µs | 6.2 ms | 61 ms | 795 µs | 4.6 | 348.7 | 3.2 ms | 11 µs | 4.6 ms | 4.6 ms | 96 µs | 7.9 MB | 2.1 MB |
+| python (typing.py) | 132 KB | 3859 | 12 ms | 3.2 ms | 61 ms | 819 µs | 2.1 | 158.2 | 2.1 ms | 12 µs | 94 ms | 2.3 ms | 97 µs | 7.1 MB | 0.9 MB |
+| python (_pydecimal.py) | 223 KB | 6407 | 12 ms | 4.7 ms | 100 ms | 1.3 ms | 2.2 | 164.3 | 13 ms | 12 µs | 122 ms | 3.4 ms | 95 µs | 10.4 MB | 1.2 MB |
+| rust (onepass.rs) | 130 KB | 3209 | 42 ms | 2.3 ms | 42 ms | 578 µs | 3.1 | 221.2 | 1.5 ms | 11 µs | 13 ms | 1.4 ms | 97 µs | 6.6 MB | 0.9 MB |
+| rust (dense.rs) | 214 KB | 5261 | 43 ms | 3.7 ms | 72 ms | 1.1 ms | 2.9 | 194.3 | 1.6 ms | 11 µs | 6.5 ms | 2.2 ms | 78 µs | 9.8 MB | 1.2 MB |
+| c (zlib.h) | 101 KB | 2058 | 7.2 ms | 1.1 ms | 13 ms | 134 µs | 7.6 | 740.8 | 8.3 ms | 11 µs | 7.9 ms | 12 µs | 14 µs | 2.9 MB | 0.8 MB |
+| c (sqlite3.h) | 674 KB | 14350 | 7.8 ms | 6.7 ms | 58 ms | 827 µs | 11.4 | 796.4 | 29 ms | 12 µs | 30 ms | 13 µs | 15 µs | 6.3 MB | 2.4 MB |
+
+- TS open is a new instance, the text and the highlight query compiled, without a
+  parse; TS full is the parse and the spans of the whole document. HL open includes
+  lexing the whole document, so it compares with TS open plus TS full.
+- Edit types one character in the middle of the file, highlights again and reads the
+  120 visible lines. HL edit is about 11 µs everywhere, because the relex stops at the
+  first line whose lexer state is unchanged.
+- Opener types `/*` (or `"""`, `<!--`) at the start of a code line 10% into the file,
+  which recolors the rest of it, and reads the 120 lines below. "Whole file" lexes to
+  the end of the document before it returns; "visible first" stops after the visible
+  lines and leaves the rest for later, as the session does. TS reparses the whole tree
+  incrementally. In C, `/*` closes at the next `*/`, so the recolor stays short, and in
+  zlib.h the opener landed inside a comment, so that row measures little.
+- Memory is the instance's linear memory: for TS the text, tree and query after a
+  full parse; for HL the text, tokens and line states of the live document.
+
+Color agreement, on the characters that are not spaces, in coarse classes (comment,
+string, keyword, function, type, constant, property and so on; variables and
+punctuation count as plain). It measures how much the colors differ from what
+tree-sitter painted, not which is right. About 9% of the Go differences are method
+calls such as `p.init()`, which jamb's tree-sitter query painted as properties, because
+its general `field_identifier` pattern came after the `function.method` one and the
+later span won; highlights colors them as functions. "After name map" renames the
+tokens that the two name differently for the same thing (JSON keys, CSS selectors).
+
+| Document | Same class (raw names) | Same class (after name map) | Same class among colored chars (mapped) | Largest differences after map (TS → HL) |
+|---|--:|--:|--:|---|
+| go small (parser.go) | 80.6% | 80.6% | 72.0% | property → function 9.1% (e.g. `init`); type → property 4.1% (e.g. `File`); plain → type 2.6% (e.g. `Trace`); plain → function 2.0% (e.g. `len`) |
+| go large (runtime/proc.go) | 89.5% | 89.5% | 87.1% | plain → function 7.2% (e.g. `main_main`); property → function 2.0% (e.g. `Itoa`); type → plain 0.6% (e.g. `m`); plain → type 0.3% (e.g. `Gosched`) |
+| go huge (jamb ui/*.go) | 82.4% | 82.4% | 77.0% | property → function 6.4% (e.g. `access`); plain → function 6.3% (e.g. `panic`); plain → type 2.9% (e.g. `Text`); type → plain 0.8% (e.g. `accessInfo`) |
+| ts small | 98.5% | 98.5% | 97.4% | comment → keyword 0.7% (e.g. `@`); function → property 0.2% (e.g. `getSources`); type → plain 0.2% (e.g. `string`); plain → function 0.1% (e.g. `captureMapping`) |
+| ts large | 99.2% | 99.2% | 98.9% | property → type 0.2% (e.g. `None`); function → plain 0.2% (e.g. `parseTokenNode`); type → property 0.1% (e.g. `Identifier`); plain → function 0.1% (e.g. `parseOptionalToken`) |
+| css small | 69.3% | 82.8% | 79.0% | plain → constant 10.0% (e.g. `-`); type → constant 5.0% (e.g. `16px`); plain → property 1.4% (e.g. `.`); plain → string 0.4% (e.g. `#`) |
+| css large | 62.2% | 81.7% | 76.8% | property → plain 9.5% (e.g. `-`); plain → constant 4.7% (e.g. `system`); type → constant 2.0% (e.g. `180deg`); plain → property 1.6% (e.g. `.`) |
+| html small | 94.4% | 94.4% | 92.0% | plain → string 5.4% (e.g. `"`); constant → tag 0.1% (e.g. `<`); plain → property 0.0% (e.g. `jQuery`); plain → function 0.0% (e.g. `write`) |
+| html large | 93.6% | 93.6% | 89.7% | plain → string 5.1% (e.g. `"`); plain → property 0.9% (e.g. `text`); plain → constant 0.3% (e.g. `none`); plain → comment 0.1% (e.g. `/`) |
+| json(c) small | 64.6% | 100.0% | 100.0% |  |
+| json(c) large | 20.0% | 100.0% | 100.0% |  |
+| python (typing.py) | 90.9% | 90.9% | 88.0% | function → type 3.3% (e.g. `ABCMeta`); property → function 1.5% (e.g. `join`); function → attribute 1.1% (e.g. `@`); plain → keyword 1.0% (e.g. `is`) |
+| python (_pydecimal.py) | 93.0% | 93.0% | 91.1% | property → function 3.3% (e.g. `_fix_nan`); function → type 2.5% (e.g. `DecimalTuple`); plain → keyword 0.6% (e.g. `in`); function → constant 0.3% (e.g. `ROUND_05UP`) |
+| rust (onepass.rs) | 96.7% | 96.7% | 96.3% | function → constant 0.8% (e.g. `DEAD`); function → type 0.7% (e.g. `Vec`); property → plain 0.6% (e.g. `match_kind`); plain → namespace 0.5% (e.g. `alloc`) |
+| rust (dense.rs) | 96.7% | 96.7% | 96.2% | property → plain 0.8% (e.g. `accelerate`); function → type 0.6% (e.g. `BTreeMap`); attribute → plain 0.5% (e.g. `feature`); plain → namespace 0.5% (e.g. `core`) |
+| c (zlib.h) | 93.8% | 93.8% | 93.5% | type → constant 1.8% (e.g. `FAR`); type → plain 1.4% (e.g. `alloc_func`); keyword → plain 0.9% (e.g. `#`); constant → plain 0.7% (e.g. `ZLIB_H`) |
+| c (sqlite3.h) | 93.6% | 93.6% | 93.5% | constant → plain 2.2% (e.g. `SQLITE3_H`); type → plain 1.5% (e.g. `sqlite3`); comment → plain 0.8% (e.g. `/`); keyword → plain 0.8% (e.g. `#`) |
+
+Binary size (`go build -trimpath`; stripped with `-ldflags "-s -w"`) of a program that
+imports `codeedit`:
+
+| Program | Default | Stripped |
+|---|--:|--:|
+| `codeedit` without grammars | 6.34 MB | 4.51 MB |
+| with all 18 jamb-grammars modules | 26.49 MB | 24.64 MB |
+| with highlights.wasm (76 languages) | 6.52 MB | 4.69 MB |
+
+The compiled code in the cache directory took 0.67 to 1.79 MB for each grammar (18.2
+MB for all 18), and 0.68 MB for highlights.
+
 ## Conclusion for the experiment
 
 The question was whether Go can give a GPUI-like experience with simpler

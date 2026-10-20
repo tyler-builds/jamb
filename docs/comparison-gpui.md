@@ -123,7 +123,7 @@ A hello app uses only part of jamb, and the Go linker drops the rest. Larger app
 
 gpui-component's own gallery app was not built: its dependencies were not in the local Cargo cache, and downloading them would have added about 1 GB. The database workbench is not the same app as the jamb demo, and its driver and TLS add to its size, so it is an indication, not a like-for-like comparison.
 
-In the jamb demo, the code editor's part of the binary, by symbol size: wazero, the WebAssembly runtime that runs tree-sitter, about 1.1 MB, plus about 0.2 MB of standard-library packages it brings in; the editor itself about 0.5 MB; and the Go grammar 0.36 MB. Each also adds to Go's runtime tables, which grow with the amount of code. An app that does not import `codeedit` links none of it.
+In the jamb demo, the code editor's part of the binary, by symbol size: wazero, the WebAssembly runtime that runs tree-sitter, about 1.1 MB, plus about 0.2 MB of standard-library packages it brings in; the editor itself about 0.5 MB; and the Go grammar 0.36 MB. These sizes were measured when the editor highlighted with tree-sitter. Since 2026-10-19 it uses @pierre/highlights instead, whose one module of 0.17 MB holds all 76 languages, in place of the grammars (see BENCHMARKS.md); the figures above were not measured again. Each also adds to Go's runtime tables, which grow with the amount of code. An app that does not import `codeedit` links none of it.
 
 ### Build times (seconds; three runs; dependencies already downloaded)
 

@@ -163,42 +163,31 @@ Code blocks are in the monospace font (the `CodeBlock` part's `FontFamily` is
 and are selectable. They are plain unless the view has a highlighter:
 
 ```go
-import (
-	"github.com/tyler-builds/jamb-grammars/golang"
-	"github.com/tyler-builds/jamb-grammars/python"
-	"github.com/tyler-builds/jamb/markdown/mdcode"
-)
+import "github.com/tyler-builds/jamb/markdown/mdcode"
 
-var code = mdcode.Highlight(golang.Grammar, python.Grammar) // one for the app
+var code = mdcode.Highlight() // one for the app
 
 markdown.View(readme).Code(code)
 ```
 
-`mdcode` colors a block whose fence names one of its grammars, by the grammar's name
-in any case, or by an alias: `golang` for `go`; `js`, `jsx`, `mjs`, `cjs` and `node`
-for `javascript`; `ts`, `mts` and `cts` for `typescript`; `py` and `python3` for
-`python`; `sh`, `shell`, `zsh` and `console` for `bash`; `rs` for `rust`; `c++`, `cc`,
-`cxx`, `hpp` and `h++` for `cpp`; `h` for `c`; `cs` and `c#` for `csharp`; `yml` for
-`yaml`; `md` for `markdown`; `htm` and `xhtml` for `html`; and `jsonc` for `json`.
-The colors are the theme's `Syntax` styles, which the code editor uses, matched by
-the capture name and then by its shorter forms ("function.method" falls back to
-"function"). Under high contrast the theme's syntax colors are the system colors.
+`mdcode` colors a block whose fence names a language that the code editor's
+highlighter knows, by its name or an alias, in any case: one of the 76 languages of
+@pierre/highlights, such as `go` or `golang`, `python` or `py`, `typescript` or `ts`,
+`rust` or `rs`, `bash` or `sh`, `yaml` or `yml`, `csharp` or `c#`, `json` and `jsonc`
+(`highlight.Languages` lists the names). The colors are the theme's `Syntax` styles,
+which the code editor uses, matched by the token name and then by its shorter forms
+("function.method" falls back to "function"). Under high contrast the theme's syntax
+colors are the system colors.
 
-Each block is parsed once for each language and code, the first time a view shows
-it, and its colors are kept by the highlighter, so a render of the same text, or a
-new text that keeps the block, parses nothing again. A block is plain for the moment
-its parse takes. The highlighter parses at most two blocks at a time, each in a
-highlight session (a WebAssembly instance and its goroutine) that is closed as soon
-as the block is done, and its goroutines end when the queue is empty: a document of
-200 code blocks peaked at 7 goroutines in the package's test, 2 of them from before
-the view. A block that no view shows any more, because the view went away or its
-text changed, is dropped from the queue, and its parse is stopped if it has started.
-The first block of a language also compiles that grammar's module, once per
-process; the code editor keeps the compiled code in a cache directory, so later runs
-start faster.
+Each block is lexed while the view renders, the first time a view shows it: a block of
+a few kilobytes takes some microseconds, and a megabyte about 10 ms. Its colors are kept
+by the highlighter, for up to 1024 blocks, so a render of the same text, or a new text
+that keeps the block, lexes nothing again. The first block of all also compiles the
+highlighter's module, once per process; the code editor keeps the compiled code in a
+cache directory, so later runs start faster.
 
 `mdcode` is a separate package so that only the apps that import it link the code
-editor's highlighting: the WebAssembly runtime wazero, which runs the grammars, and
+editor's highlighting: its WebAssembly module, the runtime wazero, which runs it, and
 the `crypto` packages that wazero imports. An app that imports `markdown` alone
 links none of them; `go list -deps` on it lists no `codeedit`, `wazero` or `crypto`
 package.
