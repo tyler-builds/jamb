@@ -508,6 +508,7 @@ type dgColDrag struct {
 // moved, accepts whether the column from can be put beside the column to, and drop
 // puts it there (after it when after is set). mark is where a dragged column would
 // land, setMark sets it, and stopDrag stops a press from dragging the header.
+// post runs a function at the start of the next frame.
 type dgHeadOps[T any] struct {
 	changed  func()
 	widthOf  func(cl DataColumn[T]) float32
@@ -517,6 +518,7 @@ type dgHeadOps[T any] struct {
 	mark     dgColMark
 	setMark  func(dgColMark)
 	stopDrag func()
+	post     func(func())
 	// startN and endN are the numbers of the columns pinned to the start and the end.
 	startN, endN int
 	// runs are the pieces of the row of the groups of columns, or nil without it.
@@ -958,6 +960,9 @@ type dgShared[T any] struct {
 	dragKey      string
 	dragX, dragW float32
 	dragFrom     float32 // the width at the press, at the Text size setting 100 percent
+	// edgePress is set from a press on a column's edge until the frame after its
+	// release, so that the click the release makes on the header cell does not sort.
+	edgePress bool
 
 	// A column the cursor moved to is scrolled into view at the next paint, from
 	// revealX0 to revealX1 in the content.
@@ -2227,6 +2232,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				rt.drag = dragState{}
 			}
 		},
+		post:   rt.Post,
 		startN: startN,
 		endN:   endN,
 		runs:   runs,
@@ -2586,7 +2592,11 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 		}
 		if sortable {
 			ci := c
-			hc.OnClick(func() { sortBy(ci) })
+			hc.OnClick(func() {
+				if !sh.edgePress {
+					sortBy(ci)
+				}
+			})
 		}
 		if g.headerMenu != nil {
 			key := cl.key()
@@ -2633,6 +2643,7 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 					if e.Button == input.ButtonLeft {
 						sh.dragging, sh.dragKey, sh.dragX, sh.dragW = true, key, e.X, cw[ci]
 						sh.dragFrom = widthOf(cl)
+						sh.edgePress = true
 						ho.stopDrag()
 						e.StopPropagation()
 					}
@@ -2649,6 +2660,7 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 						changed()
 					}
 					sh.dragging = false
+					ho.post(func() { sh.edgePress = false })
 				}).
 				OnDoubleClick(func() {
 					if setWidth(ci, fit(ci)) {
