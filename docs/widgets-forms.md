@@ -310,8 +310,10 @@ field is valid, the submit function runs. `OnSubmit(fn)` returns an error for th
 form's own message, such as a refusal from a server; the message is shown in the
 summary and announced. `OnSubmitAsync(fn)` runs work in the background: `fn` starts the
 work and returns a channel that receives the result (nil, or the error for the message).
-While it runs, `f.Submitting()` is true, `Submit` does nothing, and the button can be
-disabled, with a `ProgressRing` beside it.
+While it runs, `f.Submitting()` is true, `Submit` does nothing, and the button can show
+it with `Loading`: a busy ring in place of its icon, or over its label, while it keeps
+the focus, its Tab stop and its width. A disabled button would lose the focus the user
+just pressed it with.
 
 ```go
 f := ui.NewForm().OnSubmitAsync(func() <-chan error {
@@ -319,9 +321,18 @@ f := ui.NewForm().OnSubmitAsync(func() <-chan error {
 	go func() { done <- saveToServer(name) }()
 	return done
 })
-ui.Button("Save").Disabled(f.Submitting()).OnClick(f.Submit)
+ui.Button("Save").Loading(f.Submitting()).OnClick(f.Submit)
 ```
 
+- A loading button (`Loading(true)`, also on `IconButton` and `SplitButton`) does
+  nothing on a click, Enter, Space, an Invoke from assistive technology or a modal's
+  Enter, and a dropdown menu does not open from it. It is not disabled: it stays
+  focusable and enabled, assistive technology hears its name with the status
+  "Loading" (`Strings.Loading`), and nothing is announced, so call `Announce` if the
+  wait must be heard. The ring is drawn in the button's text color, which high
+  contrast keeps, and is still under reduced motion. `RootLoading` (on a split
+  button `MainLoading` and `ArrowLoading`) is its look, dimmed to 80% by default and
+  not dimmed under high contrast. `Disabled(true)` wins over `Loading`.
 - Enter in a single-line field of a form submits the form. A check box, switch or
   radio button keeps Enter for the modal's default button, as it does outside a form.
 - `f.Reset()` clears the submitted state and the form's message, and forgets its

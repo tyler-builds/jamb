@@ -61,7 +61,7 @@ var layerDocAlias = map[string]string{"CheckboxTri": "Checkbox", "Accordion": "C
 // not drawn by an element of its own: its style is the state layer of its base part.
 var layerStateSuffixes = []string{"Hover", "Pressed", "FocusVisible", "FocusWithin", "Focused", "Selected",
 	"Disabled", "Highlighted", "Invalid", "Checked", "Mixed", "Open", "ReadOnly", "Sorted", "Alternate",
-	"Editing", "InRange", "Today", "OutsideMonth", "Active", "Current", "Complete", "Filled"}
+	"Editing", "InRange", "Today", "OutsideMonth", "Active", "Current", "Complete", "Filled", "Loading"}
 
 // isStatePart reports whether the part p is the state of a documented base part.
 func isStatePart(p string, documented []string) bool {

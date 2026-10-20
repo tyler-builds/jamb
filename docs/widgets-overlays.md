@@ -85,7 +85,9 @@ ui.MenuBar(
   with two buttons, the action and the arrow, which is named "More options"
   (`Strings.MoreOptions`) and reports whether the menu is expanded; UI Automation's
   SplitButton control type would be one element with both patterns, which the
-  access tree has no role for. `Disabled(true)` disables both segments. Its look is
+  access tree has no role for. `Disabled(true)` disables both segments, and
+  `Loading(true)` shows a busy ring on the action and makes both segments inert
+  while they keep their focus and Tab stops, as a loading `Button` does. Its look is
   `ui.SplitButtonStyle`, set with `Theme.SplitButton` or `.Styles(...)`.
 - **Look.** Menus use the theme's surface, border, shadow and highlight colors.
   They enter and leave with the same motion as the command palette.

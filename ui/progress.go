@@ -314,6 +314,7 @@ type ProgressRingElement struct {
 	name   string
 	key    string
 	styles ProgressRingStyle
+	color  Color // set by a loading button: the dots are its text color, in every theme
 }
 
 // ProgressRing creates a busy indicator of the medium size (RingMedium).
@@ -400,6 +401,9 @@ func (r *ProgressRingElement) dot(st ProgressRingStyle, i int, c Color, opacity 
 	angle := 2*math.Pi*float64(i)/ringDots - math.Pi/2
 	x := r.size/2 + radius*float32(math.Cos(angle)) - d/2
 	y := r.size/2 + radius*float32(math.Sin(angle)) - d/2
+	if !r.color.IsZero() {
+		c = r.color
+	}
 	return Div().asPart("ProgressRing.Dot").Absolute().Left(x).Top(y).Size(Px(d), Px(d)).Radius(d / 2).
 		Background(c).Opacity(opacity).Style(st.Dot)
 }

@@ -18,20 +18,22 @@ import (
 // the line between them, and only their outer corners are rounded. Each segment
 // has the states of a button: Hover while the pointer is over it, Pressed while it
 // is pressed (and, for the arrow, while its menu is open), Disabled when the split
-// button is disabled, and FocusVisible while it has keyboard focus (its focus ring
-// is added to its shadows). Label and Icon are the action's text and icon, and
-// Chevron the arrow's icon.
+// button is disabled, Loading while it is loading (see Loading), and FocusVisible
+// while it has keyboard focus (its focus ring is added to its shadows). Label and
+// Icon are the action's text and icon, and Chevron the arrow's icon.
 type SplitButtonStyle struct {
 	Root              Style // the row of the two segments
 	Main              Style // the segment that runs the action
 	MainHover         Style // the action segment while the pointer is over it, if enabled
 	MainPressed       Style // the action segment while it is pressed
 	MainDisabled      Style // the action segment when the split button is disabled
+	MainLoading       Style // the action segment while the split button is loading
 	MainFocusVisible  Style // the action segment while it has keyboard focus
 	Arrow             Style // the segment that opens the menu
 	ArrowHover        Style // the arrow segment while the pointer is over it, if enabled
 	ArrowPressed      Style // the arrow segment while it is pressed or its menu is open
 	ArrowDisabled     Style // the arrow segment when the split button is disabled
+	ArrowLoading      Style // the arrow segment while the split button is loading
 	ArrowFocusVisible Style // the arrow segment while it has keyboard focus
 	Label             Style // the text of the action
 	Icon              Style // the icon of the action
@@ -46,11 +48,13 @@ func (s SplitButtonStyle) merge(o SplitButtonStyle) SplitButtonStyle {
 		MainHover:         s.MainHover.Merge(o.MainHover),
 		MainPressed:       s.MainPressed.Merge(o.MainPressed),
 		MainDisabled:      s.MainDisabled.Merge(o.MainDisabled),
+		MainLoading:       s.MainLoading.Merge(o.MainLoading),
 		MainFocusVisible:  s.MainFocusVisible.Merge(o.MainFocusVisible),
 		Arrow:             s.Arrow.Merge(o.Arrow),
 		ArrowHover:        s.ArrowHover.Merge(o.ArrowHover),
 		ArrowPressed:      s.ArrowPressed.Merge(o.ArrowPressed),
 		ArrowDisabled:     s.ArrowDisabled.Merge(o.ArrowDisabled),
+		ArrowLoading:      s.ArrowLoading.Merge(o.ArrowLoading),
 		ArrowFocusVisible: s.ArrowFocusVisible.Merge(o.ArrowFocusVisible),
 		Label:             s.Label.Merge(o.Label),
 		Icon:              s.Icon.Merge(o.Icon),
@@ -66,11 +70,13 @@ func (s SplitButtonStyle) plain() SplitButtonStyle {
 		MainHover:         plainStyle(s.MainHover),
 		MainPressed:       plainStyle(s.MainPressed),
 		MainDisabled:      plainStyle(s.MainDisabled),
+		MainLoading:       plainStyle(s.MainLoading),
 		MainFocusVisible:  plainStyle(s.MainFocusVisible),
 		Arrow:             plainStyle(s.Arrow),
 		ArrowHover:        plainStyle(s.ArrowHover),
 		ArrowPressed:      plainStyle(s.ArrowPressed),
 		ArrowDisabled:     plainStyle(s.ArrowDisabled),
+		ArrowLoading:      plainStyle(s.ArrowLoading),
 		ArrowFocusVisible: plainStyle(s.ArrowFocusVisible),
 		Label:             plainStyle(s.Label),
 		Icon:              plainStyle(s.Icon),
@@ -115,11 +121,13 @@ func splitButtonDefaults(t *Theme, v ButtonVariant, size controlSize) SplitButto
 		MainHover:    b.RootHover,
 		MainPressed:  b.RootPressed,
 		MainDisabled: b.RootDisabled,
+		MainLoading:  b.RootLoading,
 		Arrow:        arrow,
 		ArrowHover:   b.RootHover,
 		// The arrow keeps its pressed look while its menu is open.
 		ArrowPressed:  b.RootPressed,
 		ArrowDisabled: b.RootDisabled,
+		ArrowLoading:  b.RootLoading,
 		Label:         b.Label,
 		Icon:          b.Icon,
 	}
@@ -152,6 +160,7 @@ type SplitButtonElement struct {
 	variant  ButtonVariant
 	ctlSize  controlSize // see Small and Large
 	disabled bool
+	loading  bool // see Loading
 	tooltip  string
 	styles   SplitButtonStyle
 	key      string
@@ -200,6 +209,12 @@ func (b *SplitButtonElement) Large() *SplitButtonElement { b.ctlSize = sizeLarge
 // Disabled sets whether the split button is disabled: neither the action nor the
 // menu can be used.
 func (b *SplitButtonElement) Disabled(d bool) *SplitButtonElement { b.disabled = d; return b }
+
+// Loading shows a busy ring on the action segment and makes both segments inert,
+// as Button.Loading does: the action does not run and the menu does not open. Both
+// keep their focus and Tab stops, and the split button keeps its width.
+// Disabled(true) wins over Loading.
+func (b *SplitButtonElement) Loading(on bool) *SplitButtonElement { b.loading = on; return b }
 
 // Tooltip shows s below the split button after the pointer rests on it. Assistive
 // technology reads it as the group's description, unless it has another.
@@ -254,7 +269,7 @@ func (b *SplitButtonElement) expand(ctx *Context) Element {
 			rt.menuClosed(restore)
 		}
 		openMenu := func(keyboard bool) {
-			if open.Peek() || b.disabled || b.build == nil {
+			if open.Peek() || b.disabled || b.loading || b.build == nil {
 				return
 			}
 			built := b.build()
@@ -270,10 +285,28 @@ func (b *SplitButtonElement) expand(ctx *Context) Element {
 		// The focus ring of a segment is added to its shadows, as a Button's is.
 		ring := Shadow{Spread: 2, Color: t.FocusRing}
 		main := Div().asPart("SplitButton.Main").Style(st.Main).Grow(1).Role(access.RoleButton).Label(b.label)
-		if b.icon != nil {
-			main.Child(Div().asPart("SplitButton.Icon").Style(st.Icon).Child(Icon(b.icon).Size(iconSize)))
+		busy := b.loading && !b.disabled
+		var busyRing Element
+		if busy {
+			busyRing = loadingRing(iconSize, st.Main.Merge(st.MainLoading).TextColor, t)
 		}
-		main.Child(Div().asPart("SplitButton.Label").Style(st.Label).Child(Text(b.label).NoWrap()))
+		if b.icon != nil {
+			ic := Div().asPart("SplitButton.Icon").Style(st.Icon)
+			if busyRing != nil {
+				ic.Child(busyRing)
+			} else {
+				ic.Child(Icon(b.icon).Size(iconSize))
+			}
+			main.Child(ic)
+		}
+		label := Div().asPart("SplitButton.Label").Style(st.Label).Child(Text(b.label).NoWrap())
+		main.Child(label)
+		if busyRing != nil && b.icon == nil {
+			// The label keeps its room and the ring is drawn over it, as on a Button.
+			label.Opacity(0)
+			main.Child(Div().Absolute().Left(0).Right(0).Top(0).Bottom(0).
+				Row().Align(Center).Justify(Center).Child(busyRing))
+		}
 		arrow := Div().asPart("SplitButton.Arrow").Style(st.Arrow).Role(access.RoleButton).Label(strs.MoreOptions).
 			AccessExpanded(open.Get()).
 			Child(Div().asPart("SplitButton.Chevron").Style(st.Chevron).Child(Icon(icons.ChevronDown).Size(iconSize - 2)))
@@ -285,6 +318,18 @@ func (b *SplitButtonElement) expand(ctx *Context) Element {
 			main.Style(st.MainDisabled).Cursor(CursorNotAllowed)
 			arrow.Style(st.ArrowDisabled).Cursor(CursorNotAllowed)
 			main.access().disabled, arrow.access().disabled = true, true
+			return root
+		}
+		if busy {
+			// Loading: both segments keep their focus and Tab stops, and do nothing.
+			main.Style(st.MainLoading).OnClick(func() {}).Cursor(CursorDefault).Focusable().
+				FocusVisible(Style{Shadows: append(slices.Clone(st.Main.Shadows), ring)}.Merge(st.MainFocusVisible))
+			arrow.Style(st.ArrowLoading).OnClick(func() {}).Cursor(CursorDefault).Focusable().
+				FocusVisible(Style{Shadows: append(slices.Clone(st.Arrow.Shadows), ring)}.Merge(st.ArrowFocusVisible))
+			if b.handle != nil {
+				main.FocusHandle(b.handle)
+			}
+			main.access().status = strs.Loading
 			return root
 		}
 		main.Hover(st.MainHover).Pressed(st.MainPressed).Focusable().

@@ -14,6 +14,7 @@ type modalOpts struct {
 	area          bool // the body's field is a TextArea
 	backdrop      bool // CloseOnBackdrop
 	disableCreate bool // the default button is disabled
+	loadingCreate bool // the default button is loading
 	initialCreate bool // InitialFocus names the default button
 }
 
@@ -51,6 +52,7 @@ func newModalTest(o modalOpts) *modalTest {
 		create := Button("Create").OnClick(func() { m.creates++ })
 		create.handle = m.createH
 		create.disabled = o.disableCreate
+		create.loading = o.loadingCreate
 		mod := Modal("New project", body).Footer(cancel, create).Default(create).
 			OnClose(func() { m.closes++; m.open.Set(false) })
 		if o.backdrop {
@@ -160,6 +162,16 @@ func TestModalEnterInTextAreaIsNewline(t *testing.T) {
 	}
 	if got := m.name.Peek(); got != "a\nb" {
 		t.Errorf("text area holds %q, want a newline between a and b", got)
+	}
+}
+
+// A loading default button does not run on Enter.
+func TestModalLoadingDefaultDoesNothing(t *testing.T) {
+	m := newModalTest(modalOpts{loadingCreate: true})
+	m.show()
+	m.r.key(input.KeyEnter, 0)
+	if m.creates != 0 {
+		t.Errorf("Enter ran the loading default button %d times", m.creates)
 	}
 }
 

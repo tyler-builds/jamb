@@ -614,6 +614,9 @@ func (dm *DropdownMenuElement) expand(ctx *Context) Element {
 			if open.Peek() {
 				return
 			}
+			if b, ok := trigger.(*ButtonElement); ok && b.loading && !b.disabled {
+				return // a loading trigger is inert (see ButtonElement.Loading)
+			}
 			built := build()
 			if len(built) == 0 {
 				return

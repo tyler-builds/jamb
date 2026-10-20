@@ -19,6 +19,7 @@ func testButtonParts(t *testing.T, applied map[string]bool) {
 		part     string
 		set      func(*ButtonStyle, Style)
 		disabled bool
+		loading  bool
 		text     bool // the part is colored by its text color
 		act      func(*testing.T, *accessRig)
 	}
@@ -29,6 +30,7 @@ func testButtonParts(t *testing.T, applied map[string]bool) {
 		{part: "Button.RootPressed", set: func(s *ButtonStyle, m Style) { s.RootPressed = m },
 			act: func(t *testing.T, r *accessRig) { pressNode(r, partNode(t, r.rt, "Button.Root", "")) }},
 		{part: "Button.RootDisabled", set: func(s *ButtonStyle, m Style) { s.RootDisabled = m }, disabled: true},
+		{part: "Button.RootLoading", set: func(s *ButtonStyle, m Style) { s.RootLoading = m }, loading: true},
 		{part: "Button.RootFocusVisible", set: func(s *ButtonStyle, m Style) { s.RootFocusVisible = m },
 			act: func(t *testing.T, r *accessRig) { focusNode(r, partNode(t, r.rt, "Button.Root", "")) }},
 		{part: "Button.Label", set: func(s *ButtonStyle, m Style) { s.Label = m }, text: true},
@@ -39,7 +41,12 @@ func testButtonParts(t *testing.T, applied map[string]bool) {
 		t.Run(c.part, func(t *testing.T) {
 			var st ButtonStyle
 			c.set(&st, Style{Background: markBG, TextColor: markFG})
-			r := newAccessRig(func(ctx *Context) Element { return partButton(ButtonPrimary, st, c.disabled) })
+			r := newAccessRig(func(ctx *Context) Element {
+				if c.loading {
+					return Div().Column().Child(Button("Save").Icon(icons.Check).Key("save").Loading(true).Styles(st))
+				}
+				return partButton(ButtonPrimary, st, c.disabled)
+			})
 			if c.act != nil {
 				c.act(t, r)
 			}
