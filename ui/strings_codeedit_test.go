@@ -31,3 +31,20 @@ func TestCodeEditorFindStringsFollowTheLanguage(t *testing.T) {
 		t.Errorf("zh-CN count = %q, want the English fallback %q", got, "3 of 12")
 	}
 }
+
+// The messages of the code editor's diagnostics have English text in every language until a
+// pack translates them.
+func TestCodeEditorDiagnosticStringsFallBackToEnglish(t *testing.T) {
+	for _, locale := range []string{"en", "it", "zh-CN", "zh-TW", "zh-HK"} {
+		s := StringsFor(locale)
+		for name, v := range map[string]string{"CodeEditorError": s.CodeEditorError, "CodeEditorWarning": s.CodeEditorWarning,
+			"CodeEditorInfo": s.CodeEditorInfo, "CodeEditorHint": s.CodeEditorHint} {
+			if v == "" {
+				t.Errorf("%s: %s is empty", locale, name)
+			}
+		}
+		if got := s.CodeEditorDiagnostic(s.CodeEditorError, 3, "undefined: x"); got != "Error on line 3: undefined: x" {
+			t.Errorf("%s: the diagnostic message is %q", locale, got)
+		}
+	}
+}

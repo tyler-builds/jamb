@@ -310,6 +310,17 @@ type Strings struct {
 	CodeEditorBadPattern string
 	// CodeEditorCount builds the message that gives the position of the current match, from its number and the total.
 	CodeEditorCount func(current, total int) string
+	// CodeEditorError is the name of the severity of an error diagnostic.
+	CodeEditorError string
+	// CodeEditorWarning is the name of the severity of a warning diagnostic.
+	CodeEditorWarning string
+	// CodeEditorInfo is the name of the severity of an information diagnostic.
+	CodeEditorInfo string
+	// CodeEditorHint is the name of the severity of a hint diagnostic.
+	CodeEditorHint string
+	// CodeEditorDiagnostic builds the message that announces a diagnostic, from the name of its
+	// severity, its line number and its message.
+	CodeEditorDiagnostic func(severity string, line int, message string) string
 
 	// The charts (package charts): the names of the chart types, which begin a chart's
 	// summary. ChartLine is the name of a line chart.
@@ -603,6 +614,13 @@ func englishStrings() *Strings {
 		CodeEditorBadPattern: "Invalid pattern",
 		CodeEditorCount: func(current, total int) string {
 			return fmt.Sprintf("%d of %d", current, total)
+		},
+		CodeEditorError:   "Error",
+		CodeEditorWarning: "Warning",
+		CodeEditorInfo:    "Information",
+		CodeEditorHint:    "Hint",
+		CodeEditorDiagnostic: func(severity string, line int, message string) string {
+			return fmt.Sprintf("%s on line %d: %s", severity, line, message)
 		},
 
 		ChartLine:                 "Line chart",

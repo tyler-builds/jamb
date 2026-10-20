@@ -74,13 +74,19 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	}
 	tab := ps.tab
 	digits := len(strconv.Itoa(doc.LineCount()))
+	// The gutter is the markers of the diagnostics, once the document has had some, the numbers
+	// and the fold markers.
+	diagW := float32(0)
+	if doc.diagSet {
+		diagW = max(lineH*0.6, 10)
+	}
 	numW := float32(0)
 	if ps.numbers {
 		numW = float32(digits)*charW + 12
 	}
 	foldW := max(lineH*0.6, 10)
-	foldX := numW
-	textX := numW + foldW + 4
+	foldX := diagW + numW
+	textX := foldX + foldW + 4
 	textW := max(w-textX, 0)
 	vs.syncWrap(textW, charW, lineH)
 	x := vs.rowIndex()
@@ -124,6 +130,10 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	cur := -1
 	if len(matches) > 0 {
 		cur = vs.currentMatch(matches)
+	}
+	var diags []Diagnostic
+	if len(shown) > 0 {
+		diags = doc.diagnosticsIn(shown[0].from, shown[len(shown)-1].to)
 	}
 	fg := st.Text.TextColor
 	maxCells := 0
@@ -179,6 +189,15 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 		case dr.from < dr.to:
 			vs.drawSegment(p, ts, line, ls, dr, tx, y, charW, tab, fg)
 		}
+		for _, g := range diags {
+			c := diagnosticStyle(st, g.Severity).TextColor
+			if !g.onRow(dr, le) || c.IsZero() {
+				continue
+			}
+			x0 := dr.cellOf(line, ls, min(max(g.From, dr.from), dr.to), tab)
+			x1 := dr.cellOf(line, ls, min(max(g.To, dr.from), dr.to), tab)
+			drawSquiggle(p, tx+float32(x0)*charW, tx+float32(max(x1, x0+1))*charW, y+lineH-1, c)
+		}
 	}
 	// The gutter covers the text that is scrolled under it, and the numbers and the fold
 	// markers are drawn over it, on the first segment of each row.
@@ -188,18 +207,27 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 	vs.maxCells = maxCells
 	gutterFg := st.Gutter.TextColor
 	nts := ui.TextFormat{FontSize: st.Gutter.FontSize, Mono: true, Color: gutterFg, Align: ui.End}
+	worst := make(map[int]Severity) // the most serious diagnostic that starts on each row
+	for _, g := range diags {
+		if r := doc.RowOf(g.From); worst[r] == 0 || g.Severity < worst[r] {
+			worst[r] = g.Severity
+		}
+	}
 	for k, dr := range shown {
 		if dr.seg != 0 {
 			continue
 		}
 		row := dr.row
 		y := float32(first+k)*lineH - vs.scrollY
+		if s := worst[row]; s != 0 {
+			drawDiagnosticMarker(p, s, 0, diagW, y, lineH, diagnosticStyle(st, s).TextColor, st.Gutter.FontSize)
+		}
 		if ps.numbers {
 			nts.Color = gutterFg
 			if carets[row] && !ps.t.CodeEditor.ActiveLineNumber.IsZero() {
 				nts.Color = ps.t.CodeEditor.ActiveLineNumber
 			}
-			p.Text(numW-6, y, strconv.Itoa(row+1), nts)
+			p.Text(diagW+numW-6, y, strconv.Itoa(row+1), nts)
 		}
 		if doc.opensBlock(row, tab) {
 			vs.drawFoldMarker(p, row, foldX, foldW, y, lineH, gutterFg)

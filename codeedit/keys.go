@@ -66,6 +66,8 @@ var (
 	CmdGoToLine          = ui.NewAction("codeedit.go-to-line", "Go to line")
 	CmdFold              = ui.NewAction("codeedit.fold", "Fold")
 	CmdUnfold            = ui.NewAction("codeedit.unfold", "Unfold")
+	CmdNextDiagnostic    = ui.NewAction("codeedit.next-diagnostic", "Go to next problem")
+	CmdPrevDiagnostic    = ui.NewAction("codeedit.prev-diagnostic", "Go to previous problem")
 )
 
 // editorAction is one command and what it does to the editor it runs in.
@@ -155,6 +157,8 @@ func buildActions() []editorAction {
 		{CmdGoToLine, func(e *EditorElement, vs *viewState) { vs.openBar(barGoto) }},
 		{CmdFold, func(e *EditorElement, vs *viewState) { vs.doc.Fold(vs.doc.RowOf(vs.doc.Caret())); vs.touch() }},
 		{CmdUnfold, func(e *EditorElement, vs *viewState) { vs.doc.Unfold(vs.doc.RowOf(vs.doc.Caret())); vs.touch() }},
+		{CmdNextDiagnostic, func(e *EditorElement, vs *viewState) { vs.goToDiagnostic(true) }},
+		{CmdPrevDiagnostic, func(e *EditorElement, vs *viewState) { vs.goToDiagnostic(false) }},
 	}
 	return out
 }
@@ -193,6 +197,7 @@ func Bindings() []ui.Binding {
 		b("ctrl+f", CmdFind), b("ctrl+h", CmdReplace), b("ctrl+g", CmdGoToLine),
 		b("f3", CmdFindNext), b("shift+f3", CmdFindPrevious),
 		b("ctrl+/", CmdComment), b("ctrl+shift+[", CmdFold), b("ctrl+shift+]", CmdUnfold),
+		b("f8", CmdNextDiagnostic), b("shift+f8", CmdPrevDiagnostic),
 	}
 }
 

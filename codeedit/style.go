@@ -14,7 +14,10 @@ import "github.com/tyler-builds/jamb/ui"
 // column of line numbers and fold markers: its TextColor, FontSize and Background.
 // ActiveLine is the row of the caret, Selection the selected text, Match the other find
 // matches and CurrentMatch the current one; their Background is the fill. Find is the box
-// of the find and replace bar.
+// of the find and replace bar. DiagnosticError, DiagnosticWarning, DiagnosticInfo and
+// DiagnosticHint are the marks of the diagnostics of each severity: their TextColor colors the
+// wavy underline and the gutter marker, which the theme's Danger, Warning, Accent and TextMuted
+// colors are by default.
 //
 // Under high contrast the colors of these parts are the system colors, whatever is set
 // here or in the theme; their sizes and spacing still apply.
@@ -37,6 +40,14 @@ type Style struct {
 	CurrentMatch ui.Style
 	// Find is the look of the find bar.
 	Find ui.Style
+	// DiagnosticError is the look of the marks of an error: its TextColor.
+	DiagnosticError ui.Style
+	// DiagnosticWarning is the look of the marks of a warning: its TextColor.
+	DiagnosticWarning ui.Style
+	// DiagnosticInfo is the look of the marks of an information diagnostic: its TextColor.
+	DiagnosticInfo ui.Style
+	// DiagnosticHint is the look of the marks of a hint: its TextColor.
+	DiagnosticHint ui.Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -51,6 +62,11 @@ func (s Style) merge(o Style) Style {
 		Match:        s.Match.Merge(o.Match),
 		CurrentMatch: s.CurrentMatch.Merge(o.CurrentMatch),
 		Find:         s.Find.Merge(o.Find),
+
+		DiagnosticError:   s.DiagnosticError.Merge(o.DiagnosticError),
+		DiagnosticWarning: s.DiagnosticWarning.Merge(o.DiagnosticWarning),
+		DiagnosticInfo:    s.DiagnosticInfo.Merge(o.DiagnosticInfo),
+		DiagnosticHint:    s.DiagnosticHint.Merge(o.DiagnosticHint),
 	}
 }
 
@@ -79,6 +95,11 @@ func editorDefaults(t *ui.Theme) Style {
 		Match:        ui.Style{Background: t.Accent.Alpha(0.25)},
 		CurrentMatch: ui.Style{Background: t.Accent.Alpha(0.55)},
 		Find:         ui.Style{Background: t.Surface, BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius, Gap: 6, Padding: ui.All(6)},
+
+		DiagnosticError:   ui.Style{TextColor: t.Danger},
+		DiagnosticWarning: ui.Style{TextColor: t.Warning},
+		DiagnosticInfo:    ui.Style{TextColor: t.Accent},
+		DiagnosticHint:    ui.Style{TextColor: t.TextMuted},
 	}
 }
 
@@ -94,6 +115,11 @@ func (s Style) plain() Style {
 		Match:        plainPart(s.Match),
 		CurrentMatch: plainPart(s.CurrentMatch),
 		Find:         plainPart(s.Find),
+
+		DiagnosticError:   plainPart(s.DiagnosticError),
+		DiagnosticWarning: plainPart(s.DiagnosticWarning),
+		DiagnosticInfo:    plainPart(s.DiagnosticInfo),
+		DiagnosticHint:    plainPart(s.DiagnosticHint),
 	}
 }
 
@@ -113,6 +139,13 @@ func (s Style) resolve(ctx *ui.Context) Style {
 	if t.HighContrast {
 		st.Text = st.Text.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.CodeEditor.Foreground}, "high contrast"))
 		st.Gutter = st.Gutter.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.CodeEditor.LineNumber}, "high contrast"))
+		// The marks of the diagnostics take the system colors that the theme holds; the gutter
+		// markers differ in shape, so the severities do not rest on color.
+		hc := func(c ui.Color) ui.Style { return ui.StyleLayer(ctx, ui.Style{TextColor: c}, "high contrast") }
+		st.DiagnosticError = st.DiagnosticError.Merge(hc(t.Danger))
+		st.DiagnosticWarning = st.DiagnosticWarning.Merge(hc(t.Warning))
+		st.DiagnosticInfo = st.DiagnosticInfo.Merge(hc(t.Accent))
+		st.DiagnosticHint = st.DiagnosticHint.Merge(hc(t.TextMuted))
 	}
 	return st
 }

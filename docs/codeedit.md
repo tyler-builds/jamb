@@ -2,8 +2,8 @@
 
 The `codeedit` package is a code editor for source files: a multi-line text area with a
 line-indexed buffer, undo and redo, several selections, find and replace, folding by indentation,
-soft wrap, syntax highlighting for 76 languages, input-method composition, and an accessibility
-Text pattern. It is pure
+soft wrap, syntax highlighting for 76 languages, input-method composition, diagnostics and the
+hooks of a language server, and an accessibility Text pattern. It is pure
 Go and draws on the Canvas of the `ui` package. It is built with
 `codeedit.Editor(codeedit.NewDocument(text))`. Its keys are actions with default bindings, so they
 work without setup, and an app can rebind them. The sections below cover the keys, the document,
@@ -65,6 +65,9 @@ own scroll position.
 | `Selections()`, `SetSelections(...)`, `Primary()`, `Caret()` | The selections; the last one set is the primary. |
 | `SetTabSize(n)` | The width of a tab stop, for the commands that depend on columns. The editor sets it from `TabSize`. |
 | `OnChange(fn)`, `OnEdit(fn)`, `Version()` | Listen to changes. `OnEdit` reports each replaced byte range, last part first. |
+| `TextVersion()` | A number that changes with the text only, for the requests to a language server. |
+| `SetDiagnostics(ds)`, `SetDiagnosticsFor(v, ds)`, `Diagnostics()`, `DiagnosticsAt(off)` | The diagnostics (see Diagnostics). |
+| `UTF16Pos(off)`, `OffsetUTF16(row, col)` | Convert between byte offsets and rows with UTF-16 columns, as the Language Server Protocol counts them. |
 
 Positions are byte offsets. Selections move with the text: a caret before an insertion moves
 after it, and a caret inside a replaced range goes to its start.
@@ -108,6 +111,7 @@ value, so an app can rebind it with `ui.BindIn("CodeEditor", keys, action)` or t
 | Ctrl+F, Ctrl+H | Find, and find and replace. |
 | F3, Shift+F3 | Next and previous match. |
 | Ctrl+G | Go to line. |
+| F8, Shift+F8 | Select the next or the previous diagnostic, and announce it. |
 
 The punctuation keys name their physical position as the US layout prints it: `ctrl+/` is the
 slash key, and `ctrl+shift+[` is the key that prints `[` on a US keyboard (Shift makes it `{`,
@@ -175,6 +179,42 @@ Each edit wraps again only the rows it touches, and a change of the width in cel
 again, keeping the row at the top of the view where it was. Folding hides the segments of the rows
 under the header, and the header keeps its own. The Text pattern reports each segment as a line and
 each row as a paragraph.
+
+## Diagnostics
+
+Diagnostics are the errors, warnings and notes that a language server or a linter reports. They
+belong to the document, so every editor that shows it draws them:
+
+```go
+text, ver := doc.Text(), doc.TextVersion() // the version is recorded with the request
+go func() {
+	ds := lint(text)
+	ctx.Post(func() { doc.SetDiagnosticsFor(ver, ds) }) // dropped if the text changed since
+}()
+```
+
+A `Diagnostic` has a byte range `[From, To)`, a `Severity` (`SeverityError`, `SeverityWarning`,
+`SeverityInfo`, `SeverityHint`; zero is an error), a `Message`, and the `Source` and `Code` that
+reported it. An empty range marks the character at `From`. `SetDiagnostics` replaces the set;
+`SetDiagnosticsFor` does the same only when the text is still the one of the given `TextVersion`,
+and reports whether it did. A move of the caret does not make a set stale. The diagnostics follow
+the text through edits, undo and redo: an insertion before one moves it, typing at either of its
+ends does not grow it, and a range that is replaced becomes an empty one at the start of the
+replacement. `SetText` removes them.
+
+Each diagnostic is drawn as a wavy underline, on every display row it covers; an empty one, or one
+about the line feed, takes one cell. Once a document has had diagnostics set, the gutter has a
+column of markers, one on each row where a diagnostic starts, for the most serious of them: a
+filled circle for an error, a triangle for a warning, an "i" for information and a dot for a hint,
+so that the severity does not rest on color. The column stays while the set is empty, so that the
+text does not shift as diagnostics come and go. F8 and Shift+F8 select the next or the previous
+diagnostic, wrapping around the text, scroll to it, and announce it politely, such as "Error on
+line 3: undefined: x" (`ui.Strings.CodeEditorDiagnostic` and the names of the severities,
+`CodeEditorError`, `CodeEditorWarning`, `CodeEditorInfo` and `CodeEditorHint`).
+
+The Document is not safe for concurrent use: an app that gets diagnostics on another goroutine sets
+them on the UI thread, with `ui.Context.Post`. `UTF16Pos` and `OffsetUTF16` convert between byte
+offsets and the positions of the Language Server Protocol, whose columns count UTF-16 code units.
 
 ## Highlighting
 
@@ -288,6 +328,7 @@ The parts are:
 | `Selection` | The selected text. |
 | `Match`, `CurrentMatch` | The find matches. |
 | `Find` | The find and replace bar. |
+| `DiagnosticError`, `DiagnosticWarning`, `DiagnosticInfo`, `DiagnosticHint` | The marks of the diagnostics: the `TextColor` of the underline and of the gutter marker. By default the theme's `Danger`, `Warning`, `Accent` and `TextMuted`. |
 
 Under high contrast the colors are the system colors (the theme's `CodeEditor` colors), whatever is set
 in the theme's `codeedit.Style` or in `Styles`; sizes and spacing still apply.
