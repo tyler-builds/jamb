@@ -229,3 +229,84 @@ func TestModalOverNonModalTrapsFocus(t *testing.T) {
 		t.Fatal("a press on the window behind reached it under a modal")
 	}
 }
+
+// TestModalOverNonModalEscapeClosesModalFirst checks that Escape, with focus in a
+// modal opened over a non-modal dialog, closes the modal and leaves the dialog.
+func TestModalOverNonModalEscapeClosesModalFirst(t *testing.T) {
+	c := newNonModalTest(findPanel)
+	c.show(t)
+	c.modal.Set(true)
+	for range 4 {
+		c.r.frame()
+	}
+	c.r.focusKey(t, "ok")
+	c.r.press(input.KeyEscape, 0)
+	if c.modalCloses != 1 || c.modal.Peek() {
+		t.Fatalf("Escape closed the modal %d times, open %v", c.modalCloses, c.modal.Peek())
+	}
+	if c.closes != 0 || !c.open.Peek() {
+		t.Fatal("Escape closed the non-modal dialog too")
+	}
+}
+
+// TestNonModalEscapeNeedsFocusInside checks that Escape closes a non-modal dialog
+// only while focus is inside it: a press that leaves focus in the window behind
+// does not close it.
+func TestNonModalEscapeNeedsFocusInside(t *testing.T) {
+	c := newNonModalTest(findPanel)
+	c.show(t)
+	c.r.clickKey(t, "behind")
+	c.r.press(input.KeyEscape, 0)
+	if c.closes != 0 || !c.open.Peek() {
+		t.Fatalf("Escape with focus outside closed the dialog %d times", c.closes)
+	}
+	c.r.focusKey(t, "find")
+	c.r.press(input.KeyEscape, 0)
+	if c.closes != 1 || c.open.Peek() {
+		t.Fatalf("Escape with focus inside closed the dialog %d times, open %v", c.closes, c.open.Peek())
+	}
+}
+
+// TestNonModalEscapeClosesPopoverFirst checks that a popover open inside a
+// non-modal dialog takes Escape before the dialog does.
+func TestNonModalEscapeClosesPopoverFirst(t *testing.T) {
+	c := newNonModalTest(func(c *nonModalTest) *ModalElement {
+		return Modal("Find", Popover(Button("Filters").Key("filters"), func() Element {
+			return Button("Apply").Key("apply")
+		})).NonModal().OnClose(func() { c.closes++; c.open.Set(false) })
+	})
+	c.show(t)
+	c.r.clickKey(t, "filters")
+	if _, ok := c.r.rt.Find("apply"); !ok {
+		t.Fatal("the popover did not open")
+	}
+	c.r.press(input.KeyEscape, 0)
+	if _, ok := c.r.rt.Find("apply"); ok || c.closes != 0 || !c.open.Peek() {
+		t.Fatalf("the first Escape did not close the popover alone: dialog closed %d times", c.closes)
+	}
+	c.r.press(input.KeyEscape, 0)
+	if c.closes != 1 {
+		t.Fatalf("the second Escape closed the dialog %d times, want 1", c.closes)
+	}
+}
+
+// TestNonModalEnterRunsDefaultOnlyInside checks that Enter runs a non-modal
+// dialog's default button only while focus is inside the dialog.
+func TestNonModalEnterRunsDefaultOnlyInside(t *testing.T) {
+	c := newNonModalTest(func(c *nonModalTest) *ModalElement {
+		done := Button("Done").Key("done").OnClick(func() { c.done++ })
+		return Modal("Find", TextInput(NewSignal("")).Label("Find text").Key("find")).
+			NonModal().Footer(done).Default(done).OnClose(func() { c.closes++; c.open.Set(false) })
+	})
+	c.show(t)
+	c.r.focusKey(t, "find")
+	c.r.press(input.KeyEnter, 0)
+	if c.done != 1 {
+		t.Fatalf("Enter inside the dialog ran the default %d times, want 1", c.done)
+	}
+	c.r.focusKey(t, "behind")
+	c.r.press(input.KeyEnter, 0)
+	if c.done != 1 || c.behind != 1 {
+		t.Fatalf("Enter in the window behind ran the default (%d) or not the button (%d)", c.done, c.behind)
+	}
+}
