@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
@@ -24,6 +25,11 @@ func navigationSection() ui.Element {
 		node := ui.Local(ctx, "nav.node", "src")
 		big := ui.Local(ctx, "nav.big", "folder-0000")
 		note := ui.Local(ctx, "nav.note", "")
+		// The project tree is opened and closed from its buttons, and reports its open keys and
+		// its last open or close in the status line.
+		openKeys := ui.Local(ctx, "nav.treeOpen", []string(nil))
+		handle := ui.Local(ctx, "nav.treeHandle", ui.NewTreeHandle()).Peek()
+		lastEvent := ui.Local(ctx, "nav.treeEvent", "none")
 
 		samples := []ui.Element{
 			sample(t, "Tabs, panels kept", ui.Div().Width(ui.Px(420)).Child(ui.Tabs(plain,
@@ -55,8 +61,7 @@ func navigationSection() ui.Element {
 				ui.Collapsible("Text alerts", sms, panelText(t, "Send a text message for each change.")).Key("nav.smsSection"),
 				ui.Collapsible("Push alerts", push, panelText(t, "Send a push notification for each change.")).Key("nav.pushSection"),
 			).Key("nav.accordion").SingleOpen())),
-			sample(t, "Tree view", ui.Div().Width(ui.Px(420)).Child(ui.Tree(files, node).
-				Key("nav.tree").Label("Project files").Style(ui.Style{MaxHeight: ui.Px(200)}))),
+			sample(t, "Tree view", treeFromCode(t, files, node, openKeys, handle, lastEvent)),
 			sample(t, "Tree view, 10,000 generated folders", ui.Div().Width(ui.Px(420)).Child(ui.Tree(folders, big).
 				Key("nav.bigTree").Label("Generated folders").Style(ui.Style{Height: ui.Px(200)}))),
 			manyTabsSample(t),
@@ -98,6 +103,28 @@ func manyTabsSample(t *ui.Theme) ui.Element {
 			Suffix(add).
 			OverflowMenu().TabMaxWidth(ui.Px(120))))
 	})
+}
+
+// treeFromCode is the project tree with buttons that open and close it from code,
+// and a status line. The status line shows the open keys, and the last node that was
+// opened or closed, by the tree or by a button.
+func treeFromCode(t *ui.Theme, files []ui.TreeNode, node *ui.Signal[string], openKeys *ui.Signal[[]string],
+	handle *ui.TreeHandle, lastEvent *ui.Signal[string]) ui.Element {
+	open := "none"
+	if keys := openKeys.Get(); len(keys) > 0 {
+		open = strings.Join(keys, ", ")
+	}
+	return ui.Div().Column().Gap(8).Width(ui.Px(420)).
+		Child(ui.Div().Row().Wrap().Gap(8).
+			Child(ui.Button("Expand all").Key("nav.treeExpandAll").Secondary().Small().OnClick(handle.ExpandAll)).
+			Child(ui.Button("Collapse all").Key("nav.treeCollapseAll").Secondary().Small().OnClick(handle.CollapseAll)).
+			Child(ui.Button("Reveal a deep node").Key("nav.treeReveal").Secondary().Small().
+				OnClick(func() { handle.Reveal("src/ui/tree.go") }))).
+		Child(ui.Tree(files, node).Key("nav.tree").Label("Project files").Style(ui.Style{MaxHeight: ui.Px(200)}).
+			Handle(handle).Expanded(openKeys).
+			OnExpand(func(key string) { lastEvent.Set("expanded " + key) }).
+			OnCollapse(func(key string) { lastEvent.Set("collapsed " + key) })).
+		Child(ui.Text(fmt.Sprintf("Open: %s. Last event: %s.", open, lastEvent.Get())).FontSize(12).TextColor(t.TextMuted))
 }
 
 // panelText is the content of a sample panel.

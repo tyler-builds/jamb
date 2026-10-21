@@ -2,9 +2,14 @@ package views
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/tyler-builds/jamb/ui"
 )
+
+// uploadToastID is the ID of the upload toast, which each step of an upload updates
+// in place.
+const uploadToastID = "demo.upload"
 
 // feedbackSection is the Feedback part of the Components page: progress bars,
 // busy rings, toasts, badges, alerts, keyboard shortcuts and an empty state. Its toasts appear in the window's Toaster and
@@ -12,6 +17,8 @@ import (
 func feedbackSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 	count := ui.Local(ctx, "feedback-count", 0)
 	alertShown := ui.Local(ctx, "feedback-alert", true)
+	// upload keeps the cancel of the next step of the upload, so that Dismiss can end it.
+	upload := ui.Local(ctx, "feedback-upload", func() {})
 	// Undo puts the count back, so the toast's action does real work.
 	increment := func() {
 		before := count.Peek()
@@ -41,6 +48,9 @@ func feedbackSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 			Child(ui.Button("Error toast").Secondary().OnClick(func() {
 				notify(ctx, s, ui.ToastError, "Upload failed. It stays until you dismiss it.")
 			}))),
+		sample(t, "Titled toast, updated in place by its ID", ui.Div().Row().Wrap().Gap(8).
+			Child(ui.Button("Upload").Secondary().OnClick(func() { startUpload(ctx, upload) })).
+			Child(ui.Button("Dismiss").Secondary().OnClick(func() { dismissUpload(ctx, upload) }))),
 		sample(t, fmt.Sprintf("Toast with Undo: count %d", count.Get()),
 			ui.Button("Increment").Secondary().OnClick(increment)),
 		sample(t, "OS notification, with two buttons",
@@ -67,6 +77,31 @@ func feedbackSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 			Child(ui.Empty("No notifications").Description("Updates about your projects appear here.").
 				Action(ui.Button("Notification settings").Secondary().Small().OnClick(func() { s.Page.Set(PageSettings) })))),
 	)
+}
+
+// startUpload starts a demo upload, after the one in progress is stopped. Its
+// progress is the titled toast with uploadToastID, which each step updates in place.
+func startUpload(ctx *ui.Context, stop *ui.Signal[func()]) {
+	stop.Peek()()
+	uploadStep(ctx, stop, 20)
+}
+
+// uploadStep shows the upload at pct percent, and runs the next step a second later.
+// After the last step the toast says the file is uploaded. The cancel of the next
+// step is kept in stop.
+func uploadStep(ctx *ui.Context, stop *ui.Signal[func()], pct int) {
+	if pct > 100 {
+		ctx.ToastWithID(uploadToastID, ui.ToastSuccess, "Uploaded").Title("Upload")
+		return
+	}
+	ctx.ToastWithID(uploadToastID, ui.ToastInfo, fmt.Sprintf("Uploading %d%%", pct)).Title("Upload")
+	stop.Set(ctx.After(time.Second, func() { uploadStep(ctx, stop, pct+20) }))
+}
+
+// dismissUpload stops the upload and removes its toast.
+func dismissUpload(ctx *ui.Context, stop *ui.Signal[func()]) {
+	stop.Peek()()
+	ctx.DismissToast(uploadToastID)
 }
 
 // alertSamples shows an alert of each variant. The success alert has a close

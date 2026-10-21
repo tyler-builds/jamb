@@ -127,7 +127,8 @@ var componentSections = []componentSection{
 			return section(t, "Menus", dropdownSample(t), contextSample(t))
 		}},
 	{"Navigation and layout", "Tabs Collapsible Accordion Tree tree view folders panels expand " +
-		"ScrollButtons OverflowMenu TabMaxWidth Prefix Suffix many tabs scroll overflow menu truncate long label add tab",
+		"ScrollButtons OverflowMenu TabMaxWidth Prefix Suffix many tabs scroll overflow menu truncate long label add tab " +
+		"expand all collapse all reveal deep node open keys tree handle expanded",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return navigationSection() }},
 	{"Split panes", "Split Pane Percent resize divider panes collapsible",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return splitSection() }},
@@ -194,7 +195,8 @@ var componentSections = []componentSection{
 	{"Focus and scrolling", "FocusWithin Focused FocusVisible Focusable TabIndex TabStop ScrollX focus ring keyboard Tab order scroll",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return focusSection(t) }},
 	{"Feedback", "Kbd Alert Empty Badge BadgeText BadgeDot Toast ProgressBar ProgressRing Notify " +
-		"keyboard shortcut spinner busy progress toast badge alert empty state OS notification",
+		"keyboard shortcut spinner busy progress toast badge alert empty state OS notification " +
+		"titled toast upload progress update in place id dismiss",
 		func(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element { return feedbackSection(ctx, t, s) }},
 	{"Notification area and taskbar", "TaskbarProgress SetTaskbarBadge NewTray tray icon taskbar badge progress system tray",
 		func(ctx *ui.Context, _ *ui.Theme, s *Store) ui.Element { return shellSection(ctx, s) }},
