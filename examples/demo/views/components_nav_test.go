@@ -24,3 +24,26 @@ func TestManyTabsAddsATabAndKeepsItsFullLabel(t *testing.T) {
 		t.Errorf("development warnings: %v", r.warnings)
 	}
 }
+
+// The tree buttons open the project tree from code, and the status line reports the
+// open keys and the last node that was opened or closed.
+func TestTreeButtonsOpenRevealAndReportFromCode(t *testing.T) {
+	r := newDemoRig(t)
+	showComponents(r)
+	clickButton(r, t, "Reveal a deep node")
+	accesstest.Find(t, r.tree(), access.RoleTreeItem, "tree.go")
+	if !hasText(r, "Open: src, src/ui. Last event: expanded src/ui.") {
+		t.Error("after Reveal, the status line does not show the opened nodes and the last one")
+	}
+	clickButton(r, t, "Collapse all")
+	if !hasText(r, "Open: none. Last event: collapsed src/ui.") {
+		t.Error("after Collapse all, the status line does not show that no node is open")
+	}
+	clickButton(r, t, "Expand all")
+	if !hasText(r, "Open: src, src/ui, docs. Last event: expanded docs.") {
+		t.Error("after Expand all, the status line does not show every node open")
+	}
+	if len(r.warnings) > 0 {
+		t.Errorf("development warnings: %v", r.warnings)
+	}
+}
