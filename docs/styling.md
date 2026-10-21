@@ -573,7 +573,7 @@ parts that the code applies.
 | `ProgressBar` | `Track`, `Fill`, `Label` | `Indeterminate()` (the sliding segment is `Fill`) | none | done |
 | `ProgressRing` | `Ring`, `Dot` | sizes (`RingSmall`, `RingMedium`, `RingLarge`) | none | done |
 | `Badge` | `Badge`, `Label`, `Dot` | `Neutral`, `Accent`, `Success`, `Warning`, `Danger` (style per variant in `Theme.Badges`) | none | done |
-| `Toast` | `Container`, `Icon`, `Text`, `Action`, `Close` | `Info`, `Success`, `Warning`, `Error` (style per kind in `Theme.Toasts`; placement with `Toaster.Placement`) | none | done |
+| `Toast` | `Container`, `Icon`, `Title`, `Text`, `Action`, `Close` | `Info`, `Success`, `Warning`, `Error` (style per kind in `Theme.Toasts`; placement with `Toaster.Placement`) | none | done |
 | `Alert` | `Alert`, `Icon`, `Title`, `Description`, `Close` | `Info`, `Success`, `Warning`, `Danger` (style per variant in `Theme.Alerts`) | none | done |
 | `Tooltip` | `Panel`, `Text` | none | none | done |
 | `Avatar` | `Avatar`, `Initials` | none | none | done |

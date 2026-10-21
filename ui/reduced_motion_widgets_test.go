@@ -187,7 +187,7 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 			},
 			// A sticky toast has no timer, so only its enter motion asks for frames.
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) {
-				r.rt.toast(ToastInfo, "Saved").Sticky()
+				r.rt.toast("", ToastInfo, "Saved").Sticky()
 				r.frame()
 			}},
 		{name: "Tooltip", animates: true,

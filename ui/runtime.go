@@ -803,6 +803,7 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 	rt.expirePending(now)
 	rt.runTimers(now, false)
 	rt.tickToasts(now)
+	rt.announceToasts(now)
 	rt.wakeToasts(now)
 	if rt.tipCandidate != 0 && rt.tipShown != rt.tipCandidate && rt.tipCandidate != rt.tipDismissed && !now.Before(rt.tipAt) {
 		rt.showTip(rt.tipCandidate)

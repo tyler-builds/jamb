@@ -11,10 +11,12 @@ func testToastParts(t *testing.T, applied map[string]bool) {
 		set    func(*ToastStyle, Style)
 		action bool
 		text   bool
+		title  bool
 	}
 	cases := []toastCase{
 		{part: "Toast.Container", set: func(s *ToastStyle, m Style) { s.Container = m }},
 		{part: "Toast.Icon", set: func(s *ToastStyle, m Style) { s.Icon = m }},
+		{part: "Toast.Title", set: func(s *ToastStyle, m Style) { s.Title = m }, text: true, title: true},
 		{part: "Toast.Text", set: func(s *ToastStyle, m Style) { s.Text = m }},
 		{part: "Toast.Action", set: func(s *ToastStyle, m Style) { s.Action = m }, action: true},
 		{part: "Toast.Close", set: func(s *ToastStyle, m Style) { s.Close = m }},
@@ -25,9 +27,12 @@ func testToastParts(t *testing.T, applied map[string]bool) {
 			var st ToastStyle
 			c.set(&st, Style{Background: markBG, TextColor: markFG})
 			r := newAccessRig(func(ctx *Context) Element { return Div().Column().Child(Toaster()) })
-			toast := r.rt.toast(ToastInfo, "Saved").Styles(st)
+			toast := r.rt.toast("", ToastInfo, "Saved").Styles(st)
 			if c.action {
 				toast.Action("Undo", func() {})
+			}
+			if c.title {
+				toast.Title("Upload")
 			}
 			r.frame()
 			n := partNode(t, r.rt, c.part, "")
@@ -81,7 +86,7 @@ func TestToastUnderHighContrast(t *testing.T) {
 	theme.Toast = ToastStyle{Container: Style{Background: markBG}}
 	r := newThemedRig(&theme, func(ctx *Context) Element { return Div().Column().Child(Toaster()) })
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastBlack()})
-	r.rt.toast(ToastError, "Failed")
+	r.rt.toast("", ToastError, "Failed")
 	r.frame()
 	th := r.rt.theme
 	n := partNode(t, r.rt, "Toast.Container", "")

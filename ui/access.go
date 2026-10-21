@@ -279,10 +279,14 @@ const maxAnnouncements = 16
 // message that has no focused element to carry it, such as "Saved". It is safe
 // from any goroutine. Without an assistive technology it has no effect beyond
 // the bounded queue.
-func Announce(text string, p access.Politeness) {
+func Announce(text string, p access.Politeness) { announceFrom(text, p, "") }
+
+// announceFrom queues text from the source (see access.Announcement.Source), which
+// is empty for the default source. Toasts with an ID announce from their own source.
+func announceFrom(text string, p access.Politeness, source string) {
 	accessAnnouncements.Lock()
 	defer accessAnnouncements.Unlock()
-	q := append(accessAnnouncements.queue, access.Announcement{Text: text, Politeness: p})
+	q := append(accessAnnouncements.queue, access.Announcement{Text: text, Politeness: p, Source: source})
 	if len(q) > maxAnnouncements {
 		q = q[len(q)-maxAnnouncements:]
 	}

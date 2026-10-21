@@ -95,6 +95,9 @@ type Strings struct {
 	ExpandNavigation string
 	// DismissNotification is the name of the button that dismisses a notification.
 	DismissNotification string
+	// ToastAnnouncement is the text a toast with a title is announced with, from the
+	// title and the message, such as "Upload: Uploaded".
+	ToastAnnouncement func(title, text string) string
 	// PreviousPage is the name of the button that goes to the previous page.
 	PreviousPage string
 	// NextPage is the name of the button that goes to the next page.
@@ -507,6 +510,7 @@ func englishStrings() *Strings {
 		CollapseNavigation:  "Collapse navigation",
 		ExpandNavigation:    "Expand navigation",
 		DismissNotification: "Dismiss notification",
+		ToastAnnouncement:   func(title, text string) string { return title + ": " + text },
 		PreviousPage:        "Previous page",
 		NextPage:            "Next page",
 		PreviousSlide:       "Previous slide",
