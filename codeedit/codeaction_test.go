@@ -470,6 +470,68 @@ func TestLightbulbClickOpensTheMenu(t *testing.T) {
 	}
 }
 
+// The quick fix row of the hover opens the menu of code actions at the diagnostic.
+func TestHoverQuickFixOpensTheMenu(t *testing.T) {
+	instantTimers(t)
+	h := newHarness(t, "alpha beta", withActions(func(ctx context.Context, q CodeActionQuery) ([]CodeAction, error) {
+		return []CodeAction{{Title: "Import alpha", Kind: CodeActionQuickFix}}, nil
+	}))
+	vs := h.ed.view
+	h.doc.SetDiagnostics([]Diagnostic{{From: 6, To: 10, Message: "undefined: beta"}})
+	h.frame()
+	h.rest(0, 7)
+	h.frame()
+	if !vs.hover.open {
+		t.Fatal("the hover did not open on the diagnostic")
+	}
+	r, ok := h.rt.Find("codeedit.hover.quickfix")
+	if !ok {
+		t.Fatal("the hover has no quick fix row")
+	}
+	h.click(r.X+r.W/2, r.Y+r.H/2, 0, 1)
+	h.waitFor("the menu", func() bool { return vs.actions.open && !vs.actions.loading })
+	if vs.hover.open {
+		t.Error("the hover is still open with the menu")
+	}
+	if p := h.doc.Primary(); p.Head != 6 {
+		t.Errorf("the caret is at %d, want the diagnostic's start 6", p.Head)
+	}
+	if got := actionTitles(vs); !slices.Equal(got, []string{"Import alpha"}) {
+		t.Errorf("the menu shows %v", got)
+	}
+}
+
+// The hover and the menu can be open together, each with its own key, so the runtime warns of no
+// duplicate key.
+func TestHoverAndMenuOpenTogetherWarnOfNoDuplicateKey(t *testing.T) {
+	instantTimers(t)
+	h := newHarness(t, "alpha beta", withActions(func(ctx context.Context, q CodeActionQuery) ([]CodeAction, error) {
+		return []CodeAction{{Title: "Fix", Kind: CodeActionQuickFix}}, nil
+	}))
+	var warns []string
+	h.rt.SetWarnFunc(func(s string) { warns = append(warns, s) })
+	vs := h.ed.view
+	h.doc.SetDiagnostics([]Diagnostic{{From: 0, To: 5, Message: "undefined: alpha"}})
+	h.frame()
+	h.invokeActions()
+	h.rest(0, 2)
+	h.waitFor("the hover", func() bool { return vs.hover.open })
+	h.frame()
+	if !vs.actions.open {
+		t.Fatal("the menu closed when the hover opened")
+	}
+	for _, key := range []string{"codeedit.hover", "codeedit.hover.quickfix", "codeedit.actions"} {
+		if _, ok := h.rt.Find(key); !ok {
+			t.Errorf("%s is not in the tree", key)
+		}
+	}
+	for _, w := range warns {
+		if strings.Contains(w, "duplicate key") {
+			t.Errorf("warning: %s", w)
+		}
+	}
+}
+
 // Read-only editors have no code actions: Ctrl+. does nothing.
 func TestReadOnlyEditorHasNoCodeActions(t *testing.T) {
 	asked := false
