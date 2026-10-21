@@ -337,6 +337,11 @@ type Announcement struct {
 	Text string
 	// Politeness is how urgently the message is announced.
 	Politeness Politeness
+	// Source names the source of the message, such as "jamb.toast:upload". The
+	// messages of one source may replace each other while they wait to be spoken, so
+	// a progress message that is updated is not read in full each time. Empty means
+	// the default source.
+	Source string
 }
 
 // Range is the number a slider or spin box holds, with the bounds and the steps

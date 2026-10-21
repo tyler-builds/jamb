@@ -603,13 +603,17 @@ func TestStatePropertiesOfTheNewPatterns(t *testing.T) {
 }
 
 // TestNotificationProcessingForPoliteness checks the mapping that the design
-// records: polite announcements are queued, and assertive ones interrupt.
+// records: polite announcements are queued, and assertive ones interrupt. A polite
+// announcement with a source supersedes the queued ones from that source.
 func TestNotificationProcessingForPoliteness(t *testing.T) {
-	if got := notificationProcessingOf(access.Polite); got != notificationAll {
+	if got := notificationProcessingOf(access.Announcement{Politeness: access.Polite}); got != notificationAll {
 		t.Errorf("polite = %d, want All (%d)", got, notificationAll)
 	}
-	if got := notificationProcessingOf(access.Assertive); got != notificationImportantMostRecent {
-		t.Errorf("assertive = %d, want ImportantMostRecent (%d)", got, notificationImportantMostRecent)
+	if got := notificationProcessingOf(access.Announcement{Politeness: access.Polite, Source: "jamb.toast:upload"}); got != notificationMostRecent {
+		t.Errorf("polite with a source = %d, want MostRecent (%d)", got, notificationMostRecent)
+	}
+	if got := notificationProcessingOf(access.Announcement{Politeness: access.Assertive, Source: "jamb.toast:upload"}); got != notificationImportantMostRecent {
+		t.Errorf("assertive with a source = %d, want ImportantMostRecent (%d)", got, notificationImportantMostRecent)
 	}
 }
 

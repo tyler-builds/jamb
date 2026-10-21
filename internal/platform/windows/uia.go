@@ -150,6 +150,7 @@ const (
 	notificationKindOther           = 4
 	notificationImportantMostRecent = 1
 	notificationAll                 = 2
+	notificationMostRecent          = 3
 
 	// ProviderOptions.
 	providerClientSide             = 0x1
@@ -1499,21 +1500,29 @@ func variantBSTRValue(v variant) uintptr { return *(*uintptr)(unsafe.Pointer(&v.
 // interrupts the speech in progress and then says the most recent one. The
 // activity ID names the source of the notification.
 func (w *window) announce(a access.Announcement) {
-	display, activity := bstrOf(a.Text), bstrOf("jamb")
-	win32.UiaRaiseNotificationEvent(w.uiaRoot, notificationKindOther, notificationProcessingOf(a.Politeness), display, activity)
+	activity := a.Source
+	if activity == "" {
+		activity = "jamb"
+	}
+	display, activityID := bstrOf(a.Text), bstrOf(activity)
+	win32.UiaRaiseNotificationEvent(w.uiaRoot, notificationKindOther, notificationProcessingOf(a), display, activityID)
 	win32.SysFreeString(display)
-	win32.SysFreeString(activity)
+	win32.SysFreeString(activityID)
 }
 
 // notificationProcessingOf returns the NotificationProcessing of an announcement
-// with the politeness p. Polite is All: presented when possible, and every
-// message is delivered. Assertive is ImportantMostRecent: presented as soon as
-// possible, and a newer message supersedes an older one. Microsoft warns that
-// ImportantAll can flood the user, and ImportantCurrentThenMostRecent exists
-// only from Windows build 26100.
-func notificationProcessingOf(p access.Politeness) int32 {
-	if p == access.Assertive {
+// a. Assertive is ImportantMostRecent: presented as soon as possible, and a newer
+// message supersedes an older one. Polite is All: presented when possible, and
+// every message is delivered. A polite announcement with a source is MostRecent,
+// so a newer message from the same source supersedes the ones still waiting.
+// Microsoft warns that ImportantAll can flood the user, and
+// ImportantCurrentThenMostRecent exists only from Windows build 26100.
+func notificationProcessingOf(a access.Announcement) int32 {
+	switch {
+	case a.Politeness == access.Assertive:
 		return notificationImportantMostRecent
+	case a.Source != "":
+		return notificationMostRecent
 	}
 	return notificationAll
 }
