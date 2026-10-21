@@ -153,7 +153,8 @@ var componentSections = []componentSection{
 	{"Code editor", "codeedit Editor NewDocument code syntax highlighting languages find replace go to line cursors " +
 		"SoftWrap WrapColumn WrappingIndent word wrap SetDiagnostics SetDiagnosticsFor diagnostics problems errors warnings F8 " +
 		"Hover HoverFunc HoverDelay hover Completions CompletionProvider completion autocomplete Ctrl+Space " +
-		"Definitions OnOpenLocation definition go to definition F12",
+		"Definitions OnOpenLocation definition go to definition F12 CodeActions CodeActionProvider code actions " +
+		"quick fix lightbulb Ctrl+. refactor organize imports",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return codeEditorSection() }},
 	{"Customizing", "Styles Theme Variant RenderTab Tabs Segmented Indicator Checkbox Collapsible NumberInput SpinButtons " +
 		"Select Button Badge render slot styling",

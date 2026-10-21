@@ -24,16 +24,49 @@ func TestCodeEditorSampleProvidersAnswerForItsNames(t *testing.T) {
 	}
 }
 
-// The sample's three problems are marked at the text they name.
+// The sample's four problems are marked at the text they name.
 func TestCodeEditorDocumentMarksItsProblems(t *testing.T) {
 	ds := codeEditorDocument().Diagnostics()
-	if len(ds) != 3 {
-		t.Fatalf("the document has %d diagnostics, want 3", len(ds))
+	if len(ds) != 4 {
+		t.Fatalf("the document has %d diagnostics, want 4", len(ds))
 	}
 	for _, d := range ds {
 		if d.From < 0 || d.To > len(codeEditorSample) || d.From >= d.To {
 			t.Errorf("the diagnostic %+v is not a range of the sample", d)
 		}
+	}
+}
+
+// The sample's code actions fix the misspelt name with a preferred quick fix that replaces it, list
+// a refactoring disabled with its reason, and run organize imports into the status line.
+func TestCodeEditorSampleOffersCodeActions(t *testing.T) {
+	var status string
+	at := strings.Index(codeEditorSample, "nmae")
+	q := codeedit.CodeActionQuery{
+		Query:       codeedit.Query{Text: codeEditorSample, Offset: at},
+		From:        at,
+		To:          at,
+		Diagnostics: codeEditorDocument().DiagnosticsAt(at),
+		Trigger:     codeedit.CodeActionInvoked,
+	}
+	acts, err := codeEditorActions{report: func(s string) { status = s }}.CodeActions(context.Background(), q)
+	if err != nil || len(acts) != 3 {
+		t.Fatalf("the actions are %+v, %v; want three", acts, err)
+	}
+	fix := acts[0]
+	if fix.Kind != codeedit.CodeActionQuickFix || !fix.Preferred || len(fix.Edits) != 1 ||
+		fix.Edits[0] != (codeedit.Change{From: at, To: at + len("nmae"), Text: "name"}) {
+		t.Errorf("the quick fix is %+v, want the misspelt name replaced", fix)
+	}
+	if acts[1].Disabled == "" || !acts[1].Kind.Within(codeedit.CodeActionRefactor) {
+		t.Errorf("the refactoring is %+v, want it disabled with a reason", acts[1])
+	}
+	if acts[2].Kind != codeedit.CodeActionSourceOrganizeImports || acts[2].Run == nil {
+		t.Fatalf("the source action is %+v, want organize imports with a Run", acts[2])
+	}
+	acts[2].Run()
+	if status == "" {
+		t.Error("organize imports did not report into the status line")
 	}
 }
 
