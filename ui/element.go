@@ -126,9 +126,11 @@ type DivElement struct {
 	roving       *rovingGroup      // set by Toolbar: the focusable elements inside are one Tab stop
 	focusIn      func(in bool)     // set by HoverCard: focus entered (true) or left the element and its descendants
 	modal        *modalSpec        // set on the backdrop of a Modal (see modal.go)
-	modalFooter  bool              // set on a Modal's footer, which the initial focus skips
 	acc          *accessInfo       // accessibility role, name and states (see access.go)
 	ime          *IME              // set by DivElement.IME, for an input method (see element_input.go)
+
+	// noInitialFocus is set on a Modal's footer and close box, which the initial focus skips.
+	noInitialFocus bool
 
 	// fillFromParent paints fillBase and then the parent's background under the
 	// element's own, so that the element is opaque in its parent's state (a pinned

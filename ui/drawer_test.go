@@ -13,7 +13,7 @@ import (
 func partDrawer(side DrawerSide, st DrawerStyle, closed *bool) *DrawerElement {
 	ok := Button("Save").Key("ok").Primary()
 	return Drawer("Settings", TextInput(NewSignal("")).Label("Name").Key("name")).
-		Side(side).Footer(Button("Cancel"), ok).Default(ok).Styles(st).
+		Side(side).Footer(Button("Cancel"), ok).Default(ok).Styles(st).CloseButton(true).
 		OnClose(func() {
 			if closed != nil {
 				*closed = true
@@ -69,7 +69,9 @@ func testDrawerParts(t *testing.T, applied map[string]bool) {
 	}{
 		{"Drawer.Scrim", func(s *DrawerStyle, m Style) { s.Scrim = m }},
 		{"Drawer.Panel", func(s *DrawerStyle, m Style) { s.Panel = m }},
+		{"Drawer.Header", func(s *DrawerStyle, m Style) { s.Header = m }},
 		{"Drawer.Title", func(s *DrawerStyle, m Style) { s.Title = m }},
+		{"Drawer.Close", func(s *DrawerStyle, m Style) { s.Close = m }},
 		{"Drawer.Body", func(s *DrawerStyle, m Style) { s.Body = m }},
 		{"Drawer.Footer", func(s *DrawerStyle, m Style) { s.Footer = m }},
 	}

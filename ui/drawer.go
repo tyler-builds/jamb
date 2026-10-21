@@ -64,6 +64,10 @@ func (d *DrawerElement) InitialFocus(h *FocusHandle) *DrawerElement { d.m.Initia
 // a press on the backdrop. It should remove the drawer from the app's state.
 func (d *DrawerElement) OnClose(fn func()) *DrawerElement { d.m.OnClose(fn); return d }
 
+// CloseButton shows a close button at the top right of the drawer, when show is
+// set (see Modal.CloseButton).
+func (d *DrawerElement) CloseButton(show bool) *DrawerElement { d.m.CloseButton(show); return d }
+
 // Styles sets the look of the parts of the drawer, for this instance only.
 func (d *DrawerElement) Styles(st DrawerStyle) *DrawerElement { d.m.Styles(st); return d }
 

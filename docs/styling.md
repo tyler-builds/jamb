@@ -564,8 +564,8 @@ parts that the code applies.
 | `DataGrid` | `Grid`, `GridFocusVisible`, `Header`, `HeaderCell`, `HeaderCellHover`, `HeaderCellSorted`, `SortIndicator`, `ResizeHandle`, `Row`, `RowHover`, `RowSelected`, `RowAlternate`, `Cell`, `CellFocused`, `Empty`, `CellEditing`, `Editor`, `EditorMessage`, `DropIndicator`, `CellPinned`, `PinnedEdge`, `HeaderGroup`, `CellSelected` | `DataGridComfortable`, `DataGridCompact`, `Striped()` | `DataColumn.Cell`, `DataColumn.RenderHeader` | done |
 | `DropdownMenu`, `ContextMenu` | `Panel`, `Item`, `ItemHighlighted`, `ItemDisabled`, `Separator`, `SectionLabel`, `Shortcut`, `Check`, `SubmenuChevron` | none | none | done |
 | `MenuBar` | `BarItem`, `BarItemHover`, `BarItemFocusVisible`, `BarItemOpen` | none | none | done |
-| `Modal` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | none | none | done |
-| `Drawer` | `Scrim`, `Panel`, `Title`, `Body`, `Footer` | `Side` (`DrawerRight`, `DrawerLeft`, `DrawerTop`, `DrawerBottom`) | none | done |
+| `Modal` | `Scrim`, `Panel`, `Header`, `Title`, `Close`, `Body`, `Footer` | none | none | done |
+| `Drawer` | `Scrim`, `Panel`, `Header`, `Title`, `Close`, `Body`, `Footer` | `Side` (`DrawerRight`, `DrawerLeft`, `DrawerTop`, `DrawerBottom`) | none | done |
 | `AlertDialog` | `Scrim`, `Panel`, `Header`, `Icon`, `Title`, `Message`, `Body`, `Footer` | `Intent` (`AlertDialogInfo`, `AlertDialogConfirm`, `AlertDialogWarning`, `AlertDialogDestructive`) | `Body`, `Action` (elements) | done |
 | `Popover` | `Panel` | `Placement` | none | done |
 | `HoverCard` | `Panel` | `Placement` | none | done |
