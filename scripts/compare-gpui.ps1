@@ -178,7 +178,10 @@ function Invoke-BuildOnce([string]$Dir, [string]$Command, [hashtable]$EnvVars, [
     }
     try {
         $sw = [Diagnostics.Stopwatch]::StartNew()
-        $p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/d', '/c', "`"$bat`"" -Wait -PassThru -WindowStyle Hidden
+        # Waits for cmd.exe alone: Start-Process -Wait would also wait for every process the
+        # build started, and the MSVC linker leaves vctip.exe running for about 15 minutes.
+        $p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/d', '/c', "`"$bat`"" -PassThru -WindowStyle Hidden
+        $p.WaitForExit()
         $sw.Stop()
     } finally {
         foreach ($k in $EnvVars.Keys) { [Environment]::SetEnvironmentVariable($k, $old[$k]) }
