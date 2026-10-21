@@ -151,10 +151,12 @@ type Renderer struct {
 	swap1   bool // created via CreateSwapChainForHwnd (unscaled flip model)
 	// waitable is the swap chain's frame latency waitable object, 0 when the
 	// chain has none. It is signaled when the chain can take another frame.
-	waitable    uintptr
-	swapFlags   uint32
-	resized     bool // the swap chain changed size this frame
-	presentWait time.Duration
+	waitable  uintptr
+	swapFlags uint32
+	resized   bool // the swap chain changed size this frame
+	// presentStart and presentEnd are when the last Present call started and
+	// returned, on the clock of win32.PerformanceNanos.
+	presentStart, presentEnd int64
 	// occluded is set when the last Present found the window covered by another
 	// window, so its frame was not shown. occlusionFactory and occlusionCookie
 	// record the registration that wakes the window when it is visible again.
@@ -179,8 +181,10 @@ func (r *Renderer) Describe() string {
 	return "Direct3D 11, blit model (fallback)"
 }
 
-// LastPresentWait reports how long the last Present call blocked.
-func (r *Renderer) LastPresentWait() time.Duration { return r.presentWait }
+// LastPresent reports when the last Present call started and returned, in
+// nanoseconds on the performance counter (see win32.PerformanceNanos). The
+// difference is how long Present blocked.
+func (r *Renderer) LastPresent() (start, end int64) { return r.presentStart, r.presentEnd }
 
 // SetVSync enables (default) or disables waiting for vertical blank in
 // Present. Disabling it is only useful for measuring raw throughput.
@@ -799,9 +803,9 @@ func (r *Renderer) EndFrame() error {
 		sync = 0
 	}
 	r.resized = false
-	t0 := time.Now()
+	r.presentStart = win32.PerformanceNanos()
 	hr, _, _ = syscall.SyscallN(r.swap.fn(8), r.swap.this(), sync, 0) // Present
-	r.presentWait = time.Since(t0)
+	r.presentEnd = win32.PerformanceNanos()
 	r.occluded = hr == dxgiStatusOccluded
 	if r.occluded {
 		return nil

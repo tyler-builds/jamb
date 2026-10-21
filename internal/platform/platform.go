@@ -381,6 +381,10 @@ type Event struct {
 	Text   string
 	// Paths are the files of an EventFileDrop, as local file system paths.
 	Paths []string
+	// Arrived is when the platform received the event, on the platform's
+	// performance clock (windows.Clock on Windows), or 0 when it does not stamp
+	// events. Frame statistics measure input latency from it.
+	Arrived int64
 	// Cursor, ClauseStart and ClauseEnd are byte offsets in Text of an
 	// EventComposition.
 	Cursor, ClauseStart, ClauseEnd int

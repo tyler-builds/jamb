@@ -51,8 +51,9 @@ type window struct {
 	buttonsDown int
 	highSurr    uint16
 	inSizeMove  bool
-	ready       bool // OnCreate succeeded; frames may be rendered
-	maximized   bool // last reported state, see platform.EventWindowState
+	ready       bool  // OnCreate succeeded; frames may be rendered
+	maximized   bool  // last reported state, see platform.EventWindowState
+	msgAt       int64 // arrival of the message being handled, see Clock
 	wakeAt      time.Time
 	imeRect     platform.Rect
 	// imeCanceling is set while CancelComposition runs, so the composition
@@ -549,6 +550,7 @@ func (w *window) cursorHandle(c input.Cursor) uintptr {
 
 func (w *window) emit(e platform.Event) {
 	e.Mods = currentMods()
+	e.Arrived = w.msgAt
 	w.handler.OnEvent(w, e)
 }
 
@@ -606,6 +608,9 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	if w == nil {
 		return win32.DefWindowProc(hwnd, msg, wp, lp)
 	}
+	// The arrival of the message, which the events it makes carry (see emit). The
+	// message time of GetMessageTime has only millisecond resolution.
+	w.msgAt = Clock()
 	if msg != 0 && msg == taskbarButtonMsg {
 		w.taskbarButtonCreated()
 		return 0
