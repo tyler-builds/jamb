@@ -16,7 +16,7 @@ func TestComponentsPageSettlesAfterScrollUnderHover(t *testing.T) {
 	s := NewStore()
 	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
 	rt.SetViewport(1200, 760, 1)
-	now := time.Unix(1_000_000, 0)
+	now := time.Now() // the runtime reads the wall clock for its timers, so frames must too
 	frame := func() {
 		now = now.Add(16 * time.Millisecond)
 		rt.Frame(now)
