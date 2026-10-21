@@ -48,6 +48,9 @@ The milestone status, and the known limitations and next steps.
   (tooltips and the command palette do). Escape closes an overlay only when it
   has an `OnClickOutside`; any other overlay handles Escape itself, with
   `OnAction` and a binding or in `OnKeyDown`.
+- **Non-modal dialogs.** They are placed by their kind and are not anchored to an
+  element or dragged. Their Narrator announcements, and F6 with dialogs open, are
+  checked headless only; a hand check on Windows is still owed.
 - **Key bindings.** A handler can't pass the key on to the next binding.
   The keymap file's watch is per directory, so other files that change there
   (such as the notes file on each save) cause a cheap re-read of keymap.json,

@@ -151,6 +151,10 @@ ui.If(open.Get(), ui.Drawer("Filters", filters).
 	OnClose(func() { open.Set(false) }))
 ```
 
+A drawer can show a close button (`CloseButton(true)`, see
+[Close button](#close-button)) and can be non-modal (`NonModal()`, see
+[Non-modal dialogs](#non-modal-dialogs)); an alert dialog is never a drawer.
+
 Their looks are `ui.PopoverStyle` (`Panel`) and `ui.DrawerStyle` (the modal's parts),
 set in `Theme.Popover` and `Theme.Drawer` or with `.Styles(...)`.
 
@@ -232,6 +236,50 @@ ui.If(open.Get(), ui.Modal("New project", form).
   handlers and typed text outside the modal don't reach anything behind it, and
   Alt doesn't activate a menu bar. Keys handled inside the modal (a field's
   editing keys, the modal's own bindings) work as usual.
+
+### Close button
+
+`CloseButton(true)` shows a close button at the top right of the panel, beside the
+title. It runs `OnClose`, and it is built only when there is an `OnClose`. The
+button is a small ghost icon button named by `Strings.Close`, first in the Tab
+order; the initial focus skips it. A drawer has the same button. `AlertDialog`
+has none: it asks for an answer, so its Cancel button and Escape are the way out.
+The parts are `Header`, the row of the title and the button, and `Close`, the box
+around the button (`ModalStyle`, or `DrawerStyle` for a drawer).
+
+### Non-modal dialogs
+
+`NonModal()` makes a modal or a drawer non-modal, for a dialog that leaves the
+window in use while it is open, such as a find bar or a properties sheet. Place
+non-modal dialogs before the modals in the window's root element, so that a modal
+is drawn over them:
+
+```go
+ui.If(open.Get(), ui.Modal("Find", findField).NonModal().
+	Footer(done).Default(done).
+	OnClose(closeFn))             // a close button is shown; CloseButton(false) hides it
+```
+
+- There is no scrim, so the window is not dimmed and a press on it reaches the
+  window. `Modal.Scrim` is not built for a non-modal dialog. The dialog is centered,
+  or, for a drawer, at its side. It is not anchored to an element (use a
+  `Popover` for that), and it cannot be dragged.
+- Focus is not trapped. Tab moves through the whole window, into the dialog and
+  out again. F6 and Shift+F6 cycle the window, the open non-modal dialogs (topmost
+  first) and the toasts; a dialog is entered at the element that last had focus in
+  it. Focus moves into the dialog when it opens, and returns to the element that had
+  it when the dialog closes, if focus is still inside.
+- Escape closes the dialog only while focus is inside it, after any popover inside
+  it. Enter runs the dialog's default button only from inside it. The app's
+  bindings, F10 and Alt run as usual.
+- A press outside the panel does not close the dialog. `CloseOnClickOutside()`
+  makes it close, and the press still reaches the window.
+- A press in a non-modal dialog, or focus entering it from outside, raises it above
+  the other non-modal dialogs. A modal opened over them covers them, takes focus
+  and presses, and a press on its backdrop does not close the dialogs under it.
+- Assistive technology hears a dialog that is not modal: the UI Automation window
+  reports IsModal and IsTopmost as false, with the non-modal state
+  (`access.StateNonModal`), and its opening and closing raise the window events.
 
 ### Alert dialogs
 
