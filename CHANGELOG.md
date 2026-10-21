@@ -43,6 +43,12 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
   styles of `tag`, `property` and `attribute` when a theme does not style them.
 - `highlight.DefaultMaxBytes` is 16 MB (was 5 MB).
 - The session's spans no longer overlap, and leave out the spaces around a token.
+- `compare-gpui.ps1` measures on a non-primary monitor without activating the windows. Its pointer
+  phase posts mouse messages instead of moving the cursor, and its focused idle sample runs only
+  with `-IncludeFocused`. `-Position` sets where the windows open.
+- BENCHMARKS.md leads with the results of 2026-10-21, with how to reproduce them and the known
+  issues they show, and keeps the earlier measurements under their dates. The GPUI comparison has
+  a third pass, and the README and the getting-started guide quote its figures.
 
 ### Added
 
@@ -133,6 +139,25 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 - `Tree.Expanded` keeps the open nodes in a signal the app can set, and `OnExpand` and
   `OnCollapse` report each node the user or the app opens or closes. `TreeHandle` (`NewTreeHandle`,
   `Tree.Handle`) expands, collapses, reveals and selects nodes from code.
+- `ui.Runtime.FrameRequested` reports whether a frame is wanted when the call is made. The frame
+  statistics use it to leave frames that follow an idle gap out of the present intervals.
+- Dev hooks for measurements: `JAMB_NOACTIVATE=1` shows every window without activating it, and
+  `JAMB_POSITION="X,Y"` places the first window's top-left corner at a logical position, negative
+  values included. `JAMB_FRAMESTATS=PATH` records every frame of the first window, with its CPU time,
+  the interval between presents and the latency of each scripted input event. `JAMB_HEAPLOG=PATH`
+  writes the memory counters every `JAMB_HEAPLOG_SECONDS` seconds, for soak runs. The `mark` and
+  `repeat N` steps of `JAMB_SCRIPT` loop a sequence (`repeat 0` until the window closes). See
+  [docs/tools.md](docs/tools.md).
+- `scripts/bench-live.ps1` measures a running demo and hello on a secondary monitor: startup, idle
+  CPU and memory, scripted scenarios with frame and input latency, resizing, stress, a second window
+  and an optional soak. Its windows never take focus or the cursor.
+- `scripts/bench-go.ps1` runs every Go benchmark in the workspace a set number of times, summarizes
+  the results with benchstat, and can compare them with an earlier run.
+- An advisory benchmark workflow compares the Go benchmarks of each pull request with its base and
+  writes the comparison to the job summary. It reports slowdowns and never fails a pull request.
+- Go benchmarks for hit testing, key dispatch, text input typing, expanded trees, animations, the
+  accessibility tree and its updates, theme and page switches, glyph rasterization, and layout of
+  Latin, bidi and complex scripts.
 
 ### Fixed
 
@@ -148,6 +173,10 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 
 - `Toast.Dismiss` on a toast that had the focus lost the focus. It now moves the focus on, as the
   toast's close button does.
+- A window at a negative position could be placed a pixel off on a monitor scaled above 100%,
+  because the scaling rounded toward zero for negative values. Halves now round away from zero, as
+  positive values do. A window moved to a monitor with another scale before its creation finished
+  now receives the change once it is ready.
 
 ### Removed
 
