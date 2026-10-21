@@ -38,8 +38,8 @@ The controls, with no app code, once their roles and states are set:
   selected. A `Collapsible` header is a button that expands and collapses, and its
   content is a group named by the header. A `Tree` is a tree whose items expand
   and collapse, with their level and position in their set. Every tree item has
-  ExpandCollapse, and a leaf reports that it has no children. Only the rows in view
-  are in the tree.
+  ExpandCollapse, and a leaf reports that it has no children. A node opened or closed
+  from code raises the same expanded change. Only the rows in view are in the tree.
 - A `TextInput` or `TextArea` has its text as its value, which assistive
   technology can read and set. It also has the UI Automation Text pattern: a
   screen reader reads and moves by character, word, line and paragraph, reads
@@ -54,7 +54,10 @@ The controls, with no app code, once their roles and states are set:
 - A `ProgressBar` is a progress bar whose range is read-only: assistive technology
   reads its value and cannot set it. An indeterminate bar and a `ProgressRing` are
   progress bars with no range. The Toaster's region is a group named "Notifications",
-  and each toast is a group named by its text. A badge attached to an element is
+  and each toast is a group named by its title, or by its text when it has none, and
+  described by its text. A toast with an ID announces from its own source, which is
+  passed to UI Automation as the activity ID (`jamb.toast:<id>`); how a screen reader
+  uses that ID varies. A badge attached to an element is
   part of that element's name (see Feedback above).
 
 The API, on the elements that already exist:

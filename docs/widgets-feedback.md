@@ -24,6 +24,8 @@ ui.BadgeDot().Variant(ui.BadgeDanger)                 // a dot only
 ui.Div().Label("Projects").Badged(ui.Badge(6).Noun("items")) // a badge on an element
 ui.Toaster().Key("toaster")                           // once, as the last child of the window's root
 ctx.Toast(ui.ToastSuccess, "Project created").Action("Undo", undo) // in a handler
+ctx.ToastWithID("upload", ui.ToastInfo, "Uploading 20%").Title("Upload") // updates the shown "upload" toast
+ctx.DismissToast("upload")                                              // removes it, if it is shown
 ```
 
 - **Progress bar.** A determinate bar is a read-only range: its value is clamped to
@@ -75,9 +77,23 @@ ctx.Toast(ui.ToastSuccess, "Project created").Action("Undo", undo) // in a handl
   element it had. Escape in the region returns focus. F6 toggling is what the framework
   does for now: full cycling through several regions (the sidebar, the header, the
   content, the toasts), as Microsoft's guidance describes, is future work.
-- **Toast announcements.** Each toast is announced through `Announce`: politely for
-  info and success, and assertively for warning and error, as the existing
-  announcements are. Its group is named by its text.
+- **Toast announcements.** Each toast is announced: politely for info and success,
+  and assertively for warning and error. A toast is announced once per frame, so the
+  updates made in one handler are read as their last text. Its group is named by its
+  text, or by its title when it has one, and described by its text.
+- **Keyed and titled toasts.** `ToastWithID` shows a toast under an ID the app
+  chooses, or, when a toast with that ID is shown, replaces it in place: the toast
+  keeps its place in the stack, its element, its hover and its focus, and its time
+  starts again. Its text, variant, title and actions are those of the new call, so
+  chain them again on each update. An update does not take room in the stack, and it
+  is not announced again when its text is unchanged. The same kind of toast is
+  announced at most once every 2 seconds: an update within that gap is read when the
+  gap ends, and the latest text is the one read. A toast with an ID announces from
+  its own source, so a newer message replaces the earlier ones still waiting to be
+  read (Windows UI Automation's most-recent processing). `DismissToast` removes the
+  toast with the ID, as its close button does, and does nothing when none is shown.
+  `Toast.Title` gives a toast a semibold title above its text. `Toast.Dismiss` moves
+  the focus on when the focus was in the toast, as the close button does.
 
 ## Alerts
 
