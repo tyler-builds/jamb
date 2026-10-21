@@ -60,6 +60,7 @@ func (d *Document) SetDiagnostics(ds []Diagnostic) {
 	}
 	slices.SortStableFunc(out, func(a, b Diagnostic) int { return a.From - b.From })
 	d.diags, d.diagSet = out, true
+	d.diagVer++
 	d.redraw()
 }
 

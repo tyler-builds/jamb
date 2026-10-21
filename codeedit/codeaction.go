@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/ui"
@@ -115,6 +116,28 @@ type actionState struct {
 	top     int          // the first line the rows show, kept by follow
 	since   []Change
 	menu    asyncSlot[[]CodeAction]
+
+	// bulb says whether the lightbulb shows, on the row bulbRow. key is what the lightbulb was asked
+	// for, when keyed; again makes a debounced request stale, and auto is the request on its way.
+	bulb    bool
+	bulbRow int
+	key     bulbKey
+	keyed   bool
+	again   uint64
+	auto    asyncSlot[[]CodeAction]
+}
+
+// actionsDebounce is the pause after the text or the caret moves before the editor asks whether
+// the line has a code action, so that the lightbulb does not ask on every key.
+const actionsDebounce = 250 * time.Millisecond
+
+// A bulbKey is what the lightbulb is asked about: the document, its text and its diagnostics as
+// they are, and the primary selection.
+type bulbKey struct {
+	doc  *Document
+	text uint64
+	diag uint64
+	sel  Selection
 }
 
 // An actionLine is a row of the menu: the header of a group, when item is -1, or the action
@@ -497,6 +520,69 @@ func (vs *viewState) actionsPopup(st Style) ui.Element {
 		}
 	}
 	return vs.popupAnchor("codeedit.actions.anchor", as.at, panel)
+}
+
+// syncLightbulb is called at each render. The lightbulb shows on the row of the caret when a
+// diagnostic is there and the provider has an enabled action for it. The lightbulb is hidden when
+// the editor is not focused, when the provider is not set, when there is no diagnostic at the
+// selection or on the caret's row, and when the text, the diagnostics or the selection change; a
+// change asks again after the debounce.
+func (vs *viewState) syncLightbulb() {
+	st := &vs.actions
+	key := bulbKey{doc: vs.doc, text: vs.doc.TextVersion(), diag: vs.doc.diagVer, sel: vs.doc.Primary()}
+	from, to := key.sel.Range()
+	if vs.actionsP == nil || !vs.focused || len(vs.actionDiagnostics(from, to)) == 0 {
+		vs.hideLightbulb()
+		return
+	}
+	if st.keyed && st.key == key {
+		return // asked about already, and its answer is shown or on its way
+	}
+	st.bulb = false
+	st.auto.stop()
+	st.again++
+	st.key, st.keyed = key, true
+	st.bulbRow = vs.doc.RowOf(key.sel.Head)
+	again := st.again
+	afterFunc(actionsDebounce, func() {
+		if c := vs.latest.Load(); c != nil {
+			c.Post(func() {
+				if st.again == again {
+					vs.probeLightbulb()
+				}
+			})
+		}
+	})
+}
+
+// hideLightbulb hides the lightbulb and drops its request, and a debounced one that is waiting.
+func (vs *viewState) hideLightbulb() {
+	st := &vs.actions
+	st.bulb, st.keyed = false, false
+	st.auto.stop()
+	st.again++
+}
+
+// probeLightbulb asks the provider for the actions of the primary selection, as an automatic
+// request, and shows the lightbulb when one of them is enabled.
+func (vs *viewState) probeLightbulb() {
+	st := &vs.actions
+	prov, q := vs.actionsP, vs.actionQuery(CodeActionAutomatic)
+	st.auto.run(vs, func(ctx context.Context) ([]CodeAction, error) { return prov.CodeActions(ctx, q) },
+		func(items []CodeAction, err error) {
+			st.bulb = err == nil && slices.ContainsFunc(items, func(a CodeAction) bool { return a.Disabled == "" })
+			vs.touch()
+		})
+}
+
+// drawLightbulb draws a lightbulb in the gutter column at x, w wide, on the row at y: a filled bulb
+// with its base under it, so that the mark shows that there is an action by its shape, not by its
+// color alone.
+func drawLightbulb(p *ui.Painter, x, w, y, lineH float32, c ui.Color) {
+	r := min(w, lineH) * 0.3
+	cx, cy := x+w/2, y+lineH/2-r*0.3
+	p.Fill(ui.NewPath().Circle(cx, cy, r), c)
+	p.FillRect(cx-r*0.6, cy+r*0.9, r*1.2, r*0.5, c)
 }
 
 // actionRow returns the row of the action on the line i of the menu. A disabled action shows its

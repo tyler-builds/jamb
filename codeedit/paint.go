@@ -94,7 +94,7 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 
 	// The scroll position: the caret is kept in view after a move, and the position stays in
 	// the content. Rows wrapped to the view's width do not scroll horizontally.
-	vs.geo = geometry{lineH: lineH, charW: charW, gutterW: textX, textX: textX, foldX: foldX, viewW: w, viewH: h, painted: true}
+	vs.geo = geometry{lineH: lineH, charW: charW, gutterW: textX, textX: textX, foldX: foldX, markW: diagW, viewW: w, viewH: h, painted: true}
 	if vs.reveal {
 		vs.reveal = false
 		vs.revealCaret(x, lineH, charW, h, textW)
@@ -225,7 +225,9 @@ func (vs *viewState) paint(p *ui.Painter, w, h float32, ps paintSettings) {
 		}
 		row := dr.row
 		y := float32(first+k)*lineH - vs.scrollY
-		if s := worst[row]; s != 0 {
+		if vs.actions.bulb && row == vs.actions.bulbRow {
+			drawLightbulb(p, 0, diagW, y, lineH, st.Lightbulb.TextColor)
+		} else if s := worst[row]; s != 0 {
 			drawDiagnosticMarker(p, s, 0, diagW, y, lineH, diagnosticStyle(st, s).TextColor, st.Gutter.FontSize)
 		}
 		if ps.numbers {
