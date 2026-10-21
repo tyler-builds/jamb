@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
@@ -58,6 +59,7 @@ func navigationSection() ui.Element {
 				Key("nav.tree").Label("Project files").Style(ui.Style{MaxHeight: ui.Px(200)}))),
 			sample(t, "Tree view, 10,000 generated folders", ui.Div().Width(ui.Px(420)).Child(ui.Tree(folders, big).
 				Key("nav.bigTree").Label("Generated folders").Style(ui.Style{Height: ui.Px(200)}))),
+			manyTabsSample(t),
 		}
 		// Each sample is a column, not a wrapped row, since the tabs and the tree are wide.
 		col := ui.Div().Column().Gap(18)
@@ -66,6 +68,35 @@ func navigationSection() ui.Element {
 			Child(SectionTitle(t, "Navigation and layout")).
 			Child(ui.Text("Tab moves to the selected tab. Left and Right select the neighbouring tabs; Ctrl+Tab goes to the next tab from the tab list or the panel.").FontSize(12).TextColor(t.TextMuted)).
 			Child(col)
+	})
+}
+
+// manyTabsSample is a narrow strip of tabs that do not fit. The strip scrolls, with
+// arrow buttons at its ends, the overflow menu lists every tab, the long label is cut
+// short at TabMaxWidth, and the prefix and the suffix sit outside the strip. The add
+// button appends a tab and selects it. The tabs are kept in the component.
+func manyTabsSample(t *ui.Theme) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		names := ui.Local(ctx, "nav.manyNames", []string{
+			"Tab 1", "Tab 2", "Tab 3", "Tab 4", "Tab 5", "Tab 6", "Tab 7", "Tab 8", "Tab 9",
+			"Quarterly revenue by region, with forecasts",
+		})
+		picked := ui.Local(ctx, "nav.manyPicked", "Tab 1")
+		tabs := make([]ui.Tab[string], 0, len(names.Get()))
+		for _, name := range names.Get() {
+			tabs = append(tabs, ui.Tab[string]{Value: name, Label: name,
+				Panel: func() ui.Element { return panelText(t, name+" panel") }})
+		}
+		add := ui.IconButton(icons.Plus).Label("Add tab").OnClick(func() {
+			next := fmt.Sprintf("Tab %d", len(names.Peek()))
+			names.Update(func(ns []string) []string { return append(slices.Clone(ns), next) })
+			picked.Set(next)
+		})
+		return sample(t, "Many tabs: scroll, overflow menu, long label, add", ui.Div().Width(ui.Px(360)).Child(ui.Tabs(picked, tabs...).
+			Key("nav.manyTabs").Label("Many tabs").
+			Prefix(ui.Text("Sheets").FontSize(12).TextColor(t.TextMuted)).
+			Suffix(add).
+			OverflowMenu().TabMaxWidth(ui.Px(120))))
 	})
 }
 
