@@ -20,6 +20,9 @@ What is automatic, with no app code:
 - Menus, menu bars and menu items carry their roles, checked and disabled
   states, and nesting level. A `Modal` is a dialog named by its title, and an
   `AlertDialog` an alert dialog named by its title and described by its message.
+  A `NonModal` dialog is a dialog that is not a modal window: UI Automation reports
+  IsModal and IsTopmost as false for it, and F6 moves focus between the window and
+  the dialog.
 - A `UniformList` or `ListOf` exposes its built rows as list items, each with
   its position in the full list ("40 of 10,000"). Only the rows that are built
   are in the tree.

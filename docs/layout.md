@@ -294,7 +294,9 @@ The parts are listed in the widget table of docs/styling.md.
 - A drop on another window shows no preview before the release. It is found by each
   window's content area under the pointer, so where two floating windows overlap at
   the release point, the drop goes to one of them.
-- Ctrl+F6 moves between groups, not F6, which the toast region uses.
+- Ctrl+F6 moves between groups, not F6, which moves between the window's regions:
+  the window, non-modal dialogs and the toast region (see
+  [Non-modal dialogs](widgets-overlays.md#non-modal-dialogs)).
 - Every panel of the layout is built when the dock is shown, not when it is first
   selected.
 - A split keeps each pane at least 48 logical pixels, and the edge strips are 24

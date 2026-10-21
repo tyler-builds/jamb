@@ -217,6 +217,9 @@ With nothing open, Escape does what it did before. An overlay without
 the auto-repeats of the press that closed it are ignored, so they neither close
 the next overlay nor blur a field; press again to close the next one.
 
+A non-modal dialog (see [Non-modal dialogs](widgets-overlays.md#non-modal-dialogs))
+closes on Escape only while focus is inside it, after the overlays inside it.
+
 A menu takes Escape itself: the first press closes its open submenu, and the
 next closes the menu (see [Menus](widgets-overlays.md#menus)).
 
