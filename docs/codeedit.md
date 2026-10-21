@@ -48,8 +48,8 @@ rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+d", ui.Unbind(codeedit.CmdAddNextOc
 `TabSize` (4 by default), `CommentPrefix`, `Size`, the sizing methods (`Width`, `Height`,
 `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow` and `GridSpan`, as on the `ui` widgets;
 Full by 300 pixels by default), `Styles`, `Language`, `Highlighter`, `SoftWrap`, `WrapColumn`
-and `WrappingIndent` (see Soft wrap), and `Hover`, `HoverDelay`, `Completions`, `Definitions` and
-`OnOpenLocation` (see Language server hooks).
+and `WrappingIndent` (see Soft wrap), and `Hover`, `HoverDelay`, `Completions`, `Definitions`,
+`CodeActions` and `OnOpenLocation` (see Language server hooks).
 
 ## Document
 
@@ -116,6 +116,7 @@ value, so an app can rebind it with `ui.BindIn("CodeEditor", keys, action)` or t
 | Ctrl+K Ctrl+I | Open the hover at the caret, and announce it. |
 | F12 | Go to the definition at the caret, with `Definitions`. |
 | Ctrl+Space | Open the completion list; Up, Down, PageUp and PageDown move its highlight, and Enter and Tab accept it. |
+| Ctrl+. | Open the code actions at the caret, with `CodeActions`; Up, Down, PageUp and PageDown move the highlight, and Enter applies it. |
 
 The punctuation keys name their physical position as the US layout prints it: `ctrl+/` is the
 slash key, and `ctrl+shift+[` is the key that prints `[` on a US keyboard (Shift makes it `{`,
@@ -301,6 +302,67 @@ document: its bytes `[From, To)` are selected and scrolled into view. Any other 
 function set with `OnOpenLocation`, with the `Row` and `Col` the provider gave; without one it is not
 opened. While Ctrl is held, the word under the pointer is underlined and the pointer is a hand.
 
+### Code actions
+
+```go
+type fixer struct{}
+
+func (fixer) CodeActions(ctx context.Context, q codeedit.CodeActionQuery) ([]codeedit.CodeAction, error) {
+	return []codeedit.CodeAction{{
+		Title:       "Fix spelling",
+		Kind:        codeedit.CodeActionQuickFix,
+		Diagnostics: q.Diagnostics,
+		Preferred:   true,
+		Edits:       []codeedit.Change{{From: 0, To: 4, Text: "hello"}},
+	}}, nil
+}
+
+codeedit.Editor(doc).CodeActions(fixer{})
+```
+
+Ctrl+. (`CmdCodeActions`) opens a menu of the actions at the primary caret, with a loading row while
+the provider answers. The provider gets a `CodeActionQuery`: the text and the caret's offset, the
+primary selection's `From` and `To`, the diagnostics that overlap the selection (its ends included),
+or those on the caret's row when none do, and the `Trigger`. A `CodeAction` has a `Title`, a `Kind`
+in the Language Server Protocol's hierarchy (`Within` tells whether a kind is in another), the
+diagnostics it fixes, `Preferred`, a `Disabled` reason, the `Edits` to this document in the offsets
+of the query's text, and a `Run` function.
+
+The menu groups the answer as quick fixes, refactorings, source actions and others, with the
+preferred actions first in each group and then the provider's order; it keeps at most 100. The
+first preferred enabled action is highlighted, or else the first enabled one. Up and Down move the
+highlight and wrap around, PageUp and PageDown move it by ten actions, and the group headers are
+skipped. A disabled action can be highlighted, but it is not applied: it is shown dimmed with its
+reason, and Enter or a click announces the reason and keeps the menu open. Enter or a click applies
+the highlighted action; Escape, a click outside the menu, typing, a blur, and a move of the caret off
+its row close it.
+
+Applying an action makes its `Edits` as one step of the undo history, after they are mapped through
+the changes made since the query's text. A change made elsewhere that touches an edit drops the
+action, and the menu asks again. Then `Run` runs on the UI thread, so it can run a command, change
+another file, or apply a workspace edit; it may capture state that has since changed, so it should
+check what it acts on. An edit that does not fit the text is announced as a failure, and `Run` does
+not run. A read-only editor has no code actions.
+
+A lightbulb in the gutter marks a line with a diagnostic on it when an action for the caret is
+enabled. The editor asks the provider with the `CodeActionAutomatic` trigger, 250 milliseconds after
+the text, the diagnostics, the caret or the focus last changed; the lightbulb hides until that
+answer, and when the caret leaves the row, the text changes, or the editor loses focus. Its click
+opens the menu, as does the Quick fix row of the hover on a diagnostic. A provider that answers an
+automatic query should answer it cheaply.
+
+A language server's `WorkspaceEdit` is split by the app's adapter: the entries for this document
+become `Edits`, with their positions converted by `OffsetUTF16`; the entries for other files, and any
+`command`, go in `Run`, which may call the function set with `OnOpenLocation` or the app's own
+apply-edit.
+
+The menu is a list for assistive technology, named by `ui.Strings.CodeEditorCodeActions`. Its rows
+are list items with their position, and a disabled row's name includes the reason; group headers are
+hidden from it. The number of actions is announced when the answer comes, and each action the
+highlight moves to is announced. The keyboard focus stays in the editor. The lightbulb is not
+announced on caret moves: keyboard users reach the actions with Ctrl+. or with the hover's Quick fix
+row.
+
 ## Highlighting
 
 Highlighting uses the session in `codeedit/highlight`, which runs @pierre/highlights. `Language`
@@ -413,7 +475,9 @@ The parts are:
 | `Selection` | The selected text. |
 | `Match`, `CurrentMatch` | The find matches. |
 | `Find` | The find and replace bar. |
-| `Popup`, `PopupItem`, `PopupItemSelected` | The panel of the hover and of the completions, one entry of it, and the completion that Enter accepts. |
+| `Popup`, `PopupItem`, `PopupItemSelected` | The panel of the hover, of the completions and of the code actions, one entry of it, and the entry that Enter accepts. |
+| `PopupItemDisabled`, `PopupGroup` | A code action that is disabled, and the group headers of the code actions menu: their `TextColor`. By default the theme's `Disabled` and `TextMuted`. |
+| `Lightbulb` | The lightbulb that marks a line with a code action: its `TextColor`. By default the theme's `Warning`. |
 | `DiagnosticError`, `DiagnosticWarning`, `DiagnosticInfo`, `DiagnosticHint` | The marks of the diagnostics: the `TextColor` of the underline and of the gutter marker. By default the theme's `Danger`, `Warning`, `Accent` and `TextMuted`. |
 
 Under high contrast the colors are the system colors (the theme's `CodeEditor` colors), whatever is set
