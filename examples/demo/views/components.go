@@ -126,7 +126,8 @@ var componentSections = []componentSection{
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {
 			return section(t, "Menus", dropdownSample(t), contextSample(t))
 		}},
-	{"Navigation and layout", "Tabs Collapsible Accordion Tree tree view folders panels expand",
+	{"Navigation and layout", "Tabs Collapsible Accordion Tree tree view folders panels expand " +
+		"ScrollButtons OverflowMenu TabMaxWidth Prefix Suffix many tabs scroll overflow menu truncate long label add tab",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return navigationSection() }},
 	{"Split panes", "Split Pane Percent resize divider panes collapsible",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return splitSection() }},
