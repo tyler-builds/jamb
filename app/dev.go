@@ -102,11 +102,16 @@ import (
 //	devicelost      simulate a GPU device loss: the device is released, and the
 //	                loss is handled as if the next Present had failed, so every
 //	                window rebuilds its swap chain (see recovery.go)
+//	mark            a loop point for repeat; the steps after it run again
+//	repeat N        go back to the last mark N more times; repeat 0 loops until
+//	                the window closes. A loop with no wait runs as fast as frames
+//	                allow. A repeat needs a mark before it in the script
 //	shot PATH       save a PNG screenshot of the next frame
 //	a11ydump PATH   write the accessibility tree as text (see ui.Runtime.AccessTree)
 //	exit            close the window
 //
 // Example: JAMB_SCRIPT="idle; shot a.png; click 600 400; idle; shot b.png; exit"
+// Example: JAMB_SCRIPT="mark; click 600 400; wait 500; repeat 99; exit" clicks 100 times
 type devOptions struct {
 	trace      bool
 	script     string
@@ -331,6 +336,28 @@ type script struct {
 	waitUntil time.Time
 	shotPath  string
 	idleCount int
+	mark      int         // the index of the last mark step run, or -1 before any
+	repeats   map[int]int // the repeats still to go of each repeat step being run, by index
+}
+
+// repeatAgain reports whether the repeat step at index i sends the script back to its
+// mark. A repeat N goes back N more times, counted over the times the step is reached;
+// a repeat 0 always does. When the count runs out the step is forgotten, so that an
+// enclosing loop starts it afresh.
+func (s *script) repeatAgain(i int, n float32) bool {
+	if n == 0 {
+		return true
+	}
+	left, active := s.repeats[i]
+	if !active {
+		left = int(n)
+	}
+	if left == 0 {
+		delete(s.repeats, i)
+		return false
+	}
+	s.repeats[i] = left - 1
+	return true
 }
 
 // typeText returns the text of a type step: everything after the single space
@@ -341,7 +368,8 @@ func typeText(seg string) string {
 }
 
 func parseScript(src string) (*script, error) {
-	s := &script{target: 1}
+	s := &script{target: 1, mark: -1, repeats: map[int]int{}}
+	marked := false // a mark step precedes the steps parsed so far
 	for _, seg := range strings.Split(src, ";") {
 		raw := strings.TrimSpace(seg)
 		if raw == "" {
@@ -398,9 +426,19 @@ func parseScript(src string) (*script, error) {
 			if err == nil && st.n < 1 {
 				err = fmt.Errorf("JAMB_SCRIPT step %q: windows are numbered from 1", raw)
 			}
+		case "mark":
+			marked = true
+		case "repeat":
+			st.n, err = parse(0)
+			if err == nil && (st.n < 0 || st.n != float32(int(st.n))) {
+				err = fmt.Errorf("JAMB_SCRIPT step %q: repeat takes a whole number of times; 0 loops until the window closes", raw)
+			}
+			if err == nil && !marked {
+				err = fmt.Errorf("JAMB_SCRIPT step %q: repeat needs a mark before it", raw)
+			}
 		case "idle", "exit", "devicelost":
 		default:
-			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, rclick, down, up, scroll, key, type, drop, wait, idle, devicelost, shot, a11ydump or exit", op)
+			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, rclick, down, up, scroll, key, type, drop, wait, idle, devicelost, mark, repeat, shot, a11ydump or exit", op)
 		}
 		if err != nil {
 			return nil, err
@@ -558,6 +596,12 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 			s.idleCount = 0
 		case "devicelost":
 			simulateDeviceLoss()
+		case "mark":
+			s.mark = s.i
+		case "repeat":
+			if s.repeatAgain(s.i, st.n) {
+				s.i = s.mark // the steps after the mark run again
+			}
 		case "shot":
 			s.shotPath = st.arg
 			s.i++
