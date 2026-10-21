@@ -115,7 +115,8 @@ type completionState struct {
 	from, end  int
 	items      []CompletionItem
 	shown      []int
-	sel        int
+	sel        int // the highlighted item, an index of shown
+	top        int // the first item the rows show, kept by follow
 	since      []Change
 	slot       asyncSlot[CompletionList]
 	again      uint64 // the debounced request for an incomplete list, which a later one makes stale
@@ -130,7 +131,7 @@ func (vs *viewState) triggerCompletion(why CompletionTrigger, char rune) {
 	cs := &vs.completion
 	caret := vs.doc.Caret()
 	if !cs.open {
-		cs.from, cs.items, cs.shown, cs.sel = vs.wordStart(caret), nil, nil, 0
+		cs.from, cs.items, cs.shown, cs.sel, cs.top = vs.wordStart(caret), nil, nil, 0, 0
 	}
 	cs.open, cs.loading, cs.failed, cs.end, cs.since = true, true, false, caret, nil
 	prov := vs.completeP
@@ -247,7 +248,7 @@ func (vs *viewState) closeCompletion() bool {
 	if !cs.open {
 		return false
 	}
-	cs.open, cs.loading, cs.failed, cs.items, cs.shown, cs.since = false, false, false, nil, nil, nil
+	cs.open, cs.loading, cs.failed, cs.items, cs.shown, cs.since, cs.top = false, false, false, nil, nil, nil, 0
 	vs.touch()
 	return true
 }
@@ -280,6 +281,7 @@ func (vs *viewState) filterCompletions() {
 	}
 	cs.shown = append(prefix, rest...)
 	cs.sel = min(cs.sel, max(len(cs.shown)-1, 0))
+	cs.follow()
 }
 
 // subsequence reports whether the characters of word appear in s in order.
@@ -314,6 +316,7 @@ func (vs *viewState) completionKey(m Move) bool {
 	default:
 		return false
 	}
+	cs.follow()
 	ui.Announce(cs.itemAt(cs.sel).Label, access.Polite)
 	vs.touch()
 	return true
@@ -321,6 +324,28 @@ func (vs *viewState) completionKey(m Move) bool {
 
 // itemAt returns the i-th item shown.
 func (cs *completionState) itemAt(i int) CompletionItem { return cs.items[cs.shown[i]] }
+
+// follow scrolls the rows the list shows the least it takes to keep the highlighted item among
+// them, so that they stay where they are while the highlight moves within them.
+func (cs *completionState) follow() {
+	cs.top = min(max(cs.top, 0), max(len(cs.shown)-completionRows, 0))
+	switch {
+	case cs.sel < cs.top:
+		cs.top = cs.sel
+	case cs.sel >= cs.top+completionRows:
+		cs.top = cs.sel - completionRows + 1
+	}
+}
+
+// anyDoc reports whether an item shown has documentation.
+func (cs *completionState) anyDoc() bool {
+	for i := range cs.shown {
+		if cs.itemAt(i).Doc != "" {
+			return true
+		}
+	}
+	return false
+}
 
 // acceptCompletion accepts the highlighted item of the open list, and reports whether there was
 // one: the word before each caret is replaced by the item's text, with the item's edits, as one
@@ -405,7 +430,7 @@ func (vs *viewState) completionPopup(st Style) ui.Element {
 	case len(cs.shown) == 0:
 		panel.Child(ui.Div().Style(st.PopupItem).Child(ui.Text(strs.NoResults)))
 	}
-	first := min(max(cs.sel-completionRows/2, 0), max(len(cs.shown)-completionRows, 0))
+	first := min(cs.top, max(len(cs.shown)-completionRows, 0))
 	for i := first; i < min(first+completionRows, len(cs.shown)); i++ {
 		i, it := i, cs.itemAt(i)
 		style := st.PopupItem
@@ -414,7 +439,14 @@ func (vs *viewState) completionPopup(st Style) ui.Element {
 		}
 		row := ui.Div().Key(fmt.Sprintf("codeedit.completion/%d", cs.shown[i])).Row().Gap(12).Style(style).
 			Role(access.RoleListItem).AccessSelected(i == cs.sel).AccessPosition(i+1, len(cs.shown)).Label(it.Label).
-			OnMouseEnter(func() { cs.sel = i; vs.touch() }).
+			// The pointer moves the highlight only when it moves: a list that changes under a
+			// pointer that rests on it does not.
+			OnMouseMove(func(*ui.MouseEvent) {
+				if cs.sel != i {
+					cs.sel = i
+					vs.touch()
+				}
+			}).
 			OnClick(func() { cs.sel = i; vs.acceptCompletion() }).
 			Child(ui.Text(it.Label).NoWrap())
 		if it.Detail != "" {
@@ -422,10 +454,19 @@ func (vs *viewState) completionPopup(st Style) ui.Element {
 		}
 		panel.Child(row)
 	}
-	if len(cs.shown) > 0 {
-		if doc := cs.itemAt(cs.sel).Doc; doc != "" {
-			panel.Child(ui.Div().Style(st.PopupItem).Opacity(0.8).Child(ui.Text(doc)))
+	// The documentation of the highlighted item is one line under the list, and the line is kept
+	// while any item shown has documentation, so that the popup keeps its height and width as the
+	// highlight moves.
+	if cs.anyDoc() {
+		doc := ui.Div().Style(st.PopupItem).Opacity(0.8)
+		if text := cs.itemAt(cs.sel).Doc; text != "" {
+			// A text of the width of the list takes no width of its own, so a long one is cut
+			// short rather than widening the list.
+			doc.Child(ui.Text(text).Truncate().Width(ui.Full))
+		} else { // a line of no-break space keeps the height of the text
+			doc.AccessHidden().Child(ui.Text(" ").NoWrap().Width(ui.Full))
 		}
+		panel.Child(doc)
 	}
 	return vs.popupAnchor("codeedit.completions.anchor", cs.from, panel)
 }

@@ -2,7 +2,10 @@ package codeedit
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/tyler-builds/jamb/access"
@@ -218,5 +221,76 @@ func TestCompletionIncompleteAsksAgain(t *testing.T) {
 	}
 	if len(*delays) == 0 || (*delays)[len(*delays)-1] != completionDebounce {
 		t.Errorf("the delays are %v, want the debounce", *delays)
+	}
+}
+
+// Moving the highlight, with Down or by the pointer over the rows, changes only which row is
+// highlighted: the items keep their order, the popup keeps its place and size, and the provider is
+// not asked again.
+func TestCompletionHighlightMovesKeepTheList(t *testing.T) {
+	items := make([]CompletionItem, 14)
+	for i := range items {
+		items[i] = CompletionItem{Label: fmt.Sprintf("item%02d", i), Detail: "func(a int, b string) (int, error)", Kind: CompletionFunction}
+		if i%3 == 0 {
+			items[i].Doc = "Documentation of the item, one line of text."
+		}
+	}
+	var asked atomic.Int32
+	p := fakeCompleter{triggers: ".", fn: func(ctx context.Context, q CompletionQuery) (CompletionList, error) {
+		asked.Add(1)
+		return CompletionList{From: -1, Items: items}, nil
+	}}
+	h := newHarness(t, "", func(e *EditorElement) *EditorElement { return e.Completions(p) })
+	vs := h.ed.view
+	h.openList()
+	before := labels(vs)
+	box, ok := h.rt.Find("codeedit.completions")
+	if !ok {
+		t.Fatal("the list is not in the tree")
+	}
+	check := func(what string) {
+		t.Helper()
+		if got := labels(vs); !slices.Equal(got, before) {
+			t.Errorf("%s: the list shows %v, want %v", what, got, before)
+		}
+		if r, _ := h.rt.Find("codeedit.completions"); r != box {
+			t.Errorf("%s: the popup is at %+v, want %+v", what, r, box)
+		}
+		if n := asked.Load(); n != 1 {
+			t.Errorf("%s: the provider was asked %d times, want once", what, n)
+		}
+	}
+	// The rows shown are the first ten until the highlight passes them, and then they scroll
+	// only as far as the highlight, so that the highlighted row is the last one.
+	firstRow := func() int {
+		for i := range items {
+			if _, ok := h.rt.Find(fmt.Sprintf("codeedit.completion/%d", i)); ok {
+				return i
+			}
+		}
+		return -1
+	}
+	for range 12 {
+		h.key(input.KeyDown, 0)
+		check("down")
+		want := max(vs.completion.sel-completionRows+1, 0)
+		if got := firstRow(); got != want {
+			t.Errorf("down to %d: the rows start at %d, want %d", vs.completion.sel, got, want)
+		}
+	}
+	if vs.completion.sel != 12 {
+		t.Fatalf("down twelve times highlighted %d, want 12", vs.completion.sel)
+	}
+	for i := range items {
+		r, ok := h.rt.Find(fmt.Sprintf("codeedit.completion/%d", i))
+		if !ok {
+			continue // not in the rows the list shows
+		}
+		h.rt.PointerMove(r.X+r.W/2, r.Y+r.H/2, 0)
+		h.frame()
+		check(fmt.Sprintf("the pointer over item %d", i))
+		if vs.completion.sel != i {
+			t.Errorf("the pointer over item %d highlighted %d", i, vs.completion.sel)
+		}
 	}
 }
