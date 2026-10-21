@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -137,5 +138,67 @@ func TestScriptTypeKeepsText(t *testing.T) {
 	}
 	if _, err := parseScript("type"); err == nil {
 		t.Error("a type step with no text parsed; want an error")
+	}
+}
+
+func TestParseScriptReadsLoops(t *testing.T) {
+	s, err := parseScript("click 1 2; mark; wait 5; repeat 3; mark; repeat 0")
+	if err != nil {
+		t.Fatalf("parseScript: %v", err)
+	}
+	var ops []string
+	for _, st := range s.steps {
+		ops = append(ops, st.op)
+	}
+	if got, want := strings.Join(ops, " "), "click mark wait repeat mark repeat"; got != want {
+		t.Errorf("steps = %q, want %q", got, want)
+	}
+	if s.steps[3].n != 3 || s.steps[5].n != 0 {
+		t.Errorf("repeat counts = %v, %v; want 3 and 0", s.steps[3].n, s.steps[5].n)
+	}
+}
+
+func TestParseScriptRejectsBadLoops(t *testing.T) {
+	for _, src := range []string{
+		"repeat 2",          // no mark before it
+		"repeat 2; mark",    // the mark comes after
+		"mark; repeat",      // no count
+		"mark; repeat -1",   // negative
+		"mark; repeat 1.5",  // not whole
+		"mark; repeat many", // not a number
+	} {
+		if _, err := parseScript(src); err == nil {
+			t.Errorf("parseScript(%q) succeeded; want an error", src)
+		}
+	}
+	if _, err := parseScript("mark; idle; repeat 1"); err != nil {
+		t.Errorf("a repeat after a mark and an idle: %v", err)
+	}
+}
+
+// TestRepeatAgainCountsTheLoops checks that repeat N jumps back N times, and that a
+// repeat is forgotten once its count runs out, so an enclosing loop starts it again.
+func TestRepeatAgainCountsTheLoops(t *testing.T) {
+	s, err := parseScript("mark; repeat 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var jumps []bool
+	for range 3 {
+		jumps = append(jumps, s.repeatAgain(1, 2))
+	}
+	if want := []bool{true, true, false}; !slices.Equal(jumps, want) {
+		t.Errorf("repeat 2 jumped %v, want %v", jumps, want)
+	}
+	if len(s.repeats) != 0 {
+		t.Errorf("an exhausted repeat is still remembered: %v", s.repeats)
+	}
+	for range 5 {
+		if !s.repeatAgain(1, 0) {
+			t.Fatal("repeat 0 stopped jumping")
+		}
+	}
+	if len(s.repeats) != 0 {
+		t.Errorf("repeat 0 is remembered: %v", s.repeats)
 	}
 }
