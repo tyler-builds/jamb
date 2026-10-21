@@ -331,8 +331,8 @@ of the query's text, and a `Run` function.
 The menu groups the answer as quick fixes, refactorings, source actions and others, with the
 preferred actions first in each group and then the provider's order; it keeps at most 100. The
 first preferred enabled action is highlighted, or else the first enabled one. Up and Down move the
-highlight and wrap around, PageUp and PageDown move it by ten actions, and the group headers are
-skipped. A disabled action can be highlighted, but it is not applied: it is shown dimmed with its
+highlight and wrap around, PageUp and PageDown move it by ten actions, Home and End go to the first
+and the last action, and the group headers are skipped. A disabled action can be highlighted, but it is not applied: it is shown dimmed with its
 reason, and Enter or a click announces the reason and keeps the menu open. Enter or a click applies
 the highlighted action; Escape, a click outside the menu, typing, a blur, and a move of the caret off
 its row close it.
