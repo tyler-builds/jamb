@@ -135,7 +135,8 @@ var componentSections = []componentSection{
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return dockSection() }},
 	{"Form controls", "Checkbox CheckboxTri Switch Toggle ToggleGroup segmented Rating stars RadioGroup radio Select " +
 		"Slider RangeSlider range price thumbs NumberInput spin OTPInput one-time code PIN TextInput Masked Revealable password Clearable clear ReadOnly read-only Disabled Form Field " +
-		"Notification preferences validation",
+		"Notification preferences validation TemplateFormat NumberFormat InputFormat Format Accept Complete Display " +
+		"input mask format phone number template decimals signed masked PIN handle",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return formControlsSection() }},
 	{"Forms", "Form Field TextInput Validate Required MaxLength Pattern email error summary submit async ProgressRing validation",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return formsSection(t) }},
