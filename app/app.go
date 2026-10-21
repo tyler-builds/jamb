@@ -234,6 +234,9 @@ func (a *App) RunE(w Window) error {
 		}
 	}
 	application.dev = loadDevOptions()
+	if d := application.dev; d.heapLog != "" {
+		startHeapLog(d.heapLog, time.Duration(d.heapSecs*float64(time.Second)))
+	}
 	application.devTools = a.devTools
 	application.gpu.adapter = gpuAdapter
 	prepareDevice()

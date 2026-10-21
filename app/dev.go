@@ -39,6 +39,11 @@ import (
 //	                    Input steps of JAMB_SCRIPT are timed when they inject
 //	                    their event, and OS events when the window receives them.
 //	                    Time to the screen is not measured (see framestats.go)
+//	JAMB_HEAPLOG=PATH   write a CSV row of memory counters now and every 10 seconds
+//	                    (JAMB_HEAPLOG_SECONDS changes the interval), for soak runs:
+//	                    elapsed_s, the Go heap in use and its objects, total
+//	                    allocated bytes and allocations, GC cycles, goroutines, and
+//	                    the process's private bytes and working set
 //	JAMB_VSYNC=0        present without waiting for vblank (throughput tests)
 //	JAMB_GEOMETRY_FILE  remember the window position/size in this file
 //	                    (set by the `jamb dev` runner across restarts). The file
@@ -107,7 +112,9 @@ type devOptions struct {
 	script     string
 	stress     string
 	stressSecs float64
-	frameStats string // JAMB_FRAMESTATS: the CSV path of the frame statistics, or ""
+	frameStats string  // JAMB_FRAMESTATS: the CSV path of the frame statistics, or ""
+	heapLog    string  // JAMB_HEAPLOG: the CSV path of the memory counters, or ""
+	heapSecs   float64 // JAMB_HEAPLOG_SECONDS: the interval of the rows, 10 by default
 	noVSync    bool
 	geometry   string
 	position   *platform.Point // JAMB_POSITION: where the first window is placed, or nil
@@ -131,6 +138,8 @@ func loadDevOptions() devOptions {
 		stress:        os.Getenv("JAMB_STRESS"),
 		stressSecs:    5,
 		frameStats:    os.Getenv("JAMB_FRAMESTATS"),
+		heapLog:       os.Getenv("JAMB_HEAPLOG"),
+		heapSecs:      10,
 		noVSync:       os.Getenv("JAMB_VSYNC") == "0",
 		geometry:      os.Getenv("JAMB_GEOMETRY_FILE"),
 		highContrast:  os.Getenv("JAMB_HIGH_CONTRAST"),
@@ -155,6 +164,9 @@ func loadDevOptions() devOptions {
 	d.a11yWarn = d.trace || d.devStarted > 0 || os.Getenv("JAMB_A11Y_WARN") == "1"
 	if v, err := strconv.ParseFloat(os.Getenv("JAMB_STRESS_SECONDS"), 64); err == nil && v > 0 {
 		d.stressSecs = v
+	}
+	if v, err := strconv.ParseFloat(os.Getenv("JAMB_HEAPLOG_SECONDS"), 64); err == nil && v > 0 {
+		d.heapSecs = v
 	}
 	return d
 }
