@@ -121,7 +121,7 @@ func TestInputPathKeepsTheExtension(t *testing.T) {
 // presentedAt records a frame whose CPU work starts at frameAt and whose Present
 // call runs from start to end, all in nanoseconds.
 func presentedAt(f *frameStats, st ui.FrameStats, frameAt, start, end int64) {
-	f.presented(st, frameAt, start, end, nil)
+	f.presented(st, frameAt, start, end, true, nil)
 }
 
 func TestFrameStatsRecordsFramesAndCoalescedInput(t *testing.T) {
@@ -165,9 +165,9 @@ func TestFrameStatsCSV(t *testing.T) {
 	presentedAt(f, ui.FrameStats{Built: true}, 0, 1_500_000, 2_000_000)
 	presentedAt(f, ui.FrameStats{Painted: true}, 16_000_000, 16_250_000, 16_300_000)
 
-	wantFrames := "frame,t_ms,cpu_ms,present_interval_ms,kind\n" +
-		"1,0.000,1.500,,rebuild\n" +
-		"2,16.000,0.250,14.750,repaint\n"
+	wantFrames := "frame,t_ms,cpu_ms,present_interval_ms,kind,continuous\n" +
+		"1,0.000,1.500,,rebuild,0\n" +
+		"2,16.000,0.250,14.750,repaint,1\n"
 	if got := f.framesCSV(); got != wantFrames {
 		t.Errorf("framesCSV =\n%s\nwant\n%s", got, wantFrames)
 	}
@@ -194,7 +194,7 @@ func TestFrameStatsReportLines(t *testing.T) {
 		"jamb framestats: frames=3 ",
 		"refresh=60.00Hz (period 16.667ms)",
 		"  cpu per frame: count=3 ",
-		"  present interval: count=2 ",
+		"  present interval, continuous frames only (2 of 2): count=2 ",
 		"over 1.5x period: 1",
 		"  input key, to CPU end: count=1 ",
 		"  input key, to Present returned: count=1 ",
@@ -205,6 +205,34 @@ func TestFrameStatsReportLines(t *testing.T) {
 	}
 	if strings.Contains(out, "input move") {
 		t.Errorf("report prints a kind with no events:\n%s", out)
+	}
+}
+
+func TestFrameStatsExcludesIdleGaps(t *testing.T) {
+	f := newFrameStats("unused.csv")
+	// Frame 1 was not wanted when its Present returned, so the next frame, 315 ms
+	// later after idle, has an idle gap in its interval and is not continuous.
+	f.presented(ui.FrameStats{Painted: true}, 0, 1_000_000, 1_100_000, false, nil)
+	f.presented(ui.FrameStats{Painted: true}, 315_000_000, 315_100_000, 315_200_000, true, nil)
+	// Frame 3 followed frame 2 at once: its interval is continuous.
+	f.presented(ui.FrameStats{Painted: true}, 331_666_666, 331_700_000, 331_800_000, false, nil)
+
+	wantFrames := "frame,t_ms,cpu_ms,present_interval_ms,kind,continuous\n" +
+		"1,0.000,1.000,,repaint,0\n" +
+		"2,315.000,0.100,314.100,repaint,0\n" +
+		"3,331.667,0.033,16.600,repaint,1\n"
+	if got := f.framesCSV(); got != wantFrames {
+		t.Errorf("framesCSV =\n%s\nwant\n%s", got, wantFrames)
+	}
+	var b bytes.Buffer
+	f.report(&b)
+	out := b.String()
+	for _, want := range []string{
+		"  present interval, continuous frames only (1 of 2): count=1 avg=16.6ms p50=16.6ms p95=16.6ms p99=16.6ms max=16.6ms; over 1.5x period: n/a",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("report lacks %q:\n%s", want, out)
+		}
 	}
 }
 
