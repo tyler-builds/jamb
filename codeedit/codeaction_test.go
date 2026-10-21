@@ -273,6 +273,64 @@ func TestActionOrderAndDisabledActions(t *testing.T) {
 	}
 }
 
+// A change made elsewhere while the menu is open does not close it: the action's edits are mapped
+// through it when the action is applied.
+func TestExternalEditWhileOpenMapsTheEdits(t *testing.T) {
+	h := newHarness(t, "helo world", withActions(func(ctx context.Context, q CodeActionQuery) ([]CodeAction, error) {
+		return []CodeAction{{Title: "Fix spelling", Edits: []Change{{From: 0, To: 4, Text: "hello"}}}}, nil
+	}))
+	h.invokeActions()
+	if err := h.doc.Edit(Change{From: 10, To: 10, Text: "!"}); err != nil {
+		t.Fatal(err)
+	}
+	if !h.ed.view.actions.open {
+		t.Fatal("a change elsewhere closed the menu")
+	}
+	h.key(input.KeyEnter, 0)
+	if got := h.doc.Text(); got != "hello world!" {
+		t.Fatalf("the text is %q, want the action applied to the mapped range", got)
+	}
+}
+
+// A change elsewhere that touches the range of an action's edit drops the action: the menu asks
+// again, and the text is left as it is.
+func TestOverlappingExternalEditDropsAndAsksAgain(t *testing.T) {
+	var calls atomic.Int32
+	h := newHarness(t, "helo world", withActions(func(ctx context.Context, q CodeActionQuery) ([]CodeAction, error) {
+		calls.Add(1)
+		return []CodeAction{{Title: "Fix spelling", Edits: []Change{{From: 0, To: 4, Text: "hello"}}}}, nil
+	}))
+	vs := h.ed.view
+	h.invokeActions()
+	if err := h.doc.Edit(Change{From: 0, To: 2, Text: "XY"}); err != nil {
+		t.Fatal(err)
+	}
+	h.key(input.KeyEnter, 0)
+	h.waitFor("the second answer", func() bool { return calls.Load() == 2 && !vs.actions.loading })
+	if got := h.doc.Text(); got != "XYlo world" {
+		t.Errorf("the text is %q, want the external edit alone", got)
+	}
+	if !vs.actions.open {
+		t.Error("the menu closed instead of asking again")
+	}
+}
+
+// The edits of an action are one step of the undo history, however many changes they make.
+func TestMultiChangeActionIsOneUndoStep(t *testing.T) {
+	h := newHarness(t, "helo world", withActions(func(ctx context.Context, q CodeActionQuery) ([]CodeAction, error) {
+		return []CodeAction{{Title: "Fix", Edits: []Change{{From: 0, To: 4, Text: "hello"}, {From: 5, To: 10, Text: "there"}}}}, nil
+	}))
+	h.invokeActions()
+	h.key(input.KeyEnter, 0)
+	if got := h.doc.Text(); got != "hello there" {
+		t.Fatalf("the text is %q, want both edits made", got)
+	}
+	h.doc.Undo()
+	if got := h.doc.Text(); got != "helo world" {
+		t.Fatalf("one undo left %q, want the action undone whole", got)
+	}
+}
+
 // Read-only editors have no code actions: Ctrl+. does nothing.
 func TestReadOnlyEditorHasNoCodeActions(t *testing.T) {
 	asked := false
