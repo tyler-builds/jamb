@@ -223,6 +223,20 @@ func (vs *viewState) hoverPopup(st Style) ui.Element {
 		}
 		panel.Child(ui.Div().Style(st.PopupItem).TextColor(diagnosticStyle(st, g.Severity).TextColor).Child(ui.Text(msg)))
 	}
+	if vs.actionsP != nil && len(hv.diags) > 0 {
+		// The quick fix opens the menu of code actions at the first diagnostic. A press on the row
+		// leaves the editor focused, as a press in the completion list does.
+		from := hv.diags[0].From
+		label := strs.CodeEditorQuickFix + "… (Ctrl+.)"
+		panel.Child(ui.Div().Key("codeedit.hover.quickfix").Style(st.PopupItem).Role(access.RoleButton).Label(label).
+			KeepFocus().OnMouseDown(func(*ui.MouseEvent) { vs.canvasFocus.Focus() }).
+			OnClick(func() {
+				vs.doc.SetCaret(from)
+				vs.reveal = true
+				vs.openActions(CodeActionInvoked)
+			}).
+			Child(ui.Text(label).NoWrap()))
+	}
 	switch a := hv.answer; {
 	case a.Content != nil:
 		panel.Child(ui.Div().Style(st.PopupItem).Child(a.Content()))
