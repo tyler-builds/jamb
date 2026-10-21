@@ -232,7 +232,7 @@ func formatSamples(ctx *ui.Context, t *ui.Theme) []ui.Element {
 			amountReadout),
 		formSample(t, "Masked template: PIN", ui.TextInput(pin).Label("Sample PIN").Masked().
 			Format(ui.TemplateFormat("9999")).Width(ui.Px(200)),
-			fmt.Sprintf("raw %q", pin.Get())),
+			fmt.Sprintf("%d of 4 digits", len(pin.Get()))),
 		formSample(t, "Accept: lowercase handle", ui.TextInput(handle).Key("format-handle").Label("Sample handle").Placeholder("lowercase, digits, _").
 			Accept(handlePattern.MatchString).Width(ui.Px(200)),
 			fmt.Sprintf("raw %q", handle.Get())),
