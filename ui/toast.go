@@ -183,8 +183,9 @@ func (t *Toast) Sticky() *Toast {
 	return t
 }
 
-// Dismiss removes the toast now.
-func (t *Toast) Dismiss() { t.rt.dismissToast(t.e) }
+// Dismiss removes the toast now. If the focus is on the toast, it moves on as it
+// does for the toast's close button.
+func (t *Toast) Dismiss() { t.rt.closeToast(t.e) }
 
 // Styles sets the look of the parts of this toast alone. Set fields win over the
 // theme's Toast and Toasts and the defaults of its kind; see ToastStyle and

@@ -339,3 +339,22 @@ func TestTimedToastClockStartsWhenShown(t *testing.T) {
 		t.Error("the info toast went at once: the idle time was counted against it")
 	}
 }
+
+// Toast.Dismiss from a handler, with the focus on the toast, moves the focus as
+// the close button does: back to the element that had it before the region.
+func TestToastDismissMovesFocusOffAToastThatHadIt(t *testing.T) {
+	r := toastRig(t)
+	toast := r.rt.toast(ToastInfo, "Saved")
+	r.frame()
+	r.focusKey(t, "save")
+	r.press(input.KeyF6, 0)
+	r.press(input.KeyTab, 0) // into the toast: its close button
+	toast.Dismiss()
+	r.frame()
+	if present(r, toast.e.id) {
+		t.Fatal("Dismiss did not remove the toast")
+	}
+	if got := r.focusedKey(); got != "save" {
+		t.Errorf("after Dismiss with focus in the toast, focus is on %q, want save", got)
+	}
+}
