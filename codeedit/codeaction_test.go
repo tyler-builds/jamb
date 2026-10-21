@@ -236,6 +236,28 @@ func TestActionKeysRouteToTheMenu(t *testing.T) {
 	}
 }
 
+// Home and End move the highlight of the menu to its first and its last action.
+func TestActionHomeAndEndGoToTheEnds(t *testing.T) {
+	h := newHarness(t, "text", withActions(func(ctx context.Context, q CodeActionQuery) ([]CodeAction, error) {
+		return []CodeAction{
+			{Title: "Fix", Kind: CodeActionQuickFix, Preferred: true},
+			{Title: "Other", Kind: CodeActionQuickFix},
+			{Title: "Extract", Kind: CodeActionRefactorExtract},
+		}, nil
+	}))
+	vs := h.ed.view
+	h.doc.SetCaret(2)
+	h.invokeActions()
+	h.key(input.KeyEnd, 0)
+	if highlighted(vs) != "Extract" || h.doc.Caret() != 2 {
+		t.Fatalf("End highlights %q with the caret at %d, want Extract and the caret kept", highlighted(vs), h.doc.Caret())
+	}
+	h.key(input.KeyHome, 0)
+	if highlighted(vs) != "Fix" {
+		t.Fatalf("Home highlights %q, want the first action", highlighted(vs))
+	}
+}
+
 // The menu lists the quick fixes first, the preferred ones first in each group, with the first
 // preferred enabled action highlighted. A disabled action can be highlighted; Enter announces its
 // reason and keeps the menu open.

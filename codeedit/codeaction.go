@@ -270,6 +270,20 @@ func (as *actionState) step(i, n int, wrap bool) int {
 	return j
 }
 
+// edgeAction returns the first action line of the menu, or the last one when last is set.
+func (as *actionState) edgeAction(last bool) int {
+	for i := range as.lines {
+		j := i
+		if last {
+			j = len(as.lines) - 1 - i
+		}
+		if as.lines[j].item >= 0 {
+			return j
+		}
+	}
+	return as.sel
+}
+
 // follow scrolls the rows the menu shows the least it takes to keep the highlighted line among
 // them. The rows of the menu do not change height while the highlight moves.
 func (as *actionState) follow() {
@@ -422,6 +436,10 @@ func (vs *viewState) actionKey(m Move) bool {
 		st.sel = st.step(st.sel, -actionRows, false)
 	case MovePageDown:
 		st.sel = st.step(st.sel, actionRows, false)
+	case MoveLineStart:
+		st.sel = st.edgeAction(false)
+	case MoveLineEnd:
+		st.sel = st.edgeAction(true)
 	default:
 		return false
 	}
