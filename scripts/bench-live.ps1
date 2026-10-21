@@ -376,7 +376,7 @@ try {
     $pointerScript += '; repeat 0'
     $scenarioDefs = @(
         [pscustomobject]@{ name = 'activity-scroll'
-            script = "click $($nav.Activity); wait 800; mark; scroll 700 480 -120; wait 16; repeat 0" },
+            script = "click $($nav.Activity); wait 800; mark; scroll 700 480 120; wait 16; repeat 0" },
         [pscustomobject]@{ name = 'pointer-moves'; script = $pointerScript },
         [pscustomobject]@{ name = 'typing'
             script = "click $($nav.Activity); wait 800; click 407 215; wait 300; mark; type e; wait 100; key backspace; wait 100; repeat 0" },
@@ -598,8 +598,8 @@ try {
         $rows = @($startup | Where-Object { $_.app -eq $a.key })
         if ($rows.Count -eq 0) { continue }
         $warmVis = @(); $warmPaint = @(); $warmTrace = @()
-        foreach ($r in $rows) {
-            foreach ($w in $r.warm) {
+        foreach ($row in $rows) {
+            foreach ($w in $row.warm) {
                 $warmVis += $w.visibleMs; $warmPaint += $w.paintedMs
                 if ($null -ne $w.traceMs) { $warmTrace += $w.traceMs }
             }
