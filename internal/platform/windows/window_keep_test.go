@@ -29,3 +29,21 @@ func TestKeepOnScreenMovesAWindowInFromTheEdges(t *testing.T) {
 		}
 	}
 }
+
+// TestScaleIntMirrorsNegativePositions checks that a negative logical position, such as a
+// monitor left of the primary, scales to the exact negation of its positive mirror.
+func TestScaleIntMirrorsNegativePositions(t *testing.T) {
+	for _, dpi := range []uint32{96, 120, 144, 192} {
+		for _, v := range []int{1, 7, 100, 1600, 1919} {
+			if got, want := scaleInt(-v, dpi), -scaleInt(v, dpi); got != want {
+				t.Errorf("scaleInt(%d, %d) = %d, want %d", -v, dpi, got, want)
+			}
+		}
+	}
+	if got := scaleInt(-1600, 96); got != -1600 {
+		t.Errorf("scaleInt(-1600, 96) = %d, want -1600", got)
+	}
+	if got := scaleInt(-1600, 144); got != -2400 {
+		t.Errorf("scaleInt(-1600, 144) = %d, want -2400", got)
+	}
+}

@@ -332,7 +332,15 @@ func (w *window) outerSize(width, height int, dpi uint32) (int32, int32) {
 	return r.Right - r.Left, r.Bottom - r.Top
 }
 
-func scaleInt(v int, dpi uint32) int { return (v*int(dpi) + 48) / 96 }
+// scaleInt converts logical pixels to physical ones at dpi, rounding halves away from
+// zero, so a negative position (a monitor left of or above the primary) maps as its
+// positive mirror does.
+func scaleInt(v int, dpi uint32) int {
+	if v < 0 {
+		return -((-v*int(dpi) + 48) / 96)
+	}
+	return (v*int(dpi) + 48) / 96
+}
 
 // keepOnScreen returns the top-left corner of a window of w by h physical pixels that is
 // placed at (x, y), moved in so that it lies within the work area. The right and bottom
@@ -679,7 +687,11 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 	case win32.WM_DPICHANGED:
 		w.dpi = uint32(win32.HIWORD(wp))
 		r := (*win32.RECT)(ptr(lp))
-		w.emit(platform.Event{Kind: platform.EventScaleChanged})
+		// A window placed on another monitor before OnCreate has no runtime yet, so
+		// the handler hears of the scale once the window is ready.
+		if w.ready {
+			w.emit(platform.Event{Kind: platform.EventScaleChanged})
+		}
 		win32.SetWindowPos(hwnd, r.Left, r.Top, r.Right-r.Left, r.Bottom-r.Top, win32.SWP_NOZORDER|win32.SWP_NOACTIVATE)
 		return 0
 
