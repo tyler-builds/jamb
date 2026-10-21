@@ -12,7 +12,9 @@ without the jamb-grammars module. This changes the highlighting API. The data gr
 pinned and grouped columns, cell selection, context menus and loading more rows; tabs scroll when
 they overflow; buttons get a loading state; `AlertDialog` is new; text inputs format as the user
 types; the code editor wraps lines and takes diagnostics, hovers, completions and definitions from
-the app; and animations gain springs, keyframes, timelines, delays and staggers.
+the app; and animations gain springs, keyframes, timelines, delays and staggers. Dialogs and sheets
+can show a close button and stay out of the way as non-modal panels, toasts can be updated and
+dismissed by ID, trees open and close from code, and the code editor offers quick fixes.
 
 ### Changed
 
@@ -110,6 +112,27 @@ the app; and animations gain springs, keyframes, timelines, delays and staggers.
   spring for their hover transitions; zero values keep today's.
 - Under reduced motion, springs, keyframes, timelines, delays and staggers jump to their end (a
   repeating one holds its first frame).
+- Editors ask a `CodeActionProvider` (`CodeActions`) for quick fixes, refactorings and source
+  actions. A lightbulb in the gutter marks a line with a problem that has a fix; Ctrl+., a click on
+  the lightbulb or the hover's Quick fix row opens a menu grouped by kind, preferred actions first
+  and unavailable ones dimmed with their reason. An action's edits apply as one undo step, and its
+  `Run` handles anything outside the document.
+- `Modal.CloseButton` and `Drawer.CloseButton` add a close button to the header, named Close for
+  screen readers. It is off by default.
+- `Modal.NonModal` and `Drawer.NonModal` show a dialog or a sheet without a backdrop that leaves the
+  rest of the window usable: Tab moves in and out of it, F6 cycles through the window, the open
+  dialogs and the toasts, and Escape and Enter act on it while it has the focus. A press raises it
+  above the others. It shows a close button by default, closes on a press outside only with
+  `CloseOnClickOutside`, and screen readers report it as not modal.
+- `Context.ToastWithID` shows a toast under an ID, or replaces the toast showing with that ID in
+  place, keeping its position and focus and restarting its time; `Context.DismissToast` removes
+  it. `Toast.Title` adds a title above the message. Updates are announced at most once every two
+  seconds, and a newer one replaces those still waiting.
+- `access.Announcement.Source` names the source of an announcement, passed to UI Automation as the
+  activity ID.
+- `Tree.Expanded` keeps the open nodes in a signal the app can set, and `OnExpand` and
+  `OnCollapse` report each node the user or the app opens or closes. `TreeHandle` (`NewTreeHandle`,
+  `Tree.Handle`) expands, collapses, reveals and selects nodes from code.
 
 ### Fixed
 
@@ -122,6 +145,9 @@ the app; and animations gain springs, keyframes, timelines, delays and staggers.
 
 - A key binding on Ctrl+Space typed a space as well as running its action, because Windows sends
   the space with the key. The binding now drops that space.
+
+- `Toast.Dismiss` on a toast that had the focus lost the focus. It now moves the focus on, as the
+  toast's close button does.
 
 ### Removed
 
