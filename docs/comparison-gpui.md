@@ -294,7 +294,7 @@ Each row lists options that one side has and the other lacks; options both have 
 |---|---|---|
 | TextInput | A loading state; text alignment; autofill and autocorrect hints; inline token events; a context menu | Validators that show error messages; a value kept raw under a template or locale number format; image paste; masked text kept off the clipboard; label and description links |
 | TextArea | Auto-grow between a minimum and maximum number of rows | `Validate`, leading and trailing slots, image paste |
-| Code editor | Code-action and document-color providers; semantic tokens; whitespace and indent guides; indent rules per language | Add next occurrence, toggle comment, go to line, bracket matching, find with case, whole-word and regex options |
+| Code editor | Document-color providers; semantic tokens; whitespace and indent guides; indent rules per language | A gutter lightbulb for code actions, add next occurrence, toggle comment, go to line, bracket matching, find with case, whole-word and regex options |
 | NumberInput | Prefix and suffix, a dynamic step, thousands separators | `Precision`, `Align`, optional spin buttons, `Validate` |
 | Select | Search in the list, grouped options, a clear button, menu size limits, empty-state content | Type-ahead, custom option and value rendering, `Validate`, disabled options |
 | Combobox | A fixed-list picker with multi-select and a footer | Free-text autocomplete with async suggestions, debounce and a minimum length |
@@ -309,9 +309,9 @@ Each row lists options that one side has and the other lacks; options both have 
 
 | Component | GPUI Kit has, jamb lacks | jamb has, GPUI Kit lacks |
 |---|---|---|
-| Dialog / Modal | A close button, no-backdrop mode, an Escape switch, built-in OK and Cancel, a description slot, entrance animations, opening from anywhere (jamb's `AlertDialog` has the buttons, a description and intents) | A default button on Enter, `InitialFocus`, focus restored on close, height capped to the window with a scrolling body |
-| Sheet / Drawer | Resizable, non-modal, a backdrop-click switch | A default button, initial focus, minimum and maximum sizes |
-| Notification / Toast | Title, icon and custom content; click and close events; replace or remove by ID; placement per toast; one call for in-app and system | F6 moves focus into toasts; announced by severity; timers pause on hover and focus; system toasts with images, up to five actions and activation arguments |
+| Dialog / Modal | An Escape switch, built-in OK and Cancel, a description slot, entrance animations, opening from anywhere (jamb's `AlertDialog` has the buttons, a description and intents) | Non-modal dialogs that leave the window usable (F6 moves between them), a default button on Enter, `InitialFocus`, focus restored on close, height capped to the window with a scrolling body |
+| Sheet / Drawer | Resizable | A default button, initial focus, minimum and maximum sizes |
+| Notification / Toast | Icon and custom content; click and close events; placement per toast; one call for in-app and system | F6 moves focus into toasts; announced by severity; timers pause on hover and focus; system toasts with images, up to five actions and activation arguments |
 | Popover, HoverCard | Controlled open state, an arrow, offset, a right-click trigger, open-change events | An accessible name, 13 placements, hover cards that open on keyboard focus |
 | Sidebar | Nested submenus, item context menus and suffixes, the right side, off-canvas and animated collapse | Selection bound to a signal, arrow-key navigation, badges read by screen readers, disabled items |
 | Resizable / Split | Panels added, removed and reset at run time; hidden and fixed panels; custom handles | Keyboard resizing, collapsible panes, percent sizes, sizes bound to a signal for saving |
@@ -328,7 +328,7 @@ Each row lists options that one side has and the other lacks; options both have 
 | DataTable / DataGrid | Row headers; a column-selection mode | Multiple-row selection, inline cell editing with custom editors, interactive cells, density, a sort comparer per column, keyboard column resizing |
 | Dock | Collapsible side docks with toggle and size, zoom, lock, per-panel state saved through a registry, panel toolbar buttons and tab menus, lifecycle hooks | Panels torn off into floating windows, keyboard panel moves, layout operations as plain values |
 | Tabs | Pill, outline and folder variants; prefix and suffix on each tab | Reordering, reselect events, built-in panels kept mounted, tab popups, custom tab rendering |
-| Tree | Disabled items, context menus, expand and collapse events, selecting or revealing an item from code | Children loaded on demand, type-ahead, custom row rendering |
+| Tree | Disabled items, context menus | Children loaded on demand, type-ahead, custom row rendering |
 | List | Search, sections with headers and footers, selection with confirm and cancel, load more, empty and loading states | Rows of any height without given sizes, chat-style bottom anchoring |
 | Menu | Native menus drawn by the OS, links, custom element items, scrollable menus with size limits | Radio items, type-ahead, Shift+F10 and the Menu key, Alt to focus the menu bar |
 | Charts | Reference lines, custom tooltips, step curves, bar labels and gradients, pie padding and labels with leader lines, public scale and shape primitives | Scatter, several series in line and bar charts, horizontal bars, legends that hide series, time axes and axis titles, keyboard navigation with announcements, a data-table view, downsampling, high-contrast hatching |
@@ -362,10 +362,10 @@ Each row lists options that one side has and the other lacks; options both have 
 Where GPUI Kit offers more:
 
 - **Platforms.** jamb runs on Windows only.
-- **Lists and trees.** Lists have no built-in search or sections (apps build them from a text input and a filtered list), and trees cannot be opened from code.
+- **Lists and trees.** Lists have no built-in search or sections (apps build them from a text input and a filtered list).
 - **Theming.** Runtime JSON themes with hot reload, and a larger token set.
-- **Dialogs and overlays.** Close buttons, non-modal dialogs and sheets, and notifications with titles and IDs.
-- **Code editor.** Code actions, document colors and semantic tokens.
+- **Dialogs and overlays.** An Escape switch, resizable sheets, and notifications with icons, custom content and click events.
+- **Code editor.** Document colors and semantic tokens.
 - **An unstyled layer** for apps with their own design system.
 
 Where jamb offers more:
