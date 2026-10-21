@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/ui"
 )
 
 // withActions sets the provider of the code actions of an editor to fn.
@@ -528,6 +529,34 @@ func TestHoverAndMenuOpenTogetherWarnOfNoDuplicateKey(t *testing.T) {
 	for _, w := range warns {
 		if strings.Contains(w, "duplicate key") {
 			t.Errorf("warning: %s", w)
+		}
+	}
+}
+
+// The parts of the code actions take the theme's colors in the dark and the light themes, and the
+// system colors under high contrast: the lightbulb and the group headers the text color, and a
+// disabled action the disabled color.
+func TestCodeActionStylesFollowTheTheme(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		th   *ui.Theme
+		hc   bool
+	}{
+		{"dark", ui.DarkTheme(), false},
+		{"light", ui.LightTheme(), false},
+		{"high contrast", ui.DarkTheme(), true},
+	} {
+		st, used := resolvedIn(Style{}, tc.th, tc.hc)
+		if tc.hc {
+			if st.Lightbulb.TextColor != used.Text || st.PopupGroup.TextColor != used.Text || st.PopupItemDisabled.TextColor != used.Disabled {
+				t.Errorf("%s: lightbulb %v, group %v, disabled %v; want the system text and disabled colors",
+					tc.name, st.Lightbulb.TextColor, st.PopupGroup.TextColor, st.PopupItemDisabled.TextColor)
+			}
+			continue
+		}
+		if st.Lightbulb.TextColor != tc.th.Warning || st.PopupGroup.TextColor != tc.th.TextMuted || st.PopupItemDisabled.TextColor != tc.th.Disabled {
+			t.Errorf("%s: lightbulb %v, group %v, disabled %v; want the theme's warning, muted and disabled colors",
+				tc.name, st.Lightbulb.TextColor, st.PopupGroup.TextColor, st.PopupItemDisabled.TextColor)
 		}
 	}
 }
