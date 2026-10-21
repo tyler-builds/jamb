@@ -6,7 +6,6 @@ import (
 	"image/png"
 	"os"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +24,21 @@ import (
 //	                    print frame/allocation/GC statistics and exit. MODE is
 //	                    "rebuild" (re-render every component every frame) or
 //	                    "paint" (repaint the retained tree every frame).
+//	JAMB_FRAMESTATS=PATH  record every frame of the first window, from its first
+//	                    frame until it closes (an `exit` step, a close from outside
+//	                    or the end of JAMB_STRESS), with the performance counter.
+//	                    At close it writes PATH, one row per frame: frame, t_ms
+//	                    (from the first frame), cpu_ms (from the frame's start to
+//	                    Present), present_interval_ms (from the previous Present;
+//	                    empty for the first frame) and kind (rebuild, update or
+//	                    repaint). It writes PATH-input.csv beside it (PATH with
+//	                    "-input" before the extension), one row per input event a
+//	                    frame rendered: kind (key, move, click or scroll), t_ms,
+//	                    to_cpu_end_ms and to_present_ms, measured from the oldest
+//	                    unrendered event of its kind. It prints a summary to stderr.
+//	                    Input steps of JAMB_SCRIPT are timed when they inject
+//	                    their event, and OS events when the window receives them.
+//	                    Time to the screen is not measured (see framestats.go)
 //	JAMB_VSYNC=0        present without waiting for vblank (throughput tests)
 //	JAMB_GEOMETRY_FILE  remember the window position/size in this file
 //	                    (set by the `jamb dev` runner across restarts). The file
@@ -93,6 +107,7 @@ type devOptions struct {
 	script     string
 	stress     string
 	stressSecs float64
+	frameStats string // JAMB_FRAMESTATS: the CSV path of the frame statistics, or ""
 	noVSync    bool
 	geometry   string
 	position   *platform.Point // JAMB_POSITION: where the first window is placed, or nil
@@ -115,6 +130,7 @@ func loadDevOptions() devOptions {
 		script:        os.Getenv("JAMB_SCRIPT"),
 		stress:        os.Getenv("JAMB_STRESS"),
 		stressSecs:    5,
+		frameStats:    os.Getenv("JAMB_FRAMESTATS"),
 		noVSync:       os.Getenv("JAMB_VSYNC") == "0",
 		geometry:      os.Getenv("JAMB_GEOMETRY_FILE"),
 		highContrast:  os.Getenv("JAMB_HIGH_CONTRAST"),
@@ -222,14 +238,14 @@ func (d devOptions) reportReady() {
 	}
 }
 
-// stress measures sustained frame cost.
+// stress measures sustained frame cost. Its times are on the clock of clockNow.
 type stress struct {
 	mode      string
-	start     time.Time
-	until     time.Time
-	cpu       []time.Duration
-	lastFrame time.Time
-	intervals []time.Duration
+	start     int64 // zero until the first frame
+	until     int64
+	cpu       []int64
+	lastFrame int64
+	intervals []int64
 	mem0      runtime.MemStats
 	nodes     int
 }
@@ -238,12 +254,12 @@ func newStress(mode string) *stress { return &stress{mode: mode} }
 
 // begin is called before each frame's runtime work.
 func (s *stress) begin(h *host, secs float64) {
-	now := time.Now()
-	if s.start.IsZero() {
-		s.start, s.until = now, now.Add(time.Duration(secs*float64(time.Second)))
+	now := clockNow()
+	if s.start == 0 {
+		s.start, s.until = now, now+int64(secs*float64(time.Second))
 		runtime.ReadMemStats(&s.mem0)
 	} else {
-		s.intervals = append(s.intervals, now.Sub(s.lastFrame))
+		s.intervals = append(s.intervals, now-s.lastFrame)
 	}
 	s.lastFrame = now
 	switch s.mode {
@@ -255,28 +271,24 @@ func (s *stress) begin(h *host, secs float64) {
 }
 
 // end records the CPU time of a frame and reports when done.
-func (s *stress) end(h *host, w platform.Window, cpu time.Duration) bool {
+func (s *stress) end(h *host, w platform.Window, cpu int64) bool {
 	s.cpu = append(s.cpu, cpu)
 	s.nodes = h.rt.Stats().Nodes
-	if time.Now().Before(s.until) {
+	now := clockNow()
+	if now < s.until {
 		return true
 	}
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	n := len(s.cpu)
-	sorted := append([]time.Duration(nil), s.cpu...)
-	slices.Sort(sorted)
-	var total time.Duration
-	for _, d := range s.cpu {
-		total += d
-	}
-	elapsed := time.Since(s.start)
+	c := summarize(s.cpu)
+	elapsed := time.Duration(now - s.start)
 	frames := float64(n)
 	fmt.Fprintf(os.Stderr, "jamb stress mode=%s nodes=%d frames=%d elapsed=%.2fs fps=%.1f\n",
 		s.mode, s.nodes, n, elapsed.Seconds(), frames/elapsed.Seconds())
 	fmt.Fprintf(os.Stderr, "  cpu per frame (build+layout+paint+submit): avg=%v p50=%v p99=%v max=%v\n",
-		(total / time.Duration(n)).Round(time.Microsecond), sorted[n/2].Round(time.Microsecond),
-		sorted[n*99/100].Round(time.Microsecond), sorted[n-1].Round(time.Microsecond))
+		time.Duration(c.avg).Round(time.Microsecond), time.Duration(c.p50).Round(time.Microsecond),
+		time.Duration(c.p99).Round(time.Microsecond), time.Duration(c.max).Round(time.Microsecond))
 	fmt.Fprintf(os.Stderr, "  alloc: %.1f KB/frame, %.0f objects/frame, %.2f MB/s; GC cycles=%d (%.1f/s), pause total=%v; heap=%.1f MB\n",
 		float64(m.TotalAlloc-s.mem0.TotalAlloc)/frames/1024, float64(m.Mallocs-s.mem0.Mallocs)/frames,
 		float64(m.TotalAlloc-s.mem0.TotalAlloc)/elapsed.Seconds()/1e6,
@@ -484,6 +496,7 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 			return false
 		}
 		st := s.steps[s.i]
+		arrived := clockNow() // an input step's event arrives when the step injects it
 		switch st.op {
 		case "move":
 			rt.PointerMove(st.x, st.y, 0)
@@ -557,6 +570,9 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 			s.i = len(s.steps)
 			w.Close()
 			return false
+		}
+		if k, ok := scriptInputKind(st.op); ok && h.fs != nil {
+			h.fs.input(k, arrived, rt.NeedsFrame())
 		}
 		s.i++
 		if st.op != "wait" && st.op != "idle" {

@@ -448,6 +448,7 @@ type host struct {
 	keymapFile *keymap.File
 	stopWatch  func() // stops the keymap file watcher, if one runs
 	stress     *stress
+	fs         *frameStats // JAMB_FRAMESTATS, on the first window only
 
 	frames int
 
@@ -516,6 +517,9 @@ func (h *host) OnCreate(w platform.Window) error {
 	if h.primary {
 		if h.dev.stress != "" {
 			h.stress = newStress(h.dev.stress)
+		}
+		if h.dev.frameStats != "" {
+			h.fs = newFrameStats(h.dev.frameStats)
 		}
 		if h.dev.script != "" {
 			application.script, err = parseScript(h.dev.script)
@@ -627,7 +631,11 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 		h.rh.WindowFocus(false)
 	}
 	w.SetCursor(h.rh.Cursor())
-	if h.rt.NeedsFrame() {
+	needsFrame := h.rt.NeedsFrame()
+	if k, ok := inputKindOf(e.Kind); ok && h.fs != nil {
+		h.fs.input(k, e.Arrived, needsFrame)
+	}
+	if needsFrame {
 		w.Wake()
 	}
 }
@@ -752,6 +760,7 @@ func (h *host) OnFrame(w platform.Window) bool {
 		w.SetDark(dark)
 	}
 	frameStart := time.Now()
+	frameAt := clockNow()
 	if !h.gpuReady(frameStart) {
 		return false // the device is lost; the window is woken when it may draw
 	}
@@ -817,9 +826,13 @@ func (h *host) OnFrame(w platform.Window) bool {
 			h.traceFrames, h.traceSince = 0, time.Now()
 		}
 	}
+	// The CPU side of the frame ends where Present starts; Present blocks for vsync.
+	start, end := presentTimes(h.r, clockNow())
+	if h.fs != nil {
+		h.fs.presented(h.rt.Stats(), frameAt, start, end, w)
+	}
 	if h.stress != nil {
-		// Present() blocks for vsync; measure only the CPU side of the frame.
-		return h.stress.end(h, w, cpuTime(frameStart, t0, h))
+		return h.stress.end(h, w, start-frameAt)
 	}
 	if script != nil {
 		again = script.afterDraw(h, w) || again
@@ -827,23 +840,13 @@ func (h *host) OnFrame(w platform.Window) bool {
 	return again
 }
 
-// cpuTime is the frame's CPU work: runtime stages plus command submission,
-// excluding time spent blocked in Present.
-func cpuTime(frameStart, submitStart time.Time, h *host) time.Duration {
-	st := h.rt.Stats()
-	return st.BuildTime + st.LayoutTime + st.PaintTime + time.Since(submitStart) - h.presentWait()
-}
-
-func (h *host) presentWait() time.Duration {
-	if p, ok := h.r.(interface{ LastPresentWait() time.Duration }); ok {
-		return p.LastPresentWait()
-	}
-	return 0
-}
-
 // OnDestroy implements platform.Handler. The app quits when its last window
 // closes, or when a QuitWhenClosed window does.
 func (h *host) OnDestroy(w platform.Window) {
+	if h.fs != nil {
+		h.fs.finish()
+		h.fs = nil
+	}
 	if h.r != nil {
 		h.r.Close()
 		h.r = nil
