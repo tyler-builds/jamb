@@ -41,6 +41,7 @@ func italianStrings() *Strings {
 		CollapseNavigation:        "Comprimi navigazione",
 		ExpandNavigation:          "Espandi navigazione",
 		DismissNotification:       "Chiudi notifica",
+		ToastAnnouncement:         func(title, text string) string { return title + ": " + text },
 		PreviousPage:              "Pagina precedente",
 		NextPage:                  "Pagina successiva",
 		PreviousSlide:             "Diapositiva precedente",

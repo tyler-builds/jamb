@@ -45,11 +45,13 @@ func toastDefaultTime(v ToastVariant) time.Duration {
 // built-in defaults of its variant, then over the theme's Toast, then over the
 // theme's Toasts for that variant, then over the Styles of the toast; see
 // docs/styling.md. Container is the box of a toast, Icon the icon of its variant
-// (its TextColor is the icon's color), Text the message, and Action and Close
-// the wrappers of the action button and the dismiss button.
+// (its TextColor is the icon's color), Title the title of a toast that has one,
+// Text the message, and Action and Close the wrappers of the action button and
+// the dismiss button.
 type ToastStyle struct {
 	Container Style // the box of the toast
 	Icon      Style // the icon, in the color of its variant
+	Title     Style // the title, when the toast has one
 	Text      Style // the message
 	Action    Style // the wrapper of the action button
 	Close     Style // the wrapper of the dismiss button
@@ -60,6 +62,7 @@ func (s ToastStyle) merge(o ToastStyle) ToastStyle {
 	return ToastStyle{
 		Container: s.Container.Merge(o.Container),
 		Icon:      s.Icon.Merge(o.Icon),
+		Title:     s.Title.Merge(o.Title),
 		Text:      s.Text.Merge(o.Text),
 		Action:    s.Action.Merge(o.Action),
 		Close:     s.Close.Merge(o.Close),
@@ -71,6 +74,7 @@ func (s ToastStyle) plain() ToastStyle {
 	return ToastStyle{
 		Container: plainStyle(s.Container),
 		Icon:      plainStyle(s.Icon),
+		Title:     plainStyle(s.Title),
 		Text:      plainStyle(s.Text),
 		Action:    plainStyle(s.Action),
 		Close:     plainStyle(s.Close),
@@ -99,27 +103,33 @@ func (tv ToastVariants) of(v ToastVariant) ToastStyle {
 
 // toastDefaults returns the built-in look of a toast of variant v, from the
 // colors of t. Under high contrast every icon is the text color, and the border
-// is drawn in the text color, so the shape tells the variant.
-func toastDefaults(t *Theme, v ToastVariant) ToastStyle {
+// is drawn in the text color, so the shape tells the variant. A toast with a
+// title has a semibold title, and its message is in the muted text color.
+func toastDefaults(t *Theme, v ToastVariant, titled bool) ToastStyle {
 	edge, width := t.Border, float32(1)
 	if t.HighContrast {
 		edge, width = t.Text, 2
 	}
 	_, c := toastIcon(t, v)
-	return ToastStyle{
+	st := ToastStyle{
 		Container: Style{Direction: Row, Align: Center, Gap: 10, MinWidth: Px(280), MaxWidth: Px(420),
 			Padding: XY(14, 10), Radius: t.Radius, Background: t.Surface, BorderWidth: width, BorderColor: edge,
 			Shadows: []Shadow{ShadowMd}},
-		Icon: Style{Width: Px(18), Height: Px(18), NoShrink: true, TextColor: c},
+		Icon:  Style{Width: Px(18), Height: Px(18), NoShrink: true, TextColor: c},
+		Title: Style{FontWeight: FontSemibold, TextColor: t.Text},
 	}
+	if titled && !t.HighContrast {
+		st.Text = Style{TextColor: t.TextMuted}
+	}
+	return st
 }
 
 // resolveToast returns the look of a toast of variant v: the defaults, merged
 // with the theme's Toast, the theme's Toasts for the variant, and the toast's own
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveToast(ctx *Context, v ToastVariant, inst ToastStyle) ToastStyle {
+func resolveToast(ctx *Context, v ToastVariant, titled bool, inst ToastStyle) ToastStyle {
 	t := ctx.Theme()
-	return layered(ctx, toastDefaults(t, v), ToastStyle.merge, ToastStyle.plain,
+	return layered(ctx, toastDefaults(t, v, titled), ToastStyle.merge, ToastStyle.plain,
 		themeLayer(t.Toast), themeLayer(t.Toasts.of(v)), instanceLayer(inst))
 }
 
@@ -146,7 +156,9 @@ type Toast struct {
 // runs whether or not the Toaster is being rendered.
 type toastEntry struct {
 	id       uint64
+	appID    string // the ID the app gave the toast, or "" (see ToastWithID)
 	variant  ToastVariant
+	title    string
 	text     string
 	action   string
 	onAction func()
@@ -154,6 +166,13 @@ type toastEntry struct {
 	sticky   bool          // no timeout: the toast stays until it is dismissed
 	hovered  bool          // the pointer is over the toast
 	styles   ToastStyle    // the look of this toast alone (see Styles)
+
+	// The announcement of the toast (see announceToasts).
+	say         bool         // a text or variant change is waiting to be announced
+	said        string       // the text last announced
+	saidVariant ToastVariant // the variant last announced
+	sayAt       time.Time    // when the toast was last announced
+	refocus     bool         // the focus was on the action, which an update may remove
 }
 
 // Toast shows a notification with text in the window's Toaster. It is announced
@@ -161,7 +180,39 @@ type toastEntry struct {
 // warning and error. It does not take focus, so typing carries on where it was.
 // Without a Toaster in the window it is not shown. Call it from a click or
 // another handler on the UI thread, or from a goroutine through Post.
-func (c *Context) Toast(v ToastVariant, text string) *Toast { return c.rt.toast(v, text) }
+func (c *Context) Toast(v ToastVariant, text string) *Toast { return c.rt.toast("", v, text) }
+
+// ToastWithID shows a toast with the ID, or, when a toast with the ID is already
+// shown, replaces that toast in place: its text, variant, title, action, time and
+// styles are set again from the returned Toast, and it keeps its place in the
+// stack and its focus and hover. An update does not announce the text again when
+// it is the same, and the same kind of toast is announced at most every two
+// seconds. The ID is unique in the window, and it is not shown in the toast.
+// Without an ID (the empty string) it is a new toast, as Toast makes.
+func (c *Context) ToastWithID(id string, v ToastVariant, text string) *Toast {
+	return c.rt.toast(id, v, text)
+}
+
+// DismissToast removes the toast with the ID, as its close button does, and moves
+// the focus on if it was in the toast. It does nothing when no such toast is shown.
+func (c *Context) DismissToast(id string) {
+	if id == "" {
+		return
+	}
+	for _, e := range c.rt.toasts {
+		if e.appID == id {
+			c.rt.closeToast(e)
+			return
+		}
+	}
+}
+
+// Title gives the toast a title, shown above its text in a semibold line. The
+// title names the toast to assistive technology, and the text is its description.
+func (t *Toast) Title(s string) *Toast {
+	t.e.title = s
+	return t
+}
 
 // Action adds a button labelled label to the toast, such as "Undo". Running it
 // calls fn and dismisses the toast.
@@ -195,31 +246,115 @@ func (t *Toast) Styles(st ToastStyle) *Toast {
 	return t
 }
 
-// toast adds a toast to the stack and announces it. When the stack is over its
-// maximum, the oldest toast that is not hovered or focused goes.
-func (rt *Runtime) toast(v ToastVariant, text string) *Toast {
+// toast adds a toast to the stack, or replaces the shown toast with the ID id, and
+// queues its announcement for the next frame. When the stack is over its maximum,
+// the oldest toast that is not hovered or focused goes. An update takes no room.
+func (rt *Runtime) toast(id string, v ToastVariant, text string) *Toast {
 	if !rt.toastsTimed() {
 		rt.toastAt = rt.now() // the first timed toast's time starts now, not at the last frame
 	}
-	rt.toastNext++
-	e := &toastEntry{id: rt.toastNext, variant: v, text: text, left: toastDefaultTime(v), sticky: v == ToastError}
-	rt.toasts = append(rt.toasts, e)
-	for len(rt.toasts) > rt.toastMaxShown() {
-		i := rt.evictable()
-		if i < 0 {
-			break // every toast is in use: the stack grows rather than drop one
+	e := rt.toastByID(id)
+	if e != nil {
+		// An update keeps the place, the hover and the focus of the toast, and sets the rest again.
+		e.refocus = e.action != "" && rt.focusWithin(toastActionKey(e.id))
+		e.variant, e.text = v, text
+		e.title, e.action, e.onAction, e.styles = "", "", nil, ToastStyle{}
+		e.left, e.sticky = toastDefaultTime(v), v == ToastError
+	} else {
+		rt.toastNext++
+		e = &toastEntry{id: rt.toastNext, appID: id, variant: v, text: text, left: toastDefaultTime(v), sticky: v == ToastError}
+		rt.toasts = append(rt.toasts, e)
+		for len(rt.toasts) > rt.toastMaxShown() {
+			i := rt.evictable()
+			if i < 0 {
+				break // every toast is in use: the stack grows rather than drop one
+			}
+			rt.announceToast(rt.toasts[i], rt.now()) // a toast pushed out before its frame is still announced
+			rt.toasts = slices.Delete(rt.toasts, i, i+1)
 		}
-		rt.toasts = slices.Delete(rt.toasts, i, i+1)
 	}
+	e.say = true
 	rt.bumpToasts()
 	rt.wakeToasts(rt.now()) // a toast's end is a wake-up, even when no frame is asked for
-	p := access.Polite
-	if v >= ToastWarning {
-		p = access.Assertive
-	}
-	Announce(text, p)
 	return &Toast{rt: rt, e: e}
 }
+
+// toastByID returns the shown toast with the app's ID id, or nil. The empty ID
+// names no toast.
+func (rt *Runtime) toastByID(id string) *toastEntry {
+	if id == "" {
+		return nil
+	}
+	for _, e := range rt.toasts {
+		if e.appID == id {
+			return e
+		}
+	}
+	return nil
+}
+
+// toastAnnounceGap is the least time between two announcements of the same kind of
+// toast. An update within it waits, and its latest text is announced when it ends.
+const toastAnnounceGap = 2 * time.Second
+
+// announceToasts announces the toasts that changed since the last frame, once each.
+// A toast is announced when it is shown, when its variant changes, and when its
+// text changes; the text is the title and the message as one. It runs at the start
+// of each frame, so that the updates made in one handler are announced once, with
+// the last text. An update of the same kind of toast within toastAnnounceGap is
+// held until the gap ends, and a toast dismissed meanwhile is not announced.
+func (rt *Runtime) announceToasts(now time.Time) {
+	var wake time.Time
+	for _, e := range rt.toasts {
+		if at := rt.announceToast(e, now); !at.IsZero() && (wake.IsZero() || at.Before(wake)) {
+			wake = at
+		}
+	}
+	if !wake.IsZero() {
+		rt.wakeAt(wake)
+	}
+}
+
+// announceToast announces the toast e if it changed and the gap allows it. It
+// returns when a held announcement of e is due, or the zero time.
+func (rt *Runtime) announceToast(e *toastEntry, now time.Time) time.Time {
+	if !e.say {
+		return time.Time{}
+	}
+	text := rt.toastAnnouncement(e)
+	if !e.sayAt.IsZero() && text == e.said && e.variant == e.saidVariant {
+		e.say = false
+		return time.Time{}
+	}
+	if e.variant == e.saidVariant && !e.sayAt.IsZero() && now.Sub(e.sayAt) < toastAnnounceGap {
+		return e.sayAt.Add(toastAnnounceGap)
+	}
+	e.say = false
+	e.said, e.saidVariant, e.sayAt = text, e.variant, now
+	p := access.Polite
+	if e.variant >= ToastWarning {
+		p = access.Assertive
+	}
+	source := ""
+	if e.appID != "" {
+		source = toastSource(e.appID)
+	}
+	announceFrom(text, p, source)
+	return time.Time{}
+}
+
+// toastAnnouncement returns the text a toast is announced with: its message, and
+// its title before it when it has one.
+func (rt *Runtime) toastAnnouncement(e *toastEntry) string {
+	if e.title == "" {
+		return e.text
+	}
+	return rt.strings.ToastAnnouncement(e.title, e.text)
+}
+
+// toastSource is the source of the announcements of the toast with the app's ID id.
+// Its announcements replace each other while they wait (see access.Announcement).
+func toastSource(id string) string { return "jamb.toast:" + id }
 
 // evictable returns the index of the oldest toast that is neither hovered nor
 // holding keyboard focus, or -1 when there is none. A toast a user is reading or
@@ -375,6 +510,10 @@ func (rt *Runtime) closeToast(e *toastEntry) {
 // toastKey is the key of the element of a toast.
 func toastKey(id uint64) string { return fmt.Sprintf("jamb.toast:%d", id) }
 
+// toastActionKey is the key of the action of a toast, so that an update can tell
+// whether the focus was on it.
+func toastActionKey(id uint64) string { return fmt.Sprintf("jamb.toast:%d/action", id) }
+
 // ToasterElement shows the window's toasts as a stack in the bottom-right
 // corner. Place one in the window, as the last child of the root element, so
 // that it is laid out over the content. Only one is needed; it shows every
@@ -436,15 +575,23 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 		region.Right(16).Bottom(16).Align(End)
 	}
 	for _, e := range rt.toasts {
+		if e.refocus {
+			// The focused action was removed by an update: the focus moves to the region.
+			e.refocus = false
+			if e.action == "" {
+				rt.pendingFocus = rt.toastRegion
+			}
+		}
 		region.Child(rt.toastView(ctx, strs, t, e))
 	}
 	return region
 }
 
 // toastView is one toast in the stack: an icon, the text, an optional action
-// and a close button. It is a group named by its text.
+// and a close button. It is a group named by its title and described by its
+// text, or named by its text when it has no title.
 func (rt *Runtime) toastView(ctx *Context, strs *Strings, t *Theme, e *toastEntry) *DivElement {
-	st := resolveToast(ctx, e.variant, e.styles)
+	st := resolveToast(ctx, e.variant, e.title != "", e.styles)
 	ic, _ := toastIcon(t, e.variant)
 	box := Div().asPart("Toast.Container").Key(toastKey(e.id)).Style(st.Container).
 		Enter(Fade().Slide(0, 8), Animation{Duration: 160 * time.Millisecond}).
@@ -458,10 +605,20 @@ func (rt *Runtime) toastView(ctx *Context, strs *Strings, t *Theme, e *toastEntr
 				rt.closeToast(e)
 			}
 		})
+	if e.title != "" {
+		box.Label(e.title).Description(e.text)
+	}
 	box.Child(Div().asPart("Toast.Icon").Style(st.Icon).Child(Icon(ic).Size(18)))
-	box.Child(Div().asPart("Toast.Text").Style(st.Text).Grow(1).Child(Text(e.text)))
+	if e.title == "" {
+		box.Child(Div().asPart("Toast.Text").Style(st.Text).Grow(1).Child(Text(e.text)))
+	} else {
+		body := Div().Column().Gap(2).Grow(1).MinWidth(Px(0))
+		body.Child(Div().asPart("Toast.Title").Style(st.Title).Child(Text(e.title)))
+		body.Child(Div().asPart("Toast.Text").Style(st.Text).Child(Text(e.text)))
+		box.Child(body)
+	}
 	if e.action != "" {
-		box.Child(Div().asPart("Toast.Action").Style(st.Action).Child(Button(e.action).Small().Ghost().OnClick(func() {
+		box.Child(Div().asPart("Toast.Action").Key(toastActionKey(e.id)).Style(st.Action).Child(Button(e.action).Small().Ghost().OnClick(func() {
 			if e.onAction != nil {
 				e.onAction()
 			}

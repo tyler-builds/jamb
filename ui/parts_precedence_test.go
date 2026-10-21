@@ -218,7 +218,7 @@ func TestWidgetPartPrecedence(t *testing.T) {
 			theme: func(th *Theme, c Color) { th.Toast.Container.Background = c },
 			make: func(t *testing.T, th *Theme, inst *Color) *accessRig {
 				r := newThemedRig(th, func(ctx *Context) Element { return Div().Column().Child(Toaster()) })
-				r.rt.toast(ToastInfo, "Saved").Styles(ToastStyle{Container: bgStyle(inst)})
+				r.rt.toast("", ToastInfo, "Saved").Styles(ToastStyle{Container: bgStyle(inst)})
 				r.frame()
 				return r
 			}},
