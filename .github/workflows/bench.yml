@@ -1,0 +1,94 @@
+name: Benchmarks
+
+# Advisory. The job compares the Go benchmarks of a pull request with those of its
+# base, and writes the comparison to the job summary. It never fails a pull request
+# for a slowdown: shared runners are noisy, so a difference is a prompt to look, not
+# a result. See scripts/bench-go.ps1.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run.
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  compare:
+    name: Benchmarks against the base
+    runs-on: windows-latest
+    timeout-minutes: 60
+    # Advisory: a failing benchmark or a slow run is reported, never required.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The base of the pull request; on a manual run, the same commit twice, which
+          # shows the noise of the runner.
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: base
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: head
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+          cache-dependency-path: |
+            base/**/go.sum
+            head/**/go.sum
+      # The base may predate the runner, so the head's copy runs both sides. The base
+      # runs first, then the head, on the same runner in the same job. The 100 MB rope
+      # benchmarks are left out: they take most of the time and add little, since their
+      # 2.6 MB counterparts run the same code.
+      # A failing run does not stop the job, so the head still runs and the summary is written.
+      - name: Run the benchmarks on the base
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Copy-Item -LiteralPath head\scripts\bench-go.ps1 -Destination base\scripts\bench-go.ps1 -Force
+          ./base/scripts/bench-go.ps1 -Count 6 -Skip '100MB' -OutDir "$env:RUNNER_TEMP\bench-base"
+      - name: Run the benchmarks on the head and compare
+        if: always()
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $base = Get-ChildItem "$env:RUNNER_TEMP\bench-base\bench-*.txt" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.summary.txt' } | Select-Object -First 1
+          $runArgs = @('-Count', '6', '-Skip', '100MB', '-OutDir', "$env:RUNNER_TEMP\bench-head")
+          if ($base) { $runArgs += @('-Baseline', $base.FullName) }
+          ./head/scripts/bench-go.ps1 @runArgs
+      - name: Write the summary
+        if: always()
+        shell: pwsh
+        run: |
+          $summary = $env:GITHUB_STEP_SUMMARY
+          $outHead = "$env:RUNNER_TEMP\bench-head"
+          $note = @(
+            '## Go benchmarks: advisory',
+            '',
+            'Shared runners are noisy: a few percent of a difference, and sometimes more, can be',
+            'the machine. This comparison is advisory and does not gate the pull request.',
+            'A difference is worth a look when benchstat reports it as significant (not "~")',
+            'in a benchmark you changed. Each side ran 6 times on one runner, base first.',
+            ''
+          )
+          Add-Content -LiteralPath $summary -Value $note
+          $compare = Get-ChildItem "$outHead\*.compare.txt" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($compare) {
+            Add-Content -LiteralPath $summary -Value '### Comparison (base to head)', '', '```text'
+            Add-Content -LiteralPath $summary -Value (Get-Content -LiteralPath $compare.FullName -Encoding UTF8)
+            Add-Content -LiteralPath $summary -Value '```'
+          } else {
+            Add-Content -LiteralPath $summary -Value 'No comparison was written. See the run log.'
+          }
+          $raw = Get-ChildItem "$outHead\bench-*.txt" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.summary.txt' -and $_.Name -notlike '*.compare.txt' } | Select-Object -First 1
+          if ($raw) {
+            Add-Content -LiteralPath $summary -Value '', '### Machine', '', '```text'
+            Add-Content -LiteralPath $summary -Value (Get-Content -LiteralPath $raw.FullName -TotalCount 13 -Encoding UTF8)
+            Add-Content -LiteralPath $summary -Value '```'
+          }
