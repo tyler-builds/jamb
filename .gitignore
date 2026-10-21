@@ -2,6 +2,8 @@
 *.exe
 /bin/
 /out/
+# Output of scripts/bench-go.ps1: raw benchmark runs, summaries and profiles.
+/bench-results/
 # Release output of jamb package, written to <app>/dist.
 dist/
 *.prof
