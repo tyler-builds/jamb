@@ -52,14 +52,14 @@ jobs:
         continue-on-error: true
         run: |
           Copy-Item -LiteralPath head\scripts\bench-go.ps1 -Destination base\scripts\bench-go.ps1 -Force
-          ./base/scripts/bench-go.ps1 -Count 6 -Skip '100MB' -OutDir "$env:RUNNER_TEMP\bench-base"
+          ./base/scripts/bench-go.ps1 -Count 6 -Skip '100MB' -BenchTime 500ms -OutDir "$env:RUNNER_TEMP\bench-base"
       - name: Run the benchmarks on the head and compare
         if: always()
         shell: pwsh
         continue-on-error: true
         run: |
           $base = Get-ChildItem "$env:RUNNER_TEMP\bench-base\bench-*.txt" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.summary.txt' } | Select-Object -First 1
-          $runArgs = @('-Count', '6', '-Skip', '100MB', '-OutDir', "$env:RUNNER_TEMP\bench-head")
+          $runArgs = @('-Count', '6', '-Skip', '100MB', '-BenchTime', '500ms', '-OutDir', "$env:RUNNER_TEMP\bench-head")
           if ($base) { $runArgs += @('-Baseline', $base.FullName) }
           ./head/scripts/bench-go.ps1 @runArgs
       - name: Write the summary
