@@ -841,3 +841,36 @@ func TestChordDroppedWhenFocusMoves(t *testing.T) {
 		t.Errorf("g in a, then focus moves to b and o: a %q, b %q, %d hits; want \"\", \"o\" and no hits", va.Peek(), vb.Peek(), hits)
 	}
 }
+
+// TestConsumedKeyDropsItsText checks that a binding that consumes Ctrl+Space drops the space the
+// platform sends with it, as it drops the text of a printable key, and that the key's text reaches
+// the field when no binding takes it.
+func TestConsumedKeyDropsItsText(t *testing.T) {
+	top := NewAction("test.consumed.space", "Top")
+	field := NewFocusHandle()
+	v := NewSignal("")
+	hits := 0
+	r := newKeyRig(func(ctx *Context) Element {
+		return Div().OnAction(top, func() { hits++ }).Child(TextInput(v).FocusHandle(field))
+	})
+	r.rt.AddBindings(Bind("ctrl+space", top))
+	field.Focus()
+	r.frame()
+	press := func(k input.Key, mods input.Modifiers, text string) {
+		r.rt.KeyDown(k, mods, false)
+		if text != "" {
+			r.rt.TextInput(text)
+		}
+		r.rt.KeyUp(k, mods)
+		r.frame()
+	}
+
+	press(input.KeySpace, input.ModCtrl, " ")
+	if hits != 1 || v.Peek() != "" {
+		t.Errorf("ctrl+space: %d hits, value %q; want 1 hit and no space", hits, v.Peek())
+	}
+	press(input.KeySpace, 0, " ")
+	if hits != 1 || v.Peek() != " " {
+		t.Errorf("space: %d hits, value %q; want the space typed", hits, v.Peek())
+	}
+}

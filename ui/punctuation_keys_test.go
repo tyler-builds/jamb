@@ -66,15 +66,25 @@ func TestPunctuationKeysLabelAsTheyAreNamed(t *testing.T) {
 }
 
 // TestPunctuationKeysTypeTextWithoutModifiers checks that a single-stroke binding on a punctuation key
-// consumes text the way = and - do: the key types text on its own, and not with Ctrl, Alt or Super.
+// consumes text the way = and - do: the key types text on its own, and with Ctrl, which the platform
+// may still send as the character, but not with Alt or Super. A letter with Ctrl types no text.
 func TestPunctuationKeysTypeTextWithoutModifiers(t *testing.T) {
 	for _, tc := range punctuationKeys {
 		s := keystroke{key: tc.key}
 		if !s.typesText() {
 			t.Errorf("%s does not type text on its own", tc.name)
 		}
-		if (keystroke{key: tc.key, mods: input.ModCtrl}).typesText() {
-			t.Errorf("ctrl+%s types text", tc.name)
+		if !(keystroke{key: tc.key, mods: input.ModCtrl}).typesText() {
+			t.Errorf("ctrl+%s does not type text", tc.name)
 		}
+		if (keystroke{key: tc.key, mods: input.ModAlt}).typesText() {
+			t.Errorf("alt+%s types text", tc.name)
+		}
+	}
+	if !(keystroke{key: input.KeySpace, mods: input.ModCtrl}).typesText() {
+		t.Error("ctrl+space does not type text")
+	}
+	if (keystroke{key: input.KeyA, mods: input.ModCtrl}).typesText() {
+		t.Error("ctrl+a types text")
 	}
 }

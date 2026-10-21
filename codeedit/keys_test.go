@@ -46,3 +46,21 @@ func TestPunctuationKeysRunTheCommands(t *testing.T) {
 		t.Fatalf("ctrl+shift+] left %d rows shown, want 4", h.doc.VisibleRows())
 	}
 }
+
+// TestCtrlSpaceTypesNoSpace checks that Ctrl+Space opens the list and types no space: the
+// platform sends the key press and then the space character that the chord produces, and the
+// binding consumes both.
+func TestCtrlSpaceTypesNoSpace(t *testing.T) {
+	h := newHarness(t, "al\nnext", func(e *EditorElement) *EditorElement {
+		return e.Completions(words("alpha", "alfa", "beta"))
+	})
+	h.doc.SetCaret(2)
+	h.rt.KeyDown(input.KeySpace, input.ModCtrl, false)
+	h.rt.TextInput(" ")
+	h.rt.KeyUp(input.KeySpace, input.ModCtrl)
+	h.frame()
+	h.waitFor("the completions", func() bool { return h.ed.view.completion.open && !h.ed.view.completion.loading })
+	if got := h.doc.Text(); got != "al\nnext" || h.doc.Caret() != 2 {
+		t.Fatalf("ctrl+space gave %q with the caret at %d, want the text unchanged with the caret at 2", got, h.doc.Caret())
+	}
+}
