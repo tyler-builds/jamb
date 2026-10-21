@@ -61,6 +61,7 @@ type Document struct {
 	// draw them, told when they change, which is not a change of the version.
 	diags   []Diagnostic
 	diagSet bool
+	diagVer uint64 // changes on every SetDiagnostics, which the lightbulb of the code actions asks about
 	redraws []listener
 }
 

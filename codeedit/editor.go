@@ -174,6 +174,7 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 		vs.completeP = nil // nothing to complete in a text that does not change
 		vs.actionsP = nil  // and no code action to apply to it
 	}
+	vs.syncLightbulb()
 	vs.doc.SetTabSize(e.tabSize)
 	t := ctx.Theme()
 	st := e.styles.resolve(ctx)
@@ -387,6 +388,7 @@ type geometry struct {
 	gutterW float32 // the width of the numbers and the fold markers, up to the text
 	textX   float32 // where the text starts, before the horizontal scroll
 	foldX   float32 // the left edge of the fold markers
+	markW   float32 // the width of the column of the diagnostic markers and the lightbulb, at the left edge
 	viewW   float32
 	viewH   float32
 	painted bool
@@ -540,6 +542,8 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 	row := dr.row
 	vs.restart = true
 	switch {
+	case vs.actions.bulb && row == vs.actions.bulbRow && dr.seg == 0 && ev.LocalX < g.markW:
+		vs.openActions(CodeActionInvoked) // the lightbulb in the gutter opens the menu
 	case ev.LocalX >= g.foldX && ev.LocalX < g.textX && dr.seg == 0 && vs.doc.opensBlock(row, vs.tab):
 		if !vs.doc.Unfold(row) {
 			vs.doc.Fold(row)

@@ -331,6 +331,145 @@ func TestMultiChangeActionIsOneUndoStep(t *testing.T) {
 	}
 }
 
+// deferredTimers makes the editor's timers wait, until the test runs them with the returned
+// functions' list, so that the debounce of the lightbulb can be seen.
+func deferredTimers(t *testing.T) *[]func() {
+	var fns []func()
+	old := afterFunc
+	afterFunc = func(d time.Duration, f func()) { fns = append(fns, f) }
+	t.Cleanup(func() { afterFunc = old })
+	return &fns
+}
+
+// The lightbulb shows on the row of a diagnostic once an automatic request has an enabled action
+// for it. It hides when the caret leaves the row, when the text changes, and when the editor loses
+// focus, and asks again after the debounce. Its click opens the menu.
+func TestLightbulbShowsOnADiagnosticRow(t *testing.T) {
+	timers := deferredTimers(t)
+	queries := make(chan CodeActionQuery, 8)
+	h := newHarness(t, "alpha beta\ngamma", withActions(func(ctx context.Context, q CodeActionQuery) ([]CodeAction, error) {
+		queries <- q
+		return []CodeAction{{Title: "Fix", Kind: CodeActionQuickFix, Edits: []Change{{From: 0, To: 5, Text: "omega"}}}}, nil
+	}))
+	vs := h.ed.view
+	h.doc.SetDiagnostics([]Diagnostic{{From: 0, To: 5, Message: "undefined: alpha"}})
+	runTimers := func() {
+		fns := *timers
+		*timers = nil
+		for _, f := range fns {
+			f()
+		}
+		h.frame()
+	}
+
+	h.doc.SetCaret(2)
+	h.frame()
+	runTimers()
+	h.waitFor("the lightbulb", func() bool { return vs.actions.bulb })
+	if vs.actions.bulbRow != 0 {
+		t.Fatalf("the lightbulb is on row %d, want the diagnostic's row 0", vs.actions.bulbRow)
+	}
+	q := <-queries
+	if q.Trigger != CodeActionAutomatic || q.From != 2 || q.To != 2 {
+		t.Errorf("the automatic query is %+v", q)
+	}
+	if len(q.Diagnostics) != 1 || q.Diagnostics[0].Message != "undefined: alpha" {
+		t.Errorf("the query's diagnostics are %+v, want the one on the caret", q.Diagnostics)
+	}
+
+	h.doc.SetCaret(len(h.doc.Text()))
+	h.frame()
+	if vs.actions.bulb {
+		t.Fatal("the lightbulb is still shown on a row without a diagnostic")
+	}
+	runTimers()
+	if len(queries) != 0 {
+		t.Errorf("the provider was asked about a row without a diagnostic")
+	}
+
+	h.doc.SetCaret(2)
+	h.frame()
+	runTimers()
+	h.waitFor("the lightbulb again", func() bool { return vs.actions.bulb })
+	<-queries
+
+	h.typeText("x")
+	h.frame()
+	if vs.actions.bulb {
+		t.Fatal("the lightbulb is still shown after an edit")
+	}
+	runTimers()
+	h.waitFor("the lightbulb after the edit", func() bool { return vs.actions.bulb })
+	<-queries
+
+	vs.focused = false // the blur handler's effect on the editor
+	vs.closePopups()
+	vs.touch()
+	h.frame()
+	if vs.actions.bulb {
+		t.Error("the lightbulb is still shown after the editor lost focus")
+	}
+}
+
+// An editor whose actions are all disabled shows no lightbulb.
+func TestLightbulbNeedsAnEnabledAction(t *testing.T) {
+	timers := deferredTimers(t)
+	asked := make(chan struct{}, 4)
+	h := newHarness(t, "alpha", withActions(func(ctx context.Context, q CodeActionQuery) ([]CodeAction, error) {
+		asked <- struct{}{}
+		return []CodeAction{{Title: "Import", Disabled: "no import path"}}, nil
+	}))
+	vs := h.ed.view
+	h.doc.SetDiagnostics([]Diagnostic{{From: 0, To: 5, Message: "undefined: alpha"}})
+	h.doc.SetCaret(1)
+	h.frame()
+	fns := *timers
+	*timers = nil
+	for _, f := range fns {
+		f()
+	}
+	h.frame() // runs the request the timer posted
+	<-asked
+	h.waitFor("the answer", func() bool { return !vs.actions.auto.pending() })
+	if vs.actions.bulb || !vs.actions.keyed {
+		t.Errorf("the lightbulb is %v after disabled actions only, want hidden and not asked again", vs.actions.bulb)
+	}
+}
+
+// The lightbulb's click opens the menu at the caret, asked as an invoked request.
+func TestLightbulbClickOpensTheMenu(t *testing.T) {
+	timers := deferredTimers(t)
+	triggers := make(chan CodeActionTrigger, 4)
+	h := newHarness(t, "alpha", withActions(func(ctx context.Context, q CodeActionQuery) ([]CodeAction, error) {
+		triggers <- q.Trigger
+		return []CodeAction{{Title: "Fix", Kind: CodeActionQuickFix}}, nil
+	}))
+	vs := h.ed.view
+	h.doc.SetDiagnostics([]Diagnostic{{From: 0, To: 5, Message: "undefined: alpha"}})
+	h.doc.SetCaret(1)
+	h.frame()
+	fns := *timers
+	*timers = nil
+	for _, f := range fns {
+		f()
+	}
+	h.frame() // runs the request the timer posted
+	h.waitFor("the lightbulb", func() bool { return vs.actions.bulb })
+	if got := <-triggers; got != CodeActionAutomatic {
+		t.Fatalf("the lightbulb was asked with trigger %v, want automatic", got)
+	}
+	r, _ := h.rt.Find("wrap")
+	g := vs.geo
+	h.click(r.X+1+g.markW/2, r.Y+1+g.lineH/2, 0, 1)
+	h.waitFor("the menu", func() bool { return vs.actions.open && !vs.actions.loading })
+	if got := <-triggers; got != CodeActionInvoked {
+		t.Errorf("the click asked with trigger %v, want invoked", got)
+	}
+	if got := actionTitles(vs); !slices.Equal(got, []string{"Fix"}) {
+		t.Errorf("the menu shows %v", got)
+	}
+}
+
 // Read-only editors have no code actions: Ctrl+. does nothing.
 func TestReadOnlyEditorHasNoCodeActions(t *testing.T) {
 	asked := false

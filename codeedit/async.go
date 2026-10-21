@@ -87,4 +87,5 @@ func (vs *viewState) stopRequests() {
 	vs.completion.slot.stop()
 	vs.define.stop()
 	vs.actions.menu.stop()
+	vs.hideLightbulb()
 }
