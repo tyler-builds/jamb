@@ -585,7 +585,11 @@ func (vs *viewState) hideLightbulb() {
 // request, and shows the lightbulb when one of them is enabled.
 func (vs *viewState) probeLightbulb() {
 	st := &vs.actions
-	prov, q := vs.actionsP, vs.actionQuery(CodeActionAutomatic)
+	prov := vs.actionsP
+	if prov == nil {
+		return
+	}
+	q := vs.actionQuery(CodeActionAutomatic)
 	st.auto.run(vs, func(ctx context.Context) ([]CodeAction, error) { return prov.CodeActions(ctx, q) },
 		func(items []CodeAction, err error) {
 			st.bulb = err == nil && slices.ContainsFunc(items, func(a CodeAction) bool { return a.Disabled == "" })
