@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
@@ -105,6 +106,7 @@ func formControlsSection() ui.Element {
 			formSample(t, "Text input, read-only", ui.TextInput(token).Label("Access token").ReadOnly(true).Width(ui.Px(200)), "select and copy it"),
 			formSample(t, "Text input, disabled", ui.TextInput(lockedNote).Label("Project name, disabled").Disabled(true).Width(ui.Px(200)), lockedNote.Get()),
 		}
+		samples = append(samples, formatSamples(ctx, t)...)
 		row := ui.Div().Row().Wrap().Align(ui.Start).Gap(22)
 		for _, s := range samples {
 			row.Child(s)
@@ -190,6 +192,51 @@ func formSample(t *ui.Theme, label string, control ui.Element, readout string) u
 		Child(ui.Text(label).FontSize(11).TextColor(t.TextSubtle)).
 		Child(control).
 		Child(ui.Text("Value: " + readout).FontSize(12).TextColor(t.TextMuted))
+}
+
+// handlePattern is what the Accept sample lets a handle be: lowercase letters, digits
+// and underscores. Accept sees each edit's result, so the pattern matches partial
+// input too, which is why it allows an empty handle.
+var handlePattern = regexp.MustCompile(`^[a-z0-9_]*$`)
+
+// formatSamples are the input formats of the text fields: a phone number and a code
+// as templates, an amount as a number, a PIN as a masked template, and a handle that
+// Accept filters as it is typed. Each readout shows the raw value the signal holds,
+// which is what the app reads; the field shows it formatted.
+func formatSamples(ctx *ui.Context, t *ui.Theme) []ui.Element {
+	phone := ui.Local(ctx, "format.phone", "")
+	code := ui.Local(ctx, "format.code", "")
+	amount := ui.Local(ctx, "format.amount", "")
+	pin := ui.Local(ctx, "format.pin", "")
+	handle := ui.Local(ctx, "format.handle", "")
+
+	phoneFormat := ui.TemplateFormat("(999) 999-9999")
+	codeFormat := ui.TemplateFormat("AA-9999")
+	codeComplete := codeFormat.Complete("Enter two letters, a dash and four digits")
+	amountFormat := ui.NumberFormat(ui.NumberOptions{Decimals: 2, Signed: true})
+
+	codeReadout := fmt.Sprintf("raw %q, complete", code.Get())
+	if codeComplete(code.Get()) != nil {
+		codeReadout = fmt.Sprintf("raw %q, not complete", code.Get())
+	}
+	amountReadout := fmt.Sprintf("raw %q, shown as %q", amount.Get(), amountFormat.Display(amount.Get()))
+	return []ui.Element{
+		formSample(t, "Template: phone", ui.TextInput(phone).Key("format-phone").Label("Sample phone").Placeholder("(555) 010-0100").
+			Format(phoneFormat).Width(ui.Px(200)),
+			fmt.Sprintf("raw %q", phone.Get())),
+		formSample(t, "Template: code, with Complete", ui.TextInput(code).Key("format-code").Label("Sample code").Placeholder("AB-1234").
+			Format(codeFormat).Validate(codeComplete).Width(ui.Px(200)),
+			codeReadout),
+		formSample(t, "Number: two decimals, signed", ui.TextInput(amount).Key("format-amount").Label("Sample amount").Placeholder("0.00").
+			Format(amountFormat).Width(ui.Px(200)),
+			amountReadout),
+		formSample(t, "Masked template: PIN", ui.TextInput(pin).Label("Sample PIN").Masked().
+			Format(ui.TemplateFormat("9999")).Width(ui.Px(200)),
+			fmt.Sprintf("raw %q", pin.Get())),
+		formSample(t, "Accept: lowercase handle", ui.TextInput(handle).Key("format-handle").Label("Sample handle").Placeholder("lowercase, digits, _").
+			Accept(handlePattern.MatchString).Width(ui.Px(200)),
+			fmt.Sprintf("raw %q", handle.Get())),
+	}
 }
 
 // radioSample is a radio group with a disabled option.

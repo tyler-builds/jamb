@@ -24,7 +24,7 @@ func showComponents(r *demoRig) {
 	r.s.Page.Set(PageComponents)
 	// The page is taller than the test window: a click on an element below the window
 	// does nothing, so the window is made tall enough to show the whole page.
-	r.rt.SetViewport(1200, 6000, 1)
+	r.rt.SetViewport(1200, 9000, 1)
 	r.frame()
 }
 
