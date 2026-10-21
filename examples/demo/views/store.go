@@ -114,6 +114,12 @@ type Store struct {
 	PaletteOpen  *ui.Signal[bool] // the command palette (Ctrl+Shift+P)
 	SampleName   *ui.Signal[string]
 	SampleResult *ui.Signal[string]
+	// FindOpen shows the non-modal find sample of the Components page, and FindQuery
+	// and FindReplace are its fields. SheetOpen shows its non-modal properties sheet.
+	FindOpen    *ui.Signal[bool]
+	FindQuery   *ui.Signal[string]
+	FindReplace *ui.Signal[string]
+	SheetOpen   *ui.Signal[bool]
 
 	nextID, nextMsg int
 	// details are the project windows open, by project ID. Only the UI thread
@@ -179,6 +185,10 @@ func NewStore() *Store {
 		PaletteOpen:  ui.NewSignal(false),
 		SampleName:   ui.NewSignal(""),
 		SampleResult: ui.NewSignal(""),
+		FindOpen:     ui.NewSignal(false),
+		FindQuery:    ui.NewSignal(""),
+		FindReplace:  ui.NewSignal(""),
+		SheetOpen:    ui.NewSignal(false),
 		details:      map[int]ui.Window{},
 		activity:     ui.NewListHandle(),
 	}

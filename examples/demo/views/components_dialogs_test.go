@@ -3,8 +3,10 @@ package views
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/tyler-builds/jamb/dialog"
+	"github.com/tyler-builds/jamb/ui"
 )
 
 // The Dialogs section names files by their file name only: the folders they
@@ -44,5 +46,59 @@ func TestMessageAnswers(t *testing.T) {
 	}
 	if got := describeButton(dialog.NoButton); got != "the box could not open" {
 		t.Errorf("describeButton(NoButton) = %q", got)
+	}
+}
+
+// The find and properties samples are non-modal: with both open, the page still
+// takes a press, and moving to another page leaves both open.
+func TestNonModalSamplesLeaveThePageUsable(t *testing.T) {
+	s := NewStore()
+	s.Page.Set(PageComponents)
+	s.FindOpen.Set(true)
+	s.SheetOpen.Set(true)
+	rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
+	rt.SetViewport(1200, 760, 1)
+	rt.Frame(time.Now())
+	if _, ok := rt.Find("find-replace"); !ok {
+		t.Fatal("the find dialog did not open")
+	}
+	if _, ok := rt.Find("sheet-done"); !ok {
+		t.Fatal("the properties sheet did not open")
+	}
+	if err := rt.ClickKey("nav-Projects"); err != nil {
+		t.Fatal(err)
+	}
+	if s.Page.Get() != PageProjects {
+		t.Errorf("page = %v, want projects: the page did not take the press", s.Page.Get())
+	}
+	if !s.FindOpen.Get() || !s.SheetOpen.Get() {
+		t.Error("moving to another page closed a non-modal sample")
+	}
+}
+
+// The modal and drawer samples have a close button that closes them.
+func TestDialogSamplesHaveCloseButtons(t *testing.T) {
+	for _, open := range []func(*Store) *ui.Signal[bool]{
+		func(s *Store) *ui.Signal[bool] { return s.SampleOpen },
+		func(s *Store) *ui.Signal[bool] { return s.DrawerOpen },
+		func(s *Store) *ui.Signal[bool] { return s.FindOpen },
+	} {
+		s := NewStore()
+		s.Page.Set(PageComponents)
+		signal := open(s)
+		signal.Set(true)
+		rt := ui.NewRuntime(App(s), DemoDarkTheme, nil)
+		rt.SetViewport(1200, 760, 1)
+		rt.Frame(time.Now())
+		key := "jamb.modal/close"
+		if signal == s.FindOpen {
+			key = "sample-find/close"
+		}
+		if err := rt.ClickKey(key); err != nil {
+			t.Fatal(err)
+		}
+		if signal.Get() {
+			t.Errorf("the close button of %q did not close the sample", key)
+		}
 	}
 }

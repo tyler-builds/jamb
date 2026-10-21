@@ -161,6 +161,7 @@ var componentSections = []componentSection{
 		"Select Button Badge render slot styling",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return customizingSection() }},
 	{"Dialogs", "MessageBox OpenFiles SaveFile PickFolder Modal Drawer AlertDialog CommandPalette Clipboard SetClipboard dialog file open " +
+		"NonModal non-modal find replace properties sheet close F6 " +
 		"save folder message box modal sheet alert confirm delete command palette Ctrl+Shift+P copy paste",
 		func(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element { return dialogsSection(ctx, t, s) }},
 	{"Images", "Image ImageFit FitCover FitContain FitFill picture photo",

@@ -54,7 +54,7 @@ func sampleModal(s *Store) ui.Element {
 		cancel := ui.Button("Cancel").Secondary().OnClick(func() { s.SampleOpen.Set(false) })
 		body := labeledField(t, "Name", ui.TextInput(s.SampleName).Label("Name").LabelledBy(fieldLabel("Name")).Placeholder("A name for the sample").Width(ui.Full))
 		return ui.Modal("Form in a modal", body).Footer(cancel, save).Default(save).
-			OnClose(func() { s.SampleOpen.Set(false) }).CloseOnBackdrop()
+			OnClose(func() { s.SampleOpen.Set(false) }).CloseOnBackdrop().CloseButton(true)
 	})
 }
 
@@ -107,6 +107,57 @@ func sampleDrawer(s *Store) ui.Element {
 			).Label("Density"))
 		done := ui.Button("Done").OnClick(closeFn)
 		return ui.Drawer("Display settings", body).Side(ui.DrawerRight).
+			Footer(done).Default(done).OnClose(closeFn).CloseButton(true)
+	})
+}
+
+// sampleFind is the find and replace sample of the Components page. It is a
+// non-modal dialog, so the page stays usable while it is open, and F6 moves focus
+// between it, the page and the toasts. Replace reports what it did in the dialog.
+func sampleFind(s *Store) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		status := ui.Local(ctx, "find-status", "")
+		if !s.FindOpen.Get() {
+			return nil
+		}
+		t := ctx.Theme()
+		replace := ui.Button("Replace").Key("find-replace").Primary().OnClick(func() {
+			find := strings.TrimSpace(s.FindQuery.Peek())
+			if find == "" {
+				status.Set("Type the text to find first.")
+				return
+			}
+			status.Set("Replaced “" + find + "” with “" + strings.TrimSpace(s.FindReplace.Peek()) + "”.")
+		})
+		body := ui.Div().Column().Gap(12).
+			Child(ui.Text("The page stays usable while this dialog is open. Press F6 to move between it, " +
+				"the page and the toasts.").FontSize(13).TextColor(t.TextMuted)).
+			Child(labeledField(t, "Find", ui.TextInput(s.FindQuery).Label("Find").LabelledBy(fieldLabel("Find")).
+				Placeholder("Text to find").Width(ui.Full))).
+			Child(labeledField(t, "Replace with", ui.TextInput(s.FindReplace).Label("Replace with").
+				LabelledBy(fieldLabel("Replace with")).Placeholder("Replacement text").Width(ui.Full))).
+			Child(ui.If(status.Get() != "", ui.Text(status.Get()).FontSize(13).TextColor(t.TextMuted)))
+		return ui.Modal("Find and replace", body).Key("sample-find").NonModal().
+			Footer(replace).Default(replace).OnClose(func() { s.FindOpen.Set(false) })
+	})
+}
+
+// sampleSheet is the properties sample of the Components page: a non-modal drawer
+// at the right edge, so the page stays usable while it is open, and it can be open
+// together with the find sample. Its details are made up for the sample.
+func sampleSheet(s *Store) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		pinned := ui.Local(ctx, "sheet-pinned", false)
+		if !s.SheetOpen.Get() {
+			return nil
+		}
+		t := ctx.Theme()
+		closeFn := func() { s.SheetOpen.Set(false) }
+		body := ui.Div().Column().Gap(14).
+			Child(ui.Text("A sample note, with made-up details.").FontSize(13).TextColor(t.TextMuted)).
+			Child(ui.Checkbox("Pinned to the top", pinned))
+		done := ui.Button("Done").Key("sheet-done").OnClick(closeFn)
+		return ui.Drawer("Properties", body).Key("sample-sheet").Side(ui.DrawerRight).NonModal().
 			Footer(done).Default(done).OnClose(closeFn)
 	})
 }

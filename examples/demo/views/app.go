@@ -45,6 +45,10 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			Child(Sidebar(s)).
 			Child(ui.Div().Width(ui.Px(1)).Height(ui.Full).Background(t.Border)).
 			Child(Main(s)).
+			// The non-modal dialogs come before the modals, so that the modals cover
+			// them: the find and properties samples of the Components page.
+			Child(sampleFind(s)).
+			Child(sampleSheet(s)).
 			// Last, so the modals cover the window: the New Project form and the
 			// form sample of the Components page.
 			Child(newProjectModal(s)).
