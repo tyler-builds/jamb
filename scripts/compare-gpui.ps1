@@ -209,20 +209,6 @@ function Move-Pointer([IntPtr]$Hwnd, [int]$Seconds) {
     }
 }
 
-function Resize-Window([IntPtr]$Hwnd, [int]$Seconds) {
-    # SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE
-    $flags = [uint32](0x0002 -bor 0x0004 -bor 0x0010)
-    $sw = [Diagnostics.Stopwatch]::StartNew()
-    while ($sw.Elapsed.TotalSeconds -lt $Seconds) {
-        $t = $sw.Elapsed.TotalSeconds
-        $w = [int](800 + 240 * [math]::Sin(2 * [math]::PI * $t / 4))
-        $h = [int](600 + 180 * [math]::Sin(2 * [math]::PI * $t / 5))
-        [void][Cmp.Win32]::SetWindowPos($Hwnd, [IntPtr]::Zero, 0, 0, $w, $h, $flags)
-        [Threading.Thread]::Sleep(16)
-    }
-    [void][Cmp.Win32]::SetWindowPos($Hwnd, [IntPtr]::Zero, 0, 0, 800, 600, $flags)
-}
-
 # Starts the app with its placement and activation variables, and waits for a visible
 # window titled "Hello" with a non-blank client area. Times are from the launch call.
 # The caller disposes of the capture. The window must lie off the primary monitor.
