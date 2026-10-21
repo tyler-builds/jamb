@@ -62,6 +62,9 @@ func dialogsSection(ctx *ui.Context, t *ui.Theme, s *Store) ui.Element {
 			s.SampleOpen.Set(true)
 		})),
 		sample(t, "Drawer", ui.Button("Open drawer").Secondary().OnClick(func() { s.DrawerOpen.Set(true) })),
+		sample(t, "Non-modal: F6 moves between them and the page", ui.Div().Row().Gap(8).
+			Child(ui.Button("Find and replace").Key("find-open").Secondary().OnClick(func() { s.FindOpen.Set(true) })).
+			Child(ui.Button("Properties").Key("sheet-open").Secondary().OnClick(func() { s.SheetOpen.Set(true) }))),
 		sample(t, "Alert dialog", ui.Button("Delete sample…").Secondary().OnClick(func() { s.AlertOpen.Set(true) })),
 		sample(t, "Command palette", ui.Button("Open command palette").Secondary().
 			OnClick(func() { s.PaletteOpen.Set(true) })),
