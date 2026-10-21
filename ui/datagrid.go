@@ -2158,7 +2158,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		// screen. The cells are drawn over the cells that scroll under them, and they
 		// are not culled at the place their layout gives them.
 		list.pin = func(nd *node, sx float32) {
-			endOff := sx - max(nd.lay.ContentW-nd.lay.W, 0)
+			// The end of the rows stops short of the body's right padding, the gutter the
+			// scrollbar takes, so the end-pinned cells are moved over it to the inner edge.
+			endOff := sx - max(nd.lay.ContentW-nd.lay.W, 0) + nd.style.Padding.Right
 			move := func(c *node, off float32) {
 				c.style.OffsetX, c.div.style.OffsetX = off, off
 				c.keepGen = rt.paintGen
