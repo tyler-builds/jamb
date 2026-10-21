@@ -325,6 +325,27 @@ type Strings struct {
 	// CodeEditorDiagnostic builds the message that announces a diagnostic, from the name of its
 	// severity, its line number and its message.
 	CodeEditorDiagnostic func(severity string, line int, message string) string
+	// CodeEditorCodeActions is the name of the menu of code actions.
+	CodeEditorCodeActions string
+	// CodeEditorQuickFix is the name of the group of quick fixes in the menu of code actions.
+	CodeEditorQuickFix string
+	// CodeEditorRefactor is the name of the group of refactorings in the menu of code actions.
+	CodeEditorRefactor string
+	// CodeEditorSourceAction is the name of the group of source actions in the menu of code actions.
+	CodeEditorSourceAction string
+	// CodeEditorMoreActions is the name of the group of the other code actions.
+	CodeEditorMoreActions string
+	// CodeEditorNoCodeActions is the message shown when there are no code actions.
+	CodeEditorNoCodeActions string
+	// CodeEditorLoadingActions is the message shown while the code actions load.
+	CodeEditorLoadingActions string
+	// CodeEditorActionFailed is the message shown when the code actions could not load or be applied.
+	CodeEditorActionFailed string
+	// CodeEditorActionCount builds the message that gives the number of code actions.
+	CodeEditorActionCount func(n int) string
+	// CodeEditorActionUnavailable builds the message that says a code action is disabled, from its
+	// title and the reason it is disabled.
+	CodeEditorActionUnavailable func(title, reason string) string
 
 	// The charts (package charts): the names of the chart types, which begin a chart's
 	// summary. ChartLine is the name of a line chart.
@@ -627,6 +648,20 @@ func englishStrings() *Strings {
 		CodeEditorHint:    "Hint",
 		CodeEditorDiagnostic: func(severity string, line int, message string) string {
 			return fmt.Sprintf("%s on line %d: %s", severity, line, message)
+		},
+		CodeEditorCodeActions:    "Code actions",
+		CodeEditorQuickFix:       "Quick fix",
+		CodeEditorRefactor:       "Refactor",
+		CodeEditorSourceAction:   "Source action",
+		CodeEditorMoreActions:    "More actions",
+		CodeEditorNoCodeActions:  "No code actions available",
+		CodeEditorLoadingActions: "Loading actions",
+		CodeEditorActionFailed:   "Could not apply the action",
+		CodeEditorActionCount: func(n int) string {
+			return fmt.Sprintf("%d actions", n)
+		},
+		CodeEditorActionUnavailable: func(title, reason string) string {
+			return fmt.Sprintf("%s, unavailable: %s", title, reason)
 		},
 
 		ChartLine:                 "Line chart",
