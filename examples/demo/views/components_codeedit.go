@@ -22,6 +22,11 @@ func greet(name string) string {
 	return fmt.Sprintf("hello, %s", name)
 }
 
+// farewell says goodbye to name.
+func farewell(name string) string {
+	return fmt.Sprintf("bye, %s", nmae)
+}
+
 func main() {
 	fmt.Println(greet("world"))
 }
@@ -33,7 +38,7 @@ const codeEditorContext = "CodeEditorSample"
 
 // codeEditorSection shows a code editor on a sample Go file, highlighted as Go. The
 // document is kept in the section, so the text and the caret survive the section's re-renders.
-// It has diagnostics, a hover, completions and go to definition from fake providers,
+// It has diagnostics, a hover, completions, go to definition and code actions from fake providers,
 // and soft wrap set by the controls above it. Try Ctrl+F, Ctrl+H, Ctrl+G, Ctrl+D and Alt+click.
 func codeEditorSection() ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
@@ -50,6 +55,7 @@ func codeEditorSection() ui.Element {
 		ed := codeedit.Editor(doc).Label("Sample Go file").Language("go").CommentPrefix("// ").Height(ui.Px(260)).
 			SoftWrap(wrap.Get()).WrapColumn(60).WrappingIndent(indent).
 			Hover(codeEditorHover).Completions(codeEditorCompletions{}).Definitions(codeEditorDefinitions{}).
+			CodeActions(codeEditorActions{report: func(s string) { opened.Set(s) }}).
 			OnOpenLocation(func(l codeedit.Location) { opened.Set("Opened in another tab: " + l.URI) })
 
 		controls := ui.Div().Row().Wrap().Align(ui.Center).Gap(18).
@@ -67,6 +73,7 @@ func codeEditorSection() ui.Element {
 			Child(controls).
 			Child(ui.Div().Key("code-editor").Width(ui.Full).KeyContext(codeEditorContext).Child(ed)).
 			Child(ui.Text("F8 and Shift+F8 go to the next and previous problem, underlined and marked in the gutter. "+
+				"Ctrl+. opens the code actions for a problem. "+
 				"Ctrl+Space, or a dot, asks for completions. F12 or Ctrl+click goes to a definition. "+
 				"Rest the pointer on a name, or press Ctrl+K Ctrl+I, for its hover.").FontSize(12).TextColor(t.TextMuted)).
 			Child(ui.Text(status).FontSize(12).TextColor(t.TextMuted)))
@@ -86,6 +93,7 @@ func codeEditorDocument() *codeedit.Document {
 		mark(`return "hello"`, codeedit.SeverityWarning, "Demo warning: this greeting could be a constant."),
 		mark(`name == ""`, codeedit.SeverityHint, "Demo hint: a hint is a suggestion, such as a simpler check."),
 		mark(`fmt.Println`, codeedit.SeverityError, "Demo error: an error marks a line that does not build."),
+		mark(`nmae`, codeedit.SeverityError, "Demo error: undefined: nmae"),
 	})
 	return doc
 }
@@ -169,6 +177,42 @@ func (codeEditorDefinitions) Definition(_ context.Context, q codeedit.Query) ([]
 		return []codeedit.Location{{URI: "file:///sample/fmt/print.go"}}, nil
 	}
 	return nil, nil
+}
+
+// codeEditorActions is a CodeActionProvider for the sample. A misspelt name has a quick fix, which
+// is preferred; a refactoring is listed disabled, with its reason; and organize imports is a source
+// action whose Run reports into the status line of the section, through report.
+type codeEditorActions struct {
+	report func(string)
+}
+
+// CodeActions answers for the diagnostics of the query: the quick fix for a misspelt name, and the
+// two actions every query gets.
+func (a codeEditorActions) CodeActions(_ context.Context, q codeedit.CodeActionQuery) ([]codeedit.CodeAction, error) {
+	var out []codeedit.CodeAction
+	for _, d := range q.Diagnostics {
+		if d.From >= 0 && d.From <= d.To && d.To <= len(q.Text) && q.Text[d.From:d.To] == "nmae" {
+			out = append(out, codeedit.CodeAction{
+				Title:       "Change nmae to name",
+				Kind:        codeedit.CodeActionQuickFix,
+				Diagnostics: []codeedit.Diagnostic{d},
+				Preferred:   true,
+				Edits:       []codeedit.Change{{From: d.From, To: d.To, Text: "name"}},
+			})
+		}
+	}
+	out = append(out,
+		codeedit.CodeAction{
+			Title:    "Extract function",
+			Kind:     codeedit.CodeActionRefactorExtract,
+			Disabled: "the demo does not extract functions",
+		},
+		codeedit.CodeAction{
+			Title: "Organize imports",
+			Kind:  codeedit.CodeActionSourceOrganizeImports,
+			Run:   func() { a.report("Organized imports: the demo has no imports to sort.") },
+		})
+	return out, nil
 }
 
 // wordAt returns the byte range of the identifier that holds the offset off in s. An
