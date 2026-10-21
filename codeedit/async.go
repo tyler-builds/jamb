@@ -75,13 +75,16 @@ func (s *asyncSlot[T]) pending() bool { return s.cancel != nil }
 func (vs *viewState) closePopups() bool {
 	hover := vs.closeHover()
 	list := vs.closeCompletion()
-	return hover || list
+	actions := vs.closeActions()
+	return hover || list || actions
 }
 
 // stopRequests cancels every request of the editor, for a removed editor or another document.
+// The lightbulb is hidden too: it is about the document it was asked of.
 func (vs *viewState) stopRequests() {
 	vs.closePopups()
 	vs.hover.slot.stop()
 	vs.completion.slot.stop()
 	vs.define.stop()
+	vs.actions.menu.stop()
 }

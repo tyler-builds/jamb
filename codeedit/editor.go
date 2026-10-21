@@ -168,9 +168,11 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	vs.wrap = e.wrap
 	vs.hoverP, vs.hoverDelay = e.hoverP, e.hoverDelay
 	vs.completeP = e.complete
+	vs.actionsP = e.actionsP
 	vs.defineP, vs.openLoc = e.define, e.openLoc
 	if e.readOnly {
 		vs.completeP = nil // nothing to complete in a text that does not change
+		vs.actionsP = nil  // and no code action to apply to it
 	}
 	vs.doc.SetTabSize(e.tabSize)
 	t := ctx.Theme()
@@ -210,6 +212,9 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	}
 	if vs.completion.open {
 		area.Child(vs.completionPopup(st))
+	}
+	if vs.actions.open {
+		area.Child(vs.actionsPopup(st))
 	}
 	root.Child(area)
 	return root
@@ -310,6 +315,11 @@ type viewState struct {
 	hover      hoverState
 	completeP  CompletionProvider
 	completion completionState
+	// actionsP is the provider of the code actions, and actions the menu of them and the lightbulb
+	// (see codeaction.go). selfEdit is set while the editor makes an edit of its own, through edit.
+	actionsP CodeActionProvider
+	actions  actionState
+	selfEdit bool
 	// defineP is the provider of definitions, openLoc opens one in another file, define is its
 	// request, and link the word that a Ctrl+click goes to the definition of.
 	defineP DefinitionProvider
@@ -422,6 +432,7 @@ func (vs *viewState) attachDoc(doc *Document) {
 		doc.OnEdit(func(c Change) {
 			vs.closeHover()
 			vs.completionEdited(c)
+			vs.actionsEdited(c)
 			vs.define.stop()
 			vs.link = linkState{}
 		}),
@@ -437,6 +448,8 @@ func (vs *viewState) attachDoc(doc *Document) {
 // in view. Errors from the document are returned to the caller, so they can be dropped
 // where a key has nothing to do.
 func (vs *viewState) edit(fn func(*Document) error) {
+	vs.selfEdit = true
+	defer func() { vs.selfEdit = false }()
 	_ = fn(vs.doc)
 	vs.followCompletion()
 	vs.reveal = true
@@ -451,6 +464,7 @@ func (vs *viewState) move(m Move, extend bool) {
 		vs.doc.Move(m, extend, vs.pageRows())
 	}
 	vs.movedCompletion()
+	vs.movedActions()
 	vs.reveal = true
 	vs.restart = true
 	vs.touch()
