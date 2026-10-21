@@ -119,15 +119,16 @@ The milestone status, and the known limitations and next steps.
     and contrast 0.5; other tuner settings scale the correction rather
     than being fitted.
   - **Spell checking.** Missing. Rich text is display-only; text areas stay single-style.
-  - **Shaping cost.** About 0.4 ms per 1,000 characters. It's cached per
+  - **Shaping cost.** About 0.4 ms per 1,000 characters (measured 2026-10-06). It's cached per
     paragraph, so typing in a long note re-shapes only the edited paragraph
-    (about 0.1 ms per keystroke at 11,000 characters).
+    (about 0.1 ms per keystroke at 11,000 characters, also 2026-10-06).
 - **Untested paths.** Non-100% DPI is covered by a headless test
   (`TestScaleProducesPhysicalPixels`) but not on real hardware.
   Multi-monitor `WM_DPICHANGED` has not been exercised either.
 - **Paint cost is per visible node.** Paint and hit testing skip off-screen
   subtrees (see the frame pipeline), so a long scroll list costs about its
-  visible rows: repainting 10,000 nodes with 73 on screen takes about 0.06 ms.
+  visible rows: repainting 10,000 nodes with 73 on screen takes about 0.07 ms
+  (71.5 µs in the 2026-10-21 Go suite).
   A tree whose nodes are all on screen still pays the per-node cost, and a
   container with 10,000 children runs a visibility test on each of them. The
   node itself is about 1 KB; the compact per-node paint struct is the next
@@ -155,8 +156,9 @@ The milestone status, and the known limitations and next steps.
   in the process Explorer gives it to); `JAMB_SCRIPT`'s `drop` step covers
   everything after it. Windows refuses drops from Explorer into an app
   running as administrator.
-- **Startup.** The ~180 ms startup floor is Direct3D driver initialization.
-  The framework's own startup cost is about 20 ms.
+- **Startup.** The ~180 ms startup floor (2026-10-12) is Direct3D driver initialization.
+  The framework's own startup cost is about 20 ms. The 2026-10-21 traces put the first
+  frame at 196 ms for hello and 215 ms for the demo, warm.
 - **Menus.** Alt+letter mnemonics are not implemented. A menu stays open when a
   key binding moves focus elsewhere. A press outside, Escape or Tab closes it.
   Focus loss does not close menus, because a click on the trigger of a focusable
@@ -197,8 +199,8 @@ The milestone status, and the known limitations and next steps.
   items). The caption
   buttons (Minimize, Maximize, Close) have their roles and names, but their
   invoke path has not been checked live. Building the tree for the demo's
-  dashboard takes about 18 µs, measured with a benchmark; the cost grows with
-  the tree. A UI Automation client that walks the whole tree over and over makes
+  dashboard takes about 18 µs, measured with a benchmark before 2026-10-21 (not re-run
+  that day; the cost grows with the tree). A UI Automation client that walks the whole tree over and over makes
   the process's private memory rise about 0.05 MB per walk of the demo's 46 nodes;
   the same walk against Windows Notepad grows at the same rate per element, so it
   is UI Automation's own per-client state, not a jamb leak (see
