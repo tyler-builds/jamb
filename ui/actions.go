@@ -94,14 +94,18 @@ type keystroke struct {
 }
 
 // typesText reports whether the press can type text: a printable key, without
-// Ctrl, Alt or Super. The platform sends text only for such keys, so a
-// single-stroke binding that consumes any other key drops no text.
+// Alt or Super. Ctrl is ignored for a key that is not a letter: Windows sends
+// the space of Ctrl+Space, while Ctrl with a letter sends a control character
+// the platform drops. So a single-stroke binding that consumes any other key
+// drops no text.
 func (s keystroke) typesText() bool {
-	if s.mods.Has(input.ModCtrl) || s.mods.Has(input.ModAlt) || s.mods.Has(input.ModSuper) {
+	if s.mods.Has(input.ModAlt) || s.mods.Has(input.ModSuper) {
 		return false
 	}
 	switch {
-	case s.key >= input.KeyA && s.key <= input.KeyZ, s.key >= input.Key0 && s.key <= input.Key9:
+	case s.key >= input.KeyA && s.key <= input.KeyZ:
+		return !s.mods.Has(input.ModCtrl)
+	case s.key >= input.Key0 && s.key <= input.Key9:
 		return true
 	}
 	switch s.key {

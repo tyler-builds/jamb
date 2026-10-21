@@ -120,6 +120,9 @@ the app; and animations gain springs, keyframes, timelines, delays and staggers.
 - Ending a drag of a `DataGrid` column's edge over its header also sorted the column. It no longer
   does.
 
+- A key binding on Ctrl+Space typed a space as well as running its action, because Windows sends
+  the space with the key. The binding now drops that space.
+
 ### Removed
 
 - **Breaking:** `highlight.Grammar`, `highlight.NewGrammar` and `highlight.ABI`, and jamb's
