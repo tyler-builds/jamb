@@ -30,8 +30,11 @@ import (
 //	                    At close it writes PATH, one row per frame: frame, t_ms
 //	                    (from the first frame), cpu_ms (from the frame's start to
 //	                    Present), present_interval_ms (from the previous Present;
-//	                    empty for the first frame) and kind (rebuild, update or
-//	                    repaint). It writes PATH-input.csv beside it (PATH with
+//	                    empty for the first frame), kind (rebuild, update or
+//	                    repaint) and continuous (1 when the frame came straight
+//	                    after the previous one, with no idle gap). The summary's
+//	                    present interval covers the continuous frames only. It
+//	                    writes PATH-input.csv beside it (PATH with
 //	                    "-input" before the extension), one row per input event a
 //	                    frame rendered: kind (key, move, click or scroll), t_ms,
 //	                    to_cpu_end_ms and to_present_ms, measured from the oldest

@@ -26,10 +26,11 @@ import (
 
 // frameSample is one frame the window presented.
 type frameSample struct {
-	at       int64  // when the frame began, from the first frame
-	cpu      int64  // from the frame's start to the start of Present, which blocks for vsync
-	interval int64  // from the previous Present's start to this one's; 0 for the first frame
-	kind     string // "rebuild", "update" or "repaint", see frameKind
+	at         int64  // when the frame began, from the first frame
+	cpu        int64  // from the frame's start to the start of Present, which blocks for vsync
+	interval   int64  // from the previous Present's start to this one's; 0 for the first frame
+	kind       string // "rebuild", "update" or "repaint", see frameKind
+	continuous bool   // the previous frame was wanted when its Present returned, so there was no idle gap
 }
 
 // inputSample is one input event the frames rendered: from the oldest unrendered
@@ -132,13 +133,18 @@ type frameStats struct {
 	pendingAt [inputKinds]int64
 
 	refreshHz float64 // the refresh rate of the window's monitor, read at the first frame
+
+	// wanted is whether a frame was wanted when the previous Present returned.
+	wanted bool
 }
 
 func newFrameStats(path string) *frameStats { return &frameStats{path: path} }
 
 // presented records a frame the window presented. The frame began at frameAt, and its
-// Present call ran from start to end.
-func (f *frameStats) presented(st ui.FrameStats, frameAt, start, end int64, w platform.Window) {
+// Present call ran from start to end. wanted is whether another frame was wanted
+// when Present returned (see ui.Runtime.FrameRequested): if so, the next frame came
+// at once, and its present interval has no idle gap in it.
+func (f *frameStats) presented(st ui.FrameStats, frameAt, start, end int64, wanted bool, w platform.Window) {
 	if len(f.frames) == 0 {
 		f.origin = frameAt
 		f.refreshHz = refreshHz(w)
@@ -146,7 +152,9 @@ func (f *frameStats) presented(st ui.FrameStats, frameAt, start, end int64, w pl
 	s := frameSample{at: frameAt - f.origin, cpu: start - frameAt, kind: frameKind(st)}
 	if len(f.frames) > 0 {
 		s.interval = start - f.lastStart
+		s.continuous = f.wanted
 	}
+	f.wanted = wanted
 	f.lastStart = start
 	f.frames = append(f.frames, s)
 	for k := range inputKinds {
@@ -222,17 +230,21 @@ func (s summary) String() string {
 // csvMillis formats a duration in nanoseconds as milliseconds, for the CSV files.
 func csvMillis(ns int64) string { return fmt.Sprintf("%.3f", float64(ns)/1e6) }
 
-// framesCSV returns the frame CSV: one row per frame, and the present interval
-// empty for the first frame.
+// framesCSV returns the frame CSV: one row per frame, the present interval
+// empty for the first frame, and continuous 1 when the interval has no idle gap.
 func (f *frameStats) framesCSV() string {
 	var b strings.Builder
-	b.WriteString("frame,t_ms,cpu_ms,present_interval_ms,kind\n")
+	b.WriteString("frame,t_ms,cpu_ms,present_interval_ms,kind,continuous\n")
 	for i, s := range f.frames {
 		interval := ""
 		if s.interval > 0 {
 			interval = csvMillis(s.interval)
 		}
-		fmt.Fprintf(&b, "%d,%s,%s,%s,%s\n", i+1, csvMillis(s.at), csvMillis(s.cpu), interval, s.kind)
+		continuous := 0
+		if s.continuous {
+			continuous = 1
+		}
+		fmt.Fprintf(&b, "%d,%s,%s,%s,%s,%d\n", i+1, csvMillis(s.at), csvMillis(s.cpu), interval, s.kind, continuous)
 	}
 	return b.String()
 }
@@ -254,7 +266,9 @@ func inputPath(path string) string {
 }
 
 // report prints the summary, one line per metric, to w. The present interval line
-// counts the frames whose interval exceeded 1.5 times the refresh period.
+// covers only the continuous frames, those with no idle gap before them, and counts
+// those whose interval exceeded 1.5 times the refresh period. An idle gap of any
+// length is not a present interval of the display.
 func (f *frameStats) report(w io.Writer) {
 	n := len(f.frames)
 	var elapsed time.Duration
@@ -274,7 +288,7 @@ func (f *frameStats) report(w io.Writer) {
 	var intervals []int64
 	for i, s := range f.frames {
 		cpu[i] = s.cpu
-		if s.interval > 0 {
+		if s.continuous {
 			intervals = append(intervals, s.interval)
 		}
 	}
@@ -283,7 +297,9 @@ func (f *frameStats) report(w io.Writer) {
 	if limit > 0 {
 		over = fmt.Sprint(overBudget(intervals, limit))
 	}
-	fmt.Fprintf(w, "  present interval: %v; over 1.5x period: %s\n", summarize(intervals), over)
+	withInterval := max(n-1, 0)
+	fmt.Fprintf(w, "  present interval, continuous frames only (%d of %d): %v; over 1.5x period: %s\n",
+		len(intervals), withInterval, summarize(intervals), over)
 	for k := range inputKinds {
 		var toCPU, toPresent []int64
 		for _, s := range f.inputs {

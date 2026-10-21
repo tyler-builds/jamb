@@ -749,6 +749,14 @@ func (rt *Runtime) NeedsFrame() bool {
 	return rt.looping || rt.busy()
 }
 
+// FrameRequested reports whether a frame is wanted now: NeedsFrame, or a
+// wake-up requested since the last Frame began (by Post, a change made from
+// another goroutine, or a timer). Frame statistics use it to tell a frame that
+// followed at once from one that came after an idle gap.
+func (rt *Runtime) FrameRequested() bool {
+	return rt.framePending.Load() || rt.NeedsFrame()
+}
+
 // Settled reports whether the UI has come to rest: nothing changed since the
 // last Frame, nothing animates toward an end, and no animation waits out its
 // Delay or has an OnDone still to run. Repeating animations (see
