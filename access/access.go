@@ -122,8 +122,9 @@ func (r Role) String() string {
 	return fmt.Sprintf("role(%d)", uint8(r))
 }
 
-// IsDialog reports whether the role is a modal dialog, RoleDialog or
-// RoleAlertDialog: a window of its own to assistive technology.
+// IsDialog reports whether the role is a dialog, RoleDialog or RoleAlertDialog:
+// a window of its own to assistive technology. A dialog is modal unless its node
+// has StateNonModal.
 func (r Role) IsDialog() bool { return r == RoleDialog || r == RoleAlertDialog }
 
 // Interactive reports whether a user operates a node of this role, so that it
@@ -160,6 +161,7 @@ const (
 	StateToggle                               // the node has an on or off state; StateChecked says whether it is on
 	StatePassword                             // a password field: its text is hidden (UI Automation IsPassword), as in a masked OTPInput
 	StateMultiSelectable                      // the selection container takes more than one item (see StateSelectionContainer)
+	StateNonModal                             // a dialog that leaves the window behind it usable, so it is not a modal window
 )
 
 // Has reports whether all the flags in f are set.
@@ -187,6 +189,7 @@ var stateNames = [...]struct {
 	{StateToggle, "toggle"},
 	{StatePassword, "password"},
 	{StateMultiSelectable, "multi-selectable"},
+	{StateNonModal, "non-modal"},
 }
 
 // String lists the flags that are set, such as "focusable focused".

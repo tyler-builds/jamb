@@ -235,6 +235,14 @@ const (
 // A text area is an Edit, not a Document: a Document is for read-only rich
 // text, and the ui runtime's text areas are editable. Unknown roles are Panes,
 // which carry no pattern and so no behavior a client would expect.
+//
+// isModalDialog reports whether n is a modal dialog: a dialog that is not
+// StateNonModal. A non-modal dialog leaves the window behind it usable, so
+// UI Automation does not report it as the window's modal (IsModal, IsTopmost).
+func isModalDialog(n *access.Node) bool {
+	return n.Role.IsDialog() && !n.States.Has(access.StateNonModal)
+}
+
 func controlType(r access.Role) int32 {
 	if r.IsDialog() {
 		return ctWindow
@@ -522,7 +530,7 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 		}
 	case propWindowIsModal:
 		if n.Role.IsDialog() {
-			return variantBool(true)
+			return variantBool(isModalDialog(n))
 		}
 	case propHeadingLevel:
 		if n.Heading > 0 {

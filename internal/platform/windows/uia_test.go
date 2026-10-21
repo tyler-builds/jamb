@@ -195,6 +195,21 @@ func TestNodeProperties(t *testing.T) {
 	win32.SysFreeString(variantBSTROf(lct))
 }
 
+// A non-modal dialog is a dialog, but not a modal window: IsModal is
+// VARIANT_FALSE, while IsDialog still reports it.
+func TestNonModalDialogProperties(t *testing.T) {
+	n := &access.Node{ID: 7, Role: access.RoleDialog, Name: "Properties", States: access.StateNonModal}
+	if v := nodeProperty(propIsDialog, n, false); v.vt != vtBool || variantBoolOf(v) != -1 {
+		t.Errorf("IsDialog for a non-modal dialog is not VARIANT_TRUE")
+	}
+	if v := nodeProperty(propWindowIsModal, n, false); v.vt != vtBool || variantBoolOf(v) != 0 {
+		t.Errorf("Window.IsModal for a non-modal dialog is not VARIANT_FALSE")
+	}
+	if v := nodeProperty(propWindowIsModal, &access.Node{ID: 8, Role: access.RoleDialog}, false); variantBoolOf(v) != -1 {
+		t.Errorf("Window.IsModal for a modal dialog is not VARIANT_TRUE")
+	}
+}
+
 // An alert dialog is a Window (50032) that is a dialog and modal, with the
 // Window pattern, as a dialog is, and its own localized control type.
 func TestAlertDialogProperties(t *testing.T) {
