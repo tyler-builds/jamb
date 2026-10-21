@@ -131,6 +131,9 @@ type DivElement struct {
 
 	// noInitialFocus is set on a Modal's footer and close box, which the initial focus skips.
 	noInitialFocus bool
+	// hitThrough is set on the transparent layer of a non-modal dialog: a press on
+	// the layer itself reaches the window behind it (see NonModal).
+	hitThrough bool
 
 	// fillFromParent paints fillBase and then the parent's background under the
 	// element's own, so that the element is opaque in its parent's state (a pinned

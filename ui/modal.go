@@ -38,11 +38,17 @@ type ModalElement struct {
 	initial  *FocusHandle
 	onClose  func()
 	backdrop bool
-	// closeBtn shows a close button at the top right of the panel (see CloseButton).
-	closeBtn bool
-	styles   ModalStyle
-	size     sizing // the panel's sizes, from the sizing methods (see Sizing in docs/styling.md)
-	key      string // the element key, see Key
+	// closeBtn shows a close button at the top right of the panel (see CloseButton),
+	// and closeSet records that CloseButton was called, which a non-modal dialog
+	// needs to tell its default from an explicit false.
+	closeBtn, closeSet bool
+	// nonModal leaves the window behind the dialog usable: there is no scrim, and
+	// focus is not trapped (see NonModal). outside makes a press outside the panel
+	// close it (see CloseOnClickOutside).
+	nonModal, outside bool
+	styles            ModalStyle
+	size              sizing // the panel's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	key               string // the element key, see Key
 	// drawer makes the modal a Drawer: its panel is against the window's side
 	// edge, with the Drawer parts and styles.
 	drawer bool
@@ -150,15 +156,19 @@ func (m *ModalElement) MaxWidth(l Length) *ModalElement { m.size.setMaxWidth(l);
 // modalSpec is what the runtime keeps from a built Modal, on its backdrop
 // element (DivElement.modal).
 type modalSpec struct {
-	def     *ButtonElement // the default button, or nil
-	initial *FocusHandle   // the element to focus first, or nil
+	def      *ButtonElement // the default button, or nil
+	initial  *FocusHandle   // the element to focus first, or nil
+	nonModal bool           // a non-modal dialog: it does not trap focus (see NonModal)
+	close    func()         // what the dialog's close does, run by Escape from inside a non-modal one
 }
 
 // modalFrame is an open modal, and the element that had focus before it opened.
-// Focus returns to ret when the modal leaves the tree.
+// Focus returns to ret when the modal leaves the tree. last is the element inside
+// it that had focus most recently, for a non-modal dialog that F6 enters.
 type modalFrame struct {
-	id  uint64
-	ret uint64
+	id   uint64
+	ret  uint64
+	last uint64
 }
 
 // Modal creates a dialog with a title and a body. Add its buttons with Footer.
@@ -209,9 +219,40 @@ func (m *ModalElement) CloseOnBackdrop() *ModalElement {
 // CloseButton shows a close button at the top right of the panel, beside the
 // title, when show is set. Pressing it runs OnClose, and it is built only when
 // there is an OnClose. It is a small icon button labelled with Strings.Close,
-// first in the Tab order; initial focus skips it.
+// first in the Tab order; initial focus skips it. A non-modal dialog shows one
+// unless CloseButton(false) is called.
 func (m *ModalElement) CloseButton(show bool) *ModalElement {
-	m.closeBtn = show
+	m.closeBtn, m.closeSet = show, true
+	return m
+}
+
+// closeShown reports whether the panel has a close button: one that is asked for,
+// or, for a non-modal dialog, one that is not declined, and only with an OnClose.
+func (m *ModalElement) closeShown() bool {
+	show := m.closeBtn || (m.nonModal && !m.closeSet)
+	return show && m.onClose != nil
+}
+
+// NonModal makes the dialog non-modal, for a window that stays usable while the
+// dialog is open, such as a find bar or a properties sheet. There is no scrim, so
+// the window behind is not dimmed, and a press on it reaches the window. Focus is
+// not trapped: Tab moves through the whole window, and F6 cycles the dialog with
+// the window's other regions. A non-modal dialog has a close button unless
+// CloseButton(false) is called. Escape closes it while focus is inside it, and
+// Enter runs its default button only then. A press outside it does not close it
+// unless CloseOnClickOutside is called. Several non-modal dialogs can be open, and
+// the one that was last pressed or focused is on top. A modal that opens later
+// covers them, as it covers the window.
+func (m *ModalElement) NonModal() *ModalElement {
+	m.nonModal = true
+	return m
+}
+
+// CloseOnClickOutside makes a press outside the panel close the dialog (see
+// OnClose). For a modal it is CloseOnBackdrop. A non-modal dialog closes on a
+// press in the window behind it only when this is called.
+func (m *ModalElement) CloseOnClickOutside() *ModalElement {
+	m.backdrop, m.outside = true, true
 	return m
 }
 
@@ -242,7 +283,7 @@ func (m *ModalElement) expand(ctx *Context) Element {
 			m.onClose()
 		}
 	}
-	if m.closeBtn && m.onClose != nil {
+	if m.closeShown() {
 		// The title and the close box share a row at the top of the panel. The
 		// box's key is scoped by the modal's key, as the message of an alert dialog is.
 		key := "jamb.modal/close"
@@ -256,7 +297,7 @@ func (m *ModalElement) expand(ctx *Context) Element {
 			Div().asPart(part+".Title").Style(st.Title).Grow(1).Child(Text(m.title)),
 			closeBox)
 	}
-	spec := &modalSpec{def: m.def, initial: m.initial}
+	spec := &modalSpec{def: m.def, initial: m.initial, nonModal: m.nonModal, close: closeFn}
 
 	footer := Div().asPart(part + ".Footer").Style(st.Footer).Shrink(0).Children(m.footer...)
 	footer.noInitialFocus = true
@@ -281,7 +322,7 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		}
 		enter, exit = Fade().Slide(dx, dy), Fade().Slide(dx, dy)
 	}
-	panel := Div().asPart(part+".Panel").Overlay(placement).Style(st.Panel).
+	panel := Div().asPart(part+".Panel").Style(st.Panel).
 		// The panel and the backdrop take focus by click, so a click on either
 		// does not leave the modal without focus. Neither is in the Tab order.
 		Focusable().TabStop(false).
@@ -289,15 +330,22 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		Exit(exit, Animation{Duration: ctx.Theme().Motion.exit(90 * time.Millisecond)}).
 		// A press on the panel is not a press on the backdrop behind it.
 		OnMouseDown(func(e *MouseEvent) { e.StopPropagation() }).
-		// The overlay's dismiss handler: Escape closes the topmost overlay with
-		// one (see "Escape and overlays"). A press outside the panel is always on
-		// the backdrop, which the panel counts as its parent, so it does not
-		// reach this.
-		OnClickOutside(closeFn).
 		Child(title).
 		Child(Div().asPart(part + ".Body").Style(st.Body).Grow(1).ScrollY().Child(m.body)).
 		Child(footer).
 		Role(role).Label(m.title)
+	if !m.nonModal {
+		// A modal's panel is an overlay, placed on its backdrop. A non-modal panel is a
+		// child of its layer, which holds it in place (see below).
+		panel.Overlay(placement)
+	}
+	if !m.nonModal || m.outside {
+		// The overlay's dismiss handler: Escape closes the topmost overlay with one
+		// (see "Escape and overlays"). A press outside the panel is always on the
+		// backdrop, which the panel counts as its parent, so it does not reach this.
+		// A non-modal panel closes on a press outside it only when asked to.
+		panel.OnClickOutside(closeFn)
+	}
 	if m.describedBy != "" {
 		panel.DescribedBy(m.describedBy)
 	}
@@ -315,6 +363,30 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		}
 	}
 	m.size.apply(panel)
+	if m.nonModal {
+		// There is no scrim. The layer is transparent and covers the window, and
+		// hitThrough lets a press on it reach the window behind. The panel sits at its
+		// side, or in the middle, inside the margin.
+		layer := Div().Absolute().Inset(0).Padding(margin).
+			Enter(Fade(), Animation{Duration: ctx.Theme().Motion.enter(140 * time.Millisecond)}).
+			Exit(Fade(), Animation{Duration: ctx.Theme().Motion.exit(90 * time.Millisecond)}).
+			Child(panel)
+		switch {
+		case !m.drawer:
+			layer.Column().Justify(Center).Align(Center)
+		case m.side == DrawerLeft:
+			layer.Row().Justify(Start).Align(Stretch)
+		case m.side == DrawerRight:
+			layer.Row().Justify(End).Align(Stretch)
+		case m.side == DrawerTop:
+			layer.Column().Justify(Start).Align(Stretch)
+		default:
+			layer.Column().Justify(End).Align(Stretch)
+		}
+		layer.hitThrough = true
+		layer.modal = spec
+		return layer
+	}
 	// The backdrop's padding is the margin around the panel, so a panel of 100% is the
 	// window less the margin.
 	backdrop := Div().asPart(part+".Scrim").Absolute().Inset(0).Style(st.Scrim).Padding(margin).
@@ -331,12 +403,13 @@ func (m *ModalElement) expand(ctx *Context) Element {
 	return backdrop
 }
 
-// topModal returns the backdrop of the last open Modal in the tree, or nil.
+// topModal returns the backdrop of the last open Modal in the tree, or nil. A
+// non-modal dialog is not a modal, so it does not trap focus or keys.
 func (rt *Runtime) topModal() *node {
 	var top *node
 	var walk func(n *node)
 	walk = func(n *node) {
-		if n.div != nil && n.div.modal != nil {
+		if n.div != nil && n.div.modal != nil && !n.div.modal.nonModal {
 			top = n
 		}
 		for _, c := range n.children {
