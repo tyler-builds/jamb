@@ -27,7 +27,18 @@ import (
 //	                    "paint" (repaint the retained tree every frame).
 //	JAMB_VSYNC=0        present without waiting for vblank (throughput tests)
 //	JAMB_GEOMETRY_FILE  remember the window position/size in this file
-//	                    (set by the `jamb dev` runner across restarts)
+//	                    (set by the `jamb dev` runner across restarts). The file
+//	                    holds "X Y W H" in physical pixels; X and Y may be
+//	                    negative for a monitor left of or above the primary
+//	JAMB_POSITION="X,Y" place the first window's top-left corner at logical
+//	                    (X, Y), before it is first shown, instead of the saved
+//	                    geometry. Later windows cascade from it as usual
+//	JAMB_NOACTIVATE=1   show every window without activating it, and never ask
+//	                    Windows to make one the foreground window, so a run does
+//	                    not take the user's focus or move the pointer. Rendering,
+//	                    scripts and stress mode are unchanged, but the window is
+//	                    never active, so a text field draws no caret, as in any
+//	                    background window
 //	JAMB_A11Y_WARN=1    warn about accessibility problems, such as an unlabeled
 //	                    button or an image without Alt. Also on under JAMB_TRACE=1
 //	                    and `jamb dev`.
@@ -84,9 +95,11 @@ type devOptions struct {
 	stressSecs float64
 	noVSync    bool
 	geometry   string
-	devStarted int64 // unix nanos when the dev runner noticed a change
-	a11yWarn   bool  // development warnings about accessibility (see ui.Runtime.SetAccessWarnings)
-	inspect    bool  // JAMB_INSPECT=1: the inspector opens for the first window
+	position   *platform.Point // JAMB_POSITION: where the first window is placed, or nil
+	noActivate bool            // JAMB_NOACTIVATE=1: no window is activated
+	devStarted int64           // unix nanos when the dev runner noticed a change
+	a11yWarn   bool            // development warnings about accessibility (see ui.Runtime.SetAccessWarnings)
+	inspect    bool            // JAMB_INSPECT=1: the inspector opens for the first window
 	// The settings overrides (see the package comment): highContrast is the
 	// variable's value, textScale is a percent (0 when unset), reducedMotion
 	// the variable's value.
@@ -112,6 +125,14 @@ func loadDevOptions() devOptions {
 	if v, err := strconv.Atoi(os.Getenv("JAMB_TEXT_SCALE")); err == nil && v > 0 {
 		d.textScale = min(max(v, 100), 225)
 	}
+	if s := os.Getenv("JAMB_POSITION"); s != "" {
+		if p, ok := parsePosition(s); ok {
+			d.position = &p
+		} else {
+			fmt.Fprintf(os.Stderr, "jamb: JAMB_POSITION=%q is not X,Y in whole logical pixels; ignored\n", s)
+		}
+	}
+	d.noActivate = os.Getenv("JAMB_NOACTIVATE") == "1"
 	d.devStarted, _ = strconv.ParseInt(os.Getenv("JAMB_DEV_CHANGED_AT"), 10, 64)
 	// Accessibility warnings belong to development runs: a traced run, a run
 	// under `jamb dev`, or one that asks for them.
@@ -166,6 +187,21 @@ func (d devOptions) loadGeometry() platform.Rect {
 		return platform.Rect{}
 	}
 	return r
+}
+
+// parsePosition reads a JAMB_POSITION value, "X,Y" in whole logical pixels, and
+// reports false for anything else.
+func parsePosition(s string) (platform.Point, bool) {
+	xs, ys, found := strings.Cut(s, ",")
+	if !found {
+		return platform.Point{}, false
+	}
+	x, errX := strconv.Atoi(strings.TrimSpace(xs))
+	y, errY := strconv.Atoi(strings.TrimSpace(ys))
+	if errX != nil || errY != nil {
+		return platform.Point{}, false
+	}
+	return platform.Point{X: x, Y: y}, true
 }
 
 func (d devOptions) saveGeometry(r platform.Rect) {

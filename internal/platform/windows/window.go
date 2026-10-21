@@ -373,7 +373,20 @@ func (w *window) ClientOrigin() platform.Point {
 	s := w.Scale()
 	return platform.Point{X: int(float32(p.X)/s + 0.5), Y: int(float32(p.Y)/s + 0.5)}
 }
-func (w *window) Show()  { win32.ShowWindow(w.hwnd, win32.SW_SHOW) }
+
+// Show implements platform.Window. A window opened with NoActivate is shown without
+// being activated.
+func (w *window) Show() { win32.ShowWindow(w.hwnd, w.showCmd()) }
+
+// showCmd is the ShowWindow command that shows the window: SW_SHOW, which activates
+// it, or SW_SHOWNOACTIVATE for a NoActivate window.
+func (w *window) showCmd() int {
+	if w.opts.NoActivate {
+		return win32.SW_SHOWNOACTIVATE
+	}
+	return win32.SW_SHOW
+}
+
 func (w *window) Close() { win32.PostMessage(w.hwnd, win32.WM_CLOSE, 0, 0) }
 
 // Hide implements platform.Window. The window's taskbar button goes with it, and
@@ -404,7 +417,7 @@ func shownState(visible, minimized bool) bool { return visible && !minimized }
 // Restore implements platform.Window: it shows the window and brings it to the
 // front, restoring it first when it is minimized.
 func (w *window) Restore() {
-	win32.ShowWindow(w.hwnd, win32.SW_SHOW)
+	win32.ShowWindow(w.hwnd, w.showCmd())
 	w.Focus()
 	w.Wake()
 }
@@ -485,6 +498,13 @@ func (w *window) SetFullscreen(on bool) {
 // Focus implements platform.Window. Windows only lets an app take the
 // foreground when the user is working with it; otherwise the taskbar flashes.
 func (w *window) Focus() {
+	if w.opts.NoActivate {
+		// Restoring a minimized window with SW_RESTORE would activate it.
+		if win32.IsIconic(w.hwnd) {
+			win32.ShowWindow(w.hwnd, win32.SW_SHOWNOACTIVATE)
+		}
+		return
+	}
 	if win32.IsIconic(w.hwnd) {
 		win32.ShowWindow(w.hwnd, win32.SW_RESTORE)
 	}

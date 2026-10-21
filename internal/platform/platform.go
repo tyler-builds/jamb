@@ -51,6 +51,11 @@ type WindowOptions struct {
 	// TitleBarHandler, and the window keeps its native resize borders, snap
 	// and shadow. See TitleBarHandler.
 	CustomTitleBar bool
+	// NoActivate shows the window without activating it, and the adapter never
+	// asks the system to make it the foreground window: showing, restoring and
+	// Focus leave the active window alone. Only Windows does this. It is for
+	// measurements that must not take the user's focus (see JAMB_NOACTIVATE).
+	NoActivate bool
 }
 
 // Point is a position in logical pixels (see WindowOptions.Origin).
