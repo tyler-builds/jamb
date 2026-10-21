@@ -277,3 +277,111 @@ function Start-Recorded([string]$Exe, [hashtable]$EnvVars, [string]$StdOut = '',
         foreach ($k in $EnvVars.Keys) { [Environment]::SetEnvironmentVariable($k, $old[$k]) }
     }
 }
+
+# Resizes a window in a sine wave around a base size, with SWP_NOMOVE | SWP_NOZORDER |
+# SWP_NOACTIVATE, so the window keeps its place and is never activated. It restores the
+# base size at the end.
+function Resize-Window([IntPtr]$Hwnd, [int]$Seconds, [int]$BaseWidth = 800, [int]$BaseHeight = 600, [int]$AmplitudeWidth = 240, [int]$AmplitudeHeight = 180) {
+    $flags = [uint32](0x0002 -bor 0x0004 -bor 0x0010)
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    while ($sw.Elapsed.TotalSeconds -lt $Seconds) {
+        $t = $sw.Elapsed.TotalSeconds
+        $w = [int]($BaseWidth + $AmplitudeWidth * [math]::Sin(2 * [math]::PI * $t / 4))
+        $h = [int]($BaseHeight + $AmplitudeHeight * [math]::Sin(2 * [math]::PI * $t / 5))
+        [void][Cmp.Win32]::SetWindowPos($Hwnd, [IntPtr]::Zero, 0, 0, $w, $h, $flags)
+        [Threading.Thread]::Sleep(16)
+    }
+    [void][Cmp.Win32]::SetWindowPos($Hwnd, [IntPtr]::Zero, 0, 0, $BaseWidth, $BaseHeight, $flags)
+}
+
+# The text of a file that an app may still have open, read with shared access.
+function Read-SharedText([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return '' }
+    $fs = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+    try {
+        $reader = New-Object IO.StreamReader($fs)
+        return $reader.ReadToEnd()
+    } finally {
+        $fs.Dispose()
+    }
+}
+
+# Converts a Go duration as printed by time.Duration ("1.25ms", "845 us" in microseconds,
+# "2s") to milliseconds, or $null when the text is not a duration.
+function Convert-DurationMs([string]$Text) {
+    if ($Text -notmatch '^([0-9.]+)(\S+)$') { return $null }
+    $n = [double]$Matches[1]
+    switch ($Matches[2]) {
+        'ms' { return $n }
+        's' { return $n * 1000 }
+        'ns' { return $n / 1e6 }
+        default { return $n / 1000 }
+    }
+}
+
+# Least-squares slope of Y against X (the units of Y per unit of X), or $null.
+function Get-Slope([double[]]$X, [double[]]$Y) {
+    $n = $X.Count
+    if ($n -lt 2) { return $null }
+    $sx = 0.0; $sy = 0.0; $sxy = 0.0; $sxx = 0.0
+    for ($i = 0; $i -lt $n; $i++) {
+        $sx += $X[$i]; $sy += $Y[$i]; $sxy += $X[$i] * $Y[$i]; $sxx += $X[$i] * $X[$i]
+    }
+    $den = $n * $sxx - $sx * $sx
+    if ($den -eq 0) { return $null }
+    return ($n * $sxy - $sx * $sy) / $den
+}
+
+# Reads a jamb frame-statistics CSV pair and the summary the app printed to stderr. The
+# present interval statistics cover the continuous frames only, as the app's own summary
+# does. The over-1.5x count and the refresh rate are the app's own: the measured median
+# is what the docs should report next to the monitor's refresh rate.
+function Read-FrameStats([string]$FramesCsv, [string]$InputCsv, [string]$StderrPath) {
+    $frames = @()
+    if (Test-Path -LiteralPath $FramesCsv) { $frames = @(Import-Csv -LiteralPath $FramesCsv) }
+    $inputs = @()
+    if (Test-Path -LiteralPath $InputCsv) { $inputs = @(Import-Csv -LiteralPath $InputCsv) }
+
+    $cpu = [double[]]@($frames | ForEach-Object { [double]$_.cpu_ms })
+    $intervals = [double[]]@($frames | Where-Object { $_.continuous -eq '1' -and $_.present_interval_ms -ne '' } |
+        ForEach-Object { [double]$_.present_interval_ms })
+    $kinds = [ordered]@{}
+    foreach ($g in @($frames | Group-Object kind)) { $kinds[$g.Name] = $g.Count }
+
+    $inputOut = [ordered]@{}
+    foreach ($g in @($inputs | Group-Object kind)) {
+        $toCpu = [double[]]@($g.Group | ForEach-Object { [double]$_.to_cpu_end_ms })
+        $toPresent = [double[]]@($g.Group | ForEach-Object { [double]$_.to_present_ms })
+        $inputOut[$g.Name] = [ordered]@{
+            n = $g.Count
+            toCpuEndMs = [ordered]@{ p50 = Get-Percentile $toCpu 50; p95 = Get-Percentile $toCpu 95; p99 = Get-Percentile $toCpu 99 }
+            toPresentMs = [ordered]@{ p50 = Get-Percentile $toPresent 50; p95 = Get-Percentile $toPresent 95; p99 = Get-Percentile $toPresent 99 }
+        }
+    }
+
+    $text = Read-SharedText $StderrPath
+    $hookHz = $null
+    if ($text -match 'refresh=([0-9.]+)Hz') { $hookHz = [double]$Matches[1] }
+    $over = $null
+    if ($text -match 'over 1\.5x period: (\d+)') { $over = [int]$Matches[1] }
+    $summaryLines = @($text -split "`r?`n" | Where-Object { $_ -match '^(jamb framestats|  )' })
+
+    return [ordered]@{
+        frames = $frames.Count
+        cpuMs = [ordered]@{ p50 = Get-Percentile $cpu 50; p95 = Get-Percentile $cpu 95; p99 = Get-Percentile $cpu 99; max = Get-Percentile $cpu 100 }
+        intervalMs = [ordered]@{ n = $intervals.Count; p50 = Get-Percentile $intervals 50; p95 = Get-Percentile $intervals 95; p99 = Get-Percentile $intervals 99; max = Get-Percentile $intervals 100 }
+        overOneAndHalfPeriod = $over
+        hookRefreshHz = $hookHz
+        frameKinds = $kinds
+        inputs = $inputOut
+        summaryLines = $summaryLines
+    }
+}
+
+# "median [min-max]" for a summary from Get-Summary, or n/a.
+function Format-Stat($Stat, [int]$Digits = 1) {
+    if ($null -eq $Stat) { return 'n/a' }
+    $med = [math]::Round($Stat.median, $Digits)
+    if ($Stat.n -le 1) { return "$med" }
+    return "$med [$([math]::Round($Stat.min, $Digits))$([char]0x2013)$([math]::Round($Stat.max, $Digits))]"
+}
