@@ -117,6 +117,12 @@ func italianStrings() *Strings {
 		CodeEditorCount: func(current, total int) string {
 			return fmt.Sprintf("%d di %d", current, total)
 		},
+		CodeEditorCodeActions:   "Azioni codice",
+		CodeEditorQuickFix:      "Correzione rapida",
+		CodeEditorRefactor:      "Refactoring",
+		CodeEditorSourceAction:  "Azione sorgente",
+		CodeEditorMoreActions:   "Altre azioni",
+		CodeEditorNoCodeActions: "Nessuna azione disponibile",
 
 		Required: "Questo campo è obbligatorio.",
 	}
