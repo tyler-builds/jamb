@@ -339,6 +339,8 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		// A modal's panel is an overlay, placed on its backdrop. A non-modal panel is a
 		// child of its layer, which holds it in place (see below).
 		panel.Overlay(placement)
+	} else {
+		panel.access().nonModal = true
 	}
 	if !m.nonModal || m.outside {
 		// The overlay's dismiss handler: Escape closes the topmost overlay with one

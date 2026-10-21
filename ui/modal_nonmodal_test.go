@@ -3,6 +3,7 @@ package ui
 import (
 	"testing"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 )
 
@@ -378,6 +379,23 @@ func TestNonModalEnterRunsDefaultOnlyInside(t *testing.T) {
 	c.r.press(input.KeyEnter, 0)
 	if c.done != 1 || c.behind != 1 {
 		t.Fatalf("Enter in the window behind ran the default (%d) or not the button (%d)", c.done, c.behind)
+	}
+}
+
+// TestNonModalDialogAccessState checks that the panel of a non-modal dialog is
+// reported as non-modal, and a modal's panel is not.
+func TestNonModalDialogAccessState(t *testing.T) {
+	c := newNonModalTest(findPanel)
+	c.show(t)
+	if n := c.r.stateOf(t, access.RoleDialog, "Find"); !n.States.Has(access.StateNonModal) {
+		t.Fatalf("the non-modal dialog's states are %q", n.States)
+	}
+	c.modal.Set(true)
+	for range 4 {
+		c.r.frame()
+	}
+	if n := c.r.stateOf(t, access.RoleDialog, "Confirm"); n.States.Has(access.StateNonModal) {
+		t.Fatalf("a modal's states include non-modal: %q", n.States)
 	}
 }
 
