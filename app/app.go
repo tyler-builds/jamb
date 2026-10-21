@@ -349,13 +349,19 @@ func openWindow(cfg Window, handle *appWindow) (*host, error) {
 		Title: cfg.Title, Width: cfg.Width, Height: cfg.Height,
 		MinWidth: cfg.MinWidth, MinHeight: cfg.MinHeight, Dark: cfg.themeFor(systemSettings(h.dev).Dark).Dark,
 		CustomTitleBar: cfg.Chrome == ChromeCustom,
+		NoActivate:     h.dev.noActivate,
 	}
-	if h.primary {
-		opts.Frame = h.dev.loadGeometry()
-	}
-	if opts.Frame.W == 0 {
-		opts.Origin = origin(cfg)
-		opts.KeepOnScreen = cfg.keepOnScreen
+	if h.primary && h.dev.position != nil {
+		// JAMB_POSITION places the first window exactly; the saved geometry is not used.
+		opts.Origin = h.dev.position
+	} else {
+		if h.primary {
+			opts.Frame = h.dev.loadGeometry()
+		}
+		if opts.Frame.W == 0 {
+			opts.Origin = origin(cfg)
+			opts.KeepOnScreen = cfg.keepOnScreen
+		}
 	}
 	h.darkFrame = opts.Dark
 	if _, err := openPlatform(opts, h); err != nil {

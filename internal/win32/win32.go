@@ -220,6 +220,9 @@ const (
 	SW_MAXIMIZE   = 3
 	SW_RESTORE    = 9
 	SW_SHOWNORMAL = 1
+	// SW_SHOWNOACTIVATE shows the window in its most recent size and position,
+	// without making it the active window.
+	SW_SHOWNOACTIVATE = 4
 
 	SM_CXSIZEFRAME    = 32
 	SM_CYSIZEFRAME    = 33

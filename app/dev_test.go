@@ -1,11 +1,49 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/internal/platform"
 )
+
+func TestParsePosition(t *testing.T) {
+	cases := []struct {
+		s    string
+		want platform.Point
+		ok   bool
+	}{
+		{"-1600,200", platform.Point{X: -1600, Y: 200}, true},
+		{" 10 , -20 ", platform.Point{X: 10, Y: -20}, true},
+		{"0,0", platform.Point{}, true},
+		{"100", platform.Point{}, false},
+		{"100,", platform.Point{}, false},
+		{"1.5,2", platform.Point{}, false},
+		{"", platform.Point{}, false},
+	}
+	for _, c := range cases {
+		p, ok := parsePosition(c.s)
+		if ok != c.ok || p != c.want {
+			t.Errorf("parsePosition(%q) = %v, %v; want %v, %v", c.s, p, ok, c.want, c.ok)
+		}
+	}
+}
+
+// TestGeometryFileKeepsNegativePosition checks that a saved position left of or above
+// the primary monitor is read back as saved, not clamped or rejected.
+func TestGeometryFileKeepsNegativePosition(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "geometry.txt")
+	if err := os.WriteFile(path, []byte("-3200 -400 800 600"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := devOptions{geometry: path}.loadGeometry()
+	if want := (platform.Rect{X: -3200, Y: -400, W: 800, H: 600}); got != want {
+		t.Errorf("loadGeometry = %v, want %v", got, want)
+	}
+}
 
 func TestParseKey(t *testing.T) {
 	cases := []struct {
