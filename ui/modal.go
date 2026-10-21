@@ -498,6 +498,121 @@ func (rt *Runtime) focusDialog() *node {
 	return nil
 }
 
+// nonModalDialogs returns the open non-modal dialogs, the topmost first: the one
+// painted last is on top.
+func (rt *Runtime) nonModalDialogs() []*node {
+	var out []*node
+	var walk func(n *node)
+	walk = func(n *node) {
+		if n.div != nil && n.div.modal != nil && n.div.modal.nonModal {
+			out = append(out, n)
+		}
+		kids := n.order
+		if len(kids) == 0 {
+			kids = n.children
+		}
+		for _, c := range kids {
+			walk(c)
+		}
+	}
+	if rt.tree != nil {
+		walk(rt.tree)
+	}
+	slices.Reverse(out)
+	return out
+}
+
+// nonModalFocus records a focus change from oldID to id for the non-modal dialogs
+// it enters or leaves. A dialog that focus comes into from outside returns focus
+// to the element it came from when it closes, and remembers the element that has
+// focus now, for F6 (see cycleRegions).
+func (rt *Runtime) nonModalFocus(oldID, id uint64) {
+	for a := rt.byID[id]; a != nil; a = a.parent {
+		if a.div == nil || a.div.modal == nil || !a.div.modal.nonModal {
+			continue
+		}
+		i := slices.IndexFunc(rt.modals, func(f modalFrame) bool { return f.id == a.id })
+		if i < 0 {
+			continue
+		}
+		inside := false
+		for o := rt.byID[oldID]; o != nil && !inside; o = o.parent {
+			inside = o.id == a.id
+		}
+		if !inside {
+			rt.modals[i].ret = oldID
+		}
+		rt.modals[i].last = id
+	}
+}
+
+// cycleRegions moves focus to the next region of the window, or to the previous one
+// with back. The regions are the window, each open non-modal dialog (topmost
+// first) and the toast region when a toast is shown. F6 and Shift+F6 step through
+// them. A dialog is entered at the element that last had focus in it. With a
+// modal open, or with no non-modal dialog, F6 only toggles the toast region (see
+// toggleToastFocus).
+func (rt *Runtime) cycleRegions(back bool) {
+	dialogs := rt.nonModalDialogs()
+	if rt.topModal() != nil || len(dialogs) == 0 {
+		rt.toggleToastFocus()
+		return
+	}
+	toast := len(rt.toasts) > 0 && rt.toastRegion != 0 && rt.byID[rt.toastRegion] != nil
+	// Region 0 is the window, 1 to len(dialogs) the dialogs, and the last is the
+	// toast region when it is shown.
+	count := 1 + len(dialogs)
+	if toast {
+		count++
+	}
+	cur := 0
+	for i, d := range dialogs {
+		if rt.focusInside(d.id) {
+			cur = i + 1
+		}
+	}
+	if toast && rt.inToastRegion() {
+		cur = count - 1
+	}
+	next := cur + 1
+	if back {
+		next = cur - 1
+	}
+	next = (next + count) % count
+
+	if cur == 0 {
+		rt.windowFocus = rt.focusID
+	}
+	switch {
+	case next == 0:
+		id := rt.windowFocus
+		if rt.byID[id] == nil {
+			id = 0
+		}
+		rt.setFocus(id)
+	case next <= len(dialogs):
+		rt.setFocus(rt.dialogEntry(dialogs[next-1]))
+	default:
+		rt.toastReturn = rt.focusID
+		rt.setFocus(rt.toastRegion)
+	}
+	rt.revealFocus = true
+	rt.needPaint = true
+	rt.requestFrame()
+}
+
+// dialogEntry returns the element that F6 gives focus to when it enters the
+// non-modal dialog at n: the one that last had focus in it, else the one it opens
+// with. It returns 0 when there is none.
+func (rt *Runtime) dialogEntry(n *node) uint64 {
+	if i := slices.IndexFunc(rt.modals, func(f modalFrame) bool { return f.id == n.id }); i >= 0 {
+		if l := rt.modals[i].last; l != 0 && rt.byID[l] != nil && subtreeHas(n, l) {
+			return l
+		}
+	}
+	return rt.modalFocus(n)
+}
+
 // modalDefault runs the default button of the dialog that has focus, as Enter
 // does in a dialog, or else of the open modal. A non-modal dialog's default runs
 // only from inside it. It reports whether there was one to run.

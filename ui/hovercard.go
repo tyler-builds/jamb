@@ -215,4 +215,5 @@ func (rt *Runtime) focusInChanged(oldID, id uint64) {
 			a.div.focusIn(true)
 		}
 	}
+	rt.nonModalFocus(oldID, id)
 }

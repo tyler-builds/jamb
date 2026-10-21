@@ -690,8 +690,9 @@ func (rt *Runtime) keyDown(k input.Key, mods input.Modifiers, repeat bool) {
 		// tap. A window without a menu bar does nothing.
 		rt.activateMenuBar()
 	case !repeat && k == input.KeyF6 && (mods == 0 || mods == input.ModShift):
-		// F6 moves focus into the toast region and back (see Toaster).
-		rt.toggleToastFocus()
+		// F6 moves focus between the regions of the window: the window, the open
+		// non-modal dialogs and the toasts (see Toaster and cycleRegions).
+		rt.cycleRegions(mods.Has(input.ModShift))
 	case rt.zoomKeys && mods.Has(input.ModCtrl) && k == input.KeyEqual:
 		rt.ZoomIn()
 	case rt.zoomKeys && mods.Has(input.ModCtrl) && k == input.KeyMinus:

@@ -12,6 +12,7 @@ import (
 type nonModalTest struct {
 	r                       *accessRig
 	open, modal             *Signal[bool]
+	toasts                  bool // the window has a Toaster, for F6 to cycle to
 	closes, modalCloses     int
 	behind, done, modalDone int
 }
@@ -29,6 +30,9 @@ func newNonModalTest(build func(c *nonModalTest) *ModalElement) *nonModalTest {
 			ok := Button("OK").Key("ok").Primary().OnClick(func() { c.modalDone++ })
 			page.Child(Modal("Confirm", Text("Sure?")).Footer(ok).Default(ok).
 				OnClose(func() { c.modalCloses++; c.modal.Set(false) }))
+		}
+		if c.toasts {
+			page.Child(Toaster().Key("toaster"))
 		}
 		return page
 	})
@@ -287,6 +291,72 @@ func TestNonModalEscapeClosesPopoverFirst(t *testing.T) {
 	c.r.press(input.KeyEscape, 0)
 	if c.closes != 1 {
 		t.Fatalf("the second Escape closed the dialog %d times, want 1", c.closes)
+	}
+}
+
+// TestF6CyclesWindowAndDialog checks that F6 moves focus from the window into the
+// open non-modal dialog and back, and that Shift+F6 steps the other way.
+func TestF6CyclesWindowAndDialog(t *testing.T) {
+	c := newNonModalTest(findPanel)
+	c.show(t)
+	c.r.clickKey(t, "behind")
+	for _, want := range []string{"find", "behind", "find"} {
+		c.r.press(input.KeyF6, 0)
+		if got := c.r.focusedKey(); got != want {
+			t.Fatalf("F6 put focus on %q, want %q", got, want)
+		}
+	}
+	c.r.press(input.KeyF6, input.ModShift)
+	if got := c.r.focusedKey(); got != "behind" {
+		t.Fatalf("Shift+F6 put focus on %q, want the window", got)
+	}
+}
+
+// TestF6EntersDialogAtLastFocus checks that F6 returns to the element in a
+// non-modal dialog that had focus last, not to its first field.
+func TestF6EntersDialogAtLastFocus(t *testing.T) {
+	c := newNonModalTest(findPanel)
+	c.show(t)
+	c.r.clickKey(t, "behind")
+	c.r.press(input.KeyF6, 0)
+	c.r.focusKey(t, "done")
+	c.r.press(input.KeyF6, 0)
+	c.r.press(input.KeyF6, 0)
+	if got := c.r.focusedKey(); got != "done" {
+		t.Fatalf("F6 back into the dialog put focus on %q, want its last element", got)
+	}
+}
+
+// TestF6CyclesToastRegion checks that, with a toast shown, F6 goes from the window
+// to the dialog, then to the toast region, then back to the window.
+func TestF6CyclesToastRegion(t *testing.T) {
+	c := newNonModalTest(findPanel)
+	c.toasts = true
+	c.show(t)
+	c.r.rt.toast(ToastInfo, "Saved")
+	c.r.frame()
+	c.r.clickKey(t, "behind")
+	for _, want := range []string{"find", "jamb.toasts", "behind"} {
+		c.r.press(input.KeyF6, 0)
+		if got := c.r.focusedKey(); got != want {
+			t.Fatalf("F6 put focus on %q, want %q", got, want)
+		}
+	}
+}
+
+// TestF6WithModalOpenStaysInModal checks that F6 does not leave a modal for the
+// non-modal dialog under it.
+func TestF6WithModalOpenStaysInModal(t *testing.T) {
+	c := newNonModalTest(findPanel)
+	c.show(t)
+	c.modal.Set(true)
+	for range 4 {
+		c.r.frame()
+	}
+	c.r.focusKey(t, "ok")
+	c.r.press(input.KeyF6, 0)
+	if got := c.r.focusedKey(); got != "ok" {
+		t.Fatalf("F6 in a modal put focus on %q", got)
 	}
 }
 

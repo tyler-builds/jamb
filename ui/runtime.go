@@ -434,6 +434,9 @@ type Runtime struct {
 	// the one whose initial focus is set once the next build is done.
 	modals       []modalFrame
 	pendingModal uint64
+	// windowFocus is the element in the window that had focus when F6 last left
+	// the window for another region (see cycleRegions).
+	windowFocus uint64
 
 	// acc is the accessibility tree's state (see access.go). It is nil until
 	// the tree is first asked for, so a runtime without assistive technology
