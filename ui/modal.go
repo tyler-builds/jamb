@@ -487,10 +487,25 @@ func subtreeHas(n *node, id uint64) bool {
 	return false
 }
 
-// modalDefault runs the default button of the open modal, as Enter does in a
-// dialog. It reports whether there was one to run.
+// focusDialog returns the innermost dialog, modal or non-modal, that has focus
+// inside it, or nil.
+func (rt *Runtime) focusDialog() *node {
+	for _, n := range rt.focusPath() {
+		if n.div != nil && n.div.modal != nil {
+			return n
+		}
+	}
+	return nil
+}
+
+// modalDefault runs the default button of the dialog that has focus, as Enter
+// does in a dialog, or else of the open modal. A non-modal dialog's default runs
+// only from inside it. It reports whether there was one to run.
 func (rt *Runtime) modalDefault() bool {
-	m := rt.topModal()
+	m := rt.focusDialog()
+	if m == nil {
+		m = rt.topModal()
+	}
 	if m == nil {
 		return false
 	}

@@ -210,15 +210,33 @@ func (rt *Runtime) escapeOverlay() func() {
 	return nil
 }
 
-// escapeDismisses reports whether Escape would close an overlay or hide a
-// tooltip. While it would, the field's own Cancel does not run.
-func (rt *Runtime) escapeDismisses() bool { return rt.escapeOverlay() != nil || rt.tipShown != 0 }
+// escapeDialog returns the close of the innermost non-modal dialog that has focus
+// inside it, or nil. Escape closes such a dialog only from inside it, since the
+// window behind it is not covered (see NonModal).
+func (rt *Runtime) escapeDialog() func() {
+	for _, n := range rt.focusPath() {
+		if n.div != nil && n.div.modal != nil && n.div.modal.nonModal {
+			return n.div.modal.close
+		}
+	}
+	return nil
+}
 
-// dismissEscape closes the topmost overlay, or else hides the tooltip, and
-// reports whether it did. A hidden tooltip stays hidden while the pointer
-// rests on the same element.
+// escapeDismisses reports whether Escape would close an overlay, a non-modal
+// dialog or a tooltip. While it would, the field's own Cancel does not run.
+func (rt *Runtime) escapeDismisses() bool {
+	return rt.escapeOverlay() != nil || rt.escapeDialog() != nil || rt.tipShown != 0
+}
+
+// dismissEscape closes the topmost overlay, or else the non-modal dialog with
+// focus, or else hides the tooltip, and reports whether it did. A hidden tooltip
+// stays hidden while the pointer rests on the same element.
 func (rt *Runtime) dismissEscape() bool {
 	if fn := rt.escapeOverlay(); fn != nil {
+		fn()
+		return true
+	}
+	if fn := rt.escapeDialog(); fn != nil {
 		fn()
 		return true
 	}
