@@ -150,7 +150,10 @@ var componentSections = []componentSection{
 		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return dataGridSection(ctx, t) }},
 	{"Charts", "charts Line Area Bar Scatter Pie Donut Radar Candlestick Sankey DataTable graph plot table",
 		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return chartsSection(ctx, t) }},
-	{"Code editor", "codeedit Editor NewDocument code syntax highlighting languages find replace go to line cursors",
+	{"Code editor", "codeedit Editor NewDocument code syntax highlighting languages find replace go to line cursors " +
+		"SoftWrap WrapColumn WrappingIndent word wrap SetDiagnostics SetDiagnosticsFor diagnostics problems errors warnings F8 " +
+		"Hover HoverFunc HoverDelay hover Completions CompletionProvider completion autocomplete Ctrl+Space " +
+		"Definitions OnOpenLocation definition go to definition F12",
 		func(*ui.Context, *ui.Theme, *Store) ui.Element { return codeEditorSection() }},
 	{"Customizing", "Styles Theme Variant RenderTab Tabs Segmented Indicator Checkbox Collapsible NumberInput SpinButtons " +
 		"Select Button Badge render slot styling",
