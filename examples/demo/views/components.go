@@ -187,7 +187,8 @@ var componentSections = []componentSection{
 	{"Clipping and borders", "Radius BorderEdges Border ScrollY clip rounded corners underline tabs accent bar",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return clipSection(t) }},
 	{"Motion", "Animate Animation ease Linear OutCubic InOutCubic Bounce Reverse Scale Offset Transition Hover ZIndex " +
-		"animation easing transform",
+		"animation easing transform Spring Keyframes Play Keyframe Sequence Parallel Then Repeat AnimateTimeline timeline Delay Stagger OnDone " +
+		"Motion.Opacity Theme.Motion MotionTokens reduced motion replay",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return motionSection(t) }},
 	{"Focus and scrolling", "FocusWithin Focused FocusVisible Focusable TabIndex TabStop ScrollX focus ring keyboard Tab order scroll",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element { return focusSection(t) }},
@@ -417,6 +418,7 @@ func motionSection(t *ui.Theme) ui.Element {
 		{"InOutCubic", ease.InOutCubic},
 		{"Bounce(Out)", ease.Bounce(ease.Out)},
 		{"Reverse(Out)", ease.Reverse(ease.Out)},
+		{"Spring(0.3)", ease.Spring(0.3)},
 	}
 	card := Card(t).Gap(14).Child(SectionTitle(t, "Motion"))
 	for _, c := range curves {
@@ -429,7 +431,12 @@ func motionSection(t *ui.Theme) ui.Element {
 		Child(sample(t, "Scale(0.8)", tile(t, "Card").Scale(0.8))).
 		Child(sample(t, "Offset(10, 6)", tile(t, "Card").Offset(10, 6))).
 		Child(sample(t, "Hover: scale and lift", tile(t, "Card").Key("hover-lift-card").Transition(fast).Hover(ui.Style{Scale: 1.08, OffsetY: -4}))).
-		Child(sample(t, "ZIndex: first child on top", stack)))
+		Child(sample(t, "ZIndex: first child on top", stack))).
+		Child(ui.Divider()).
+		Child(ui.Text("Springs, keyframes, timelines, delays and staggers. Each plays when it is shown, and its button plays it again. " +
+			"Under reduced motion they jump to their end. Theme.Motion sets how long the built-in menus, dialogs and hover colors take.").
+			FontSize(13).TextColor(t.TextMuted)).
+		Child(ui.Div().Row().Wrap().Align(ui.Start).Gap(22).Children(motionTimingSamples(t)...))
 }
 
 // easeRow is a ball that travels a track on the curve, repeating forever.
