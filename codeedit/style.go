@@ -18,7 +18,9 @@ import "github.com/tyler-builds/jamb/ui"
 // DiagnosticHint are the marks of the diagnostics of each severity: their TextColor colors the
 // wavy underline and the gutter marker, which the theme's Danger, Warning, Accent and TextMuted
 // colors are by default. Popup is the panel of the hover and of the completions, PopupItem one
-// entry of it, and PopupItemSelected the completion that Enter accepts.
+// entry of it, and PopupItemSelected the completion that Enter accepts. Lightbulb is the mark
+// of a line that has a code action, its TextColor; PopupItemDisabled is a code action that is
+// disabled, and PopupGroup the header of a group in the menu of code actions, each by its TextColor.
 //
 // Under high contrast the colors of these parts are the system colors, whatever is set
 // here or in the theme; their sizes and spacing still apply.
@@ -55,6 +57,12 @@ type Style struct {
 	PopupItem ui.Style
 	// PopupItemSelected is the completion that Enter accepts.
 	PopupItemSelected ui.Style
+	// Lightbulb is the mark of a line that has a code action: its TextColor.
+	Lightbulb ui.Style
+	// PopupItemDisabled is the look of a code action that is disabled: its TextColor.
+	PopupItemDisabled ui.Style
+	// PopupGroup is the look of the header of a group in the menu of code actions: its TextColor.
+	PopupGroup ui.Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -78,6 +86,9 @@ func (s Style) merge(o Style) Style {
 		Popup:             s.Popup.Merge(o.Popup),
 		PopupItem:         s.PopupItem.Merge(o.PopupItem),
 		PopupItemSelected: s.PopupItemSelected.Merge(o.PopupItemSelected),
+		Lightbulb:         s.Lightbulb.Merge(o.Lightbulb),
+		PopupItemDisabled: s.PopupItemDisabled.Merge(o.PopupItemDisabled),
+		PopupGroup:        s.PopupGroup.Merge(o.PopupGroup),
 	}
 }
 
@@ -116,6 +127,9 @@ func editorDefaults(t *ui.Theme) Style {
 			Radius: t.Radius, Padding: ui.All(4), Gap: 2, FontSize: t.FontSize},
 		PopupItem:         ui.Style{Padding: ui.Edges{Top: 2, Right: 6, Bottom: 2, Left: 6}, Radius: t.Radius},
 		PopupItemSelected: ui.Style{Background: t.Accent, TextColor: t.AccentText},
+		Lightbulb:         ui.Style{TextColor: t.Warning},
+		PopupItemDisabled: ui.Style{TextColor: t.Disabled},
+		PopupGroup:        ui.Style{TextColor: t.TextMuted},
 	}
 }
 
@@ -140,6 +154,9 @@ func (s Style) plain() Style {
 		Popup:             plainPart(s.Popup),
 		PopupItem:         plainPart(s.PopupItem),
 		PopupItemSelected: plainPart(s.PopupItemSelected),
+		Lightbulb:         plainPart(s.Lightbulb),
+		PopupItemDisabled: plainPart(s.PopupItemDisabled),
+		PopupGroup:        plainPart(s.PopupGroup),
 	}
 }
 
@@ -166,6 +183,11 @@ func (s Style) resolve(ctx *ui.Context) Style {
 		st.DiagnosticWarning = st.DiagnosticWarning.Merge(hc(t.Warning))
 		st.DiagnosticInfo = st.DiagnosticInfo.Merge(hc(t.Accent))
 		st.DiagnosticHint = st.DiagnosticHint.Merge(hc(t.TextMuted))
+		// The lightbulb and the group headers take the text color, and a disabled action the
+		// disabled color, which is GrayText; the shape of the lightbulb marks it, not the color.
+		st.Lightbulb = st.Lightbulb.Merge(hc(t.Text))
+		st.PopupGroup = st.PopupGroup.Merge(hc(t.Text))
+		st.PopupItemDisabled = st.PopupItemDisabled.Merge(hc(t.Disabled))
 	}
 	return st
 }
