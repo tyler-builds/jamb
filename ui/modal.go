@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"cmp"
 	"slices"
 	"time"
 
@@ -424,10 +425,62 @@ func (rt *Runtime) topModal() *node {
 
 // modalMounted records a Modal that has just appeared. The element with focus
 // now is where focus returns when it closes, and the initial focus is set once
-// the tree is built (see buildDirty).
+// the tree is built (see buildDirty). A non-modal dialog is on top of the others
+// that were raised before it.
 func (rt *Runtime) modalMounted(n *node) {
 	rt.modals = append(rt.modals, modalFrame{id: n.id, ret: rt.focusID})
 	rt.pendingModal = n.id
+	if n.div.modal.nonModal {
+		rt.stackDialog(n)
+	}
+}
+
+// stackDialog gives the non-modal dialog at n the highest raise number.
+func (rt *Runtime) stackDialog(n *node) {
+	if rt.raised == nil {
+		rt.raised = map[uint64]uint64{}
+	}
+	rt.raiseSeq++
+	rt.raised[n.id] = rt.raiseSeq
+}
+
+// raiseDialog raises the non-modal dialog at n above the other non-modal dialogs
+// in its parent, as a press in it or focus entering it does. A modal is not moved:
+// it stays above them all.
+func (rt *Runtime) raiseDialog(n *node) {
+	if n.div == nil || n.div.modal == nil || !n.div.modal.nonModal {
+		return
+	}
+	rt.stackDialog(n)
+	if n.parent != nil {
+		rt.reorder(n.parent)
+	}
+	rt.needPaint = true
+	rt.requestFrame()
+}
+
+// raiseDialogs puts the non-modal dialogs among the children of n in raise order.
+// They keep the slots they hold, and the most recently raised one takes the last
+// of them, so it is painted on top. The other children keep their places.
+func (rt *Runtime) raiseDialogs(n *node) {
+	if len(rt.raised) == 0 {
+		return
+	}
+	var slots []int
+	var dialogs []*node
+	for i, c := range n.order {
+		if c.div != nil && c.div.modal != nil && c.div.modal.nonModal {
+			slots = append(slots, i)
+			dialogs = append(dialogs, c)
+		}
+	}
+	if len(dialogs) < 2 {
+		return
+	}
+	slices.SortStableFunc(dialogs, func(a, b *node) int { return cmp.Compare(rt.raised[a.id], rt.raised[b.id]) })
+	for k, i := range slots {
+		n.order[i] = dialogs[k]
+	}
 }
 
 // modalFocus returns the element that takes focus when the modal at n opens:
@@ -463,6 +516,7 @@ func (rt *Runtime) modalFocus(n *node) uint64 {
 // focus was inside it, focus goes back to the element it returns to. Focus that
 // has moved elsewhere is left alone.
 func (rt *Runtime) modalClosed(n *node) {
+	delete(rt.raised, n.id)
 	i := slices.IndexFunc(rt.modals, func(f modalFrame) bool { return f.id == n.id })
 	if i < 0 {
 		return
@@ -541,6 +595,7 @@ func (rt *Runtime) nonModalFocus(oldID, id uint64) {
 		}
 		if !inside {
 			rt.modals[i].ret = oldID
+			rt.raiseDialog(a)
 		}
 		rt.modals[i].last = id
 	}
