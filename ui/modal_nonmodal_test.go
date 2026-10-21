@@ -334,7 +334,7 @@ func TestF6CyclesToastRegion(t *testing.T) {
 	c := newNonModalTest(findPanel)
 	c.toasts = true
 	c.show(t)
-	c.r.rt.toast(ToastInfo, "Saved")
+	c.r.rt.toast("", ToastInfo, "Saved")
 	c.r.frame()
 	c.r.clickKey(t, "behind")
 	for _, want := range []string{"find", "jamb.toasts", "behind"} {
