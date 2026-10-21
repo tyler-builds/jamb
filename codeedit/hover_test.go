@@ -160,3 +160,36 @@ func TestHoverShowsDiagnosticsWithoutAProvider(t *testing.T) {
 		t.Error("the hover popup is not in the tree")
 	}
 }
+
+// The hover and the list can be open together, and their anchors are siblings: each has its own
+// key, so the runtime warns of no duplicate key.
+func TestHoverAndListOpenTogetherWarnOfNoDuplicateKey(t *testing.T) {
+	instantTimers(t)
+	h := newHarness(t, "al alpha", func(e *EditorElement) *EditorElement {
+		return e.HoverDelay(time.Millisecond).
+			Hover(HoverFunc(func(ctx context.Context, q Query) (Hover, error) { return Hover{Text: "a word"}, nil })).
+			Completions(words("alpha", "alfa"))
+	})
+	var warns []string
+	h.rt.SetWarnFunc(func(s string) { warns = append(warns, s) })
+	vs := h.ed.view
+	h.doc.SetCaret(2)
+	h.openList()
+	h.rest(0, 1)
+	h.waitFor("the hover", func() bool { return vs.hover.open })
+	h.frame()
+	if !vs.completion.open {
+		t.Fatal("the list closed when the hover opened")
+	}
+	if _, ok := h.rt.Find("codeedit.hover"); !ok {
+		t.Error("the hover is not in the tree")
+	}
+	if _, ok := h.rt.Find("codeedit.completions"); !ok {
+		t.Error("the list is not in the tree")
+	}
+	for _, w := range warns {
+		if strings.Contains(w, "duplicate key") {
+			t.Errorf("warning: %s", w)
+		}
+	}
+}

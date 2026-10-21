@@ -229,14 +229,15 @@ func (vs *viewState) hoverPopup(st Style) ui.Element {
 	case a.Text != "":
 		panel.Child(ui.Div().Style(st.PopupItem).Child(ui.Text(a.Text)))
 	}
-	return vs.popupAnchor(hv.from, panel)
+	return vs.popupAnchor("codeedit.hover.anchor", hv.from, panel)
 }
 
 // popupAnchor returns a box one pixel wide and a row high at the byte offset off, which a popup's
 // overlay hangs from, so that it opens under the text. The box is placed from the geometry of
-// the last paint.
-func (vs *viewState) popupAnchor(off int, popup ui.Element) ui.Element {
+// the last paint. key is unique to the popup: the hover and the list can both be open, and their
+// boxes are siblings.
+func (vs *viewState) popupAnchor(key string, off int, popup ui.Element) ui.Element {
 	r := vs.caretRect(off)
-	return ui.Div().Key("codeedit.anchor").Absolute().Left(max(r.X, 0)).Top(r.Y).
+	return ui.Div().Key(key).Absolute().Left(max(r.X, 0)).Top(r.Y).
 		Size(ui.Px(1), ui.Px(max(r.H, 1))).Child(popup)
 }

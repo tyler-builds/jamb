@@ -427,5 +427,5 @@ func (vs *viewState) completionPopup(st Style) ui.Element {
 			panel.Child(ui.Div().Style(st.PopupItem).Opacity(0.8).Child(ui.Text(doc)))
 		}
 	}
-	return vs.popupAnchor(cs.from, panel)
+	return vs.popupAnchor("codeedit.completions.anchor", cs.from, panel)
 }
