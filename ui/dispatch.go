@@ -302,6 +302,13 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 	rt.showTip(0)
 	rt.tipCandidate = 0
 	rt.clickOutside(path)
+	for _, n := range path {
+		// A press in a non-modal dialog raises it above the other dialogs (see raiseDialog).
+		if n.div != nil && n.div.modal != nil && n.div.modal.nonModal {
+			rt.raiseDialog(n)
+			break
+		}
+	}
 	if b == input.ButtonRight && rt.ctxMenu == nil {
 		// A context menu that survived the press was pressed inside: it stays.
 		if n := menuTarget(path); n != nil {

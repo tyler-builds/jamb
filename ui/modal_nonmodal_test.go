@@ -380,3 +380,79 @@ func TestNonModalEnterRunsDefaultOnlyInside(t *testing.T) {
 		t.Fatalf("Enter in the window behind ran the default (%d) or not the button (%d)", c.done, c.behind)
 	}
 }
+
+// panelNamed reports whether the path holds the panel of a drawer named name.
+func panelNamed(path []*node, name string) bool {
+	for _, n := range path {
+		if n.div != nil && n.div.part == "Drawer.Panel" && n.div.acc != nil && n.div.acc.name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// stackRig is a window with two non-modal drawers that overlap in the middle: First
+// at the left edge, Second at the right, so Second is on top. A modal may be shown
+// over them.
+func stackRig(modal *Signal[bool]) *accessRig {
+	return newAccessRig(func(ctx *Context) Element {
+		page := Div().Size(Full, Full).Column().
+			Child(Drawer("First", Button("Inside first").Key("first")).Side(DrawerLeft).NonModal().OnClose(func() {})).
+			Child(Drawer("Second", Button("Inside second").Key("second")).Side(DrawerRight).NonModal().OnClose(func() {}))
+		if modal.Get() {
+			page.Child(Modal("Confirm", Text("Sure?")).OnClose(func() { modal.Set(false) }))
+		}
+		return page
+	})
+}
+
+// TestNonModalPressRaisesDialog checks that a press in a non-modal dialog raises
+// it above the dialog it overlaps: a later press in the overlap hits it.
+func TestNonModalPressRaisesDialog(t *testing.T) {
+	r := stackRig(NewSignal(false))
+	for range 12 {
+		r.frame()
+	}
+	if path := r.rt.hitTest(250, 200); !panelNamed(path, "Second") {
+		t.Fatal("before any press, the overlap is not Second's")
+	}
+	r.clickAt(20, 200) // First, outside the overlap
+	if path := r.rt.hitTest(250, 200); !panelNamed(path, "First") {
+		t.Fatal("a press in First did not raise it above Second")
+	}
+}
+
+// TestNonModalFocusRaisesDialog checks that focus entering a non-modal dialog
+// raises it, as a press does.
+func TestNonModalFocusRaisesDialog(t *testing.T) {
+	r := stackRig(NewSignal(false))
+	for range 12 {
+		r.frame()
+	}
+	r.focusKey(t, "first")
+	if path := r.rt.hitTest(250, 200); !panelNamed(path, "First") {
+		t.Fatal("focus entering First did not raise it above Second")
+	}
+}
+
+// TestModalStaysAboveNonModalDialogs checks that a modal opened over two non-modal
+// dialogs covers them, and that raising a dialog does not move it below them.
+func TestModalStaysAboveNonModalDialogs(t *testing.T) {
+	modal := NewSignal(false)
+	r := stackRig(modal)
+	for range 12 {
+		r.frame()
+	}
+	r.focusKey(t, "first")
+	modal.Set(true)
+	for range 12 {
+		r.frame()
+	}
+	scrim := false
+	for _, n := range r.rt.hitTest(250, 200) {
+		scrim = scrim || (n.div != nil && n.div.part == "Modal.Scrim")
+	}
+	if !scrim {
+		t.Fatal("a modal opened over the dialogs does not cover them")
+	}
+}

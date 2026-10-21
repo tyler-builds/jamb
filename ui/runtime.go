@@ -437,6 +437,11 @@ type Runtime struct {
 	// windowFocus is the element in the window that had focus when F6 last left
 	// the window for another region (see cycleRegions).
 	windowFocus uint64
+	// raised is the order in which the non-modal dialogs were last raised, by
+	// their node IDs: a larger number is higher (see raiseDialog). raiseSeq is the
+	// latest number given.
+	raised   map[uint64]uint64
+	raiseSeq uint64
 
 	// acc is the accessibility tree's state (see access.go). It is nil until
 	// the tree is first asked for, so a runtime without assistive technology
@@ -1546,6 +1551,7 @@ func (rt *Runtime) reorder(n *node) {
 	if hasZ {
 		sort.SliceStable(n.order, func(a, b int) bool { return n.order[a].style.ZIndex < n.order[b].style.ZIndex })
 	}
+	rt.raiseDialogs(n)
 }
 
 // resolveStyle merges a div's hover/pressed/focused styles for its current state.
