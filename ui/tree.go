@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -133,6 +134,9 @@ func resolveTree(ctx *Context, inst TreeStyle) TreeStyle {
 // A click selects a node, and a click on its chevron opens or closes it without
 // selecting it. A double-click opens or closes it, as it does on Windows.
 // Selection is single.
+//
+// The open nodes are the tree's own state, unless Expanded gives the tree the keys
+// of the open nodes in a signal, which the app can open and close.
 type TreeElement struct {
 	nodes       []TreeNode
 	selected    *Signal[string]
@@ -140,6 +144,10 @@ type TreeElement struct {
 	key         string
 	style       Style
 	onSelect    func(key string)
+	onExpand    func(key string)
+	onCollapse  func(key string)
+	expanded    *Signal[[]string] // the open keys, when the app keeps them (see Expanded)
+	handle      *TreeHandle       // see Handle
 	styles      TreeStyle
 	renderRow   func(node TreeNode, state PartState) Element
 	renderLabel func(node TreeNode, state PartState) Element
@@ -206,6 +214,89 @@ func (tv *TreeElement) Styles(st TreeStyle) *TreeElement { tv.styles = tv.styles
 // OnChange runs fn with the key of the node after the selection changes, by a
 // click, the keys or a typed letter. The signal is set first.
 func (tv *TreeElement) OnChange(fn func(key string)) *TreeElement { tv.onSelect = fn; return tv }
+
+// Expanded keeps the keys of the open nodes in keys: the tree sets it when a node
+// is opened or closed, and a value the app sets in keys opens those nodes and
+// closes the others. A nil keys keeps the open nodes inside the tree. The keys are
+// kept in the order the nodes were opened; closing a node keeps the keys of the
+// nodes below it, so opening it again shows them open.
+func (tv *TreeElement) Expanded(keys *Signal[[]string]) *TreeElement { tv.expanded = keys; return tv }
+
+// OnExpand runs fn with the key of a node after it is opened, by a click, the keys,
+// the accessibility actions, a TreeHandle or Reveal. It does not run for the keys
+// the app sets in Expanded.
+func (tv *TreeElement) OnExpand(fn func(key string)) *TreeElement { tv.onExpand = fn; return tv }
+
+// OnCollapse runs fn with the key of a node after it is closed, from the same
+// sources as OnExpand. It does not run for the keys the app sets in Expanded.
+func (tv *TreeElement) OnCollapse(fn func(key string)) *TreeElement { tv.onCollapse = fn; return tv }
+
+// Handle connects h, so that code can open, close, reveal and select the nodes of
+// the tree. See TreeHandle.
+func (tv *TreeElement) Handle(h *TreeHandle) *TreeElement { tv.handle = h; return tv }
+
+// TreeHandle opens, closes, reveals and selects the nodes of a Tree from code, by
+// their keys. Create one with NewTreeHandle and pass it to Tree.Handle. A request
+// takes effect when the tree is next built, on the next frame, in the order the
+// requests were made. A key that names no visible node does nothing, except for
+// Reveal and Select, which open the nodes above the key. Call it on the UI thread.
+//
+// ExpandAll and Reveal call the children of the nodes they open, and so load every
+// node below them: a tree that loads its children lazily loads them all.
+type TreeHandle struct {
+	inst *componentInstance
+	ops  []treeOp
+}
+
+// treeOp is a request of a TreeHandle.
+type treeOp struct {
+	kind treeOpKind
+	key  string
+}
+
+// treeOpKind is the kind of a request of a TreeHandle.
+type treeOpKind uint8
+
+const (
+	treeOpExpand treeOpKind = iota
+	treeOpCollapse
+	treeOpExpandAll
+	treeOpCollapseAll
+	treeOpReveal
+	treeOpSelect
+)
+
+// NewTreeHandle creates a handle to pass to Tree.Handle.
+func NewTreeHandle() *TreeHandle { return &TreeHandle{} }
+
+// Expand opens the node with the key, if it is shown and can have children.
+func (h *TreeHandle) Expand(key string) { h.request(treeOp{treeOpExpand, key}) }
+
+// Collapse closes the node with the key, if it is shown and can have children. If
+// the selected node was shown only below it, the selection moves to it, and OnChange
+// runs.
+func (h *TreeHandle) Collapse(key string) { h.request(treeOp{treeOpCollapse, key}) }
+
+// ExpandAll opens every node that can have children.
+func (h *TreeHandle) ExpandAll() { h.request(treeOp{kind: treeOpExpandAll}) }
+
+// CollapseAll closes every node. The selection moves to the top-level node that
+// holds it, and OnChange runs.
+func (h *TreeHandle) CollapseAll() { h.request(treeOp{kind: treeOpCollapseAll}) }
+
+// Reveal opens the nodes above the node with the key, and scrolls it into view. It
+// does nothing when the tree has no such node.
+func (h *TreeHandle) Reveal(key string) { h.request(treeOp{treeOpReveal, key}) }
+
+// Select reveals the node with the key and selects it. It does not run OnChange.
+func (h *TreeHandle) Select(key string) { h.request(treeOp{treeOpSelect, key}) }
+
+func (h *TreeHandle) request(op treeOp) {
+	h.ops = append(h.ops, op)
+	if h.inst != nil {
+		h.inst.invalidate()
+	}
+}
 
 // RenderRow replaces the icon and the label of each row with what fn returns. The
 // row keeps its chevron, its level, key, selection, keys and accessible name, which
@@ -290,31 +381,158 @@ func treeTypeahead(rows []treeRow, from int, text string) int {
 	return -1
 }
 
+// setOpen opens or closes the node with key in store, the open keys of the tree. A
+// change calls OnExpand or OnCollapse, once for the node.
+func (tv *TreeElement) setOpen(store *Signal[[]string], key string, v bool) {
+	keys := store.Peek()
+	if slices.Contains(keys, key) == v {
+		return
+	}
+	if v {
+		store.Set(append(slices.Clone(keys), key))
+		if tv.onExpand != nil {
+			tv.onExpand(key)
+		}
+		return
+	}
+	store.Set(slices.DeleteFunc(slices.Clone(keys), func(k string) bool { return k == key }))
+	if tv.onCollapse != nil {
+		tv.onCollapse(key)
+	}
+}
+
+// applyTreeOps runs the requests of h in order, against the open keys in store, and
+// rebuilds the visible rows after each. It returns the key of the last node to
+// reveal, if there was one, and whether a request closed a node, which may hide the
+// selection (see moveSelection).
+func (tv *TreeElement) applyTreeOps(h *TreeHandle, store *Signal[[]string]) (reveal string, collapsed bool) {
+	ops := h.ops
+	h.ops = nil
+	for _, op := range ops {
+		rows := flattenTree(tv.nodes, keySetOf(store.Peek()))
+		switch op.kind {
+		case treeOpExpand:
+			if i := rowOf(rows, op.key); i >= 0 && rows[i].expandable {
+				tv.setOpen(store, op.key, true)
+			}
+		case treeOpCollapse:
+			if i := rowOf(rows, op.key); i >= 0 && rows[i].expandable {
+				tv.setOpen(store, op.key, false)
+				collapsed = true
+			}
+		case treeOpExpandAll:
+			for _, k := range allExpandable(tv.nodes) {
+				tv.setOpen(store, k, true)
+			}
+		case treeOpCollapseAll:
+			for _, k := range store.Peek() {
+				tv.setOpen(store, k, false)
+			}
+			collapsed = true
+		case treeOpReveal, treeOpSelect:
+			path := treePath(tv.nodes, op.key)
+			if len(path) == 0 {
+				break
+			}
+			for _, k := range path[:len(path)-1] {
+				tv.setOpen(store, k, true)
+			}
+			reveal = op.key
+			if op.kind == treeOpSelect {
+				tv.selected.Set(op.key)
+			}
+		}
+	}
+	return reveal, collapsed
+}
+
+// moveSelection selects the nearest node above the selection that is shown, when
+// the selection is hidden: a collapse code requested hid it. It runs OnChange.
+func (tv *TreeElement) moveSelection(rows []treeRow) {
+	sel := tv.selected.Peek()
+	if sel == "" || rowOf(rows, sel) >= 0 {
+		return
+	}
+	path := treePath(tv.nodes, sel)
+	for i := len(path) - 2; i >= 0; i-- {
+		if rowOf(rows, path[i]) >= 0 {
+			tv.selected.Set(path[i])
+			if tv.onSelect != nil {
+				tv.onSelect(path[i])
+			}
+			return
+		}
+	}
+}
+
+// treePath returns the keys of the nodes from the top of nodes down to the node
+// with key, or nil when there is no such node. It calls the children of the nodes
+// on the way.
+func treePath(nodes []TreeNode, key string) []string {
+	for _, n := range nodes {
+		if n.Key == key {
+			return []string{n.Key}
+		}
+		if n.Children != nil {
+			if p := treePath(n.Children(), key); p != nil {
+				return append([]string{n.Key}, p...)
+			}
+		}
+	}
+	return nil
+}
+
+// allExpandable returns the keys of every node that can have children, at any
+// depth. It calls the children of every such node.
+func allExpandable(nodes []TreeNode) []string {
+	var out []string
+	for _, n := range nodes {
+		if n.Children != nil {
+			out = append(out, n.Key)
+			out = append(out, allExpandable(n.Children())...)
+		}
+	}
+	return out
+}
+
+// keySetOf returns the keys as a set.
+func keySetOf(keys []string) map[string]bool {
+	m := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		m[k] = true
+	}
+	return m
+}
+
 func (tv *TreeElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
 		st := resolveTree(ctx, tv.styles)
 		sel := tv.selected.Get()
-		open := Local(ctx, "open", map[string]bool{})
+		// The open keys are the app's signal when Expanded set one, else the tree's state.
+		store := Local(ctx, "open", []string(nil))
+		if tv.expanded != nil {
+			store = tv.expanded
+		}
 		handle := Local(ctx, "handle", NewListHandle()).Peek()
 		typed := Local(ctx, "typed", selectType{})
-		rows := flattenTree(tv.nodes, open.Get())
+		rows := flattenTree(tv.nodes, keySetOf(store.Get()))
+		if h := tv.handle; h != nil {
+			h.inst = ctx.inst
+			reveal, collapsed := tv.applyTreeOps(h, store)
+			rows = flattenTree(tv.nodes, keySetOf(store.Peek()))
+			if collapsed {
+				tv.moveSelection(rows)
+			}
+			if i := rowOf(rows, reveal); reveal != "" && i >= 0 {
+				handle.ScrollToItem(i)
+			}
+			sel = tv.selected.Peek()
+		}
 		cur := rowOf(rows, sel)
 
-		// setOpen opens or closes the node with key, keeping the other nodes' state.
-		setOpen := func(key string, v bool) {
-			m := open.Peek()
-			if m[key] == v {
-				return
-			}
-			next := make(map[string]bool, len(m)+1)
-			for k, x := range m {
-				next[k] = x
-			}
-			next[key] = v
-			open.Set(next)
-		}
+		setOpen := func(key string, v bool) { tv.setOpen(store, key, v) }
 		// choose selects the node at row i, and scrolls it into view.
 		choose := func(i int) {
 			if i < 0 || i >= len(rows) {
@@ -331,20 +549,10 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 		}
 		// openSiblings opens the closed siblings of row i that have children.
 		openSiblings := func(i int) {
-			m := open.Peek()
-			next := make(map[string]bool, len(m)+len(rows))
-			for k, x := range m {
-				next[k] = x
-			}
-			changed := false
 			for _, r := range rows {
 				if r.parent == rows[i].parent && r.expandable && !r.open {
-					next[r.key] = true
-					changed = true
+					tv.setOpen(store, r.key, true)
 				}
-			}
-			if changed {
-				open.Set(next)
 			}
 		}
 

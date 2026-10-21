@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -637,4 +638,268 @@ func TestTreeHighContrastTextScaleAndReducedMotion(t *testing.T) {
 			t.Fatalf("reduced motion %v: opening a row asks for frames", reduced)
 		}
 	}
+}
+
+// treeHandleRig builds treeDemo in a tree of height 300 that has the handle h, and
+// the open keys in expanded when it is not nil. Its callbacks append to log, as
+// "expand:key", "collapse:key" and "change:key".
+func treeHandleRig(h *TreeHandle, expanded *Signal[[]string], sel *Signal[string], asked *int, log *[]string) *accessRig {
+	return newAccessRig(func(ctx *Context) Element {
+		return Div().Column().Child(Tree(treeDemo(sel, asked), sel).Key("files").
+			Label("Project files").Style(Style{Height: Px(300)}).Expanded(expanded).Handle(h).
+			OnChange(func(key string) { *log = append(*log, "change:"+key) }).
+			OnExpand(func(key string) { *log = append(*log, "expand:"+key) }).
+			OnCollapse(func(key string) { *log = append(*log, "collapse:"+key) }))
+	})
+}
+
+// treeOpen reports whether the row named name is open in the access tree.
+func treeOpen(r *accessRig, t *testing.T, name string) bool {
+	t.Helper()
+	return r.stateOf(t, access.RoleTreeItem, name).States.Has(access.StateExpanded)
+}
+
+// clickChevron clicks the chevron of the row with the key.
+func clickChevron(r *accessRig, t *testing.T, key string) {
+	t.Helper()
+	row := r.rt.nodeRect(keyNode(t, r.rt, key))
+	for _, n := range partNodes(r.rt, "Tree.Chevron") {
+		if c := r.rt.nodeRect(n); c.Y >= row.Y && c.Y < row.Y+row.H {
+			r.rt.PointerDown(c.X+c.W/2, c.Y+c.H/2, input.ButtonLeft, 1, 0)
+			r.rt.PointerUp(c.X+c.W/2, c.Y+c.H/2, input.ButtonLeft, 0)
+			r.frame()
+			return
+		}
+	}
+	t.Fatalf("no chevron on the row %q", key)
+}
+
+func TestTreeHandleExpandAndCollapseFromCode(t *testing.T) {
+	sel := NewSignal("zeta")
+	asked := 0
+	var log []string
+	h := NewTreeHandle()
+	r := treeHandleRig(h, nil, sel, &asked, &log)
+	h.Expand("docs")
+	r.frame()
+	if !treeOpen(r, t, "Docs") || asked == 0 {
+		t.Fatalf("Expand did not open Docs and load its children (asked %d)", asked)
+	}
+	h.Collapse("docs")
+	r.frame()
+	if treeOpen(r, t, "Docs") {
+		t.Fatal("Collapse did not close Docs")
+	}
+	if want := []string{"expand:docs", "collapse:docs"}; !slices.Equal(log, want) || sel.Peek() != "zeta" {
+		t.Errorf("callbacks %v and selection %q, want %v and zeta", log, sel.Peek(), want)
+	}
+}
+
+// Requests for a node that is not shown, that is not expandable or that is not in
+// the tree do nothing.
+func TestTreeHandleIgnoresHiddenLeavesAndUnknownKeys(t *testing.T) {
+	sel := NewSignal("zeta")
+	asked := 0
+	var log []string
+	h := NewTreeHandle()
+	r := treeHandleRig(h, nil, sel, &asked, &log)
+	h.Expand("nope")
+	h.Expand("docs/a")
+	h.Expand("zeta")
+	h.Collapse("src")
+	h.Collapse("nope")
+	r.frame()
+	if len(log) != 0 || treeOpen(r, t, "Docs") || sel.Peek() != "zeta" {
+		t.Errorf("requests for no visible node changed the tree: callbacks %v", log)
+	}
+}
+
+func TestTreeHandleCallsBeforeTheFirstBuildApply(t *testing.T) {
+	sel := NewSignal("zeta")
+	asked := 0
+	var log []string
+	h := NewTreeHandle()
+	h.Expand("docs")
+	r := treeHandleRig(h, nil, sel, &asked, &log)
+	if !treeOpen(r, t, "Docs") {
+		t.Fatal("an Expand made before the first build did not apply")
+	}
+}
+
+func TestTreeHandleExpandAllAndCollapseAllMoveTheSelectionUp(t *testing.T) {
+	sel := NewSignal("docs/a")
+	asked := 0
+	var log []string
+	h := NewTreeHandle()
+	r := treeHandleRig(h, nil, sel, &asked, &log)
+	h.ExpandAll()
+	r.frame()
+	if !treeOpen(r, t, "Docs") || !treeOpen(r, t, "Src") {
+		t.Fatal("ExpandAll did not open every node that has children")
+	}
+	h.CollapseAll()
+	r.frame()
+	if treeOpen(r, t, "Docs") || treeOpen(r, t, "Src") {
+		t.Fatal("CollapseAll left a node open")
+	}
+	if sel.Peek() != "docs" {
+		t.Errorf("the selection is %q after CollapseAll, want the top node that holds it, docs", sel.Peek())
+	}
+	if want := []string{"expand:docs", "expand:src", "collapse:docs", "collapse:src", "change:docs"}; !slices.Equal(log, want) {
+		t.Errorf("callbacks %v, want %v", log, want)
+	}
+}
+
+// A Collapse that hides the selection moves it to the node that was collapsed.
+func TestTreeHandleCollapseMovesTheSelectionToTheCollapsedNode(t *testing.T) {
+	sel := NewSignal("zeta")
+	asked := 0
+	var log []string
+	h := NewTreeHandle()
+	r := treeHandleRig(h, nil, sel, &asked, &log)
+	h.Select("docs/b")
+	r.frame()
+	if sel.Peek() != "docs/b" || !slices.Equal(log, []string{"expand:docs"}) {
+		t.Fatalf("Select selected %q with callbacks %v, want docs/b and the opening of Docs", sel.Peek(), log)
+	}
+	h.Collapse("docs")
+	r.frame()
+	if sel.Peek() != "docs" {
+		t.Errorf("the selection is %q after its node was collapsed, want docs", sel.Peek())
+	}
+	if want := []string{"expand:docs", "collapse:docs", "change:docs"}; !slices.Equal(log, want) {
+		t.Errorf("callbacks %v, want %v", log, want)
+	}
+}
+
+// Reveal opens the nodes above a node that is deep in a large tree, and the node is
+// scrolled into view. Only the rows in view are built.
+func TestTreeHandleRevealScrollsADeepNodeIntoView(t *testing.T) {
+	nodes := make([]TreeNode, 10000)
+	for i := range nodes {
+		key := fmt.Sprintf("n%05d", i)
+		nodes[i] = TreeNode{Key: key, Label: "Node " + key, Children: func() []TreeNode {
+			return []TreeNode{{Key: key + "/c", Label: "child " + key}}
+		}}
+	}
+	sel := NewSignal("n00000")
+	var log []string
+	h := NewTreeHandle()
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().Child(Tree(nodes, sel).Key("big").Label("Big").
+			Style(Style{Height: Px(300)}).Handle(h).OnChange(func(k string) { log = append(log, k) }))
+	})
+	h.Reveal("n09999/c")
+	for range 4 {
+		r.frame()
+	}
+	if !treeOpen(r, t, "Node n09999") {
+		t.Fatal("Reveal did not open the node above the deep node")
+	}
+	if got := countRole(r.tree(), access.RoleTreeItem); got == 0 || got > 40 {
+		t.Fatalf("%d rows are built; only the rows in view should be", got)
+	}
+	tree := r.rt.nodeRect(keyNode(t, r.rt, "big"))
+	row := r.rt.nodeRect(keyNode(t, r.rt, "n09999/c"))
+	if row.Y < tree.Y || row.Y+row.H > tree.Y+tree.H {
+		t.Errorf("the revealed row is at %v, outside the tree at %v", row, tree)
+	}
+	if sel.Peek() != "n00000" || len(log) != 0 {
+		t.Errorf("Reveal changed the selection to %q (%v)", sel.Peek(), log)
+	}
+}
+
+// Select reveals the node and selects it, and it does not run OnChange.
+func TestTreeHandleSelectDoesNotRunOnChange(t *testing.T) {
+	sel := NewSignal("zeta")
+	asked := 0
+	var log []string
+	h := NewTreeHandle()
+	r := treeHandleRig(h, nil, sel, &asked, &log)
+	h.Select("docs/a")
+	r.frame()
+	if sel.Peek() != "docs/a" || !treeOpen(r, t, "Docs") {
+		t.Errorf("Select left the selection at %q with Docs open %v", sel.Peek(), treeOpen(r, t, "Docs"))
+	}
+	if len(log) != 1 || log[0] != "expand:docs" {
+		t.Errorf("callbacks %v, want only the expansion of Docs", log)
+	}
+}
+
+// With Expanded the open keys are the app's: the tree sets them, and the app's
+// values open and close nodes without running the callbacks.
+func TestTreeExpandedSignalIsControlled(t *testing.T) {
+	sel := NewSignal("zeta")
+	asked := 0
+	var log []string
+	expanded := NewSignal([]string(nil))
+	h := NewTreeHandle()
+	r := treeHandleRig(h, expanded, sel, &asked, &log)
+	h.Expand("docs")
+	r.frame()
+	if !slices.Equal(expanded.Peek(), []string{"docs"}) {
+		t.Fatalf("the tree set the keys to %v, want [docs]", expanded.Peek())
+	}
+	expanded.Set([]string{})
+	r.frame()
+	if treeOpen(r, t, "Docs") {
+		t.Fatal("the app cleared the open keys, and Docs stayed open")
+	}
+	expanded.Set([]string{"docs"})
+	r.frame()
+	if !treeOpen(r, t, "Docs") {
+		t.Fatal("the app opened Docs, and it did not open")
+	}
+	if want := []string{"expand:docs"}; !slices.Equal(log, want) {
+		t.Errorf("callbacks %v, want %v: the app's values do not run them", log, want)
+	}
+}
+
+// The open nodes change the same way from a click, the keys, the asterisk and the
+// accessibility actions, and each change runs its callback once.
+func TestTreeCallbacksRunForEveryUserSource(t *testing.T) {
+	sel := NewSignal("docs")
+	asked := 0
+	var log []string
+	r := treeHandleRig(NewTreeHandle(), nil, sel, &asked, &log)
+	clickChevron(r, t, "docs")
+	if want := []string{"expand:docs"}; !slices.Equal(log, want) || sel.Peek() != "docs" {
+		t.Fatalf("a click on the chevron ran %v and selected %q, want %v without a selection change", log, sel.Peek(), want)
+	}
+	log = nil
+	r.focusTree(t)
+	r.press(input.KeyLeft, 0) // closes the open Docs, which is selected
+	r.typeText("*")           // opens the closed nodes beside Docs that have children: Docs and Src
+	if want := []string{"collapse:docs", "expand:docs", "expand:src"}; !slices.Equal(log, want) {
+		t.Errorf("keys and the asterisk ran %v, want %v", log, want)
+	}
+	log = nil
+	docs := r.stateOf(t, access.RoleTreeItem, "Docs")
+	r.rt.runAccess(docs.ID, access.Request{Action: access.ActionCollapse})
+	r.frame()
+	r.rt.runAccess(docs.ID, access.Request{Action: access.ActionExpand})
+	r.frame()
+	if want := []string{"collapse:docs", "expand:docs"}; !slices.Equal(log, want) || sel.Peek() != "docs" {
+		t.Errorf("the accessibility actions ran %v and selected %q, want %v", log, sel.Peek(), want)
+	}
+}
+
+// An open or close of a node raises the expanded property for assistive technology.
+func TestTreeHandleRaisesExpandedForAssistiveTechnology(t *testing.T) {
+	sel := NewSignal("zeta")
+	asked := 0
+	var log []string
+	h := NewTreeHandle()
+	r := treeHandleRig(h, nil, sel, &asked, &log)
+	var raised []access.PropertyChange
+	r.bridge.Listen(func(u access.Update) { raised = append(raised, u.Properties...) })
+	id := r.stateOf(t, access.RoleTreeItem, "Docs").ID
+	h.Expand("docs")
+	r.frame()
+	for _, p := range raised {
+		if p.ID == id && p.Property == access.PropertyExpanded {
+			return
+		}
+	}
+	t.Errorf("no expanded property change for Docs in %v", raised)
 }
