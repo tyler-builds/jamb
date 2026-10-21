@@ -68,6 +68,15 @@ func (d *DrawerElement) OnClose(fn func()) *DrawerElement { d.m.OnClose(fn); ret
 // set (see Modal.CloseButton).
 func (d *DrawerElement) CloseButton(show bool) *DrawerElement { d.m.CloseButton(show); return d }
 
+// NonModal makes the drawer non-modal: the window behind it stays usable, with
+// no backdrop and no focus trap (see Modal.NonModal).
+func (d *DrawerElement) NonModal() *DrawerElement { d.m.NonModal(); return d }
+
+// CloseOnClickOutside makes a press outside the drawer close it (see
+// Modal.CloseOnClickOutside). A modal drawer closes on a press on its backdrop
+// already.
+func (d *DrawerElement) CloseOnClickOutside() *DrawerElement { d.m.CloseOnClickOutside(); return d }
+
 // Styles sets the look of the parts of the drawer, for this instance only.
 func (d *DrawerElement) Styles(st DrawerStyle) *DrawerElement { d.m.Styles(st); return d }
 

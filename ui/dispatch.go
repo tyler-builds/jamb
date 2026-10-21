@@ -41,7 +41,7 @@ func (rt *Runtime) hit(n *node, x, y float32) bool {
 			return true
 		}
 	}
-	if n.hit.Contains(x, y) {
+	if (n.div == nil || !n.div.hitThrough) && n.hit.Contains(x, y) {
 		rt.hitPath = append(rt.hitPath, n)
 		return true
 	}
@@ -168,8 +168,13 @@ func (rt *Runtime) clickOutside(path []*node) {
 		}
 		return false
 	}
+	// A press that a modal takes is not outside a non-modal dialog that it covers.
+	modal := rt.topModal() != nil
 	for _, o := range append([]*node(nil), rt.outside...) {
 		if in(o.id) || (o.div.overlay != 0 && o.parent != nil && in(o.parent.id)) || rt.undisplayed(o) {
+			continue
+		}
+		if p := o.parent; modal && p != nil && p.div != nil && p.div.modal != nil && p.div.modal.nonModal {
 			continue
 		}
 		if fn := o.div.h.onClickOutside; fn != nil {
