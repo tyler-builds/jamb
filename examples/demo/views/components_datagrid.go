@@ -3,6 +3,8 @@ package views
 import (
 	"fmt"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -190,5 +192,184 @@ func dataGridSection(ctx *ui.Context, t *ui.Theme) ui.Element {
 			Child(ui.Checkbox("Striped", striped).Key("runs-striped")).
 			Child(ui.Checkbox("No rows", none).Key("runs-none")).
 			Child(ui.Text(fmt.Sprintf("%d selected", len(picked.Get()))).FontSize(13).TextColor(t.TextMuted))).
-		Child(grid)
+		Child(grid).
+		Child(shipmentsPart(ctx, t))
+}
+
+// shipRow is one shipment of the columns sample. Like the deploy runs, the shipments
+// are generated from their index, so they are the same on every start, and they
+// name no real company.
+type shipRow struct {
+	Index    int
+	ID       string
+	Customer string
+	Region   string
+	Carrier  string
+	Status   string
+	Weight   float32 // in kilograms
+}
+
+// The values the shipments are drawn from.
+var (
+	shipCustomers = []string{"Harbor Supply", "Pine Works", "Blue Mesa Ltd", "Riverside Foods", "Northgate Parts"}
+	shipRegions   = []string{"North", "South", "East", "West"}
+	shipCarriers  = []string{"Ground", "Air", "Freight"}
+	shipStatuses  = []string{"Packed", "In transit", "Delivered", "Delayed"}
+)
+
+// shipments returns n shipments, from the one at index first.
+func shipments(first, n int) []shipRow {
+	out := make([]shipRow, n)
+	for k := range out {
+		i := first + k
+		h := uint32(i+1) * 2246822519
+		out[k] = shipRow{
+			Index:    i,
+			ID:       fmt.Sprintf("SHP-%06d", i+1),
+			Customer: shipCustomers[h%uint32(len(shipCustomers))],
+			Region:   shipRegions[(h>>8)%uint32(len(shipRegions))],
+			Carrier:  shipCarriers[(h>>12)%uint32(len(shipCarriers))],
+			Status:   shipStatuses[(h>>16)%uint32(len(shipStatuses))],
+			Weight:   float32((h>>4)%5000) / 10,
+		}
+	}
+	return out
+}
+
+// shipUnits is the units a shipment sent in week w (from 0) of the year.
+func shipUnits(r shipRow, w int) int {
+	return int(((uint32(r.Index+1)*2654435761 + uint32(w+1)*40503) >> 20) % 500)
+}
+
+// shipColumns are the columns of the shipments grid. The order is pinned at the start
+// and the actions at the end, the week columns share a group header, and every column
+// can be moved. Track opens nothing: it reports the shipment in a toast.
+func shipColumns(ctx *ui.Context) []ui.DataColumn[shipRow] {
+	cols := []ui.DataColumn[shipRow]{
+		{Header: "Order", Pin: ui.PinStart, Width: 130, Resizable: true,
+			Text:    func(r shipRow) string { return r.ID },
+			Compare: ui.SortBy(func(r shipRow) string { return r.ID })},
+		{Header: "Customer", Group: "Customer", Width: 150, Resizable: true,
+			Text:    func(r shipRow) string { return r.Customer },
+			Compare: ui.SortByText(func(r shipRow) string { return r.Customer })},
+		{Header: "Region", Group: "Customer", Width: 100, Resizable: true,
+			Text:    func(r shipRow) string { return r.Region },
+			Compare: ui.SortByText(func(r shipRow) string { return r.Region })},
+		{Header: "Carrier", Group: "Shipment", Width: 110, Resizable: true,
+			Text:    func(r shipRow) string { return r.Carrier },
+			Compare: ui.SortByText(func(r shipRow) string { return r.Carrier })},
+		{Header: "Status", Group: "Shipment", Width: 120, Resizable: true,
+			Text:    func(r shipRow) string { return r.Status },
+			Compare: ui.SortByText(func(r shipRow) string { return r.Status })},
+		{Header: "Weight", Group: "Shipment", Width: 110, Resizable: true, Align: ui.End,
+			Text:    func(r shipRow) string { return fmt.Sprintf("%.1f kg", r.Weight) },
+			Compare: ui.SortBy(func(r shipRow) float32 { return r.Weight })},
+	}
+	for w := range 24 {
+		cols = append(cols, ui.DataColumn[shipRow]{Header: fmt.Sprintf("Week %02d", w+1), Group: "Units shipped",
+			Width: 84, Resizable: true, Align: ui.End,
+			Text:    func(r shipRow) string { return strconv.Itoa(shipUnits(r, w)) },
+			Compare: ui.SortBy(func(r shipRow) int { return shipUnits(r, w) })})
+	}
+	return append(cols, ui.DataColumn[shipRow]{Header: "Actions", Pin: ui.PinEnd, Interactive: true, Width: 110, Resizable: true,
+		Cell: func(r shipRow) ui.Element {
+			return ui.Button("Track").Small().Label("Track " + r.ID).OnClick(func() {
+				ctx.Toast(ui.ToastInfo, "Tracking "+r.ID+" is not connected in this demo")
+			})
+		}})
+}
+
+// setShipStatus sets the status of the shipment with the ID id. Like updateRun, it
+// copies the rows, so the grid sorts them again.
+func setShipStatus(rows *ui.Signal[[]shipRow], id, status string) {
+	rows.Update(func(rs []shipRow) []shipRow {
+		out := slices.Clone(rs)
+		for i := range out {
+			if out[i].ID == id {
+				out[i].Status = status
+			}
+		}
+		return out
+	})
+}
+
+// layoutText says what the saved layout holds: the order and the widths the user has
+// set, as OnColumnsChange reports them.
+func layoutText(st ui.ColumnState) string {
+	if st.Order == nil {
+		return "No column change yet. Move a header, drag an edge, or use the header menu; each change is saved here."
+	}
+	return fmt.Sprintf("Saved layout: order starts %s; %d widths set.", strings.Join(st.Order[:min(3, len(st.Order))], ", "), len(st.Widths))
+}
+
+// shipmentsPart is the second data grid of the section: 240 shipments that load 60 at
+// a time, with a movable, pinned and grouped column layout that the app saves, and
+// buttons that scroll and focus the grid from code. A grid of six shipments under it
+// selects cells.
+func shipmentsPart(ctx *ui.Context, t *ui.Theme) ui.Element {
+	rows := ui.Local(ctx, "ship.rows", shipments(0, 60))
+	order := ui.Local(ctx, "ship.order", []string(nil))
+	widths := ui.Local(ctx, "ship.widths", map[string]float32(nil))
+	saved := ui.Local(ctx, "ship.saved", ui.ColumnState{})
+	loading := ui.Local(ctx, "ship.loading", false)
+	handle := ui.Local(ctx, "ship.handle", ui.NewDataGridHandle()).Peek()
+	cells := ui.Local(ctx, "ship.cells", []ui.CellKey(nil))
+
+	reset := func() {
+		order.Set(nil)
+		widths.Set(nil)
+		saved.Set(ui.ColumnState{})
+	}
+	grid := ui.DataGrid(rows.Get(), func(r shipRow) string { return r.ID }, shipColumns(ctx)...).
+		Label("Shipments").Movable().ColumnOrder(order).ColumnWidths(widths).
+		OnColumnsChange(func(st ui.ColumnState) { saved.Set(st) }).
+		ContextMenu(func(r shipRow, column string) []ui.MenuItem {
+			return []ui.MenuItem{
+				{Label: "Mark " + r.ID + " as delivered", OnClick: func() { setShipStatus(rows, r.ID, "Delivered") }},
+				{Label: "Mark " + r.ID + " as delayed", OnClick: func() { setShipStatus(rows, r.ID, "Delayed") }},
+				ui.MenuSeparator(),
+				{Label: "Column: " + column, Disabled: true},
+			}
+		}).
+		HeaderContextMenu(func(column string) []ui.MenuItem {
+			return []ui.MenuItem{
+				{Label: "Reset column layout", OnClick: reset},
+				{Label: "Say the column name", OnClick: func() { ctx.Toast(ui.ToastInfo, column) }},
+			}
+		}).
+		LoadMore(len(rows.Get()) < 240, func() {
+			loading.Set(true)
+			ctx.After(900*time.Millisecond, func() {
+				loading.Set(false)
+				rows.Update(func(rs []shipRow) []shipRow { return append(slices.Clone(rs), shipments(len(rs), 60)...) })
+			})
+		}).
+		LoadingMore(loading.Get()).Handle(handle).
+		Empty(ui.Text("No shipments")).Style(ui.Style{Height: ui.Px(320)})
+	sixRows := shipments(0, 6)
+	small := ui.DataGrid(sixRows, func(r shipRow) string { return r.ID },
+		ui.DataColumn[shipRow]{Header: "Order", Width: 130, Text: func(r shipRow) string { return r.ID }},
+		ui.DataColumn[shipRow]{Header: "Customer", Width: 170, Text: func(r shipRow) string { return r.Customer }},
+		ui.DataColumn[shipRow]{Header: "Carrier", Width: 120, Text: func(r shipRow) string { return r.Carrier }},
+		ui.DataColumn[shipRow]{Header: "Weight", Width: 120, Align: ui.End, Text: func(r shipRow) string { return fmt.Sprintf("%.1f kg", r.Weight) }},
+	).Label("Cell selection").CellSelection(ui.SelectionMultiple, cells).Style(ui.Style{Height: ui.Px(190)})
+
+	return ui.Div().Column().Gap(12).
+		Child(ui.Divider()).
+		Child(SectionTitle(t, "Data grid: columns, groups and rows")).
+		Child(ui.Text("240 shipments, 60 loaded at a time: scroll to the end to load more. Drag a header to move a column, " +
+			"with Ctrl+Shift+Left and Right on a header to move it from the keyboard. Drag an edge to resize; " +
+			"Order is pinned at the start and Actions at the end. Right-click a row or a header for a menu. " +
+			"Week columns sit under one group header and scroll sideways.").FontSize(13).TextColor(t.TextMuted)).
+		Child(ui.Text(layoutText(saved.Get())).FontSize(13).TextColor(t.TextMuted)).
+		Child(ui.Div().Row().Wrap().Align(ui.Center).Gap(10).
+			Child(ui.Button("Scroll to row 45").Secondary().Small().OnClick(func() { handle.ScrollToRow("SHP-000045") })).
+			Child(ui.Button("Focus Status of row 12").Secondary().Small().OnClick(func() { handle.FocusCell("SHP-000012", "Status") })).
+			Child(ui.Button("Scroll to Week 20").Secondary().Small().OnClick(func() { handle.ScrollToColumn("Week 20") })).
+			Child(ui.Button("Reset columns").Secondary().Small().OnClick(reset))).
+		Child(grid).
+		Child(ui.Text("Cell selection: click a cell, Shift+click for a rectangle, Ctrl+Space for a column, Shift+Space for a row, Ctrl+A for all.").
+			FontSize(13).TextColor(t.TextMuted)).
+		Child(small).
+		Child(ui.Text(fmt.Sprintf("%d cells selected", len(cells.Get()))).FontSize(13).TextColor(t.TextMuted))
 }

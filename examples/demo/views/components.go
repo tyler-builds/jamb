@@ -142,7 +142,9 @@ var componentSections = []componentSection{
 		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return comboboxSection(ctx, t) }},
 	{"Date and time", "DatePicker TimePicker Calendar CalendarRange Field Form Required date time calendar range",
 		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return dateTimeSection(ctx, t) }},
-	{"Data grid", "DataGrid SortBy SortByText Select Tabs Checkbox BadgeText table rows columns sort resize density striped",
+	{"Data grid", "DataGrid SortBy SortByText Select Tabs Checkbox BadgeText table rows columns sort resize density striped " +
+		"Movable ColumnOrder ColumnWidths OnColumnsChange PinStart PinEnd Group ContextMenu HeaderContextMenu LoadMore LoadingMore " +
+		"DataGridHandle ScrollToRow ScrollToColumn FocusCell CellSelection CellKey reorder move pin freeze group header menu virtualization",
 		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return dataGridSection(ctx, t) }},
 	{"Charts", "charts Line Area Bar Scatter Pie Donut Radar Candlestick Sankey DataTable graph plot table",
 		func(ctx *ui.Context, t *ui.Theme, _ *Store) ui.Element { return chartsSection(ctx, t) }},
