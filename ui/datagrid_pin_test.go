@@ -62,7 +62,7 @@ func TestDataGridPinnedColumnsOrderAndAccess(t *testing.T) {
 func TestDataGridPinnedCellsStayInView(t *testing.T) {
 	r := dgPinRig(nil)
 	body := dgBody(t, r)
-	left, right := dgRows(r, body)
+	left, _ := dgRows(r, body)
 	for _, x := range []float32{0, 120, 1e6} {
 		dgScrollX(r, body, x)
 		if body.st.scrollX == 0 && x > 0 {
@@ -73,10 +73,12 @@ func TestDataGridPinnedCellsStayInView(t *testing.T) {
 				t.Errorf("at scroll %v a start-pinned cell is at %v, want %v", body.st.scrollX, got, left)
 			}
 		}
+		// The end-pinned cells reach the inner edge of the body, over the gutter.
+		inner := r.rt.nodeRect(body).X + r.rt.nodeRect(body).W - body.style.borderEdges().Right
 		for _, n := range []*node{dgCell(r, 2, 4), dgHeader(r, "Z")} {
 			rc := r.rt.nodeRect(n)
-			if got := rc.X + rc.W; got != right {
-				t.Errorf("at scroll %v an end-pinned cell ends at %v, want %v", body.st.scrollX, got, right)
+			if got := rc.X + rc.W; got != inner {
+				t.Errorf("at scroll %v an end-pinned cell ends at %v, want %v", body.st.scrollX, got, inner)
 			}
 		}
 	}
@@ -187,5 +189,48 @@ func TestDataGridPinnedColumnsMoveInTheirRegion(t *testing.T) {
 	r.press(input.KeyRight, input.ModCtrl|input.ModShift)
 	if len(changes) != 1 {
 		t.Errorf("A did not move among the columns that scroll: %v", changes)
+	}
+}
+
+// TestDataGridEndPinnedColumnIsAtTheInnerEdge checks that the end-pinned cells and
+// header cells end at the inner edge of the body, under the gutter the scrollbar
+// takes, at every sideways scroll, with and without column virtualization. No
+// scrolling cell is drawn to the right of them.
+func TestDataGridEndPinnedColumnIsAtTheInnerEdge(t *testing.T) {
+	many := append([]DataColumn[dgItem]{{Header: "Order", Pin: PinStart, Width: 130, Text: func(x dgItem) string { return x.ID }}},
+		dgManyColumns(40)...)
+	many = append(many, DataColumn[dgItem]{Header: "Actions", Pin: PinEnd, Width: 110, Interactive: true,
+		Cell: func(x dgItem) Element { return Text("Track " + x.ID) }})
+	cases := []struct {
+		name string
+		r    *accessRig
+		end  string // the header of the end-pinned column
+		last int    // its column, 0-based
+	}{
+		{"without virtualization", dgPinRig(nil), "Z", 4},
+		{"with virtualization", newAccessRig(func(ctx *Context) Element {
+			return DataGrid(dgItems(20), func(x dgItem) string { return x.ID }, many...).Label("Runs")
+		}), "Actions", len(many) - 1},
+	}
+	for _, tc := range cases {
+		r := tc.r
+		dgSettle(r)
+		body := dgBody(t, r)
+		innerRight := func() float32 {
+			b := r.rt.nodeRect(body)
+			return b.X + b.W - body.style.borderEdges().Right
+		}
+		for _, x := range []float32{0, 150, 1e6} {
+			dgScrollX(r, body, x)
+			for _, n := range []*node{dgCell(r, 0, tc.last), dgCell(r, 2, tc.last), dgHeader(r, tc.end)} {
+				if n == nil {
+					t.Fatalf("%s: the end-pinned cell is not built", tc.name)
+				}
+				if got := r.rt.nodeRect(n); got.X+got.W != innerRight() {
+					t.Errorf("%s: at scroll %v the end-pinned cell ends at %v, want the inner edge %v",
+						tc.name, body.st.scrollX, got.X+got.W, innerRight())
+				}
+			}
+		}
 	}
 }
