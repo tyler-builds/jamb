@@ -520,15 +520,17 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 		rows := flattenTree(tv.nodes, keySetOf(store.Get()))
 		if h := tv.handle; h != nil {
 			h.inst = ctx.inst
-			reveal, collapsed := tv.applyTreeOps(h, store)
-			rows = flattenTree(tv.nodes, keySetOf(store.Peek()))
-			if collapsed {
-				tv.moveSelection(rows)
+			if len(h.ops) > 0 {
+				reveal, collapsed := tv.applyTreeOps(h, store)
+				rows = flattenTree(tv.nodes, keySetOf(store.Peek()))
+				if collapsed {
+					tv.moveSelection(rows)
+				}
+				if i := rowOf(rows, reveal); reveal != "" && i >= 0 {
+					handle.ScrollToItem(i)
+				}
+				sel = tv.selected.Peek()
 			}
-			if i := rowOf(rows, reveal); reveal != "" && i >= 0 {
-				handle.ScrollToItem(i)
-			}
-			sel = tv.selected.Peek()
 		}
 		cur := rowOf(rows, sel)
 
