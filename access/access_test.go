@@ -280,6 +280,22 @@ func TestAlertDialogIsADialog(t *testing.T) {
 	}
 }
 
+func TestNonModalStateNames(t *testing.T) {
+	s := StateFocusable | StateNonModal
+	if got := s.String(); got != "focusable non-modal" {
+		t.Fatalf("state %q", got)
+	}
+}
+
+func TestDiffReportsNonModalDialogOpened(t *testing.T) {
+	closed := NewTree(0, []*Node{{ID: RootID, Role: RoleWindow}})
+	panel := &Node{ID: 6, Role: RoleDialog, Parent: RootID, States: StateNonModal}
+	open := NewTree(0, []*Node{{ID: RootID, Role: RoleWindow, Children: []ID{6}}, panel})
+	if u := Diff(closed, open); len(u.Opened) != 1 || u.Opened[0] != (Popup{6, RoleDialog}) {
+		t.Fatalf("opening reported %v", u.Opened)
+	}
+}
+
 func TestNodeEqualComparesScroll(t *testing.T) {
 	a := &Node{ID: 1, Scroll: Scroll{Container: true, CanY: true, Y: 10}}
 	b := &Node{ID: 1, Scroll: Scroll{Container: true, CanY: true, Y: 10}}
