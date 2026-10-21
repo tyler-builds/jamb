@@ -69,6 +69,7 @@ var (
 	CmdNextDiagnostic    = ui.NewAction("codeedit.next-diagnostic", "Go to next problem")
 	CmdPrevDiagnostic    = ui.NewAction("codeedit.prev-diagnostic", "Go to previous problem")
 	CmdShowHover         = ui.NewAction("codeedit.show-hover", "Show hover")
+	CmdCodeActions       = ui.NewAction("codeedit.code-actions", "Show code actions")
 )
 
 // editorAction is one command and what it does to the editor it runs in.

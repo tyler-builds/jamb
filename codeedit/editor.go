@@ -26,6 +26,7 @@ type EditorElement struct {
 	hoverP      HoverProvider
 	hoverDelay  time.Duration
 	complete    CompletionProvider
+	actionsP    CodeActionProvider
 	define      DefinitionProvider
 	openLoc     func(Location)
 	size        sizes // see Size
