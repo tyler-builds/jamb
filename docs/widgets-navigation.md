@@ -34,6 +34,10 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
 	Style(ui.Style{MaxHeight: ui.Px(320)}).OnChange(func(key string) { ... })
 // ui.TreeNode{Key: "src", Label: "src", Icon: icons.Folder,
 //	Children: func() []ui.TreeNode { return loadSrc() }}   // nil Children: a leaf
+th := ui.NewTreeHandle()                                    // code opens, closes, reveals and selects nodes
+ui.Tree(nodes, selected).Key("files").Handle(th).Expanded(openKeys). // *ui.Signal[[]string]: the open keys
+	OnExpand(func(key string) { ... }).OnCollapse(func(key string) { ... })
+th.Reveal("src/main.go") // opens the nodes above it and scrolls it into view
 ```
 
 - **Tabs.** The tab list is one Tab stop, at the selected tab, as Microsoft's
@@ -136,6 +140,22 @@ ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[stri
   selects a node, and a click on its chevron opens or closes it without selecting.
   A double-click opens or closes it. Keys are kept by node key, so focus and the
   selection stay with their node as the rows scroll.
+- **Tree from code.** A `TreeHandle` (`NewTreeHandle`, passed with `Tree.Handle`)
+  opens and closes nodes by key with `Expand` and `Collapse`, opens or closes all of
+  them with `ExpandAll` and `CollapseAll`, and opens the nodes above a key and scrolls
+  it into view with `Reveal`. `Select` does the same and selects the node, without
+  running `OnChange`. A request applies on the next frame, in the order it was made,
+  and a request made before the first frame applies then. A key that is not shown
+  does nothing, except that `Reveal` and `Select` open the nodes above it. Collapsing
+  the node that holds the selection moves the selection to the collapsed node and runs
+  `OnChange`; `CollapseAll` moves it to the top-level node that holds it. `ExpandAll`
+  and `Reveal` ask for the children of the nodes they open, so a lazily loaded tree
+  loads all of them below those nodes.
+- **Open state.** `Expanded` keeps the open keys in a `Signal[[]string]`: the tree
+  sets it when a node opens or closes, and a value the app sets opens and closes the
+  nodes. `OnExpand` and `OnCollapse` run once for each node that changes, from a
+  click, the keys, `*`, an accessibility action or a `TreeHandle`, and not for a value
+  the app sets.
 
 Breadcrumbs and pagination. A breadcrumb trail shows where the user is, and a
 pagination control moves through pages of results. Their looks are
