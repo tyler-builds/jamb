@@ -91,44 +91,47 @@ and the [concepts](docs/concepts.md) page introduces the API.
 ## Benchmarks
 
 The same hello-world app (a window, a greeting and a click counter) built with jamb and with GPUI, the
-UI framework from Zed, on one Windows machine. Lower is better in every row, and the better figure is
-in bold. [docs/comparison-gpui.md](docs/comparison-gpui.md) has the method, the ranges of each
-measurement and the setup.
+UI framework from Zed, on one Windows machine. The figures are from 2026-10-21, except the two rows
+marked 2026-10-12. Lower is better in every row, and the better figure is in bold. The windows were on
+a secondary 144 Hz monitor, never activated, while a video played on the primary monitor. The
+[docs/comparison-gpui.md](docs/comparison-gpui.md) has the method, the ranges of each measurement and
+the setup.
 
 | Measure | jamb | GPUI |
 |---|---|---|
-| Startup to first frame, warm launch | **266 ms** | 387 ms |
-| Startup to first frame, first launch (scanned by the antivirus) | **496 ms** | 611 ms |
-| Idle CPU, window focused | **0.29%** of one core | 1.85% |
-| Idle CPU, window in the background | **0.16%** | 1.67% |
-| Memory, private bytes | 78.2 MB | **75.3 MB** |
-| Memory, working set | 58.8 MB | **52.5 MB** |
-| GPU memory, dedicated | **13.8 MB** | 17.5 MB |
-| Threads | 36 | **30** |
-| CPU while the pointer moves over the window | **2.2%** | 3.4% |
-| CPU while the window is resized | **11.5%** | 18.8% |
-| Context switches per second while resizing | 2,411 | **1,820** |
-| Build after an edit | **2 s** | 4 s (release), 6 s (debug) |
-| Clean build | **9 s** | 138 s (release), 100 s (debug) |
-| Binary size, default release build | **8.4 MB** | 9.21 MB |
-| Binary size, GPUI's size-optimized build profile (a clean build of about 238 s) | | **4.31 MB** |
+| Startup to first frame, warm launch | **222 ms** | 304 ms |
+| Startup to first frame, first launch (scanned by the antivirus) | **487 ms** | 493 ms |
+| Window visible, first launch | 468 ms | **460 ms** |
+| Idle CPU, window in the background, 60 s | **0.05%** of one core | 1.74% |
+| Idle context switches per second | **64** | 410 |
+| Memory, private bytes | 78.8 MB | **73.2 MB** |
+| Memory, working set | 58.4 MB | **49.0 MB** |
+| GPU memory, dedicated | **13.7 MB** | 15.5 MB |
+| Threads | 39 | **32** |
+| Handles | 483 | **462** |
+| CPU while the pointer moves over the window | **1.1%** | 3.6% |
+| CPU while the window is resized | **11.8%** | 13.9% |
+| Context switches per second while resizing | 2,175 | **1,531** |
+| Build after an edit (release, text change) | **1.36 s** | 2.57 s (release), 3.60 s (debug) |
+| Clean build (2026-10-12) | **9 s** | 138 s (release), 100 s (debug) |
+| Binary size, release build | 9.36 MB | **9.22 MB** |
+| Binary size, GPUI's size-optimized build profile (2026-10-12) | | **4.31 MB** |
 
-The runtime and memory rows were measured on 2026-10-12, before the themes, the dock, the inspector,
-charts and the code editor were added; since then the hello app's binary has grown from 7.18 MB to
-8.41 MB (measured on 2026-10-14), and memory and startup may have changed too. They will be measured
-again.
+The focused idle CPU was not measured on 2026-10-21. On 2026-10-12 the hello app used 0.29% of a core
+with the window focused, and GPUI 1.85%. jamb's frames on the secondary monitor followed the primary
+monitor's refresh rate, a known issue listed in [BENCHMARKS.md](BENCHMARKS.md).
 
-The demo app (four pages, about 200 elements on screen), from [BENCHMARKS.md](BENCHMARKS.md), measured
-on 2026-10-06 and 2026-10-12, also before those additions:
+The demo app (four pages), from [BENCHMARKS.md](BENCHMARKS.md), measured on 2026-10-21 unless the row says
+otherwise:
 
 | Measure | Result | What it means |
 |---|---|---|
-| Rebuild after an edit | 0.25 to 0.84 s | Edit, build and run stays under a second; `jamb dev` shows the new window 1.05 to 1.36 s after a save. |
-| Startup to first frame | about 195 ms | About 180 ms of it is the graphics driver creating the Direct3D device. |
-| Idle CPU | 0 ms in 10 s | An idle window draws nothing and wakes no timers. |
-| Full re-render of every component | about 0.3 ms of CPU per frame | A 120 Hz display allows 8.3 ms per frame, so this is about 4% of the budget. |
-| One signal change in a 10,000-element tree | 0.59 ms | Only the component that read the signal renders again. |
-| One scroll step in a 100,000-row list | 0.17 ms | Only the rows in view are built. |
+| Startup to first frame, warm | 215 ms | About 180 ms of it is the graphics driver creating the Direct3D device (2026-10-12). |
+| Idle CPU, unfocused, 60 s | 0.13% of one core | An idle window draws nothing. About 66 context switches a second; the 2026-10-12 analysis traced most of an idle window's wake-ups to the graphics driver's thread. |
+| Full re-render of every component | 0.97 ms of CPU per frame on average, 164 FPS at vsync, on a 310-element page | A full re-render is a stress case; normal updates are incremental. It allocates 936 KB a frame, up from 110 KB (2026-10-06), which is under investigation. |
+| One signal change in a 10,000-element tree | 0.31 ms | Only the component that read the signal renders again. |
+| One scroll step in a 100,000-row list | 0.15 ms | Only the rows in view are built. |
+| Rebuild after an edit (2026-10-06) | 0.25 to 0.84 s | Edit, build and run stays under a second; `jamb dev` shows the new window 1.05 to 1.36 s after a save. |
 
 ## How it works
 
