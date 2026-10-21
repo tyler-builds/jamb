@@ -250,7 +250,7 @@ show.
 ### GPUI comparison
 
 Summary only. The full runtime, build and binary tables, with the method and the
-earlier passes, are in [docs/comparison-gpui.md](docs/comparison-gpui.md#third-pass-2026-10-21).
+earlier passes, are in [docs/comparison-gpui.md](docs/comparison-gpui.md#third-pass-2026-10-21-current).
 The third pass ran hello for jamb and for GPUI on the secondary monitor, without
 activation, three runs each. jamb has the lower idle CPU (0.05% against 1.74%), the
 lower pointer and resize CPU, and the faster warm launch (221.6 ms against 304.1 ms
