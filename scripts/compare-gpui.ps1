@@ -15,9 +15,9 @@
         directory, dependencies already downloaded) and the build output sizes;
       - optionally, the one-time dependency download into temporary caches;
       - startup to the first painted frame, for the first launch of a new copy of the
-        executable and for warm launches of the same file, idle CPU and memory (focused
-        and unfocused),
-        CPU during continuous pointer movement, and CPU during continuous resizing.
+        executable and for warm launches of the same file, idle CPU and memory
+        (unfocused; focused with -IncludeFocused), CPU during continuous pointer
+        movement, and CPU during continuous resizing.
 
     By default the builds use the normal Go build cache and gpui-hello's own target
     folder (see -GpuiTargetDir), so only the first run compiles GPUI from scratch.
@@ -27,9 +27,15 @@
     and gpui-hello's src\main.rs, and each is restored from a byte-for-byte backup
     in a finally block.
 
-    The pointer and resize phases move the real mouse cursor for a few seconds at a
-    time and resize the app window. Run the script only when that is acceptable. The
-    cursor is put back where it was afterwards.
+    The runtime phase never moves the real mouse cursor, never activates a window and
+    never takes focus. Both apps open on the non-primary monitor at -Position, without
+    activation (JAMB_POSITION and JAMB_NOACTIVATE for jamb's hello, HELLO_POSITION and
+    HELLO_NOACTIVATE for gpui-hello). The pointer phase posts WM_MOUSEMOVE messages
+    with client coordinates to each window, which both apps read from their message
+    queues; the resize phase moves the window's size with SetWindowPos and SWP_NOACTIVATE.
+    The focused idle sample activates each window, so it is skipped unless
+    -IncludeFocused is given; with that switch the previously active window is
+    activated again afterwards.
 
     Requirements: Windows 10 or later, Go 1.27 or later, Rust 1.95.0 through rustup,
     the Visual Studio 2022 C++ tools and the Windows SDK, and the gpui-hello project
@@ -61,6 +67,15 @@
 .PARAMETER MoveSeconds
     Length of the pointer-movement and resize samples. Default 10.
 
+.PARAMETER Position
+    Logical top-left corner of each app's first window, as X,Y. It must lie on a
+    non-primary monitor. Default -1600,150 (the secondary monitor of the reference machine).
+
+.PARAMETER IncludeFocused
+    Also measure the focused idle sample. This activates each app's window, which takes
+    the focus from the user's window, and the previously active window is activated
+    again afterwards. Skipped by default; the summary says so.
+
 .PARAMETER SkipGo
     Skip the jamb (Go) builds and runtime measurements.
 
@@ -68,7 +83,7 @@
     Skip the GPUI (Rust) builds and runtime measurements.
 
 .PARAMETER SkipInteraction
-    Skip the pointer-movement and resize samples. Use it when the cursor must not move.
+    Skip the pointer-movement and resize samples.
 
 .PARAMETER IncludeCleanBuilds
     Also time clean builds: each build runs -Runs times with an empty build cache or
@@ -104,6 +119,8 @@ param(
     [switch]$SkipGo,
     [switch]$SkipRust,
     [switch]$SkipInteraction,
+    [string]$Position = '-1600,150',
+    [switch]$IncludeFocused,
     [switch]$IncludeCleanBuilds,
     [string]$GpuiTargetDir = '',
     [switch]$IncludeDownload,
@@ -130,133 +147,7 @@ New-Item -ItemType Directory -Path (Join-Path $work 'logs'), (Join-Path $work 'b
 $started = New-Object System.Collections.ArrayList
 $R = [ordered]@{ buildRetries = @() }
 
-if (-not ('Cmp.Win32' -as [type])) {
-    Add-Type -AssemblyName System.Drawing
-    Add-Type -TypeDefinition @'
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
-using System.Text;
-
-namespace Cmp {
-public static class Win32 {
-    public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
-
-    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc callback, IntPtr lParam);
-    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
-    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int max);
-    [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hWnd, out RECT rect);
-    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-    [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr hWnd, ref POINT point);
-    [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
-    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
-    [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
-    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
-    [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hWnd);
-    [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string className, string title);
-
-    // Windows only lets the foreground process move focus. A quick Alt press, which
-    // the app ignores, makes the system accept the request.
-    public static bool ForceForeground(IntPtr hWnd) {
-        keybd_event(0x12, 0, 0, UIntPtr.Zero);
-        keybd_event(0x12, 0, 2, UIntPtr.Zero);
-        return SetForegroundWindow(hWnd);
-    }
-
-    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
-    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
-
-    // Top-level windows owned by a process, visible or not.
-    public static List<IntPtr> WindowsOf(uint pid) {
-        var found = new List<IntPtr>();
-        EnumWindows((hWnd, l) => {
-            uint p;
-            GetWindowThreadProcessId(hWnd, out p);
-            if (p == pid) found.Add(hWnd);
-            return true;
-        }, IntPtr.Zero);
-        return found;
-    }
-
-    public static string TitleOf(IntPtr hWnd) {
-        var sb = new StringBuilder(256);
-        GetWindowText(hWnd, sb, sb.Capacity);
-        return sb.ToString();
-    }
-
-    // Client area of the window in screen coordinates.
-    public static Rectangle ClientScreenRect(IntPtr hWnd) {
-        RECT cr;
-        GetClientRect(hWnd, out cr);
-        POINT origin = new POINT { X = 0, Y = 0 };
-        ClientToScreen(hWnd, ref origin);
-        return new Rectangle(origin.X, origin.Y, cr.Right - cr.Left, cr.Bottom - cr.Top);
-    }
-
-    // Renders the window with PW_RENDERFULLCONTENT and returns only its client area.
-    public static Bitmap CaptureClient(IntPtr hWnd) {
-        RECT wr;
-        GetWindowRect(hWnd, out wr);
-        int ww = wr.Right - wr.Left, wh = wr.Bottom - wr.Top;
-        var full = new Bitmap(ww, wh, PixelFormat.Format32bppArgb);
-        using (var g = Graphics.FromImage(full)) {
-            IntPtr dc = g.GetHdc();
-            PrintWindow(hWnd, dc, 2);
-            g.ReleaseHdc(dc);
-        }
-        Rectangle client = ClientScreenRect(hWnd);
-        var clip = new Rectangle(client.Left - wr.Left, client.Top - wr.Top, client.Width, client.Height);
-        var result = full.Clone(clip, PixelFormat.Format32bppArgb);
-        full.Dispose();
-        return result;
-    }
-
-    // Number of distinct colours on a sparse grid of the bitmap. One colour means blank.
-    public static int DistinctColors(Bitmap bmp) {
-        var seen = new HashSet<int>();
-        var rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
-        var data = bmp.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-        try {
-            int stepX = Math.Max(1, bmp.Width / 160), stepY = Math.Max(1, bmp.Height / 120);
-            int[] row = new int[bmp.Width];
-            for (int y = 0; y < bmp.Height; y += stepY) {
-                Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), row, 0, bmp.Width);
-                for (int x = 0; x < bmp.Width; x += stepX) seen.Add(row[x]);
-            }
-        } finally {
-            bmp.UnlockBits(data);
-        }
-        return seen.Count;
-    }
-}
-}
-'@ -ReferencedAssemblies System.Drawing
-}
-
-function Get-DirBytes([string]$Path) {
-    if ([string]::IsNullOrEmpty($Path) -or -not (Test-Path -LiteralPath $Path)) { return [int64]0 }
-    [int64]$sum = 0
-    foreach ($f in [IO.Directory]::EnumerateFiles($Path, '*', [IO.SearchOption]::AllDirectories)) {
-        $sum += (New-Object IO.FileInfo -ArgumentList $f).Length
-    }
-    return $sum
-}
-
-function Get-Summary([double[]]$Values) {
-    $s = @($Values | Sort-Object)
-    $n = $s.Count
-    if ($n -eq 0) { return $null }
-    if ($n % 2 -eq 1) { $med = $s[[int](($n - 1) / 2)] } else { $med = ($s[$n / 2 - 1] + $s[$n / 2]) / 2 }
-    return [ordered]@{ median = [math]::Round($med, 2); min = [math]::Round($s[0], 2); max = [math]::Round($s[$n - 1], 2); n = $n; values = @($Values | ForEach-Object { [math]::Round($_, 2) }) }
-}
-
-function MB([double]$Bytes) { return [math]::Round($Bytes / 1MB, 2) }
+. (Join-Path $PSScriptRoot 'bench-common.ps1')
 
 # Runs a build command in a generated batch file, so quoting survives PowerShell.
 # Returns the wall-clock seconds. A failed build is retried once, because the MSVC
@@ -299,56 +190,21 @@ function Invoke-BuildOnce([string]$Dir, [string]$Command, [hashtable]$EnvVars, [
 # Replaces a file's bytes and returns nothing; used for the temporary source edits.
 function Write-Bytes([string]$Path, [byte[]]$Bytes) { [IO.File]::WriteAllBytes($Path, $Bytes) }
 
-function Get-ContextSwitches([int]$ProcessId) {
-    $rows = Get-CimInstance -ClassName Win32_PerfRawData_PerfProc_Thread -Filter "IDProcess=$ProcessId"
-    return [double](($rows | Measure-Object -Property ContextSwitchesPersec -Sum).Sum)
-}
-
-function Get-GpuMemory([int]$ProcessId) {
-    try {
-        $prefix = "pid_$($ProcessId)_"
-        $ded = (Get-Counter -Counter '\GPU Process Memory(*)\Dedicated Usage' -ErrorAction Stop).CounterSamples |
-            Where-Object { $_.InstanceName -like "$prefix*" } | Measure-Object -Property CookedValue -Sum
-        $shared = (Get-Counter -Counter '\GPU Process Memory(*)\Shared Usage' -ErrorAction Stop).CounterSamples |
-            Where-Object { $_.InstanceName -like "$prefix*" } | Measure-Object -Property CookedValue -Sum
-        $dedMB = $null; $sharedMB = $null
-        if ($ded.Count -gt 0) { $dedMB = MB $ded.Sum }
-        if ($shared.Count -gt 0) { $sharedMB = MB $shared.Sum }
-        return [ordered]@{ dedicatedMB = $dedMB; sharedMB = $sharedMB }
-    } catch {
-        return [ordered]@{ dedicatedMB = $null; sharedMB = $null; note = 'GPU Process Memory counters not available' }
-    }
-}
-
-# CPU (percent of one core) and context switches per second over the action.
-function Measure-Cpu($Proc, [scriptblock]$Action) {
-    $Proc.Refresh()
-    $cpu0 = $Proc.TotalProcessorTime.TotalMilliseconds
-    $cs0 = Get-ContextSwitches $Proc.Id
-    $sw = [Diagnostics.Stopwatch]::StartNew()
-    & $Action
-    $sw.Stop()
-    $Proc.Refresh()
-    $cpu1 = $Proc.TotalProcessorTime.TotalMilliseconds
-    $cs1 = Get-ContextSwitches $Proc.Id
-    $sec = $sw.Elapsed.TotalSeconds
-    return [ordered]@{
-        cpuPct = [math]::Round(($cpu1 - $cpu0) / 1000 / $sec * 100, 3)
-        ctxPerSec = [math]::Round(($cs1 - $cs0) / $sec, 1)
-        seconds = [math]::Round($sec, 2)
-    }
-}
-
+# Moves the pointer over the window with the same Lissajous path as before, but by
+# posting WM_MOUSEMOVE (0x0200) with client coordinates to the window. The real cursor
+# does not move, and no window is activated; both apps read their message queues.
 function Move-Pointer([IntPtr]$Hwnd, [int]$Seconds) {
     $r = [Cmp.Win32]::ClientScreenRect($Hwnd)
-    $cx = $r.Left + $r.Width / 2
-    $cy = $r.Top + $r.Height / 2
+    $cx = $r.Width / 2
+    $cy = $r.Height / 2
     $sw = [Diagnostics.Stopwatch]::StartNew()
     while ($sw.Elapsed.TotalSeconds -lt $Seconds) {
         $t = $sw.Elapsed.TotalSeconds
-        $x = $cx + 0.4 * $r.Width * [math]::Sin(2 * [math]::PI * $t / 3.1)
-        $y = $cy + 0.4 * $r.Height * [math]::Sin(2 * [math]::PI * $t / 2.3)
-        [void][Cmp.Win32]::SetCursorPos([int]$x, [int]$y)
+        $x = [int]($cx + 0.4 * $r.Width * [math]::Sin(2 * [math]::PI * $t / 3.1))
+        $y = [int]($cy + 0.4 * $r.Height * [math]::Sin(2 * [math]::PI * $t / 2.3))
+        # lParam holds the client y in the high word and the client x in the low word.
+        $lParam = [IntPtr]::new([long]((([long]$y) -shl 16) -bor ([long]($x -band 0xFFFF))))
+        [void][Cmp.Win32]::PostMessage($Hwnd, 0x0200, [IntPtr]::Zero, $lParam)
         [Threading.Thread]::Sleep(16)
     }
 }
@@ -367,11 +223,12 @@ function Resize-Window([IntPtr]$Hwnd, [int]$Seconds) {
     [void][Cmp.Win32]::SetWindowPos($Hwnd, [IntPtr]::Zero, 0, 0, 800, 600, $flags)
 }
 
-# Starts the app and waits for a visible window titled "Hello" with a non-blank
-# client area. Times are from the launch call. The caller disposes of the capture.
+# Starts the app with its placement and activation variables, and waits for a visible
+# window titled "Hello" with a non-blank client area. Times are from the launch call.
+# The caller disposes of the capture. The window must lie off the primary monitor.
 function Start-Hello($App, [string]$Exe) {
     $clock = [Diagnostics.Stopwatch]::StartNew()
-    $p = Start-Process -FilePath $Exe -PassThru
+    $p = Start-Recorded $Exe $App.env
     [void]$started.Add($p)
     $deadline = (Get-Date).AddSeconds(60)
     $hwnd = [IntPtr]::Zero
@@ -383,6 +240,7 @@ function Start-Hello($App, [string]$Exe) {
     }
     if ($hwnd -eq [IntPtr]::Zero) { throw "$($App.key): no visible 'Hello' window within 60 s" }
     $visibleMs = $clock.Elapsed.TotalMilliseconds
+    Assert-OffPrimary ([Cmp.Win32]::WindowScreenRect($hwnd)) $monitors "$($App.key) window"
 
     $bmp = $null
     $distinct = 0
@@ -433,16 +291,21 @@ function Measure-App($App, [int]$Run) {
     $dpi = [Cmp.Win32]::GetDpiForWindow($hwnd)
 
     [Threading.Thread]::Sleep($SettleSeconds * 1000)
-    [void][Cmp.Win32]::ForceForeground($hwnd)
-    [Threading.Thread]::Sleep(500)
-    $focusedOk = ([Cmp.Win32]::GetForegroundWindow() -eq $hwnd)
-    $idleFocused = Measure-Cpu $p { [Threading.Thread]::Sleep($IdleSeconds * 1000) }
-
-    # The taskbar takes the focus; the app stays visible and is no longer active.
-    $taskbar = [Cmp.Win32]::FindWindow('Shell_TrayWnd', $null)
-    [void][Cmp.Win32]::ForceForeground($taskbar)
-    [Threading.Thread]::Sleep(500)
-    [Threading.Thread]::Sleep($SettleSeconds * 1000)
+    $focusedOk = $null
+    $idleFocused = $null
+    if ($IncludeFocused) {
+        # Activates the app, then gives the focus back to the window that had it.
+        $previous = [Cmp.Win32]::GetForegroundWindow()
+        [void][Cmp.Win32]::ForceForeground($hwnd)
+        [Threading.Thread]::Sleep(500)
+        $focusedOk = ([Cmp.Win32]::GetForegroundWindow() -eq $hwnd)
+        $idleFocused = Measure-Cpu $p { [Threading.Thread]::Sleep($IdleSeconds * 1000) }
+        if ($previous -ne [IntPtr]::Zero -and $previous -ne $hwnd) {
+            [void][Cmp.Win32]::ForceForeground($previous)
+            [Threading.Thread]::Sleep(500)
+        }
+    }
+    # The app is never activated in the default run, so this is the unfocused sample.
     $unfocusedOk = ([Cmp.Win32]::GetForegroundWindow() -ne $hwnd)
     $idleUnfocused = Measure-Cpu $p { [Threading.Thread]::Sleep($IdleSeconds * 1000) }
 
@@ -460,13 +323,8 @@ function Measure-App($App, [int]$Run) {
     $pointer = $null
     $resize = $null
     if (-not $SkipInteraction) {
-        $cursor = New-Object Cmp.Win32+POINT
-        [void][Cmp.Win32]::GetCursorPos([ref]$cursor)
-        [void][Cmp.Win32]::ForceForeground($hwnd)
-        [Threading.Thread]::Sleep(500)
         $pointer = Measure-Cpu $p { Move-Pointer $hwnd $MoveSeconds }
         $resize = Measure-Cpu $p { Resize-Window $hwnd $MoveSeconds }
-        [void][Cmp.Win32]::SetCursorPos($cursor.X, $cursor.Y)
     }
 
     Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
@@ -747,13 +605,22 @@ try {
         $R.firstBuildDownload = $dl
     }
 
-    # Runtime
+    # Runtime. Both apps open on the non-primary monitor at -Position, without activation.
+    $monitors = Get-MonitorInfo
+    $at = Get-SecondaryPoint $Position $monitors
+    $R.display = [ordered]@{
+        position = "$($at.x),$($at.y)"
+        monitors = $monitors
+        focusedIdle = $(if ($IncludeFocused) { 'measured; each window was activated, and the previous foreground window was restored' } else { 'skipped; pass -IncludeFocused to measure it (it activates each window)' })
+    }
     $apps = @()
     if (-not $SkipGo) {
-        $apps += [pscustomobject]@{ key = 'jamb'; exe = "$work\bin\jamb-rel.exe"; shot = 'comparison-jamb-hello.png' }
+        $apps += [pscustomobject]@{ key = 'jamb'; exe = "$work\bin\jamb-rel.exe"; shot = 'comparison-jamb-hello.png'
+            env = @{ JAMB_POSITION = $Position; JAMB_NOACTIVATE = '1' } }
     }
     if (-not $SkipRust) {
-        $apps += [pscustomobject]@{ key = 'gpui'; exe = "$work\bin\gpui-rel.exe"; shot = 'comparison-gpui-hello.png' }
+        $apps += [pscustomobject]@{ key = 'gpui'; exe = "$work\bin\gpui-rel.exe"; shot = 'comparison-gpui-hello.png'
+            env = @{ HELLO_POSITION = $Position; HELLO_NOACTIVATE = '1' } }
     }
     # Both apps are dark: GPUI's hello sets its colors, and jamb's hello follows
     # Windows' app mode, so it is pinned to the dark mode for the run.
@@ -774,8 +641,6 @@ try {
             firstPaintedMs = Get-Summary ([double[]]($rows | ForEach-Object { $_.firstPaintedMs }))
             warmVisibleMs = Get-Summary ([double[]]($rows | ForEach-Object { $_.warmVisibleMs }))
             warmPaintedMs = Get-Summary ([double[]]($rows | ForEach-Object { $_.warmPaintedMs }))
-            idleFocusedCpuPct = Get-Summary ([double[]]($rows | ForEach-Object { $_.idleFocused.cpuPct }))
-            idleFocusedCtxPerSec = Get-Summary ([double[]]($rows | ForEach-Object { $_.idleFocused.ctxPerSec }))
             idleUnfocusedCpuPct = Get-Summary ([double[]]($rows | ForEach-Object { $_.idleUnfocused.cpuPct }))
             idleUnfocusedCtxPerSec = Get-Summary ([double[]]($rows | ForEach-Object { $_.idleUnfocused.ctxPerSec }))
             privateMB = Get-Summary ([double[]]($rows | ForEach-Object { $_.memory.privateMB }))
@@ -784,6 +649,10 @@ try {
             handles = Get-Summary ([double[]]($rows | ForEach-Object { $_.memory.handles }))
             gpuDedicatedMB = Get-Summary ([double[]]($rows | Where-Object { $null -ne $_.memory.gpuDedicatedMB } | ForEach-Object { $_.memory.gpuDedicatedMB }))
             gpuSharedMB = Get-Summary ([double[]]($rows | Where-Object { $null -ne $_.memory.gpuSharedMB } | ForEach-Object { $_.memory.gpuSharedMB }))
+        }
+        if ($IncludeFocused) {
+            $summaries[$app.key].idleFocusedCpuPct = Get-Summary ([double[]]($rows | ForEach-Object { $_.idleFocused.cpuPct }))
+            $summaries[$app.key].idleFocusedCtxPerSec = Get-Summary ([double[]]($rows | ForEach-Object { $_.idleFocused.ctxPerSec }))
         }
         if (-not $SkipInteraction) {
             $summaries[$app.key].pointerCpuPct = Get-Summary ([double[]]($rows | ForEach-Object { $_.pointer.cpuPct }))
