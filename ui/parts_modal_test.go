@@ -10,7 +10,7 @@ func partModal(st ModalStyle) Element {
 	cancel := Button("Cancel").Key("cancel")
 	ok := Button("OK").Key("ok").Primary()
 	return Div().Column().Child(Modal("Settings", Text("Body text")).
-		Footer(cancel, ok).Default(ok).Styles(st))
+		Footer(cancel, ok).Default(ok).Styles(st).CloseButton(true).OnClose(func() {}))
 }
 
 func testModalParts(t *testing.T, applied map[string]bool) {
@@ -23,7 +23,9 @@ func testModalParts(t *testing.T, applied map[string]bool) {
 	cases := []modalCase{
 		{part: "Modal.Scrim", set: func(s *ModalStyle, m Style) { s.Scrim = m }, drawn: "Modal.Scrim"},
 		{part: "Modal.Panel", set: func(s *ModalStyle, m Style) { s.Panel = m }, drawn: "Modal.Panel"},
+		{part: "Modal.Header", set: func(s *ModalStyle, m Style) { s.Header = m }, drawn: "Modal.Header"},
 		{part: "Modal.Title", set: func(s *ModalStyle, m Style) { s.Title = m }, drawn: "Modal.Title"},
+		{part: "Modal.Close", set: func(s *ModalStyle, m Style) { s.Close = m }, drawn: "Modal.Close"},
 		{part: "Modal.Body", set: func(s *ModalStyle, m Style) { s.Body = m }, drawn: "Modal.Body"},
 		{part: "Modal.Footer", set: func(s *ModalStyle, m Style) { s.Footer = m }, drawn: "Modal.Footer"},
 	}

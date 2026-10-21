@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/input"
 )
 
@@ -37,6 +38,8 @@ type ModalElement struct {
 	initial  *FocusHandle
 	onClose  func()
 	backdrop bool
+	// closeBtn shows a close button at the top right of the panel (see CloseButton).
+	closeBtn bool
 	styles   ModalStyle
 	size     sizing // the panel's sizes, from the sizing methods (see Sizing in docs/styling.md)
 	key      string // the element key, see Key
@@ -63,11 +66,15 @@ func (m *ModalElement) elementKey() string { return m.key }
 // built-in defaults, then over the theme's Modal, then over the Styles of the
 // instance; see docs/styling.md. Scrim is the dimmed backdrop, Panel the dialog
 // on it, Title its title, Body the area of the body and Footer the row of
-// buttons. The panel's width is its Width, 420 px by default.
+// buttons. The panel's width is its Width, 420 px by default. Header is the row of
+// the title and the close button, and Close the box around that button; both are
+// built only when the modal has a close button (see CloseButton).
 type ModalStyle struct {
 	Scrim  Style // the dimmed backdrop behind the dialog
 	Panel  Style // the dialog
+	Header Style // the row of the title and the close button, at the top of the dialog
 	Title  Style // the title, at the top of the dialog
+	Close  Style // the box around the close button, at the top right
 	Body   Style // the body, under the title
 	Footer Style // the row of buttons, at the bottom
 }
@@ -77,7 +84,9 @@ func (s ModalStyle) merge(o ModalStyle) ModalStyle {
 	return ModalStyle{
 		Scrim:  s.Scrim.Merge(o.Scrim),
 		Panel:  s.Panel.Merge(o.Panel),
+		Header: s.Header.Merge(o.Header),
 		Title:  s.Title.Merge(o.Title),
+		Close:  s.Close.Merge(o.Close),
 		Body:   s.Body.Merge(o.Body),
 		Footer: s.Footer.Merge(o.Footer),
 	}
@@ -88,7 +97,9 @@ func (s ModalStyle) plain() ModalStyle {
 	return ModalStyle{
 		Scrim:  plainStyle(s.Scrim),
 		Panel:  plainStyle(s.Panel),
+		Header: plainStyle(s.Header),
 		Title:  plainStyle(s.Title),
+		Close:  plainStyle(s.Close),
 		Body:   plainStyle(s.Body),
 		Footer: plainStyle(s.Footer),
 	}
@@ -100,7 +111,9 @@ func modalDefaults(t *Theme) ModalStyle {
 		Scrim: Style{Background: t.Scrim},
 		Panel: Style{Width: Px(modalWidth), Background: t.Surface, BorderWidth: 1, BorderColor: t.Border,
 			Radius: 10, Shadows: []Shadow{ShadowLg}, Padding: All(20), Gap: 16},
+		Header: Style{Direction: Row, Align: Start, Gap: 8},
 		Title:  Style{FontSize: 16, FontWeight: FontSemibold},
+		Close:  Style{NoShrink: true},
 		Body:   Style{Direction: Column, Gap: 12},
 		Footer: Style{Direction: Row, Justify: End, Gap: 8, Wrap: true},
 	}
@@ -193,6 +206,15 @@ func (m *ModalElement) CloseOnBackdrop() *ModalElement {
 	return m
 }
 
+// CloseButton shows a close button at the top right of the panel, beside the
+// title, when show is set. Pressing it runs OnClose, and it is built only when
+// there is an OnClose. It is a small icon button labelled with Strings.Close,
+// first in the Tab order; initial focus skips it.
+func (m *ModalElement) CloseButton(show bool) *ModalElement {
+	m.closeBtn = show
+	return m
+}
+
 func (*ModalElement) isElement() {}
 
 func (m *ModalElement) expand(ctx *Context) Element {
@@ -220,10 +242,24 @@ func (m *ModalElement) expand(ctx *Context) Element {
 			m.onClose()
 		}
 	}
+	if m.closeBtn && m.onClose != nil {
+		// The title and the close box share a row at the top of the panel. The
+		// box's key is scoped by the modal's key, as the message of an alert dialog is.
+		key := "jamb.modal/close"
+		if m.key != "" {
+			key = m.key + "/close"
+		}
+		closeBox := Div().asPart(part + ".Close").Style(st.Close).Child(
+			IconButton(icons.X).Label(ctx.Strings().Close).Small().Ghost().OnClick(closeFn).Key(key))
+		closeBox.noInitialFocus = true
+		title = Div().asPart(part+".Header").Style(st.Header).Shrink(0).Children(
+			Div().asPart(part+".Title").Style(st.Title).Grow(1).Child(Text(m.title)),
+			closeBox)
+	}
 	spec := &modalSpec{def: m.def, initial: m.initial}
 
 	footer := Div().asPart(part + ".Footer").Style(st.Footer).Shrink(0).Children(m.footer...)
-	footer.modalFooter = true
+	footer.noInitialFocus = true
 	// The panel is at most the window's height less the margin, so its title and footer
 	// stay on screen. A body that does not fit scrolls, and the focus reveals the field
 	// in it (see FocusHandle.Focus).
@@ -332,7 +368,7 @@ func (rt *Runtime) modalFocus(n *node) uint64 {
 	var found uint64
 	var walk func(c *node)
 	walk = func(c *node) {
-		if found != 0 || c.flags&flagNoDisplay != 0 || (c.div != nil && (c.div.modalFooter || c.div.tabSkip)) {
+		if found != 0 || c.flags&flagNoDisplay != 0 || (c.div != nil && (c.div.noInitialFocus || c.div.tabSkip)) {
 			return
 		}
 		if d := c.div; d != nil && d.focusable && !d.noTabStop && d.tabIndex >= 0 {
