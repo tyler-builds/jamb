@@ -94,3 +94,11 @@ func newRenderer(w platform.Window, width, height int) (render.Renderer, error) 
 // readPlatformSettings reads the operating system's accessibility and text
 // settings (see platform.Settings).
 func readPlatformSettings() platform.Settings { return windows.ReadSettings() }
+
+// clockNow returns the performance clock that frame statistics and input latency
+// use, in nanoseconds (see windows.Clock).
+func clockNow() int64 { return windows.Clock() }
+
+// processMemory returns the process's private bytes and working set (see
+// windows.ProcessMemory).
+func processMemory() (privateBytes, workingSet uint64) { return windows.ProcessMemory() }

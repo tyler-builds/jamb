@@ -5,6 +5,7 @@ package app
 import (
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/render"
@@ -41,3 +42,10 @@ func gpuAdapter() string { return "" }
 // readPlatformSettings reports the defaults: no platform adapter reads the
 // settings yet.
 func readPlatformSettings() platform.Settings { return platform.DefaultSettings() }
+
+// clockNow returns the time since the process started, in nanoseconds, for frame
+// statistics and input latency.
+func clockNow() int64 { return int64(time.Since(processStart)) }
+
+// processMemory reports no memory counters on this platform yet.
+func processMemory() (privateBytes, workingSet uint64) { return 0, 0 }
