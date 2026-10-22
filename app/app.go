@@ -866,7 +866,7 @@ func (h *host) OnFrame(w platform.Window) bool {
 	// The CPU side of the frame ends where Present starts; Present blocks for vsync.
 	start, end := presentTimes(h.r, clockNow())
 	if h.fs != nil {
-		h.fs.presented(h.rt.Stats(), frameAt, start, end, h.rt.FrameRequested(), w)
+		h.fs.presented(h.rt.Stats(), frameAt, start, end, frameWanted(h.rt.FrameRequested(), h.stress != nil), w)
 	}
 	if h.stress != nil {
 		return h.stress.end(h, w, start-frameAt)

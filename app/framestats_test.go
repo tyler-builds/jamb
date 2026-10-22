@@ -245,3 +245,19 @@ func TestFrameStatsReportWithoutRefresh(t *testing.T) {
 		t.Errorf("report without a refresh rate:\n%s", out)
 	}
 }
+
+// A JAMB_STRESS run keeps a frame wanted after each frame, so its frames are
+// continuous even when the runtime itself wants nothing more.
+func TestFrameWanted(t *testing.T) {
+	for name, tc := range map[string]struct {
+		requested, stressing, want bool
+	}{
+		"runtime wants a frame":        {true, false, true},
+		"stress keeps frames coming":   {false, true, true},
+		"nothing wanted, not stressed": {false, false, false},
+	} {
+		if got := frameWanted(tc.requested, tc.stressing); got != tc.want {
+			t.Errorf("%s: frameWanted = %t, want %t", name, got, tc.want)
+		}
+	}
+}
