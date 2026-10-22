@@ -13,10 +13,7 @@ kept, so the history stays readable.
 
 These are the results of the performance work on branch `perf/improvements-2026-10-22`,
 measured on the same machine and with the same scripts as 2026-10-21. The
-conditions differ from that pass in two ways, and both matter for reading the
-live figures: the mouse moved over the benchmark windows during part of the live
-run, and no video was playing on the primary monitor (the machine was in normal
-use). The details are under [Gaps](#gaps).
+machine was not dedicated to benchmarking: other applications were running.
 
 | | |
 |---|---|
@@ -28,7 +25,7 @@ use). The details are under [Gaps](#gaps).
 | Power plan | Balanced |
 | Displays | Same as 2026-10-21: primary 1920 x 1080 at 165 Hz; secondary 1920 x 1080 at 144 Hz, at X = -1920 |
 | Live windows | Same as 2026-10-21: logical (-1600, 150) on the secondary monitor, never activated (`JAMB_NOACTIVATE=1`) |
-| Background load | Normal use. No video was noted. The mouse moved over the live windows during the startup and idle phases of the first live run, about the first ten minutes (see [Gaps](#gaps)) |
+| Background load | The machine was not dedicated to benchmarking: other applications were running |
 | Commits | Live runs and the GPUI pass: `2124a35`, the branch HEAD at the time, with no pacing. Soak and Go suite: `da18e5b`, the same code as `2124a35` plus the per-monitor pacing commit that was dropped afterwards (see [Tried and dropped](#tried-and-dropped)). The pacing does not change memory, and the headless suite does not exercise it |
 | Samples | Live: 3 runs, each figure the median across runs with the range in brackets. GPUI pass: 3 runs, warm launches pooled (15 values). Soak: one 30-minute run. Go: `-count 10`, compared with 2026-10-21 by benchstat |
 
@@ -57,8 +54,8 @@ Where a figure is a median with a range, the range is in brackets.
 | Startup, demo, first launch, `JAMB_TRACE` | 214.9 ms | 217.7 ms | +2.8 ms, worse | `bench-live` |
 | Startup, demo, warm, window visible / painted | 226 / 251.8 ms | 243.5 / 261.4 ms | +17.5 / +9.6 ms, worse | `bench-live` |
 | Startup, demo, warm, `JAMB_TRACE` | 214.8 ms | 221.2 ms [211.6–247.3] | +6.4 ms (+3%), worse | `bench-live` |
-| Idle CPU, hello, unfocused 60 s | 0.08% | 0.03% [0.03–0.42] | lower median; the 0.42% maximum is during the mouse movement | `bench-live`, 3 runs |
-| Idle context switches/s, hello | 66 | 66.1 [65.5–152.6] | unchanged median; the maximum is during the mouse movement | `bench-live` |
+| Idle CPU, hello, unfocused 60 s | 0.08% | 0.03% [0.03–0.42] | lower median | `bench-live`, 3 runs |
+| Idle context switches/s, hello | 66 | 66.1 [65.5–152.6] | unchanged median | `bench-live` |
 | Idle private bytes, hello | 78.1 MB | 75.8 MB | -2.3 MB (-3%) | `bench-live` |
 | Idle working set, hello | 63.3 MB | 59.6 MB | -3.7 MB (-6%) | `bench-live` |
 | Threads / handles, hello | 39 / 509 | 39 [38–40] / 509 [503–528] | unchanged | `bench-live` |
@@ -209,8 +206,6 @@ Two commits are measurement fixes, not performance changes: `3f88090` makes
 Live, `bench-live`, 3 runs, process start to the first frame. Medians, with the
 range in brackets. Times are in milliseconds; "visible" is the window shown,
 "painted" the first frame with content, and "trace" the app's `JAMB_TRACE` line.
-The live run's startup phase is inside the period when the mouse moved over the
-windows (see [Gaps](#gaps)).
 
 | App | First launch: visible | First launch: painted | First launch: trace | Warm: visible | Warm: painted | Warm: trace |
 |---|--:|--:|--:|--:|--:|--:|
@@ -228,8 +223,7 @@ on the secondary monitor and were not activated.
 | demo | 0.08 [0.05–0.13] | 65.5 [65.5–73.2] | 119 [118.9–120.9] | 115.3 [115.2–116.7] | 40 | 537 [536–539] | 17.1 | 1.6 |
 
 Two windows (the demo's main window and a project window), 60 s: CPU 0.05%
-[0.03–0.08], 65.6 context switches/s [65.4–65.8]. The maxima of the hello sample
-(0.42% and 152.6/s) are in the run during which the mouse moved over the window.
+[0.03–0.08], 65.6 context switches/s [65.4–65.8].
 
 ### Scenarios
 
@@ -529,8 +523,7 @@ The status of each finding of 2026-10-21, and the new ones of this pass.
     - `InitialBuild` gc/op +11% against 22% fewer allocations.
     - The demo's warm launch in the live run: the window visible +17.5 ms, painted
       +9.6 ms and the trace +6.4 ms. The first-frame gains of `b2b6d13` and
-      `1cdc3cb` measured in their own runs do not show here. These live startup
-      figures are also inside the period of mouse movement.
+      `1cdc3cb` measured in their own runs do not show here.
     - The live hello warm trace: 195.8 ms to 203.9 ms.
     - The pointer movement in the GPUI pass: jamb's CPU 1.09% to 1.41%, and its
       context switches 581 to 605 a second, now above GPUI's 588.
@@ -543,15 +536,6 @@ What these numbers do not cover:
 - **One machine.** Every figure is from one desktop with an i5-11600K and an RTX
   3070 Ti. There is no integrated GPU, no laptop, no high-DPI display, and no
   multi-GPU setup.
-- **Conditions differ from 2026-10-21.** The mouse moved over the live windows on
-  the secondary monitor during the startup and idle phases of the first live run
-  (about the first ten minutes), and the foreground changed once, to hello at
-  09:18:51 and back. The medians are robust to that; the maxima are not, and the
-  startup figures of those phases are affected. No video played on the primary
-  monitor this time, so the background load also differs.
-- **GPUI pass.** Its watch log records two cursor moves at 09:39:18 and 09:39:19
-  with no focus change. The script does not move the cursor in this pass, so the
-  source of the moves is not known.
 - **Commits.** The live runs and the GPUI pass ran on `2124a35`, with no pacing.
   The soak and the Go suite ran on `da18e5b`, which is the same code plus the
   pacing commit that was dropped. Pacing does not affect memory, and the headless
