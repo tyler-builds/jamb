@@ -110,7 +110,7 @@ Where a figure is a median with a range, the range is in brackets.
 | Soak, private bytes, slope after 5 min | -5.0 MiB/h | -7.9 MiB/h | no growth | soak, 30 min |
 | Soak, working set, range after 5 min | 218–253 MiB | 204–232 MiB | lower range | soak, 30 min |
 | Soak, working set, slope after 5 min | -4.8 MiB/h | -7.7 MiB/h | no growth | soak, 30 min |
-| Soak, GC cycles in 30 min | 831 | 531 | -36% | soak, 30 min |
+| Soak, GC cycles in 30 min | 828 | 527 | -36% | soak, 30 min |
 | Soak, allocated in 30 min | 40.8 GiB | 22.4 GiB | -45% | soak, 30 min |
 | Soak, allocations (mallocs) in 30 min | 184.8 million | 57.1 million | -69% | soak, 30 min |
 | jamb warm launch, window visible (GPUI pass) | 204.3 ms [200.8–242.8] | 203.5 ms [201.2–233.5] | -0.4% | `compare-gpui`, 3 runs |
@@ -311,8 +311,9 @@ five, fitted by least squares to the heap log from 300 s to 1,800 s:
 - Private bytes: range **208 to 236 MiB**, slope **−7.9 MiB/hour**.
 - Working set: range **204 to 232 MiB**, slope **−7.7 MiB/hour**.
 
-Over the 30 minutes the process ran **531 GC cycles** and allocated **22.4 GiB**,
-with 57.1 million allocations. On 2026-10-21 the same measurements were 831 cycles,
+Over the 30 minutes the process ran **527 GC cycles** and allocated **22.4 GiB**,
+with 57.1 million allocations. On 2026-10-21 the same measurements were 828 cycles
+(the 2026-10-21 section gives the counter's end value, 831),
 40.8 GiB and 184.8 million. Every 5-minute bucket after the warm-up stays in its
 range, and none of the three counters rises after the warm-up. The heap's fitted
 slope is positive, but its range is flat across the buckets, and the fit covers
