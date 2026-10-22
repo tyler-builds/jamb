@@ -1,7 +1,9 @@
 package app
 
 import (
+	"bytes"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +13,10 @@ import (
 	"github.com/tyler-builds/jamb/internal/uihost"
 	"github.com/tyler-builds/jamb/ui"
 )
+
+// The tests exercise the inspector, so they register it, as package devtools does
+// for an app.
+func init() { RegisterInspector() }
 
 // inspSampleWindow makes a headless window to inspect: a labelled button, a
 // check box and a card, with the host side the inspector reads.
@@ -307,6 +313,30 @@ func TestInspectShortcutNeedsDevTools(t *testing.T) {
 	}
 	if h.inspectKey(input.KeyI, input.ModCtrl) {
 		t.Fatal("Ctrl+I without Shift was taken as the shortcut")
+	}
+}
+
+// TestInspectNotRegistered checks that without RegisterInspector the shortcut does
+// not open anything and is left to the window, and that the warning says how to
+// link the inspector, once.
+func TestInspectNotRegistered(t *testing.T) {
+	registered := inspectOpen
+	defer func() { inspectOpen = registered }()
+	inspectOpen = nil
+	h, _, _ := inspSampleWindow(t)
+	h.devTools = true
+	if h.inspectKey(input.KeyI, input.ModCtrl|input.ModShift) {
+		t.Fatal("the shortcut was taken without a registered inspector")
+	}
+	if h.insp != nil {
+		t.Fatal("an inspector opened without RegisterInspector")
+	}
+	inspectorWarn = sync.Once{}
+	var out bytes.Buffer
+	warnInspectorNotLinked(&out)
+	warnInspectorNotLinked(&out)
+	if n := strings.Count(out.String(), "devtools"); n != 1 || !strings.Contains(out.String(), "jamb/devtools") {
+		t.Errorf("warning = %q, want one line that names the devtools import", out.String())
 	}
 }
 

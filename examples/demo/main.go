@@ -3,6 +3,9 @@ package main
 import (
 	"github.com/tyler-builds/jamb/app"
 
+	// The visual inspector: Ctrl+Shift+I opens it, here in a release build too
+	// (see App.DevTools).
+	_ "github.com/tyler-builds/jamb/devtools"
 	"github.com/tyler-builds/jamb/examples/demo/views"
 )
 
@@ -14,6 +17,7 @@ func main() {
 	application := app.New().
 		AppID("JambExamples.Demo").
 		SingleInstance(nil).
+		DevTools(true).
 		OnNotification(views.NotificationClicked(store))
 	application.Run(app.Window{
 		Title:     "Jamb Demo",
