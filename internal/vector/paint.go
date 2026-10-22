@@ -49,7 +49,9 @@ type Paint struct {
 	Gradient *Gradient
 }
 
-// shader computes premultiplied colors for the pixels of one paint.
+// shader computes premultiplied colors for the pixels of one paint. A canvas keeps
+// one shader and sets it up for each fill (see init), since the gradient's table
+// is 4 KB and would otherwise be made for every fill.
 type shader struct {
 	solid [4]float32 // premultiplied, 0..255
 	grad  *Gradient
@@ -58,20 +60,22 @@ type shader struct {
 	alpha float32
 }
 
-func newShader(p Paint, toDevice Matrix, alpha float32) (*shader, bool) {
-	s := &shader{alpha: alpha}
+// init sets s up to paint p with the matrix toDevice and the alpha, as the last
+// paint s was set up for does not matter, and reports whether anything is painted.
+func (s *shader) init(p Paint, toDevice Matrix, alpha float32) bool {
+	s.grad, s.alpha = nil, alpha
 	if p.Gradient == nil || len(p.Gradient.Stops) == 0 {
 		c := p.Color
 		a := c.A * alpha
 		if a <= 0 {
-			return nil, false
+			return false
 		}
 		s.solid = [4]float32{c.R * a * 255, c.G * a * 255, c.B * a * 255, a * 255}
-		return s, true
+		return true
 	}
 	g := p.Gradient
 	if len(g.Stops) == 1 {
-		return newShader(Paint{Color: g.Stops[0].Color}, toDevice, alpha)
+		return s.init(Paint{Color: g.Stops[0].Color}, toDevice, alpha)
 	}
 	m := g.Matrix
 	if m == (Matrix{}) {
@@ -79,7 +83,7 @@ func newShader(p Paint, toDevice Matrix, alpha float32) (*shader, bool) {
 	}
 	inv, ok := m.Then(toDevice).Invert()
 	if !ok {
-		return nil, false
+		return false
 	}
 	s.grad, s.inv = g, inv
 	// The colors along the gradient, interpolated straight, then premultiplied.
@@ -89,7 +93,7 @@ func newShader(p Paint, toDevice Matrix, alpha float32) (*shader, bool) {
 		a := c.A * alpha
 		s.lut[i] = [4]float32{c.R * a * 255, c.G * a * 255, c.B * a * 255, a * 255}
 	}
-	return s, true
+	return true
 }
 
 func stopColor(stops []Stop, t float32) Color {
