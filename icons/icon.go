@@ -9,6 +9,7 @@ package icons
 import (
 	"image"
 	"math"
+	"sync"
 )
 
 // Icon is a vector icon on a 24×24 grid.
@@ -19,6 +20,11 @@ type Icon struct {
 	fills   [][]pt // closed polygons, filled
 	// StrokeWidth in grid units; default 2.
 	StrokeWidth float32
+
+	// build makes the shapes; it runs once, on the first Rasterize, so that an
+	// app pays for the icons it draws and not for the whole set at start.
+	build func(b *builder)
+	once  sync.Once
 }
 
 type pt struct{ x, y float32 }
@@ -29,12 +35,16 @@ type builder struct {
 	cur []pt
 }
 
-func newIcon(name string, build func(b *builder)) *Icon {
-	ic := &Icon{Name: name, StrokeWidth: 2}
-	b := &builder{ic: ic}
-	build(b)
-	b.end()
-	return ic
+// makeShapes builds the shapes of the icon, once. A zero Icon has none.
+func (ic *Icon) makeShapes() {
+	ic.once.Do(func() {
+		if ic.build != nil {
+			b := &builder{ic: ic}
+			ic.build(b)
+			b.end()
+		}
+		ic.build = nil
+	})
 }
 
 func (b *builder) end() {
@@ -127,6 +137,7 @@ func abs(v float32) float32 {
 // computed analytically from the distance to each stroke, which gives clean
 // round caps and joins at any size.
 func (ic *Icon) Rasterize(dst *image.Alpha) {
+	ic.makeShapes()
 	b := dst.Bounds()
 	w, h := b.Dx(), b.Dy()
 	scale := float32(w) / 24
