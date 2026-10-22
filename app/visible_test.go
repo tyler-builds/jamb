@@ -1,6 +1,10 @@
 package app
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/tyler-builds/jamb/internal/scene"
+)
 
 // TestDrawWanted checks the frame decision for the window states: shown, hidden,
 // minimized (which the platform reports as not visible, with no client area) and
@@ -24,6 +28,26 @@ func TestDrawWanted(t *testing.T) {
 	} {
 		if got := drawWanted(tc.visible, tc.drawn, tc.width, tc.height); got != tc.want {
 			t.Errorf("%s: drawWanted = %t; want %t", name, got, tc.want)
+		}
+	}
+}
+
+// The first frame's scene is used only for the size it was built for: a window
+// that has been resized since needs a new one, and a missing scene is built.
+func TestPreSceneFits(t *testing.T) {
+	built := &scene.Scene{}
+	for name, tc := range map[string]struct {
+		pre           *scene.Scene
+		preW, preH    int
+		width, height int
+		want          bool
+	}{
+		"same size":     {built, 800, 600, 800, 600, true},
+		"resized":       {built, 780, 600, 800, 600, false},
+		"nothing built": {nil, 800, 600, 800, 600, false},
+	} {
+		if got := preSceneFits(tc.pre, tc.preW, tc.preH, tc.width, tc.height); got != tc.want {
+			t.Errorf("%s: preSceneFits = %t, want %t", name, got, tc.want)
 		}
 	}
 }

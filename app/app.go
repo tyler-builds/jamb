@@ -459,6 +459,10 @@ type host struct {
 
 	frames    int
 	presented bool // the last OnFrame reached the screen, see Presented
+	// preScene is the first frame's scene, built in OnCreate for a client area of
+	// preW×preH; nil once a frame has used it.
+	preScene   *scene.Scene
+	preW, preH int
 
 	traceFrames int
 	traceSince  time.Time
@@ -474,24 +478,13 @@ func (h *host) OnCreate(w platform.Window) error {
 		// that cannot be given a swap chain yet.
 		return errors.New("the GPU device was lost and has not been rebuilt yet; open the window again in a moment")
 	}
-	width, height := w.Size()
-	r, err := newRenderer(w, width, height)
-	if err != nil {
-		return err
-	}
-	h.r = r
-	desc := ""
-	if d, ok := r.(interface{ Describe() string }); ok {
-		desc = " (" + d.Describe() + ")"
-	}
-	h.dev.tracef("renderer ready in %v%s", time.Since(t0), desc)
 	t1 := time.Now()
 	ts, waited, err := sharedText()
 	if err != nil {
 		return err
 	}
 	if waited {
-		h.dev.tracef("fonts ready (waited %v after the renderer)", time.Since(t1))
+		h.dev.tracef("fonts ready (waited %v)", time.Since(t1))
 	}
 	h.rt = ui.NewRuntime(h.cfg.Root, h.cfg.themeFor(false), ts)
 	h.rt.SetStrings(h.cfg.Strings)
@@ -537,6 +530,24 @@ func (h *host) OnCreate(w platform.Window) error {
 		}
 	}
 	h.handle.host = h
+	// The first frame is built while the GPU device is still being created (see
+	// prepareDevice): the layout and paint do not need the device, so the window
+	// waits only for what is left of it. OnFrame presents this scene.
+	if width, height := w.Size(); width > 0 && height > 0 {
+		h.preScene = h.rh.Frame(time.Now())
+		h.preW, h.preH = width, height
+	}
+	width, height := w.Size()
+	r, err := newRenderer(w, width, height)
+	if err != nil {
+		return err
+	}
+	h.r = r
+	desc := ""
+	if d, ok := r.(interface{ Describe() string }); ok {
+		desc = " (" + d.Describe() + ")"
+	}
+	h.dev.tracef("renderer ready %v after process start (OnCreate took %v)%s", time.Since(processStart), time.Since(t0), desc)
 	application.windows = append(application.windows, h)
 	h.startInspector()
 	return nil
@@ -803,7 +814,11 @@ func (h *host) OnFrame(w platform.Window) bool {
 	if h.stress != nil {
 		h.stress.begin(h, h.dev.stressSecs)
 	}
-	sc := h.rh.Frame(frameStart)
+	sc := h.preScene
+	h.preScene = nil
+	if !preSceneFits(sc, h.preW, h.preH, width, height) {
+		sc = h.rh.Frame(frameStart)
+	}
 	if h.insp != nil {
 		h.insp.frame(h.rt, frameStart)
 	}
