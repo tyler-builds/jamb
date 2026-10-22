@@ -128,7 +128,7 @@ The milestone status, and the known limitations and next steps.
 - **Paint cost is per visible node.** Paint and hit testing skip off-screen
   subtrees (see the frame pipeline), so a long scroll list costs about its
   visible rows: repainting 10,000 nodes with 73 on screen takes about 0.07 ms
-  (71.5 µs in the 2026-10-21 Go suite).
+  (72.1 µs in the 2026-10-22 Go suite; 71.5 µs on 2026-10-21).
   A tree whose nodes are all on screen still pays the per-node cost, and a
   container with 10,000 children runs a visibility test on each of them. The
   node itself is about 1 KB; the compact per-node paint struct is the next
@@ -157,8 +157,8 @@ The milestone status, and the known limitations and next steps.
   everything after it. Windows refuses drops from Explorer into an app
   running as administrator.
 - **Startup.** The ~180 ms startup floor (2026-10-12) is Direct3D driver initialization.
-  The framework's own startup cost is about 20 ms. The 2026-10-21 traces put the first
-  frame at 196 ms for hello and 215 ms for the demo, warm.
+  The framework's own startup cost is about 20 ms. The 2026-10-22 traces put the first
+  frame at 204 ms for hello and 221 ms for the demo, warm (196 ms and 215 ms on 2026-10-21).
 - **Menus.** Alt+letter mnemonics are not implemented. A menu stays open when a
   key binding moves focus elsewhere. A press outside, Escape or Tab closes it.
   Focus loss does not close menus, because a click on the trigger of a focusable
