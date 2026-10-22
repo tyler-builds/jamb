@@ -149,11 +149,19 @@ type Renderer struct {
 	capture func(*image.RGBA, error)
 	noVSync bool
 	swap1   bool // created via CreateSwapChainForHwnd (unscaled flip model)
+	// swap2 is the chain's IDXGISwapChain2, which sets the size shown of the
+	// buffers; nil when the chain has none.
+	swap2 *com
 	// waitable is the swap chain's frame latency waitable object, 0 when the
 	// chain has none. It is signaled when the chain can take another frame.
 	waitable  uintptr
 	swapFlags uint32
 	resized   bool // the swap chain changed size this frame
+	// bufW and bufH are the size of the swap chain's buffers, which are at least
+	// width×height. They differ from it only with swap2; see resize.
+	bufW, bufH int
+	// resizeBuffersCalls counts the ResizeBuffers calls, for the tests.
+	resizeBuffersCalls int
 	// presentStart and presentEnd are when the last Present call started and
 	// returned, on the clock of win32.PerformanceNanos.
 	presentStart, presentEnd int64
@@ -409,16 +417,86 @@ func (r *Renderer) createTarget() error {
 	return nil
 }
 
+// resize makes w×h the size of the frame. A window that grows takes buffers with
+// headroom (see headroom), and a size that the buffers still hold only moves the
+// shown part of them (IDXGISwapChain2::SetSourceSize). ResizeBuffers drops the
+// buffers' contents and costs most of a resize step, so a drag that keeps within
+// the headroom calls it only when the window outgrows it. A chain without swap2
+// has buffers of exactly the window's size, as it always had.
 func (r *Renderer) resize(w, h int) error {
+	if r.swap2 != nil && w <= r.bufW && h <= r.bufH {
+		if err := r.setSourceSize(w, h); err != nil {
+			return err
+		}
+		r.width, r.height = w, h
+		return nil
+	}
+	bw, bh := w, h
+	if r.swap2 != nil {
+		bw, bh = headroom(w), headroom(h)
+	}
+	return r.resizeBuffers(bw, bh, w, h)
+}
+
+// resizeBuffers sets the buffers to bw×bh and shows the top-left w×h of them.
+func (r *Renderer) resizeBuffers(bw, bh, w, h int) error {
 	syscall.SyscallN(r.ctx.fn(33), r.ctx.this(), 0, 0, 0) // OMSetRenderTargets(0, nil, nil)
 	r.rtv.Release()
 	r.rtv = nil
-	hr, _, _ := syscall.SyscallN(r.swap.fn(13), r.swap.this(), 0, uintptr(w), uintptr(h), dxgiFormatUnknown, uintptr(r.swapFlags)) // ResizeBuffers
+	hr, _, _ := syscall.SyscallN(r.swap.fn(13), r.swap.this(), 0, uintptr(bw), uintptr(bh), dxgiFormatUnknown, uintptr(r.swapFlags)) // ResizeBuffers
+	r.resizeBuffersCalls++
 	if err := r.checkDevice("IDXGISwapChain::ResizeBuffers", hr); err != nil {
+		// No target is bound now; the next frame resizes again.
+		r.width, r.height = 0, 0
 		return err
+	}
+	r.bufW, r.bufH = bw, bh
+	if r.swap2 != nil {
+		if err := r.setSourceSize(w, h); err != nil {
+			r.width, r.height = 0, 0
+			return err
+		}
 	}
 	r.width, r.height = w, h
 	return r.createTarget()
+}
+
+// headroom returns the buffer size for a visible size of n: a quarter more, so a
+// window that keeps growing takes a new buffer once per 25 percent of growth.
+func headroom(n int) int { return n + n/4 }
+
+// ShrinkBuffers gives back the buffers' room beyond the headroom of the visible
+// size, when the window is at most half the size of its buffers in a dimension,
+// as after a resize that made it smaller. The buffers' contents are lost, so the
+// caller draws a frame, and it reports whether the buffers changed. A chain
+// without swap2 has no spare room, so it reports false.
+func (r *Renderer) ShrinkBuffers() (bool, error) {
+	if r.swap2 == nil || r.width <= 0 || r.height <= 0 {
+		return false, nil
+	}
+	if r.bufW <= 2*r.width && r.bufH <= 2*r.height {
+		return false, nil
+	}
+	if err := r.resizeBuffers(headroom(r.width), headroom(r.height), r.width, r.height); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// setSourceSize shows the top-left w×h of the buffers.
+func (r *Renderer) setSourceSize(w, h int) error {
+	hr, _, _ := syscall.SyscallN(r.swap2.fn(29), r.swap2.this(), uintptr(w), uintptr(h)) // IDXGISwapChain2::SetSourceSize
+	return r.checkDevice("IDXGISwapChain2::SetSourceSize", hr)
+}
+
+// queryChain2 returns the chain's IDXGISwapChain2, or nil when it has none.
+func (r *Renderer) queryChain2() *com {
+	var sc2 *com
+	hr, _, _ := syscall.SyscallN(r.swap.fn(0), r.swap.this(), uintptr(unsafe.Pointer(&iidIDXGISwapChain2)), uintptr(unsafe.Pointer(&sc2))) // QueryInterface
+	if hresult(hr).failed() {
+		return nil
+	}
+	return sc2
 }
 
 type inputElem struct {
@@ -931,7 +1009,9 @@ func (r *Renderer) readBack() (*image.RGBA, error) {
 		return nil, err
 	}
 	defer staging.Release()
-	syscall.SyscallN(r.ctx.fn(47), r.ctx.this(), staging.this(), back.this()) // CopyResource
+	// The buffers may be larger than the frame, so only its shown part is copied.
+	region := box{Right: uint32(r.width), Bottom: uint32(r.height), Back: 1}
+	syscall.SyscallN(r.ctx.fn(46), r.ctx.this(), staging.this(), 0, 0, 0, 0, back.this(), 0, uintptr(unsafe.Pointer(&region))) // CopySubresourceRegion
 	var m mappedSubresource
 	hr, _, _ = syscall.SyscallN(r.ctx.fn(14), r.ctx.this(), staging.this(), 0, d3dMapRead, 0, uintptr(unsafe.Pointer(&m)))
 	if err := check("Map(staging)", hr); err != nil {
@@ -972,8 +1052,9 @@ func (r *Renderer) releaseSwap() {
 		r.waitable = 0
 	}
 	r.rtv.Release()
+	r.swap2.Release()
 	r.swap.Release()
-	r.rtv, r.swap = nil, nil
+	r.rtv, r.swap, r.swap2 = nil, nil, nil
 }
 
 // Recreate builds the window's swap chain and render target again on the
@@ -1072,6 +1153,12 @@ func flipWaitable(effect uint32) uint32 {
 // device limits the latency, as it always did.
 func (r *Renderer) finishSwapChain(swap *com, flags uint32) {
 	r.swap, r.swapFlags = swap, flags
+	// The buffers are created at the window's client size, which is the size
+	// the chain was asked for (zero means the window's size).
+	r.bufW, r.bufH = r.width, r.height
+	if r.swap1 {
+		r.swap2 = r.queryChain2()
+	}
 	r.watchOcclusion()
 	if flags&dxgiSwapChainFlagWaitable != 0 && r.attachWaitable() {
 		return

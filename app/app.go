@@ -603,6 +603,7 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 	case platform.EventMoved:
 		h.saveGeometry(w)
 		h.reportGeometry(w)
+		h.shrinkBuffers(w)
 	case platform.EventSettingsChanged:
 		h.applySettings()
 	case platform.EventWindowState:
@@ -755,6 +756,28 @@ func (h *host) TitleArea(w platform.Window, x, y float32) platform.TitleArea {
 // Presented implements platform.Presenter: the last frame was shown, so the
 // window needs no repaint on WM_PAINT at its size.
 func (h *host) Presented() bool { return h.presented }
+
+// shrinkBuffers gives the window's swap chain back the room that a larger size
+// took, once the user has finished moving or resizing it (see
+// d3d11.Renderer.ShrinkBuffers). The window then draws into the smaller buffers.
+func (h *host) shrinkBuffers(w platform.Window) {
+	s, ok := h.r.(interface{ ShrinkBuffers() (bool, error) })
+	if !ok {
+		return
+	}
+	shrunk, err := s.ShrinkBuffers()
+	if err != nil {
+		if errors.Is(err, render.ErrDeviceLost) {
+			loseGPU(err)
+		} else {
+			fmt.Fprintln(os.Stderr, "jamb: shrinking the window's buffers failed:", err)
+		}
+		return
+	}
+	if shrunk {
+		w.Wake()
+	}
+}
 
 // OnFrame implements platform.Handler.
 func (h *host) OnFrame(w platform.Window) bool {
