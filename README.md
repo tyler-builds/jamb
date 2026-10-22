@@ -91,46 +91,54 @@ and the [concepts](docs/concepts.md) page introduces the API.
 ## Benchmarks
 
 The same hello-world app (a window, a greeting and a click counter) built with jamb and with GPUI, the
-UI framework from Zed, on one Windows machine. The figures are from 2026-10-21, except the two rows
-marked 2026-10-12. Lower is better in every row, and the better figure is in bold. The windows were on
-a secondary 144 Hz monitor, never activated. The machine was not dedicated to benchmarking: other
-applications were running. The [docs/comparison-gpui.md](docs/comparison-gpui.md) has the method, the ranges of each measurement and
-the setup.
+UI framework from Zed, on one Windows machine. The figures are from 2026-10-22, except the rows marked
+2026-10-12. Lower is better in every row, and the better figure is in bold. The windows were on a
+secondary 144 Hz monitor, never activated. No video was noted on the primary monitor this time (one
+played during the 2026-10-21 pass), so the two passes' background loads differ. The
+[docs/comparison-gpui.md](docs/comparison-gpui.md) has the method, the ranges of each measurement and
+the setup, and the 2026-10-21 pass.
 
 | Measure | jamb | GPUI |
 |---|---|---|
-| Startup to first frame, warm launch | **222 ms** | 304 ms |
-| Startup to first frame, first launch (scanned by the antivirus) | **487 ms** | 493 ms |
-| Window visible, first launch | 468 ms | **460 ms** |
-| Idle CPU, window in the background, 60 s | **0.05%** of one core | 1.74% |
-| Idle context switches per second | **64** | 410 |
-| Memory, private bytes | 78.8 MB | **73.2 MB** |
-| Memory, working set | 58.4 MB | **49.0 MB** |
+| Startup to first frame, warm launch | **215 ms** | 296 ms |
+| Startup to first frame, first launch (scanned by the antivirus) | **496.5 ms** | 502.2 ms |
+| Window visible, first launch | **480 ms** | 485.9 ms |
+| Idle CPU, window in the background, 60 s | **0.10%** of one core | 1.46% |
+| Idle context switches per second | **66** | 422 |
+| Memory, private bytes | 75.7 MB | **73.2 MB** |
+| Memory, working set | 55.1 MB | **49.0 MB** |
 | GPU memory, dedicated | **13.7 MB** | 15.5 MB |
-| Threads | 39 | **32** |
-| Handles | 483 | **462** |
-| CPU while the pointer moves over the window | **1.1%** | 3.6% |
-| CPU while the window is resized | **11.8%** | 13.9% |
-| Context switches per second while resizing | 2,175 | **1,531** |
-| Build after an edit (release, text change) | **1.36 s** | 2.57 s (release), 3.60 s (debug) |
+| Threads | 38 | **32** |
+| Handles | 477 | **462** |
+| CPU while the pointer moves over the window | **1.4%** | 2.5% |
+| CPU while the window is resized | **2.5%** | 10.8% |
+| Context switches per second while resizing | **1,210** | 1,326 |
+| Build after an edit (release, text change) | **1.39 s** | 2.50 s (release), 3.62 s (debug) |
 | Clean build (2026-10-12) | **9 s** | 138 s (release), 100 s (debug) |
-| Binary size, release build | 9.36 MB | **9.22 MB** |
+| Binary size, release build | **8.02 MB** | 9.22 MB |
 | Binary size, GPUI's size-optimized build profile (2026-10-12) | | **4.31 MB** |
 
-The focused idle CPU was not measured on 2026-10-21. On 2026-10-12 the hello app used 0.29% of a core
-with the window focused, and GPUI 1.85%. jamb's frames on the secondary monitor followed the primary
-monitor's refresh rate, a known issue listed in [BENCHMARKS.md](BENCHMARKS.md).
+Against 2026-10-21, jamb's resize CPU fell from 11.8% to 2.5%, and its warm launch and idle memory
+are a little lower. Its idle CPU (0.05% then) and its pointer CPU (1.1% then) rose, though both stay
+below GPUI's. The focused idle CPU was not measured on 2026-10-21 or 2026-10-22. On 2026-10-12 the
+hello app used 0.29% of a core with the window focused, and GPUI 1.85%. jamb's frames on the secondary
+monitor followed the primary monitor's refresh rate, a known issue listed in
+[BENCHMARKS.md](BENCHMARKS.md).
 
-The demo app (four pages), from [BENCHMARKS.md](BENCHMARKS.md), measured on 2026-10-21 unless the row says
-otherwise:
+The demo app (four pages), from [BENCHMARKS.md](BENCHMARKS.md), measured on 2026-10-22 unless the row says
+otherwise. The figures in the middle column are the 2026-10-22 results, with the 2026-10-21 figure in
+brackets where it changed:
 
 | Measure | Result | What it means |
 |---|---|---|
-| Startup to first frame, warm | 215 ms | About 180 ms of it is the graphics driver creating the Direct3D device (2026-10-12). |
-| Idle CPU, unfocused, 60 s | 0.13% of one core | An idle window draws nothing. About 66 context switches a second; the 2026-10-12 analysis traced most of an idle window's wake-ups to the graphics driver's thread. |
-| Full re-render of every component | 0.97 ms of CPU per frame on average, 164 FPS at vsync, on a 310-element page | A full re-render is a stress case; normal updates are incremental. It allocates 936 KB a frame, up from 110 KB (2026-10-06), which is under investigation. |
-| One signal change in a 10,000-element tree | 0.31 ms | Only the component that read the signal renders again. |
-| One scroll step in a 100,000-row list | 0.15 ms | Only the rows in view are built. |
+| Startup to first frame, warm | 221 ms (261 ms to the first painted frame) [215 ms, 252 ms] | About 180 ms of it is the graphics driver creating the Direct3D device (2026-10-12). Both figures are higher than on 2026-10-21, which is not explained. |
+| Idle CPU, unfocused, 60 s | 0.08% of one core [0.13%] | An idle window draws nothing. About 66 context switches a second; the 2026-10-12 analysis traced most of an idle window's wake-ups to the graphics driver's thread. |
+| Full re-render of every component | 0.81 ms of CPU per frame on average, 165 FPS at vsync, on a 310-element page [0.97 ms, 164 FPS] | A full re-render is a stress case; normal updates are incremental. It allocates 465 KB a frame [936 KB], still above the 110 KB of 2026-10-06. |
+| One key press in a 10,000-node tree | 0.47 µs [273 µs] | The top modal is cached per build, so a key press no longer searches the tree. |
+| One signal change in a 10,000-element tree | 0.32 ms [0.31 ms] | Only the component that read the signal renders again. |
+| One scroll step in a 100,000-row list | 0.15 ms in a `UniformList`, 0.07 ms in a `ListOf` [0.15 ms] | Only the rows in view are built. |
+| Expanded tree, 10,100 rows, one frame | 2.0 ms [80.5 ms] | A tree or data grid without a height shows the rows that fit its parent. |
+| Page switch, first visit (click to Present, p95) | 37.7 ms [26.7 ms] | The first visit to a page builds it. This got worse in the live run, which is not explained. |
 | Rebuild after an edit (2026-10-06) | 0.25 to 0.84 s | Edit, build and run stays under a second; `jamb dev` shows the new window 1.05 to 1.36 s after a save. |
 
 ## How it works
