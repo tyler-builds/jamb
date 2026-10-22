@@ -1,13 +1,584 @@
 # Benchmarks
 
 This file reports jamb's measured performance. The current results, dated
-2026-10-21, come first, followed by how to reproduce them and the coverage gaps.
-The earlier measurements (2026-10-06 to 2026-10-14) follow under
+2026-10-22, come first. They are compared with the results of 2026-10-21, which
+were measured before the performance work of 2026-10-22 and follow them. Each
+section gives how to reproduce its figures and the coverage gaps. The earlier
+measurements (2026-10-06 to 2026-10-14) follow under
 [Earlier measurements](#earlier-measurements), with their original dates. Where a
-2026-10-21 figure replaces an earlier one, the earlier figure is marked
-superseded and kept, so the history stays readable.
+later figure replaces an earlier one, the earlier figure is marked superseded and
+kept, so the history stays readable.
 
-## Current results (2026-10-21)
+## Current results (2026-10-22)
+
+These are the results of the performance work on branch `perf/improvements-2026-10-22`,
+measured on the same machine and with the same scripts as 2026-10-21. The
+conditions differ from that pass in two ways, and both matter for reading the
+live figures: the mouse moved over the benchmark windows during part of the live
+run, and no video was playing on the primary monitor (the machine was in normal
+use). The details are under [Gaps](#gaps).
+
+| | |
+|---|---|
+| CPU | Intel Core i5-11600K, 6 cores, 12 threads, 3.90 GHz |
+| GPU | NVIDIA GeForce RTX 3070 Ti, driver 32.0.16.1742 |
+| RAM | 31.9 GB |
+| OS | Windows 11 Enterprise, build 26200 |
+| Toolchains | Go 1.27.1 windows/amd64; Rust 1.95.0 (GPUI comparison only) |
+| Power plan | Balanced |
+| Displays | Same as 2026-10-21: primary 1920 x 1080 at 165 Hz; secondary 1920 x 1080 at 144 Hz, at X = -1920 |
+| Live windows | Same as 2026-10-21: logical (-1600, 150) on the secondary monitor, never activated (`JAMB_NOACTIVATE=1`) |
+| Background load | Normal use. No video was noted. The mouse moved over the live windows during the startup and idle phases of the first live run, about the first ten minutes (see [Gaps](#gaps)) |
+| Commits | Live runs and the GPUI pass: `2124a35`, the branch HEAD at the time, with no pacing. Soak and Go suite: `da18e5b`, the same code as `2124a35` plus the per-monitor pacing commit that was dropped afterwards (see [Tried and dropped](#tried-and-dropped)). The pacing does not change memory, and the headless suite does not exercise it |
+| Samples | Live: 3 runs, each figure the median across runs with the range in brackets. GPUI pass: 3 runs, warm launches pooled (15 values). Soak: one 30-minute run. Go: `-count 10`, compared with 2026-10-21 by benchstat |
+
+The method is the 2026-10-21 method, with the scripts and their options as
+described in [How to reproduce (2026-10-21)](#how-to-reproduce-2026-10-21).
+
+### Summary
+
+Every figure of the live run, the GPUI pass (jamb's side), the soak and the Go
+suite's headline rows is in this table, including the ones that got worse or did
+not move. "Change" is the 2026-10-22 value minus the 2026-10-21 value, with the
+percentage of the earlier value. Lower is better unless the row says otherwise.
+Where a figure is a median with a range, the range is in brackets.
+
+| Metric | 2026-10-21 | 2026-10-22 | Change | Measured by |
+|---|--:|--:|--:|---|
+| Binary, stripped release, hello | 9.36 MB | 8.02 MB | -1.34 MB (-14%) | `bench-live`, one build each |
+| Binary, stripped release, demo | 19.61 MB | 19.04 MB | -0.57 MB (-3%) | `bench-live` |
+| Binary, default `go build`, hello | 13.01 MB | 11.42 MB | -1.59 MB (-12%) | `bench-live` |
+| Binary, default `go build`, demo | 26.91 MB | 26.35 MB | -0.56 MB (-2%) | `bench-live` |
+| Startup, hello, first launch, window visible / painted | 462 / 487.4 ms | 462.2 / 475.7 ms | 0 / -11.7 ms | `bench-live`, 3 runs |
+| Startup, hello, first launch, `JAMB_TRACE` | 198.1 ms | 197.9 ms | 0 | `bench-live` |
+| Startup, hello, warm, window visible / painted | 213.8 / 231.9 ms | 218.7 / 232.6 ms | +4.9 / +0.7 ms | `bench-live` |
+| Startup, hello, warm, `JAMB_TRACE` | 195.8 ms | 203.9 ms [196–213.9] | +8.1 ms (+4%), worse | `bench-live` |
+| Startup, demo, first launch, window visible / painted | 608.7 / 640.4 ms | 630.8 / 646.2 ms | +22.1 / +5.8 ms, worse | `bench-live` |
+| Startup, demo, first launch, `JAMB_TRACE` | 214.9 ms | 217.7 ms | +2.8 ms, worse | `bench-live` |
+| Startup, demo, warm, window visible / painted | 226 / 251.8 ms | 243.5 / 261.4 ms | +17.5 / +9.6 ms, worse | `bench-live` |
+| Startup, demo, warm, `JAMB_TRACE` | 214.8 ms | 221.2 ms [211.6–247.3] | +6.4 ms (+3%), worse | `bench-live` |
+| Idle CPU, hello, unfocused 60 s | 0.08% | 0.03% [0.03–0.42] | lower median; the 0.42% maximum is during the mouse movement | `bench-live`, 3 runs |
+| Idle context switches/s, hello | 66 | 66.1 [65.5–152.6] | unchanged median; the maximum is during the mouse movement | `bench-live` |
+| Idle private bytes, hello | 78.1 MB | 75.8 MB | -2.3 MB (-3%) | `bench-live` |
+| Idle working set, hello | 63.3 MB | 59.6 MB | -3.7 MB (-6%) | `bench-live` |
+| Threads / handles, hello | 39 / 509 | 39 [38–40] / 509 [503–528] | unchanged | `bench-live` |
+| GPU shared memory, hello | 1.5 MB | 1.1 MB | -0.4 MB | `bench-live` |
+| Idle CPU, demo, unfocused 60 s | 0.13% | 0.08% [0.05–0.13] | lower | `bench-live` |
+| Idle context switches/s, demo | 65.6 | 65.5 [65.5–73.2] | unchanged | `bench-live` |
+| Idle private bytes, demo | 122.9 MB | 119.0 MB | -3.9 MB (-3%) | `bench-live` |
+| Idle working set, demo | 117.2 MB | 115.3 MB | -1.9 MB (-2%) | `bench-live` |
+| Threads / handles, demo | 40 / 539 | 40 / 537 [536–539] | unchanged / -2 | `bench-live` |
+| GPU dedicated / shared memory, demo | 17.1 / 2.1 MB | 17.1 / 1.6 MB | unchanged / -0.5 MB | `bench-live` |
+| Two windows, idle 60 s, CPU | 0.1% [0–0.21] | 0.05% [0.03–0.08] | lower | `bench-live` |
+| Two windows, idle 60 s, context switches/s | 65.4 | 65.6 [65.4–65.8] | unchanged | `bench-live` |
+| Scenario, pointer moves over the Activity rows, CPU | 15.3% | 13.58% [12.96–14.83] | -1.7 points | `bench-live` |
+| Scenario, Activity scroll, CPU | 19.35% | 14.66% [14.35–15.14] | -4.7 points | `bench-live` |
+| Scenario, animation, CPU | 18.58% | 14.82% [13.26–15.31] | -3.8 points | `bench-live` |
+| Scenario, page switch, CPU | 17.32% | 19.36% [15.77–21.39] | +2.0 points, worse | `bench-live` |
+| Scenario, code editor, CPU | 22.64% | 18.27% [17.32–23.9] | -4.4 points | `bench-live` |
+| Scenario, typing, CPU | 4.84% [4.37–7.17] | 8.12% [4.37–8.43] | +3.3 points, worse (ranges overlap) | `bench-live` |
+| CPU per frame p99, Activity scroll | 2.27 ms [1.97–2.88] | 1.29 ms [1.26–1.37] | -43% | `bench-live` |
+| CPU per frame p99, code editor | 6.34 ms | 5.21 ms [4.86–5.29] | -18% | `bench-live` |
+| Present interval median, five scenarios | 6.05–6.06 ms | 6.04–6.05 ms | unchanged (the 144 Hz period is 6.94 ms; see [Known issues](#known-issues)) | `bench-live` |
+| Present interval median, code editor | 5.95 ms | 4.53 ms [4.47–4.7] | -1.42 ms; not explained (see [Known issues](#known-issues)) | `bench-live` |
+| Frames over 1.5x the period, Activity scroll | 7 [6–16] | 1 [0–2] | fewer | `bench-live` |
+| Frames over 1.5x the period, code editor | 40 [14–55] | 14 [12–17] | fewer | `bench-live` |
+| Input to Present p95, Activity scroll (378 events) | 8.01 ms | 7.07 ms | -0.9 ms | `bench-live` |
+| Input to Present p95, typing (key events) | 17.39 ms | 12.70 ms [8.12–13.14] | -4.7 ms | `bench-live` |
+| Input to Present, animation clicks (p50 = p95) | 68.09 ms [61.81–69.83] | 47.26 ms [45.45–52.24] | -21 ms (-31%) | `bench-live` |
+| Input to Present p95, page-switch clicks (first visits) | 26.73 ms [25.64–32] | 37.68 ms [29.37–40.58] | +11 ms (+41%), worse | `bench-live` |
+| Input to Present p95, code-editor clicks | 60.92 ms [53.65–65.71] | 43.53 ms [43.35–110.78] | -17 ms; one run reached 110.78 ms | `bench-live` |
+| Input to Present p95, code-editor keys | 11.77 ms | 7.97 ms [6.46–8] | -3.8 ms | `bench-live` |
+| Resize by `SetWindowPos`, 10 s, CPU | 13.86% [10.42–14.5] | 4.53% [2.03–6.56] | -9.3 points (-67%) | `bench-live` |
+| Resize, context switches/s | 2,473 [2,383–2,518] | 1,411 [1,405–1,411] | -43% | `bench-live` |
+| Resize, frames in 10 s | 567 | 326 | -43% (fewer frames: see [What changed](#what-changed)) | `bench-live` |
+| Resize, CPU per frame p50 / p95 | 1.42 / 2.04 ms | 0.26 / 0.41 ms | -82% / -80% | `bench-live` |
+| Stress, full re-render, vsync: frames/s | 163.8 | 165.1 | +0.8% | `bench-live`, 10 s |
+| Stress, full re-render, vsync: CPU per frame avg | 0.97 ms | 0.81 ms | -16% | `bench-live` |
+| Stress, full re-render, vsync: allocated per frame | 936.1 KB | 465.2 KB | -50% | `bench-live` |
+| Stress, full re-render, vsync: objects per frame | 2,731 | 1,607 | -41% | `bench-live` |
+| Stress, full re-render, vsync: GC cycles/s | 10.5 | not in the 2026-10-22 summary | | `bench-live` |
+| Stress, full re-render, uncapped: frames/s | 729.2 | 1,357.2 [1,257.5–1,362.1] | +86% | `bench-live` |
+| Stress, full re-render, uncapped: allocated per frame | 934.1 KB | 465.3 KB | -50% | `bench-live` |
+| Stress, paint only, vsync: frames/s | 164.6 | 165.1 | unchanged | `bench-live` |
+| Stress, paint only, vsync: allocated / objects per frame | 3.6 KB / 50 | 0.5 KB / 25 | -86% / -50% | `bench-live` |
+| Stress, paint only, uncapped: frames/s | 1,796.4 | 3,628.7 [3,579.7–3,751.1] | +102% | `bench-live` |
+| Stress, paint only, uncapped: allocated / objects per frame | 0.7 KB / 27 | 0.4 KB / 23 | -43% / -15% | `bench-live` |
+| Soak, Go heap in use, range after the first 5 min | 66–129 MiB | 55–102 MiB | lower range | soak, 30 min |
+| Soak, Go heap in use, slope after the first 5 min | -6.2 MiB/h | +1.95 MiB/h | flat range across the buckets; not read as growth (see [Soak](#soak)) | soak, 30 min |
+| Soak, private bytes, range after 5 min | 222–258 MiB | 208–236 MiB | lower range | soak, 30 min |
+| Soak, private bytes, slope after 5 min | -5.0 MiB/h | -7.9 MiB/h | no growth | soak, 30 min |
+| Soak, working set, range after 5 min | 218–253 MiB | 204–232 MiB | lower range | soak, 30 min |
+| Soak, working set, slope after 5 min | -4.8 MiB/h | -7.7 MiB/h | no growth | soak, 30 min |
+| Soak, GC cycles in 30 min | 831 | 531 | -36% | soak, 30 min |
+| Soak, allocated in 30 min | 40.8 GiB | 22.4 GiB | -45% | soak, 30 min |
+| Soak, allocations (mallocs) in 30 min | 184.8 million | 57.1 million | -69% | soak, 30 min |
+| jamb warm launch, window visible (GPUI pass) | 204.3 ms [200.8–242.8] | 203.5 ms [201.2–233.5] | -0.4% | `compare-gpui`, 3 runs |
+| jamb warm launch, first painted frame (GPUI pass) | 221.6 ms [212.1–255.5] | 215.4 ms [211.2–246.9] | -6.2 ms (-3%) | `compare-gpui` |
+| jamb first launch, window visible (GPUI pass) | 468 ms [463.7–491] | 480 ms [477.2–485.1] | +12 ms (+3%), worse | `compare-gpui` |
+| jamb first launch, first painted frame (GPUI pass) | 486.9 ms [486.1–530.4] | 496.5 ms [490.9–511.7] | +9.6 ms (+2%), worse | `compare-gpui` |
+| jamb idle CPU, unfocused 60 s (GPUI pass) | 0.05% [0.05–0.23] | 0.10% [0.08–0.10] | +0.05 points, worse; still far below GPUI's 1.46% | `compare-gpui` |
+| jamb idle context switches/s (GPUI pass) | 64.1 | 66.3 [65.8–66.3] | +3%, worse | `compare-gpui` |
+| jamb private bytes (GPUI pass) | 78.76 MB [78.03–79.52] | 75.70 MB [74.26–75.92] | -3.1 MB (-4%) | `compare-gpui` |
+| jamb working set (GPUI pass) | 58.36 MB | 55.12 MB | -3.2 MB (-6%) | `compare-gpui` |
+| jamb threads / handles (GPUI pass) | 39 / 483 | 38 / 477 | -1 / -6 | `compare-gpui` |
+| jamb GPU dedicated / shared memory (GPUI pass) | 13.71 / 1.48 MB | 13.71 / 1.09 MB | unchanged / -0.39 MB | `compare-gpui` |
+| jamb pointer movement, CPU, 10 s (GPUI pass) | 1.09% [0.93–1.25] | 1.41% [1.25–1.56] | +0.32 points (+29%), worse | `compare-gpui` |
+| jamb pointer movement, context switches/s (GPUI pass) | 580.7 [575.4–592.3] | 604.5 [585.3–614.8] | +4%, worse | `compare-gpui` |
+| jamb resize, CPU, 10 s (GPUI pass) | 11.84% [11.36–13.4] | 2.50% [1.71–6.24] | -9.3 points (-79%) | `compare-gpui` |
+| jamb resize, context switches/s (GPUI pass) | 2,174.8 [2,072.1–2,200] | 1,210.1 [1,195.9–1,232.9] | -44% | `compare-gpui` |
+| Build after an edit, release, text change, hello | 1.36 s [1.34–1.37] | 1.39 s [1.33–1.47] | +0.03 s (+2%), within the spread | `compare-gpui`, 3 runs |
+| Build after an edit, default (`go build`), text change, hello | 1.48 s [1.48–1.49] | 1.43 s [1.42–1.45] | -0.05 s (-3%) | `compare-gpui` |
+| Go, `Scale`, full re-render, 10,000 nodes | 12.43 ms | 9.60 ms | -22.8% | `bench-go`, `-count 10` |
+| Go, `Scale`, single signal update, 10,000 nodes | 310.4 µs | 324.5 µs | +4.6% (p = 0.004), worse | `bench-go` |
+| Go, `KeyDispatch`, field caret, 10,000 nodes | 272.9 µs | 0.466 µs | -99.8% | `bench-go` |
+| Go, `KeyDispatch`, global binding, 10,000 nodes | 182.8 µs | 0.432 µs | -99.8% | `bench-go` |
+| Go, `TreeExpanded`, 10,100 rows, one frame | 80.53 ms | 2.00 ms | -97.5% | `bench-go` |
+| Go, `TreeExpanded`, 1,100 rows, one frame | 8.156 ms | 0.430 ms | -94.7% | `bench-go` |
+| Go, `ThemeSwitch` (demo) | 10.09 ms; 76,600 allocs | 6.46 ms; 19,020 allocs | -36%; -75% allocs | `bench-go` |
+| Go, `PageSwitch` (demo) | 2.979 ms; 17,620 allocs | 2.090 ms; 5,979 allocs | -30%; -66% allocs | `bench-go` |
+| Go, `FrameRebuild` | 259.2 µs; 1,376 allocs | 216.1 µs; 661 allocs | -17%; -52% allocs | `bench-go` |
+| Go, `ListOf` scroll, 100,000 rows | 97.04 µs; 547 allocs | 65.54 µs; 285 allocs | -32%; -48% allocs | `bench-go` |
+| Go, `UniformList`, div, 10,000 rows, scroll step | 360.2 µs | 441.6 µs | +23% (p < 0.001), worse | `bench-go` |
+| Go, `InitialBuild`, 10,000 nodes | 11.86 ms; 74,150 allocs | 12.25 ms; 58,090 allocs | +3.3% time, -22% allocs; gc/op +11% | `bench-go` |
+| Go, `HitTest`, 100 to 10,000 nodes | 145–148 ns | 155–157 ns | +5% to +8%, worse (0 allocs) | `bench-go` |
+| Go, `WidgetFrameInspector` | 28.10 ms | 29.78 ms | +6%, worse | `bench-go` |
+| Go, `codeedit` `KeystrokeWrapped50kLines` | 1.510 ms | 0.801 ms | -47% | `bench-go` |
+| Go, `codeedit` `ScrollFrame50kLines` | 719.6 µs | 572.5 µs | -20% | `bench-go` |
+| Go, `DataGridKeyFrame100k` | 377.2 µs | 313.5 µs | -17% | `bench-go` |
+
+Not re-measured on 2026-10-22, so the figures are in
+[Earlier measurements](#earlier-measurements): the build-footprint numbers from
+`scripts/bench.sh` (cold build, no-op rebuild, save-to-window), the repository
+size, and the highlighting comparison of 2026-10-19.
+
+### What changed
+
+The performance commits on this branch since 2026-10-21, oldest first. Each row
+gives the effect the commit measured, with its own baseline and sample, as its
+commit message reports it. Those effects are not added together: several commits
+change the same path. The live and Go figures above are the combined result.
+
+| Commit | Change | Measured effect (from the commit) |
+|---|---|---|
+| `13e776a` | Built-in themes are built by functions, not package-level literals | Stripped binary: hello -569 KB, demo -569 KB |
+| `6f3bd41` | Each icon's shapes are built on its first use | Stripped binary: hello -94 KB, demo -32 KB; the package's init (721 allocations) is gone |
+| `0698f35` | **Breaking:** the visual inspector is linked only through package `devtools` | Stripped binary: hello 9.16 MB to 8.38 MB (-780 KB); the inspector's code is gone from hello. See [CHANGELOG](CHANGELOG.md) |
+| `d63d081` | `jamb dev` links the inspector into the app it builds, with `go build -overlay` | None; keeps the inspector in `jamb dev` |
+| `25e88f9` | Go-text font files are given with their glyph outlines cut; shaping needs only the bounding boxes | Hello idle, 3 launches each, mean private bytes 81.3 to 78.9 MB (-2.48 MB); working set 63.0 to 60.9 MB (-2.05 MB); binary +12 KB |
+| `7ae866d` | A `WM_PAINT` after a `WM_SIZE` frame is skipped when the window has shown that size | Resize: frames per step 1.65 to 1.00; process CPU 9.9% to 8.9% (median of 6 pairs) |
+| `59cfa35` | Instance buffers start at 4 KB, not 64 KB | Hello idle, GPU shared memory 1.33 MB to 1.09 MB (3 runs) |
+| `6cf0506` | Swap chain buffers keep headroom on resize, with `SetSourceSize`; the room is given back at the end of a move | Resize, 8 s, 3 pairs: process CPU 10.1% to 4.7%; UI-thread CPU per step 1.78 to 0.30 ms; context switches 2,301 to 1,535/s |
+| `1cdc3cb` | The first frame is drawn before the window is shown, so it does not appear blank | Blank gap of a warm launch, median of 4 pairs: 36.5 ms to 12.6 ms |
+| `b2b6d13` | The first scene is built while the GPU device is created | Device ready to first Present, median of 4 runs: 18.4 ms to 6.6 ms |
+| `3336a8a` | The top modal is cached per build generation, not searched on each key press | `KeyDispatch` field caret at 100, 1,000 and 10,000 nodes: 1,430, 14,213 and 254,614 ns to 491, 535 and 486 ns |
+| `8fcc19e` | **Behaviour change:** a Tree or DataGrid without a height takes the height its parent gives, and shows the rows that fit | Tree, 1,100 rows: frame 8.27 to 0.68 ms; 10,100 rows: 86.7 to 2.65 ms; a 5,000-row DataGrid builds 15 rows, not 5,000 |
+| `cfc24f9` | Structs are reordered to the smaller allocation size classes; children lists are sized to their content; a tree's rows are sized from the last flatten | `Scale` 10,000 full rebuild 61.9k to 45.8k allocs/op; `InitialBuild` 10,000 74.2k to 58.1k; `FrameRebuild` 1,376 to 935 |
+| `4a7a7fe` | Canvas fills reuse one shader; an opaque solid fill that covers a pixel is written directly | `codeedit` `ScrollFrame50kLines` 1,212 to 572 µs; `KeystrokeWrapped50kLines` 1,645 to 813 µs (6 runs) |
+| `139be0e` | The DataGrid's key position table is built only when keys can repeat | `KeyFrame100k` 407 to 356 µs (-12.5%), 2,248 to 1,950 allocs |
+| `9d0fd90` | The Activity filter works incrementally; the Components page builds its large tree and runs once | No benchmark in its message; its effect is in the demo table of `c45d8aa` |
+| `c45d8aa` | An element that is rebuilt where it was keeps its node | Demo table in its message, with `9d0fd90` in the same tree, 0216a54 to this commit (count 4): `PageSwitch` 17.8k to 6.2k allocs, 5.5 to 2.2 ms; `ThemeSwitch` 76.6k to 19.0k allocs, 22.7 to 8.6 ms; `ComponentsScroll` 441 to 343 allocs |
+| `c9f1cc7` | A `ListOf` row is a component kept in the window; a row that stays is not rendered again | `ListOf` scroll step, 100,000 rows: 547 to 285 allocs/op, 167 to 60 KiB/op; nodes built per scroll frame, average 55 to 24 |
+| `2124a35` | The 100,000 DataGrid runs are built on the first visit to the Components page again, not at startup | Startup heap -12 MB (the prewarm cost about 12 MB in every launch). Live idle private bytes: 134.4 MB in the run that found it, 119.0 MB in the 2026-10-22 live run |
+
+Two commits are measurement fixes, not performance changes: `3f88090` makes
+`JAMB_STRESS` frames count as continuous in the frame statistics (the
+`JAMB_FRAMESTATS` run of the stress mode had no present intervals before), and
+`23e8581` documents the swap chain and the pacing in the architecture guide.
+
+### Tried and dropped
+
+- **Per-monitor pacing.** A window whose monitor refreshes at another rate than
+  the desktop's was paced to its own monitor's vblank. On the 144 Hz secondary the
+  present interval moved from 6.06 ms to 6.94 ms, the monitor's own period, but
+  each frame gained 0.88 ms of latency, and one pacing thread spiked to 12 to 20%
+  of a core on the secondary. The change was dropped. Windows pace to the
+  compositor again, which runs at the primary monitor's rate. The superseded run
+  with the pacing in its build is `gpui-with-pacing.json`; it is not used in the
+  tables above.
+- **The D3D11 `PREVENT_INTERNAL_THREADING_OPTIMIZATIONS` flag.** It was considered
+  and rejected: it moves the driver's work onto the UI thread.
+- **Dropping `net/url` from `OpenURL`.** It was dropped because it gave no size
+  reduction.
+- **The 100,000-run prewarm** of 2026-10-22 (a goroutine at startup) was reverted
+  by `2124a35`. It saved the first visit about 3.5 ms and cost about 12 MB of heap
+  in every launch, including launches that never open the page.
+
+### Startup
+
+Live, `bench-live`, 3 runs, process start to the first frame. Medians, with the
+range in brackets. Times are in milliseconds; "visible" is the window shown,
+"painted" the first frame with content, and "trace" the app's `JAMB_TRACE` line.
+The live run's startup phase is inside the period when the mouse moved over the
+windows (see [Gaps](#gaps)).
+
+| App | First launch: visible | First launch: painted | First launch: trace | Warm: visible | Warm: painted | Warm: trace |
+|---|--:|--:|--:|--:|--:|--:|
+| hello | 462.2 [439.9–504.7] | 475.7 [469.1–515.1] | 197.9 [196.4–209.5] | 218.7 [216.4–241] | 232.6 [229.4–254.3] | 203.9 [196–213.9] |
+| demo | 630.8 [623.9–683.7] | 646.2 [640.6–699.9] | 217.7 [204.8–222.1] | 243.5 [230.7–266.7] | 261.4 [248–279.9] | 221.2 [211.6–247.3] |
+
+### Idle
+
+Live, `bench-live`, 60 s unfocused after an 8 s settle, 3 runs. The windows were
+on the secondary monitor and were not activated.
+
+| App | CPU, % of one core | Context switches/s | Private MB | Working set MB | Threads | Handles | GPU dedicated MB | GPU shared MB |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| hello | 0.03 [0.03–0.42] | 66.1 [65.5–152.6] | 75.8 [75.6–75.9] | 59.6 [58.9–62.6] | 39 [38–40] | 509 [503–528] | 13.7 | 1.1 |
+| demo | 0.08 [0.05–0.13] | 65.5 [65.5–73.2] | 119 [118.9–120.9] | 115.3 [115.2–116.7] | 40 | 537 [536–539] | 17.1 | 1.6 |
+
+Two windows (the demo's main window and a project window), 60 s: CPU 0.05%
+[0.03–0.08], 65.6 context switches/s [65.4–65.8]. The maxima of the hello sample
+(0.42% and 152.6/s) are in the run during which the mouse moved over the window.
+
+### Scenarios
+
+Live, `bench-live`, the demo at its default 1200 x 760 window, 3 runs. The
+scenarios are as in [Scenarios (2026-10-21)](#scenarios-2026-10-21); the frame
+statistics and the input events are the same. The monitor's refresh for the
+"over 1.5x" count is 144 Hz.
+
+| Scenario | CPU, % of one core | Frames | CPU per frame p50 / p95 / p99 (ms) | Present interval median / p95 (ms) | Over 1.5x | Input to Present, p50 / p95 (ms) |
+|---|--:|--:|--:|--:|--:|--:|
+| activity-scroll | 14.66 [14.35–15.14] | 1,944 [1,926–1,961] | 0.28 / 0.79 / 1.29 [1.26–1.37] | 6.05 / 6.57 | 1 [0–2] | scroll (378): 6.10 / 7.07; click (1): 6.89 |
+| pointer-moves | 13.58 [12.96–14.83] | 1,943 [1,931–1,970] | 0.23 / 0.44 / 0.59 [0.57–0.59] | 6.05 / 6.31 | 1 [0–2] | move (468): 6.04 / 6.36; click (1): 6.04 |
+| typing | 8.12 [4.37–8.43] | 329 [325–394] | 0.28 / 4.45 / 7.20 [3.06–7.55] | 6.04 / 6.43 | 0 | key (96): 4.22 / 12.70; move (6): 2.02 / 4.59; click (2): 6.21 |
+| animation | 14.82 [13.26–15.31] | 1,932 [1,912–1,934] | 0.29 / 0.53 / 0.72 [0.72–0.85] | 6.05 / 6.37 | 1 [0–2] | key (1): 2.24; click (2): 47.26 [45.45–52.24] |
+| page-switch | 19.36 [15.77–21.39] | 1,768 [1,736–1,790] | 0.28 / 0.63 / 2.04 [2.04–2.34] | 6.05 / 6.33 | 1 [1–2] | click (39): 6.17 / 37.68 [29.37–40.58] |
+| code-editor | 18.27 [17.32–23.9] | 1,202 [1,180–1,217] | 0.24 / 3.20 / 5.21 [4.86–5.29] | 4.53 / 8.86 | 14 [12–17] | key (161): 2.27 / 7.97; scroll (160): 4.63 / 10.37; click (3): 4.43 / 43.53 [43.35–110.78] |
+
+Input latency runs from the scripted event's arrival to the return of `Present`,
+as in 2026-10-21. The code-editor scenario's median present interval, 4.53 ms,
+is shorter than either monitor's period. It is reported as measured, and the
+cause is open (see [Known issues](#known-issues)).
+
+### Resize
+
+Live, `bench-live`, 10 s of `SetWindowPos` on the demo window without activation,
+3 runs.
+
+| CPU, % of one core | Context switches/s | Frames | CPU per frame p50 / p95 (ms) | Over 1.5x |
+|--:|--:|--:|--:|--:|
+| 4.53 [2.03–6.56] | 1,410.6 [1,405.3–1,410.9] | 326 [325–327] | 0.26 [0.26–0.26] / 0.41 [0.37–0.57] | 0 |
+
+The summary reports no present interval for resize (n/a). The frames fell from 567
+to 326 in 10 s, because a resize step now renders one frame instead of two (see
+the `7ae866d` row of [What changed](#what-changed)).
+
+### Stress
+
+Live, `bench-live`, the demo for 10 s in each mode, 3 runs. The GC cycle count is
+not in this pass's summary; the 2026-10-21 figures (10.5 and 46.2 a second) are in
+its section.
+
+| Mode | Frames/s | CPU per frame avg / p50 / p99 (ms) | Allocated KB/frame | Objects/frame |
+|---|--:|--:|--:|--:|
+| rebuild, vsync | 165.1 [165–165.1] | 0.81 [0.8–0.85] / 0.73 [0.72–0.76] / 1.85 [1.76–2] | 465.2 | 1,607 |
+| rebuild, uncapped | 1,357.2 [1,257.5–1,362.1] | 0.58 [0.58–0.63] / 0.52 [0.52–0.55] / 1.46 [1.46–1.53] | 465.3 | 1,605 |
+| paint, vsync | 165.1 [164.9–165.2] | 0.25 [0.24–0.27] / 0.23 [0.22–0.24] / 0.59 [0.59–0.6] | 0.5 | 25 |
+| paint, uncapped | 3,628.7 [3,579.7–3,751.1] | 0.16 [0.16–0.16] / 0.14 [0.14–0.14] / 0.28 [0.27–0.29] | 0.4 | 23 |
+
+On 2026-10-21 the page under stress had 310 nodes; the 2026-10-22 summary does not
+give its count. Allocation per frame in a full re-render is half its 2026-10-21
+value, and still above the 110 KB of 2026-10-06 (see [Known issues](#known-issues)).
+
+### Two windows
+
+The two-window figures are in [Idle](#idle). The counters are for the whole process.
+
+### Soak
+
+Live, `JAMB_HEAPLOG` over 30 minutes, one run, commit `da18e5b`. That build still
+has the per-monitor pacing commit, which was dropped afterwards; pacing does not
+change memory. The run's summary does not restate the loop; the 2026-10-21 soak
+loop (scrolling, page switches and typing in the demo) is described under
+[Soak (2026-10-21)](#soak-2026-10-21). The counters are those the script
+reports, in MiB:
+
+| Counter | Start | End | Max |
+|---|--:|--:|--:|
+| Go heap in use | 9.06 | 84.75 | 102.3 |
+| Private bytes | 57.77 | 214.96 | 236.09 |
+| Working set | 23.77 | 211.26 | 232.37 |
+| Go heap objects | 28,605 | 336,940 | 373,042 |
+| Goroutines | 4 | 3 | 5 |
+
+As on 2026-10-21, the script's own slope column is fitted over the whole run,
+and the warm-up dominates it. The figures below use the minutes after the first
+five, fitted by least squares to the heap log from 300 s to 1,800 s:
+
+- Go heap in use: range **55 to 102 MiB**, slope **+1.95 MiB/hour**.
+- Private bytes: range **208 to 236 MiB**, slope **−7.9 MiB/hour**.
+- Working set: range **204 to 232 MiB**, slope **−7.7 MiB/hour**.
+
+Over the 30 minutes the process ran **531 GC cycles** and allocated **22.4 GiB**,
+with 57.1 million allocations. On 2026-10-21 the same measurements were 831 cycles,
+40.8 GiB and 184.8 million. Every 5-minute bucket after the warm-up stays in its
+range, and none of the three counters rises after the warm-up. The heap's fitted
+slope is positive, but its range is flat across the buckets, and the fit covers
+one 25-minute window of one run, so it is reported and not read as growth. The
+limits of 2026-10-21 apply unchanged: one run and one loop.
+
+### GPUI comparison
+
+Summary only. The full runtime, build and binary tables, with the method and the
+earlier passes, are in
+[docs/comparison-gpui.md](docs/comparison-gpui.md#fourth-pass-2026-10-22-current).
+The fourth pass ran hello for jamb and for GPUI on the secondary monitor, without
+activation, three runs each, with jamb at `2124a35`. jamb has the lower idle CPU
+(0.10% against 1.46%) and context switches, the lower pointer CPU (1.41% against
+2.50%), the lower resize CPU (2.50% against 10.76%) and resize context switches
+(1,210 against 1,326 a second), and the faster warm launch (215.4 ms against 296.2 ms
+to the first painted frame). It is also ahead on the first launch of a new copy
+this time (496.5 ms against 502.2 ms painted, 480 ms against 485.9 ms visible), where
+the third pass had GPUI ahead. GPUI has the lower private bytes (73.2 MB against
+75.7 MB), working set (49.0 MB against 55.1 MB), threads and handles, the GPU
+shared memory and the pointer context switches (588 against 605 a second). jamb
+has the lower GPU dedicated memory. The release binary is 8.02 MB, against GPUI's
+9.22 MB.
+
+### Go benchmark suite
+
+Go, `bench-go`, `-count 10`, 2026-10-22, commit `da18e5b` (the Commits row of the
+environment table above gives the difference from HEAD). Each
+2026-10-22 value is the benchstat median of ten runs; the 2026-10-21 column is the
+median of the same suite on `2c5c6b0`, which is the same code as `0216a54` with
+docs only in between. The comparison was run with
+`go run golang.org/x/perf/cmd/benchstat@v0.0.0-20261009192801-be2c69fb417e`
+on the two raw files. Its markers: "~" is no significant change (p ≥ 0.05). Where
+a change is marked "noisy", the spread of the 2026-10-22 run is wide enough that
+the change is not a reliable reading (±20% or more).
+
+Time per operation, grouped by package. "Change" is for the time, unless the row
+says otherwise.
+
+**`ui` (the framework runtime, widgets and lists)**
+
+| Benchmark | 2026-10-22 | 2026-10-21 | Change |
+|---|--:|--:|--:|
+| `HitTest`, 100 / 1,000 / 10,000 nodes | 155.2 / 156.6 / 154.8 ns; 0 allocs | 147.7 / 145.2 / 144.8 ns | +5.2% / +7.8% / +6.8% |
+| `KeyDispatch`, field caret, 100 / 1,000 / 10,000 nodes | 0.456 / 0.458 / 0.466 µs | 1.275 / 13.01 / 272.9 µs | -64% / -96% / -99.8% |
+| `KeyDispatch`, global binding, 100 / 1,000 / 10,000 nodes | 0.434 / 0.432 / 0.432 µs | 0.989 / 8.705 / 182.8 µs | -56% / -95% / -99.8% |
+| `TopModal`, 100 / 10,000 nodes (new) | 1.47 / 1.48 ns; 0 allocs | not measured | new |
+| `TextInputTyping`, field / 10 KB area | 14.09 µs / 4.440 µs | 14.62 µs / 4.336 µs | ~ / +2.4% |
+| `TreeExpanded`, 1,100 rows, frame / arrow down | 0.430 ms / 22.38 µs | 8.156 ms / 8.158 ms (±98%) | -94.7% / -99.7% |
+| `TreeExpanded`, 10,100 rows, frame / arrow down | 2.00 ms / 2.19 ms | 80.53 ms / 82.04 ms | -97.5% / -97.3% |
+| `Animations`, 10 / 100 / 1,000 running | 8.056 µs / 82.60 µs / 1.819 ms | 9.045 µs / 95.78 µs / 1.986 ms | -10.9% / -13.8% / -8.4% |
+| `AccessTree`, 100 / 1,000 / 10,000 nodes | 13.29 µs (noisy) / 125.3 µs / 1.608 ms | 12.63 µs / 113.3 µs / 1.688 ms | +5.2% / ~ / -4.8% |
+| `AccessUpdate`, 100 / 1,000 / 10,000 nodes | 84.69 µs / 229.4 µs / 2.588 ms | 85.95 µs / 226.3 µs / 2.752 ms | -1.5% / ~ / -6.0% |
+| `Scale`, full rebuild, 100 / 1,000 / 10,000 nodes | 130.1 µs / 873.7 µs / 9.596 ms | 152.6 µs / 1.145 ms / 12.43 ms | -14.7% / -23.7% / -22.8% |
+| `Scale`, single signal update, 100 / 1,000 / 10,000 nodes | 78.46 / 90.27 µs / 324.5 µs | 78.28 / 89.80 µs / 310.4 µs | ~ / ~ / +4.6% |
+| `Scale`, hover change, 100 / 1,000 / 10,000 nodes | 47.91 / 49.76 / 74.08 µs | 47.55 / 48.95 / 73.52 µs | ~ / ~ / ~ |
+| `Scale`, repaint only, 100 / 1,000 / 10,000 nodes | 46.92 / 48.77 / 72.06 µs | 46.56 / 47.79 / 71.51 µs | ~ / +2.1% / ~ |
+| `Scale`, window resize, 100 / 1,000 / 10,000 nodes | 55.91 µs / 144.8 µs / 2.153 ms (noisy) | 55.10 µs / 142.1 µs / 1.880 ms | ~ / +1.9% / +14.5% (noisy) |
+| `InitialBuild`, 100 / 1,000 / 10,000 nodes | 222.0 µs / 1.235 ms / 12.25 ms | 221.8 µs / 1.196 ms / 11.86 ms | ~ / +3.3% / +3.3% |
+| `FrameRebuild` | 216.1 µs | 259.2 µs | -16.6% |
+| `ShrinkingTextRows` / `BuildTextContent` | 44.21 µs / 2.121 ms | 41.06 µs / 2.041 ms | +7.7% / +3.9% |
+| `SplitsResized` / `SplitsResizedWalk` | 989.0 ns / 538.6 µs | 874.9 ns / 453.5 µs | +13.0% / +18.8% |
+| `WidgetFrameNoInspector` / `WidgetFrameInspector` | 2.037 ms / 29.78 ms | 2.166 ms / 28.10 ms | -6.0% / +6.0% |
+| `UniformList`, build (list 100k / div 10k) | 290.4 µs / 62.87 ms | 287.3 µs / 61.72 ms | ~ / +1.9% |
+| `UniformList`, scroll step (list 100k / div 10k) | 151.5 µs / 441.6 µs | 150.5 µs / 360.2 µs | ~ / +22.6% |
+| `ListOf`, build / scroll / rebuild, 100k rows | 12.25 ms / 65.54 µs / 12.41 ms | 12.18 ms / 97.04 µs / 13.06 ms | ~ / -32.5% / ~ |
+| `DataGridBuildFirst100k` / `DataGridKeyFrame100k` / `DataGridSort100k` | 10.26 ms / 313.5 µs / 7.440 ms | 11.47 ms / 377.2 µs / 7.640 ms | -10.6% / -16.9% / -2.6% |
+
+**`examples/demo/views`**
+
+| Benchmark | 2026-10-22 | 2026-10-21 | Change |
+|---|--:|--:|--:|
+| `ComponentsScroll` | 172.4 µs (±8%) | 182.4 µs (±6%) | ~ |
+| `ThemeSwitch` | 6.460 ms (±3%); 6.52 MiB, 19,020 allocs per op | 10.085 ms (±7%); 15.39 MiB, 76,600 allocs | -35.9%; -57.6% bytes; -75.2% allocs |
+| `PageSwitch` | 2.090 ms (±10%); 2.87 MiB, 5,979 allocs per op | 2.979 ms (±3%); 4.62 MiB, 17,620 allocs | -29.8%; -37.9% bytes; -66.1% allocs |
+
+The `PageSwitch` node count is 237 in both runs, with a spread of ±31% in 2026-10-22
+(±1189% in 2026-10-21), so the time is the measure to read.
+
+**`internal/text`**
+
+| Benchmark | 2026-10-22 | 2026-10-21 | Change |
+|---|--:|--:|--:|
+| `GlyphRaster`, latin, warm / cold | 11.19 µs / 233.1 µs | 10.83 µs / 228.0 µs | +3.4% / +2.2% |
+| `GlyphRaster`, CJK, warm / cold | 3.377 µs / 45.02 µs | 3.373 µs / 44.98 µs | ~ / ~ |
+| `LayoutScripts`, latin / bidi / arabic / devanagari / CJK | 345.0 / 638.1 / 516.0 µs / 1.301 ms / 514.4 µs | 351.3 / 648.9 / 518.7 µs / 1.314 ms / 525.0 µs | -1.8% / -1.7% / ~ / ~ / -2.0% |
+| `LayoutParagraph` | 345.6 µs | 351.0 µs | -1.5% |
+| `EditLongDocument` | 2.061 µs | 2.103 µs | -2.0% |
+
+**`internal/layout`**
+
+| Benchmark | 2026-10-22 | 2026-10-21 | Change |
+|---|--:|--:|--:|
+| `Layout`, 259 / 1,093 / 1,555 nodes | 2.980 / 2.990 / 2.922 ns; 0 allocs | 2.975 / 3.003 / 2.941 ns | ~ / ~ / -0.6% (a cache hit, see [Known issues](#known-issues)) |
+| `ShrinkingRows` | 17.13 µs | 17.25 µs | ~ |
+
+**`internal/rope`** (2.6 MB / 100 MB)
+
+| Benchmark | 2026-10-22 | 2026-10-21 | Change |
+|---|--:|--:|--:|
+| `Build` | 1.930 ms / 71.93 ms | 1.994 ms / 74.47 ms | -3.2% / -3.4% |
+| `Iterate` | 71.28 µs (noisy) / 7.279 ms | 69.23 µs / 7.451 ms | ~ / -2.3% |
+| `Line` | 204.2 ns / 602.5 ns | 206.3 ns / 642.2 ns | ~ / -6.2% |
+| `Point` | 254.9 ns / 649.8 ns | 254.2 ns / 663.8 ns | ~ / ~ |
+| `UTF16` | 343.5 ns / 745.9 ns | 345.6 ns / 740.5 ns | ~ / ~ |
+| `Insert` | 993.4 ns / 1.129 µs | 973.8 ns / 1.132 µs | ~ / ~ |
+
+**`codeedit`**
+
+| Benchmark | 2026-10-22 | 2026-10-21 | Change |
+|---|--:|--:|--:|
+| `Open100kLines` | 4.721 ms | 5.771 ms | -18.2% |
+| `Keystroke50kLines` / `KeystrokeWrapped50kLines` | 859.1 µs / 801.0 µs | 991.1 µs / 1.510 ms | -13.3% / -47.0% |
+| `ScrollFrame50kLines` / `ScrollFrameWrapped50kLines` | 572.5 µs / 492.1 µs | 719.6 µs / 645.0 µs | -20.4% / -23.7% |
+| `WrapWidthChange100kLines` | 3.740 ms | 4.108 ms | -9.0% |
+
+**`markdown`**
+
+| Benchmark | 2026-10-22 | 2026-10-21 | Change |
+|---|--:|--:|--:|
+| `Parse` | 1.649 ms (±8%) | 1.700 ms (±6%) | ~ |
+| `ParseAndBuild`, 300 / 2,000 lines | 1.539 ms / 10.37 ms | 1.761 ms / 12.25 ms | -12.6% / -15.4% |
+| `Scroll` | 52.38 µs | 52.90 µs | ~ |
+
+**`charts`**
+
+| Benchmark | 2026-10-22 | 2026-10-21 | Change |
+|---|--:|--:|--:|
+| `Line100k` / `Area100k` | 348.9 µs / 339.3 µs | 346.6 µs / 348.5 µs | ~ / -2.6% |
+| `LTTB` | 281.8 µs | 281.5 µs | ~ |
+
+**Allocations and bytes.** The changes in allocations and bytes per operation
+are exact, because they do not depend on the machine's speed. The rows that moved
+most:
+
+| Benchmark | Allocs/op 2026-10-22 | 2026-10-21 | Bytes/op 2026-10-22 | 2026-10-21 |
+|---|--:|--:|--:|--:|
+| `FrameRebuild` | 661 | 1,376 | 241.8 KiB | 617.6 KiB |
+| `Scale`, full rebuild, 100 / 1,000 / 10,000 nodes | 356 / 3,425 / 35,780 | 694 / 6,109 / 61,880 | 101.1 KiB / 991.3 KiB / 9.69 MiB | 254.7 KiB / 2.43 MiB / 24.30 MiB |
+| `Scale`, single signal update, 10,000 nodes | 74 | 87 | 9.48 KiB | 16.92 KiB |
+| `InitialBuild`, 100 / 1,000 / 10,000 nodes | 1,005 / 5,898 / 58,090 | 1,210 / 7,548 / 74,150 | 654.9 KiB / 2.85 MiB / 24.93 MiB | 696.2 KiB / 3.10 MiB / 27.32 MiB |
+| `TreeExpanded`, 1,100 rows, frame | 4,198 | 42,386 | 485.7 KiB | 19.02 MiB |
+| `TreeExpanded`, 10,100 rows, frame | 31,170 | 384,410 | 1.92 MiB | 173.85 MiB |
+| `ListOf`, scroll step, 100k rows | 285 | 547 | 59.5 KiB | 166.6 KiB |
+| `ListOf`, rebuild, 100k rows | 200,600 | 200,900 | 8.41 MiB | 11.87 MiB |
+| `UniformList`, build, div 10k | 260,400 | 340,500 | 122.5 MiB | 134.5 MiB |
+| `Animations`, 1,000 running | 2,024 | 3,024 | 1.033 MiB | 2.498 MiB |
+| `DataGridBuildFirst100k` | 58,510 | 70,700 | 12.80 MiB | 13.74 MiB |
+| `ThemeSwitch` (demo) | 19,020 | 76,600 | 6.52 MiB | 15.39 MiB |
+| `ParseAndBuild`, 300 lines (`markdown`) | 12,350 | 14,130 | 1.570 MiB | 2.647 MiB |
+| `KeystrokeWrapped50kLines` (`codeedit`) | 465 | 492 | 47.27 KiB | 152.57 KiB |
+
+Allocation counts of the suite's other rows are in the raw file
+(`bench-2026-10-22-0853-da18e5b.txt`, with its `.summary.txt`). The raw files of
+both runs are on the result folders named in
+[How to reproduce (2026-10-21)](#how-to-reproduce-2026-10-21); they are not in the
+repository.
+
+The losses in this table are in the time rows above, and the one in the gc/op
+column is in its own note: `InitialBuild` allocates 22% fewer objects, but its
+gc/op (the GC cycles per operation) is 11% higher, for reasons not investigated.
+
+### Known issues
+
+The status of each finding of 2026-10-21, and the new ones of this pass.
+
+1. **Frame pacing on the 144 Hz monitor (open).** A window on the 144 Hz secondary
+   presents at the primary monitor's period: 6.05 ms in five of the six live
+   scenarios, against the secondary's 6.94 ms. The compositor appears to set the
+   pace. The per-monitor pacing that moved the interval to 6.94 ms was dropped; it
+   added 0.88 ms of latency and a CPU spike on one thread (see
+   [Tried and dropped](#tried-and-dropped)). The code-editor scenario's median
+   interval, 4.53 ms, is shorter than either monitor's period, and it is not
+   explained: it may be a property of that scenario's frames, or of the measurement.
+2. **Allocation in a full re-render (halved, still above 2026-10-06).** The
+   `rebuild` stress allocates 465 KB and 1,607 objects per frame on the 310-node
+   page, against 936 KB and 2,731 on 2026-10-21 and 110 KB and about 550 objects on
+   2026-10-06. The remaining allocation has not been profiled in this pass.
+3. **Key dispatch scales with the tree (fixed).** `topModal` is cached per build
+   generation (`3336a8a`). A key press costs about 0.45 µs at 100, 1,000 and 10,000
+   nodes, against 273 µs at 10,000 nodes on 2026-10-21.
+4. **Expanded trees (fixed for a parent with a height).** A Tree or DataGrid without
+   a height now shows the rows that fit its parent (`8fcc19e`). A 10,100-row tree
+   takes 2.0 ms per frame, against 80.5 ms. A parent with no bounded height still
+   shows every row. The behaviour change is in the CHANGELOG.
+5. **First visit to a page (open).** The first visit is still the slow one. The
+   live page-switch click p95 is 37.7 ms [29.4–40.6], up from 26.7 ms on
+   2026-10-21. The code-editor click p95 is 43.5 ms, down from 60.9 ms, with one
+   run at 110.8 ms. The animation clicks, which are first visits as in 2026-10-21,
+   reach Present in 47 ms, down from 68 ms. Later visits are not measured in the
+   live runs.
+6. **Activity list scroll (improved, not closed).** The CPU per frame at p99 is
+   1.29 ms, down from 2.27 ms, and frames over 1.5x the period fell from 7 to 1.
+   The p50 is 0.28 ms, as before.
+7. **Binary sizes (partly resolved).** The stripped hello binary is 8.02 MB, below
+   the 8.41 MB of 2026-10-14. The stripped demo is 19.04 MB, against 15.99 MB on
+   2026-10-14; its growth is not investigated.
+8. **The layout benchmark measures the cache.** `Layout` re-runs `Compute` on an
+   unchanged tree, a cache hit. Unchanged; a benchmark that dirties the tree is
+   still needed for a full-layout figure.
+9. **Noisy rows.** `PageSwitch` nodes, `TreeExpanded` arrow down at 1,100 rows,
+   `Animations` at 100 running, `Scale` at 10,000 nodes for window resize (±26%
+   in this run), `AccessTree` at 100 nodes (±62%) and the `gc/op` of single signal
+   updates are too wide to read small changes from with ten runs.
+10. **Losses measured in this pass, not explained.** Each is reported as measured,
+    with no cause assigned:
+    - `UniformList`, a 10,000-row div: the scroll step went from 360 µs to 442 µs
+      (+23%, p < 0.001).
+    - `Scale`, a single signal update at 10,000 nodes: 310 µs to 325 µs (+4.6%,
+      p = 0.004).
+    - `SplitsResized` +13% and `SplitsResizedWalk` +19%, and `WidgetFrameInspector` +6%.
+    - `HitTest` +5% to +8% (about 10 ns, with no allocations).
+    - `InitialBuild` gc/op +11% against 22% fewer allocations.
+    - The demo's warm launch in the live run: the window visible +17.5 ms, painted
+      +9.6 ms and the trace +6.4 ms. The first-frame gains of `b2b6d13` and
+      `1cdc3cb` measured in their own runs do not show here. These live startup
+      figures are also inside the period of mouse movement.
+    - The live hello warm trace: 195.8 ms to 203.9 ms.
+    - The pointer movement in the GPUI pass: jamb's CPU 1.09% to 1.41%, and its
+      context switches 581 to 605 a second, now above GPUI's 588.
+    - The live typing CPU median, 4.8% to 8.1% (the ranges overlap).
+
+### Gaps
+
+What these numbers do not cover:
+
+- **One machine.** Every figure is from one desktop with an i5-11600K and an RTX
+  3070 Ti. There is no integrated GPU, no laptop, no high-DPI display, and no
+  multi-GPU setup.
+- **Conditions differ from 2026-10-21.** The mouse moved over the live windows on
+  the secondary monitor during the startup and idle phases of the first live run
+  (about the first ten minutes), and the foreground changed once, to hello at
+  09:18:51 and back. The medians are robust to that; the maxima are not, and the
+  startup figures of those phases are affected. No video played on the primary
+  monitor this time, so the background load also differs.
+- **GPUI pass.** Its watch log records two cursor moves at 09:39:18 and 09:39:19
+  with no focus change. The script does not move the cursor in this pass, so the
+  source of the moves is not known.
+- **Commits.** The live runs and the GPUI pass ran on `2124a35`, with no pacing.
+  The soak and the Go suite ran on `da18e5b`, which is the same code plus the
+  pacing commit that was dropped. Pacing does not affect memory, and the headless
+  suite does not exercise it, but the soak's build is not the one the live runs
+  measured.
+- **No focused idle.** The focused idle samples were not taken on 2026-10-22, as on
+  2026-10-21. Focused idle is in the 2026-10-12 comparison only.
+- **No peer frameworks except GPUI.** Gio and Fyne would take focus at launch, so
+  the live method could not be used for them.
+- **Latency stops at Present.** Input latency is measured from the injected event
+  to the return of `Present`. It does not include the compositor, the monitor's
+  scan-out or the photon, and the events are injected in-process.
+- **Advisory CI benchmarks.** The pull-request benchmark job runs on shared
+  GitHub-hosted runners, which are noisy. It reports a comparison with the base in
+  the job summary and never fails a pull request for a slowdown.
+- **Soak length and workload.** One 30-minute run of one loop, as on 2026-10-21.
+- **Not measured on 2026-10-22:** build footprint (`scripts/bench.sh`), the
+  cold-build and save-to-window times, the glyph-atlas memory, the code-editor
+  highlighting comparison, and the multi-window memory delta. These keep their
+  earlier dates. The GC cycle count of the live stress runs is missing from the
+  summary of this pass.
+
+## Results on 2026-10-21 (before the performance work)
+
+These are the 2026-10-21 results, measured on commit `2c5c6b0` (the same code as
+`0216a54`; the commits between them are docs only). They are the baseline of the
+2026-10-22 comparison above. The text below is unchanged except for the headings,
+which carry the date, and the status notes.
 
 Every live figure below was measured on one machine, with the windows on a
 secondary monitor. The machine was not dedicated to benchmarking: other
@@ -28,7 +599,7 @@ this table first.
 | Commits | Live runs and the Go suite: `2c5c6b0` (the live run used its parent, `b6a6369`). The Go header reads `2c5c6b0-dirty` because a regenerated screenshot was present during the run and then discarded |
 | Samples | Live: 3 runs, each figure the median across runs with the range in brackets. Soak: one 30-minute run. Go: `-count 10`, medians with benchstat's spread |
 
-### Summary
+### Summary (2026-10-21)
 
 | Area | Result, 2026-10-21 | Measured by |
 |---|---|---|
@@ -58,7 +629,7 @@ Not re-measured on 2026-10-21, so the figures are in
 phase breakdown, the repository size, and the highlighting comparison of
 2026-10-19.
 
-### How to reproduce
+### How to reproduce (2026-10-21)
 
 Each script is run from the repository root with
 `powershell -ExecutionPolicy Bypass -File scripts\<name>.ps1`. Each writes its raw
@@ -102,7 +673,7 @@ Scripted input (`JAMB_SCRIPT`) is delivered inside the app, not by the operating
 system. The real cursor, the keyboard focus and the window activation are never
 touched by the live runs.
 
-### Startup
+### Startup (2026-10-21)
 
 Live, `bench-live`, 3 runs, process start to the first frame. The figures are
 medians across the runs with the range in brackets. "Visible" is the window shown,
@@ -118,7 +689,7 @@ All times are in milliseconds. A new copy of an executable is scanned by Windows
 Defender before its first run, which accounts for the difference between the first
 and warm launches. The same first-launch effect is in the GPUI comparison below.
 
-### Idle
+### Idle (2026-10-21)
 
 Live, `bench-live`, 60 s unfocused after an 8 s settle, 3 runs. The window was on
 the secondary monitor.
@@ -141,7 +712,7 @@ were Task Manager's private working set. That is a different counter from the
 private bytes above, so the two are not compared. See the
 [earlier memory measurements](#startup-memory-and-binary-size-2026-10-12).
 
-### Scenarios
+### Scenarios (2026-10-21)
 
 Live, `bench-live`, the demo at its default 1200 x 760 window, about 10 s per
 scenario including the scripted setup, 3 runs. Each scenario's loop is scripted
@@ -181,7 +752,7 @@ The median present interval is about 6 ms in every scenario (5.95 to 6.06 ms). T
 is the 165 Hz primary monitor's period, not the 144 Hz secondary monitor's (6.94 ms).
 See [Known issues](#known-issues).
 
-### Resize
+### Resize (2026-10-21)
 
 Live, `bench-live`, 10 s of `SetWindowPos` on the demo window, without activation,
 3 runs.
@@ -192,7 +763,7 @@ Live, `bench-live`, 10 s of `SetWindowPos` on the demo window, without activatio
 
 The summary reports no present interval for resize (n/a).
 
-### Stress
+### Stress (2026-10-21)
 
 Live, `bench-live`, the demo for 10 s in each mode, 3 runs. `rebuild` re-renders
 every component on every frame. `paint` repaints the retained tree. `vsync` is the
@@ -209,11 +780,11 @@ The page under stress has 310 nodes. The allocation figures for `rebuild` are a
 regression from the earlier 110 KB and about 550 objects per frame on a 210-node
 page (2026-10-06). See [Known issues](#known-issues).
 
-### Two windows
+### Two windows (2026-10-21)
 
-The two-window figures are in [Idle](#idle). The counters are for the whole process.
+The two-window figures are in [Idle (2026-10-21)](#idle-2026-10-21). The counters are for the whole process.
 
-### Soak
+### Soak (2026-10-21)
 
 Live, `JAMB_HEAPLOG` over 30 minutes (one run, commit `2c5c6b0`). The loop scrolls,
 switches pages and types in the demo. Memory counters, in MiB as the script reports
@@ -248,10 +819,10 @@ The fit has a short window and one run, so it shows the absence of growth in thi
 loop. It does not rule out a slow leak that a longer or different workload would
 show.
 
-### GPUI comparison
+### GPUI comparison (2026-10-21)
 
 Summary only. The full runtime, build and binary tables, with the method and the
-earlier passes, are in [docs/comparison-gpui.md](docs/comparison-gpui.md#third-pass-2026-10-21-current).
+earlier passes, are in [docs/comparison-gpui.md](docs/comparison-gpui.md#third-pass-2026-10-21-history).
 The third pass ran hello for jamb and for GPUI on the secondary monitor, without
 activation, three runs each. jamb has the lower idle CPU (0.05% against 1.74%), the
 lower pointer and resize CPU, and the faster warm launch (221.6 ms against 304.1 ms
@@ -260,7 +831,7 @@ MB), working set (49.0 MB against 58.4 MB), threads and handles, the lower
 first-launch window time, and the smaller release binary (9.22 MB against 9.36 MB).
 Focused idle was not measured in that pass.
 
-### Go benchmark suite
+### Go benchmark suite (2026-10-21)
 
 Go, `bench-go`, `-count 10`, 2026-10-21, commit `2c5c6b0`. Each value is the
 benchstat median of the ten runs, with its spread, on one 12-thread machine. The
@@ -367,9 +938,10 @@ Allocation figures for each benchmark are in the raw output that `bench-go.ps1`
 wrote for this run (`bench-2026-10-21-0429-2c5c6b0-dirty.txt`, with its
 `.summary.txt` from benchstat).
 
-### Known issues
+### Known issues (2026-10-21)
 
-These are the findings of this pass. Each is open. None has been fixed.
+These are the findings of this pass, as they were measured. Their status on
+2026-10-22 is in the current [Known issues](#known-issues).
 
 1. **Frame pacing on the 144 Hz monitor.** A live window on the 144 Hz secondary
    monitor presented at a median interval of 6.06 ms in every scenario, which is
@@ -415,7 +987,7 @@ These are the findings of this pass. Each is open. None has been fixed.
    `Scale` at 10,000 nodes for single signal updates (±35%) have spreads too wide to
    read small changes from with ten runs.
 
-### Gaps
+### Gaps (2026-10-21)
 
 What these numbers do not cover:
 
