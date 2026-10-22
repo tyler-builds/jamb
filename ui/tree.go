@@ -190,6 +190,10 @@ func (tv *TreeElement) FocusHandle(h *FocusHandle) *TreeElement {
 // Tree creates a tree of nodes, with the node whose key equals selected's
 // value selected. The nodes shown first are the top level, and every node is
 // closed until the user opens it.
+//
+// With no size, the tree takes the height its parent leaves it, and shows the
+// rows that fit in it, however many rows are open. A tree in a column that is
+// not bounded shows every row.
 func Tree(nodes []TreeNode, selected *Signal[string]) *TreeElement {
 	return &TreeElement{nodes: nodes, selected: selected}
 }
@@ -647,8 +651,9 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 			}
 		}
 		// The list sits in a column that takes the tree's style, so that the list
-		// fills the space the style gives it.
-		return tv.size.apply(Div().Column().Style(tv.style)).Child(list)
+		// fills the space the style gives it. The column may shrink below its rows,
+		// so that the list windows them to the space instead of building them all.
+		return tv.size.apply(Div().Column().MinHeight(Px(0)).Style(tv.style)).Child(list)
 	})
 }
 

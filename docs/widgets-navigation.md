@@ -127,8 +127,10 @@ th.Reveal("src/main.go") // opens the nodes above it and scrolls it into view
   A section's `OnChange` runs when it is closed by the accordion too.
 - **Tree view.** Only the rows in view are built, so a tree of tens of thousands
   of nodes costs what its visible part costs. A node's children are asked for only
-  while it is open. Size the tree with `Style`: a tree with no bounded height
-  shows every row. The tree is one focusable element. Its keys act on the
+  while it is open. A tree with no size takes the height its parent leaves it,
+  and shows the rows that fit in it; a tree in a parent with no bounded height
+  shows every row, so size the tree with `Style` to bound it. The tree is one
+  focusable element. Its keys act on the
   selected node, which follows the keyboard (single selection). Down and Up move
   to the next and previous visible node, without wrapping. Home and End go to the
   first and last visible node. Right opens a closed node, and on an open node

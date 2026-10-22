@@ -618,6 +618,9 @@ func (g *DataGridElement[T]) FocusHandle(h *FocusHandle) *DataGridElement[T] {
 // the key of each row, which must be unique and stable: the focus, the selection
 // and the sort follow it.
 //
+// With no size, the grid takes the height its parent leaves it, and builds the
+// rows that fit in it, as a grid with a Height does.
+//
 //	ui.DataGrid(runs, func(r Run) string { return r.ID },
 //		ui.DataColumn[Run]{Header: "Name", Text: func(r Run) string { return r.Name }, Compare: byName, Grow: 1},
 //		ui.DataColumn[Run]{Header: "Status", Text: func(r Run) string { return r.Status }}).
@@ -2242,7 +2245,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	list.header = g.headerRow(st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
 		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) }, ho, strs)
 
-	root := g.size.apply(Div().Column().Style(g.style)).Child(list)
+	// The column may shrink below its rows, so that the list windows them to the space
+	// instead of building them all (see Tree).
+	root := g.size.apply(Div().Column().MinHeight(Px(0)).Style(g.style)).Child(list)
 	if g.rowMenu != nil || g.headerMenu != nil {
 		// The menu hangs from the grid's outer box, which does not scroll, so that it
 		// opens at the pointer however far the rows are scrolled.
