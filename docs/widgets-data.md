@@ -39,7 +39,10 @@ atEnd := ui.Local(ctx, "atEnd", false)
 ui.ListOf(...).Bottom().Handle(h).OnAtEnd(atEnd.Set) // then: if !atEnd.Get() { show "Jump to latest" }
 ```
 
-Only the rows near the viewport are built. A row's height is measured once it
+Only the rows near the viewport are built. Each row is a component of its own:
+a row that stays in view is not built again when the list scrolls, and a signal
+that a row reads re-renders that row alone. A new slice of items, or a new list
+element from a parent's render, renders every row again. A row's height is measured once it
 is built and remembered by its key while the item stays in the list. A row not yet seen is estimated from the
 mean of the measured heights (32 px before any is measured). The scroll position
 stays on the item at the top of the viewport, so measuring rows above it, or

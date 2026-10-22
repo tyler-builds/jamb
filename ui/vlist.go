@@ -60,6 +60,12 @@ func (l *ListElement) GridSpan(cols, rows int) *ListElement { l.size.setSpan(col
 // row gets the item and its index in items, as Map's function does, for
 // striping or a position such as "3 of 10".
 //
+// Each row is rendered as a component of its own. A row that stays in the
+// window is not rendered again when the window moves, and a signal that a row
+// reads re-renders that row alone, not the list. The list is rendered again when
+// its items change or its own state does (a scroll to an item, for one), and then
+// its rows are rendered again, since the row function may read the list's data.
+//
 // Changes are detected by slice identity: pass a new slice to change the
 // items, as with signals. Changing a slice in place is not detected:
 //
@@ -124,15 +130,19 @@ type varState struct {
 
 	from, to         int // rows to build, [from, to); set when the window moves
 	windowSet        bool
-	builtFrom, built int     // rows the last expand built, [builtFrom, built)
-	inner            float32 // viewport height inside the padding, from the last paint
-	top              float32 // offset of the spacer in the scroll container
-	pad              float32 // space above the rows (Bottom)
-	atEnd            bool    // the list was at its end at the last paint
-	overflow         bool    // the rows were taller than the viewport at the last paint
-	endKnown         bool    // a paint has recorded atEnd
-	warned           bool
-	rebuilds         int // O(n) index rebuilds, for tests and benchmarks
+	builtFrom, built int // rows the last expand built, [builtFrom, built)
+	// rows are the rows of the window that the last expand built, by key, for the
+	// list element rowsFor (see expand).
+	rowsFor  *ListElement
+	rows     map[string]*vRow
+	inner    float32 // viewport height inside the padding, from the last paint
+	top      float32 // offset of the spacer in the scroll container
+	pad      float32 // space above the rows (Bottom)
+	atEnd    bool    // the list was at its end at the last paint
+	overflow bool    // the rows were taller than the viewport at the last paint
+	endKnown bool    // a paint has recorded atEnd
+	warned   bool
+	rebuilds int // O(n) index rebuilds, for tests and benchmarks
 }
 
 // rebuild reads every item's key and sets up the height index. Heights
@@ -282,18 +292,78 @@ func (l *ListElement) expand(ctx *Context) Element {
 		to = max(min(vs.to, vs.count), from)
 	}
 	spacer := Div().Key("jamb.list.spacer").Shrink(0).Height(Px(vs.pad + float32(vs.hidx.total())))
+	// A row is a component, and the rows of the window are kept for as long as the
+	// list is the same element: a row that is still in the window is passed again as
+	// the same component, which is not rendered again, so moving the window builds
+	// only the rows that come into it (see vRow).
+	if vs.rowsFor != l {
+		vs.rowsFor, vs.rows = l, nil
+	}
+	rows := make(map[string]*vRow, to-from)
 	for i := from; i < to; i++ {
 		top := vs.pad + float32(vs.hidx.prefix(i))
-		r := l.rowAt(i)
-		wrap := Div().Key("jamb.vrow:" + vs.keys[i]).Absolute().Top(top).Left(0).Right(0).Child(r)
-		setListPosition(wrap, r, i+1, vs.count)
+		k := vs.keys[i]
+		vr := vs.rows[k]
+		if vr == nil {
+			vr = l.newRow(vs, i)
+		}
+		wrap := Div().Key("jamb.vrow:" + k).Absolute().Top(top).Left(0).Right(0).Child(vr.el)
+		if !vr.known || !vr.ownRole {
+			wrap.listItem(i+1, vs.count)
+		}
+		vr.wrap = wrap
+		rows[k] = vr
 		spacer.Child(wrap)
 	}
+	vs.rows = rows
 	vs.builtFrom, vs.built = from, to
 	container := l.size.apply(Div().ScrollY().Style(l.style)).Role(access.RoleList)
 	container.access().container = l.selectable
 	container.vrows = vs
 	return container.Child(spacer)
+}
+
+// vRow is a row of a ListOf's window: the component that renders the row, and the
+// wrapper that the last expand put it in. A row with a role of its own takes the
+// item's position itself (see setListPosition), and then its wrapper is not a list
+// item. Whether it has one is found when the row renders, and the wrapper is changed
+// to match, since the wrapper is not built again for a row that is kept.
+type vRow struct {
+	el      *ComponentElement
+	wrap    *DivElement // the wrapper of the row in the last expand that had it
+	ownRole bool        // the row has a role of its own
+	known   bool        // a render of the row has found ownRole
+}
+
+// newRow returns the row of item i of the window vs, which renders the list's row
+// at its position.
+func (l *ListElement) newRow(vs *varState, i int) *vRow {
+	vr := &vRow{}
+	vr.el = Component(func(*Context) Element {
+		r := l.rowAt(i)
+		own := hasOwnRole(r)
+		if own {
+			setListPosition(nil, r, i+1, vs.count)
+		}
+		if !vr.known || own != vr.ownRole {
+			vr.ownRole, vr.known = own, true
+			if w := vr.wrap; w != nil {
+				if own {
+					w.acc = nil
+				} else {
+					w.listItem(i+1, vs.count)
+				}
+			}
+		}
+		return r
+	})
+	return vr
+}
+
+// hasOwnRole reports whether r is a div with a role of its own.
+func hasOwnRole(r Element) bool {
+	d, ok := r.(*DivElement)
+	return ok && d.acc != nil && d.acc.role != access.RoleUnknown
 }
 
 // setAtEnd records whether the list is at its end. onAtEnd is called on the
