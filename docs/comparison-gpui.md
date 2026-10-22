@@ -6,7 +6,7 @@ Measured with `scripts/compare-gpui.ps1`, three runs per measurement, in three p
 
 ## Summary
 
-Figures are from the current pass (2026-10-21) unless marked otherwise. That pass ran both apps on a secondary 144 Hz monitor, without activating them, while a video played on the primary monitor, so the machine was not idle.
+Figures are from the current pass (2026-10-21) unless marked otherwise. That pass ran both apps on a secondary 144 Hz monitor, without activating them. The machine was not dedicated to benchmarking: other applications were running.
 
 - **Startup.** On a warm launch, jamb painted its first frame at 221.6 ms [212.1–255.5] and GPUI at 304.1 ms [293.6–336.1]. On the first launch of a new copy, which Windows Defender scans before it runs, jamb painted at 486.9 ms [486.1–530.4] and GPUI at 493 ms [473.3–498.1]. GPUI's window was visible sooner on that first launch, at 460.2 ms [455–482.6] against jamb's 468 ms [463.7–491].
 - **Binary size.** GPUI's release binary is 9.22 MB and jamb's stripped release binary is 9.36 MB. jamb's binary has grown since 2026-10-14 (8.41 MB then). GPUI's 15.28 MB for the same app built with gpui-component, now GPUI Kit, is from before the rename (see [Binary size, updated](#binary-size-updated)).
@@ -30,7 +30,7 @@ Figures are from the current pass (2026-10-21) unless marked otherwise. That pas
 | GPUI lockfile | `Cargo.lock` copied from gpui-testing; cargo pruned it to 673 packages for this app |
 | jamb builds | Release: `go build -trimpath -ldflags "-s -w"` (size) and `-s -w -H windowsgui` (timed and run, see Method). Default: `go build` |
 | GPUI builds | Release: `cargo build --release`, the default release profile, as most Rust apps ship. Debug: `cargo build` |
-| Machine load | Other applications were running during the measurements (the machine was not dedicated to the test). On 2026-10-21 a video played in a browser on the primary monitor throughout |
+| Machine load | The machine was not dedicated to benchmarking: other applications were running |
 
 The two apps look the same. Both windows are 800 x 600, titled "Hello", with a `#0c0c0e` background, "Hello, world!" at 24 px in the system UI font, and a button in jamb's primary-button colors (accent `#6265ed`, hover `#5b5ee7`, 8 px radius, medium weight). Segoe UI has no Medium face; both frameworks draw medium-weight text with Segoe UI Semibold. The button's padding differs slightly: jamb's button is a little smaller than GPUI's. Both apps were clicked twice in a QA run; both showed "Clicked 2 times".
 
@@ -60,7 +60,7 @@ Changes in the third pass (2026-10-21), compared with the passes before it:
 - **No activation.** Neither window was activated, so the runs took no focus from the user. The focused idle sample is skipped unless `-IncludeFocused` is given, and it was not given. The unfocused idle sample therefore has no focus change in it.
 - **Pointer.** The pointer phase posts `WM_MOUSEMOVE` messages with client coordinates to each window, instead of moving the real cursor. The apps read them from their own message queues. This measures the handling of pointer messages, not the mouse path.
 - **Resize.** The window size changes with `SetWindowPos` using `SWP_NOACTIVATE`.
-- **Background load.** A video played in a browser on the primary monitor throughout.
+- **Background load.** The machine was not dedicated to benchmarking: other applications were running.
 - **Commit and script.** jamb at `2c5c6b0`. The script's runtime phase keeps the cursor and the primary monitor untouched (commit `cce80e1`, made before this pass).
 
 - **Source size.** Files and lines in the app's own source. Framework size for jamb is the non-test `.go` files of every jamb package in the dependency graph of `examples/hello` (`go list -deps`). For GPUI, the sizes are the crate directories of every package in `Cargo.lock` (from `cargo metadata --locked`), not the whole caches. The zed checkout is a monorepo, so only the crate directories are counted.
@@ -84,7 +84,7 @@ Changes in the third pass (2026-10-21), compared with the passes before it:
 
 ### Third pass, 2026-10-21 (current)
 
-Three runs of each measurement, on the secondary monitor, without activation, with a video playing on the primary monitor (see [Method](#method) for the changes from the earlier passes). The better value of each row is in bold, whichever side it is. Medians are shown with the minimum and maximum of the three runs in brackets. The warm launches pool fifteen values (three runs of five launches).
+Three runs of each measurement, on the secondary monitor, without activation (see [Method](#method) for the changes from the earlier passes). The better value of each row is in bold, whichever side it is. Medians are shown with the minimum and maximum of the three runs in brackets. The warm launches pool fifteen values (three runs of five launches).
 
 #### Runtime
 
@@ -276,7 +276,7 @@ The first pass showed GPUI ahead on startup, memory and binary size. Investigati
 - **Startup method.** Times include process creation and the script's polling, and are measured from the launch call. jamb's own trace (`JAMB_TRACE=1`) puts its first frame about 195 ms after process start on this machine (2026-10-21: 195.8 ms warm and 198.1 ms on the first launch, for hello; 214.8 ms warm for the demo); the external warm figure (221.6 ms in the third pass) adds process creation and polling. First-launch times depend on the antivirus and its settings.
 - **Synthetic input.** In the first pass, the pointer phase moved the real cursor and the resize phase resized the app's window, for a few seconds each; the script restored the cursor afterwards. In the third pass, the pointer phase posts `WM_MOUSEMOVE` messages and the resize phase uses `SetWindowPos` without activation, so neither moves the cursor or takes focus. The Alt key press that the script uses to bring an app to the front, in the passes that focus it, is also synthetic.
 - **Focus and occlusion.** In the second pass, the unfocused sample gave focus to the taskbar. The app stayed visible, but a window that is not visible at all could behave differently. In the third pass, neither window was activated, so no focus changed.
-- **Measurement noise.** The machine was not idle: other applications were running, and on 2026-10-21 a video played on the primary monitor. The sample size is three runs (fifteen warm launches for startup).
+- **Measurement noise.** The machine was not dedicated to benchmarking: other applications were running. The sample size is three runs (fifteen warm launches for startup).
 - **Secondary monitor (2026-10-21).** The third pass ran on a 144 Hz monitor. jamb's presents on that monitor followed the primary monitor's 165 Hz period (about 6.06 ms), so the frame timing there may not reflect the monitor the window is on. See [BENCHMARKS.md](../BENCHMARKS.md), Known issues.
 - **GPUI app source (2026-10-21).** The `src/main.rs` of gpui-hello has 108 lines in the third pass, against 68 in the earlier passes. The difference is the code added for this pass: `HELLO_POSITION` gives the window an origin and the display that contains it, and `HELLO_NOACTIVATE` opens the window with `focus: false` and skips `cx.activate`. The view and its rendering did not change, and without the variables the app behaves as before. The jamb app's `main.go` is 28 lines in every pass.
 - **No focused idle (2026-10-21).** The focused idle sample was not measured in the third pass, so the comparison of focused idle CPU rests on the second pass.
