@@ -105,6 +105,14 @@ type FrameWaiter interface {
 	FrameWaitable() uintptr
 }
 
+// Presenter is optionally implemented by a Handler that reports whether its last
+// OnFrame reached the screen. The adapter repaints a window on WM_PAINT unless it
+// showed a frame at the window's current size (see repaintNeeded), so a frame
+// that was not shown, because the window was hidden or covered, is drawn again.
+type Presenter interface {
+	Presented() bool
+}
+
 // AccessHandler is optionally implemented by a Handler whose UI is exposed to
 // assistive technology. AccessBridge returns the bridge that the window's UI
 // runtime publishes its access tree on, or nil before the runtime exists. The
