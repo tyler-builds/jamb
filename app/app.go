@@ -760,7 +760,7 @@ func (h *host) Presented() bool { return h.presented }
 func (h *host) OnFrame(w platform.Window) bool {
 	h.presented = false
 	width, height := w.Size()
-	if !drawWanted(w.Visible(), width, height) {
+	if !drawWanted(w.Visible(), h.frames > 0, width, height) {
 		// Hidden or minimized: nothing is drawn, and no animation runs. Showing the
 		// window wakes it, and its first frame then reads the current state.
 		return false
