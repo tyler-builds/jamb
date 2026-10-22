@@ -83,6 +83,7 @@ func (rt *Runtime) retireChild(c *componentInstance) {
 // children of the stale nodes of rt, which the next build of rt replaces; the retire
 // skips them, since the instance is no longer rt's (see retireNode).
 func (rt *Runtime) park(inst *componentInstance) {
+	rt.topModalOK = false
 	ids := map[uint64]bool{}
 	insts := map[*componentInstance]bool{}
 	forNodes(inst.root, func(n *node) { ids[n.id] = true })
@@ -128,7 +129,9 @@ func (rt *Runtime) park(inst *componentInstance) {
 // instances that render straight into the parent's children are given the new parent. A
 // focused node that was inside it keeps the focus when the runtime has it.
 func (rt *Runtime) adopt(inst *componentInstance, parent *node) {
+	rt.topModalOK = false
 	from := inst.rt
+	from.topModalOK = false
 	moved := from != rt
 	inst.reparent(parent)
 	move := func(id uint64) {

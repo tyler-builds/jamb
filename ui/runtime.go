@@ -434,6 +434,12 @@ type Runtime struct {
 	// the one whose initial focus is set once the next build is done.
 	modals       []modalFrame
 	pendingModal uint64
+	// topModalGen, topModalOK and topModalNode cache the answer of topModal for
+	// the build generation topModalGen (see topModal). topModalOK is cleared when
+	// a modal mounts, closes or moves between runtimes.
+	topModalGen  uint32
+	topModalOK   bool
+	topModalNode *node
 	// windowFocus is the element in the window that had focus when F6 last left
 	// the window for another region (see cycleRegions).
 	windowFocus uint64
