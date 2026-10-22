@@ -11,6 +11,7 @@ type Canvas struct {
 	layers []layer
 	r      rasterizer
 	cov    []float32
+	sh     shader // the shader of the fill being drawn (see draw)
 	// Tolerance is how far, in pixels, flattened curves may stray; 0 means
 	// 0.05, which loses no visible area to the straight segments.
 	Tolerance float32
@@ -184,13 +185,22 @@ func (c *Canvas) polys(p *Path, s *Stroke) [][]Point {
 // draw paints the coverage of polys.
 func (c *Canvas) draw(polys [][]Point, paint Paint, rule FillRule) {
 	st := c.top()
-	sh, ok := newShader(paint, st.m, st.alpha)
-	if !ok || len(polys) == 0 {
+	sh := &c.sh
+	if !sh.init(paint, st.m, st.alpha) || len(polys) == 0 {
 		return
 	}
 	dst := c.target()
 	w, h := dst.Rect.Dx(), dst.Rect.Dy()
 	y0, y1 := c.r.fill(polys, rule, w, h, c.cov)
+	// An opaque solid color that fully covers a pixel replaces what is under it. The
+	// blend below then keeps none of the pixel, so its bytes are the color's, and
+	// the pixel is written directly: it gives the same bytes as the blend does.
+	solid := sh.grad == nil
+	opaque := solid && sh.solid[3] == 255
+	var px [4]uint8
+	for k := range 4 {
+		px[k] = uint8(min(sh.solid[k]+0.5, 255))
+	}
 	for y := y0; y < y1; y++ {
 		row := c.cov[y*w : (y+1)*w]
 		for x, cv := range row {
@@ -204,7 +214,14 @@ func (c *Canvas) draw(polys [][]Point, paint Paint, rule FillRule) {
 					continue
 				}
 			}
-			src := sh.at(float32(x)+0.5, float32(y)+0.5)
+			if opaque && cv == 1 {
+				copy(dst.Pix[y*dst.Stride+x*4:y*dst.Stride+x*4+4], px[:])
+				continue
+			}
+			src := sh.solid
+			if !solid {
+				src = sh.at(float32(x)+0.5, float32(y)+0.5)
+			}
 			sa := src[3] * cv
 			if sa <= 0 {
 				continue
