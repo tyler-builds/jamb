@@ -408,7 +408,22 @@ func (m *ModalElement) expand(ctx *Context) Element {
 
 // topModal returns the backdrop of the last open Modal in the tree, or nil. A
 // non-modal dialog is not a modal, so it does not trap focus or keys.
+//
+// The answer changes only when the tree does: a build pass bumps rt.gen, and a
+// subtree that is parked or adopted, or a modal that mounts or closes, clears
+// topModalOK. So it is kept for the build generation it was found in, and the
+// keys and presses between two builds don't walk the whole tree again.
 func (rt *Runtime) topModal() *node {
+	if rt.topModalOK && rt.topModalGen == rt.gen && (rt.topModalNode == nil || rt.byID[rt.topModalNode.id] == rt.topModalNode) {
+		return rt.topModalNode
+	}
+	top := rt.walkTopModal()
+	rt.topModalGen, rt.topModalOK, rt.topModalNode = rt.gen, true, top
+	return top
+}
+
+// walkTopModal finds the answer of topModal by walking the whole tree.
+func (rt *Runtime) walkTopModal() *node {
 	var top *node
 	var walk func(n *node)
 	walk = func(n *node) {
@@ -430,6 +445,7 @@ func (rt *Runtime) topModal() *node {
 // the tree is built (see buildDirty). A non-modal dialog is on top of the others
 // that were raised before it.
 func (rt *Runtime) modalMounted(n *node) {
+	rt.topModalOK = false
 	rt.modals = append(rt.modals, modalFrame{id: n.id, ret: rt.focusID})
 	rt.pendingModal = n.id
 	if n.div.modal.nonModal {
@@ -518,6 +534,7 @@ func (rt *Runtime) modalFocus(n *node) uint64 {
 // focus was inside it, focus goes back to the element it returns to. Focus that
 // has moved elsewhere is left alone.
 func (rt *Runtime) modalClosed(n *node) {
+	rt.topModalOK = false
 	delete(rt.raised, n.id)
 	i := slices.IndexFunc(rt.modals, func(f modalFrame) bool { return f.id == n.id })
 	if i < 0 {
