@@ -127,11 +127,11 @@ type Store struct {
 	details map[int]ui.Window
 	// activity scrolls the Activity page's list.
 	activity *ui.ListHandle
-	// matched caches the events for the last Activity filter, so the list
-	// gets the same slice while the filter holds.
-	matchedQ   string
-	matched    []event
-	hasMatched bool
+	// matches holds the results of the Activity filter for the query and the
+	// shorter queries it extends, each step a subset of the one before it. A
+	// longer query filters the last step, and Backspace gets the earlier step
+	// back as it was, so the list sees the same slice and keeps its index.
+	matches []matchStep
 }
 
 // dropMark is the insertion line shown while a project is dragged over a card.

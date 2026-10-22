@@ -1,6 +1,7 @@
 package views
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -218,5 +219,46 @@ func TestMatchingEventsKeepsTheSliceWhileTheQueryHolds(t *testing.T) {
 	}
 	if all := s.matchingEvents(""); len(all) != len(events) {
 		t.Errorf("a blank query returned %d events, want %d", len(all), len(events))
+	}
+}
+
+// A longer query filters the last result, and Backspace gets the shorter query's
+// slice back as it was, so the list keeps its index while the user types.
+func TestMatchingEventsNarrowsAndReusesTheEarlierStep(t *testing.T) {
+	s := NewStore()
+	const q = "dev runner"
+	want := 0
+	for _, e := range events {
+		if strings.Contains(e.lower, q) {
+			want++
+		}
+	}
+	var prefixes [][]event
+	for n := 1; n <= len(q); n++ {
+		prefixes = append(prefixes, s.matchingEvents(q[:n]))
+	}
+	full := s.matchingEvents(q)
+	if len(full) != want || want == 0 {
+		t.Fatalf("typed filter kept %d events, want %d (and some)", len(full), want)
+	}
+	back := s.matchingEvents(q[:len(q)-1])
+	if len(back) != len(prefixes[len(prefixes)-2]) || &back[0] != &prefixes[len(prefixes)-2][0] {
+		t.Error("Backspace did not get the earlier step's slice back")
+	}
+	if got := s.matchingEvents("zzz-no-match"); len(got) != 0 {
+		t.Errorf("a query with no match kept %d events", len(got))
+	}
+	if got := s.matchingEvents(q); len(got) != want {
+		t.Errorf("retyping the query kept %d events, want %d", len(got), want)
+	}
+}
+
+// Every event has its text lower-cased and its key set when it is made, since the
+// filter and the list read them on each render.
+func TestSampleEventsCacheTheirTextAndKey(t *testing.T) {
+	for _, e := range events {
+		if e.lower != strings.ToLower(e.text()) || e.key != strconv.Itoa(e.id) {
+			t.Fatalf("event %d: lower %q, key %q", e.id, e.lower, e.key)
+		}
 	}
 }

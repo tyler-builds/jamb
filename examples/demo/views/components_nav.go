@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
@@ -14,7 +15,7 @@ import (
 func navigationSection() ui.Element {
 	// The trees are made once: the section re-renders on each change, and the
 	// nodes of the large tree are not made again then.
-	files, folders := projectFiles(), generatedFolders(10000)
+	files, folders := projectFiles(), bigFolders()
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
 		plain := ui.Local(ctx, "nav.plain", "alpha")
@@ -153,6 +154,10 @@ func projectFiles() []ui.TreeNode {
 		{Key: "LICENSE", Label: "LICENSE", Icon: icons.File},
 	}
 }
+
+// bigFolders returns the 10,000 folders of the large tree, made on the first use
+// and then kept: the page is built again on each visit, and the tree is not.
+var bigFolders = sync.OnceValue(func() []ui.TreeNode { return generatedFolders(10000) })
 
 // generatedFolders is n folders, each with three files that are made only when the
 // folder opens, so a large tree costs what its visible part costs.
