@@ -813,6 +813,24 @@ func (r *Renderer) EndFrame() error {
 	return r.checkDevice("IDXGISwapChain::Present", hr)
 }
 
+// instanceBufferMin is the smallest instance buffer, in bytes. A window's first
+// frame is a few kilobytes of instances, so a small buffer keeps the GPU memory
+// a process holds low; a buffer grows with the frames that need more.
+const instanceBufferMin = 4 * 1024
+
+// instanceCapacity returns the size of a new instance buffer for size bytes of
+// instances. The buffer has half again the room it needs, and at least
+// instanceBufferMin, so a frame that grows a little does not recreate it. Buffers
+// grow geometrically and are not shrunk, so a window that keeps drawing the same
+// content never creates one.
+func instanceCapacity(size int) int {
+	capacity := max(size, instanceBufferMin)
+	for capacity < size*3/2 {
+		capacity *= 2
+	}
+	return capacity
+}
+
 func (r *Renderer) upload(p pipelineKind, data unsafe.Pointer, count int) error {
 	if count == 0 {
 		return nil
@@ -821,10 +839,7 @@ func (r *Renderer) upload(p pipelineKind, data unsafe.Pointer, count int) error 
 	vb := &r.vbufs[p]
 	if vb.capacity < size {
 		vb.buf.Release()
-		capacity := max(size, 64*1024)
-		for capacity < size*3/2 {
-			capacity *= 2
-		}
+		capacity := instanceCapacity(size)
 		desc := bufferDesc{ByteWidth: uint32(capacity), Usage: d3dUsageDynamic, BindFlags: d3dBindVertexBuffer, CPUAccessFlags: d3dCPUAccessWrite}
 		var buf *com
 		hr, _, _ := syscall.SyscallN(r.device.fn(3), r.device.this(), uintptr(unsafe.Pointer(&desc)), 0, uintptr(unsafe.Pointer(&buf))) // CreateBuffer
