@@ -141,7 +141,13 @@ func (rt *Runtime) findKey(n *node, key string) *node {
 	if n.key == key {
 		return n
 	}
-	for _, c := range n.children {
+	kids := n.children
+	if n.reused {
+		// Rebuilt in place by the build under way: until the build ends, the tree as
+		// last laid out is the one its old children make.
+		kids = n.oldKids
+	}
+	for _, c := range kids {
 		if f := rt.findKey(c, key); f != nil {
 			return f
 		}

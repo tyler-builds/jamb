@@ -96,8 +96,9 @@ func TestSignalUpdateRebuildsOnlyItsSubtree(t *testing.T) {
 			kept++
 		}
 	}
-	if kept != total-3 {
-		t.Errorf("kept %d of %d nodes, want all but the 3 rebuilt", kept, total)
+	if kept != total {
+		// The 3 rebuilt nodes are rebuilt in place (see newNode), so every node is kept.
+		t.Errorf("kept %d of %d nodes, want all", kept, total)
 	}
 	if findText(rt.tree, "row 37 edited") == nil {
 		t.Fatal("updated text not in tree")

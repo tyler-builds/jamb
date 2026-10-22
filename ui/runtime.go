@@ -98,9 +98,16 @@ type node struct {
 	id       uint64
 	kind     nodeKind
 	flags    nodeFlags // copied from the element so paint and hit testing need not load it
+	fresh    bool      // the element did not exist before this build
+	reused   bool      // rebuilt in place by the build under way; retire has yet to deal with oldKids
+	gen      uint32    // frame in which the node was built
 	parent   *node
 	children []*node
 	order    []*node // paint order: children sorted by ZIndex
+	// oldKids holds the children the node had before the build that rebuilt it in
+	// place (see newNode), until retire has dealt with the ones that went. Between
+	// builds it is empty.
+	oldKids []*node
 
 	div    *DivElement
 	textEl *TextElement
@@ -114,8 +121,6 @@ type node struct {
 	// boundary is set when this node is the root of an instance's output.
 	owner    *componentInstance
 	boundary *componentInstance
-	gen      uint32 // frame in which the node was built
-	fresh    bool   // the element did not exist before this build
 	key      string // the element's key (or its component's), for Find and Dump
 
 	style Style
@@ -142,6 +147,7 @@ type node struct {
 	// ancestors, which are painted even when off screen.
 	paintGen uint32
 	keepGen  uint32
+	reuseGen uint32 // the build that last rebuilt the node in place (see newNode)
 	painted  []*node
 }
 
@@ -270,13 +276,14 @@ type Runtime struct {
 	sys    SystemSettings
 	// textFactor scales the font size of text (see textStyle); caretWidth is the
 	// width of the text caret in logical pixels. Both follow sys.
-	textFactor float32
-	caretWidth float32
-	text       *text.System
-	engine     layout.Engine
-	scene      scene.Scene
-	tree       *node
-	byID       map[uint64]*node
+	textFactor  float32
+	caretWidth  float32
+	text        *text.System
+	engine      layout.Engine
+	scene       scene.Scene
+	tree        *node
+	byID        map[uint64]*node
+	nodesReused int // nodes rebuilt in place (see newNode), for tests
 
 	instances map[uint64]*componentInstance
 	states    map[uint64]*nodeState
@@ -1190,6 +1197,21 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	if b := n.boundary; b != nil && b.root == n && !b.disposed && (b.rt != rt || b.gen == rt.gen && n.gen != rt.gen) {
 		return // a reused instance's subtree, now part of the new tree, or one taken by another runtime
 	}
+	if n.reused {
+		// Rebuilt in place (see newNode): the node stays, and of the children it had
+		// before, those that were not rebuilt in place are retired as usual.
+		n.reused = false
+		kids := n.oldKids
+		for i, c := range kids {
+			kids[i] = nil
+			rt.retireNode(c, mayExit)
+		}
+		n.oldKids = kids[:0]
+		return
+	}
+	if n.reuseGen == rt.gen && rt.byID[n.id] == n {
+		return // rebuilt in place earlier in this build, and live: its old children are dealt with
+	}
 	leaving := rt.byID[n.id] == n
 	if leaving {
 		delete(rt.byID, n.id)
@@ -1256,9 +1278,30 @@ func (rt *Runtime) disposeInstance(inst *componentInstance) {
 	}
 }
 
+// newNode returns the node for an element built under parent. An element that is
+// rebuilt where it was, with the same kind and the same parent, gets its node back
+// rather than a new one: the node stays the same object across builds, so that the
+// nodes of a list or a tree are not allocated again on each build. Its children
+// before this build are kept in oldKids, which retire deals with (see retireNode),
+// and the node is marked reused until then. A node is not reused twice in one build.
 func (rt *Runtime) newNode(kind nodeKind, id uint64, parent *node, owner *componentInstance) *node {
-	n := &node{rt: rt, kind: kind, id: id, parent: parent, owner: owner, gen: rt.gen}
-	n.fresh = rt.byID[id] == nil // a new element, not a rebuild of an existing one
+	var n *node
+	if old := rt.byID[id]; old != nil && old.kind == kind && old.rt == rt && old.gen != rt.gen &&
+		old.parent == parent && len(old.oldKids) == 0 {
+		// The arrays of the children and of the layout children are kept for this
+		// build's children, cleared of the old pointers.
+		prev, spare, lc, pa := old.children, old.oldKids[:0], old.lay.Children[:0], old.painted[:0]
+		clear(lc[:cap(lc)])
+		clear(pa[:cap(pa)])
+		*old = node{rt: rt, kind: kind, id: id, parent: parent, owner: owner, gen: rt.gen}
+		old.oldKids, old.children, old.lay.Children, old.painted = prev, spare, lc, pa
+		old.reused, old.reuseGen = true, rt.gen
+		rt.nodesReused++
+		n = old
+	} else {
+		n = &node{rt: rt, kind: kind, id: id, parent: parent, owner: owner, gen: rt.gen}
+		n.fresh = rt.byID[id] == nil // a new element, not a rebuild of an existing one
+	}
 	if rt.insp != nil {
 		delete(rt.insp.edits, id) // a live edit lasts until its element is built again
 	}
