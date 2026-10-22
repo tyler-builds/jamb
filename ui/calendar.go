@@ -1,7 +1,7 @@
 package ui
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -240,7 +240,7 @@ func calendarDay(c calendarView, s *Strings, day time.Time, row, col int) *DivEl
 	on := start || end || (!c.value.IsZero() && sameDay(day, c.value))
 	ok := c.enabled(day)
 	cell := Div().asPart(c.widget + ".Day").Style(st.Day).Role(access.RoleDataItem).
-		Label(c.loc.longDate(day)).Child(Text(fmt.Sprintf("%d", day.Day())).NoWrap())
+		Label(c.loc.longDate(day)).Child(Text(strconv.Itoa(day.Day())).NoWrap())
 	a := cell.access()
 	cell.AccessCell(row, col).AccessSelected(on)
 	if day.Month() != c.focus.Month() || day.Year() != c.focus.Year() {
@@ -272,10 +272,11 @@ func calendarDay(c calendarView, s *Strings, day time.Time, row, col int) *DivEl
 		a.disabled = true
 		cell.Style(st.DayDisabled)
 	} else {
-		cell.Hover(st.DayHover).Cursor(CursorPointer).OnClick(func() { c.pick(day) })
+		pick := c.pick // the closure keeps the function, not the whole calendar
+		cell.Hover(st.DayHover).Cursor(CursorPointer).OnClick(func() { pick(day) })
 	}
-	if c.hover != nil {
-		cell.OnMouseEnter(func() { c.hover(day) })
+	if hover := c.hover; hover != nil {
+		cell.OnMouseEnter(func() { hover(day) })
 	}
 	if sameDay(day, c.focus) {
 		a.highlighted = true

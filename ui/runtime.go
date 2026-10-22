@@ -1432,6 +1432,11 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 			}
 		}
 		rt.setOverhang(n)
+		if k := len(e.children); k > 0 {
+			// The children are known, so their lists are made once rather than grown.
+			n.children = make([]*node, 0, k)
+			n.lay.Children = make([]*layout.Node, 0, k)
+		}
 		for i, c := range e.children {
 			cid := childID(id, i, c)
 			if rt.claimed(cid) {
@@ -1557,11 +1562,18 @@ func (rt *Runtime) duplicateKey(id uint64, e Element) uint64 {
 
 // reorder rebuilds a node's paint order (children sorted by ZIndex).
 func (rt *Runtime) reorder(n *node) {
-	n.order = append(n.order[:0], n.children...)
 	hasZ := false
 	for _, c := range n.children {
 		hasZ = hasZ || c.style.ZIndex != 0
 	}
+	if !hasZ && len(rt.raised) == 0 {
+		// Without a ZIndex or a raised dialog the paint order is the children's
+		// order, so the two share the slice. Nothing writes to order in place
+		// unless raised is set (see raiseDialogs), so the copy below is kept for it.
+		n.order = n.children
+		return
+	}
+	n.order = append([]*node(nil), n.children...)
 	if hasZ {
 		sort.SliceStable(n.order, func(a, b int) bool { return n.order[a].style.ZIndex < n.order[b].style.ZIndex })
 	}

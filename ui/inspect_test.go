@@ -190,7 +190,8 @@ func TestInspectLiveEditAppliesAndIsDroppedOnRebuild(t *testing.T) {
 		t.Fatalf("card width after the edit = %v, want 200", r.W)
 	}
 
-	want := "ui.Style{\n\tWidth: ui.Px(200),\n\tBackground: ui.Hex(\"#ff0000ff\"),\n\tClear: ui.ClearPadding,\n}"
+	// The literal lists the fields in the order Style declares them (see Style).
+	want := "ui.Style{\n\tBackground: ui.Hex(\"#ff0000ff\"),\n\tWidth: ui.Px(200),\n\tClear: ui.ClearPadding,\n}"
 	if got := tg.GoLiteral(card); got != want {
 		t.Fatalf("GoLiteral =\n%s\nwant\n%s", got, want)
 	}

@@ -84,7 +84,12 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	s := &n.style
 	bx, by := ox+n.lay.X, oy+n.lay.Y
 	n.paintGen = rt.paintGen
-	n.painted = n.painted[:0]
+	if n.painted == nil && len(n.order) > 0 {
+		// The first paint of the node lists its children: room for all of them.
+		n.painted = make([]*node, 0, len(n.order))
+	} else {
+		n.painted = n.painted[:0]
+	}
 	rt.stats.NodesPainted++
 	if n.flags&flagExit != 0 {
 		// Kept so the element can be drawn as a ghost after it is removed.
