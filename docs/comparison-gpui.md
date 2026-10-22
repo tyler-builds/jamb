@@ -2,35 +2,35 @@
 
 This document compares two builds of the same small app on one Windows machine: jamb (Go) and GPUI (Rust, the UI framework from Zed). The app is a window with a centered greeting and a button that counts its clicks. It measures project size, binary size, build times, startup, idle CPU and memory, and the CPU cost of pointer movement and window resizing. [Components: jamb and GPUI Kit](#components-jamb-and-gpui-kit) compares jamb's widgets, their options and the framework features around them with GPUI Kit's, the component library for GPUI from Longbridge (named gpui-component until September 2026).
 
-Measured with `scripts/compare-gpui.ps1`, three runs per measurement, in three passes: two on 2026-10-12 and one on 2026-10-21, the current pass (see [Measurement passes](#measurement-passes)). Results are shown as median [minimum–maximum].
+Measured with `scripts/compare-gpui.ps1`, three runs per measurement, in four passes: two on 2026-10-12, one on 2026-10-21 and one on 2026-10-22, the current pass (see [Measurement passes](#measurement-passes)). Results are shown as median [minimum–maximum].
 
 ## Summary
 
-Figures are from the current pass (2026-10-21) unless marked otherwise. That pass ran both apps on a secondary 144 Hz monitor, without activating them. The machine was not dedicated to benchmarking: other applications were running.
+Figures are from the current pass (2026-10-22) unless marked otherwise. That pass ran both apps on a secondary 144 Hz monitor, without activating them. No video was noted on the primary monitor, unlike the third pass, so the two passes' background loads differ. The run's watch log records two cursor moves during the pass, which are described in the caveats.
 
-- **Startup.** On a warm launch, jamb painted its first frame at 221.6 ms [212.1–255.5] and GPUI at 304.1 ms [293.6–336.1]. On the first launch of a new copy, which Windows Defender scans before it runs, jamb painted at 486.9 ms [486.1–530.4] and GPUI at 493 ms [473.3–498.1]. GPUI's window was visible sooner on that first launch, at 460.2 ms [455–482.6] against jamb's 468 ms [463.7–491].
-- **Binary size.** GPUI's release binary is 9.22 MB and jamb's stripped release binary is 9.36 MB. jamb's binary has grown since 2026-10-14 (8.41 MB then). GPUI's 15.28 MB for the same app built with gpui-component, now GPUI Kit, is from before the rename (see [Binary size, updated](#binary-size-updated)).
-- **Build time.** An incremental release build of jamb's hello app took 1.36 s [1.34–1.37], and GPUI's 2.57 s [2.53–2.62]. The clean builds were not measured in this pass, so the 2026-10-12 figures stand (see [Build times](#build-times-seconds-three-runs-dependencies-already-downloaded)).
-- **Idle CPU.** Unfocused for 60 s, jamb used 0.05% of one core [0.05–0.23], with 64 context switches per second. GPUI used 1.74% [1.69–1.77], with 410 per second. The focused idle sample was not measured in this pass.
-- **Memory.** GPUI uses less private memory: 73.15 MB [73.13–73.3] against jamb's 78.76 MB [78.03–79.52]. GPUI also uses less working set (48.98 MB against 58.36 MB) and has fewer threads (32 against 39) and handles (462 against 483). jamb uses less GPU memory (13.71 MB dedicated, against 15.46 MB).
+- **Startup.** On a warm launch, jamb painted its first frame at 215.4 ms [211.2–246.9] and GPUI at 296.2 ms [291.1–372.6]. On the first launch of a new copy, which Windows Defender scans before it runs, jamb painted at 496.5 ms [490.9–511.7] and GPUI at 502.2 ms [498.2–519.7]. jamb's window was visible sooner on that first launch this time, at 480 ms [477.2–485.1] against GPUI's 485.9 ms [482.5–502.7]; in the third pass GPUI's was first.
+- **Binary size.** jamb's stripped release binary is 8.02 MB and GPUI's release binary is 9.22 MB (jamb's was 9.36 MB on 2026-10-21 and 8.41 MB on 2026-10-14). With default build flags, jamb's binary is 11.42 MB, and GPUI's debug binary is 24.40 MB. GPUI's 15.28 MB for the same app built with gpui-component, now GPUI Kit, is from before the rename (see [Binary size, updated](#binary-size-updated)).
+- **Build time.** An incremental release build of jamb's hello app took 1.39 s [1.33–1.47], and GPUI's 2.50 s [2.49–2.52]. The clean builds were not measured in the last two passes, so the 2026-10-12 figures stand (see [Build times](#build-times-seconds-three-runs-dependencies-already-downloaded)).
+- **Idle CPU.** Unfocused for 60 s, jamb used 0.10% of one core [0.08–0.10], with 66 context switches per second. GPUI used 1.46% [1.38–1.54], with 422 per second. jamb's figure was 0.05% in the third pass. The focused idle sample was not measured in this pass.
+- **Memory.** GPUI uses less private memory: 73.16 MB [73.14–73.19] against jamb's 75.70 MB [74.26–75.92]. GPUI also uses less working set (48.99 MB against 55.12 MB) and has fewer threads (32 against 38) and handles (462 against 477). jamb uses less GPU dedicated memory (13.71 MB, against 15.46 MB). The gaps are smaller than in the third pass, when they were 5.6 MB of private bytes and 9.4 MB of working set.
 - **Project size.** jamb's app is one 28-line file. GPUI's app is one file of 108 lines today, against 68 in the earlier passes: the third pass added the `HELLO_POSITION` and `HELLO_NOACTIVATE` variables (see the caveats). GPUI resolves 673 packages in `Cargo.lock`.
 - **Toolchain.** jamb needs only the Go toolchain. The app builds with `CGO_ENABLED=0`. GPUI needs Rust 1.95.0, the MSVC linker and the Windows SDK, and its build scripts compile C and assembly helpers.
-- **Interaction.** During pointer movement, jamb used 1.09% of a core [0.93–1.25] against GPUI's 3.59% [3.43–5.46]. During programmatic resizing, jamb used 11.84% [11.36–13.4] against GPUI's 13.89% [13.59–15.28], but jamb made more context switches while resizing (2,175 per second against 1,531). The 2026-10-12 first-pass figures used the real cursor and are kept in the history.
+- **Interaction.** During pointer movement, jamb used 1.41% of a core [1.25–1.56] against GPUI's 2.50% [2.50–4.37], and jamb's context switches were 604.5 per second [585.3–614.8] against GPUI's 587.8 [580.8–588.5]. During programmatic resizing, jamb used 2.50% [1.71–6.24] against GPUI's 10.76% [5.93–16.23], with 1,210 context switches per second against GPUI's 1,326. In the third pass, jamb's resize CPU was 11.84%; the change is in the resize path of the 2026-10-22 performance work (see [BENCHMARKS.md](../BENCHMARKS.md), What changed). The 2026-10-12 first-pass figures used the real cursor and are kept in the history.
 
 ## Setup
 
 | Item | Value |
 |---|---|
 | Machine | Desktop PC: Intel Core i5-11600K (6 cores, 12 logical processors), NVIDIA GeForce RTX 3070 Ti, 32 GB RAM, Windows 11 Enterprise build 26200, Balanced power plan |
-| Displays (2026-10-21) | Primary: 1920 x 1080 at 165 Hz. Secondary: 1920 x 1080 at 144 Hz, at -1920,0. Both apps' windows opened on the secondary at logical -1600,150, never activated. The earlier passes used the default position, on the primary |
+| Displays (2026-10-21 and 2026-10-22) | Primary: 1920 x 1080 at 165 Hz. Secondary: 1920 x 1080 at 144 Hz, at -1920,0. Both apps' windows opened on the secondary at logical -1600,150, never activated. The earlier passes used the default position, on the primary |
 | Display scale | 100% (the 800 x 600 window had an 800 x 600 client area) |
-| jamb | Go go1.27.1 windows/amd64; `examples/hello` is its own module in `go.work`. Commits per pass: see [Measurement passes](#measurement-passes) |
+| jamb | Go go1.27.1 windows/amd64; `examples/hello` is its own module in `go.work`. Commits per pass: see [Measurement passes](#measurement-passes). The fourth pass used `2124a35` |
 | GPUI | `gpui` and `gpui_platform` 0.2.2 from `https://github.com/zed-industries/zed` at revision `cc053a4a6fa2fd0e8793201ed9099466af1be0b1` (the revision of the gpui-testing project), feature `font-kit` |
 | GPUI toolchain | Rust and Cargo 1.95.0 (pinned by `rust-toolchain.toml`), built with `--locked` |
 | GPUI lockfile | `Cargo.lock` copied from gpui-testing; cargo pruned it to 673 packages for this app |
 | jamb builds | Release: `go build -trimpath -ldflags "-s -w"` (size) and `-s -w -H windowsgui` (timed and run, see Method). Default: `go build` |
 | GPUI builds | Release: `cargo build --release`, the default release profile, as most Rust apps ship. Debug: `cargo build` |
-| Machine load | The machine was not dedicated to benchmarking: other applications were running |
+| Machine load | Other applications were running during the measurements (the machine was not dedicated to the test). On 2026-10-21 a video played in a browser on the primary monitor throughout. On 2026-10-22 no video was noted, and the run's watch log records two cursor moves (see Caveats) |
 
 The two apps look the same. Both windows are 800 x 600, titled "Hello", with a `#0c0c0e` background, "Hello, world!" at 24 px in the system UI font, and a button in jamb's primary-button colors (accent `#6265ed`, hover `#5b5ee7`, 8 px radius, medium weight). Segoe UI has no Medium face; both frameworks draw medium-weight text with Segoe UI Semibold. The button's padding differs slightly: jamb's button is a little smaller than GPUI's. Both apps were clicked twice in a QA run; both showed "Clicked 2 times".
 
@@ -40,19 +40,22 @@ The two apps look the same. Both windows are 800 x 600, titled "Hello", with a `
 
 ## Measurement passes
 
-The measurements come from three passes of the script on the same machine.
+The measurements come from four passes of the script on the same machine.
 
 | Pass | jamb code | What it measured |
 |---|---|---|
 | First | Commit `db7d858` plus the then-uncommitted `examples/hello` | Clean build times, build output sizes, GPUI's size-profile binary (footnote below), pointer movement and resizing |
 | Second | Commit `06e5936` | Everything else: project size, binary sizes, incremental builds, startup, idle CPU, memory and GPU memory, the screenshots |
-| Third (current) | 2026-10-21: the `examples/hello` of commit `2c5c6b0` | Project size, binary sizes, incremental builds, startup, idle CPU and memory, pointer movement and resizing, with the method changes described under [Method](#method). Focused idle and clean builds were not measured |
+| Third | 2026-10-21: the `examples/hello` of commit `2c5c6b0` | Project size, binary sizes, incremental builds, startup, idle CPU and memory, pointer movement and resizing, with the method changes described under [Method](#method). Focused idle and clean builds were not measured |
+| Fourth (current) | 2026-10-22: the `examples/hello` of commit `2124a35` | The same measurements as the third pass, with the same method. Focused idle and clean builds were not measured |
 
 The second pass ran with `-SkipInteraction`, because the pointer and resize phases move the real cursor. Between the passes, jamb's startup memory, binary size and font matching changed (see [Changes between the passes](#changes-between-the-passes)). None of those changes touch the input or resize path, so the first pass's interaction figures are kept, labeled as such.
 
 During the second pass, Medium text resolved to Segoe UI Regular, under an intermediate version of the font-weight rule. The final rule resolves it to Semibold. The app loads Regular and Semibold at startup either way, so the startup and memory figures are unaffected. The jamb screenshot was captured again with the final rule.
 
 ## Method
+
+The fourth pass (2026-10-22) used the third pass's method, as described below, with the jamb code of commit `2124a35`.
 
 Changes in the third pass (2026-10-21), compared with the passes before it:
 
@@ -82,11 +85,75 @@ Changes in the third pass (2026-10-21), compared with the passes before it:
 
 ## Results
 
-### Third pass, 2026-10-21 (current)
+### Fourth pass, 2026-10-22 (current)
+
+Three runs of each measurement, on the secondary monitor, without activation, on jamb's `examples/hello` at commit `2124a35` (see [Method](#method)). The better value of each row is in bold, whichever side it is. Medians are shown with the minimum and maximum of the three runs in brackets, and the brackets are omitted where the three runs agree. The warm launches pool fifteen values (three runs of five launches).
+
+#### Runtime (2026-10-22)
+
+| Metric | jamb | GPUI release |
+|---|---|---|
+| Startup, warm launch, window visible | **203.5 ms** [201.2–233.5] | 283.4 ms [280.1–327.4] |
+| Startup, warm launch, first painted frame | **215.4 ms** [211.2–246.9] | 296.2 ms [291.1–372.6] |
+| Startup, first launch of a new file, window visible | **480 ms** [477.2–485.1] | 485.9 ms [482.5–502.7] |
+| Startup, first launch of a new file, first painted frame | **496.5 ms** [490.9–511.7] | 502.2 ms [498.2–519.7] |
+| Idle CPU, unfocused (60 s) | **0.10%** [0.08–0.10] | 1.46% [1.38–1.54] |
+| Idle context switches/s, unfocused | **66.3** [65.8–66.3] | 421.7 [419.8–424.3] |
+| Idle CPU, focused (60 s) | not measured | not measured |
+| Private bytes | 75.70 MB [74.26–75.92] | **73.16 MB** [73.14–73.19] |
+| Working set | 55.12 MB [54.96–55.15] | **48.99 MB** [48.96–49.02] |
+| Threads | 38 [37–38] | **32** |
+| Handles | 477 [471–477] | **462** |
+| GPU dedicated memory | **13.71 MB** | 15.46 MB |
+| GPU shared memory | 1.09 MB [1.05–1.09] | **0.93 MB** |
+| Pointer movement, CPU (10 s) | **1.41%** [1.25–1.56] | 2.50% [2.50–4.37] |
+| Pointer movement, context switches/s | 604.5 [585.3–614.8] | **587.8** [580.8–588.5] |
+| Resizing, CPU (10 s) | **2.50%** [1.71–6.24] | 10.76% [5.93–16.23] |
+| Resizing, context switches/s | **1,210.1** [1,195.9–1,232.9] | 1,325.7 [1,324.8–1,338.4] |
+
+CPU values are percent of one logical core. The pointer and resize rows post messages and resize the window; they do not move the real cursor. The GPU memory figures include the Direct3D driver's allocations for the process.
+
+GPUI is lower on the private bytes, working set, thread and handle counts, GPU shared memory and pointer context switches. jamb is lower on idle CPU and context switches, warm and first-launch startup, pointer CPU, resize CPU and context switches, and GPU dedicated memory.
+
+#### Build times (2026-10-22)
+
+Incremental builds, dependencies already downloaded, three runs each, median [minimum–maximum] in seconds. The two toolchains' default profiles differ: jamb's default is `go build`, and GPUI's debug build is `cargo build`, so the last two rows compare the default of each side.
+
+| Build | jamb | GPUI |
+|---|---|---|
+| Release, text change | **1.39** [1.33–1.47] | 2.50 [2.49–2.52] |
+| Release, whitespace change | **1.37** [1.31–1.50] | 2.48 [2.48–2.52] |
+| Default (jamb) or debug (GPUI), text change | **1.43** [1.42–1.45] | 3.62 [3.54–3.75] |
+| Default (jamb) or debug (GPUI), whitespace change | **1.44** [1.42–1.47] | 3.58 [3.56–3.60] |
+
+Clean builds were not measured in this pass. The 2026-10-12 clean-build figures are in [Build times](#build-times-seconds-three-runs-dependencies-already-downloaded) below.
+
+#### Binary size (2026-10-22)
+
+| Build | jamb | GPUI |
+|---|---|---|
+| Release, stripped: jamb `go build -trimpath -ldflags "-s -w"` (also the runtime build, with `-H windowsgui`); GPUI `cargo build --release` (`.pdb` not included) | **8.02 MB** | 9.22 MB |
+| Default: jamb `go build`; GPUI debug `cargo build` (`.pdb` not included) | **11.42 MB** | 24.40 MB |
+
+#### Project size (2026-10-22)
+
+| Metric | jamb (Go) | GPUI (Rust) |
+|---|---|---|
+| App source | 1 file, 28 lines | 1 file, 108 lines |
+| App manifests | `go.mod`, `go.sum` | `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` |
+| Framework source used | 22 jamb package directories, 225 non-test files, 78,094 lines, 2.6 MB | Not applicable |
+| Third-party sources used | 4 modules, 76.69 MB | Registry: 647 crates, 815.02 MB; git: 25 crates, 24.58 MB |
+| Build list (Go) | 5 modules, 237.78 MB | Not applicable |
+| Packages in the hello app's dependency graph | 56 | 673 in `Cargo.lock` |
+| Toolchain install | Go GOROOT 235.47 MB | Rust 1.95.0 toolchain 571.27 MB |
+
+The framework source grew by one file and about 700 lines between the third and fourth passes (224 files and 77,359 lines on 2026-10-21), with the code of the performance work. The other rows are as they were in the third pass.
+
+### Third pass, 2026-10-21 (history)
 
 Three runs of each measurement, on the secondary monitor, without activation (see [Method](#method) for the changes from the earlier passes). The better value of each row is in bold, whichever side it is. Medians are shown with the minimum and maximum of the three runs in brackets. The warm launches pool fifteen values (three runs of five launches).
 
-#### Runtime
+#### Runtime (2026-10-21)
 
 | Metric | jamb | GPUI release |
 |---|---|---|
@@ -112,7 +179,7 @@ CPU values are percent of one logical core. The pointer and resize rows post mes
 
 GPUI is lower on the memory, thread and handle counts, the first-launch window time, the GPU shared memory and the resize context switches. jamb is lower on idle CPU and context switches, warm startup, first-launch painted frame, pointer CPU and context switches, resize CPU, and GPU dedicated memory.
 
-#### Build times
+#### Build times (2026-10-21)
 
 Incremental builds, dependencies already downloaded, three runs each, median [minimum–maximum] in seconds. The two toolchains' default profiles differ: jamb's default is `go build`, and GPUI's debug build is `cargo build`, so the last two rows compare the default of each side.
 
@@ -125,7 +192,7 @@ Incremental builds, dependencies already downloaded, three runs each, median [mi
 
 Clean builds were not measured in this pass. The 2026-10-12 clean-build figures are in [Build times](#build-times-seconds-three-runs-dependencies-already-downloaded) below.
 
-#### Binary size
+#### Binary size (2026-10-21)
 
 | Build | Size |
 |---|---|
@@ -178,6 +245,17 @@ GPUI can be built smaller with a size-optimized profile (`opt-level = "z"`, fat 
 
 ### Binary size, updated
 
+Measured on 2026-10-22, one build each, on the same machine, with jamb at `2124a35` (the fourth pass's figures are in its binary table above):
+
+| Build | Size |
+|---|---|
+| jamb hello, `go build -trimpath -ldflags "-s -w"` (stripped; the GUI-subsystem build is the same size, 8.02 MB) | 8.02 MB |
+| jamb hello, default `go build` | 11.42 MB |
+| jamb demo (`examples/demo`), stripped | 19.04 MB |
+| jamb demo, default `go build` | 26.35 MB |
+| GPUI hello (`gpui` at `cc053a4`, release, default profile) | 9.22 MB |
+| GPUI hello, debug (`cargo build`) | 24.40 MB |
+
 Measured on 2026-10-14, one build each, on the same machine. The other figures in this document are from the passes above and were not measured again.
 
 | Build | Size |
@@ -206,7 +284,7 @@ In the jamb demo, the code editor's part of the binary, by symbol size: wazero, 
 
 ### Build times (seconds; three runs; dependencies already downloaded)
 
-Measured 2026-10-12 (first and second passes). The incremental figures of 2026-10-21 are in the third pass above; these earlier incremental figures (2.03–2.06 s for jamb, 4.06–6.07 s for GPUI) are kept as history.
+Measured 2026-10-12 (first and second passes). The incremental figures of 2026-10-21 and 2026-10-22 are in the third and fourth passes above; these earlier incremental figures (2.03–2.06 s for jamb, 4.06–6.07 s for GPUI) are kept as history.
 
 | Build | Median [min–max] |
 |---|---|
@@ -273,13 +351,14 @@ The first pass showed GPUI ahead on startup, memory and binary size. Investigati
 - **Platform scope differs.** jamb is Windows-only today. GPUI targets macOS, Linux and Windows, and GPUI Kit adds WebAssembly, iOS and Android hosting. jamb's Linux and macOS platform packages are placeholders (per [architecture.md](architecture.md)), so the example was only compiled for them (`GOOS=linux` and `GOOS=darwin GOARCH=arm64`), not run. Cross-compiling GPUI from Windows was not tested, because it would need the rustup target and its system libraries.
 - **GPUI on Windows.** This comparison measures GPUI's Windows backend on this machine and nothing else. It does not assess that backend's maturity or stability.
 - **Driver threads.** The Direct3D driver's threads run in the app's process. Process CPU time and context switches include them, and they could not be separated.
-- **Startup method.** Times include process creation and the script's polling, and are measured from the launch call. jamb's own trace (`JAMB_TRACE=1`) puts its first frame about 195 ms after process start on this machine (2026-10-21: 195.8 ms warm and 198.1 ms on the first launch, for hello; 214.8 ms warm for the demo); the external warm figure (221.6 ms in the third pass) adds process creation and polling. First-launch times depend on the antivirus and its settings.
+- **Startup method.** Times include process creation and the script's polling, and are measured from the launch call. jamb's own trace (`JAMB_TRACE=1`) puts its first frame about 204 ms after process start on this machine (2026-10-22: 203.9 ms warm and 197.9 ms on the first launch, for hello; 221.2 ms warm for the demo. On 2026-10-21: 195.8 ms warm and 198.1 ms on the first launch, for hello); the external warm figure (215.4 ms in the fourth pass, 221.6 ms in the third) adds process creation and polling. First-launch times depend on the antivirus and its settings.
 - **Synthetic input.** In the first pass, the pointer phase moved the real cursor and the resize phase resized the app's window, for a few seconds each; the script restored the cursor afterwards. In the third pass, the pointer phase posts `WM_MOUSEMOVE` messages and the resize phase uses `SetWindowPos` without activation, so neither moves the cursor or takes focus. The Alt key press that the script uses to bring an app to the front, in the passes that focus it, is also synthetic.
-- **Focus and occlusion.** In the second pass, the unfocused sample gave focus to the taskbar. The app stayed visible, but a window that is not visible at all could behave differently. In the third pass, neither window was activated, so no focus changed.
-- **Measurement noise.** The machine was not dedicated to benchmarking: other applications were running. The sample size is three runs (fifteen warm launches for startup).
-- **Secondary monitor (2026-10-21).** The third pass ran on a 144 Hz monitor. jamb's presents on that monitor followed the primary monitor's 165 Hz period (about 6.06 ms), so the frame timing there may not reflect the monitor the window is on. See [BENCHMARKS.md](../BENCHMARKS.md), Known issues.
+- **Focus and occlusion.** In the second pass, the unfocused sample gave focus to the taskbar. The app stayed visible, but a window that is not visible at all could behave differently. In the third and fourth passes, neither window was activated, so no focus changed.
+- **Measurement noise.** The machine was not idle: other applications were running, and on 2026-10-21 a video played on the primary monitor. The sample size is three runs (fifteen warm launches for startup).
+- **Secondary monitor (2026-10-21 and 2026-10-22).** The third and fourth passes ran on a 144 Hz monitor. jamb's presents on that monitor followed the primary monitor's 165 Hz period (about 6.06 ms on 2026-10-21 and 6.05 ms in the 2026-10-22 live runs), so the frame timing there may not reflect the monitor the window is on. See [BENCHMARKS.md](../BENCHMARKS.md), Known issues.
+- **Cursor (2026-10-22).** The run's watch log, which records the cursor and the foreground window during the pass, shows two cursor position changes at 09:39:18 and 09:39:19 and no change of the foreground window. The script's runtime phases do not move the cursor, and the source of these moves is not known. Neither window was activated, so no focus changed.
 - **GPUI app source (2026-10-21).** The `src/main.rs` of gpui-hello has 108 lines in the third pass, against 68 in the earlier passes. The difference is the code added for this pass: `HELLO_POSITION` gives the window an origin and the display that contains it, and `HELLO_NOACTIVATE` opens the window with `focus: false` and skips `cx.activate`. The view and its rendering did not change, and without the variables the app behaves as before. The jamb app's `main.go` is 28 lines in every pass.
-- **No focused idle (2026-10-21).** The focused idle sample was not measured in the third pass, so the comparison of focused idle CPU rests on the second pass.
+- **No focused idle (2026-10-21 and 2026-10-22).** The focused idle sample was not measured in the third or fourth pass, so the comparison of focused idle CPU rests on the second pass.
 - **Button look.** The button colors and radius match jamb's primary button (GPUI's `rounded_lg` is 8 px), but the padding is not identical (see Setup). The text is GPUI's default system font, which is also what jamb uses on Windows.
 - **Build flags.** The jamb run and screenshot binary uses `-H windowsgui`, so no console window appears. A console-subsystem build launched from Explorer or `Start-Process` also opens a console window, which adds several hundred milliseconds to startup. GPUI's release build uses the `windows_subsystem` attribute for the same reason.
 
@@ -465,9 +544,9 @@ Where jamb offers more:
 
 ## Open items
 
-- **jamb's idle CPU.** In the third pass, this hello app used 0.05% [0.05–0.23] of a core over 60 s unfocused, with about 64 context switches per second. `BENCHMARKS.md` reports 0.13% of a core for the demo over the same time (2026-10-21). In the second pass, the hello app used 0.16–0.29% of a core, and most of the wake-ups came from the graphics driver's own thread, which runs in every Direct3D 11 process (see `BENCHMARKS.md`).
-- **The remaining memory gap.** In the third pass, jamb used about 5.6 MB more private bytes (78.76 against 73.15 MB) and about 9.4 MB more working set (58.36 against 48.98 MB) than GPUI. In the second pass the gaps were about 3 MB and 6 MB. Most of the difference is the Go runtime's own memory and go-text, the shaping library, which parses each font file's outlines when the font loads. Removing the latter would need changes in go-text.
-- **GPUI idle wake-ups.** In the third pass, GPUI used 1.74% of a core and about 410 context switches per second while idle (about 2% and 530 per second in the second pass). The cause was not investigated.
+- **jamb's idle CPU.** In the fourth pass, this hello app used 0.10% [0.08–0.10] of a core over 60 s unfocused, with about 66 context switches per second (0.05% and 64 in the third pass). `BENCHMARKS.md` reports 0.08% of a core for the demo over the same time (the 2026-10-22 live run) and 0.13% (2026-10-21). In the second pass, the hello app used 0.16–0.29% of a core, and most of the wake-ups came from the graphics driver's own thread, which runs in every Direct3D 11 process (see `BENCHMARKS.md`).
+- **The remaining memory gap.** In the fourth pass, jamb used about 2.5 MB more private bytes (75.70 against 73.16 MB) and about 6.1 MB more working set (55.12 against 48.99 MB) than GPUI. In the third pass the gaps were about 5.6 MB and 9.4 MB, and in the second about 3 MB and 6 MB. Most of the difference is the Go runtime's own memory and go-text, the shaping library, which parses each font file's outlines when the font loads. Removing the latter would need changes in go-text.
+- **GPUI idle wake-ups.** In the fourth pass, GPUI used 1.46% of a core and about 422 context switches per second while idle (1.74% and 410 in the third pass; about 2% and 530 per second in the second). The cause was not investigated.
 
 ## Reproducing
 
