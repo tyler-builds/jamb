@@ -921,9 +921,10 @@ type dgShared[T any] struct {
 	ident          unsafe.Pointer
 	n              int
 	keys           []string       // key of each row of the data
+	sortedKeys     bool           // the keys are in strictly increasing order, so unique
 	by             SortState      // the sort the order is made for
 	order          []int          // the row of the data at each displayed position
-	pos            map[string]int // displayed position by key
+	pos            map[string]int // displayed position by key, made when needed (see posOf)
 	dup            string         // a key that is used twice, for the warning
 	data           []T            // the rows of the last build, for an edit to find its row
 
@@ -997,8 +998,12 @@ func (sh *dgShared[T]) update(rows []T, key func(T) string, cols []DataColumn[T]
 	if !sh.keyed || sh.ident != ident || sh.n != n {
 		sh.keyed, sh.ident, sh.n = true, ident, n
 		sh.keys = make([]string, n)
+		sh.sortedKeys = true
 		for i := range rows {
 			sh.keys[i] = key(rows[i])
+			if i > 0 && sh.keys[i-1] >= sh.keys[i] {
+				sh.sortedKeys = false
+			}
 		}
 		sh.ordered = false
 	}
@@ -1024,15 +1029,35 @@ func (sh *dgShared[T]) update(rows []T, key func(T) string, cols []DataColumn[T]
 		}
 	}
 	sh.order = order
-	sh.pos = make(map[string]int, n)
+	sh.pos, sh.dup = nil, ""
+	// Keys in strictly increasing order are unique, so the table of positions can
+	// wait for its first lookup; otherwise it is made now, to find a repeated key.
+	if !sh.sortedKeys {
+		sh.makePos()
+	}
+}
+
+// makePos makes the table of displayed positions by key, and notes in dup a key
+// that is used twice.
+func (sh *dgShared[T]) makePos() {
+	sh.pos = make(map[string]int, len(sh.order))
 	sh.dup = ""
-	for p, i := range order {
+	for p, i := range sh.order {
 		k := sh.keys[i]
 		if _, ok := sh.pos[k]; ok && sh.dup == "" {
 			sh.dup = k
 		}
 		sh.pos[k] = p
 	}
+}
+
+// posOf returns the displayed position of the row with key k.
+func (sh *dgShared[T]) posOf(k string) (int, bool) {
+	if sh.pos == nil {
+		sh.makePos()
+	}
+	q, ok := sh.pos[k]
+	return q, ok
 }
 
 // selection returns the set of the keys in sel, made again only when sel changes.
@@ -1187,8 +1212,10 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	// the same cell.
 	cursor := cur.Get()
 	p := min(max(cursor.pos, 0), max(n-1, 0))
-	if q, ok := sh.pos[cursor.key]; ok && cursor.key != "" {
-		p = q
+	if cursor.key != "" {
+		if q, ok := sh.posOf(cursor.key); ok {
+			p = q
+		}
 	}
 	col := colOf(cursor.colKey, cursor.col)
 	onHeader := cursor.header
@@ -1197,7 +1224,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	ed.col = colOf(ed.colKey, ed.col)
 	anchorPos := func() int {
 		if k := anchor.Peek(); k != "" {
-			if q, ok := sh.pos[k]; ok {
+			if q, ok := sh.posOf(k); ok {
 				return q
 			}
 		}
@@ -1421,9 +1448,13 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	// this build. A focus request moves the cursor after the build, as a key would.
 	if h := g.gridHandle; h != nil {
 		h.inst = inst
-		q, rowOK := sh.pos[h.row]
+		var q int
+		rowOK := false
+		if h.hasRow {
+			q, rowOK = sh.posOf(h.row)
+		}
 		c, colOK := colPos[h.col]
-		rowOK, colOK = rowOK && h.hasRow, colOK && h.hasCol
+		colOK = colOK && h.hasCol
 		switch {
 		case h.focus && rowOK:
 			if !colOK {
@@ -1588,7 +1619,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if e.key == "" {
 			return false
 		}
-		q, ok := sh.pos[e.key]
+		q, ok := sh.posOf(e.key)
 		if !ok {
 			edit.Set(dgEdit{})
 			return false
@@ -1644,7 +1675,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if !commitEdit(sh.draft.Peek()) {
 			return
 		}
-		if q, ok := sh.pos[e.key]; ok {
+		if q, ok := sh.posOf(e.key); ok {
 			for c := colOf(e.colKey, e.col) + dir; c >= 0 && c < nc; c += dir {
 				if cols[c].Edit != nil {
 					place(q, c, false)
@@ -2092,7 +2123,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		// then the focus is not inside the cell, so the blur check below waits. When
 		// focus has left the editing cell, the edit is saved, as a text field's is.
 		if e := edit.Peek(); e.key != "" && cols[colOf(e.colKey, e.col)].Editor != nil {
-			if q, ok := sh.pos[e.key]; ok {
+			if q, ok := sh.posOf(e.key); ok {
 				if cell := dgCellNode(nd, q+1, colOf(e.colKey, e.col)+1); cell != nil {
 					switch {
 					case sh.wantFocus:

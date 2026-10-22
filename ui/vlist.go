@@ -158,7 +158,7 @@ func (vs *varState) rebuild(rt *Runtime, l *ListElement) {
 	// map: heights of items that left are dropped, so the table stays the size
 	// of the list however much it churns.
 	hs := make([]float32, n)
-	heights := make(map[string]float32, n)
+	heights := make(map[string]float32, min(n, len(vs.heights)))
 	for i, k := range vs.keys {
 		if h, ok := vs.heights[k]; ok {
 			hs[i], heights[k] = h, h
