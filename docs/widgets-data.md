@@ -61,7 +61,7 @@ cheaper and its scrollbar thumb is exact from the start.
 
 ## Data grids
 
-`ui.DataGrid` shows rows and columns of business data. Like `UniformList`, it builds only the rows in view, so a grid of 100,000 rows costs what its visible rows cost. Its header stays at the top as the rows scroll, and the header scrolls with the rows when the columns are wider than the grid.
+`ui.DataGrid` shows rows and columns of business data. Like `UniformList`, it builds only the rows in view, so a grid of 100,000 rows costs what its visible rows cost. Its header stays at the top as the rows scroll, and the header scrolls with the rows when the columns are wider than the grid. With no size, a grid takes the height its parent leaves it, as a `Tree` does, so a grid in a full-height column needs no `Height`; a grid in a parent with no bounded height shows every row.
 
 ```go
 type run struct {
