@@ -10,8 +10,9 @@ superseded and kept, so the history stays readable.
 ## Current results (2026-10-21)
 
 Every live figure below was measured on one machine, with the windows on a
-secondary monitor and a video playing on the primary monitor. The machine was
-not idle. The conditions matter more than usual here, so read this table first.
+secondary monitor. The machine was not dedicated to benchmarking: other
+applications were running. The conditions matter more than usual here, so read
+this table first.
 
 | | |
 |---|---|
@@ -23,7 +24,7 @@ not idle. The conditions matter more than usual here, so read this table first.
 | Power plan | Balanced |
 | Displays | Primary: 1920 x 1080 at 165 Hz, 100% scale. Secondary: 1920 x 1080 at 144 Hz, 100% scale, at X = -1920 |
 | Live windows | Placed on the secondary monitor at logical (-1600, 150). Never activated (`JAMB_NOACTIVATE=1`), so they took no focus and no pointer |
-| Background load | A video played in a browser on the primary monitor for every live run |
+| Background load | The machine was not dedicated to benchmarking: other applications were running |
 | Commits | Live runs and the Go suite: `2c5c6b0` (the live run used its parent, `b6a6369`). The Go header reads `2c5c6b0-dirty` because a regenerated screenshot was present during the run and then discarded |
 | Samples | Live: 3 runs, each figure the median across runs with the range in brackets. Soak: one 30-minute run. Go: `-count 10`, medians with benchstat's spread |
 
@@ -120,7 +121,7 @@ and warm launches. The same first-launch effect is in the GPUI comparison below.
 ### Idle
 
 Live, `bench-live`, 60 s unfocused after an 8 s settle, 3 runs. The window was on
-the secondary monitor and the video was playing on the primary.
+the secondary monitor.
 
 | App | CPU, % of one core | Context switches/s | Private MB | Working set MB | Threads | Handles | GPU dedicated MB | GPU shared MB |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
@@ -468,7 +469,7 @@ machine idle. The 2026-10-21 pass differs on each of those points.
 | Dependencies | `golang.org/x/image` only (plus pieces of `x/text` and `x/sys`); 59 MB in the module cache | |
 | Build cache produced by a cold build | 51 MB (in the shared GOCACHE, not the repo) | |
 | Startup (process start → first frame on screen) | ~~**~195 ms**, of which ~180 ms is creating the Direct3D device (2026-10-12)~~ *superseded 2026-10-21 for the totals: 214.8 ms demo, 195.8 ms hello (trace, warm). The Direct3D share still applies.* | perceptually instant ✅ |
-| Idle CPU | ~~**0 ms of CPU in 10 s** (1 frame rendered in total)~~ *superseded 2026-10-21: 0.13% of one core for the demo over 60 s unfocused, on the secondary monitor with a video playing.* | ≈0% ✅ |
+| Idle CPU | ~~**0 ms of CPU in 10 s** (1 frame rendered in total)~~ *superseded 2026-10-21: 0.13% of one core for the demo over 60 s unfocused, on the secondary monitor.* | ≈0% ✅ |
 | Idle memory | ~~Demo: 33 MB private working set (Task Manager's Memory column; 71 MB working set, 88 MB private bytes). Hello: 23 MB private working set, 77 MB private bytes (2026-10-12)~~ *superseded 2026-10-21: a different measure. Demo private bytes 122.9 MB and working set 117.2 MB, 60 s unfocused.* | reasonably small ✅ |
 | Interactive FPS | ~~holds 164 FPS (display refresh) in every mode tested~~ *superseded 2026-10-21: the vsync stress reaches 163.8 FPS, but the present interval on the 144 Hz monitor is 6.06 ms, not 6.94 ms. See [Known issues](#known-issues).* | 60 / 120 FPS ✅ |
 | Uncapped throughput (vsync off) | ~~319 FPS repaint-only, 285 FPS with a full re-render every frame~~ *superseded 2026-10-21: 1,796 FPS paint-only, 729 FPS full re-render* | |
@@ -549,8 +550,7 @@ many frames it renders per second of activity. When idle it renders nothing:
 the Win32 loop blocks in `GetMessage` and only wakes for input or a
 signal change.
 
-One run measured 10% CPU. That run had the mouse moving over the window,
-which is real hover work, not idle overhead.
+One run measured 10% CPU.
 
 Working set and private bytes are dominated by the Direct3D driver. The Go
 heap is 6–9 MB (reported by the stress mode below).
@@ -586,7 +586,7 @@ three runs each, after 6 s idle):
 
 Measured 2026-10-12 with the windows focused on the 165 Hz primary monitor, on an
 idle machine. Not re-measured on 2026-10-21, which measured unfocused windows on the
-secondary monitor with a video playing (see Current results).
+secondary monitor (see Current results).
 
 The idle audit looked for work the app does when nothing changes. Method: each
 binary runs alone for 60 s after a 5 s settle. CPU is the change in the

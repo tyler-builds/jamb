@@ -93,8 +93,8 @@ and the [concepts](docs/concepts.md) page introduces the API.
 The same hello-world app (a window, a greeting and a click counter) built with jamb and with GPUI, the
 UI framework from Zed, on one Windows machine. The figures are from 2026-10-21, except the two rows
 marked 2026-10-12. Lower is better in every row, and the better figure is in bold. The windows were on
-a secondary 144 Hz monitor, never activated, while a video played on the primary monitor. The
-[docs/comparison-gpui.md](docs/comparison-gpui.md) has the method, the ranges of each measurement and
+a secondary 144 Hz monitor, never activated. The machine was not dedicated to benchmarking: other
+applications were running. The [docs/comparison-gpui.md](docs/comparison-gpui.md) has the method, the ranges of each measurement and
 the setup.
 
 | Measure | jamb | GPUI |

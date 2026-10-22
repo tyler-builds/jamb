@@ -16,8 +16,8 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o jamb-demo.exe ./examples/de
 ```
 
 Results against the performance targets are in [BENCHMARKS.md](../BENCHMARKS.md). The figures
-below are from the measurements dated in that file, which were taken on a machine with a video
-playing on the primary monitor, so they are a reference, not a guarantee:
+below are from the measurements dated in that file. The machine was not dedicated to benchmarking:
+other applications were running, so they are a reference, not a guarantee:
 
 - Builds took ~0.3–0.8 s after an edit (2026-10-06).
 - Startup to the first frame was about 215 ms for the demo, warm (2026-10-21, from the trace).
