@@ -18,6 +18,13 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 
 ### Changed
 
+- **Breaking:** The visual inspector is linked only into a program that imports
+  `github.com/tyler-builds/jamb/devtools`. Every app used to carry the inspector's code. An app
+  that calls `App.DevTools(true)` and expects Ctrl+Shift+I to work in a release build must add
+  `_ "github.com/tyler-builds/jamb/devtools"` to its main package. Without the import,
+  `DevTools(true)` and `JAMB_INSPECT=1` do nothing, and the program prints one warning to stderr
+  that says how to link it. Ctrl+Shift+I then passes to the window. `jamb dev` links the inspector
+  into the apps it builds, so they need no import. The stripped hello binary is 780 KB smaller.
 - **Breaking:** `codeedit.EditorElement.Language` takes the name of a language, as a code fence
   names it, such as `"go"`, `"python"` or `"ts"`, instead of a `highlight.Grammar`. Replace
   `Language(golang.Grammar)` with `Language("go")`. An unknown name shows plain text, with
@@ -46,9 +53,46 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 - `compare-gpui.ps1` measures on a non-primary monitor without activating the windows. Its pointer
   phase posts mouse messages instead of moving the cursor, and its focused idle sample runs only
   with `-IncludeFocused`. `-Position` sets where the windows open.
-- BENCHMARKS.md leads with the results of 2026-10-21, with how to reproduce them and the known
-  issues they show, and keeps the earlier measurements under their dates. The GPUI comparison has
-  a third pass, and the README and the getting-started guide quote its figures.
+- Rebuilding an element where it was keeps its node, instead of allocating a new one and retiring
+  the old one, and the node and element structs are reordered to smaller allocation sizes. A full
+  re-render of 10,000 nodes makes 35.8k allocations instead of 61.9k, and allocates 9.7 MiB instead
+  of 24.3 MiB (see BENCHMARKS.md).
+- A `ListOf` row is a component of its own, kept in the window while it stays in view. Moving the
+  window builds only the rows that come into it, and a scroll step over 100,000 rows makes 285
+  allocations instead of 547. A signal read in a row re-renders that row, not the list. A row that
+  stays in the window is not rendered again when the window moves; a new item slice, or a new
+  `ListElement` from the parent's render, renders every row, as before.
+- The top modal is kept for the build it was found in, instead of being searched for on every key
+  press and mouse press. A key press in a 10,000-node tree takes 0.47 µs, against 273 µs before.
+- A `Tree` or `DataGrid` takes the space its parent leaves it and shows the rows that fit, instead of
+  all of its rows. This is a behaviour change: a tree of 10,100 rows takes 2.0 ms a frame, against
+  80.5 ms, and a parent with no bounded height still shows every row.
+- A `DataGrid` builds its table of row positions only when keys can repeat. A sort of a grid whose
+  keys are sorted and unique does not build it.
+- Solid fills write opaque pixels directly and a canvas reuses one shader, so the code editor's
+  scroll frame over 50,000 lines takes about 570 µs, against 720 µs on 2026-10-21, and a wrapped
+  keystroke takes 0.80 ms, against 1.51 ms.
+- The built-in themes and the 58 built-in icons are built on first use, not when the package starts,
+  which makes the stripped hello binary about 660 KB smaller.
+- Font files are parsed with the outlines of their glyphs cut, since shaping needs only each glyph's
+  bounding box and jamb reads the outlines from the file itself. The hello app's private memory is
+  about 2.5 MB smaller when idle. The binary grows by 12 KB.
+- A window keeps its swap chain buffers with room to spare when it is resized, moves only the part of
+  them that is shown for a size they still hold, and gives the room back when the user finishes the
+  resize. A window does not paint again after a size change it has already shown. In the benchmark's
+  10-second programmatic resize, CPU fell from 13.9% of a core to 4.5%.
+- The renderer's instance buffers start at 4 KB, not 64 KB, and grow as before.
+- A window's first frame is built while its GPU device is created, and is drawn before the window
+  is shown. In the commit measurements, the blank gap of a warm launch fell from a median of 36.5 ms
+  to 12.6 ms. The live startup benchmark did not improve (see BENCHMARKS.md).
+- The Activity filter narrows its list incrementally, and the Components page builds its 10,000-folder
+  tree once, not on each visit. Its 100,000 DataGrid runs are no longer built at startup, which saved
+  about 12 MB of heap in every launch; the first visit to the page builds them, in about 3.5 ms.
+- `jamb dev` links the inspector with `go build -overlay`, so the app's own directory is not written to.
+- BENCHMARKS.md leads with the results of 2026-10-22, against 2026-10-21: the changes behind them,
+  what was tried and dropped, and the known issues and gaps. The 2026-10-21 results follow under their
+  own heading. The GPUI comparison has a fourth pass (2026-10-22), and the README and the
+  getting-started guide quote its figures.
 
 ### Added
 
@@ -161,6 +205,11 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 
 ### Fixed
 
+- A window's first frame is drawn before the window is shown. Since an earlier change, the frame was
+  skipped while the window was hidden, so the window appeared with no content and was painted only
+  after it was shown.
+- `JAMB_FRAMESTATS` reports the present intervals of a `JAMB_STRESS` run. Before, a stress run had
+  no continuous frames, so the intervals were left out.
 - The code editor kept the syntax colors of the theme it first painted with: after a switch from
   the dark theme to the light one, its text stayed in the dark theme's pale colors. It now recolors
   the text when the theme changes.
