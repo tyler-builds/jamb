@@ -403,6 +403,9 @@ func (rt *Runtime) layoutPreview() {
 func (rt *Runtime) disposePreview(inst *componentInstance) {
 	rt.disposeInstance(inst)
 	if inst.root != nil {
+		// The nodes go even when this build rebuilt them in place (see newNode): they
+		// are not kept as live nodes, so retire does not skip them.
+		forNodes(inst.root, func(n *node) { n.reuseGen = 0 })
 		rt.retire(inst.root)
 	}
 }
