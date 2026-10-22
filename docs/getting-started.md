@@ -12,7 +12,7 @@ go run ./examples/notes                        # run the notes app
 go run ./cmd/jamb dev ./examples/notes         # rebuild + restart on every save, window position preserved
 go run ./cmd/jamb package --installer ./examples/demo   # Windows zip and setup.exe in examples/demo/dist (see Packaging)
 go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/...   # headless tests; JAMB_LIVE_TESTS=1 adds the few that show a window
-go build -trimpath -ldflags "-s -w -H windowsgui" -o jamb-demo.exe ./examples/demo   # ~20 MB release build (19.61 MB on 2026-10-21)
+go build -trimpath -ldflags "-s -w -H windowsgui" -o jamb-demo.exe ./examples/demo   # ~19 MB release build (19.04 MB on 2026-10-22)
 ```
 
 Results against the performance targets are in [BENCHMARKS.md](../BENCHMARKS.md). The figures
@@ -20,11 +20,12 @@ below are from the measurements dated in that file. The machine was not dedicate
 other applications were running, so they are a reference, not a guarantee:
 
 - Builds took ~0.3–0.8 s after an edit (2026-10-06).
-- Startup to the first frame was about 215 ms for the demo, warm (2026-10-21, from the trace).
-- An idle window draws nothing. The demo used 0.13% of a core over 60 s unfocused (2026-10-21).
-  The hello app in the GPUI comparison used 0.05% (2026-10-21) and 0.16–0.29% (2026-10-12).
-- A full re-render of a 310-element page costs about 1 ms of CPU per frame (0.97 ms on average,
-  2026-10-21). It allocates 936 KB per frame, which is under investigation.
+- Startup to the first frame was about 221 ms for the demo, warm (2026-10-22, from the trace; 215 ms on 2026-10-21).
+- An idle window draws nothing. The demo used 0.08% of a core over 60 s unfocused (2026-10-22; 0.13% on 2026-10-21).
+  The hello app in the GPUI comparison used 0.10% (2026-10-22), 0.05% (2026-10-21) and 0.16–0.29% (2026-10-12).
+- A full re-render of a 310-element page costs about 0.8 ms of CPU per frame (0.81 ms on average,
+  2026-10-22). It allocates 465 KB per frame (936 KB on 2026-10-21), still above its 2026-10-06 level,
+  which is under investigation.
 
 **Compared with GPUI:** [docs/comparison-gpui.md](comparison-gpui.md) measures the same hello-world app built with jamb and with GPUI (Zed's Rust UI framework): project size, binary size, build times, startup, idle CPU and memory.
 
