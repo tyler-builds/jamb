@@ -80,6 +80,7 @@ type runner struct {
 	dir      string
 	work     string
 	geometry string
+	overlay  string // the go build -overlay file that links the devtools package (see devlink.go)
 	slot     int
 	child    *exec.Cmd
 	exited   chan struct{}
@@ -92,7 +93,11 @@ func dev(dir string) error {
 		return err
 	}
 	defer os.RemoveAll(work)
-	r := &runner{dir: dir, work: work, geometry: filepath.Join(work, "geometry")}
+	overlay, err := devtoolsOverlay(work, dir)
+	if err != nil {
+		return err
+	}
+	r := &runner{dir: dir, work: work, geometry: filepath.Join(work, "geometry"), overlay: overlay}
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
@@ -207,12 +212,15 @@ func (r *runner) build() (string, bool) {
 	}
 	exe := filepath.Join(r.work, name)
 	t0 := time.Now()
-	cmd := exec.Command("go", "build", "-o", exe, ".")
+	cmd := exec.Command("go", "build", "-overlay", r.overlay, "-o", exe, ".")
 	cmd.Dir = r.dir
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	if err := cmd.Run(); err != nil {
 		os.Stderr.Write(out.Bytes())
+		if bytes.Contains(out.Bytes(), []byte(devtoolsImport)) {
+			logf("the app's jamb module has no devtools package, which jamb dev links into every app; update the jamb module")
+		}
 		logf("build failed after %v; keeping the previous version running", time.Since(t0).Round(time.Millisecond))
 		return "", false
 	}
