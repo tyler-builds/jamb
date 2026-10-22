@@ -99,6 +99,13 @@ func frameKind(st ui.FrameStats) string {
 	return "repaint"
 }
 
+// frameWanted reports whether another frame is wanted when a frame has been
+// presented: the runtime has work for one, or a JAMB_STRESS run keeps frames
+// coming until it ends. A frame that is wanted has no idle gap after it.
+func frameWanted(requested, stressing bool) bool {
+	return requested || stressing
+}
+
 // presentTimes returns when the renderer's last Present call started and returned.
 // A renderer that does not time its Present reports now for both.
 func presentTimes(r render.Renderer, now int64) (start, end int64) {
