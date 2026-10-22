@@ -66,7 +66,9 @@ import (
 //	                    and `jamb dev`.
 //	JAMB_INSPECT=1      open the visual inspector (see inspect.go) for the first
 //	                    window at start; Ctrl+Shift+I opens it under `jamb dev`
-//	                    and in an app that sets App.DevTools
+//	                    and in an app that sets App.DevTools. The program must
+//	                    link the inspector (package devtools, which `jamb dev`
+//	                    does); otherwise a warning is printed instead
 //
 // Settings overrides, for testing only. The real Windows settings are used in
 // normal use, and each variable below replaces the matching setting for this

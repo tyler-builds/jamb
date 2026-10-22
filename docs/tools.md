@@ -9,7 +9,7 @@ These environment variables work with any jamb app, with no code changes:
 |---|---|
 | `JAMB_TRACE=1` | Prints startup timings, per-frame build/layout/paint cost, and frames per second of activity, so you can confirm the app is idle. Also turns on the accessibility warnings (see [Accessibility](accessibility.md#accessibility)). |
 | `JAMB_A11Y_WARN=1` | Prints accessibility warnings: an interactive element with no name, and an image without `Alt`. Each is reported once. On by default under `jamb dev`. |
-| `JAMB_INSPECT=1` | Opens the visual inspector for the first window at start. The inspector is also on under `jamb dev`, where Ctrl+Shift+I opens it (see [Visual inspector](#visual-inspector)). |
+| `JAMB_INSPECT=1` | Opens the visual inspector for the first window at start, if the program links it. Under `jamb dev` the inspector is linked, and Ctrl+Shift+I opens it (see [Visual inspector](#visual-inspector)). |
 | `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `type TEXT` types everything after the one space that follows `type`, spaces included. `devicelost` simulates a GPU device loss; see [GPU device loss](architecture.md#gpu-device-loss). `mark` sets a loop point and `repeat N` goes back to the last mark N more times, or loops until the window closes with `repeat 0`; a `repeat` needs a `mark` before it. `a11ydump PATH` writes the accessibility tree as text (see [Accessibility](accessibility.md#accessibility)). |
 | `JAMB_STRESS=rebuild\|paint` | Measures sustained frame cost, allocation and GC, prints the results, then exits. Its frame times come from the performance counter. |
 | `JAMB_FRAMESTATS=PATH` | Records every frame of the first window, from its first frame until it closes, and writes `PATH` with one row per frame (CPU time, the interval between Presents, whether the frame rebuilt, updated or repainted the tree, and whether it came with no idle gap). The summary's present interval covers only the frames with no idle gap, so a pause between frames does not count as an interval. It writes `PATH-input.csv` beside it, with the latency of each input event that caused a frame, from its arrival to the start and the return of `Present`, and prints a summary to stderr. Time to the screen is not measured. |
@@ -62,12 +62,24 @@ window. Like the browser's developer tools, it shows the element tree, the
 style and layout of the selected element, and where each style value came
 from. It never changes the layout of the window it inspects.
 
-It is on in three cases:
+The inspector is linked only into a program that imports package
+`github.com/tyler-builds/jamb/devtools`, so a release build that does not import
+it carries none of the inspector's code. `jamb dev` links it into every app it
+builds, so the app does not need the import there. An app that wants the
+inspector in a release build adds the import to its main package:
+
+```go
+import _ "github.com/tyler-builds/jamb/devtools"
+```
+
+With the inspector linked, it is on in three cases:
 
 - Under `jamb dev`: press Ctrl+Shift+I in the window.
 - With `JAMB_INSPECT=1`: it opens for the first window at start.
 - In an app that calls `App.DevTools(true)`, so that Ctrl+Shift+I works in a
-  release build as well. Without that call, a release build has no inspector.
+  release build as well. Without the import, `DevTools(true)` does nothing, and
+  the app prints one warning to stderr that says how to link the inspector. The
+  same warning is printed for `JAMB_INSPECT=1` in a program without the import.
 
 Ctrl+Shift+I opens the inspector of the focused window, or closes it again.
 The shortcut is taken before the window's own key bindings.

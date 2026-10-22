@@ -2,8 +2,10 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/tyler-builds/jamb/input"
@@ -20,8 +22,34 @@ import (
 // under `jamb dev`, with JAMB_INSPECT=1, and in an app that sets App.DevTools;
 // Ctrl+Shift+I opens and closes it for the focused window.
 //
+// The inspector is not linked into a program unless the program imports package
+// devtools, which registers it (see RegisterInspector), so a release build
+// without that import carries none of its code.
+//
 // The inspector runs on the UI thread with the windows it inspects, and reads
 // them through the inspect.Target that the ui package gives their runtimes.
+
+// inspectOpen opens the inspector of a window. It is nil until RegisterInspector
+// sets it, and then the inspector can open; nothing else in the app refers to the
+// inspector's functions, so a program that does not register it does not link them.
+var inspectOpen func(h *host)
+
+// RegisterInspector makes the visual inspector available in this program: under
+// `jamb dev`, with JAMB_INSPECT=1, and in an app that sets App.DevTools, the
+// inspector opens. Package devtools calls it from its init, so an app that wants
+// the inspector in a release build imports devtools and does not call it.
+func RegisterInspector() { inspectOpen = openInspector }
+
+// inspectorWarn makes the warning about an unlinked inspector print once.
+var inspectorWarn sync.Once
+
+// warnInspectorNotLinked tells the developer, once, that the inspector was asked
+// for but is not linked into the program, and how to link it.
+func warnInspectorNotLinked(w io.Writer) {
+	inspectorWarn.Do(func() {
+		fmt.Fprintln(w, `jamb: the visual inspector is asked for (App.DevTools or JAMB_INSPECT=1) but is not linked into this program, so Ctrl+Shift+I and JAMB_INSPECT=1 do nothing; add a blank import of "github.com/tyler-builds/jamb/devtools" to the app's main package (jamb dev links it already)`)
+	})
+}
 
 const (
 	// inspectRefresh is how often the inspector reads its window again while the
@@ -71,24 +99,34 @@ func newInspector(target *host, tg inspect.Target) *inspector {
 }
 
 // startInspector opens the inspector of a window at start, when JAMB_INSPECT=1
-// asks for it. It runs after the window is created, on the UI thread.
+// asks for it. It runs after the window is created, on the UI thread. It warns,
+// once, when the inspector is asked for but not linked.
 func (h *host) startInspector() {
+	if inspectOpen == nil {
+		if application.devTools || h.dev.inspect {
+			warnInspectorNotLinked(os.Stderr)
+		}
+		return
+	}
 	if h.primary && h.dev.inspect {
-		postUI(func() { openInspector(h) })
+		postUI(func() { inspectOpen(h) })
 	}
 }
 
 // inspectKey handles the inspector's shortcut, Ctrl+Shift+I, which opens the
 // inspector of the window, or closes it if it is open. It reports whether k is
-// the shortcut, which then does not reach the window.
+// the shortcut, which then does not reach the window. Without a registered
+// inspector the key is not the shortcut, so the window gets it.
 func (h *host) inspectKey(k input.Key, mods input.Modifiers) bool {
 	if !h.devTools || h.inspected != nil || k != input.KeyI || mods != input.ModCtrl|input.ModShift {
 		return false
 	}
 	if h.insp != nil {
 		h.insp.win.Close()
+	} else if inspectOpen != nil {
+		inspectOpen(h)
 	} else {
-		openInspector(h)
+		return false
 	}
 	return true
 }
