@@ -89,57 +89,55 @@ type DivElement struct {
 	focusWithin  *Style
 	children     []Element
 	key          string
-	focusable    bool
-	keepFocus    bool // a press inside leaves focus where it is (see KeepFocus)
-	tabIndex     int  // see TabIndex
-	noTabStop    bool // see TabStop
-	tabSkip      bool // the focusable elements inside are left out of the Tab order (see DataGrid)
-	noDisplay    bool // see Display
-	spaceOnly    bool // Space runs OnClick but Enter does not (check boxes, switches, radio buttons)
-	capture      bool
-	autoFocus    bool
-	handle       *FocusHandle
-	overlay      Placement
-	overlayGap   float32
-	revealRow    bool         // a combo box's highlighted row: the next paint scrolls it into view (see revealRowsNow)
-	extent       *extentWatch // set by Tabs: paint reports the element's scroll offset and range (see extentWatch)
-	noScrollbar  bool         // set by Tabs on its strip, which has scroll buttons in place of a bar
-	matchAnchor  bool         // set by a Select's list: at least as wide as the field it opens from
 	tooltip      string
 	part         string          // the widget part this element draws, see asPart
-	sized        sizeSet         // the sizes a sizing method gave the element, for the inspector (see sizing.apply)
 	keyContext   string          // the KeyContext spec, as given
 	keyCtx       keyCtx          // its parsed entries, for BindIn bindings
 	actions      []actionHandler // see OnAction
-	vlist        *listState      // set on the scroll container of a UniformList
-	vrows        *varState       // set on the scroll container of a ListOf
+	drops        []DropTarget    // see OnDrop
+	handle       *FocusHandle
+	extent       *extentWatch // set by Tabs: paint reports the element's scroll offset and range (see extentWatch)
+	vlist        *listState   // set on the scroll container of a UniformList
+	vrows        *varState    // set on the scroll container of a ListOf
 	h            handlers
 	enter        *motionSpec       // see Enter
 	exit         *motionSpec       // see Exit
 	play         *playSpec         // see Play
 	dragSpec     *DragSpec         // see OnDrag
 	dragging     *Style            // see Dragging
-	drops        []DropTarget      // see OnDrop
-	area         WindowArea        // see WindowArea
 	contextMenu  func() []MenuItem // see ContextMenu
-	menuBar      bool              // set by MenuBar on the bar
 	roving       *rovingGroup      // set by Toolbar: the focusable elements inside are one Tab stop
 	focusIn      func(in bool)     // set by HoverCard: focus entered (true) or left the element and its descendants
 	modal        *modalSpec        // set on the backdrop of a Modal (see modal.go)
 	acc          *accessInfo       // accessibility role, name and states (see access.go)
 	ime          *IME              // set by DivElement.IME, for an input method (see element_input.go)
+	tabIndex     int               // see TabIndex
+	overlayGap   float32
+	fillBase     Color
 
-	// noInitialFocus is set on a Modal's footer and close box, which the initial focus skips.
-	noInitialFocus bool
+	focusable      bool
+	keepFocus      bool // a press inside leaves focus where it is (see KeepFocus)
+	noTabStop      bool // see TabStop
+	tabSkip        bool // the focusable elements inside are left out of the Tab order (see DataGrid)
+	noDisplay      bool // see Display
+	spaceOnly      bool // Space runs OnClick but Enter does not (check boxes, switches, radio buttons)
+	capture        bool
+	autoFocus      bool
+	revealRow      bool // a combo box's highlighted row: the next paint scrolls it into view (see revealRowsNow)
+	noScrollbar    bool // set by Tabs on its strip, which has scroll buttons in place of a bar
+	matchAnchor    bool // set by a Select's list: at least as wide as the field it opens from
+	menuBar        bool // set by MenuBar on the bar
+	noInitialFocus bool // set on a Modal's footer and close box, which the initial focus skips
 	// hitThrough is set on the transparent layer of a non-modal dialog: a press on
 	// the layer itself reaches the window behind it (see NonModal).
 	hitThrough bool
-
 	// fillFromParent paints fillBase and then the parent's background under the
 	// element's own, so that the element is opaque in its parent's state (a pinned
 	// cell of a DataGrid; see paintNode).
 	fillFromParent bool
-	fillBase       Color
+	overlay        Placement
+	sized          sizeSet    // the sizes a sizing method gave the element, for the inspector (see sizing.apply)
+	area           WindowArea // see WindowArea
 }
 
 // Div creates an empty container. Children stack vertically (Column) unless
@@ -162,6 +160,11 @@ func (d *DivElement) Keyf(format string, args ...any) *DivElement {
 // Child appends one child. nil is ignored.
 func (d *DivElement) Child(e Element) *DivElement {
 	if !isNil(e) {
+		if d.children == nil {
+			// Most divs built child by child have a few children: start with room
+			// for four rather than growing 1, 2, 4.
+			d.children = make([]Element, 0, 4)
+		}
 		d.children = append(d.children, e)
 	}
 	return d

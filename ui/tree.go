@@ -333,9 +333,11 @@ type treeRow struct {
 }
 
 // flattenTree returns the visible rows of nodes, depth first. The children of a
-// node are asked for only when the node is open.
-func flattenTree(nodes []TreeNode, open map[string]bool) []treeRow {
-	var rows []treeRow
+// node are asked for only when the node is open. capHint is the number of rows
+// the last flatten made, if known, so that the rows of a large tree are not
+// copied as they grow; the top-level nodes are always room enough.
+func flattenTree(nodes []TreeNode, open map[string]bool, capHint int) []treeRow {
+	rows := make([]treeRow, 0, max(capHint, len(nodes)))
 	var add func(ns []TreeNode, level, parent int)
 	add = func(ns []TreeNode, level, parent int) {
 		for i, n := range ns {
@@ -413,7 +415,7 @@ func (tv *TreeElement) applyTreeOps(h *TreeHandle, store *Signal[[]string]) (rev
 	ops := h.ops
 	h.ops = nil
 	for _, op := range ops {
-		rows := flattenTree(tv.nodes, keySetOf(store.Peek()))
+		rows := flattenTree(tv.nodes, keySetOf(store.Peek()), 0)
 		switch op.kind {
 		case treeOpExpand:
 			if i := rowOf(rows, op.key); i >= 0 && rows[i].expandable {
@@ -521,12 +523,13 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 		}
 		handle := Local(ctx, "handle", NewListHandle()).Peek()
 		typed := Local(ctx, "typed", selectType{})
-		rows := flattenTree(tv.nodes, keySetOf(store.Get()))
+		hint := Local(ctx, "rowsHint", new(int)).Peek()
+		rows := flattenTree(tv.nodes, keySetOf(store.Get()), *hint)
 		if h := tv.handle; h != nil {
 			h.inst = ctx.inst
 			if len(h.ops) > 0 {
 				reveal, collapsed := tv.applyTreeOps(h, store)
-				rows = flattenTree(tv.nodes, keySetOf(store.Peek()))
+				rows = flattenTree(tv.nodes, keySetOf(store.Peek()), len(rows))
 				if collapsed {
 					tv.moveSelection(rows)
 				}
@@ -633,8 +636,9 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 			}
 		}
 
+		*hint = len(rows)
 		list := UniformList(len(rows), func(i int) Element {
-			return tv.row(st, t, rows[i], i, sel, setOpen, choose)
+			return tv.row(&st, t, rows[i], i, sel, setOpen, choose)
 		})
 		list.Key(tv.key).SelectionContainer().Style(Style{Grow: 1}).Handle(handle)
 		list.ownPos = true
@@ -660,7 +664,7 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 // row is the element of one visible row. Its position is among its siblings, and
 // its level is its depth. The row that is selected is the highlighted one, so it
 // is the row that has accessibility focus while the tree has keyboard focus.
-func (tv *TreeElement) row(st TreeStyle, t *Theme, r treeRow, i int, sel string,
+func (tv *TreeElement) row(st *TreeStyle, t *Theme, r treeRow, i int, sel string,
 	setOpen func(string, bool), choose func(int)) Element {
 	on := r.key == sel
 	node := TreeNode{Key: r.key, Label: r.label, Icon: r.icon}

@@ -160,8 +160,50 @@ var (
 //	var Card = ui.Style{Padding: ui.All(16), Radius: 12, Background: ui.Hex("#18181b")}
 //	ui.Div().Style(Card)
 type Style struct {
-	// Layout
-	Direction Direction
+	// The fields are ordered so that the struct has no padding: the 4-byte fields are
+	// together, and so are the bytes, which keeps Style at 448 bytes, a malloc size
+	// class (see TestElementSizeClasses). The order is not part of the API.
+
+	// Visuals
+	Background Color
+	// BorderColor is the color of the border.
+	BorderColor Color
+	// TextColor is the color of the text, inherited by the descendants.
+	TextColor Color
+	Gradient  Gradient // replaces Background when set (see LinearGradient)
+	// Corners sets a radius for each corner, in place of Radius.
+	Corners Corners
+
+	// BorderWidth is the width of the border on every side, in logical pixels.
+	BorderWidth float32
+	// Radius is the radius of the rounded corners, in logical pixels.
+	Radius float32
+	// Gap is the space between the children, in logical pixels.
+	Gap float32
+	// Grow is the share of the free space that the element takes on its parent's main axis.
+	Grow float32
+	// Shrink is how much the element shrinks when the space is short.
+	Shrink  float32
+	Opacity float32 // 0 = unset (opaque)
+	// Paint-only motion, applied after layout (see Offset and Scale). Layout
+	// and hit testing of the element's position follow the offset.
+	OffsetX, OffsetY float32
+	Scale            float32 // 0 = unset (1), about the element's center
+	// FontSize is the font size in logical pixels, inherited by the descendants.
+	FontSize float32
+	// LineHeight is the distance between lines of text, in logical pixels.
+	LineHeight float32
+
+	// BorderEdges, when not zero, gives each side its own width (top, right,
+	// bottom, left) in place of BorderWidth. See BorderEdges.
+	BorderEdges Edges
+	// Padding is the space between the border and the content, on each side.
+	Padding Edges
+	// Margin is the space outside the border, on each side.
+	Margin Edges
+	// Inset holds the offsets of an Absolute element from the edges of its parent.
+	Inset Edges
+
 	// Width is the width of the element's border box.
 	Width Length
 	// Height is the height of the element's border box.
@@ -174,20 +216,13 @@ type Style struct {
 	MaxWidth Length
 	// MaxHeight is the largest height that the element can take.
 	MaxHeight Length
-	// Padding is the space between the border and the content, on each side.
-	Padding Edges
-	// Margin is the space outside the border, on each side.
-	Margin Edges
-	// Gap is the space between the children, in logical pixels.
-	Gap float32
-	// Wrap flows children onto more lines when a row (or column) is full.
-	Wrap bool
-	// Grow is the share of the free space that the element takes on its parent's main axis.
-	Grow float32
-	// Shrink is how much the element shrinks when the space is short.
-	Shrink float32
 	// Basis is the starting main size before growing/shrinking (Auto = content).
 	Basis Length
+
+	// Layout
+	Direction Direction
+	// Wrap flows children onto more lines when a row (or column) is full.
+	Wrap bool
 	// NoShrink stops the element from shrinking below its size (Shrink 0).
 	NoShrink bool
 	// fitWidth keeps an automatic width at the content's width in a column, where
@@ -205,60 +240,23 @@ type Style struct {
 	Justify   Alignment // children on the main axis
 	// Absolute removes the element from the flow; position it with Inset.
 	Absolute bool
-	// Inset holds the offsets of an Absolute element from the edges of its parent.
-	Inset    Edges
 	insetSet [4]bool
 	// OverflowX is how the content that goes past the element's width is drawn.
 	OverflowX Overflow
 	// OverflowY is how the content that goes past the element's height is drawn.
 	OverflowY Overflow
-	// ZIndex orders overlapping siblings; a higher value is drawn on top.
-	ZIndex int
-	// GridColumns makes the element a grid (see DivElement.Grid), with one
-	// track per column; GridRows sizes its first rows, and the others fit their
-	// content. ColSpan and RowSpan make a grid item cover that many columns and
-	// rows; 0 means 1.
-	GridColumns, GridRows []Length
-	// ColSpan and RowSpan are the number of grid columns and rows that the item covers; zero means one.
-	ColSpan, RowSpan int
-
-	// Visuals
-	Background Color
-	Gradient   Gradient // replaces Background when set (see LinearGradient)
-	// BorderColor is the color of the border.
-	BorderColor Color
-	// BorderWidth is the width of the border on every side, in logical pixels.
-	BorderWidth float32
-	// BorderEdges, when not zero, gives each side its own width (top, right,
-	// bottom, left) in place of BorderWidth. See BorderEdges.
-	BorderEdges Edges
-	// Radius is the radius of the rounded corners, in logical pixels.
-	Radius float32
-	// Corners sets a radius for each corner, in place of Radius.
-	Corners Corners
-	// Shadows are the drop shadows of the element, drawn in order.
-	Shadows []Shadow
-	Opacity float32 // 0 = unset (opaque)
 	// Cursor is the mouse cursor shown over the element.
 	Cursor Cursor
-
-	// Paint-only motion, applied after layout (see Offset and Scale). Layout
-	// and hit testing of the element's position follow the offset.
-	OffsetX, OffsetY float32
-	Scale            float32 // 0 = unset (1), about the element's center
-
-	// Text, inherited by descendants.
-	TextColor Color
-	// FontSize is the font size in logical pixels, inherited by the descendants.
-	FontSize float32
-	// FontWeight is the weight of the text, inherited by the descendants.
-	FontWeight FontWeight
-	// FontFamily is the name of the font family, inherited by the descendants.
-	FontFamily string
-	// LineHeight is the distance between lines of text, in logical pixels.
-	LineHeight float32
 	// TextAlign is the horizontal alignment of the text.
 	TextAlign Alignment
+	// FontWeight is the weight of the text, inherited by the descendants.
+	FontWeight FontWeight
+	// Clear removes the fields it names from the style it is merged into, before
+	// the set fields of this style are applied, so a style can turn a default off:
+	// the zero value of a field means unset and cannot replace a default by itself.
+	// The clears are kept when styles are merged, so a style merged in later, such
+	// as an instance's Styles, still clears the defaults it names. See ClearSet.
+	Clear ClearSet
 
 	// Transition eases colors, opacity, offset and scale (hover, press, theme,
 	// and changes made by a new render) over this duration.
@@ -267,13 +265,19 @@ type Style struct {
 	// change mid-flight keeps the velocity it had. Colors still ease, over
 	// Transition when it is set. The zero Spring is unset.
 	Spring Spring
-
-	// Clear removes the fields it names from the style it is merged into, before
-	// the set fields of this style are applied, so a style can turn a default off:
-	// the zero value of a field means unset and cannot replace a default by itself.
-	// The clears are kept when styles are merged, so a style merged in later, such
-	// as an instance's Styles, still clears the defaults it names. See ClearSet.
-	Clear ClearSet
+	// ZIndex orders overlapping siblings; a higher value is drawn on top.
+	ZIndex int
+	// ColSpan and RowSpan are the number of grid columns and rows that the item covers; zero means one.
+	ColSpan, RowSpan int
+	// GridColumns makes the element a grid (see DivElement.Grid), with one
+	// track per column; GridRows sizes its first rows, and the others fit their
+	// content. ColSpan and RowSpan make a grid item cover that many columns and
+	// rows; 0 means 1.
+	GridColumns, GridRows []Length
+	// Shadows are the drop shadows of the element, drawn in order.
+	Shadows []Shadow
+	// FontFamily is the name of the font family, inherited by the descendants.
+	FontFamily string
 
 	// prov records which layers set the fields, for the visual inspector. It is
 	// nil unless an inspector is attached (see style_layers.go).
