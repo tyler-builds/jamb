@@ -107,13 +107,20 @@ Each concern is replaceable independently:
 5. **Render.** Every batch is one instanced draw. Rounded rects, borders and
    Gaussian shadows are analytic SDFs in the pixel shader. Glyphs and icons
    come from one alpha atlas, and images use a second pipeline. The swap
-   chain is flip-model with no scaling. While a window edge is dragged, the
-   previous frame stays pinned 1:1 instead of being stretched, and frames for
-   a new size are presented without waiting for vsync.
+   chain is flip-model with no scaling. Its buffers have a quarter more room
+   than the window, so a drag mostly moves the shown part of them
+   (`IDXGISwapChain2::SetSourceSize`) instead of reallocating them; the room
+   is given back when the user finishes the move or resize. While a window
+   edge is dragged, the previous frame stays pinned 1:1 instead of being
+   stretched, and frames for a new size are presented without waiting for
+   vsync.
 6. **Idle.** If nothing changed, the loop blocks in `GetMessage` and uses
    0% CPU. Animations keep it rendering, paced by vsync, but only those drawn
-   on screen. A covered window stops rendering until DXGI reports it visible
-   again (`RegisterOcclusionStatusWindow`). A shown toast wakes the window when
+   on screen. The pacing follows the desktop compositor, which runs at the
+   primary monitor's rate, so a window on a monitor with a slower refresh
+   renders some frames that monitor never shows. A covered window stops
+   rendering until DXGI reports it visible again
+   (`RegisterOcclusionStatusWindow`). A shown toast wakes the window when
    its time runs out, and a caret wakes it at each blink.
 
 ## GPU device loss
