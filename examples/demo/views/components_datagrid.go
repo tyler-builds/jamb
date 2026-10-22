@@ -67,11 +67,6 @@ func runID(n int) string {
 	return string(b)
 }
 
-// PrewarmRuns makes the runs on a goroutine of its own, so that the first visit of
-// the Components page does not wait for them. deployRuns is safe to call from
-// another goroutine (it is made once, and the callers wait for it).
-func PrewarmRuns() { go deployRuns() }
-
 // runColumns are the columns of the Components page's data grid. The runs are the
 // signal runs: the Actions column retries a failed run, and the Label column edits
 // the label of a run, and both change the runs.

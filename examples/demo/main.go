@@ -11,7 +11,6 @@ import (
 
 func main() {
 	store := views.NewStore()
-	views.PrewarmRuns()
 
 	// The AppID names the app to Windows, for its OS notifications and single
 	// instance. A click on a notification reaches the running demo, not a new window.
