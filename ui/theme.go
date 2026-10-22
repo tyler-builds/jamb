@@ -268,78 +268,84 @@ func (m MotionTokens) exit(def time.Duration) time.Duration {
 	return def
 }
 
-// darkTheme and lightTheme are the built-in themes. DarkTheme and LightTheme
-// return copies, so that changing a theme never changes it for another window.
-var darkTheme = &Theme{
-	Name:          "Dark",
-	Dark:          true,
-	Background:    Hex("#0c0c0e"),
-	Panel:         Hex("#111113"),
-	Surface:       Hex("#18181b"),
-	SurfaceHover:  Hex("#1f1f23"),
-	SurfaceActive: Hex("#27272a"),
-	Border:        Hex("#26262b"),
-	BorderStrong:  Hex("#66666d"),
-	Text:          Hex("#f4f4f5"),
-	TextMuted:     Hex("#a1a1aa"),
-	TextSubtle:    Hex("#8e8e96"),
-	Accent:        Hex("#6265ed"),
-	Link:          Hex("#a5b4fc"), // 4.5:1 or more on every dark surface
-	Disabled:      Hex("#8e8e96"), // = TextSubtle
-	AccentHover:   Hex("#5b5ee7"),
-	AccentActive:  Hex("#5457e0"),
-	AccentText:    Hex("#ffffff"),
-	AccentSoft:    Hex("#6366f126"),
-	Success:       Hex("#22c55e"),
-	Warning:       Hex("#f59e0b"),
-	Danger:        Hex("#d62828"),
-	Scrollbar:     Hex("#ffffff"),
-	FocusRing:     Hex("#818cf8"),
-	Scrim:         Hex("#00000099"),
-	Radius:        8,
-	FontSize:      14,
-	Syntax:        darkSyntax,
-	CodeEditor:    darkEditor,
+// newDarkTheme and newLightTheme make the built-in themes. They are functions,
+// not package-level values, so that the literals cost code rather than data in
+// the binary. Each call returns a new theme, so changing a theme never changes
+// it for another window.
+func newDarkTheme() *Theme {
+	return &Theme{
+		Name:          "Dark",
+		Dark:          true,
+		Background:    Hex("#0c0c0e"),
+		Panel:         Hex("#111113"),
+		Surface:       Hex("#18181b"),
+		SurfaceHover:  Hex("#1f1f23"),
+		SurfaceActive: Hex("#27272a"),
+		Border:        Hex("#26262b"),
+		BorderStrong:  Hex("#66666d"),
+		Text:          Hex("#f4f4f5"),
+		TextMuted:     Hex("#a1a1aa"),
+		TextSubtle:    Hex("#8e8e96"),
+		Accent:        Hex("#6265ed"),
+		Link:          Hex("#a5b4fc"), // 4.5:1 or more on every dark surface
+		Disabled:      Hex("#8e8e96"), // = TextSubtle
+		AccentHover:   Hex("#5b5ee7"),
+		AccentActive:  Hex("#5457e0"),
+		AccentText:    Hex("#ffffff"),
+		AccentSoft:    Hex("#6366f126"),
+		Success:       Hex("#22c55e"),
+		Warning:       Hex("#f59e0b"),
+		Danger:        Hex("#d62828"),
+		Scrollbar:     Hex("#ffffff"),
+		FocusRing:     Hex("#818cf8"),
+		Scrim:         Hex("#00000099"),
+		Radius:        8,
+		FontSize:      14,
+		Syntax:        maps.Clone(darkSyntax),
+		CodeEditor:    darkEditor,
+	}
 }
 
-var lightTheme = &Theme{
-	Name:          "Light",
-	Background:    Hex("#fafafa"),
-	Panel:         Hex("#f4f4f5"),
-	Surface:       Hex("#ffffff"),
-	SurfaceHover:  Hex("#f4f4f5"),
-	SurfaceActive: Hex("#e4e4e7"),
-	Border:        Hex("#e4e4e7"),
-	BorderStrong:  Hex("#8a8a92"),
-	Text:          Hex("#18181b"),
-	TextMuted:     Hex("#52525b"),
-	TextSubtle:    Hex("#62626a"),
-	Accent:        Hex("#4f46e5"),
-	Link:          Hex("#4338ca"), // 4.5:1 or more on every light surface
-	Disabled:      Hex("#62626a"), // = TextSubtle
-	AccentHover:   Hex("#5b53f0"),
-	AccentActive:  Hex("#4338ca"),
-	AccentText:    Hex("#ffffff"),
-	AccentSoft:    Hex("#4f46e51f"),
-	Success:       Hex("#16a34a"),
-	Warning:       Hex("#d97706"),
-	Danger:        Hex("#d12a2a"),
-	Scrollbar:     Hex("#000000"),
-	FocusRing:     Hex("#6366f1"),
-	Scrim:         Hex("#18181b59"),
-	Radius:        8,
-	FontSize:      14,
-	Syntax:        lightSyntax,
-	CodeEditor:    lightEditor,
+func newLightTheme() *Theme {
+	return &Theme{
+		Name:          "Light",
+		Background:    Hex("#fafafa"),
+		Panel:         Hex("#f4f4f5"),
+		Surface:       Hex("#ffffff"),
+		SurfaceHover:  Hex("#f4f4f5"),
+		SurfaceActive: Hex("#e4e4e7"),
+		Border:        Hex("#e4e4e7"),
+		BorderStrong:  Hex("#8a8a92"),
+		Text:          Hex("#18181b"),
+		TextMuted:     Hex("#52525b"),
+		TextSubtle:    Hex("#62626a"),
+		Accent:        Hex("#4f46e5"),
+		Link:          Hex("#4338ca"), // 4.5:1 or more on every light surface
+		Disabled:      Hex("#62626a"), // = TextSubtle
+		AccentHover:   Hex("#5b53f0"),
+		AccentActive:  Hex("#4338ca"),
+		AccentText:    Hex("#ffffff"),
+		AccentSoft:    Hex("#4f46e51f"),
+		Success:       Hex("#16a34a"),
+		Warning:       Hex("#d97706"),
+		Danger:        Hex("#d12a2a"),
+		Scrollbar:     Hex("#000000"),
+		FocusRing:     Hex("#6366f1"),
+		Scrim:         Hex("#18181b59"),
+		Radius:        8,
+		FontSize:      14,
+		Syntax:        maps.Clone(lightSyntax),
+		CodeEditor:    lightEditor,
+	}
 }
 
 // DarkTheme returns the built-in dark theme: a neutral zinc palette with an
 // indigo accent. Each call returns a new copy, which the caller may change.
-func DarkTheme() *Theme { return darkTheme.Clone() }
+func DarkTheme() *Theme { return newDarkTheme() }
 
 // LightTheme returns the built-in light theme, the counterpart of DarkTheme.
 // Each call returns a new copy, which the caller may change.
-func LightTheme() *Theme { return lightTheme.Clone() }
+func LightTheme() *Theme { return newLightTheme() }
 
 // Clone returns a copy of the theme, to change for an app without changing the
 // built-in theme it was copied from. The copy shares the Shadows slices of its

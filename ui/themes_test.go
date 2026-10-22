@@ -89,6 +89,24 @@ func TestNewThemeReturnsCopies(t *testing.T) {
 	}
 }
 
+func TestBuiltInThemesReturnFreshCopies(t *testing.T) {
+	for _, build := range []func() *Theme{DarkTheme, LightTheme} {
+		a, b := build(), build()
+		a.Background = Hex("#000000")
+		a.Syntax["keyword"] = SyntaxStyle{}
+		a.Tabs.Tab.Gap = 99
+		if b.Background == a.Background {
+			t.Errorf("a change to one copy changed another copy's Background")
+		}
+		if b.Syntax["keyword"] == (SyntaxStyle{}) {
+			t.Errorf("a change to one copy's Syntax changed another copy")
+		}
+		if b.Tabs.Tab.Gap == 99 {
+			t.Errorf("a change to one copy's Tabs changed another copy")
+		}
+	}
+}
+
 func TestCloneCopiesSyntaxAndEditor(t *testing.T) {
 	base := DarkTheme()
 	c := base.Clone()
@@ -104,7 +122,7 @@ func TestCloneCopiesSyntaxAndEditor(t *testing.T) {
 	if base.CodeEditor.Selection == c.CodeEditor.Selection {
 		t.Errorf("a change to the copy's Editor changed the original")
 	}
-	if _, ok := darkTheme.Syntax["added"]; ok {
+	if _, ok := DarkTheme().Syntax["added"]; ok {
 		t.Errorf("a change to a copy changed the built-in theme")
 	}
 }

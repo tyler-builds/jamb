@@ -73,7 +73,10 @@ func TestThemeStyleCopiesAreIsolated(t *testing.T) {
 	if s, _ := ThemeStyle[widgetStyle](base); s.Box.Gap != 3 {
 		t.Errorf("the base's style = %+v, want its own", s)
 	}
-	if darkTheme.styles != nil || lightTheme.styles != nil {
+	if _, ok := ThemeStyle[widgetStyle](DarkTheme()); ok {
+		t.Error("a store on a copy changed a built-in theme")
+	}
+	if _, ok := ThemeStyle[widgetStyle](LightTheme()); ok {
 		t.Error("a store on a copy changed a built-in theme")
 	}
 	mocha, _ := NewTheme("Catppuccin Mocha")

@@ -80,9 +80,9 @@ type codeEditorSpec struct {
 // build returns a new theme from the spec: a copy of the built-in theme of its
 // mode, with the spec's colors set.
 func (s *themeSpec) build() *Theme {
-	t := lightTheme.Clone()
+	t := newLightTheme()
 	if s.Info.Dark {
-		t = darkTheme.Clone()
+		t = newDarkTheme()
 	}
 	t.Name = s.Info.Name
 	for _, f := range []struct {
