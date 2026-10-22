@@ -88,7 +88,7 @@ func ParseFont(name string, data []byte) (*Font, error) {
 		if sf, err = sfnt.Parse(data); err != nil {
 			return nil, fmt.Errorf("text: cannot parse font %q: %w (expected a .ttf, .otf or .ttc file)", name, err)
 		}
-		if face, err = tsfont.ParseTTF(bytes.NewReader(data)); err != nil {
+		if face, err = tsfont.ParseTTF(shapingResource(data)); err != nil {
 			return nil, fmt.Errorf("text: cannot load font %q for shaping: %w", name, err)
 		}
 	}
