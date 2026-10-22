@@ -28,6 +28,8 @@ type event struct {
 	color           string
 	body            string   // the text of a comment
 	details         []string // the lines a build shows when it is expanded
+	lower           string   // text(), lower-cased, which the filter searches
+	key             string   // the id as text, the item's key in the list
 }
 
 // text is what the filter searches: the header and the comment.
@@ -76,6 +78,8 @@ func sampleEvents(n int) []event {
 			v := statusVerbs[(i*7+3)%len(statusVerbs)]
 			e.verb, e.icon, e.color = v.verb, v.icon, v.color
 		}
+		e.lower = strings.ToLower(e.text())
+		e.key = strconv.Itoa(e.id)
 		out = append(out, e)
 		m += 7 + (i*13)%45
 	}
@@ -107,25 +111,39 @@ func thousands(n int) string {
 	return b.String()
 }
 
+// matchStep is the events that match the query q.
+type matchStep struct {
+	q  string
+	ev []event
+}
+
 // matchingEvents returns the events whose text contains query, ignoring case.
 // A blank query returns every event. The slice is kept while the query holds,
 // so the list sees the same items on each render and does not rebuild its
-// index.
+// index. A query that extends the last one filters the last result, not every
+// event, and a query that goes back to an earlier one gets its slice again.
 func (s *Store) matchingEvents(query string) []event {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
 		return events
 	}
-	if s.hasMatched && q == s.matchedQ {
-		return s.matched
+	for n := len(s.matches); n > 0 && !strings.HasPrefix(q, s.matches[n-1].q); n-- {
+		s.matches = s.matches[:n-1]
+	}
+	from := events
+	if n := len(s.matches); n > 0 {
+		if s.matches[n-1].q == q {
+			return s.matches[n-1].ev
+		}
+		from = s.matches[n-1].ev
 	}
 	var out []event
-	for _, e := range events {
-		if strings.Contains(strings.ToLower(e.text()), q) {
+	for _, e := range from {
+		if strings.Contains(e.lower, q) {
 			out = append(out, e)
 		}
 	}
-	s.matchedQ, s.matched, s.hasMatched = q, out, true
+	s.matches = append(s.matches, matchStep{q, out})
 	return out
 }
 
@@ -165,7 +183,7 @@ func Activity(s *Store) ui.Element {
 		if len(shown) == 0 {
 			body = noEvents(t, s)
 		} else {
-			body = ui.ListOf(shown, func(e event) string { return strconv.Itoa(e.id) }, func(_ int, e event) ui.Element {
+			body = ui.ListOf(shown, func(e event) string { return e.key }, func(_ int, e event) ui.Element {
 				return eventRow(t, s, e, compact, expanded[e.id], query).Key(fmt.Sprintf("event-%d", e.id))
 			}).Key("events").Style(ui.Style{Grow: 1}).Handle(s.activity)
 		}

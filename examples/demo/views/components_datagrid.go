@@ -44,7 +44,7 @@ func deployRuns() []runRow {
 		for i := range runsData {
 			h := uint32(i+1) * 2654435761 // a multiplicative hash spreads the fields
 			runsData[i] = runRow{
-				ID:       fmt.Sprintf("RUN-%06d", i+1),
+				ID:       runID(i + 1),
 				Service:  services[h%uint32(len(services))],
 				Status:   statuses[(h>>8)%uint32(len(statuses))],
 				Duration: time.Duration(20+(h>>12)%900) * time.Second,
@@ -55,6 +55,22 @@ func deployRuns() []runRow {
 	})
 	return runsData
 }
+
+// runID is "RUN-" and n in six digits, as fmt.Sprintf("RUN-%06d", n) writes it,
+// without fmt: the 100,000 runs are made on the first visit of the page.
+func runID(n int) string {
+	b := []byte("RUN-000000")
+	for i := len(b) - 1; i >= 4 && n > 0; i-- {
+		b[i] = byte('0' + n%10)
+		n /= 10
+	}
+	return string(b)
+}
+
+// PrewarmRuns makes the runs on a goroutine of its own, so that the first visit of
+// the Components page does not wait for them. deployRuns is safe to call from
+// another goroutine (it is made once, and the callers wait for it).
+func PrewarmRuns() { go deployRuns() }
 
 // runColumns are the columns of the Components page's data grid. The runs are the
 // signal runs: the Actions column retries a failed run, and the Label column edits
