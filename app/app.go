@@ -457,7 +457,8 @@ type host struct {
 	stress     *stress
 	fs         *frameStats // JAMB_FRAMESTATS, on the first window only
 
-	frames int
+	frames    int
+	presented bool // the last OnFrame reached the screen, see Presented
 
 	traceFrames int
 	traceSince  time.Time
@@ -751,8 +752,13 @@ func (h *host) TitleArea(w platform.Window, x, y float32) platform.TitleArea {
 	return platform.TitleNone
 }
 
+// Presented implements platform.Presenter: the last frame was shown, so the
+// window needs no repaint on WM_PAINT at its size.
+func (h *host) Presented() bool { return h.presented }
+
 // OnFrame implements platform.Handler.
 func (h *host) OnFrame(w platform.Window) bool {
+	h.presented = false
 	width, height := w.Size()
 	if !drawWanted(w.Visible(), width, height) {
 		// Hidden or minimized: nothing is drawn, and no animation runs. Showing the
@@ -806,6 +812,7 @@ func (h *host) OnFrame(w platform.Window) bool {
 		// stops asking for frames until DXGI wakes it (see render/d3d11).
 		return false
 	}
+	h.presented = true
 	h.frames++
 	if h.frames == 1 {
 		if h.primary {

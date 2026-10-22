@@ -46,6 +46,10 @@ type window struct {
 
 	wakePending atomic.Bool
 	frameWanted bool // set on the UI thread
+	// shownW and shownH are the size of the last frame that reached the screen,
+	// or zero when none did; see repaintNeeded.
+	shownW, shownH int
+
 	tracking    bool // mouse-leave tracking active
 	ncHover     bool // the pointer is over a title-bar button (non-client area)
 	buttonsDown int
@@ -293,7 +297,7 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 	w.ready = true
 	w.dm = newDirectManipulation(w)
 	// Render the first frame before showing to avoid a blank/white flash.
-	w.frameWanted = h.OnFrame(w)
+	w.render()
 	w.Show()
 	return w, nil
 }
@@ -312,6 +316,19 @@ func (w *window) frame() {
 func (w *window) render() {
 	w.wakePending.Store(false)
 	w.frameWanted = w.handler.OnFrame(w)
+	w.shownW, w.shownH = 0, 0
+	if p, ok := w.handler.(platform.Presenter); ok && p.Presented() {
+		w.shownW, w.shownH = w.width, w.height
+	}
+}
+
+// repaintNeeded reports whether a WM_PAINT renders a frame. The swap chain keeps
+// the last frame that reached the screen, so a WM_PAINT at the size of that frame
+// needs no frame of its own, and during a resize the frame that WM_SIZE rendered
+// serves the WM_PAINT that follows it. A window with an animation running, no
+// client area, or a frame that was not shown (shownW and shownH are zero) renders.
+func repaintNeeded(shownW, shownH, width, height int, frameWanted bool) bool {
+	return frameWanted || width <= 0 || height <= 0 || shownW != width || shownH != height
 }
 
 // waitable returns the handler's frame latency waitable, or 0.
@@ -397,6 +414,8 @@ func (w *window) Hide() {
 	w.frameWanted = false
 	win32.KillTimer(w.hwnd, wakeTimerID)
 	w.wakeAt = time.Time{}
+	// Shown again, the window repaints: what it showed may be stale by then.
+	w.shownW, w.shownH = 0, 0
 	win32.ShowWindow(w.hwnd, win32.SW_HIDE)
 }
 
@@ -671,7 +690,7 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 
 	case win32.WM_PAINT:
 		win32.ValidateRect(hwnd)
-		if w.ready {
+		if w.ready && repaintNeeded(w.shownW, w.shownH, w.width, w.height, w.frameWanted) {
 			w.frame()
 		}
 		return 0
