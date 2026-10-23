@@ -810,20 +810,44 @@ func TestTabsSegmentedLook(t *testing.T) {
 	r := newAccessRig(func(ctx *Context) Element { return partTabs(NewSignal("a"), TabsSegmented, TabsStyle{}) })
 	th := r.rt.theme
 	sel := keyNode(t, r.rt, "settings/tab:a")
-	if sel.style.Background != th.Accent {
-		t.Errorf("segmented: the selected segment is %v, want Accent %v", sel.style.Background, th.Accent)
+	if sel.style.Background != th.SurfaceActive {
+		t.Errorf("segmented: the selected segment is %v, want SurfaceActive %v", sel.style.Background, th.SurfaceActive)
+	}
+	if sel.style.TextColor != th.Text {
+		t.Errorf("segmented: the selected segment's text is %v, want Text %v", sel.style.TextColor, th.Text)
 	}
 	if got := len(partNodes(r.rt, "Tabs.Indicator")); got != 0 {
 		t.Errorf("segmented: %d indicators, want none", got)
 	}
-	// The unselected segment is not filled, and a hover fills it.
+	// The unselected segment is not filled and its text is muted; a hover brightens the text only.
 	gamma := keyNode(t, r.rt, "settings/tab:c")
-	if gamma.style.Background == th.Accent {
-		t.Errorf("segmented: an unselected segment is filled with Accent")
+	if gamma.style.Background == th.Accent || gamma.style.Background == th.SurfaceActive {
+		t.Errorf("segmented: an unselected segment is filled with %v", gamma.style.Background)
+	}
+	if gamma.style.TextColor != th.TextMuted {
+		t.Errorf("segmented: an unselected segment's text is %v, want TextMuted %v", gamma.style.TextColor, th.TextMuted)
 	}
 	hoverNode(r, gamma)
-	if gamma.style.Background != th.SurfaceHover {
-		t.Errorf("segmented: hovered segment is %v, want SurfaceHover %v", gamma.style.Background, th.SurfaceHover)
+	if gamma.style.TextColor != th.Text {
+		t.Errorf("segmented: hovered segment's text is %v, want Text %v", gamma.style.TextColor, th.Text)
+	}
+	if !gamma.style.Background.IsZero() {
+		t.Errorf("segmented: hovered segment is filled with %v, want no fill", gamma.style.Background)
+	}
+}
+
+// The accent fill of the selected segment comes back with Styles, as the docs say.
+func TestTabsSegmentedAccentViaStyles(t *testing.T) {
+	th := DarkTheme()
+	r := newAccessRig(func(ctx *Context) Element {
+		return partTabs(NewSignal("a"), TabsSegmented, TabsStyle{
+			TabSelected: Style{Background: th.Accent, TextColor: th.AccentText},
+		})
+	})
+	sel := keyNode(t, r.rt, "settings/tab:a")
+	if sel.style.Background != th.Accent || sel.style.TextColor != th.AccentText {
+		t.Errorf("segmented with Styles: the selected segment is %v on %v, want Accent %v on AccentText %v",
+			sel.style.Background, sel.style.TextColor, th.Accent, th.AccentText)
 	}
 }
 

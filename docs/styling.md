@@ -176,8 +176,10 @@ the same in every variant.
 
 - `Tabs.Variant(ui.TabsUnderline)` (the default) draws a line under each tab, and the
   selected tab's line is drawn in `Indicator`.
-- `Tabs.Variant(ui.TabsSegmented)` draws one row of segments. The selected segment is
-  filled with `Accent` (`TabSelected`), and there is no `Indicator`.
+- `Tabs.Variant(ui.TabsSegmented)` draws one row of segments on a sunken track. The
+  selected segment is a raised surface (`SurfaceActive`) with the text color, and there is
+  no `Indicator`. The accent fill is not the default; set `TabSelected` to `Background:
+  t.Accent, TextColor: t.AccentText` to get it back.
 - `NumberInput.SpinButtons(ui.SpinInline)` (the default when buttons are shown) draws
   a minus button at the field's left edge and a plus button at its right edge, inside
   the frame and its border, with the text between them. Each button is 24 px wide at
