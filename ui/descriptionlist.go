@@ -1,6 +1,9 @@
 package ui
 
-import "github.com/tyler-builds/jamb/access"
+import (
+	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/internal/text"
+)
 
 // DescriptionListStyle is the look of each part of a description list. A part's
 // style merges over the built-in defaults, then over the theme's
@@ -37,9 +40,11 @@ func (s DescriptionListStyle) plain() DescriptionListStyle {
 
 // descriptionListDefaults returns the built-in look of a description list: the
 // term in muted text, in a column of its own beside the value, or above the value
-// when vertical. A bordered list is outlined, with a line between its items, which
-// are padded. Under high contrast the lines and the term are the text color.
-func descriptionListDefaults(t *Theme, vertical, bordered bool) DescriptionListStyle {
+// when vertical. The column is termW wide, the width of the widest term, and at
+// most half of the item. A bordered list is outlined, with a line between its
+// items, which are padded. Under high contrast the lines and the term are the text
+// color.
+func descriptionListDefaults(t *Theme, vertical, bordered bool, termW float32) DescriptionListStyle {
 	d := DescriptionListStyle{
 		DescriptionList: Style{Gap: 12},
 		Term:            Style{FontSize: 13, TextColor: t.TextMuted},
@@ -49,7 +54,7 @@ func descriptionListDefaults(t *Theme, vertical, bordered bool) DescriptionListS
 		d.Item = Style{Direction: Column, Gap: 2}
 	} else {
 		d.Item = Style{Direction: Row, Align: Start, Gap: 12}
-		d.Term.Width, d.Term.NoShrink = Px(120), true
+		d.Term.Width, d.Term.MaxWidth, d.Term.NoShrink = Px(termW), Percent(50), true
 		d.Value.Grow = 1
 	}
 	if bordered {
@@ -65,10 +70,30 @@ func descriptionListDefaults(t *Theme, vertical, bordered bool) DescriptionListS
 // resolveDescriptionList returns the look of a description list: the defaults,
 // merged with the theme's DescriptionList and then the instance's Styles. Under
 // high contrast the two overrides are plain (see plainStyle).
-func resolveDescriptionList(ctx *Context, vertical, bordered bool, inst DescriptionListStyle) DescriptionListStyle {
+func resolveDescriptionList(ctx *Context, vertical, bordered bool, termW float32, inst DescriptionListStyle) DescriptionListStyle {
 	t := ctx.Theme()
-	return layered(ctx, descriptionListDefaults(t, vertical, bordered), DescriptionListStyle.merge,
+	return layered(ctx, descriptionListDefaults(t, vertical, bordered, termW), DescriptionListStyle.merge,
 		DescriptionListStyle.plain, themeLayer(t.DescriptionList), instanceLayer(inst))
+}
+
+// termWidth is the width of the widest of terms, set in the font of the Term part
+// (its size and weight, at the Text size). The term column of every item is this
+// wide, so the terms line up.
+func termWidth(ctx *Context, terms []string, term Style) float32 {
+	rt := ctx.rt
+	size := term.FontSize
+	if size == 0 {
+		size = rt.theme.FontSize
+	}
+	ts := text.Style{Size: size * rt.textFactor, Weight: term.FontWeight, NoWrap: true}
+	if ts.Weight == 0 {
+		ts.Weight = text.Regular
+	}
+	var w float32
+	for _, s := range terms {
+		w = max(w, rt.text.Layout(s, ts, 1e6).Width)
+	}
+	return w
 }
 
 // descItem is one term of a description list, with its value.
@@ -169,7 +194,16 @@ func (l *DescriptionListElement) Styles(st DescriptionListStyle) *DescriptionLis
 }
 
 func (l *DescriptionListElement) expand(ctx *Context) Element {
-	st := resolveDescriptionList(ctx, l.vertical, l.bordered, l.styles)
+	// The term column is measured in the term's font, which the look may change, so the
+	// look is resolved once for its font and again with the column's width.
+	st := resolveDescriptionList(ctx, l.vertical, l.bordered, 0, l.styles)
+	if !l.vertical {
+		terms := make([]string, len(l.items))
+		for i, it := range l.items {
+			terms[i] = it.term
+		}
+		st = resolveDescriptionList(ctx, l.vertical, l.bordered, termWidth(ctx, terms, st.Term), l.styles)
+	}
 	cols := make([]Length, l.columns)
 	for i := range cols {
 		cols[i] = Fr(1)

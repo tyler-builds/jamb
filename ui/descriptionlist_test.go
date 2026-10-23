@@ -74,6 +74,34 @@ func TestDescriptionListLayout(t *testing.T) {
 	}
 }
 
+// TestDescriptionListTermColumnFitsTheWidestTerm checks that the terms of every item
+// share a column as wide as the widest term, and that a term too long for its half
+// of the item is capped there, so the value keeps at least half the width.
+func TestDescriptionListTermColumnFitsTheWidestTerm(t *testing.T) {
+	r := newAccessRig(func(ctx *Context) Element {
+		return DescriptionList().Width(Px(400)).ItemText("Id", "7").ItemText("Created by", "Dana Lee")
+	})
+	terms := partNodes(r.rt, "DescriptionList.Term")
+	first := r.rt.nodeRect(terms[0])
+	for _, n := range terms {
+		if w := r.rt.nodeRect(n).W; w != first.W {
+			t.Errorf("term columns are %v and %v wide, want them aligned", first.W, w)
+		}
+	}
+	if first.W >= 120 || first.W < 40 {
+		t.Errorf("the term column is %v wide for the widest term %q, want its text width", first.W, "Created by")
+	}
+
+	long := newAccessRig(func(ctx *Context) Element {
+		return DescriptionList().Width(Px(300)).ItemText("A very long term that cannot fit beside its value", "x")
+	})
+	term := long.rt.nodeRect(partNode(t, long.rt, "DescriptionList.Term", ""))
+	item := long.rt.nodeRect(partNode(t, long.rt, "DescriptionList.Item", ""))
+	if term.W > item.W/2 {
+		t.Errorf("the long term is %v wide in an item %v wide, want at most half", term.W, item.W)
+	}
+}
+
 // TestDescriptionListBordered checks that a bordered list is outlined, and that
 // its items have a line above every row but the first and before every column but
 // the first.
