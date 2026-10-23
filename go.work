@@ -6,5 +6,6 @@ use (
 	./examples/demo
 	./examples/git
 	./examples/hello
+	./examples/monitor
 	./examples/notes
 )

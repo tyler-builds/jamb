@@ -41,6 +41,10 @@ examples/git/      module "github.com/tyler-builds/jamb/examples/git", a Git his
   graph/           lays the commits out in lanes, one row at a time
   store/           repositories as signals, history loaded a page at a time off the UI thread
   views/           title bar, sidebar, history grid with the graph, details, diff, tags
+examples/monitor/  module "github.com/tyler-builds/jamb/examples/monitor", a system monitor (see docs/examples.md)
+  sample/          reads the processors, memory, network and processes; a made-up machine for tests
+  store/           samples on a timer into signals: history, processes, alert rules and alerts
+  views/           title bar, overview tiles, dock of chart panels, process table, details, alerts
 docs/              screenshots/ (PNG captures), benchmarks/ (bench-before.txt, bench-after.txt)
 scripts/bench.sh   reproduces the build and footprint numbers
 scripts/a11y-check.ps1  live UI Automation checks of the examples (see Tools)

@@ -9,6 +9,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Added
 
+- `examples/monitor`, a system monitor: live charts of the processors, memory, network and I/O,
+  a process table sampled every second, alerts as Windows notifications, a notification area
+  icon and a taskbar badge, in panels that can be rearranged and floated. See docs/examples.md.
 - `charts.Axis.Hidden` hides an axis: no axis line, tick labels or title, and no margin for them.
   With `GridAuto` a hidden axis draws no grid lines, and `GridOn` still draws them. A line or area
   with both axes hidden, no legend and no title is a sparkline, and a chart sized to less than 120
