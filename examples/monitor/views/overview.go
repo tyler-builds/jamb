@@ -60,7 +60,8 @@ func (a *App) tile(t *ui.Theme, s tileSpec) ui.Element {
 	if s.yMax > 0 {
 		y = y.Max(s.yMax)
 	}
-	spark := charts.Area(s.series...).Key("spark").
+	// The sparkline is decoration beside the value, so the keyboard does not stop on it.
+	spark := charts.Area(s.series...).Key("spark").TabStop(false).
 		XAxis(charts.Axis{Hidden: true}).YAxis(y).Legend(charts.LegendNone).Height(ui.Px(40))
 	if s.format != nil {
 		spark.Format(s.format)

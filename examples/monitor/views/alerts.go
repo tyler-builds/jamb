@@ -22,7 +22,7 @@ func (a *App) alertPanel(ctx *ui.Context) ui.Element {
 	} else {
 		log = ui.ListOf(alerts, func(al store.Alert) string { return al.Time.String() + string(al.Kind) },
 			func(_ int, al store.Alert) ui.Element { return alertRow(t, al) }).
-			Key("alert-log").Grow(1)
+			Key("alert-log").Label("Recent alerts").Grow(1)
 	}
 	return ui.Div().Column().Size(ui.Full, ui.Full).Padding(12).Gap(12).
 		Child(a.ruleRow(ctx, store.AlertCPU, "Processor load", slices.Contains(firing, store.AlertCPU))).
