@@ -33,6 +33,10 @@ follows CSS Flexbox's automatic minimum size of flex items
 - The minimums of text grow with the Text size (`JAMB_TEXT_SCALE`). A control whose label
   is wider than a fixed `Width` should use `MinWidth` instead, so the control grows with
   its label.
+- **A stretched item keeps its cross-axis limits.** An item that stretches across a row
+  (its height) or a column (its width) takes the line's size, but never less than its
+  `MinHeight` or `MinWidth`, nor more than its `MaxHeight` or `MaxWidth`, as in CSS. A
+  row 24 px tall holds a child with `MinHeight(ui.Px(32))` at 32 px.
 
 ## Grid layout
 
