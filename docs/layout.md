@@ -265,7 +265,11 @@ back. A floating window shows its group. Its position and size are recorded in t
 layout as the user moves and resizes it: the layout takes the new place at once, and
 `OnChange` runs once the window has been still for half a second, or at once when the
 window closes. Closing a window, by the user or by the dock, docks its panels back
-into the main window, so no panel is lost with its window. Set `QuitWhenClosed` on
+into the main window, so no panel is lost with its window. A panel docks back where
+it was before it floated: as a tab of the group it left, at its old place among the
+tabs, or as a group of its own beside the group it was next to. The layout keeps that
+place with the floating group (`DockFloat.Home`), so it survives a save and a reload.
+When the panel it was next to has gone too, it docks along the right edge. Set `QuitWhenClosed` on
 the main window, so that closing it closes the floating windows too, and their
 positions are saved as they close.
 

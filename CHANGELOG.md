@@ -24,6 +24,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Changed
 
+- A floating dock panel docks back where it was before it floated, as a tab of the group it
+  left or as a group beside the one it was next to, when its window closes or with Dock back.
+  Before, it docked along the right edge. The place is kept in the new `DockFloat.Home`.
 - The window of a floating dock group is part of the dock's window. It shows that window's
   theme, text and zoom and keeps them in step both ways, uses its key bindings, and passes the
   actions it does not handle on to it, from the dock up. Before, a floated panel followed the

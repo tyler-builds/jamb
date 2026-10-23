@@ -78,6 +78,18 @@ type DockFloat struct {
 	Width int `json:"width"`
 	// Height is the height of the window's content, in logical pixels.
 	Height int `json:"height"`
+	// Home is where the group's first panel was docked before it floated, so that
+	// docking it back returns it there. Nil docks it along the right edge.
+	Home *DockHome `json:"home,omitempty"`
+}
+
+// DockHome is the place a panel was docked at, by a panel beside it: a tab of
+// Panel's group, at Index, when Zone is DockCenter, or a group of its own on the
+// Zone side of Panel's group.
+type DockHome struct {
+	Panel string   `json:"panel"`
+	Zone  DockZone `json:"zone"`
+	Index int      `json:"index,omitempty"`
 }
 
 // isSplit reports whether n is a split rather than a tab group.
@@ -107,6 +119,10 @@ func (l DockLayout) clone() DockLayout {
 		fl := make([]DockFloat, len(l.Floating))
 		for i, f := range l.Floating {
 			f.Group = f.Group.clone()
+			if f.Home != nil {
+				home := *f.Home
+				f.Home = &home
+			}
 			fl[i] = f
 		}
 		l.Floating = fl
@@ -538,22 +554,115 @@ func (l DockLayout) Float(id string, x, y, w, h int) DockLayout {
 			return out
 		}
 	}
+	home := homeOf(&out.Root, id)
 	out.removePanel(id)
-	out.Floating = append(out.Floating, DockFloat{ID: out.nextFloatID(), Group: newGroup(id), X: x, Y: y, Width: w, Height: h})
+	out.Floating = append(out.Floating, DockFloat{ID: out.nextFloatID(), Group: newGroup(id), X: x, Y: y,
+		Width: w, Height: h, Home: home})
 	return normalizeLayout(out, nil)
 }
 
 // Dock returns l with the panel id taken out of its floating group and docked back
-// into the dock, as a group along the right edge. A panel that is docked already, or
-// that does not float, leaves the layout as it is.
+// into the dock where it was before it floated: as a tab of the group it left, or as
+// a group of its own beside the group it was next to (see DockFloat.Home). When that
+// place is gone, because the panel it was next to has gone too, or the panel was not
+// the one that floated the group, it docks as a group along the right edge. A panel
+// that is docked already, or that does not float, leaves the layout as it is.
 func (l DockLayout) Dock(id string) DockLayout {
 	out := normalizeLayout(l.clone(), nil)
 	if groupIn(&out.Root, id) != nil || !out.floating(id) {
 		return out
 	}
+	var home *DockHome
+	for _, f := range out.Floating {
+		if len(f.Group.Panels) > 0 && f.Group.Panels[0] == id {
+			home = f.Home
+		}
+	}
 	out.removePanel(id)
-	placeAtEdge(&out.Root, DockRight, newGroup(id))
+	if home == nil || !placeHome(&out.Root, id, *home) {
+		placeAtEdge(&out.Root, DockRight, newGroup(id))
+	}
 	return normalizeLayout(out, nil)
+}
+
+// homeOf returns the place of the docked panel id in the tree under root: beside a
+// tab of its group, or, alone in its group, beside the nearest group of the split it
+// is in. A panel alone in the whole dock, or not in it, has none.
+func homeOf(root *DockNode, id string) *DockHome {
+	g := groupIn(root, id)
+	if g == nil {
+		return nil
+	}
+	if len(g.Panels) > 1 {
+		i := slices.Index(g.Panels, id)
+		other := g.Panels[1]
+		if i > 0 {
+			other = g.Panels[i-1]
+		}
+		return &DockHome{Panel: other, Zone: DockCenter, Index: i}
+	}
+	parent, i := parentOf(root, g)
+	if parent == nil {
+		return nil
+	}
+	// Into the sibling after it, if any, or the one before. The panel lies on the
+	// other side of the sibling from the way in.
+	j, in, zone := i+1, DockRight, DockLeft
+	if parent.Vertical {
+		in, zone = DockBottom, DockTop
+	}
+	if j >= len(parent.Children) {
+		j, in, zone = i-1, opposite(in), opposite(zone)
+	}
+	return &DockHome{Panel: entryPanel(&parent.Children[j], in), Zone: zone}
+}
+
+// parentOf returns the split under n that has g as a child, and g's place in it.
+func parentOf(n, g *DockNode) (*DockNode, int) {
+	for i := range n.Children {
+		c := &n.Children[i]
+		if c == g {
+			return n, i
+		}
+		if p, j := parentOf(c, g); p != nil {
+			return p, j
+		}
+	}
+	return nil, 0
+}
+
+// opposite returns the side across from z.
+func opposite(z DockZone) DockZone {
+	switch z {
+	case DockLeft:
+		return DockRight
+	case DockRight:
+		return DockLeft
+	case DockTop:
+		return DockBottom
+	case DockBottom:
+		return DockTop
+	}
+	return z
+}
+
+// placeHome docks the panel id at home in the tree under root, and reports whether
+// home's panel is still there to place it by.
+func placeHome(root *DockNode, id string, home DockHome) bool {
+	g := groupIn(root, home.Panel)
+	if g == nil {
+		return false
+	}
+	if home.Zone == DockCenter {
+		g.Panels = slices.Insert(g.Panels, min(max(home.Index, 0), len(g.Panels)), id)
+		g.Active = id
+		return true
+	}
+	if !root.isSplit() {
+		*root = wrapBeside(*root, newGroup(id), home.Zone)
+		return true
+	}
+	return placeBeside(root, home.Panel, home.Zone, newGroup(id))
 }
 
 // MoveSide returns l with the panel id moved into the group beside its own, on the
