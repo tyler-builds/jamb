@@ -10,6 +10,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 ### Added
 
 - `ListOf` and `UniformList` take `Label`, which names the list for assistive technology.
+- `Chart.TabStop(false)` leaves a chart and its legend out of the Tab order, for a sparkline
+  that decorates a number. A click still focuses it, and assistive technology still reads it.
 
 ### Fixed
 
