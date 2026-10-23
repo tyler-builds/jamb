@@ -14,6 +14,9 @@ ui.UniformList(len(events), func(i int) ui.Element { return eventRow(events[i]) 
 h.ScrollToItem(5000)                    // scrolls the least amount that shows row 5000
 ```
 
+Assistive technology reads a list with its number of items. `Label` names it, such as
+"Search results"; both kinds of list take it.
+
 ## Variable-height lists
 
 When rows differ in height, use `ui.ListOf`. It takes the items, a key for each
@@ -207,7 +210,7 @@ Alt is not used by the grid, so the host keeps its menu and navigation keys.
 
 **Accessibility.** The grid is a `DataGrid` control with the Grid and Table patterns. Its `RowCount` is every row of the data, built or not, and its `ColumnCount` is the number of columns. Each cell is a `DataItem` with the GridItem and TableItem patterns, and each row is a `ListItem` with the SelectionItem pattern. Each header cell is a `HeaderItem` that Invoke sorts, with its sort state in its name ("Duration, sorted descending") and in its ItemStatus. Selection uses the Selection pattern, which says whether it takes many items; with `CellSelection` the cells are its items, and the rows are not. The columns are numbered in the order they are shown, so a moved or pinned column changes its column number. GetItem answers only for the cells that are built: a row out of view, or a column out of view in a grid wider than its view, gives nothing, and the client scrolls the grid to it. See `docs/accessibility-design-phases-i-m.md`, Phase I. In a tree, `RowCount` is the rows shown, and a row reports its level and its place among its siblings (see Tree rows).
 
-**Tree rows.** `Children(fn)` makes the rows a tree. The rows given to `DataGrid` are the top level, and `fn` returns the children of a row, nil or empty for a row with none. A row with children shows a chevron in the first column, which opens and closes it, and its children are shown under it while it is open. Keys are unique across the whole tree. The grid computes no totals: a group row is an ordinary row that the app builds, with its summed values. The children of a row are sorted among their siblings by the sort, so a group sorts among the groups.
+**Tree rows.** `Children(fn)` makes the rows a tree. The rows given to `DataGrid` are the top level, and `fn` returns the children of a row, nil or empty for a row with none. A row with children shows a chevron in the first column, which opens and closes it, and its children are shown under it while it is open. Keys are unique across the whole tree. The grid computes no totals: a group row is an ordinary row that the app builds, with its summed values. The children of a row are sorted among their siblings by the sort, so a group sorts among the groups. `SortChildrenOnly()` keeps the top rows in the order given and sorts only the rows under them: the top rows are then sections, such as Task Manager's Apps, Background processes and Windows processes, which keep their place while the rows in them sort.
 
 ```go
 type proc struct {

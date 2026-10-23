@@ -114,6 +114,7 @@ type Chart struct {
 	horiz  bool
 	smooth bool
 	format func(float64) string
+	noTab  bool  // see TabStop
 	size   sizes // see Width
 	styles Style
 	// last is the geometry of the chart's latest render, which the tests read.
@@ -202,6 +203,13 @@ func (c *Chart) Title(s string) *Chart { c.title = s; return c }
 // Label sets the name that assistive technology reads for the chart, in place of the
 // name that the chart makes from its data (see the package documentation).
 func (c *Chart) Label(s string) *Chart { c.name = s; return c }
+
+// TabStop(false) leaves the chart and its legend's items out of the Tab order,
+// for a chart that only decorates, such as a sparkline beside the number it
+// charts. A click still focuses them, and the chart's keyboard walk works then.
+// Assistive technology still reads the chart, as an image named by its summary,
+// and its legend. TabStop(true), the default, puts them back.
+func (c *Chart) TabStop(on bool) *Chart { c.noTab = !on; return c }
 
 // Key gives the chart a stable identity among its siblings, so its state (the
 // hidden series, the focus and the keyboard position) survives reordering.
@@ -486,7 +494,7 @@ func (c *Chart) canvas(v *view, hidden *ui.Signal[[]bool], pointer *ui.Signal[po
 	}
 	el := ui.Canvas(func(p *ui.Painter, w, h float32) {
 		c.paint(v, p, w, h)
-	}).Size(ui.Full, ui.Auto).Grow(1).MinHeight(c.canvasMinHeight()).Label(name).Focusable()
+	}).Size(ui.Full, ui.Auto).Grow(1).MinHeight(c.canvasMinHeight()).Label(name).Focusable().TabStop(!c.noTab)
 	el.FocusVisible(ui.Style{BorderWidth: 2, BorderColor: v.t.FocusRing})
 	el.OnMouseMove(func(e *ui.MouseEvent) {
 		pointer.Set(pointerAt{on: true, x: e.LocalX, y: e.LocalY})

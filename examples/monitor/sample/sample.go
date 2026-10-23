@@ -69,6 +69,8 @@ type RawProc struct {
 	// ReadBytes and WriteBytes are the process's cumulative I/O, to files, devices
 	// and the network.
 	ReadBytes, WriteBytes uint64
+	// HasWindow is set when the process has a window on the taskbar.
+	HasWindow bool
 }
 
 // Snapshot is the state of the machine at one sample, with the rates since the
@@ -121,6 +123,9 @@ type Process struct {
 	Threads, Handles    uint32
 	// IORead and IOWrite are bytes per second.
 	IORead, IOWrite float64
+	// HasWindow is set when the process has a window on the taskbar, which makes
+	// its program an app, as Task Manager counts them.
+	HasWindow bool
 }
 
 // Program is what a process runs: its executable's full path, the program's name
@@ -261,7 +266,7 @@ func Rates(prev *Raw, cur Raw) Snapshot {
 	for _, r := range cur.Procs {
 		p := Process{Key: ProcessKey(r.PID, r.Created), PID: r.PID, PPID: r.PPID, Name: r.Name,
 			Started: fileTime(r.Created), Created: r.Created, Private: r.Private, WorkingSet: r.WorkingSet,
-			Threads: r.Threads, Handles: r.Handles}
+			Threads: r.Threads, Handles: r.Handles, HasWindow: r.HasWindow}
 		if b := before[p.Key]; b != nil {
 			if total > 0 && r.CPU > b.CPU {
 				p.CPU = clamp(float64(r.CPU-b.CPU) / float64(total) * 100 * scale)

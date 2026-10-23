@@ -279,13 +279,15 @@ follow the window of their dock, tree rows in `ui.DataGrid` for its groups, and
   theme and zoom, and the shortcuts work in it. The layout is kept in the settings.
   Ctrl+1 to Ctrl+7 show each panel, and reopen a closed one.
 - The process table is a `ui.DataGrid` that is sampled again every second. By default
-  it groups the processes as Task Manager does, with tree rows: the parts of Windows
-  in one group (a process with no executable file, such as System or Memory
-  Compression, or one whose executable is in the Windows folder and published by
-  Microsoft, read from its version information; drivers' programs are not), and each program that runs more than one process in a group with their
-  sums. Each row shows its program's icon, read once for each executable with
-  `app.FileIcon` by a goroutine of its own. "All processes" lists them one a row, and
-  a filter always does. Its sort,
+  it groups the processes as Task Manager does, with tree rows, in three sections that
+  keep their order as the table sorts (`SortChildrenOnly`): Apps, the programs with a
+  window on the taskbar; Background processes; and Windows processes, the parts of
+  Windows (a process with no executable file, such as System or Memory Compression, or
+  one whose executable is in the Windows folder and published by Microsoft, read from
+  its version information; drivers' programs are not). In each section, a program that
+  runs more than one process is a group with their sums. Each row shows its program's
+  icon, read once for each executable with `app.FileIcon` by a goroutine of its own.
+  "All processes" lists them one a row, and a filter always does. Its sort,
   focus, open groups and selection follow each row by its key as the rows move.
   The CPU column is shaded by load. Its columns can be moved and resized, and are kept.
   Ctrl+F filters it by name or PID. Right-click a row for its menu, and Delete asks

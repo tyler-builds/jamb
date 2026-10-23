@@ -3,8 +3,11 @@ package ui
 import (
 	"fmt"
 	"math"
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/tyler-builds/jamb/access"
 )
 
 // listRow is a row with a fixed height and a key derived from its index.
@@ -331,3 +334,25 @@ func checkListRows(t *testing.T, r *overlayRig, n int) {
 // listRowOf is listRow for an item of a ListOf, whose rows are keyed by the
 // ListOf's key function instead.
 func listRowOf(_ int, item int) Element { return listRow(item) }
+
+// TestListLabelNamesTheList checks that Label names both kinds of list for
+// assistive technology, and that a list without one has no name.
+func TestListLabelNamesTheList(t *testing.T) {
+	rows := []string{"a", "b", "c"}
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().Size(Full, Full).
+			Child(ListOf(rows, func(s string) string { return s }, func(_ int, s string) Element { return Text(s) }).
+				Key("varying").Label("Alerts").Height(Px(100))).
+			Child(UniformList(len(rows), func(i int) Element { return Text(rows[i]) }).
+				Key("uniform").Label("Search results").Height(Px(100))).
+			Child(ListOf(rows, func(s string) string { return s }, func(_ int, s string) Element { return Text(s) }).
+				Key("plain").Height(Px(100)))
+	})
+	var names []string
+	for _, n := range accessNodes(r, access.RoleList) {
+		names = append(names, n.Name)
+	}
+	if want := []string{"Alerts", "Search results", ""}; !slices.Equal(names, want) {
+		t.Errorf("list names = %q, want %q", names, want)
+	}
+}

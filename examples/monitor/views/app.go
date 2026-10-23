@@ -89,7 +89,7 @@ func New(s *store.Store, layout Layout) *App {
 		layout.Grouped = ui.NewSignal(true)
 	}
 	return &App{s: s, layout: layout, selected: ui.NewSignal([]string(nil)), filter: ui.NewSignal(""),
-		expanded: ui.NewSignal([]string(nil)),
+		expanded: ui.NewSignal(slices.Clone(sections)),
 		search:   ui.NewFocusHandle(), grid: ui.NewDataGridHandle(), ending: ui.NewSignal[*sample.Process](nil),
 		palette: ui.NewSignal(false), span: ui.NewSignal(60), icons: newIconCache(layout.FileIcon)}
 }

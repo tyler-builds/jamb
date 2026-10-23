@@ -7,6 +7,29 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Added
+
+- `ListOf` and `UniformList` take `Label`, which names the list for assistive technology.
+- `Chart.TabStop(false)` leaves a chart and its legend out of the Tab order, for a sparkline
+  that decorates a number. A click still focuses it, and assistive technology still reads it.
+- `DataGrid.SortChildrenOnly()` keeps the top rows of a tree in the order given and sorts only
+  the rows under them, for sections that keep their place while the rows in them sort.
+
+### Changed
+
+- The vector rasterizer, which draws charts, SVG images and canvases, keeps the edges that
+  cross a row of pixels in order from one sample of the row to the next, instead of sorting
+  them afresh at each of its 16 samples, and sorts the edges into rows in linear time. It
+  draws the same pixels. A chart's plot redraws about 2.5 times as fast: a 100,000-point line
+  in 5 ms instead of 12.3, an area in 7.5 ms instead of 18, and the system monitor's resize
+  frame fell from 6.6 to 4.0 ms. A stroke allocates a third less.
+
+### Fixed
+
+- A keyed component or composite element, such as a chart, kept answering to its key in tests
+  and in the inspector only until a component inside it rendered again. A chart's key was lost
+  on the first frame of its enter animation.
+
 ## [0.5.0] - 2026-10-23
 
 This release fixes the magnified content that v0.4.0 showed while a window's edge was dragged,
