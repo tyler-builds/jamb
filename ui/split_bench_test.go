@@ -35,11 +35,11 @@ func benchPane() Element {
 }
 
 // splitsResizedWalk is the check that splitsResized did before it kept each split's box: it searches
-// the tree for every split on every call. It is kept here as the baseline of the benchmark.
+// the tree for every split's key on every call. It is kept here as the baseline of the benchmark.
 func splitsResizedWalk(rt *Runtime) bool {
 	changed := false
-	for _, w := range rt.splitWatches {
-		if n := rt.findKey(rt.tree, w.key); n != nil && axisLength(n, w.vert) != w.seen {
+	for inst, w := range rt.splitWatches {
+		if n := rt.findKey(rt.tree, inst.root.key); n != nil && axisLength(n, w.vert) != w.seen {
 			changed = true
 		}
 	}
@@ -58,7 +58,7 @@ func BenchmarkSplitsResizedWalk(b *testing.B) {
 }
 
 // BenchmarkSplitsResized is the check of the window's 50 splits as the runtime makes it: each split
-// keeps its box, and the check reads it from the map of live nodes.
+// is its instance's root, and the check reads it from the map of live nodes.
 func BenchmarkSplitsResized(b *testing.B) {
 	rt := splitBenchRuntime(b, 50)
 	b.ResetTimer()

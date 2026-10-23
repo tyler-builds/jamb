@@ -211,6 +211,10 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 
 ### Fixed
 
+- A `Split` measures its own box. It used to find its box by searching the window for its key, so
+  of two splits with the same key in different parts of the tree (keys are unique only among
+  siblings) both measured the first. When that one was hidden, as in an app that keeps a hidden view
+  per document, the shown split had no length and ignored a drag of its divider.
 - `ui.TitleBarButtons` take the height of the title bar they are in. They were always 32 px high, so
   in a taller bar they sat in its middle with the bar above and below them, and the close button's
   red did not reach the window's corner. A bar sized by its content still gets 32 px buttons.
