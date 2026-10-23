@@ -16,7 +16,7 @@ func partTree(sel *Signal[string], st TreeStyle, row, label func(TreeNode, PartS
 		{Key: "docs", Label: "Docs", Icon: icons.Check, Children: func() []TreeNode {
 			return []TreeNode{{Key: "guide", Label: "Guide"}}
 		}},
-		{Key: "src", Label: "Source"},
+		{Key: "src", Label: "Source", Description: "Code"},
 	}
 	tv := Tree(nodes, sel).Key("files").Label("Project files").Styles(st)
 	if row != nil {
@@ -57,6 +57,7 @@ func testTreeParts(t *testing.T, applied map[string]bool) {
 		{part: "Tree.Chevron", set: func(s *TreeStyle, m Style) { s.Chevron = m }, sel: "src", drawn: "Tree.Chevron"},
 		{part: "Tree.Icon", set: func(s *TreeStyle, m Style) { s.Icon = m }, sel: "src", drawn: "Tree.Icon"},
 		{part: "Tree.Label", set: func(s *TreeStyle, m Style) { s.Label = m }, sel: "src", drawn: "Tree.Label"},
+		{part: "Tree.Description", set: func(s *TreeStyle, m Style) { s.Description = m }, sel: "src", drawn: "Tree.Description", text: true},
 		{part: "Tree.TreeFocusVisible", set: func(s *TreeStyle, m Style) { s.TreeFocusVisible = m }, sel: "src", drawn: "Tree.Tree",
 			act: func(t *testing.T, r *accessRig) { focusNode(r, partNode(t, r.rt, "Tree.Tree", "")) }},
 	}
