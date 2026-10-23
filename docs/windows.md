@@ -107,8 +107,9 @@ ui.Div().Row().Height(ui.Px(32)).WindowArea(ui.WindowAreaDrag).Justify(ui.End).
   a button inside the title bar still works. `ui.WindowAreaMinimize`,
   `ui.WindowAreaMaximize` and `ui.WindowAreaClose` act when the mouse is released over
   them.
-- `ui.TitleBarButtons()` is the usual set: 46×32 buttons like Windows 11's,
-  with hover and pressed styles, a red close button and the restore icon
+- `ui.TitleBarButtons()` is the usual set: buttons 46 px wide like Windows 11's,
+  as high as the bar they are in (32 px in a bar sized by its content), so they reach
+  the top and bottom of a taller bar, with hover and pressed styles, a red close button and the restore icon
   while the window is maximized. The buttons are native hit-test areas, which is what
   lets Windows 11 show Snap Layouts over the maximize button.
 - Windows with the operating system's title bar ignore areas.
