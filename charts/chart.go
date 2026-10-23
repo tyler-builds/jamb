@@ -474,7 +474,11 @@ func (c *Chart) column(v *view, hidden *ui.Signal[[]bool], pointer *ui.Signal[po
 	case c.legend == LegendTop && legend != nil:
 		col.Child(legend).Child(canvas)
 	case c.legend == LegendRight && c.items() > 0:
-		col.Child(ui.Div().Row().Gap(12).Grow(1).Child(canvas).Child(c.legendColumn(v, hidden, cursor)))
+		// The plot takes the width the legend leaves, and the row the chart's height: a
+		// legend of many items scrolls rather than pushing out of the chart.
+		canvas.Width(ui.Auto).Basis(ui.Px(0)).MinWidth(ui.Px(0))
+		col.Child(ui.Div().Row().Gap(12).Grow(1).MinHeight(ui.Px(0)).
+			Child(canvas).Child(c.legendColumn(v, hidden, cursor)))
 	default:
 		col.Child(canvas)
 		if legend != nil {

@@ -27,7 +27,8 @@ func (c *Chart) legendColumn(v *view, hidden *ui.Signal[[]bool], cursor *ui.Sign
 	if c.legend != LegendRight || c.items() == 0 {
 		return nil
 	}
-	col := ui.Div().Role(access.RoleGroup).Label(v.s.ChartLegend).Column().Style(v.st.Legend)
+	col := ui.Div().Role(access.RoleGroup).Label(v.s.ChartLegend).Column().Style(v.st.Legend).
+		Shrink(0).MinHeight(ui.Px(0)).ScrollY()
 	for i := 0; i < c.items(); i++ {
 		col.Child(c.legendItem(v, hidden, cursor, i))
 	}
