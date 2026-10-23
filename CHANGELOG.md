@@ -7,6 +7,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-23
+
 The code editor highlights with @pierre/highlights instead of tree-sitter: 76 languages built in,
 without the jamb-grammars module. This changes the highlighting API. The data grid gains movable,
 pinned and grouped columns, cell selection, context menus and loading more rows; tabs scroll when
@@ -620,7 +622,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tyler-builds/jamb/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tyler-builds/jamb/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tyler-builds/jamb/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tyler-builds/jamb/releases/tag/v0.1.0
