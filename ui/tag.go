@@ -50,6 +50,13 @@ func resolveTag(ctx *Context, inst TagStyle) TagStyle {
 	return layered(ctx, tagDefaults(t), TagStyle.merge, TagStyle.plain, themeLayer(t.Tag), instanceLayer(inst))
 }
 
+// tagTint returns the look of a tag of color c: a fill of c at about 14% alpha, a
+// border of c at about 32%, and the icon in c (see Tag.Color). The text keeps the
+// theme's text color.
+func tagTint(c Color) TagStyle {
+	return TagStyle{Tag: Style{Background: c.Alpha(0.14), BorderWidth: 1, BorderColor: c.Alpha(0.32)}}
+}
+
 // TagElement is a small rounded chip with a text, for a label or a filter. A tag
 // can have a leading icon, and a remove button that the user can press to take
 // the tag away.
@@ -58,6 +65,7 @@ type TagElement struct {
 	icon     *icons.Icon
 	onRemove func()
 	key      string
+	color    Color // see Color
 	styles   TagStyle
 	size     sizing // the tag's sizes, from the sizing methods (see Sizing in docs/styling.md)
 	tooltip  string // see Tooltip
@@ -75,6 +83,12 @@ func (g *TagElement) Key(k string) *TagElement { g.key = k; return g }
 
 // Icon sets an icon in front of the text.
 func (g *TagElement) Icon(ic *icons.Icon) *TagElement { g.icon = ic; return g }
+
+// Color tints the tag with c, for a tag that marks a category: a fill of c at about
+// 14% alpha, a border of c at about 32%, and the icon in c. The text keeps the
+// theme's text color, so it stays readable. Styles still wins over it, and under
+// high contrast Color is not used.
+func (g *TagElement) Color(c Color) *TagElement { g.color = c; return g }
 
 // OnRemove adds a remove button after the text, which calls fn when it is
 // pressed with the mouse, or with Enter or Space. The button is named "Remove"
@@ -110,12 +124,22 @@ func (g *TagElement) Styles(st TagStyle) *TagElement {
 }
 
 func (g *TagElement) expand(ctx *Context) Element {
-	st := resolveTag(ctx, g.styles)
+	inst := g.styles
+	if !g.color.IsZero() {
+		// The tint is an instance layer under the Styles, so Styles wins over it. Under
+		// high contrast the instance layer is plain, and the tint is dropped with its colors.
+		inst = tagTint(g.color).merge(g.styles)
+	}
+	st := resolveTag(ctx, inst)
 	strs := ctx.Strings()
 	// The tag is a group named by its text, so it is read as one thing.
 	tag := Div().asPart("Tag.Tag").Style(st.Tag).Role(access.RoleGroup).Label(g.text).Tooltip(g.tooltip)
 	if g.icon != nil {
-		tag.Child(Icon(g.icon).Size(14))
+		icon := Icon(g.icon).Size(14)
+		if !g.color.IsZero() && !ctx.Theme().HighContrast {
+			icon.Color(g.color)
+		}
+		tag.Child(icon)
 	}
 	tag.Child(Div().asPart("Tag.Label").Style(st.Label).Child(Text(g.text).Truncate()))
 	if g.onRemove != nil {
