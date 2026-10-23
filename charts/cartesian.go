@@ -26,6 +26,10 @@ const (
 	titleGap    = 6   // between an axis title and the labels beside it
 	defaultFont = 12  // the size of the axis labels when the part sets none
 	probeText   = "0" // the text whose height is a label's line height
+	// plotInset is the margin that a hidden axis leaves at its edge of the plot: the
+	// keyboard ring, which is drawn about a point on the plot's edge, reaches this far
+	// (the line's and the markers' half widths are less).
+	plotInset = focusRadius + focusRingWidth/2
 )
 
 // vertical reports whether the positions of the chart run along the x axis. Every
@@ -317,7 +321,7 @@ func (c *Chart) layout(p *ui.Painter, w, h float64, m cartModel, st Style) cartL
 		for n := nPos; ; n-- {
 			L.posTicks, L.posLabels = c.positionTicks(m, n)
 			posWide, posH, posWidths = measureLabels(p, L.posLabels, size)
-			if n <= 1 || c.positionFits(L, posWidths, posH) {
+			if n <= 1 || c.xa.Hidden || c.positionFits(L, posWidths, posH) {
 				break
 			}
 		}
@@ -327,6 +331,11 @@ func (c *Chart) layout(p *ui.Painter, w, h float64, m cartModel, st Style) cartL
 			nVal = clampInt(int(valLen/(float64(lineH)*2.6)), 2, maxValTicks)
 			if !L.vert {
 				nVal = clampInt(int(valLen/80), 2, maxValTicks)
+			}
+			// A hidden axis has no labels to fit, so its ticks only set the range: they are
+			// as many as an axis with room for its labels would have.
+			if c.ya.Hidden {
+				nVal = maxValTicks
 			}
 		}
 		var valWide, valH float32
@@ -339,37 +348,48 @@ func (c *Chart) layout(p *ui.Painter, w, h float64, m cartModel, st Style) cartL
 			}
 			valWide, valH, valWidths = measureLabels(p, L.valLabels, size)
 			L.val = axisScale(L.valLo, L.valHi, plot, !L.vert, L.vert)
-			if n <= 2 || c.valueFits(L, valWide, valH) {
+			if n <= 2 || c.ya.Hidden || c.valueFits(L, valWide, valH) {
 				break
 			}
 		}
 
 		// The margins hold the outer labels, the value labels on the value side, and the
-		// titles beside the axes that have them.
+		// titles beside the axes that have them. A hidden axis has none of these, so the
+		// sides it would hold keep only the inset.
 		var left, right, top, bottom float64
 		if L.vert {
-			left = float64(valWide) + valueMargin
-			bottom = float64(posH) + axisGap
-			top = math.Max(float64(valH)/2, edgePad)
-			right = math.Max(edgePad, lastOf(posWidths)/2)
-			left = math.Max(left, firstOf(posWidths)/2)
-			if c.ya.Label != "" {
-				top += title
+			left, right, top, bottom = plotInset, plotInset, plotInset, plotInset
+			if !c.ya.Hidden {
+				left = float64(valWide) + valueMargin
+				top = math.Max(float64(valH)/2, edgePad)
+				if c.ya.Label != "" {
+					top += title
+				}
 			}
-			if c.xa.Label != "" {
-				bottom += title
+			if !c.xa.Hidden {
+				bottom = float64(posH) + axisGap
+				right = math.Max(edgePad, lastOf(posWidths)/2)
+				left = math.Max(left, firstOf(posWidths)/2)
+				if c.xa.Label != "" {
+					bottom += title
+				}
 			}
 		} else {
-			left = float64(posWide) + valueMargin
-			bottom = float64(valH) + axisGap
-			top = math.Max(float64(posH)/2, edgePad)
-			right = math.Max(edgePad, lastOf(valWidths)/2)
-			left = math.Max(left, firstOf(valWidths)/2)
-			if c.xa.Label != "" {
-				top += title
+			left, right, top, bottom = plotInset, plotInset, plotInset, plotInset
+			if !c.xa.Hidden {
+				left = float64(posWide) + valueMargin
+				top = math.Max(float64(posH)/2, edgePad)
+				if c.xa.Label != "" {
+					top += title
+				}
 			}
-			if c.ya.Label != "" {
-				bottom += title
+			if !c.ya.Hidden {
+				bottom = float64(valH) + axisGap
+				right = math.Max(edgePad, lastOf(valWidths)/2)
+				left = math.Max(left, firstOf(valWidths)/2)
+				if c.ya.Label != "" {
+					bottom += title
+				}
 			}
 		}
 		plot = rect{x0: left, y0: top, x1: w - right, y1: h - bottom}
@@ -446,8 +466,14 @@ func (c *Chart) paintCartesian(v *view, p *ui.Painter, w, h float32) {
 	c.paintAxes(v, p, L)
 }
 
+// valueGrid reports whether the value axis draws its grid lines: always when its Grid is
+// GridOn, and under GridAuto only while the axis is shown.
+func (c *Chart) valueGrid() bool {
+	return c.ya.Grid == GridOn || c.ya.Grid == GridAuto && !c.ya.Hidden
+}
+
 // paintGrid draws the grid lines: the value axis's by default, and the position axis's
-// where its Grid is GridOn.
+// where its Grid is GridOn. A hidden axis draws none unless its Grid is GridOn.
 func (c *Chart) paintGrid(v *view, p *ui.Painter, L cartLayout) {
 	width := float32(v.st.Grid.BorderWidth)
 	if width == 0 {
@@ -455,7 +481,7 @@ func (c *Chart) paintGrid(v *view, p *ui.Painter, L cartLayout) {
 	}
 	plot := L.plot
 	path := ui.NewPath()
-	if c.ya.Grid != GridOff {
+	if c.valueGrid() {
 		for _, t := range L.valTicks {
 			a := L.val.at(t)
 			if L.vert {
@@ -480,41 +506,53 @@ func (c *Chart) paintGrid(v *view, p *ui.Painter, L cartLayout) {
 
 // paintAxes draws the axis lines, the tick labels and the axis titles. The value axis
 // is at the left of a vertical chart and the bottom of a horizontal one; the position
-// axis is at the bottom of a vertical chart and the left of a horizontal one.
+// axis is at the bottom of a vertical chart and the left of a horizontal one. A hidden
+// axis draws none of these.
 func (c *Chart) paintAxes(v *view, p *ui.Painter, L cartLayout) {
 	size := axisFont(v.st)
 	text := v.st.Axis.TextColor
 	plot := L.plot
 	line := ui.StrokeStyle{Width: 1, Color: v.t.BorderStrong}
 	x0, x1, y0, y1 := float32(plot.x0), float32(plot.x1), float32(plot.y0), float32(plot.y1)
-	if L.vert {
-		p.Stroke(ui.NewPath().MoveTo(x0, y0).LineTo(x0, y1), line)
-		p.Stroke(ui.NewPath().MoveTo(x0, y1).LineTo(x1, y1), line)
-	} else {
-		p.Stroke(ui.NewPath().MoveTo(x0, y1).LineTo(x1, y1), line)
-		p.Stroke(ui.NewPath().MoveTo(x0, y0).LineTo(x0, y1), line)
+	left := ui.NewPath().MoveTo(x0, y0).LineTo(x0, y1)
+	bottom := ui.NewPath().MoveTo(x0, y1).LineTo(x1, y1)
+	valueLine, posLine := left, bottom
+	if !L.vert {
+		valueLine, posLine = bottom, left
 	}
-	for i, t := range L.valTicks {
-		if L.vert {
-			p.Text(x0-axisGap, float32(L.val.at(t)), L.valLabels[i],
-				ui.TextFormat{FontSize: size, Color: text, Align: ui.End, VAlign: ui.Center})
-		} else {
-			p.Text(float32(L.val.at(t)), y1+axisGap, L.valLabels[i],
-				ui.TextFormat{FontSize: size, Color: text, Align: ui.Center, VAlign: ui.Start})
+	if !c.ya.Hidden {
+		p.Stroke(valueLine, line)
+		for i, t := range L.valTicks {
+			if L.vert {
+				p.Text(x0-axisGap, float32(L.val.at(t)), L.valLabels[i],
+					ui.TextFormat{FontSize: size, Color: text, Align: ui.End, VAlign: ui.Center})
+			} else {
+				p.Text(float32(L.val.at(t)), y1+axisGap, L.valLabels[i],
+					ui.TextFormat{FontSize: size, Color: text, Align: ui.Center, VAlign: ui.Start})
+			}
 		}
 	}
-	for i, t := range L.posTicks {
-		if L.vert {
-			p.Text(float32(L.pos.at(t)), y1+axisGap, L.posLabels[i],
-				ui.TextFormat{FontSize: size, Color: text, Align: ui.Center, VAlign: ui.Start})
-		} else {
-			p.Text(x0-axisGap, float32(L.pos.at(t)), L.posLabels[i],
-				ui.TextFormat{FontSize: size, Color: text, Align: ui.End, VAlign: ui.Center})
+	if !c.xa.Hidden {
+		p.Stroke(posLine, line)
+		for i, t := range L.posTicks {
+			if L.vert {
+				p.Text(float32(L.pos.at(t)), y1+axisGap, L.posLabels[i],
+					ui.TextFormat{FontSize: size, Color: text, Align: ui.Center, VAlign: ui.Start})
+			} else {
+				p.Text(x0-axisGap, float32(L.pos.at(t)), L.posLabels[i],
+					ui.TextFormat{FontSize: size, Color: text, Align: ui.End, VAlign: ui.Center})
+			}
 		}
 	}
 
 	h := float32(v.geo.h)
 	valueTitle, posTitle := c.ya.Label, c.xa.Label
+	if c.ya.Hidden {
+		valueTitle = ""
+	}
+	if c.xa.Hidden {
+		posTitle = ""
+	}
 	if L.vert {
 		if valueTitle != "" {
 			p.Text(x0, 2, valueTitle, ui.TextFormat{FontSize: size, Color: text, Align: ui.Start, VAlign: ui.Start})

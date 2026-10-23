@@ -68,6 +68,7 @@ import (
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/ease"
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/internal/layout"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -75,6 +76,10 @@ import (
 // from left to right, and its bars, slices and candles grow from their base. A
 // reduced motion setting skips it.
 const enterDuration = 600 * time.Millisecond
+
+// minCanvasHeight is the smallest height of a chart's drawing, in logical pixels, unless
+// the chart is sized to less (see canvasMinHeight).
+const minCanvasHeight = 120
 
 // kind is the type of a chart.
 type kind uint8
@@ -481,7 +486,7 @@ func (c *Chart) canvas(v *view, hidden *ui.Signal[[]bool], pointer *ui.Signal[po
 	}
 	el := ui.Canvas(func(p *ui.Painter, w, h float32) {
 		c.paint(v, p, w, h)
-	}).Size(ui.Full, ui.Auto).Grow(1).MinHeight(ui.Px(120)).Label(name).Focusable()
+	}).Size(ui.Full, ui.Auto).Grow(1).MinHeight(c.canvasMinHeight()).Label(name).Focusable()
 	el.FocusVisible(ui.Style{BorderWidth: 2, BorderColor: v.t.FocusRing})
 	el.OnMouseMove(func(e *ui.MouseEvent) {
 		pointer.Set(pointerAt{on: true, x: e.LocalX, y: e.LocalY})
@@ -516,6 +521,16 @@ func (c *Chart) canvas(v *view, hidden *ui.Signal[[]bool], pointer *ui.Signal[po
 		e.StopPropagation()
 	})
 	return el.Child(c.hoverLayer(v, pointer, cursor, focused))
+}
+
+// canvasMinHeight returns the smallest height of the drawing: 120 pixels, so that a plot
+// stays readable in a chart with no height of its own. A chart sized in pixels to less
+// than that is drawn at its own height, as a sparkline is.
+func (c *Chart) canvasMinHeight() ui.Length {
+	if c.size.h.Unit == layout.UnitPx && c.size.h.Value < minCanvasHeight {
+		return c.size.h
+	}
+	return ui.Px(minCanvasHeight)
 }
 
 // hoverLayer returns the marks of the pointer and the keyboard position, and

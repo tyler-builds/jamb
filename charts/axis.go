@@ -17,6 +17,12 @@ type Axis struct {
 	// Grid says whether the axis draws grid lines across the plot. GridAuto draws
 	// them on the value axis only.
 	Grid GridLines
+	// Hidden hides the axis: it draws no axis line, tick labels or title, and the
+	// chart reserves no margin for them. With GridAuto it draws no grid lines either;
+	// GridOn still draws them. The ticks still set the range, so Min and Max still
+	// apply. It does nothing on a pie, donut, radar or Sankey chart. A line or area
+	// with both axes hidden, no legend and no title is a sparkline.
+	Hidden bool
 
 	min, max       float64
 	hasMin, hasMax bool

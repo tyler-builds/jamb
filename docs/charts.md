@@ -61,8 +61,34 @@ index in `Data`.
 the ends of the range. Tick labels are measured with the painter, so the margins hold them,
 and labels that would overlap are thinned out.
 
+`Hidden` hides an axis. A hidden axis draws no axis line, tick labels or title, and the
+chart reserves no margin for them. With `GridAuto` it draws no grid lines, and `GridOn`
+still draws them. Its ticks still set the range, so `Min` and `Max` still apply. `Hidden`
+applies to line, area, bar, scatter and candlestick charts; a pie, donut, radar or Sankey
+chart has no axes to hide, and it does nothing to them.
+
 Tooltips, the summary and the keyboard announcements format times the same way.
 Use `Axis.Format` or `Chart.Format` for another form.
+
+### Sparklines
+
+A sparkline is a line or an area with both axes hidden, no legend and no title. Fix the
+range, so that tiles that show the same measure share a scale, and give it a small height:
+
+```go
+charts.Line(cpu).
+	XAxis(charts.Axis{Hidden: true}).
+	YAxis(charts.Axis{Hidden: true}.Min(0).Max(100)).
+	Legend(charts.LegendNone).
+	Height(ui.Px(40))
+```
+
+With nothing else drawn, the plot fills the chart, inset by 7 pixels: the keyboard ring
+reaches that far about a point on the plot's edge, and the line and marker strokes need
+less. A chart 36 pixels high draws at that height. A chart sized in pixels to less than
+120 pixels is drawn at its own height, not at the 120-pixel minimum of a plot. The chart
+part has no padding by default. A theme that adds padding to it can be overridden with
+`Styles(charts.Style{Chart: ui.Style{...}})`.
 
 ## Interaction
 
