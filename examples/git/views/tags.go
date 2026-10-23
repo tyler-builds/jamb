@@ -80,7 +80,5 @@ func kindText(g repo.Ref) string {
 }
 
 func (a *App) revealTag(ctx *ui.Context, r *store.Repo, g repo.Ref) {
-	if !a.selectCommit(r, g.Target) {
-		ctx.Toast(ui.ToastInfo, g.Name+" is further back than the history loaded so far.")
-	}
+	a.revealCommit(ctx, r, g.Target, g.Name)
 }

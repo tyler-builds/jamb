@@ -247,7 +247,7 @@ app, it is built only from the public API to find gaps in it.
   repositories, the pane widths, the theme and the zoom are kept in
   `jamb-git\settings.json` in the user's configuration folder.
 - Shortcuts: Ctrl+P (go to a branch, tag or commit, a quick open built on the command
-  palette's items), F5 or Ctrl+R (refresh), Ctrl+H (go to HEAD), Ctrl+Shift+C (copy
+  palette's items; a target further back than the history loaded so far loads the history until it is there), F5 or Ctrl+R (refresh), Ctrl+H (go to HEAD), Ctrl+Shift+C (copy
   the selected commit's hash), Ctrl+1 and Ctrl+2 (history and tags), Ctrl+K or
   Ctrl+Shift+P (command palette), Ctrl+Shift+I (the visual inspector).
 - The tests in `examples/git/views` build a small repository with `git` in a

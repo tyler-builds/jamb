@@ -64,9 +64,6 @@ type App struct {
 	goTo    *ui.Signal[bool] // the Go to palette is open
 	// themeChoice is "light", "dark" or "" to follow Windows.
 	themeChoice *ui.Signal[string]
-	// repoSel is the repository list's selection, the store's Current as a list
-	// box holds it. syncRepos copies Current into it after each change.
-	repoSel *ui.Signal[[]string]
 }
 
 // Root returns the window's render function.
@@ -84,8 +81,7 @@ func Root(s *store.Store, layout Layout, theme *ui.Signal[string]) func(*ui.Cont
 		theme = ui.NewSignal("")
 	}
 	a := &App{s: s, layout: layout, views: map[string]*view{}, search: ui.NewFocusHandle(),
-		palette: ui.NewSignal(false), goTo: ui.NewSignal(false), themeChoice: theme, repoSel: ui.NewSignal([]string(nil))}
-	a.syncRepos()
+		palette: ui.NewSignal(false), goTo: ui.NewSignal(false), themeChoice: theme}
 	sidebarSize := ui.NewSignal(ui.Px(float32(layout.Sidebar.Peek())))
 	return func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
@@ -119,7 +115,8 @@ func Root(s *store.Store, layout Layout, theme *ui.Signal[string]) func(*ui.Cont
 			Child(a.statusBar()).
 			Child(ui.CommandPalette(a.palette).Placeholder("Type a command or search…")).
 			Child(ui.CommandPalette(a.goTo).Key("go-to").ItemsOnly().
-				Placeholder("Go to a branch, tag or commit; > for commands").Items(a.goToItems)).
+				Placeholder("Go to a branch, tag or commit; > for commands").
+				Items(func(q string) []ui.PaletteItem { return a.goToItems(ctx, q) })).
 			Child(ui.Toaster().Key("toaster"))
 	}
 }
@@ -154,15 +151,6 @@ func (a *App) current() (*store.Repo, *view) {
 	return r, a.viewOf(r)
 }
 
-// syncRepos makes the repository list select the store's current repository.
-func (a *App) syncRepos() {
-	var sel []string
-	if cur := a.s.Current.Peek(); cur != "" {
-		sel = []string{cur}
-	}
-	a.repoSel.Set(sel)
-}
-
 func (a *App) changed() {
 	if a.layout.OnChange != nil {
 		a.layout.OnChange()
@@ -188,7 +176,6 @@ func (a *App) openPath(ctx *ui.Context, path string) {
 				return
 			}
 			a.s.Add(info.Root)
-			a.syncRepos()
 			a.changed()
 		})
 	}()
@@ -221,7 +208,6 @@ func (a *App) cycle(by int) {
 	}
 	i := slices.IndexFunc(repos, func(r *store.Repo) bool { return r.Path == a.s.Current.Peek() })
 	a.s.Current.Set(repos[((i+by)%len(repos)+len(repos))%len(repos)].Path)
-	a.syncRepos()
 	a.changed()
 }
 
@@ -237,6 +223,23 @@ func (a *App) selectCommit(r *store.Repo, hash string) bool {
 	r.Selected.Set([]string{hash})
 	v.grid.ScrollToRow(hash)
 	return true
+}
+
+// revealCommit selects the commit hash in the history and scrolls to it. When it
+// is further back than the pages loaded so far, the history loads until it is
+// there (the status bar shows the load); name is what the message says was not
+// found, if the history ends first.
+func (a *App) revealCommit(ctx *ui.Context, r *store.Repo, hash, name string) {
+	if a.selectCommit(r, hash) {
+		return
+	}
+	r.LoadUntil(hash, func(found bool) {
+		ctx.Post(func() {
+			if !found || !a.selectCommit(r, hash) {
+				ctx.Toast(ui.ToastWarning, name+" is not in the history of any branch.")
+			}
+		})
+	})
 }
 
 func (a *App) goHead() {
@@ -325,7 +328,7 @@ const goToMax = 200
 
 // goToItems lists the shown repository's branches, tags and loaded commits that
 // match the query, refs first. Choosing one selects its commit in the history.
-func (a *App) goToItems(query string) []ui.PaletteItem {
+func (a *App) goToItems(ctx *ui.Context, query string) []ui.PaletteItem {
 	r, _ := a.current()
 	if r == nil {
 		return nil
@@ -346,9 +349,9 @@ func (a *App) goToItems(query string) []ui.PaletteItem {
 		case repo.Tag:
 			ic, kind = icons.Tag, "tag"
 		}
-		target := ref.Target
+		target, name := ref.Target, ref.Name
 		if !add(ui.PaletteItem{Key: "ref:" + refKey(ref), Label: ref.Name, Detail: kind, Icon: ic,
-			Run: func() { a.selectCommit(r, target) }}, "", ref.Name, "") {
+			Run: func() { a.revealCommit(ctx, r, target, name) }}, "", ref.Name, "") {
 			return items
 		}
 	}
