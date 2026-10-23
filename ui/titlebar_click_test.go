@@ -70,3 +70,27 @@ func TestTitleBarButtonAreasAreThePlatforms(t *testing.T) {
 		}
 	}
 }
+
+// The title-bar buttons take the height of their bar, so in a tall bar they reach
+// its top and bottom edges, even in a bar that centers its children. A bar sized
+// by its content (bar 0 here) gets buttons 32 px high.
+func TestTitleBarButtonsFillTheBar(t *testing.T) {
+	for _, c := range []struct{ bar, want float32 }{{44, 44}, {32, 32}, {0, 32}} {
+		r := newAccessRig(func(ctx *Context) Element {
+			bar := Div().Row().Align(Center).Child(Div().Grow(1)).Child(TitleBarButtons())
+			if c.bar > 0 {
+				bar.Height(Px(c.bar))
+			}
+			return Div().Column().Child(bar)
+		})
+		for _, k := range []string{"Minimize", "Maximize", "Close"} {
+			rc, ok := r.rt.Find(k)
+			if !ok {
+				t.Fatalf("no %s button", k)
+			}
+			if rc.Y != 0 || rc.H != c.want || rc.W != 46 {
+				t.Errorf("in a %v px bar, %s is %vx%v at y %v, want 46x%v at y 0", c.bar, k, rc.W, rc.H, rc.Y, c.want)
+			}
+		}
+	}
+}

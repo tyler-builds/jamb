@@ -409,8 +409,10 @@ func (rt *Runtime) SetWindow(w Window) { rt.windowCtl = w }
 func (rt *Runtime) hostSetMaximized(on bool) { rt.maximized.Set(on) }
 
 // TitleBarButtons returns the minimize, maximize-or-restore and close buttons
-// of a custom title bar, for its right end. They are sized like Windows 11's
-// (46×32 logical pixels each) and their areas are marked, so the native hit
+// of a custom title bar, for its right end. They are 46 logical pixels wide, as
+// Windows 11's are, and take the height of the bar they are in, so in a taller bar
+// they still reach its top and bottom edges and the close button's red meets the
+// window's corner. A bar whose height comes from its content gets 32 px buttons. Their areas are marked, so the native hit
 // testing presses them, shows Snap Layouts over the maximize button, and
 // performs their actions on release. The close button turns red on hover.
 func TitleBarButtons() Element {
@@ -424,7 +426,7 @@ func TitleBarButtons() Element {
 		}
 		// key is the identity of the button, which stays English; label is its text.
 		button := func(ic *icons.Icon, area WindowArea, key, label string) *DivElement {
-			d := Div().Key(key).Width(Px(46)).Height(Px(32)).Center().
+			d := Div().Key(key).Width(Px(46)).MinHeight(Px(32)).AlignSelf(Stretch).Center().
 				TextColor(t.TextMuted).Transition(120 * time.Millisecond).
 				Hover(Style{Background: t.SurfaceHover, TextColor: t.Text}).
 				Pressed(Style{Background: t.SurfaceActive, TextColor: t.Text}).
@@ -453,7 +455,8 @@ func TitleBarButtons() Element {
 		closeButton := button(icons.X, WindowAreaClose, "Close", strs.Close).
 			Hover(Style{Background: Hex("#e81123"), TextColor: Hex("#ffffff")}).
 			Pressed(Style{Background: Hex("#f1707a"), TextColor: Hex("#ffffff")})
-		return Div().Row().Height(Px(32)).
+		// The row stretches to the bar's height, whatever the bar aligns its children to.
+		return Div().Row().MinHeight(Px(32)).AlignSelf(Stretch).
 			Child(button(icons.Minimize, WindowAreaMinimize, "Minimize", strs.Minimize)).
 			Child(button(maximize, WindowAreaMaximize, maximizeKey, maximizeLabel)).
 			Child(closeButton)

@@ -207,6 +207,9 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 
 ### Fixed
 
+- `ui.TitleBarButtons` take the height of the title bar they are in. They were always 32 px high, so
+  in a taller bar they sat in its middle with the bar above and below them, and the close button's
+  red did not reach the window's corner. A bar sized by its content still gets 32 px buttons.
 - A window's first frame is drawn before the window is shown. Since an earlier change, the frame was
   skipped while the window was hidden, so the window appeared with no content and was painted only
   after it was shown.
