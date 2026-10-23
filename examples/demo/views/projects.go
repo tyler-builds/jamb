@@ -96,7 +96,7 @@ func projectCard(t *ui.Theme, s *Store, p Project, selected, open bool) ui.Eleme
 
 	// The card takes focus, so Enter selects it and Shift+F10 opens its menu.
 	card := ui.Div().Key(fmt.Sprint(p.ID)).Role(access.RoleListItem).AccessSelected(selected).
-		Focusable().FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).Row().Align(ui.Center).Gap(16).Padding(16).Radius(12).
+		Focusable().Row().Align(ui.Center).Gap(16).Padding(16).Radius(12).
 		Background(t.Surface).Border(1, t.Border).Shadow(ui.ShadowSm).Transition(150*time.Millisecond).
 		Hover(ui.Style{BorderColor: t.BorderStrong, Background: t.SurfaceHover}).
 		When(selected, func(d *ui.DivElement) {

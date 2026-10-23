@@ -103,7 +103,6 @@ func Sidebar(s *Store) ui.Element {
 					}
 					d.Background(t.SurfaceActive).TextColor(on)
 				}).
-				FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
 				Focusable().
 				OnClick(func() { s.Page.Set(p) }).
 				Child(ui.Icon(ic).Size(17)).

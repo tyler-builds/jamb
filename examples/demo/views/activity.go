@@ -253,7 +253,7 @@ func eventRow(t *ui.Theme, s *Store, e event, compact, open bool, query string) 
 		if open {
 			chevron = icons.ChevronDown
 		}
-		row.Focusable().FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
+		row.Focusable().
 			AccessExpanded(open).
 			OnClick(func() { s.ToggleExpanded(e.id) }).
 			Child(ui.Icon(chevron).Size(14).Color(t.TextSubtle).Style(ui.Style{Margin: ui.Edges{Top: 2}}))

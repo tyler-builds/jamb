@@ -204,6 +204,13 @@ func (d *DivElement) FocusVisible(s Style) *DivElement {
 	return d
 }
 
+// defaultFocusRing reports whether the element shows the standard focus ring while
+// it has keyboard focus: it is focusable and has an OnClick, and it sets no
+// FocusVisible style of its own. The ring is the one the built-in controls draw.
+func (d *DivElement) defaultFocusRing() bool {
+	return d.focusVisible == nil && d.focusable && d.h.onClick != nil
+}
+
 // FocusWithin merges s on top while the element or any descendant has
 // keyboard focus — for example to highlight a field's frame while the text
 // inside it is being edited.
