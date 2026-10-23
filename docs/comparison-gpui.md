@@ -425,7 +425,7 @@ GPUI Kit's component page lists 69 components in four groups. The jamb column na
 
 In total, 9 of the 69 listed components have no jamb equivalent, six of them the chat and survey components.
 
-The component page also links AlertDialog, Clipboard, Empty, Focus Trap, HoverCard, Input Group, Plot, Shimmer, Table and TitleBar from its sidebar. jamb has `Empty`, `HoverCard`, `Canvas` for custom plots and `TitleBarButtons`. It has `AlertDialog`, but no copy-to-clipboard button (it has clipboard access), no public focus trap (`Modal` and `Drawer` trap focus internally), no input group, no shimmer text and no declarative table (a grid `Div` with `AccessGrid` comes closest).
+The component page also links AlertDialog, Clipboard, Empty, Focus Trap, HoverCard, Input Group, Plot, Shimmer, Table and TitleBar from its sidebar. jamb has `Empty`, `HoverCard`, `Canvas` for custom plots, `TitleBar` and `TitleBarButtons`. It has `AlertDialog` and `CopyButton`, but no public focus trap (`Modal` and `Drawer` trap focus internally), no input group, no shimmer text and no declarative table (a grid `Div` with `AccessGrid` comes closest).
 
 GPUI Kit's source has more than the component page lists: `ButtonGroup`, a standalone `Link`, `Breadcrumb`, `AppMenuBar` and `NativeMenu`, a searchable list engine, `History` and `UndoHistory`, and an indeterminate checkbox and a range slider in `gpui-base`. jamb's `Breadcrumbs`, `MenuBar`, `CheckboxTri` and `RangeSlider` correspond to some of these. What jamb has and GPUI Kit does not is mostly Windows integration: the tray (`NewTray`), jump lists, taskbar progress and badges, single instance, native file and message dialogs (`dialog`), and a title bar with Windows 11 caption buttons and Snap Layouts.
 
@@ -482,7 +482,7 @@ Each row lists options that one side has and the other lacks; options both have 
 | Scrolling | Scrollbar modes (on scroll, on hover, always), a scroll handle for any area, a horizontal virtual list | `ListOf` with rows of any height that keeps its anchor, chat-style bottom anchoring, `OnAtEnd` |
 | Theme | JSON themes loaded at run time and reloaded from a watched folder; about 135 color tokens plus radius, spacing, shadow, font and motion tokens | A high-contrast theme from the Windows system colors, light and dark that follow Windows live, theme styles per widget |
 | GroupBox, DescriptionList, Toolbar | A group-box footer and borderless variant; item spans and label width; toolbar groups, a disabled toolbar, one size for all items | A group-box description; toolbar separators |
-| TitleBar, FocusTrap | A title-bar container that pads for each platform; `.focus_trap()` on any element | Windows 11 caption buttons with Snap Layouts, native resize borders |
+| TitleBar, FocusTrap | Padding for each platform; `.focus_trap()` on any element | A slot centered on the window that never covers the sides, dimming while the window is in the background, Windows 11 caption buttons with Snap Layouts, native resize borders |
 | Settings | A settings component: pages, groups and items with search keywords, reset, and built-in field types | None |
 
 **Advanced**
@@ -510,7 +510,7 @@ Each row lists options that one side has and the other lacks; options both have 
 | Actions and keybindings | Typed actions and context predicates; the app supplies any user keymap file | Typed actions and contexts; a built-in JSON keymap file with hot reload |
 | Focus | Focus handles, tab order, a focus trap for any element | Focus handles, tab order, focus-visible and focus-within styles; traps only in `Modal` and `Drawer` |
 | Animation | Transitions, springs, keyframes, sequences, presence, stagger, motion tokens | Transitions, springs, keyframes, timelines, enter and exit animations, delays, stagger, motion tokens; reduced motion honoured |
-| Icons | 101 icons, plus the Lucide set (about 1,800) on request | 58 icons and an `SVG` element |
+| Icons | 101 icons, plus the Lucide set (about 1,800) on request | The Lucide set (1,903 icons, 1.61.0), each linked only when the app names it, and an `SVG` element |
 | Text selection | Across the text elements of a window; touch selection | Within one text element |
 | Undo history | Public `History` and `UndoHistory` types | Inside text fields and the code editor only |
 | Unstyled layer | `gpui-base`: about 40 primitives with behaviour and no styles | None; widgets are styled, with per-part styles and render slots |
