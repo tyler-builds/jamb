@@ -7,6 +7,7 @@ jamb to an app; the other pages cover one topic each.
 
 - [Getting started](getting-started.md): requirements, the bundled examples, and adding jamb to an app.
 - [Concepts](concepts.md): the element tree, the builder API, state and keys, the UI thread, and errors.
+- [Loading data](data.md): `ui.Query`, keyed data fetched off the UI thread, with retries, staleness, invalidation and tests.
 - [Layout](layout.md): shrinking, grid layout, split panes, and docking.
 - [Input](input.md): keyboard and focus, text fields and the clipboard, actions and key bindings, events, drag and drop, and gestures.
 - [Windows and dialogs](windows.md): windows, zoom, custom title bars, and native dialogs.
