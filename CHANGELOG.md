@@ -18,6 +18,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   shows a size in bytes as Windows Explorer shows it, such as "1.23 GB". Its units are the
   `Byte`, `Bytes` and `KB` to `PB` fields of `Strings`, English in every built-in pack. See
   docs/text.md.
+- Tree rows in `ui.DataGrid`: `Children(fn)` makes the rows a tree, with a chevron that opens and
+  closes a row in the first column, and `Expanded`, `OnExpand` and `OnCollapse` keep and report
+  the open rows as `ui.Tree` does. Siblings sort within their level, Left and Right open and close
+  rows, and assistive technology reports each row's level and place among its siblings. The
+  indent and chevron are the `TreeIndent` and `TreeChevron` parts of `DataGridStyle`. See
+  docs/widgets-data.md.
 - `app.FileIcon(path, size)` returns the icon Windows shows for a file, as File Explorer and
   Task Manager show it: an executable's own icon at the size asked for, or the icon of the file's
   type. See docs/os-integration.md.

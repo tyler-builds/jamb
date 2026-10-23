@@ -123,7 +123,7 @@ The grid's methods:
 - `Movable()`: lets the user move every column, as `DataColumn.Movable` does for one.
 - `Handle(h)`: a `ui.NewDataGridHandle()` scrolls the grid from code by key: `ScrollToRow(key)` in the sorted order, `ScrollToColumn(key)`, and `FocusCell(rowKey, colKey)`, which moves the focused cell, scrolls it into view and focuses the grid without changing the selection. A request applies at the grid's next build; a key that names nothing does nothing.
 - `ContextMenu(build)` and `HeaderContextMenu(build)`: menus built with the row and the column key, or the column key of a header. A right-press on a row that is not selected moves the focus there and selects the row; on a selected row it keeps the selection, as File Explorer does. Shift+F10 or the Menu key opens the menu of the focused cell, or of the header cell while the focus is on the header. An empty result opens nothing.
-- `LoadMore(hasMore, fn)` and `LoadingMore(on)`: while `hasMore` is true, `fn` runs once when the rows within a viewport of the end are built, or when Down, PageDown or Ctrl+End is pressed on the last row, and again only after the number of rows changes. It runs after the frame, never while the grid is built. `LoadingMore(true)` shows a row after the last one with a small progress ring and "Loading more rows" (`Strings.LoadingMore`), announced politely; it is not one of the grid's rows for assistive technology.
+- `LoadMore(hasMore, fn)` and `LoadingMore(on)`: while `hasMore` is true, `fn` runs once when the rows within a viewport of the end are built, or when Down, PageDown or Ctrl+End is pressed on the last row, and again only after the number of rows changes. In a tree the rows counted are every row given, children included, so opening or closing a row does not ask again. It runs after the frame, never while the grid is built. `LoadingMore(true)` shows a row after the last one with a small progress ring and "Loading more rows" (`Strings.LoadingMore`), announced politely; it is not one of the grid's rows for assistive technology.
 - `Sort(s)`: the `ui.SortState` (`Key` and `Desc`) in `s`. A click on a header cycles the column through ascending, descending and not sorted. A nil `s` keeps the sort in the grid.
 - `OnActivate(fn)`: runs `fn` with the row, on Enter or a double-click.
 - The look of the states is a fill or a line, not a change of weight: a selected row has the `RowSelected` fill, a sorted column has its arrow (`SortIndicator`), and the text keeps its weight.
@@ -138,7 +138,7 @@ Rows are identified by their keys, which must be unique and stable. The focus, t
 
 | Key | Action |
 | --- | --- |
-| Left, Right | Previous and next column |
+| Left, Right | Previous and next column. In a tree, in the first column, they open and close rows (see Tree rows) |
 | Home, End | First and last column of the row |
 | Ctrl+Home, Ctrl+End | First and last cell of the grid |
 | Down, Up | Next and previous row. Up from the first row moves to the header; Down from the header moves to the first row |
@@ -197,7 +197,7 @@ The cell's `Text`, when it is set, is still the cell's accessible name in an int
 
 Alt is not used by the grid, so the host keeps its menu and navigation keys.
 
-**Mouse.** A click selects a row: Ctrl toggles it and Shift extends the selection from the anchor. With `CellSelection` a click selects a cell, Ctrl+click toggles it, and Shift+click selects the rectangle from the anchor cell. A double-click activates the row. A click on a header cell sorts. Dragging the edge of a resizable header cell resizes its column, and the cursor is the east-west resize cursor over the edge. A double-click on the edge fits the column to the text of the rows in view. Dragging a movable header cell moves its column: a line (`DropIndicator`) shows the side of the header under the pointer that it lands on, and a press that does not move 4 px is still a click that sorts. A right-press opens the context menu (see `ContextMenu`).
+**Mouse.** A click selects a row: Ctrl toggles it and Shift extends the selection from the anchor. With `CellSelection` a click selects a cell, Ctrl+click toggles it, and Shift+click selects the rectangle from the anchor cell. A double-click activates the row. A click on a header cell sorts. Dragging the edge of a resizable header cell resizes its column, and the cursor is the east-west resize cursor over the edge. A double-click on the edge fits the column to the text of the rows in view; in a tree's first column the fit includes each row's indent and chevron. Dragging a movable header cell moves its column: a line (`DropIndicator`) shows the side of the header under the pointer that it lands on, and a press that does not move 4 px is still a click that sorts. A right-press opens the context menu (see `ContextMenu`).
 
 **Pinned columns.** A pinned column stays at its end of the grid while the others scroll under it. Its cells are filled with the grid's background and then their row's fill, so a hovered, selected or striped row shows through them; `CellPinned` styles them, and `PinnedEdge` is the cell at the inner edge of the pinned columns, with a 1 px border by default. A column that the focus moves to, or that `ScrollToColumn` names, is scrolled clear of the pinned columns.
 
@@ -205,4 +205,50 @@ Alt is not used by the grid, so the host keeps its menu and navigation keys.
 
 **Sorting.** A sort of 100,000 rows takes about 8 ms in the benchmark (`BenchmarkDataGridSort100k`), which is under the 50 ms at which a sort would move to a worker thread, so the sort runs on the UI thread. Only one column sorts at a time: Shift+click does not add a second sort (see `docs/accessibility-design-phases-i-m.md`, Phase I).
 
-**Accessibility.** The grid is a `DataGrid` control with the Grid and Table patterns. Its `RowCount` is every row of the data, built or not, and its `ColumnCount` is the number of columns. Each cell is a `DataItem` with the GridItem and TableItem patterns, and each row is a `ListItem` with the SelectionItem pattern. Each header cell is a `HeaderItem` that Invoke sorts, with its sort state in its name ("Duration, sorted descending") and in its ItemStatus. Selection uses the Selection pattern, which says whether it takes many items; with `CellSelection` the cells are its items, and the rows are not. The columns are numbered in the order they are shown, so a moved or pinned column changes its column number. GetItem answers only for the cells that are built: a row out of view, or a column out of view in a grid wider than its view, gives nothing, and the client scrolls the grid to it. See `docs/accessibility-design-phases-i-m.md`, Phase I.
+**Accessibility.** The grid is a `DataGrid` control with the Grid and Table patterns. Its `RowCount` is every row of the data, built or not, and its `ColumnCount` is the number of columns. Each cell is a `DataItem` with the GridItem and TableItem patterns, and each row is a `ListItem` with the SelectionItem pattern. Each header cell is a `HeaderItem` that Invoke sorts, with its sort state in its name ("Duration, sorted descending") and in its ItemStatus. Selection uses the Selection pattern, which says whether it takes many items; with `CellSelection` the cells are its items, and the rows are not. The columns are numbered in the order they are shown, so a moved or pinned column changes its column number. GetItem answers only for the cells that are built: a row out of view, or a column out of view in a grid wider than its view, gives nothing, and the client scrolls the grid to it. See `docs/accessibility-design-phases-i-m.md`, Phase I. In a tree, `RowCount` is the rows shown, and a row reports its level and its place among its siblings (see Tree rows).
+
+**Tree rows.** `Children(fn)` makes the rows a tree. The rows given to `DataGrid` are the top level, and `fn` returns the children of a row, nil or empty for a row with none. A row with children shows a chevron in the first column, which opens and closes it, and its children are shown under it while it is open. Keys are unique across the whole tree. The grid computes no totals: a group row is an ordinary row that the app builds, with its summed values. The children of a row are sorted among their siblings by the sort, so a group sorts among the groups.
+
+```go
+type proc struct {
+	ID, Name string
+	Memory   uint64
+	Members  []proc
+}
+
+// A group is built by the app: its Memory is the sum of its members.
+groups := groupProcesses(procs)              // []proc, each with its Members
+open := ui.NewSignal([]string{"chrome.exe"}) // the keys of the open rows
+
+ui.DataGrid(groups, func(p proc) string { return p.ID },
+	ui.DataColumn[proc]{Header: "Name", Text: func(p proc) string { return p.Name },
+		Compare: ui.SortByText(func(p proc) string { return p.Name }), Grow: 1},
+	ui.DataColumn[proc]{Header: "Memory", Text: func(p proc) string { return ui.FormatBytes(p.Memory) },
+		Compare: ui.SortBy(func(p proc) uint64 { return p.Memory }), Align: ui.End, Width: 100},
+).Label("Processes").
+	Children(func(p proc) []proc { return p.Members }).
+	Expanded(open).
+	Sort(order)
+```
+
+- `Expanded(keys)` keeps the keys of the open rows in a signal, as `Tree.Expanded` does. The grid sets it when a row is opened or closed, and a value the app sets opens and closes those rows. A nil `keys` keeps the open rows in the grid. `OnExpand(fn)` and `OnCollapse(fn)` run with the key of a row after a click on its chevron, a key, an accessibility action or a handle request; they do not run for the keys the app sets.
+- `fn` runs for every row on each build of the grid, as a flat grid reads its rows, so that a change made in place shows. Keep it cheap, such as a field read.
+- A row that is shown is the depth-first list of the open rows and their children, so `UniformList` virtualization builds only the shown rows in view.
+
+The keys of a tree, in the first column (the first column shown, after the pins and the moves):
+
+| Key | Action |
+| --- | --- |
+| Right | On a closed row, opens it. On an open row, moves to its first child. On a row with no children, moves to the next column |
+| Left | On an open row, closes it. On a closed row or a row with no children, moves to its parent. On a top row with no parent, does nothing. In other columns, moves to the previous column |
+| `*` | Opens the closed rows among the siblings of the focused row, in any column (as in `ui.Tree`) |
+
+The chevron is a click target, and it is not a Tab stop. A press on it does not select the row. The row's indent and chevron are the `TreeIndent` and `TreeChevron` parts, 16 logical pixels each at the Text size 100 percent.
+
+- A collapse that hides the focused row, from a key, a click or the app's signal, moves the focus to the row above it that is shown, in the same column.
+- The selection keeps the keys of the rows it holds, so a selected row that a collapse hides stays selected. Ctrl+A selects the rows shown.
+- `DataGridHandle.ScrollToRow(key)` and `FocusCell(rowKey, colKey)` on a row that a collapse hides open the rows above it through the `Expanded` signal, then scroll to it.
+- An edit of a row that the app hides, by setting the `Expanded` keys, saves its pending value as a blur does: the row is found in the tree, and `Edit` runs for it after the frame. A save that fails is announced and the edit ends, and the collapse is not held back. A click on a chevron saves an open edit first, as a click elsewhere in the grid does.
+- Context menus, cell selection, pinned and moved columns and LoadMore all work on the shown rows.
+
+Assistive technology reports each row with its level (`AccessLevel`), its place among its siblings and the size of their set (`AccessPosition`). A row with children is expandable: it reports whether it is open, and its expand and collapse actions open and close it. The chevron is hidden from assistive technology, since the row carries the state. A row is a `ListItem` as in a flat grid. The grid's `RowCount` is the rows shown. The decision is recorded in `docs/accessibility-design-phases-i-m.md`.

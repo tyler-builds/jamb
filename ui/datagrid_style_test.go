@@ -21,6 +21,7 @@ func partDataGrid(n int, st DataGridStyle, sel *Signal[[]string], sort *Signal[S
 func testDataGridParts(t *testing.T, applied map[string]bool) {
 	testDataGridEditParts(t, applied)
 	testDataGridColumnParts(t, applied)
+	testDataGridTreeParts(t, applied)
 	type dgCase struct {
 		part  string
 		set   func(*DataGridStyle, Style)

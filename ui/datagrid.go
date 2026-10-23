@@ -199,6 +199,10 @@ const (
 // An editable cell has two more parts: CellEditing is the cell being edited, Editor
 // is its text field (a FieldStyle; FrameInvalid is its frame while the last save
 // failed), and EditorMessage is the popover under the cell that says why a save failed.
+//
+// In a tree (see Children) the first column has two parts more: TreeIndent is the
+// space of each level above a row, and TreeChevron is the chevron that opens and closes
+// a row with children, or the space it leaves for a row without.
 type DataGridStyle struct {
 	// Grid is the frame of the grid.
 	Grid Style
@@ -248,6 +252,12 @@ type DataGridStyle struct {
 	HeaderGroup Style
 	// CellSelected is a selected cell, when the grid selects cells (see CellSelection).
 	CellSelected Style
+	// TreeIndent is the space of each level above a row, in the first column of a tree
+	// (see Children).
+	TreeIndent Style
+	// TreeChevron is the chevron that opens and closes a row with children, in the first
+	// column of a tree. A row without children leaves its space empty.
+	TreeChevron Style
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -276,6 +286,8 @@ func (s DataGridStyle) merge(o DataGridStyle) DataGridStyle {
 		PinnedEdge:       s.PinnedEdge.Merge(o.PinnedEdge),
 		HeaderGroup:      s.HeaderGroup.Merge(o.HeaderGroup),
 		CellSelected:     s.CellSelected.Merge(o.CellSelected),
+		TreeIndent:       s.TreeIndent.Merge(o.TreeIndent),
+		TreeChevron:      s.TreeChevron.Merge(o.TreeChevron),
 	}
 }
 
@@ -305,6 +317,8 @@ func (s DataGridStyle) plain() DataGridStyle {
 		PinnedEdge:       plainStyle(s.PinnedEdge),
 		HeaderGroup:      plainStyle(s.HeaderGroup),
 		CellSelected:     plainStyle(s.CellSelected),
+		TreeIndent:       plainStyle(s.TreeIndent),
+		TreeChevron:      plainStyle(s.TreeChevron),
 	}
 }
 
@@ -360,6 +374,9 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 		HeaderGroup: Style{Direction: Row, Align: Center, Justify: Center, AlignSelf: Stretch, Padding: Edges{Left: 8, Right: 8},
 			NoShrink: true, OverflowX: OverflowHidden, BorderEdges: Edges{Bottom: 1}, BorderColor: t.Border},
 		CellSelected: Style{Background: t.AccentSoft},
+		// A tree's indent and chevron are 16 logical pixels wide at the Text size 100 percent.
+		TreeIndent:  Style{Width: Px(16 * textFactor), NoShrink: true},
+		TreeChevron: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(16 * textFactor), NoShrink: true, TextColor: t.TextMuted},
 	}
 	if t.HighContrast {
 		st.RowSelected = Style{Background: t.Accent, TextColor: t.AccentText}
@@ -459,6 +476,18 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 // edit keep them. Sorting is stable, and it runs on the UI thread: a sort of 100,000
 // rows takes about 8 ms (see docs/accessibility-design-phases-i-m.md, Phase I). Keys must be unique.
 //
+// With Children the rows form a tree. The rows given to DataGrid are its top level, and
+// a row with children shows a chevron in the first column, which opens and closes it.
+// On a cell of that column, Right opens a closed row and, on an open row, moves to its
+// first child; Left closes an open row and, on a row that is closed or has no children,
+// moves to its parent. Elsewhere Left and Right move between columns, as above. The
+// * key opens the closed rows among the siblings of the focused row. A row's chevron
+// is hidden from assistive technology: the row reports its level, its place among its
+// siblings and whether it is open. The rows that are shown are counted for assistive
+// technology, and Ctrl+A selects them. A collapse that hides the focused row moves the
+// focus to the row above it that is shown. A collapse that hides a row being edited
+// saves the edit, as a blur does.
+//
 // An editing row is built only while it is in view, as the other rows are, because
 // the rows of a grid are one window of the list. When the row scrolls out of view its
 // editor is not laid out, but the edit, its text and its focus are kept, and the
@@ -495,6 +524,10 @@ type DataGridElement[T any] struct {
 	cellMode    SelectionMode
 	cells       *Signal[[]CellKey]
 	selBoth     bool // both Selection and CellSelection were called, for the warning
+	children    func(row T) []T
+	expanded    *Signal[[]string] // the open rows of a tree, when the app keeps them (see Expanded)
+	onExpand    func(key string)
+	onCollapse  func(key string)
 }
 
 // Movable lets the user move every column of the grid, as DataColumn.Movable does
@@ -564,8 +597,9 @@ type dgColMark struct {
 // the end come into view, within a viewport of rows of the last one, or when Down,
 // PageDown or Ctrl+End is pressed on the last row. It runs once for each number of
 // rows, so it runs again only after the rows have changed, and it runs after the
-// frame, not while the grid is built. fn adds the rows to the data, with LoadingMore
-// shown while they load.
+// frame, not while the grid is built. In a tree the rows counted are every row given,
+// children included, so opening or closing a row does not ask again. fn adds the rows
+// to the data, with LoadingMore shown while they load.
 func (g *DataGridElement[T]) LoadMore(hasMore bool, fn func()) *DataGridElement[T] {
 	g.hasMore, g.loadMore = hasMore, fn
 	return g
@@ -694,6 +728,53 @@ func (g *DataGridElement[T]) CellSelection(mode SelectionMode, cells *Signal[[]C
 // ordered by it. A nil s keeps the sort inside the grid. A column sorts only when
 // its Compare is set.
 func (g *DataGridElement[T]) Sort(s *Signal[SortState]) *DataGridElement[T] { g.sort = s; return g }
+
+// Children makes the rows a tree: the rows given to DataGrid are the top level, and fn
+// returns the children of a row, nil or empty for a row with none. Keys must be unique
+// across the whole tree. A row with children shows a chevron that opens and closes it,
+// and its children are shown under it while it is open (see Expanded). The rows and
+// their children are read on each build of the grid, as a flat grid reads its rows, so a
+// change made in place shows; fn therefore runs for each row on each build, and should be
+// cheap, such as a field read. The grid computes no totals: a group row is an ordinary row
+// that the app builds, with its summed values.
+//
+// The children of a row are sorted within their level by the sort (see Sort), so a
+// group sorts among the groups and a child among its siblings.
+//
+//	ui.DataGrid(groups, func(g Group) string { return g.Key },
+//		ui.DataColumn[Group]{Header: "Name", Text: func(g Group) string { return g.Name }},
+//		ui.DataColumn[Group]{Header: "Memory", Text: func(g Group) string { return g.Memory }}).
+//		Children(func(g Group) []Group { return g.Members })
+func (g *DataGridElement[T]) Children(fn func(row T) []T) *DataGridElement[T] {
+	g.children = fn
+	return g
+}
+
+// Expanded keeps the keys of the open rows of a tree in keys: the grid sets it when a
+// row is opened or closed, and a value the app sets in keys opens those rows and closes
+// the others. A nil keys keeps the open rows inside the grid. The keys are kept in the
+// order the rows were opened; closing a row keeps the keys of the rows below it, so
+// opening it again shows them open. A DataGridHandle that scrolls to a row opens the
+// rows above it (see ScrollToRow).
+func (g *DataGridElement[T]) Expanded(keys *Signal[[]string]) *DataGridElement[T] {
+	g.expanded = keys
+	return g
+}
+
+// OnExpand runs fn with the key of a row after it is opened, by a click on its chevron,
+// a key, the accessibility actions or a DataGridHandle. It does not run for the keys the
+// app sets in Expanded.
+func (g *DataGridElement[T]) OnExpand(fn func(key string)) *DataGridElement[T] {
+	g.onExpand = fn
+	return g
+}
+
+// OnCollapse runs fn with the key of a row after it is closed, from the same sources as
+// OnExpand. It does not run for the keys the app sets in Expanded.
+func (g *DataGridElement[T]) OnCollapse(fn func(key string)) *DataGridElement[T] {
+	g.onCollapse = fn
+	return g
+}
 
 // OnActivate runs fn with the row that the user activates, by Enter or a
 // double-click.
@@ -917,6 +998,7 @@ type dgRowCtx[T any] struct {
 	colAt                func(q int, x float32) int
 	activate             func(q int)
 	ops                  dgOps
+	store                *Signal[[]string] // the open rows of a tree, or nil (see Expanded)
 }
 
 // dgShared is the state of a grid that lives with it: the order of its rows, the
@@ -933,6 +1015,14 @@ type dgShared[T any] struct {
 	pos            map[string]int // displayed position by key, made when needed (see posOf)
 	dup            string         // a key that is used twice, for the warning
 	data           []T            // the rows of the last build, for an edit to find its row
+
+	// The tree of the rows, when the grid has Children (see dgTree), with the identity
+	// of the rows it was made from. open is the keys of the open rows the order was made
+	// for, and openSet the same as a set.
+	tree      *dgTree[T]
+	treeIdent unsafe.Pointer
+	open      []string
+	openSet   map[string]bool
 
 	// focus is the grid's body, and editFocus the editor of an edit. draft is the
 	// text of the editor. ctl is set by a press on a control in a cell, so that the
@@ -1035,6 +1125,7 @@ func (sh *dgShared[T]) update(rows []T, key func(T) string, cols []DataColumn[T]
 		}
 	}
 	sh.order = order
+	sh.tree = nil
 	sh.pos, sh.dup = nil, ""
 	// Keys in strictly increasing order are unique, so the table of positions can
 	// wait for its first lookup; otherwise it is made now, to find a repeated key.
@@ -1044,16 +1135,20 @@ func (sh *dgShared[T]) update(rows []T, key func(T) string, cols []DataColumn[T]
 }
 
 // makePos makes the table of displayed positions by key, and notes in dup a key
-// that is used twice.
+// that is used twice. A tree notes its repeated keys among all its rows, not among
+// the shown ones, when it is made (see dgTree).
 func (sh *dgShared[T]) makePos() {
 	sh.pos = make(map[string]int, len(sh.order))
-	sh.dup = ""
+	dup := ""
 	for p, i := range sh.order {
 		k := sh.keys[i]
-		if _, ok := sh.pos[k]; ok && sh.dup == "" {
-			sh.dup = k
+		if _, ok := sh.pos[k]; ok && dup == "" {
+			dup = k
 		}
 		sh.pos[k] = p
+	}
+	if sh.tree == nil {
+		sh.dup = dup
 	}
 }
 
@@ -1116,13 +1211,20 @@ func textWidth(rt *Runtime, s string) float32 {
 }
 
 // autoFitWidth is the width that fits column i to its header and to the Text of
-// the rows built by the last frame. A Cell slot is not measured.
-func autoFitWidth[T any](rt *Runtime, sh *dgShared[T], rows []T, cols []DataColumn[T], i int) float32 {
+// the rows built by the last frame. A Cell slot is not measured. In a tree, the first
+// column also fits the indent of each row and its chevron (see DataGridStyle).
+func autoFitWidth[T any](rt *Runtime, st DataGridStyle, sh *dgShared[T], rows []T, cols []DataColumn[T], i int) float32 {
 	cl := cols[i]
 	w := textWidth(rt, cl.Header) + 40 // the padding, the sort arrow and the edge
-	if cl.Text != nil {
-		for q := sh.builtLo; q < sh.builtHi && q < sh.n; q++ {
-			w = max(w, textWidth(rt, cl.Text(rows[sh.order[q]]))+16)
+	for q := sh.builtLo; q < sh.builtHi && q < sh.n; q++ {
+		lead := float32(0)
+		if sh.tree != nil && i == 0 {
+			lead = float32(sh.tree.level[sh.order[q]]-1)*st.TreeIndent.Width.Value + st.TreeChevron.Width.Value
+		}
+		if cl.Text != nil {
+			w = max(w, textWidth(rt, cl.Text(rows[sh.order[q]]))+16+lead)
+		} else {
+			w = max(w, 16+lead)
 		}
 	}
 	return max(w, cl.minWidth())
@@ -1167,7 +1269,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 
 	// The columns are in the order they are shown, so that a column's index is its
 	// place on the screen and its column for assistive technology.
-	rows, cols, n := g.rows, g.viewCols(colOrder.Get()), len(g.rows)
+	cols := g.viewCols(colOrder.Get())
 	nc := len(cols)
 	colPos := make(map[string]int, nc)
 	for i, cl := range cols {
@@ -1182,7 +1284,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		return min(max(i, 0), max(nc-1, 0))
 	}
 	sortState := by.Get()
-	sh.update(rows, g.key, cols, sortState)
+	store := g.openStore(ctx)
+	rows := g.refresh(sh, store, cols, sortState)
+	n := len(sh.order)
 	sh.data = rows
 	if sh.focus == nil {
 		sh.focus, sh.editFocus, sh.draft = NewFocusHandle(), NewFocusHandle(), NewSignal("")
@@ -1200,8 +1304,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		rt.warn(fmt.Sprintf("duplicate key %q among the rows of a DataGrid; keys must be unique. "+
 			"Derive keys from a unique field such as an ID.", sh.dup))
 	}
-	order := sh.order
-	keyAt := func(q int) string { return sh.keys[order[q]] }
+	// The order is read from sh, not copied: a key handler may open or close a tree row
+	// before the next frame (see setOpen), and then the handler reads the rows as shown.
+	keyAt := func(q int) string { return sh.keys[sh.order[q]] }
 	selected := sh.selection(sel.Get())
 	var cellsOn map[CellKey]bool
 	if g.cellOn {
@@ -1217,6 +1322,14 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	// The cursor follows its row by key, so that a sort or new rows keep it on
 	// the same cell.
 	cursor := cur.Get()
+	if store != nil && cursor.key != "" {
+		// A collapse that hides the focused row moves the focus to the row above it that
+		// is shown, in the same column.
+		if k, q, ok := sh.shownKey(cursor.key); ok && k != cursor.key {
+			cursor.key, cursor.pos = k, q
+			cur.Set(cursor)
+		}
+	}
 	p := min(max(cursor.pos, 0), max(n-1, 0))
 	if cursor.key != "" {
 		if q, ok := sh.posOf(cursor.key); ok {
@@ -1332,16 +1445,18 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	activate := func(q int) {
 		if g.onActivate != nil && n > 0 {
-			g.onActivate(rows[order[q]])
+			g.onActivate(rows[sh.order[q]])
 		}
 	}
 	// askMore asks LoadMore for more rows, once for each number of rows. It runs fn
-	// after the frame, since it is called while the rows are built.
+	// after the frame, since it is called while the rows are built. The rows counted
+	// are the rows given: for a tree, every row of it, children included, so that
+	// opening a row does not ask again (see Children).
 	askMore := func() {
-		if g.loadMore == nil || !g.hasMore || (sh.asked && sh.askedN == n) {
+		if g.loadMore == nil || !g.hasMore || (sh.asked && sh.askedN == len(rows)) {
 			return
 		}
-		sh.asked, sh.askedN = true, n
+		sh.asked, sh.askedN = true, len(rows)
 		rt.Post(g.loadMore)
 	}
 	selectKeys := func(ks []string) {
@@ -1374,10 +1489,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		sel.Set(next)
 	}
 	// place moves the cursor to row q (on the header when header is set) and to
-	// column cl, and brings both into view.
+	// column cl, and brings both into view. The count of the rows is read now, since a
+	// tree's open rows may have changed since the build (see setOpen).
 	place := func(q, cl int, header bool) {
 		k := ""
-		if !header && q >= 0 && q < n {
+		if !header && q >= 0 && q < len(sh.order) {
 			k = keyAt(q)
 		}
 		ck := ""
@@ -1389,7 +1505,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			sh.reveal = true
 			sh.revealX0, sh.revealX1 = xs[cl], xs[cl+1]
 		}
-		if !header && n > 0 {
+		if !header && len(sh.order) > 0 {
 			handle.ScrollToItem(q)
 		} else {
 			handle.request()
@@ -1611,9 +1727,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	editAt := func(q, cl int) {
 		text := ""
 		if c := cols[cl]; c.Value != nil {
-			text = c.Value(rows[order[q]])
+			text = c.Value(rows[sh.order[q]])
 		} else if c.Text != nil {
-			text = c.Text(rows[order[q]])
+			text = c.Text(rows[sh.order[q]])
 		}
 		startEdit(q, cl, text)
 	}
@@ -1671,6 +1787,31 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		if !commitEdit(sh.draft.Peek()) && rt.focused.Peek() {
 			refocusEditor()
+		}
+	}
+	// saveHidden saves the edit numbered seq with text after the frame, when a collapse
+	// has hidden its row: the row is found in the tree, and saved as a blur saves it. The
+	// editor is not shown for a hidden row, so an error is announced and the edit ends,
+	// and the collapse is not held back.
+	saveHidden := func(seq int, text string) {
+		rt.Post(func() {
+			e := edit.Peek()
+			if e.key == "" || e.seq != seq {
+				return
+			}
+			edit.Set(dgEdit{})
+			if i, ok := sh.tree.at[e.key]; ok {
+				if err := cols[colOf(e.colKey, e.col)].Edit(sh.tree.rows[i], text); err != nil {
+					Announce(err.Error(), access.Assertive)
+				}
+			}
+		})
+	}
+	if store != nil && ed.key != "" {
+		if _, shown := sh.posOf(ed.key); !shown {
+			if _, ok := sh.tree.at[ed.key]; ok {
+				saveHidden(ed.seq, sh.draft.Peek())
+			}
 		}
 	}
 	// tabEdit saves the edit and starts one in the next editable cell of the row
@@ -1812,6 +1953,10 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			sh.draft.Set(sh.draft.Peek() + s)
 			return
 		}
+		if s == "*" && store != nil && !onHeader && n > 0 {
+			g.openSiblings(store, sh, p)
+			return
+		}
 		r, _ := utf8.DecodeRuneInString(s)
 		// A custom editor is started by Enter or F2, not by typing: its value is not text.
 		if !sh.focus.Focused() || onHeader || n == 0 || nc == 0 || cols[col].Edit == nil || cols[col].Editor != nil ||
@@ -1856,6 +2001,14 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 					columnsChanged()
 				}
 				return true
+			}
+			if store != nil && !onHeader && col == 0 && nc > 0 && n > 0 && !ctrl && !shift {
+				if to, moves, used := g.treeKey(store, sh, p, dir); used {
+					if moves {
+						place(to, col, false)
+					}
+					return true
+				}
 			}
 			switch {
 			case nc == 0:
@@ -2032,8 +2185,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			case d == nil || d.acc == nil:
 			case d.part == "DataGrid.Cell" && d.acc.gridRow > 0:
 				return d.acc.gridRow - 1, d.acc.gridCol - 1, true
-			case d.part == "DataGrid.Row" && d.acc.setPos > 0:
-				return d.acc.setPos - 1, colAt(d.acc.setPos-1, x), true
+			case d.part == "DataGrid.Row" && d.acc.gridRow > 0:
+				return d.acc.gridRow - 1, colAt(d.acc.gridRow-1, x), true
 			}
 		}
 		return 0, 0, false
@@ -2059,7 +2212,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			default:
 				place(q, c, false)
 			}
-			return g.rowMenu(rows[order[q]], cols[c].key())
+			return g.rowMenu(rows[sh.order[q]], cols[c].key())
 		}
 		p, c, onHeader := cursorNow()
 		switch {
@@ -2068,11 +2221,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		case onHeader || g.rowMenu == nil || n == 0:
 			return nil
 		}
-		return g.rowMenu(rows[order[p]], cols[c].key())
+		return g.rowMenu(rows[sh.order[p]], cols[c].key())
 	}
 	rc := dgRowCtx[T]{t: t, ctx: ctx, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed, startN: startN, endN: endN,
-		built: built, cells: cellsOn, click: click, colAt: colAt, activate: activate, ops: ops}
+		built: built, cells: cellsOn, click: click, colAt: colAt, activate: activate, ops: ops, store: store}
 	// A row within a viewport of rows of the end asks for more rows when it is built.
 	near := n - max(int(sh.viewH/rowH), 1)
 	list := UniformList(n, func(q int) Element {
@@ -2085,6 +2238,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		return g.row(rc, q)
 	}).Key(g.keyStr).Handle(handle)
+	// A tree row's position is among its siblings, which the rows report themselves.
+	list.ownPos = store != nil
 	if g.loadingMore && n > 0 {
 		// The row of LoadingMore follows the rows. Its ring names it, and its text is
 		// for sighted users.
@@ -2280,7 +2435,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		runs:   runs,
 	}
 	list.header = g.headerRow(st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
-		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, sh, rows, cols, i) }, ho, strs)
+		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, st, sh, rows, cols, i) }, ho, strs)
 
 	// The column may shrink below its rows, so that the list windows them to the space
 	// instead of building them all (see Tree).
@@ -2324,7 +2479,23 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 	} else {
 		r.Hover(st.RowHover)
 	}
-	r.listItem(q+1, sh.n)
+	// A row reports its place in the grid, for the hit test, and its place in the set for
+	// assistive technology: among the shown rows, or among its siblings in a tree. In a
+	// tree it also reports its level, and whether it is open when it has children.
+	// The closures of a tree row capture only what they use, not rc: a captured parameter
+	// is moved to the heap for every row, flat rows included.
+	tree := rc.sh.tree
+	if tree == nil {
+		r.listItem(q+1, sh.n)
+	} else {
+		r.listItem(tree.pos[i], tree.size[i]).AccessLevel(tree.level[i])
+		if len(tree.kids[i]) > 0 {
+			key, store := k, rc.store
+			r.AccessExpanded(sh.openSet[k])
+			r.access().setExpanded = func(v bool) { g.setOpen(store, sh, key, v) }
+		}
+	}
+	r.access().gridRow = q + 1
 	if g.mode != SelectionNone {
 		r.AccessSelected(on)
 	}
@@ -2421,6 +2592,33 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 			}
 		}
 		editing := ed.key == k && ed.col == c
+		if tree != nil && c == 0 {
+			// The first column of a tree starts with an indent for each level above the row,
+			// and the chevron of a row with children, or the space of it for a leaf, so that
+			// the text of every row lines up. The chevron is a click target of its own: a
+			// press on it does not select the row.
+			for range tree.level[i] - 1 {
+				cell.Child(Div().AccessHidden().asPart("DataGrid.TreeIndent").Style(st.TreeIndent))
+			}
+			chev := Div().AccessHidden().asPart("DataGrid.TreeChevron").Style(st.TreeChevron)
+			if len(tree.kids[i]) > 0 {
+				glyph := icons.ChevronRight
+				open := sh.openSet[k]
+				if open {
+					glyph = icons.ChevronDown
+				}
+				key, store := k, rc.store
+				chev.Child(Icon(glyph).Size(12)).Cursor(CursorPointer).
+					OnMouseDown(func(e *MouseEvent) {
+						if e.Button == input.ButtonLeft {
+							sh.pressed, sh.ctl = true, true
+							e.StopPropagation()
+						}
+					}).
+					OnClick(func() { g.setOpen(store, sh, key, !open) })
+			}
+			cell.Child(chev)
+		}
 		if cl.Interactive || cl.Edit != nil {
 			// The controls of the cell are not Tab stops: the grid is the one stop.
 			cell.tabSkip = true
