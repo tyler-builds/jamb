@@ -45,8 +45,10 @@ type TabsVariant uint8
 const (
 	// TabsUnderline draws a line under the selected tab. It is the default.
 	TabsUnderline TabsVariant = iota
-	// TabsSegmented draws the tabs as one row of segments, the selected one
-	// filled with Accent. It is the look of a segmented control.
+	// TabsSegmented draws the tabs as one row of segments: a sunken track, with the
+	// selected segment raised. It is the look of a segmented control. Its selected
+	// segment is not filled with the accent; see docs/widgets-navigation.md for how to
+	// get the accent fill back.
 	TabsSegmented
 )
 
@@ -135,12 +137,22 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 		d.TabDisabled = Style{Opacity: 0.5}
 	}
 	if v == TabsSegmented {
-		d.List = Style{Direction: Row, Gap: 2, Padding: All(3), Radius: th.Radius,
+		// A quiet control: a sunken track, and a raised selected segment with no accent fill.
+		d.List = Style{Direction: Row, Gap: 2, Padding: All(2), Radius: th.Radius,
 			Background: th.Panel, BorderWidth: 1, BorderColor: th.Border, fitWidth: true}
 		d.Tab.MinHeight = Px(30)
-		d.Tab.Radius = max(th.Radius-3, 0)
-		d.TabSelected = Style{Background: th.Accent, TextColor: th.AccentText}
+		d.Tab.Radius = max(th.Radius-2, 0)
+		d.TabSelected = Style{Background: th.SurfaceActive, TextColor: th.Text}
+		d.TabHover = Style{TextColor: th.Text}
 		d.Indicator = Style{}
+		if th.HighContrast {
+			// Under high contrast the selected segment keeps the system's accent fill,
+			// which is what marks it there.
+			d.List.Padding = All(3)
+			d.Tab.Radius = max(th.Radius-3, 0)
+			d.TabHover = Style{Background: th.SurfaceHover}
+			d.TabSelected = Style{Background: th.Accent, TextColor: th.AccentText}
+		}
 	}
 	return d
 }

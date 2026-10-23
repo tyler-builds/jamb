@@ -69,8 +69,11 @@ th.Reveal("src/main.go") // opens the nodes above it and scrolls it into view
   The selected tab has a line under it, in Accent (Highlight under high contrast),
   so the selection is not carried by color alone. No state makes the text bold.
   Tabs take the height their parent gives them, so a panel can fill a window.
-  `Variant(ui.TabsSegmented)` draws the tabs as one row of segments instead, with
-  the selected segment filled in Accent (Highlight under high contrast). Both
+  `Variant(ui.TabsSegmented)` draws the tabs as one row of segments instead: a sunken
+  track, with the selected segment raised on a surface and its text in the text
+  color, and no accent fill. Under high contrast the selected segment is filled in
+  Highlight. For the accent fill, set it with `Styles`:
+  `ui.Tabs(...).Variant(ui.TabsSegmented).Styles(ui.TabsStyle{TabSelected: ui.Style{Background: t.Accent, TextColor: t.AccentText}})`. Both
   variants keep the same keys, keyboard behavior and accessible names. The parts
   of a tab list (`Bar`, `List`, `Tab`, `TabSelected`, `TabHover`, `TabDisabled`,
   `TabFocusVisible`, `Indicator`, `Panel`, `DropLine`, `ScrollButton`, `MenuButton`) are set with `Styles` or the theme, and
