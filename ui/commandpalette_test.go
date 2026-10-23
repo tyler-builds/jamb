@@ -438,6 +438,18 @@ func testCommandPaletteParts(t *testing.T, applied map[string]bool) {
 			wantBackground(t, nodes[0], c.part, markBG)
 		})
 	}
+	// The detail of an item is drawn after its name, with the Detail style.
+	applied["CommandPalette.Detail"] = true
+	t.Run("CommandPalette.Detail", func(t *testing.T) {
+		st := CommandPaletteStyle{Detail: Style{Background: markBG}}
+		r := newPaletteRig(t, func(p *CommandPaletteElement) *CommandPaletteElement {
+			return p.Styles(st).Items(func(string) []PaletteItem {
+				return []PaletteItem{{Key: "c1", Label: "Fix", Detail: "a1b2c3d Alice"}}
+			})
+		})
+		r.openPalette(t)
+		wantBackground(t, partNodes(r.rt, "CommandPalette.Detail")[0], "CommandPalette.Detail", markBG)
+	})
 	// The match is drawn in the names: the highlight of the match has the Match
 	// background.
 	applied["CommandPalette.Match"] = true

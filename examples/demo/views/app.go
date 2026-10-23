@@ -35,6 +35,7 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 				}
 			}).
 			OnAction(ShowPalette, func() { s.PaletteOpen.Set(true) }).
+			OnAction(QuickOpen, func() { s.QuickOpen.Set(true) }).
 			OnAction(ToggleTheme, func() {
 				if ctx.Theme().Dark {
 					ctx.SetTheme(DemoLightTheme)
@@ -58,9 +59,25 @@ func App(s *Store) func(ctx *ui.Context) ui.Element {
 			// The command palette lists the actions available where focus is: the
 			// shortcuts above, and those of the focused element.
 			Child(ui.CommandPalette(s.PaletteOpen)).
+			// The quick open lists the projects, before the commands it does not list.
+			Child(ui.CommandPalette(s.QuickOpen).ItemsOnly().Placeholder("Go to a project").
+				Items(func(string) []ui.PaletteItem { return projectItems(s) })).
 			// Last of all, so the toasts sit above the modals. One Toaster shows every toast.
 			Child(ui.Toaster().Key("toaster"))
 	}
+}
+
+// projectItems are the projects as the quick open lists them: each by name, with its
+// status as the detail, and choosing one shows it on the Projects page.
+func projectItems(s *Store) []ui.PaletteItem {
+	projects := s.Projects.Peek()
+	items := make([]ui.PaletteItem, 0, len(projects))
+	for _, p := range projects {
+		id := p.ID
+		items = append(items, ui.PaletteItem{Key: fmt.Sprint(id), Label: p.Name, Detail: p.Status.String(), Icon: p.Icon,
+			Run: func() { s.Selected.Set(id); s.Page.Set(PageProjects) }})
+	}
+	return items
 }
 
 // Sidebar is the navigation column. It re-renders only when the page or the
