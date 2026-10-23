@@ -139,14 +139,31 @@ of icons does not redraw when its component renders.
 
 ## Icons
 
-`icons.All` lists all of them:
+The icons are the [Lucide](https://lucide.dev) set, release 1.61.0: 1,903 icons,
+each named `icons.<CamelName>`. `icons.ArrowLeft` is `arrow-left`, and
+`icons.GitBranch` is `git-branch`. Lucide's ISC license and the MIT notice of the
+Feather icons it includes are in `third_party/lucide`. The Go names are generated
+from the pinned release by `go generate` in `icons`, which runs
+`internal/lucidegen`; the icons keep Lucide's 24 grid and 2-unit strokes with
+round caps and joins, and are drawn like an SVG image.
 
-> activity, alert, archive, arrow-left, arrow-right, arrow-up-right, bell,
-> bookmark, box, calendar, check, chevron-down, chevron-left, chevron-right,
-> chevron-up, circle, clock, copy, dashboard, download, eye, eye-off, file, filter,
-> folder, git-branch, hash, heart, home, inbox, info, layers, link, lock,
-> maximize, menu, minimize, minus, moon, more-horizontal, pause, pencil, pin, play, plus,
-> refresh, restore, search, settings, star, star-filled, sun, tag, trash, upload, users, x, zap
+An icon's SVG is compiled into the binary as text and parsed the first time the
+icon is drawn. A binary holds only the icons it names, so an app that uses ten
+icons carries ten. `icons.All()` returns every icon and so holds all of them; it
+is for tools such as `internal/iconsheet`, not for apps.
 
-The Go names are the CamelCase forms: `icons.ArrowLeft`, `icons.GitBranch`,
-and so on.
+Names from before the Lucide set still work, as the same icons:
+
+| Name | Lucide icon |
+|---|---|
+| `icons.Alert` | `triangle-alert` (`icons.TriangleAlert`) |
+| `icons.Dashboard` | `layout-dashboard` |
+| `icons.Filter` | `funnel` |
+| `icons.Home` | `house` |
+| `icons.MoreHorizontal` | `ellipsis` |
+| `icons.Refresh` | `rotate-cw` |
+
+Three names keep their own drawings, because Lucide has no match for the Windows
+caption buttons: `icons.Maximize`, `icons.Minimize` and `icons.Restore`, which
+`ui.TitleBarButtons` draws. Lucide's `maximize` and `minimize` are `icons.LucideMaximize`
+and `icons.LucideMinimize`. `icons.StarFilled` is the filled `star`.

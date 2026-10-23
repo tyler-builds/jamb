@@ -48,3 +48,12 @@ The Markdown parser of the markdown package is github.com/yuin/goldmark v1.8.6,
 Copyright (c) 2019 Yusuke Inuzuka, licensed under the MIT License
 (https://github.com/yuin/goldmark/blob/master/LICENSE). Only apps that import the
 markdown package contain it.
+
+Third-party software: Lucide
+
+The icons of the icons package are from Lucide (https://lucide.dev), release 1.61.0
+(tag 1.61.0, commit c29c276f16590cf017126671535ad8c792be64d8), Copyright (c) 2026
+Lucide Icons and Contributors, licensed under the ISC License. Some of them are
+derived from Feather, Copyright (c) 2013-present Cole Bemis, licensed under the MIT
+License. Both license texts are in third_party/lucide/. An app
+contains only the icons it names.

@@ -14,12 +14,13 @@ import (
 )
 
 func main() {
-	const cell, size, cols = 56, 32, 13
-	rows := (len(icons.All) + cols - 1) / cols
+	const cell, size, cols = 40, 24, 40
+	all := icons.All()
+	rows := (len(all) + cols - 1) / cols
 	out := image.NewRGBA(image.Rect(0, 0, cols*cell, rows*cell))
 	draw.Draw(out, out.Bounds(), image.NewUniform(color.RGBA{24, 24, 27, 255}), image.Point{}, draw.Src)
 	fg := image.NewUniform(color.RGBA{235, 235, 240, 255})
-	for i, ic := range icons.All {
+	for i, ic := range all {
 		m := image.NewAlpha(image.Rect(0, 0, size, size))
 		ic.Rasterize(m)
 		x, y := (i%cols)*cell+(cell-size)/2, (i/cols)*cell+(cell-size)/2
