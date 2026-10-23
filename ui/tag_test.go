@@ -5,6 +5,7 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/access/accesstest"
+	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/input"
 )
 
@@ -37,6 +38,38 @@ func TestTagGroup(t *testing.T) {
 	tr := r.tree()
 	accesstest.Find(t, tr, access.RoleGroup, "Sales")
 	accesstest.Absent(t, tr, access.RoleButton, "Remove Sales")
+}
+
+// Color tints the fill, the border and the icon, and leaves the text to the theme.
+// Styles wins over it, and high contrast ignores it.
+func TestTagColorTints(t *testing.T) {
+	th := DarkTheme()
+	c := Hex("#2563eb")
+	r := newAccessRig(func(ctx *Context) Element { return Tag("Sales").Icon(icons.Folder).Color(c) })
+	tag := partNode(t, r.rt, "Tag.Tag", "")
+	if got, want := tag.style.Background, c.Alpha(0.14); got != want {
+		t.Errorf("fill %v, want %v", got, want)
+	}
+	if got, want := tag.style.BorderColor, c.Alpha(0.32); got != want {
+		t.Errorf("border %v, want %v", got, want)
+	}
+	if got := partNode(t, r.rt, "Tag.Label", "").style.TextColor; got != th.Text {
+		t.Errorf("text %v, want the theme's text color %v", got, th.Text)
+	}
+
+	r = newAccessRig(func(ctx *Context) Element {
+		return Tag("Sales").Color(c).Styles(TagStyle{Tag: Style{Background: markBG}})
+	})
+	if got := partNode(t, r.rt, "Tag.Tag", "").style.Background; got != markBG {
+		t.Errorf("Styles over Color: fill %v, want %v", got, markBG)
+	}
+
+	r = newThemedRig(th, func(ctx *Context) Element { return Tag("Sales").Color(c) })
+	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastBlack()})
+	r.frame()
+	if got := partNode(t, r.rt, "Tag.Tag", "").style.Background; got == c.Alpha(0.14) {
+		t.Errorf("high contrast uses the tint fill %v", got)
+	}
 }
 
 func testTagParts(t *testing.T, applied map[string]bool) {

@@ -177,7 +177,9 @@ ui.Skeleton().Circle(32)                             // a placeholder for an ava
   `ui.AvatarInitials(name)` and `ui.AvatarColor(name)` return the initials and the fill an
   avatar of that name uses, for an app that shows the same person elsewhere.
 - **Tag.** A tag is as wide as its text by default. Under `MaxWidth`, a long text ends with an
-  ellipsis. `OnRemove` adds a button that works with the mouse, Enter and Space. `Tooltip(s)`
+  ellipsis. `Color(c)` tints it for a category: a fill of c at about 14% alpha, a border of c
+  at about 32%, and the icon in c; the text keeps the theme's text color, and high contrast
+  ignores it. `OnRemove` adds a button that works with the mouse, Enter and Space. `Tooltip(s)`
   shows s over the chip, such as the full text of a truncated tag, and is read as its description.
 - **Skeleton.** It is hidden from assistive technology. The app marks the region that is loading
   as busy, or labels it "Loading". It pulses about once every 1.2 seconds, between full and half
