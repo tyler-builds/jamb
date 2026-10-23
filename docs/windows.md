@@ -114,6 +114,44 @@ ui.Div().Row().Height(ui.Px(32)).WindowArea(ui.WindowAreaDrag).Justify(ui.End).
   lets Windows 11 show Snap Layouts over the maximize button.
 - Windows with the operating system's title bar ignore areas.
 
+### TitleBar
+
+`ui.TitleBar()` is a window's own title bar as a container: a row whose children
+go at its start, the left, in order, with the caption buttons at its end. It marks
+itself as a drag area, and its content dims while the window is not focused (the
+caption buttons keep full strength). Under high contrast it does not dim.
+
+```go
+ui.TitleBar().Height(ui.Px(32)).
+    Child(ui.Icon(icons.GitBranch)).Child(crumbs).  // the start, left to right
+    Center(search).                                  // centered on the window
+    Trailing(refresh, themeToggle)                   // the end, before the caption buttons
+```
+
+- `Center(el)` puts `el` in the middle of the bar's whole width, not between the sides.
+  It gets the room between the two sides, so it never covers them: the wider side is
+  kept clear on both ends, and when the sides leave too little room the element is
+  clipped to what is left. The sides are measured from the last layout, and the bar
+  renders again when a side changes width.
+- The start side shrinks and clips when the window is narrow, so a long title
+  truncates. Put a `Truncate` text in a wrapper with `Shrink(1)` and `MinWidth(0)`.
+- `Trailing(els...)` adds items at the end, before the caption buttons. The end
+  is as wide as its items, and the caption buttons fill the bar's height.
+- `Buttons(false)` leaves out the caption buttons, for a window that has none. They
+  are shown by default, as `TitleBarButtons`.
+- `Height` is 40 px at 100 percent Text size by default. Windows' own caption buttons
+  are 32 px, so a bar lower than 32 px cannot hold them.
+- Children that take input (a search field, a button) stay clickable inside the bar,
+  as with `WindowAreaDrag` above.
+- With the operating system's title bar (`ChromeNative`) the operating system draws
+  the caption buttons, so a window that uses a `TitleBar` there passes
+  `Buttons(false)`. The bar still lays out without them.
+- The look is `ui.TitleBarStyle` with `Bar` (the strip, with its height, fill, bottom
+  border and text) and `Center` (the centered element's box), set with `.Styles(...)`
+  or `.Style(s)` for the strip. By default the strip has no fill and no border, so it
+  is part of the window's content, as a Windows 11 title bar is; a band of its own is
+  `Style(ui.Style{Background: t.Panel, BorderEdges: ui.Edges{Bottom: 1}, BorderColor: t.Border})`.
+
 ## Native dialogs
 
 `ctx.Window()` opens the system's own dialogs, each owned by the window: a file
