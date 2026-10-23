@@ -296,7 +296,21 @@ func (d *DivElement) PaddingY(px float32) *DivElement {
 	return d
 }
 
-// PaddingEdges sets each side's padding.
+// PaddingTop sets the top padding.
+func (d *DivElement) PaddingTop(px float32) *DivElement { d.style.Padding.Top = px; return d }
+
+// PaddingRight sets the right padding.
+func (d *DivElement) PaddingRight(px float32) *DivElement { d.style.Padding.Right = px; return d }
+
+// PaddingBottom sets the bottom padding.
+func (d *DivElement) PaddingBottom(px float32) *DivElement { d.style.Padding.Bottom = px; return d }
+
+// PaddingLeft sets the left padding.
+func (d *DivElement) PaddingLeft(px float32) *DivElement { d.style.Padding.Left = px; return d }
+
+// PaddingEdges sets each side's padding. It replaces all four sides: a side the
+// Edges leaves at zero gets no padding, whatever Padding, PaddingX or PaddingY
+// set before it.
 func (d *DivElement) PaddingEdges(e Edges) *DivElement { d.style.Padding = e; return d }
 
 // Margin sets margin on all sides.
@@ -317,8 +331,14 @@ func (d *DivElement) MarginY(px float32) *DivElement {
 // MarginTop sets the top margin.
 func (d *DivElement) MarginTop(px float32) *DivElement { d.style.Margin.Top = px; return d }
 
+// MarginRight sets the right margin.
+func (d *DivElement) MarginRight(px float32) *DivElement { d.style.Margin.Right = px; return d }
+
 // MarginBottom sets the bottom margin.
 func (d *DivElement) MarginBottom(px float32) *DivElement { d.style.Margin.Bottom = px; return d }
+
+// MarginLeft sets the left margin.
+func (d *DivElement) MarginLeft(px float32) *DivElement { d.style.Margin.Left = px; return d }
 
 // Width sets the width (border box).
 func (d *DivElement) Width(l Length) *DivElement { d.style.Width = l; return d }
