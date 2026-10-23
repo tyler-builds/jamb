@@ -1,5 +1,11 @@
 # Build output stays out of the repository; Go's shared caches hold everything else.
 *.exe
+# Binaries go build writes without an extension, as cross-builds for macOS and Linux do.
+/cmd/jamb/jamb
+/examples/*/demo
+/examples/*/git
+/examples/*/hello
+/examples/*/notes
 /bin/
 /out/
 # Output of scripts/bench-go.ps1: raw benchmark runs, summaries and profiles.
