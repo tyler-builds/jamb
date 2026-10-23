@@ -18,6 +18,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   settings, as Windows formats it: the symbol, its position, the shape of a negative amount
   and the digits. `ui.CurrencySymbol()` returns the symbol, and `NumberOptions.Currency` makes
   a number field an amount of money that shows the symbol. See docs/text.md.
+- `ui.ParseNumber(text)` and `ui.ParseDate(text)` read numbers, amounts and dates written in
+  the user's locale, the counterparts of `FormatNumber`, `FormatCurrency` and `FormatDate`.
+  `ParseDate` reads ISO 8601 dates too.
 
 ### Changed
 
