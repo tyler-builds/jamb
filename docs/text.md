@@ -137,6 +137,14 @@ whether it goes after the amount. Elsewhere than on Windows the currency is the 
 dollar. A field for an amount of money is a `TextInput` with
 `NumberFormat(NumberOptions{Currency: true})` (see [Form controls](widgets-forms.md)).
 
+`ui.ParseNumber(text)` and `ui.ParseDate(text)` read numbers and dates written in the
+user's locale, for text from outside the app such as a CSV file. `ParseNumber` takes the
+locale's decimal point and group separators, or those of amounts of money, a leading
+sign, and what `FormatCurrency` writes: the currency symbol is dropped, and parentheses
+or a trailing minus make the number negative (`($5.00)` is -5). `ParseDate` reads a short
+date as a date picker reads typed text, in the locale's order, and an ISO 8601 date such
+as `2026-10-13`. Both report false for text they cannot read.
+
 `ui.FormatBytes(n)` returns a size in bytes as Windows Explorer and Task Manager show
 it, in 1024-based units with three significant digits: `512 bytes`, `1.00 KB`,
 `12.3 MB`, `123 MB` and `1.23 GB`. A size of 1000 units or more is shown in the next

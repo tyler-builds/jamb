@@ -22,6 +22,62 @@ func FormatTime(t time.Time) string { return formatClock(clockOf(t), currentLoca
 // as October 2026.
 func FormatMonthYear(t time.Time) string { return currentLocale().monthYear(t) }
 
+// ParseDate returns the day that text holds, at local midnight, and whether it is a
+// date: a short date in the user's locale, read as a date picker reads typed text
+// (the numbers in the locale's order, with any punctuation between them; a year of
+// two digits in this century or the one before; no year meaning this year), or an
+// ISO 8601 date such as 2026-10-13, which files from other programs often hold. It is
+// the counterpart of FormatDate. Month names are not read.
+func ParseDate(text string) (time.Time, bool) {
+	text = strings.TrimSpace(text)
+	if t, err := time.ParseInLocation("2006-01-02", text, time.Local); err == nil {
+		return t, true
+	}
+	return parseDate(text, currentLocale(), time.Now())
+}
+
+// ParseNumber returns the number that text holds, written in the user's locale, and
+// whether it is one: with the locale's decimal point and group separators (or those
+// of amounts of money), and a leading minus or plus. It is the counterpart of
+// FormatNumber, and reads what FormatCurrency writes too: a currency symbol before or
+// after the number is dropped, and parentheses or a trailing minus make it negative,
+// as some programs write amounts. So "1,234.5" is 1234.5 in en-US and "1.234,5" is
+// 1234.5 in de-DE, and "($5.00)" is -5.
+func ParseNumber(text string) (float64, bool) { return parseNumber(text, currentLocale()) }
+
+// parseNumber is ParseNumber in loc.
+func parseNumber(text string, loc *dateLocale) (float64, bool) {
+	s := strings.TrimSpace(text)
+	neg := false
+	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
+		neg, s = true, strings.TrimSpace(s[1:len(s)-1])
+	}
+	if loc.currency != "" {
+		s = strings.TrimSpace(strings.ReplaceAll(s, loc.currency, ""))
+	}
+	for _, m := range []string{loc.minus, "-"} {
+		if m != "" && strings.HasSuffix(s, m) && len(s) > len(m) {
+			neg, s = !neg, strings.TrimSpace(strings.TrimSuffix(s, m))
+			break
+		}
+	}
+	raw, ok := numberFromDisplay(s, loc)
+	if !ok {
+		raw, ok = numberFromDisplay(s, loc.money())
+	}
+	if !ok {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, false
+	}
+	if neg {
+		v = -v
+	}
+	return v, true
+}
+
 // FormatNumber returns v rounded to decimals places, with the group separators, the
 // decimal point and the minus sign of the user's locale, such as 12,345.68 in en-US
 // or 12.345,68 in de-DE. A negative decimals is 0. A value that rounds to zero is
