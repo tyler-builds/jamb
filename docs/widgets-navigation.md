@@ -345,9 +345,11 @@ ui.DescriptionList().Columns(2).Vertical().Bordered(). // two columns, terms abo
 ```
 
 - **Layout.** The items are laid out in a grid, row by row, in `Columns(n)` columns of the
-  same width (1 by default). By default each term is in a column of its own, 120 pixels
-  wide (the `Width` of the `Term` part), beside its value; `Vertical()` puts the term above
-  the value instead. The term is muted text, and the value takes the rest of the item.
+  same width (1 by default). By default the terms are in a column of their own, beside
+  their values, as wide as the widest term (in the `Term` part's font), so the terms line up
+  from item to item. The column is at most half the item's width, so a long term wraps within
+  that half and the value keeps the other half. `Vertical()` puts the term above the value
+  instead. The term is muted text, and the value takes the rest of the item.
 - **Bordered.** `Bordered()` outlines the list and draws a line between its items, which are
   padded. The lines are the border edges of each `Item`: one above every row but the first
   and one before every column but the first. Under high contrast the lines and the terms are
