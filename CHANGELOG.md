@@ -36,6 +36,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Fixed
 
+- A chart with `LegendRight` keeps its legend inside its box. A legend wider than the room
+  beside the plot pushed past the chart's right edge; the plot now takes the width the legend
+  leaves, and a legend taller than the chart scrolls.
 - A combo box takes focus for its text when assistive technology asks to focus it, as UI
   Automation's SetFocus on a combo box does. It offered no focus, so it could only be reached
   with Tab.
