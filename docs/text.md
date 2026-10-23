@@ -90,3 +90,29 @@ are `text.select-all` and `text.copy` in the `SelectableText` key context. The
 selection is drawn in the text fields' selection colors and cleared when focus
 moves away. A click on a link in selectable rich text still follows the link.
 Selection stays within one text element; it does not run across paragraphs.
+
+## Relative time
+
+`ui.FormatRelative(t, now)` returns how far `t` is from `now` in the user's language,
+such as "3 days ago" or "in 3 hours". A time within a minute is "now", and the
+calendar days before and after today are "yesterday" and "tomorrow". Minutes and
+hours count from the time; days count by the calendar, so a clock change does not
+shift a day. A week starts at 7 days, a month at 30 and a year at 365.
+
+`ui.TimeAgo(t)` shows the same text from the window's clock and renders again as time
+passes: every minute under an hour, every hour under a day, and daily after that. Its
+tooltip and accessible description are the full date and time (`ui.FormatDate` and
+`ui.FormatTime`). An off-screen one keeps no timer, and it catches up the next time its
+parent renders it.
+
+```go
+ui.TimeAgo(commit.When).Key("when")
+ui.Text(ui.FormatRelative(commit.When, time.Now())) // a fixed text, not refreshed
+```
+
+The words are in `ui.Strings`: `RelativeNow`, `RelativeYesterday`, `RelativeTomorrow`,
+and the functions `RelativeAgo` and `RelativeIn`, which take a `RelativeUnit`
+(`RelativeMinute` to `RelativeYear`) and the count. The English, Italian and Chinese
+forms follow the CLDR relativeTime long forms (CLDR 48.2). Chinese has no plural, so
+its words do not change with the count. `TimeAgo` uses the window's `Strings`;
+`FormatRelative` uses the system's language (see `ui.SystemStrings`).
