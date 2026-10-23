@@ -150,13 +150,14 @@ bar, which reads as the border between them. Its hit area is 9 px, centered on t
 over the edges of the panes beside it, so it is easy to grab; a press in those few pixels of a
 pane drags the divider, as in VS Code and Zed. That includes the 4 px of a pane's scroll bar
 nearest the bar; the rest of the scroll bar takes its presses as usual. The grip is a short
-pill over its middle. `Grip` on the split sets when it shows: always (`ui.SplitGripShown`, the
-default), only while the pointer is over the divider or it is dragged or focused
-(`ui.SplitGripOnHover`), or never (`ui.SplitGripHidden`). Without the grip the divider is a plain
-line between the panes, like a border. The dock's dividers use `SplitGripOnHover`.
+pill over its middle. `Grip` on the split sets when it shows: only while the pointer is over
+the divider or it is dragged or focused (`ui.SplitGripOnHover`, the default), always
+(`ui.SplitGripShown`), or never (`ui.SplitGripHidden`). Without the grip the divider is a plain
+line between the panes, like a border. The dock's dividers use `SplitGripOnHover` too.
 
 ```go
-ui.Split(files, editor).Grip(ui.SplitGripOnHover) // a line, with the grip on hover
+ui.Split(files, editor)                           // a line, with the grip on hover
+ui.Split(files, editor).Grip(ui.SplitGripShown)   // the grip is always drawn
 ```
 
 - **Pointer.** Dragging the divider moves it. The pointer is captured while the button is
