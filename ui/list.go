@@ -15,6 +15,7 @@ type UniformListElement struct {
 	row        func(i int) Element
 	style      Style
 	key        string
+	label      string // see Label
 	handle     *ListHandle
 	selectable bool // see SelectionContainer
 	// decorate, when set, adjusts the scroll container. A Tree sets its role,
@@ -89,6 +90,10 @@ func (l *UniformListElement) elementKey() string { return l.key }
 
 // Key gives the list a stable identity among its siblings.
 func (l *UniformListElement) Key(k string) *UniformListElement { l.key = k; return l }
+
+// Label names the list for assistive technology, such as "Search results", which
+// reads it with the list's role and its number of items.
+func (l *UniformListElement) Label(name string) *UniformListElement { l.label = name; return l }
 
 // Style is merged into the scroll container: size it with Height, Grow or MaxHeight.
 func (l *UniformListElement) Style(s Style) *UniformListElement { l.style = l.style.Merge(s); return l }
@@ -273,6 +278,9 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 		spacer.Child(Div().Key("jamb.list.tail").Absolute().Top(float32(l.count) * ls.rowH).Left(0).Right(0).Child(l.tail))
 	}
 	container := l.size.apply(Div().ScrollY().Style(l.style)).Role(access.RoleList)
+	if l.label != "" {
+		container.Label(l.label)
+	}
 	container.access().container = l.selectable
 	container.vlist = ls
 	if l.decorate != nil {

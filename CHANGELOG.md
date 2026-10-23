@@ -7,6 +7,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Added
+
+- `ListOf` and `UniformList` take `Label`, which names the list for assistive technology.
+
 ### Fixed
 
 - A keyed component or composite element, such as a chart, kept answering to its key in tests
