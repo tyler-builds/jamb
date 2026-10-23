@@ -28,6 +28,9 @@ internal/watch/    directory change notifications for live keymap reload (Win32 
                    notifications; polling elsewhere)
 cmd/jamb/          `jamb dev` runner and `jamb package`; module "github.com/tyler-builds/jamb/cmd/jamb"
                    (its own module, so packaging dependencies stay out of the framework's go.mod)
+examples/budget/   module "github.com/tyler-builds/jamb/examples/budget", a household budget (see docs/examples.md)
+  ledger/          accounts, categories, transactions and monthly budgets; undo; JSON; CSV import
+  views/           sidebar pages, title bar with the month, transaction table and form, budget, accounts, import
 examples/demo/     module "github.com/tyler-builds/jamb/examples/demo", consumes the framework like any app
   views/           sidebar, header, Dashboard, Projects, Activity, Settings
   assets/          embedded images

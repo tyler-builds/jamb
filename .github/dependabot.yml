@@ -4,6 +4,7 @@ updates:
     directories:
       - "/"
       - "/cmd/jamb"
+      - "/examples/budget"
       - "/examples/demo"
       - "/examples/git"
       - "/examples/hello"

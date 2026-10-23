@@ -9,6 +9,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Added
 
+- `examples/budget`, a household budget: accounts, transactions sorted into categories, a
+  budget for each category each month, an editable transaction table, forms with validation,
+  undo, and CSV import. See docs/examples.md.
 - `ListOf` and `UniformList` take `Label`, which names the list for assistive technology.
 - `Chart.TabStop(false)` leaves a chart and its legend out of the Tab order, for a sparkline
   that decorates a number. A click still focuses it, and assistive technology still reads it.
