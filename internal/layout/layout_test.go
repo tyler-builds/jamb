@@ -197,6 +197,34 @@ func TestPercentAndMinMax(t *testing.T) {
 	expect(t, b, 80, 0, 30, 10)
 }
 
+func TestStretchRespectsCrossMinAndMax(t *testing.T) {
+	// A row is 24 px tall. A stretched child takes the row's height, but no less
+	// than its MinHeight, as CSS does.
+	a := box(Style{Width: Px(10), MinHeight: Px(32)})
+	b := box(Style{Width: Px(10), MaxHeight: Px(12)})
+	row := box(Style{Direction: Row, Height: Px(24)}, a, b)
+	var e Engine
+	e.Compute(box(Style{}, row), 200, 100)
+	expect(t, a, 0, 0, 10, 32)
+	expect(t, b, 10, 0, 10, 12)
+
+	// The same in a column, where the cross axis is the width.
+	c := box(Style{Height: Px(10), MaxWidth: Px(30)})
+	col := box(Style{Width: Px(100)}, c)
+	e.Compute(col, 200, 100)
+	expect(t, c, 0, 0, 30, 10)
+}
+
+func TestStretchRespectsCrossMinWhenWrapped(t *testing.T) {
+	// Wrapped items stretch to their line, which is only known after the
+	// lines are measured; the minimum still holds.
+	a := box(Style{Width: Px(10), MinHeight: Px(32)})
+	row := box(Style{Direction: Row, Wrap: true, Width: Px(100)}, a)
+	var e Engine
+	e.Compute(row, 200, 100)
+	expect(t, a, 0, 0, 10, 32)
+}
+
 func TestAutoHeightFromChildren(t *testing.T) {
 	inner := box(Style{Height: Px(30)})
 	mid := box(Style{Padding: Edges{5, 0, 5, 0}, Margin: Edges{Top: 7}}, inner)
