@@ -7,6 +7,7 @@ updates:
       - "/examples/demo"
       - "/examples/git"
       - "/examples/hello"
+      - "/examples/monitor"
       - "/examples/notes"
     schedule:
       interval: weekly

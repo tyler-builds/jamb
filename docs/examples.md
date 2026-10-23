@@ -1,6 +1,6 @@
 # Examples
 
-The demo app, the notes app and the Git app in this repository.
+The demo app, the notes app, the Git app and the monitor in this repository.
 
 ## The demo app
 
@@ -252,3 +252,60 @@ app, it is built only from the public API to find gaps in it.
   Ctrl+Shift+P (command palette), Ctrl+Shift+I (the visual inspector).
 - The tests in `examples/git/views` build a small repository with `git` in a
   temporary folder and drive the app headlessly; they skip when `git` is missing.
+
+## The monitor
+
+`examples/monitor/` shows what the machine is doing as it changes: the load of each
+processor, the memory, the network traffic, the processes' I/O and the running
+processes. Like the notes and Git apps it is built only from the public API, and it
+found five gaps that became library features: `charts.Axis.Hidden` for its
+sparklines, `ui.FormatNumber` and `ui.FormatBytes`, floating dock windows that
+follow the window of their dock, tree rows in `ui.DataGrid` for its groups, and
+`app.FileIcon` for the programs' icons.
+
+- A goroutine samples the machine every second (0.5, 2 or 5 seconds with the interval
+  menu in the title bar, or Ctrl+[ and Ctrl+]) and sets the store's signals. On Windows
+  it reads the processes with one call to `NtQuerySystemInformation`; elsewhere, and
+  with `-synthetic`, it shows a made-up machine. The processor load is
+  `% Processor Utility`, as Task Manager shows it: the busy time scaled by the
+  processors' speed, so it reads higher than the busy time on a processor in turbo.
+  The processes' shares are scaled to it, and their memory is the private working
+  set, Task Manager's Memory column.
+- The tiles above the panels show the processor, memory, network and I/O now, each
+  with a sparkline of the last minute: a `charts.Area` with both axes hidden.
+- The panels are a `ui.Dock`: Processor (the load over time and each logical
+  processor), Memory, Network, Process I/O, Processes, Details and Alerts. Drag a tab to
+  rearrange them, or out of the window to float it. A floated panel keeps the window's
+  theme and zoom, and the shortcuts work in it. The layout is kept in the settings.
+  Ctrl+1 to Ctrl+7 show each panel, and reopen a closed one.
+- The process table is a `ui.DataGrid` that is sampled again every second. By default
+  it groups the processes as Task Manager does, with tree rows: the parts of Windows
+  in one group (a process with no executable file, such as System or Memory
+  Compression, or one whose executable is in the Windows folder and published by
+  Microsoft, read from its version information; drivers' programs are not), and each program that runs more than one process in a group with their
+  sums. Each row shows its program's icon, read once for each executable with
+  `app.FileIcon` by a goroutine of its own. "All processes" lists them one a row, and
+  a filter always does. Its sort,
+  focus, open groups and selection follow each row by its key as the rows move.
+  The CPU column is shaded by load. Its columns can be moved and resized, and are kept.
+  Ctrl+F filters it by name or PID. Right-click a row for its menu, and Delete asks
+  before it ends the selected process, through an `AlertDialog`. A process is ended
+  only if it is still the one that was selected: one that took over its PID is not.
+- The Details panel shows the selected process: its path (loaded with `ui.Query`), its
+  parent (a button selects it), when it started (`ui.TimeAgo`), and charts of its
+  processor and memory use. For Memory Compression and Secure System it says what
+  their memory is. A selected group shows its sums and its members that use the most
+  memory.
+- The Alerts panel holds two rules, for the processor load and the memory, each with
+  a limit and a time. An alert is listed in the panel, shown as a Windows notification
+  (a click shows the alerts), and marked on the taskbar button with a badge while the
+  value stays above its limit.
+- The notification area icon shows the processor load as a bar, and its tooltip the
+  load and the memory. Its menu shows the window, pauses the sampling, or quits. The
+  Alerts panel's switch closes the window to the notification area instead of
+  quitting.
+- Shortcuts: Ctrl+P (pause), Ctrl+F (filter), Ctrl+Shift+L (theme), Ctrl+K or
+  Ctrl+Shift+P (command palette), Ctrl+Shift+I (the visual inspector).
+- The settings are kept in `jamb-monitor\settings.json` in the user's configuration
+  folder. The tests in `examples/monitor/views` drive the app headlessly over the
+  made-up machine.
