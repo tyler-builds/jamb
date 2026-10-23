@@ -111,6 +111,8 @@ The runtime's warnings, such as duplicate keys, are logged to the test, and
 `u.Warnings()` returns them. `u.Runtime()` is the `*ui.Runtime` underneath, for
 what the package does not cover, such as `SetZoom`, `SetStrings` or
 `Dispatch`. After changing it directly, call `u.Frame()`.
+`u.Close()` closes the window as the app does, so the fetches of its queries are
+canceled (see [Loading data](data.md)).
 
 ## Finding elements
 
