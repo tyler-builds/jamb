@@ -40,7 +40,7 @@ func (c *Chart) legendColumn(v *view, hidden *ui.Signal[[]bool], cursor *ui.Sign
 func (c *Chart) legendItem(v *view, hidden *ui.Signal[[]bool], cursor *ui.Signal[cursorAt], i int) ui.Element {
 	name := c.itemName(v.s, i)
 	on := !v.isHidden(i)
-	item := ui.Div().Role(access.RoleButton).Label(name).AccessChecked(on).Focusable().
+	item := ui.Div().Role(access.RoleButton).Label(name).AccessChecked(on).Focusable().TabStop(!c.noTab).
 		Style(v.st.LegendItem).Row().Align(ui.Center).Child(c.swatch(v, i)).Child(ui.Text(name).NoWrap())
 	item.FocusVisible(ui.Style{BorderWidth: 2, BorderColor: v.t.FocusRing})
 	if !on {

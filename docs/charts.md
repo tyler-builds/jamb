@@ -90,13 +90,18 @@ less. A chart 36 pixels high draws at that height. A chart sized in pixels to le
 part has no padding by default. A theme that adds padding to it can be overridden with
 `Styles(charts.Style{Chart: ui.Style{...}})`.
 
+A sparkline that sits beside the number it charts is decoration: `TabStop(false)` leaves
+it, and its legend if it has one, out of the Tab order, so the keyboard does not stop on
+each tile. A click still focuses it, and assistive technology still reads its summary.
+
 ## Interaction
 
 - **Hover** shows a tooltip at the pointer: the position's label, and each shown
   series' value there. The tooltip is a real element, an overlay on the chart.
   A line, area or scatter plot shows a crosshair, and a bar chart highlights the
   slot.
-- **Keyboard.** The chart is one focus stop. Its first shown point is the start.
+- **Keyboard.** The chart is one focus stop (`TabStop(false)` takes it, and its legend,
+  out of the Tab order). Its first shown point is the start.
   Left and Right move along the points of the series. Up and Down switch to the
   next or previous series at the same place. Each step is announced with
   `ui.Announce`, such as "Tuesday, Visits 180". A focus ring marks the point.
