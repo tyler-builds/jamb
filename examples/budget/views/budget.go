@@ -180,7 +180,9 @@ func usedBar(t *ui.Theme, hc bool, r budgetRow) ui.Element {
 	} else if r.spent > 0 {
 		frac = 1.01
 	}
-	bar := ui.ProgressBar(min(max(frac, 0), 1)).Label(usedText(r)).Width(ui.Px(110))
+	// The readout says the share used, past 100 percent too, where the bar stops.
+	bar := ui.ProgressBar(min(max(frac, 0), 1)).Label(usedText(r)).Width(ui.Px(180)).
+		Format(func(float64) string { return usedText(r) })
 	switch {
 	case hc:
 	case frac > 1:
@@ -188,8 +190,7 @@ func usedBar(t *ui.Theme, hc bool, r budgetRow) ui.Element {
 	case frac > 0.9:
 		bar.Color(t.Warning)
 	}
-	return ui.Div().Row().Align(ui.Center).Gap(8).Size(ui.Full, ui.Full).
-		Child(bar).Child(ui.Text(usedText(r)).FontSize(11.5).TextColor(t.TextMuted).Truncate())
+	return ui.Div().Row().Align(ui.Center).Size(ui.Full, ui.Full).Child(bar)
 }
 
 func groupKeys(rows []budgetRow) []string {

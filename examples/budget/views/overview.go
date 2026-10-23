@@ -90,8 +90,8 @@ func (a *App) overviewPage(ctx *ui.Context) ui.Element {
 			Y: func(b monthBars) float64 { return b.budgeted }},
 	).Key("history").Title("The last six months").Format(cur).YAxis(charts.Axis{Format: cur}.Min(0)).Height(ui.Px(260))
 	body.Child(ui.Div().Row().Gap(16).Wrap().
-		Child(card(t).Grow(1).Basis(ui.Px(360)).Child(donut)).
-		Child(card(t).Grow(1).Basis(ui.Px(360)).Child(bars)))
+		Child(card(t).Key("spending-card").Grow(1).Basis(ui.Px(360)).Child(donut)).
+		Child(card(t).Key("history-card").Grow(1).Basis(ui.Px(360)).Child(bars)))
 
 	overList := ui.Div().Column().Gap(10)
 	if len(over) == 0 {
