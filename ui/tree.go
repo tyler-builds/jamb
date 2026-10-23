@@ -21,6 +21,9 @@ type TreeNode struct {
 	Key string
 	// Label is the text of the node.
 	Label string
+	// Description is muted text after the label, such as a count or a path. Assistive
+	// technology reads it as the node's description.
+	Description string
 	// Icon is an icon shown before the label.
 	Icon *icons.Icon
 	// Children are the children of the node, shown when it is open.
@@ -36,7 +39,8 @@ type TreeNode struct {
 // own: RowHover while the pointer is over a row that is not selected,
 // RowSelected for the selected row, and TreeFocusVisible for the tree while it
 // has keyboard focus (the ring is drawn on the tree, as the rows are not focused
-// themselves).
+// themselves). Description is the muted text after a node's label, and a node's
+// RenderTrailing content sits after it, at the end of the row.
 type TreeStyle struct {
 	Row              Style   // each visible row
 	RowHover         Style   // a row the pointer is over, if it is not selected
@@ -44,6 +48,7 @@ type TreeStyle struct {
 	Chevron          Style   // the click target of a node's chevron
 	Icon             Style   // the icon of a node
 	Label            Style   // the text of a node
+	Description      Style   // the text after a node's label (see TreeNode.Description)
 	TreeFocusVisible Style   // the tree while it has keyboard focus
 	Indent           float32 // the indent of each level below the top, in logical pixels
 }
@@ -61,6 +66,7 @@ func (s TreeStyle) merge(o TreeStyle) TreeStyle {
 		Chevron:          s.Chevron.Merge(o.Chevron),
 		Icon:             s.Icon.Merge(o.Icon),
 		Label:            s.Label.Merge(o.Label),
+		Description:      s.Description.Merge(o.Description),
 		TreeFocusVisible: s.TreeFocusVisible.Merge(o.TreeFocusVisible),
 		Indent:           indent,
 	}
@@ -76,6 +82,7 @@ func (s TreeStyle) plain() TreeStyle {
 		Chevron:          plainStyle(s.Chevron),
 		Icon:             plainStyle(s.Icon),
 		Label:            plainStyle(s.Label),
+		Description:      plainStyle(s.Description),
 		TreeFocusVisible: plainStyle(s.TreeFocusVisible),
 		Indent:           s.Indent,
 	}
@@ -93,6 +100,7 @@ func treeDefaults(t *Theme) TreeStyle {
 		Chevron: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(16), Height: Px(16),
 			NoShrink: true, TextColor: t.TextMuted},
 		Icon:             Style{TextColor: t.TextMuted},
+		Description:      Style{TextColor: t.TextMuted, Grow: 1, MinWidth: Px(0)},
 		TreeFocusVisible: Style{Shadows: []Shadow{ring}},
 		Indent:           18,
 	}
@@ -151,8 +159,10 @@ type TreeElement struct {
 	styles      TreeStyle
 	renderRow   func(node TreeNode, state PartState) Element
 	renderLabel func(node TreeNode, state PartState) Element
-	focusHandle *FocusHandle // see FocusHandle
-	size        sizing       // see the sizing methods
+	trailing    func(node TreeNode, state PartState) Element // see RenderTrailing
+	menu        func(key string) []MenuItem                  // see ContextMenu
+	focusHandle *FocusHandle                                 // see FocusHandle
+	size        sizing                                       // see the sizing methods
 }
 
 // The sizing methods give the tree's outer box a size, over its Style. See Sizing
@@ -321,15 +331,32 @@ func (tv *TreeElement) RenderLabel(fn func(node TreeNode, state PartState) Eleme
 	return tv
 }
 
+// RenderTrailing puts what fn returns at the end of each row, after the label and the
+// description, such as a count or a badge. The content is hidden from assistive
+// technology, so the row's name and description still say what the node is. fn is
+// called again when the row's pointer state changes, with the state in the PartState.
+func (tv *TreeElement) RenderTrailing(fn func(node TreeNode, state PartState) Element) *TreeElement {
+	tv.trailing = fn
+	return tv
+}
+
+// ContextMenu opens a menu on a row, built by build with the row's key. A right click
+// selects the row first, as File Explorer does, and Shift+F10 or the Menu key opens the
+// menu of the selected row while the tree has focus. An empty result opens nothing.
+func (tv *TreeElement) ContextMenu(build func(key string) []MenuItem) *TreeElement {
+	tv.menu = build
+	return tv
+}
+
 // treeRow is one visible row of a tree: a node, its place in the tree and its state.
 type treeRow struct {
-	key, label string
-	icon       *icons.Icon
-	level      int // 1 at the top
-	parent     int // the index of the parent row, or -1 at the top
-	pos, size  int // the position of the node among its siblings, and their number
-	expandable bool
-	open       bool
+	key, label, description string
+	icon                    *icons.Icon
+	level                   int // 1 at the top
+	parent                  int // the index of the parent row, or -1 at the top
+	pos, size               int // the position of the node among its siblings, and their number
+	expandable              bool
+	open                    bool
 }
 
 // flattenTree returns the visible rows of nodes, depth first. The children of a
@@ -342,7 +369,7 @@ func flattenTree(nodes []TreeNode, open map[string]bool, capHint int) []treeRow 
 	add = func(ns []TreeNode, level, parent int) {
 		for i, n := range ns {
 			idx := len(rows)
-			r := treeRow{key: n.Key, label: n.Label, icon: n.Icon, level: level, parent: parent,
+			r := treeRow{key: n.Key, label: n.Label, description: n.Description, icon: n.Icon, level: level, parent: parent,
 				pos: i + 1, size: len(ns), expandable: n.Children != nil}
 			r.open = r.expandable && open[n.Key]
 			rows = append(rows, r)
@@ -657,7 +684,18 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 		// The list sits in a column that takes the tree's style, so that the list
 		// fills the space the style gives it. The column may shrink below its rows,
 		// so that the list windows them to the space instead of building them all.
-		return tv.size.apply(Div().Column().MinHeight(Px(0)).Style(tv.style)).Child(list)
+		root := tv.size.apply(Div().Column().MinHeight(Px(0)).Style(tv.style)).Child(list)
+		if tv.menu != nil {
+			// Shift+F10 and the Menu key open the menu of the selected row, from the tree's
+			// own box. A pointer press that is not on a row opens nothing.
+			root.ContextMenu(func() []MenuItem {
+				if !rt.keyboardModality || cur < 0 {
+					return nil
+				}
+				return tv.menu(rows[cur].key)
+			})
+		}
+		return root
 	})
 }
 
@@ -667,7 +705,7 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 func (tv *TreeElement) row(st *TreeStyle, t *Theme, r treeRow, i int, sel string,
 	setOpen func(string, bool), choose func(int)) Element {
 	on := r.key == sel
-	node := TreeNode{Key: r.key, Label: r.label, Icon: r.icon}
+	node := TreeNode{Key: r.key, Label: r.label, Description: r.description, Icon: r.icon}
 	// draw returns the row in the state ps describes. The level sets the left
 	// padding, which the Row style replaces when it sets one.
 	draw := func(ps PartState) *DivElement {
@@ -708,9 +746,32 @@ func (tv *TreeElement) row(st *TreeStyle, t *Theme, r treeRow, i int, sel string
 			}
 			row.Child(label)
 		}
+		// The description and the trailing content are hidden from assistive technology:
+		// the row reports the description, and the trailing content is for sighted users.
+		if r.description != "" {
+			row.Child(Div().asPart("Tree.Description").AccessHidden().Style(st.Description).
+				Child(Text(r.description).NoWrap().Truncate()))
+		}
+		if tv.trailing != nil {
+			if r.description == "" {
+				row.Child(Div().Grow(1)) // pushes the trailing content to the row's end
+			}
+			row.Child(Div().asPart("Tree.Trailing").AccessHidden().Row().Align(Center).
+				Style(Style{NoShrink: true}).Child(tv.trailing(node, ps)))
+		}
 
 		a := row.access()
 		row.Role(access.RoleTreeItem).Label(r.label).AccessSelected(on)
+		if r.description != "" {
+			row.Description(r.description)
+		}
+		if tv.menu != nil {
+			key := r.key
+			row.ContextMenu(func() []MenuItem {
+				choose(i) // a right click selects the row first, as File Explorer does
+				return tv.menu(key)
+			})
+		}
 		a.setPos, a.setSize, a.level = r.pos, r.size, r.level
 		a.highlighted = on
 		if r.expandable {
@@ -727,7 +788,7 @@ func (tv *TreeElement) row(st *TreeStyle, t *Theme, r treeRow, i int, sel string
 			})
 		return row
 	}
-	if tv.renderRow == nil && tv.renderLabel == nil {
+	if tv.renderRow == nil && tv.renderLabel == nil && tv.trailing == nil {
 		return draw(PartState{Selected: on, HighContrast: t.HighContrast})
 	}
 	// With a render slot the row is its own component, so that it re-renders when

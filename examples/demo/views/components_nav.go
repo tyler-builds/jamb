@@ -67,6 +67,7 @@ func navigationSection() ui.Element {
 				Key("nav.bigTree").Label("Generated folders").Style(ui.Style{Height: ui.Px(200)}))),
 			manyTabsSample(t),
 			closableTabsSample(t),
+			annotatedTreeSample(t),
 		}
 		// Each sample is a column, not a wrapped row, since the tabs and the tree are wide.
 		col := ui.Div().Column().Gap(18)
@@ -134,6 +135,48 @@ func manyTabsSample(t *ui.Theme) ui.Element {
 			Suffix(add).
 			OverflowMenu().TabMaxWidth(ui.Px(120))))
 	})
+}
+
+// annotatedTreeSample is a tree whose nodes have a description, a count at the end of
+// each folder's row, and a context menu on each row, which a right click or Shift+F10
+// opens. The last action is shown under the tree.
+func annotatedTreeSample(t *ui.Theme) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		node := ui.Local(ctx, "nav.annNode", "src/tree.go")
+		last := ui.Local(ctx, "nav.annLast", "none")
+		counts := map[string]int{"src": 2, "docs": 1}
+		return sample(t, "Tree view, descriptions, counts and a context menu", ui.Div().Width(ui.Px(420)).Column().Gap(8).
+			Child(ui.Tree(annotatedFiles(), node).Key("nav.annTree").Label("Annotated files").
+				Style(ui.Style{MaxHeight: ui.Px(200)}).
+				RenderTrailing(func(n ui.TreeNode, s ui.PartState) ui.Element {
+					if c, ok := counts[n.Key]; ok {
+						return ui.Text(fmt.Sprint(c)).TextColor(t.TextMuted)
+					}
+					return ui.Div()
+				}).
+				ContextMenu(func(key string) []ui.MenuItem {
+					return []ui.MenuItem{
+						{Label: "Copy name", OnClick: func() { last.Set("copy name of " + key) }},
+						{Label: "Show in history", OnClick: func() { last.Set("show " + key + " in history") }},
+					}
+				})).
+			Child(ui.Text("Last action: "+last.Get()).FontSize(12).TextColor(t.TextMuted)))
+	})
+}
+
+// annotatedFiles is the tree of annotatedTreeSample.
+func annotatedFiles() []ui.TreeNode {
+	return []ui.TreeNode{
+		{Key: "src", Label: "src", Description: "Source code", Icon: icons.Folder, Children: func() []ui.TreeNode {
+			return []ui.TreeNode{
+				{Key: "src/main.go", Label: "main.go", Description: "Entry point", Icon: icons.File},
+				{Key: "src/tree.go", Label: "tree.go", Description: "Tree view", Icon: icons.File},
+			}
+		}},
+		{Key: "docs", Label: "docs", Description: "Documentation", Icon: icons.Folder, Children: func() []ui.TreeNode {
+			return []ui.TreeNode{{Key: "docs/readme.md", Label: "readme.md", Icon: icons.File}}
+		}},
+	}
 }
 
 // treeFromCode is the project tree with buttons that open and close it from code,
