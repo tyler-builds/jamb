@@ -16,8 +16,35 @@ the app; and animations gain springs, keyframes, timelines, delays and staggers.
 can show a close button and stay out of the way as non-modal panels, toasts can be updated and
 dismissed by ID, trees open and close from code, and the code editor offers quick fixes.
 
+Building a Git history browser (`examples/git`) brought a second set: `ui.Query` loads data as
+TanStack Query does, `ListBox`, `TitleBar` and `CopyButton` are new, times read "3 days ago" in
+every language jamb ships, tabs can close, trees take menus and trailing content, the command
+palette lists the app's own items, and the icons are the whole Lucide set. Several defaults
+changed with them: split grips show on hover, clickable `Div`s get a focus ring, and segmented
+tabs are neutral.
+
 ### Changed
 
+- **Breaking:** The icons are the Lucide set (1.61.0, 1,903 icons, ISC license), generated from its
+  SVG files, instead of 58 hand-drawn ones. Every old name still works: most map to the Lucide icon of
+  the same name, and `Alert`, `Dashboard`, `Filter`, `Home`, `MoreHorizontal` and `Refresh` are
+  aliases of `TriangleAlert`, `LayoutDashboard`, `Funnel`, `House`, `Ellipsis` and `RotateCw`. The
+  drawings change slightly at each call site. `icons.All` is now a function, and `Icon.StrokeWidth`
+  is gone. An icon the app never names is not linked; drawing any icon links the SVG engine, so the
+  hello app's binary grew by 213 KB (2.5%), and a program that names every icon is 2.6 MB.
+- **Breaking:** A `Split`'s grip shows only while the pointer is over the divider, or while it is
+  dragged or focused (`SplitGripOnHover` is the default and the zero value). `Grip(ui.SplitGripShown)`
+  keeps it drawn. The values of the `SplitGrip` constants changed with the new zero value.
+- **Breaking:** Segmented tabs (`TabsSegmented`) are neutral by default: a raised segment on a sunken
+  track, not an accent fill. High contrast keeps the system colors. `Styles` with an accent
+  `TabSelected` brings the fill back; docs/widgets-navigation.md shows how.
+- A focusable `Div` with `OnClick` that sets no `FocusVisible` style of its own draws the standard
+  focus ring while it has keyboard focus.
+- A `DescriptionList`'s term column is as wide as its widest term, up to half the list, instead of
+  120 px.
+- A `DataGrid` cell's render slot fills the row's height, so content sized with `ui.Full`, such as
+  a canvas, fills the cell.
+- `Text.Weight` is deprecated in favor of `Text.FontWeight`, the name `Div` uses.
 - A `Split` divider takes only its bar's thickness in the layout, 1 px by default, instead of 9 px, so
   the panes meet at the bar and it reads as the border between them. Each pane is 8 px wider than
   before beside each divider. The 9 px hit area is unchanged in size; it lies over the panes' edges,
@@ -102,6 +129,35 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 
 ### Added
 
+- `ui.Query` loads data for a component, as TanStack Query does: a per-window cache by key, one
+  fetch per key however many components use it, loading, error and refetch state, retries with
+  backoff, stale times, keeping the previous key's data while the next loads, invalidation and
+  `SetQueryData`. The fetch runs off the UI thread with a context that is canceled when nothing
+  uses the key and when the window closes. See docs/data.md.
+- `ui.ListBox` is a list the user selects from, single or multiple, with the WAI-ARIA listbox keys,
+  type-ahead, a context menu and UI Automation selection, built only in view. Its selection is a
+  signal of keys, or a single key in a string signal (`SelectedKey`).
+- `ui.TitleBar` is a container for a window's own title bar: it drags the window, dims while the
+  window is in the background, ends with the caption buttons, and centers an optional `Center`
+  element on the whole window, never over the sides. It has no fill or border of its own, so it is
+  part of the window's content unless the app styles it.
+- `ui.CopyButton` copies text, then shows "Copied" (or the text given) in place for 1.5 s and
+  announces it. A toast is optional.
+- `ui.FormatRelative` and `ui.TimeAgo` show a time as "3 days ago", "yesterday" or "in 2 hours", in
+  English, Italian and Chinese, from CLDR's relative time patterns. `TimeAgo` updates itself as
+  time passes, and its tooltip is the full date and time.
+- Tabs can close: `Tab.Closable` and `Tabs.OnClose`, with a close button, a middle-click, Ctrl+W,
+  Ctrl+F4 and Delete.
+- `Tree.ContextMenu`, `TreeNode.Description` and `Tree.RenderTrailing` (counts and badges at the end
+  of a row).
+- `CommandPalette.Items` lists the app's own items (`PaletteItem`) before the commands, and
+  `ItemsOnly` makes the palette a quick open, as VS Code's Ctrl+P is; ">" switches to commands.
+- `Div.PaddingTop`, `PaddingRight`, `PaddingBottom`, `PaddingLeft`, `MarginLeft` and `MarginRight`.
+- `ui.AvatarInitials` and `ui.AvatarColor`, the initials and fill an `Avatar` uses for a name.
+- `Tag.Color` tints a tag with a category color.
+- `TextInput.OnKeyDown` and `TextArea.OnKeyDown` run before the field's own keys.
+- `DataColumn.CellStyle` styles one column's cells, such as clearing their padding.
+- A toast shown in a window with no `Toaster` prints a development warning, once.
 - `highlight.Languages`, `highlight.Supported` and `highlight.CaptureNames` list and check the
   language names and the token names, and `highlight.Highlight(lang, code)` colors a text that is
   not edited in one call.
@@ -211,6 +267,8 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 
 ### Fixed
 
+- A stretched flex item keeps its minimum and maximum size on the cross axis, as in CSS. A
+  `MinHeight` of 32 px on a child stretched in a 24 px row used to give it 24 px.
 - A `Split` measures its own box. It used to find its box by searching the window for its key, so
   of two splits with the same key in different parts of the tree (keys are unique only among
   siblings) both measured the first. When that one was hidden, as in an app that keeps a hidden view
