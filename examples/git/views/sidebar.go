@@ -49,17 +49,12 @@ func (a *App) repoList() ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
 		repos := a.s.Repos.Get()
-		list := ui.ListBox(repos, func(r *store.Repo) string { return r.Path }, a.repoSel,
+		list := ui.ListBox(repos, func(r *store.Repo) string { return r.Path }, nil,
 			func(r *store.Repo, _ ui.PartState) ui.Element { return a.repoRow(t, r) }).
-			Key("repos").Label("Repositories").
+			Key("repos").Label("Repositories").SelectedKey(a.s.Current).
 			ItemName(func(r *store.Repo) string { return r.Info.Peek().Name }).
 			Styles(ui.ListBoxStyle{Item: ui.Style{MinHeight: ui.Px(40)}}).
-			OnChange(func(keys []string) {
-				if len(keys) == 1 {
-					a.s.Current.Set(keys[0])
-					a.changed()
-				}
-			}).
+			OnChange(func([]string) { a.changed() }).
 			ContextMenu(func(r *store.Repo) []ui.MenuItem {
 				return []ui.MenuItem{
 					{Label: "Refresh", Icon: icons.Refresh, OnClick: r.Reload},
@@ -68,7 +63,6 @@ func (a *App) repoList() ui.Element {
 					{Label: "Remove from list", Icon: icons.X, OnClick: func() {
 						a.s.Remove(r.Path)
 						delete(a.views, r.Path)
-						a.syncRepos()
 						a.changed()
 					}},
 				}
@@ -214,11 +208,9 @@ func (a *App) refTree(r *store.Repo) ui.Element {
 	})
 }
 
-// revealRef selects the commit a ref points at, or says it is not loaded yet.
+// revealRef selects the commit a ref points at.
 func (a *App) revealRef(ctx *ui.Context, r *store.Repo, ref repo.Ref) {
-	if !a.selectCommit(r, ref.Target) {
-		ctx.Toast(ui.ToastInfo, ref.Name+" is further back than the history loaded so far.")
-	}
+	a.revealCommit(ctx, r, ref.Target, ref.Name)
 }
 
 // refTrailing ends a tree row: a group's count, or a branch's mark when HEAD is on

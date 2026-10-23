@@ -125,11 +125,7 @@ func (a *App) commitMenu(ctx *ui.Context, r *store.Repo, e store.Entry) []ui.Men
 	}
 	if len(e.Parents) > 0 {
 		items = append(items, ui.MenuSeparator(), ui.MenuItem{Label: "Go to parent", Icon: icons.ArrowLeft,
-			OnClick: func() {
-				if !a.selectCommit(r, e.Parents[0]) {
-					ctx.Toast(ui.ToastInfo, "The parent is further back than the history loaded so far.")
-				}
-			}})
+			OnClick: func() { a.revealCommit(ctx, r, e.Parents[0], "The parent") }})
 	}
 	return items
 }
