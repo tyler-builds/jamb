@@ -66,6 +66,7 @@ func navigationSection() ui.Element {
 			sample(t, "Tree view, 10,000 generated folders", ui.Div().Width(ui.Px(420)).Child(ui.Tree(folders, big).
 				Key("nav.bigTree").Label("Generated folders").Style(ui.Style{Height: ui.Px(200)}))),
 			manyTabsSample(t),
+			closableTabsSample(t),
 		}
 		// Each sample is a column, not a wrapped row, since the tabs and the tree are wide.
 		col := ui.Div().Column().Gap(18)
@@ -74,6 +75,35 @@ func navigationSection() ui.Element {
 			Child(SectionTitle(t, "Navigation and layout")).
 			Child(ui.Text("Tab moves to the selected tab. Left and Right select the neighbouring tabs; Ctrl+Tab goes to the next tab from the tab list or the panel.").FontSize(12).TextColor(t.TextMuted)).
 			Child(col)
+	})
+}
+
+// closableTabsSample is a tab list whose tabs the user can close. The app keeps the open
+// tabs. OnClose drops the one that was closed, and selects the tab that took its place
+// when that one was selected, in the same handler.
+func closableTabsSample(t *ui.Theme) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		open := ui.Local(ctx, "nav.closeOpen", []string{"Notes", "Draft", "Budget", "Read me"})
+		picked := ui.Local(ctx, "nav.closePicked", "Notes")
+		last := ui.Local(ctx, "nav.closeLast", "none")
+		tabs := make([]ui.Tab[string], 0, len(open.Get()))
+		for _, name := range open.Get() {
+			tabs = append(tabs, ui.Tab[string]{Value: name, Label: name, Closable: true,
+				Panel: func() ui.Element { return panelText(t, name+" panel") }})
+		}
+		return sample(t, "Tabs, closable: close button, middle click, Delete, Ctrl+W", ui.Div().Width(ui.Px(420)).Column().Gap(8).
+			Child(ui.Tabs(picked, tabs...).Key("nav.closableTabs").Label("Open documents").
+				OnClose(func(v string) {
+					list := slices.Clone(open.Peek())
+					i := slices.Index(list, v)
+					list = slices.Delete(list, i, i+1)
+					open.Set(list)
+					if picked.Peek() == v && len(list) > 0 {
+						picked.Set(list[min(i, len(list)-1)])
+					}
+					last.Set(v)
+				})).
+			Child(ui.Text("Last closed: "+last.Get()).FontSize(12).TextColor(t.TextMuted)))
 	})
 }
 

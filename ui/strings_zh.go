@@ -74,6 +74,7 @@ func chineseMainlandStrings() *Strings {
 		Maximum:             "最大值",
 		MoreOptions:         "更多选项",
 		AllTabs:             "所有标签页",
+		CloseTab:            func(tab string) string { return "关闭 " + tab },
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移动",
@@ -216,6 +217,7 @@ func chineseTaiwanStrings() *Strings {
 		Maximum:             "最大值",
 		MoreOptions:         "更多選項",
 		AllTabs:             "所有分頁",
+		CloseTab:            func(tab string) string { return "關閉 " + tab },
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移動",
@@ -357,6 +359,7 @@ func chineseHongKongStrings() *Strings {
 		Maximum:             "最大值",
 		MoreOptions:         "更多選項",
 		AllTabs:             "所有分頁",
+		CloseTab:            func(tab string) string { return "關閉 " + tab },
 
 		PanelGroup:      "面板",
 		MovePanelLeft:   "向左移動",

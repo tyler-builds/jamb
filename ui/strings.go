@@ -158,6 +158,8 @@ type Strings struct {
 	ScrollTabsBack string
 	// ScrollTabsForward is the name of the button that scrolls a tab list toward its last tab.
 	ScrollTabsForward string
+	// CloseTab names the close button of a closable tab, such as "Close Sales" (see Tabs.OnClose).
+	CloseTab func(tab string) string
 
 	// The names of a dock's tab strip and of the commands of its tabs' menus.
 	PanelGroup string
@@ -555,6 +557,7 @@ func englishStrings() *Strings {
 		AllTabs:             "All tabs",
 		ScrollTabsBack:      "Scroll tabs back",
 		ScrollTabsForward:   "Scroll tabs forward",
+		CloseTab:            func(tab string) string { return "Close " + tab },
 
 		PanelGroup:      "Panels",
 		MovePanelLeft:   "Move left",

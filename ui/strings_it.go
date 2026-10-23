@@ -69,6 +69,7 @@ func italianStrings() *Strings {
 		Maximum:                   "Massimo",
 		MoreOptions:               "Altre opzioni",
 		AllTabs:                   "Tutte le schede",
+		CloseTab:                  func(tab string) string { return "Chiudi " + tab },
 
 		PanelGroup:      "Pannelli",
 		MovePanelLeft:   "Sposta a sinistra",
