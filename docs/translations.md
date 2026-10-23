@@ -46,6 +46,9 @@ of an image that is not shown, the name of a task's check box, and the names of
 tables, code blocks and the list of footnotes. They are English in every language
 until an app sets them too. The text of the document itself is the app's.
 
+The units of `ui.FormatBytes` are the `Byte`, `Bytes` and `KB` to `PB` fields. They are
+English in every language until an app sets them too.
+
 To change a message, start from `ui.EnglishStrings()` and set the fields you need.
 Each message with values is a function, so each language can set its own word order
 and plurals. A field that is empty or nil shows the English text. Use

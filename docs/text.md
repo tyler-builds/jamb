@@ -116,3 +116,26 @@ and the functions `RelativeAgo` and `RelativeIn`, which take a `RelativeUnit`
 forms follow the CLDR relativeTime long forms (CLDR 48.2). Chinese has no plural, so
 its words do not change with the count. `TimeAgo` uses the window's `Strings`;
 `FormatRelative` uses the system's language (see `ui.SystemStrings`).
+
+## Numbers and sizes
+
+`ui.FormatNumber(v, decimals)` returns `v` rounded to `decimals` places, with the group
+separators, the decimal point and the minus sign of the user's locale: `12,345.68` in
+en-US and `12.345,68` in de-DE. A value that rounds to zero has no minus sign. A NaN is
+the empty string, and an infinity is `∞` or `-∞`.
+
+`ui.FormatBytes(n)` returns a size in bytes as Windows Explorer and Task Manager show
+it, in 1024-based units with three significant digits: `512 bytes`, `1.00 KB`,
+`12.3 MB`, `123 MB` and `1.23 GB`. A size of 1000 units or more is shown in the next
+unit, as Windows does, so `1024000` is `0.97 MB`, and the digits are cut, not rounded, so
+`1048575` is `0.99 MB`. The sizes go up to PB. The decimal point is the locale's, as in
+`FormatNumber`. Unlike Windows, one byte is `1 byte`.
+
+```go
+ui.Text(ui.FormatBytes(p.ResidentBytes) + " in use")
+ui.Text(ui.FormatNumber(float64(p.Handles), 0) + " handles")
+```
+
+The words are in `ui.Strings`: `Byte`, `Bytes` and `KB` to `PB`. Every built-in pack sets
+them to the English words for now. `FormatBytes` uses the system's language, as
+`FormatRelative` does (see `ui.SystemStrings`).
