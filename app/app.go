@@ -923,6 +923,9 @@ func (h *host) OnDestroy(w platform.Window) {
 		h.fs.finish()
 		h.fs = nil
 	}
+	if h.rh != nil {
+		h.rh.Close() // the window's queries cancel their fetches
+	}
 	if h.r != nil {
 		h.r.Close()
 		h.r = nil
@@ -985,6 +988,7 @@ type runtimeHost interface {
 	TextInputRect() (scene.Rect, bool)
 	WindowAreaAt(x, y float32) ui.WindowArea
 	FlushTimers()
+	Close()
 }
 
 func hostOf(rt *ui.Runtime) runtimeHost { return uihost.Of(rt).(runtimeHost) }

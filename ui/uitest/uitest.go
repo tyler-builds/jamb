@@ -42,6 +42,7 @@ type host interface {
 	LocalClipboardImage() image.Image
 	SetLocalClipboardImage(image.Image)
 	PressKeys(string) error
+	Close()
 	TextOf(string) (string, bool)
 	AccessNode(*access.Tree, string) *access.Node
 	Perform(access.ID, access.Request)
@@ -125,6 +126,11 @@ func (u *UI) Runtime() *ui.Runtime { return u.rt }
 
 // Warnings returns the warnings the runtime gave so far, in order.
 func (u *UI) Warnings() []string { return u.warnings }
+
+// Close closes the window the way a window does when it closes: the fetches of its
+// queries are canceled, and no new one starts (see ui.Query). The UI cannot be
+// used after it.
+func (u *UI) Close() { u.host.Close() }
 
 // ---- time ----
 
