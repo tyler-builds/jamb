@@ -174,6 +174,8 @@ ui.Skeleton().Circle(32)                             // a placeholder for an ava
   `AccessHidden`, the avatar is an image named by the name, so it is read as the person's name.
   `Tooltip(s)` shows s over the circle, such as the name in full, since an avatar has no visible
   text; assistive technology reads it as the description unless it is the name.
+  `ui.AvatarInitials(name)` and `ui.AvatarColor(name)` return the initials and the fill an
+  avatar of that name uses, for an app that shows the same person elsewhere.
 - **Tag.** A tag is as wide as its text by default. Under `MaxWidth`, a long text ends with an
   ellipsis. `OnRemove` adds a button that works with the mouse, Enter and Space. `Tooltip(s)`
   shows s over the chip, such as the full text of a truncated tag, and is read as its description.
