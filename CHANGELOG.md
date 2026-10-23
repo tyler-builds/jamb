@@ -7,6 +7,15 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-23
+
+This release fixes the magnified content that v0.4.0 showed while a window's edge was dragged,
+and adds what a new example app needed. Building a system monitor (`examples/monitor`, in the
+style of Task Manager) brought tree rows in the data grid, charts with hidden axes for
+sparklines, numbers and byte sizes in the user's locale, and the icons Windows shows for files.
+Floating dock panels now belong to their dock's window, with its theme, zoom and shortcuts, and
+dock back where they came from. Nothing is breaking.
+
 ### Added
 
 - `examples/monitor`, a system monitor: live charts of the processors, memory, network and I/O,
@@ -664,7 +673,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/tyler-builds/jamb/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tyler-builds/jamb/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tyler-builds/jamb/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tyler-builds/jamb/compare/v0.1.0...v0.2.0
