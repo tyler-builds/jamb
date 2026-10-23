@@ -321,6 +321,7 @@ type Runtime struct {
 	graceAnims            map[*componentInstance]struct{}    // Animate instances the last paint did not draw, given one more render first
 	listStale             bool                               // a UniformList (or a strip whose extent changed) must rebuild before the frame ends
 	splitWatches          map[*componentInstance]*splitWatch // the splits that size their panes from their length (see splitsResized)
+	titleWatches          map[*componentInstance]float32     // the title bars with a centered element, and the inset each rendered with (see titleBarsResized)
 	toasts                []*toastEntry                      // the stack of toasts, oldest first (see Context.Toast)
 	toastNext             uint64                             // the ID of the last toast made
 	toastVer              *Signal[int]                       // changes when the stack changes; the Toaster renders it
@@ -866,9 +867,10 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 	if rt.needLayout {
 		rt.layout()
 	}
-	// A split sizes its panes from its own length, so one whose length changed in this layout
-	// renders again before the frame is painted (see splitsResized).
-	for i := 0; i < 2 && relayout && rt.splitsResized(); i++ {
+	// A split sizes its panes from its own length, and a title bar places its centered element
+	// from its sides, so one whose length or sides changed in this layout renders again before
+	// the frame is painted (see layoutWatchesResized).
+	for i := 0; i < 2 && relayout && rt.layoutWatchesResized(); i++ {
 		if rt.hasDirty.Load() {
 			rt.buildDirty()
 		}

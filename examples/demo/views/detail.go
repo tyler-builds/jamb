@@ -53,11 +53,10 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 	thread := ui.NewListHandle()
 	return func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
-		focused := ctx.Window().Focused()
 		tab := ui.Local(ctx, "tab", "overview")
 		p, ok := s.Project(id)
 		if !ok {
-			return ui.Div().Child(titleBar(t, focused, "")).
+			return ui.Div().Child(titleBar(t, "")).
 				Child(ui.Div().Padding(24).Child(ui.Text("This project no longer exists.")))
 		}
 		label := "Star"
@@ -97,7 +96,7 @@ func ProjectDetail(s *Store, id int) func(ctx *ui.Context) ui.Element {
 				}},
 			).Key("detail-tabs").Label("Project sections").KeepMounted())
 		return ui.Div().Size(ui.Full, ui.Full).Background(t.Background).TextColor(t.Text).
-			Child(titleBar(t, focused, p.Name)).
+			Child(titleBar(t, p.Name)).
 			Child(content)
 	}
 }
