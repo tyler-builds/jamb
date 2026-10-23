@@ -1,6 +1,6 @@
 # Examples
 
-The demo app and the notes app in this repository.
+The demo app, the notes app and the Git app in this repository.
 
 ## The demo app
 
@@ -205,3 +205,45 @@ compiled with zero errors, and it never read framework source.
 
 The agent's chip-wrapping and test workarounds were then replaced with
 these features (`examples/notes/views/tags.go`, `tags_test.go`).
+
+## The Git app
+
+`examples/git/` browses the history of Git repositories. It reads them with the
+`git` command, which must be on PATH, and never changes them. Like the notes
+app, it is built only from the public API to find gaps in it.
+
+- The sidebar lists the repositories. The + button (Ctrl+O) adds one with the
+  folder picker, and a repository's context menu refreshes it, copies its path or
+  removes it from the list. Ctrl+PageUp and Ctrl+PageDown move between them. Each
+  repository keeps its own view, hidden with `Display` while another is shown, so
+  its scroll position, selection and search survive the switch. On the first run
+  the list starts with the repository the app was started in, if any.
+- Below the repositories, a `ui.Tree` lists the branches, the remote branches by
+  remote, and the tags, with HEAD's branch checked and how far each branch is
+  ahead of and behind its upstream. Choosing one selects its commit.
+- The history is a `ui.DataGrid` of every branch's commits in topological order:
+  the graph, the message with its branch and tag pills, the author, the date and
+  the hash. The `graph` package gives each commit a lane and each row the lines
+  that cross it, and each row's graph cell is a `ui.Canvas` that draws its slice,
+  with the author's initials in the node, a dot for a merge and a ring on HEAD. The
+  rows have no border, so the slices meet. The grid loads 1,500 commits at a time
+  as it nears its end (`LoadMore`), and the lanes carry on from page to page.
+- The search field in the title bar (Ctrl+F) fades the commits that do not match
+  the words typed (in the message, the author or the start of the hash), so the
+  graph stays whole. Enter and F3 go to the next match, Shift+F3 to the previous.
+- The detail pane shows the selected commit's message, author and committer,
+  hash, parents (each selects its commit) and refs, and the files it changed with
+  their line counts. A merge is compared with its first parent. Choosing a file
+  shows its diff in place of the history, in a read-only `codeedit` editor with
+  the diff highlighting; Escape goes back.
+- The Tags page (Ctrl+2) is a sortable table of the tags, annotated or
+  lightweight, newest first. Enter or a double click shows a tag's commit.
+- The window draws its own title bar. The themes are the app's own light and
+  dark themes; they follow Windows until the sun or moon button picks one. The
+  repositories, the pane widths, the theme and the zoom are kept in
+  `jamb-git\settings.json` in the user's configuration folder.
+- Shortcuts: F5 or Ctrl+R (refresh), Ctrl+H (go to HEAD), Ctrl+Shift+C (copy
+  the selected commit's hash), Ctrl+1 and Ctrl+2 (history and tags), Ctrl+K or
+  Ctrl+Shift+P (command palette), Ctrl+Shift+I (the visual inspector).
+- The tests in `examples/git/views` build a small repository with `git` in a
+  temporary folder and drive the app headlessly; they skip when `git` is missing.

@@ -5,7 +5,7 @@ The repository layout, the architecture and frame pipeline, and GPU device loss.
 ## Repository layout
 
 ```
-go.work             workspace: the framework (.), cmd/jamb, examples/demo, examples/hello and examples/notes
+go.work             workspace: the framework (.), cmd/jamb and the four examples
 go.mod             module "github.com/tyler-builds/jamb", the framework
 app/               runs an app: window + renderer + ui runtime, dev hooks
 ui/                declarative API: Div, Text, Button, TextInput, TextArea, Icon, Image,
@@ -36,6 +36,11 @@ examples/hello/    module "github.com/tyler-builds/jamb/examples/hello", the sma
 examples/notes/    module "github.com/tyler-builds/jamb/examples/notes", a note-taking app (see below)
   store/           notes as signals, ordering, JSON persistence on a background goroutine
   views/           sidebar, note list, editor pane, actions and the command palette
+examples/git/      module "github.com/tyler-builds/jamb/examples/git", a Git history browser (see docs/examples.md)
+  repo/            reads a repository with the git command: commits, refs, changes, diffs
+  graph/           lays the commits out in lanes, one row at a time
+  store/           repositories as signals, history loaded a page at a time off the UI thread
+  views/           title bar, sidebar, history grid with the graph, details, diff, tags
 docs/              screenshots/ (PNG captures), benchmarks/ (bench-before.txt, bench-after.txt)
 scripts/bench.sh   reproduces the build and footprint numbers
 scripts/a11y-check.ps1  live UI Automation checks of the examples (see Tools)
