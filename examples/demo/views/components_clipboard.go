@@ -54,6 +54,10 @@ func clipboardSection(t *ui.Theme) ui.Element {
 				ui.Div().Width(ui.Px(280)).Child(ui.TextArea(note).Label("Message").
 					Placeholder("Write a message, or paste an image").
 					OnPasteImage(func(img image.Image) { show(img, "Pasted into the message") }))),
+			sample(t, "Copy buttons: a text copy button confirms in place, an icon one shows a check",
+				ui.Div().Row().Align(ui.Center).Gap(8).
+					Child(ui.CopyButton("https://example.com/projects/42").Label("Copy link").Copied("Link copied").Key("copy-link")).
+					Child(ui.CopyButton("v1.4.2").Tooltip("Copy the version").Key("copy-version"))),
 			sample(t, info.Get(), preview))
 	})
 }

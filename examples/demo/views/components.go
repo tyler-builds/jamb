@@ -102,7 +102,7 @@ var componentSections = []componentSection{
 				sample(t, "Highlight: Background", wordHighlight("Background", ui.Highlight{Background: t.AccentSoft, Color: t.Text})),
 				clickSample(t))
 		}},
-	{"Buttons", "Button Primary Secondary Ghost Danger Small Disabled Loading click press SplitButton split menu arrow",
+	{"Buttons", "Button Primary Secondary Ghost Danger Small Disabled Loading click press SplitButton split menu arrow CopyButton copy clipboard confirm",
 		func(_ *ui.Context, t *ui.Theme, _ *Store) ui.Element {
 			return section(t, "Buttons",
 				sample(t, "Primary", ui.Button("Primary").Primary().OnClick(pressed("Primary"))),

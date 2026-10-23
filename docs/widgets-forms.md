@@ -294,6 +294,33 @@ ui.ColorPicker(fill).Label("Fill color").Alpha().
   there; the thumb still marks the saturation and the brightness.
 - The look is `ui.ColorPickerStyle`, set in `Theme.ColorPicker` or with `.Styles(...)`.
 
+## Copy buttons
+
+`ui.CopyButton(text)` copies text to the clipboard when it is pressed. It is a
+Ghost icon button by default: a copy icon, which becomes a check after the copy. With
+`Label` it is a text button, whose label reads the confirmation after the copy.
+
+```go
+ui.CopyButton(commit.Hash).Tooltip("Copy the full hash")  // icon button
+ui.CopyButton("").Value(func() string { return link() }).Label("Copy link").Copied("Link copied")
+ui.CopyButton(url).Label("Copy link").Copied("Link copied").Secondary().Small().OnCopy(func(s string) { ... })
+```
+
+- The text is `text`, or the result of `Value`, which runs at the click. `Label` makes the
+  text button, and `Copied` sets the confirmation: the label after a copy, and the text
+  announced (default `Strings.Copied`). An icon button's accessible name is
+  `Strings.Copy`.
+- The confirmation shows for 1.5 seconds, then the button returns to its look. A second
+  copy in that time starts the 1.5 seconds again. With reduced motion there is no
+  transition, and the timing is the same.
+- After a copy, assistive technology hears the confirmation politely (`Announce`). It
+  shows no toast by default; `Toast(true)` also shows a success toast in the window's
+  `Toaster`, which announces it instead.
+- `OnCopy` runs after the copy with the text copied. Use `Disabled`, `Key`, `Tooltip`,
+  `Variant` (`Primary`, `Secondary`, `Ghost`, `Danger`), `Small` or `Large`, `Width`,
+  `Height`, `Style` and `Styles` as for `Button`. A copy button is a focusable
+  button, so Enter and Space copy.
+
 ## Forms
 
 A form is a set of fields. `ui.Field` gives a control a label, an optional help

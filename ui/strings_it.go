@@ -58,6 +58,8 @@ func italianStrings() *Strings {
 		Minimize:                  "Riduci a icona",
 		Maximize:                  "Ingrandisci",
 		Restore:                   "Ripristina",
+		Copy:                      "Copia",
+		Copied:                    "Copiato",
 		Increase:                  "Aumenta",
 		Decrease:                  "Diminuisci",
 		ShowPassword:              "Mostra password",
