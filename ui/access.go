@@ -1358,15 +1358,23 @@ func inSelectionContainer(t *access.Tree, n *access.Node) bool {
 	return false
 }
 
-// focusChild moves keyboard focus to the first focusable child of n, for an
-// element that takes focus for its child (see accessInfo.focusInside).
-func (rt *Runtime) focusChild(n *node) {
+// focusChild moves keyboard focus to the first focusable element under n, depth
+// first, for an element that takes focus for its child (see accessInfo.focusInside):
+// a DropdownMenu's trigger, or the text field inside a combo box's frame.
+func (rt *Runtime) focusChild(n *node) bool {
 	for _, c := range n.children {
-		if c.flags&flagNoDisplay == 0 && c.div != nil && c.div.focusable {
+		if c.flags&flagNoDisplay != 0 {
+			continue
+		}
+		if c.kind == kindEditor || (c.div != nil && c.div.focusable) {
 			rt.setFocus(c.id)
-			return
+			return true
+		}
+		if rt.focusChild(c) {
+			return true
 		}
 	}
+	return false
 }
 
 // comboRow returns the row that the combo box holding the text n highlights, or nil
