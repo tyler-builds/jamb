@@ -328,6 +328,8 @@ type Runtime struct {
 	toastAt               time.Time                          // when the toasts last ran their time
 	toastMax              int                                // how many toasts show at once (0: the default)
 	toastRegion           uint64                             // the node ID of the toast region, 0 when none is shown
+	hasToaster            bool                               // a Toaster has been rendered in this runtime's window
+	toastWarned           bool                               // the warning for a toast without a Toaster has been reported
 	toastReturn           uint64                             // the focus before the toast region took it (F6)
 	scrolled              bool
 	wake                  func()

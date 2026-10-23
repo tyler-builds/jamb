@@ -67,7 +67,8 @@ ctx.DismissToast("upload")                                              // remov
   holding keyboard focus goes. A toast a user is reading or using is kept, and if every
   toast is in use the stack grows for the time being. The stack sits in the window's
   bottom-right corner over the content, so put the `Toaster` last in the root element.
-  Its enter and exit motion jumps to its end under reduced motion.
+  Its enter and exit motion jumps to its end under reduced motion. A window with no
+  `Toaster` shows no toast; the first toast there is reported as a development warning.
 - **Toasts and focus.** A toast does not take focus. F6 moves focus into the toast
   region, named "Notifications", and F6 again returns it to the element that had it,
   as Windows moves between the regions of a window
