@@ -30,6 +30,32 @@ type dateLocale struct {
 	decimal, group string
 	grouping       []int
 	minus          string
+	// The currency of the locale (see FormatCurrency): its symbol, the digits after
+	// its decimal point, the decimal point, group separator and grouping of amounts of
+	// money, and Windows' patterns for a positive amount (LOCALE_ICURRENCY, 0 to 3)
+	// and a negative one (LOCALE_INEGCURR, 0 to 15). Empty separators and a nil
+	// grouping are those of numbers.
+	currency              string
+	currDigits            int
+	monDecimal, monGroup  string
+	monGrouping           []int
+	currPositive, currNeg int
+}
+
+// money returns the locale with the decimal point, the group separator and the
+// grouping of amounts of money in place of those of numbers.
+func (l *dateLocale) money() *dateLocale {
+	m := *l
+	if l.monDecimal != "" {
+		m.decimal = l.monDecimal
+	}
+	if l.monGroup != "" {
+		m.group = l.monGroup
+	}
+	if l.monGrouping != nil {
+		m.grouping = l.monGrouping
+	}
+	return &m
 }
 
 // localeOverride replaces the locale of the system, for the tests of the pickers and
@@ -71,6 +97,9 @@ func englishLocale() *dateLocale {
 		group:        ",",
 		grouping:     []int{3},
 		minus:        "-",
+		currency:     "$",
+		currDigits:   2,
+		currNeg:      1, // -$1.10
 	}
 }
 
