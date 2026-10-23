@@ -97,7 +97,8 @@ ui.DataGrid(runs, func(r run) string { return r.ID },
 | `Header` | The header text, and the column's name for assistive technology |
 | `Key` | Identifies the column in a `SortState` and in the widths the user sets. `Header` when empty |
 | `Text` | The text of each cell, and the cell's accessible name |
-| `Cell` | A render slot: replaces the text of each cell (hidden from assistive technology, so set `Text` too) |
+| `Cell` | A render slot: replaces the text of each cell (hidden from assistive technology, so set `Text` too). Its content fills the row's height, so a canvas sized with `ui.Full` is as tall as the row |
+| `CellStyle` | A `ui.Style` merged over the cell part for this column's cells, after the grid's style, such as `Style{Clear: ui.ClearPadding}` for a graph column (plain under high contrast) |
 | `RenderHeader` | A render slot: replaces the header text. `PartState.Selected` is set while the column is sorted |
 | `Compare` | Orders two rows for sorting, as `strings.Compare` does. Nil means the column cannot be sorted. A sort is stable |
 | `Width`, `MinWidth`, `MaxWidth` | The width at the 100 percent Text size (120 when zero), and the limits for resizing (40 and no limit when zero). Columns grow with the Text size, as the rows do |
