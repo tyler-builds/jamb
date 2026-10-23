@@ -77,12 +77,13 @@ The `jamb` command is a separate module, whose latest release is `cmd/jamb/v0.2.
 go install github.com/tyler-builds/jamb/cmd/jamb@v0.2.0
 ```
 
-The repository includes three examples. From a clone of the repository, run them with:
+The repository includes four examples. From a clone of the repository, run them with:
 
 ```
 go run ./examples/hello    # the smallest complete app: one window, a signal and a button
 go run ./examples/demo     # a tour of the widgets, layouts, and pages
 go run ./examples/notes    # a note-taking app
+go run ./examples/git      # a Git history browser with a commit graph
 ```
 
 The [getting started guide](docs/getting-started.md) covers the commands for building and packaging,
@@ -154,7 +155,8 @@ details.
 The examples are in [examples/](examples/). `examples/hello` is the minimal app shown above.
 `examples/demo` is a tour of the widgets and layouts. It is also the app that `jamb package` builds in
 the packaging guide. `examples/notes` is a note-taking app with persistence, a command palette,
-and a keymap file. [docs/examples.md](docs/examples.md) describes the demo and notes apps.
+and a keymap file. `examples/git` browses the history of Git repositories, with a commit graph, branches,
+tags and diffs. [docs/examples.md](docs/examples.md) describes the demo, notes and Git apps.
 
 ## Documentation
 
@@ -192,8 +194,8 @@ Development needs Go 1.27.1 or later and Windows. Run the headless tests with:
 
 ```
 gofmt -l .
-go vet ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/hello/...
-go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/hello/...
+go vet ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/hello/... ./examples/git/...
+go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/hello/... ./examples/git/...
 ```
 
 `gofmt -l .` should print nothing. The `go test` runs need no display. A few tests open a window; set

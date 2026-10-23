@@ -4,6 +4,7 @@ use (
 	.
 	./cmd/jamb
 	./examples/demo
+	./examples/git
 	./examples/hello
 	./examples/notes
 )

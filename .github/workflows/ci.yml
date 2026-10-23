@@ -17,7 +17,7 @@ concurrency:
 env:
   # Each module is checked on its own, as a user's build sees it.
   GOWORK: "off"
-  MODULES: ". cmd/jamb examples/demo examples/hello examples/notes"
+  MODULES: ". cmd/jamb examples/demo examples/git examples/hello examples/notes"
 
 defaults:
   run:
