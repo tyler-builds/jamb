@@ -102,7 +102,7 @@ func inboxRow(t *ui.Theme, it inboxItem) ui.Element {
 	row := ui.Div().Row().Align(ui.Center).Gap(10).PaddingX(4).PaddingY(6).Radius(6).
 		Child(ui.Icon(ic).Size(15).Color(c)).
 		Child(ui.Div().Grow(1).MinWidth(ui.Px(0)).Gap(1).
-			Child(ui.Text(it.Text).FontSize(13).Weight(weightOf(it.Read)).TextColor(textOf(t, it.Read))).
+			Child(ui.Text(it.Text).FontSize(13).FontWeight(weightOf(it.Read)).TextColor(textOf(t, it.Read))).
 			Child(ui.Text(ago(it.At)).FontSize(11).TextColor(t.TextSubtle)))
 	if !it.Read {
 		row.Child(ui.BadgeDot().Variant(ui.BadgeAccent))

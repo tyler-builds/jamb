@@ -91,7 +91,7 @@ func pill(t *ui.Theme, l label, lane ui.Color) ui.Element {
 	d := ui.Div().Row().Align(ui.Center).Gap(4).Height(ui.Px(20)).PaddingX(6).Shrink(0).MaxWidth(ui.Px(200)).
 		Radius(5).Background(fill).Border(1, border).
 		Child(ui.Icon(ic).Size(11).Color(iconInk)).
-		Child(ui.Text(l.Name).FontSize(11.5).Weight(ui.FontMedium).TextColor(ink).Truncate())
+		Child(ui.Text(l.Name).FontSize(11.5).FontWeight(ui.FontMedium).TextColor(ink).Truncate())
 	if len(l.Remotes) > 0 {
 		d.Child(ui.Text(strings.Join(l.Remotes, " ")).FontSize(10.5).TextColor(ink.Alpha(0.7)).Truncate())
 	}
@@ -109,7 +109,7 @@ func pills(t *ui.Theme, ls []label, lane ui.Color) ui.Element {
 			}
 			row.Child(ui.Div().Row().Align(ui.Center).Height(ui.Px(20)).PaddingX(6).Radius(5).
 				Background(t.SurfaceActive).
-				Child(ui.Text("+" + itoa(len(ls)-2)).FontSize(11).Weight(ui.FontMedium).TextColor(t.TextMuted)).
+				Child(ui.Text("+" + itoa(len(ls)-2)).FontSize(11).FontWeight(ui.FontMedium).TextColor(t.TextMuted)).
 				Tooltip(strings.Join(rest, "\n")))
 			break
 		}

@@ -40,7 +40,7 @@ func (a *App) crumbs() ui.Element {
 		t := ctx.Theme()
 		r := a.s.CurrentRepo()
 		if r == nil {
-			return ui.Text("Git").Weight(ui.FontSemibold)
+			return ui.Text("Git").FontWeight(ui.FontSemibold)
 		}
 		info := r.Info.Get()
 		head := info.Head
@@ -48,7 +48,7 @@ func (a *App) crumbs() ui.Element {
 			head = info.HeadHash[:7]
 		}
 		row := ui.Div().Row().Align(ui.Center).Gap(8).MinWidth(ui.Px(0)).
-			Child(ui.Text(info.Name).Weight(ui.FontSemibold).Truncate())
+			Child(ui.Text(info.Name).FontWeight(ui.FontSemibold).Truncate())
 		if head != "" {
 			row.Child(ui.Text("/").TextColor(t.TextSubtle)).
 				Child(ui.Div().Row().Align(ui.Center).Gap(5).
