@@ -87,6 +87,9 @@ func (s *Synthetic) Read() (Raw, error) {
 		p.ReadBytes += uint64(share * (4 << 20))
 		p.WriteBytes += uint64(share * (1 << 20))
 		used += p.Private
+		// The editor, the terminal, the file manager and the browser's first process
+		// have windows.
+		p.HasWindow = p.PID == 3120 || p.PID == 4108 || p.PID == 2210 || p.PID == 3488
 		procs = append(procs, p)
 	}
 	s.raw.Procs = procs
