@@ -38,18 +38,19 @@ var avatarPalette = [...]Color{
 // avatarInk is the color of the initials on a palette fill.
 var avatarInk = Hex("#ffffff")
 
-// avatarFill returns the fill of the avatar of name. A hash of the name picks it
-// from the palette, so a name keeps its color from one render to the next.
-func avatarFill(name string) Color {
+// AvatarColor returns the fill that Avatar uses for name. A hash of the name picks
+// it from a fixed palette, so a name keeps its color from one render to the next,
+// and an app can use the same color for the same person elsewhere.
+func AvatarColor(name string) Color {
 	h := fnv.New32a()
 	h.Write([]byte(name))
 	return avatarPalette[h.Sum32()%uint32(len(avatarPalette))]
 }
 
-// avatarInitials returns the initials of name: the first letter of its first word
-// and of its last word, uppercased, or one letter for a name of one word. A name
-// with no words has no initials.
-func avatarInitials(name string) string {
+// AvatarInitials returns the initials that Avatar shows for name: the first letter
+// of its first word and of its last word, uppercased, or one letter for a name of
+// one word. A name with no words has no initials, and "" is returned.
+func AvatarInitials(name string) string {
 	words := strings.Fields(name)
 	switch len(words) {
 	case 0:
@@ -73,7 +74,7 @@ func firstLetter(word string) string {
 // initials are the text color.
 func avatarDefaults(t *Theme, name string, size float32) AvatarStyle {
 	d := AvatarStyle{
-		Avatar:   Style{Direction: Row, Align: Center, Justify: Center, NoShrink: true, Background: avatarFill(name)},
+		Avatar:   Style{Direction: Row, Align: Center, Justify: Center, NoShrink: true, Background: AvatarColor(name)},
 		Initials: Style{FontSize: size * 0.4, FontWeight: FontSemibold, TextColor: avatarInk},
 	}
 	if t.HighContrast {
@@ -149,7 +150,7 @@ func (a *AvatarElement) expand(ctx *Context) Element {
 	if a.src != nil {
 		// The image is hidden: the circle is the one image, and it carries the name.
 		av.Child(Div().AccessHidden().Child(Image(a.src).Size(Px(d), Px(d)).Radius(d / 2)))
-	} else if initials := avatarInitials(a.name); initials != "" {
+	} else if initials := AvatarInitials(a.name); initials != "" {
 		av.Child(Div().asPart("Avatar.Initials").AccessHidden().Style(st.Initials).Child(Text(initials)))
 	}
 	if a.accessHidden {

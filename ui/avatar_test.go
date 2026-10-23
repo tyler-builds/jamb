@@ -20,8 +20,8 @@ func TestAvatarInitials(t *testing.T) {
 		{"", ""},
 	}
 	for _, c := range cases {
-		if got := avatarInitials(c.name); got != c.want {
-			t.Errorf("avatarInitials(%q) = %q, want %q", c.name, got, c.want)
+		if got := AvatarInitials(c.name); got != c.want {
+			t.Errorf("AvatarInitials(%q) = %q, want %q", c.name, got, c.want)
 		}
 	}
 }
