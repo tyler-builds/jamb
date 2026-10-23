@@ -110,6 +110,7 @@ type editorElement struct {
 	align       Alignment // where a single-line editor's text sits in its box (see alignOffset)
 	onSubmit    func(string)
 	onChange    func(string)
+	onKeyDown   func(*KeyEvent) // see TextInputElement.OnKeyDown; runs before the editor's keys
 	onBlur      func()
 	onCancel    func()
 	// onPasteImage takes an image pasted when the clipboard has no text.

@@ -613,6 +613,7 @@ type fieldOptions struct {
 	trailingEl  Element // drawn in the Trailing part, after the text (see Trailing)
 	onSubmit    func(string)
 	onChange    func(string)
+	onKeyDown   func(*KeyEvent)   // see TextInputElement.OnKeyDown
 	onPasteImg  func(image.Image) // see OnPasteImage
 	onBlur      func()            // set by NumberInput, which checks its text on blur
 	onCancel    func()            // set by DataGrid, which ends an edit on Escape in place of Cancel
@@ -700,6 +701,16 @@ func (ti *TextInputElement) OnSubmit(fn func(string)) *TextInputElement { ti.onS
 
 // OnChange sets the function that runs with the text on each change.
 func (ti *TextInputElement) OnChange(fn func(string)) *TextInputElement { ti.onChange = fn; return ti }
+
+// OnKeyDown sets the function that runs on each key press while the field has
+// focus, before the field handles the key. The field's own keys (typing, arrows,
+// Enter, Ctrl+A...) still come after it. Calling e.StopPropagation keeps the field
+// from handling the key, so an app can take a key the field would use, such as
+// Shift+Enter for a search's previous match.
+func (ti *TextInputElement) OnKeyDown(fn func(*KeyEvent)) *TextInputElement {
+	ti.onKeyDown = fn
+	return ti
+}
 
 // ReadOnly shows the text without letting it change: the field can still be
 // focused, and its text selected and copied. Assistive technology reports it as
@@ -917,6 +928,14 @@ func (ta *TextAreaElement) DescribedBy(keys ...string) *TextAreaElement {
 // OnChange sets the function that runs with the text on each change.
 func (ta *TextAreaElement) OnChange(fn func(string)) *TextAreaElement { ta.onChange = fn; return ta }
 
+// OnKeyDown sets the function that runs on each key press while the area has
+// focus, before the area handles the key; see TextInput.OnKeyDown. Calling
+// e.StopPropagation keeps the area from handling the key.
+func (ta *TextAreaElement) OnKeyDown(fn func(*KeyEvent)) *TextAreaElement {
+	ta.onKeyDown = fn
+	return ta
+}
+
 // ReadOnly shows the text without letting it change: the field can still be
 // focused, and its text selected and copied. Assistive technology reports it as
 // read-only. Its frame is the FrameReadOnly part.
@@ -1091,7 +1110,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 	}
 	ed := &editorElement{
 		value: f.value, placeholder: f.placeholder, name: name, labelledBy: labelledBy, describedBy: describedBy, multiline: multiline,
-		onSubmit: onSubmit, onChange: onChange, onBlur: onBlur, onCancel: f.onCancel, description: description,
+		onSubmit: onSubmit, onChange: onChange, onKeyDown: f.onKeyDown, onBlur: onBlur, onCancel: f.onCancel, description: description,
 		onStep: f.onStep, autoFocus: f.autoFocus, handle: h, invalid: w.invalid, required: w.required, align: f.align,
 		style: Style{Grow: 1}.Merge(st.Text), selection: st.Selection.Background, selectionText: st.Selection.TextColor,
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
