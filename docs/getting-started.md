@@ -22,7 +22,7 @@ other applications were running, so they are a reference, not a guarantee:
 - Builds took ~0.3–0.8 s after an edit (2026-10-06).
 - Startup to the first frame was about 221 ms for the demo, warm (2026-10-22, from the trace; 215 ms on 2026-10-21).
 - An idle window draws nothing. The demo used 0.08% of a core over 60 s unfocused (2026-10-22; 0.13% on 2026-10-21).
-  The hello app in the GPUI comparison used 0.10% (2026-10-22), 0.05% (2026-10-21) and 0.16–0.29% (2026-10-12).
+  The hello app in the GPUI comparison used 0.05% (2026-10-23), 0.10% (2026-10-22), 0.05% (2026-10-21) and 0.16–0.29% (2026-10-12).
 - A full re-render of a 310-element page costs about 0.8 ms of CPU per frame (0.81 ms on average,
   2026-10-22). It allocates 465 KB per frame (936 KB on 2026-10-21), still above its 2026-10-06 level,
   which is under investigation.

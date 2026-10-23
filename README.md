@@ -92,38 +92,42 @@ and the [concepts](docs/concepts.md) page introduces the API.
 ## Benchmarks
 
 The same hello-world app (a window, a greeting and a click counter) built with jamb and with GPUI, the
-UI framework from Zed, on one Windows machine. The figures are from 2026-10-22, except the rows marked
-2026-10-12. Lower is better in every row, and the better figure is in bold. The windows were on a
+UI framework from Zed, on one Windows machine. The figures are from 2026-10-23 (the v0.4.0 release), except
+the rows marked 2026-10-12. Lower is better in every row, and the better figure is in bold. The windows were on a
 secondary 144 Hz monitor, never activated. The machine was not dedicated to benchmarking: other
 applications were running. The [docs/comparison-gpui.md](docs/comparison-gpui.md) has the method, the ranges of each measurement and
-the setup, and the 2026-10-21 pass.
+the setup, and the earlier passes.
 
 | Measure | jamb | GPUI |
 |---|---|---|
-| Startup to first frame, warm launch | **215 ms** | 296 ms |
-| Startup to first frame, first launch (scanned by the antivirus) | **496.5 ms** | 502.2 ms |
-| Window visible, first launch | **480 ms** | 485.9 ms |
-| Idle CPU, window in the background, 60 s | **0.10%** of one core | 1.46% |
-| Idle context switches per second | **66** | 422 |
-| Memory, private bytes | 75.7 MB | **73.2 MB** |
-| Memory, working set | 55.1 MB | **49.0 MB** |
+| Startup to first frame, warm launch | **229 ms** | 337 ms |
+| Startup to first frame, first launch (scanned by the antivirus) | **552.5 ms** | 587.3 ms |
+| Window visible, first launch | **538.2 ms** | 552.3 ms |
+| Idle CPU, window in the background, 60 s | **0.05%** of one core | 1.48% |
+| Idle context switches per second | **71** | 426 |
+| Memory, private bytes | 76.1 MB | **73.2 MB** |
+| Memory, working set | 56.0 MB | **49.5 MB** |
 | GPU memory, dedicated | **13.7 MB** | 15.5 MB |
-| Threads | 38 | **32** |
-| Handles | 477 | **462** |
-| CPU while the pointer moves over the window | **1.4%** | 2.5% |
-| CPU while the window is resized | **2.5%** | 10.8% |
-| Context switches per second while resizing | **1,210** | 1,326 |
-| Build after an edit (release, text change) | **1.39 s** | 2.50 s (release), 3.62 s (debug) |
+| Threads | 39 | **32** |
+| Handles | 483 | **462** |
+| CPU while the pointer moves over the window | **0.8%** | 4.2% |
+| CPU while the window is resized | **7.8%** | 8.6% |
+| Context switches per second while resizing | 1,932 | **1,520** |
+| Build after an edit (release, text change) | **1.45 s** | 3.13 s (release), 4.27 s (debug) |
 | Clean build (2026-10-12) | **9 s** | 138 s (release), 100 s (debug) |
-| Binary size, release build | **8.02 MB** | 9.22 MB |
+| Binary size, release build | **8.25 MB** | 9.22 MB |
 | Binary size, GPUI's size-optimized build profile (2026-10-12) | | **4.31 MB** |
 
-Against 2026-10-21, jamb's resize CPU fell from 11.8% to 2.5%, and its warm launch and idle memory
-are a little lower. Its idle CPU (0.05% then) and its pointer CPU (1.1% then) rose, though both stay
-below GPUI's. The focused idle CPU was not measured on 2026-10-21 or 2026-10-22. On 2026-10-12 the
-hello app used 0.29% of a core with the window focused, and GPUI 1.85%. jamb's frames on the secondary
-monitor followed the primary monitor's refresh rate, a known issue listed in
-[BENCHMARKS.md](BENCHMARKS.md).
+Against 2026-10-22, jamb's resize CPU rose from 2.5% to 7.8%, and its context switches while resizing
+from 1,210 to 1,932 a second, above GPUI's. v0.4.0 keeps the swap chain's spare room only while the user
+drags the window's edge, which fixed a window shown zoomed in after a maximize and a restore, and this
+benchmark resizes the window from code, not by a drag. Both apps started more slowly than on 2026-10-22
+(jamb 215 ms and GPUI 296 ms warm then), which points to a busier machine; the pointer CPU, which varies
+from run to run, was 1.4% for jamb and 2.5% for GPUI then. jamb's binary grew by 0.23 MB: v0.4.0's
+Lucide icons link an SVG engine. The focused idle CPU was not measured on 2026-10-21, 2026-10-22 or
+2026-10-23. On 2026-10-12 the hello app used 0.29% of a core with the window focused, and GPUI 1.85%.
+jamb's frames on the secondary monitor followed the primary monitor's refresh rate, a known issue listed
+in [BENCHMARKS.md](BENCHMARKS.md).
 
 The demo app (four pages), from [BENCHMARKS.md](BENCHMARKS.md), measured on 2026-10-22 unless the row says
 otherwise. The figures in the middle column are the 2026-10-22 results, with the 2026-10-21 figure in

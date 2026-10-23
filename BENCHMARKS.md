@@ -1,13 +1,56 @@
 # Benchmarks
 
-This file reports jamb's measured performance. The current results, dated
-2026-10-22, come first. They are compared with the results of 2026-10-21, which
+This file reports jamb's measured performance. The v0.4.0 update of 2026-10-23
+comes first: it measured again what the release's resize fix changed, and the GPUI
+comparison. The current results of the performance work, dated 2026-10-22, follow
+it. They are compared with the results of 2026-10-21, which
 were measured before the performance work of 2026-10-22 and follow them. Each
 section gives how to reproduce its figures and the coverage gaps. The earlier
 measurements (2026-10-06 to 2026-10-14) follow under
 [Earlier measurements](#earlier-measurements), with their original dates. Where a
 later figure replaces an earlier one, the earlier figure is marked superseded and
 kept, so the history stays readable.
+
+## v0.4.0 update (2026-10-23)
+
+v0.4.0 fixed a window that was shown zoomed in after a maximize from its title bar and a
+restore (`bfee7ee`). The swap chain's buffers kept spare room after any growth, and showed
+the window-sized part of them; at rest, Windows showed that part magnified. They now keep
+the spare room only while the user drags the window's edge (`WM_ENTERSIZEMOVE` to
+`WM_EXITSIZEMOVE`), and take exactly the window's size otherwise. The live resize
+benchmark resizes the window from code with `SetWindowPos`, which is not a drag, so it no
+longer gets the spare room, and its figures rose. A drag by the user still gets it, and a
+script cannot make one, so the drag itself is not measured.
+
+Same machine, displays and window placement as 2026-10-22, at commit `05bbf32` (the
+v0.4.0 release), 3 runs each. The machine was not dedicated to benchmarking: other
+applications were running.
+
+### Resize (2026-10-23)
+
+Live, `bench-live`, 10 s of `SetWindowPos` on the demo window without activation,
+3 runs.
+
+| CPU, % of one core | Context switches/s | Frames | CPU per frame p50 / p95 (ms) | Over 1.5x |
+|--:|--:|--:|--:|--:|
+| 8.86 [8.74–11.71] | 2,100 [2,098.8–2,100.8] | 327 [327–327] | 1.57 [1.57–1.60] / 2.30 [2.26–2.36] | 0 |
+
+Against 2026-10-22 (4.53%, 1,411 a second, 0.26 / 0.41 ms per frame), the CPU per frame is
+back near its 2026-10-21 level (1.42 / 2.04 ms), since each step resizes the buffers
+again. The frames stay at 327, against 567 on 2026-10-21: a resize step still renders one
+frame, not two (`7ae866d`). The process CPU is below 2026-10-21's 13.86%.
+
+### GPUI comparison (2026-10-23)
+
+The fifth pass of `scripts/compare-gpui.ps1` ran the hello app for jamb and for GPUI
+again; its tables are in
+[docs/comparison-gpui.md](docs/comparison-gpui.md#fifth-pass-2026-10-23-current). While
+the window is resized from code, jamb uses 7.79% of a core [7.30–8.74] against GPUI's
+8.57% [7.33–13.11], with 1,932 context switches a second against GPUI's 1,520; on
+2026-10-22 jamb's figures were 2.50% and 1,210. Both apps started more slowly than on
+2026-10-22 (jamb's warm launch 228.8 ms against 215.4 ms, GPUI's 336.6 ms against
+296.2 ms), and jamb's idle CPU was 0.05% against 0.10%. jamb's release binary is
+8.25 MB, against 8.02 MB, since v0.4.0's Lucide icons link an SVG engine.
 
 ## Current results (2026-10-22)
 
@@ -86,10 +129,10 @@ Where a figure is a median with a range, the range is in brackets.
 | Input to Present p95, page-switch clicks (first visits) | 26.73 ms [25.64–32] | 37.68 ms [29.37–40.58] | +11 ms (+41%), worse | `bench-live` |
 | Input to Present p95, code-editor clicks | 60.92 ms [53.65–65.71] | 43.53 ms [43.35–110.78] | -17 ms; one run reached 110.78 ms | `bench-live` |
 | Input to Present p95, code-editor keys | 11.77 ms | 7.97 ms [6.46–8] | -3.8 ms | `bench-live` |
-| Resize by `SetWindowPos`, 10 s, CPU | 13.86% [10.42–14.5] | 4.53% [2.03–6.56] | -9.3 points (-67%) | `bench-live` |
-| Resize, context switches/s | 2,473 [2,383–2,518] | 1,411 [1,405–1,411] | -43% | `bench-live` |
+| Resize by `SetWindowPos`, 10 s, CPU | 13.86% [10.42–14.5] | 4.53% [2.03–6.56] | -9.3 points (-67%); superseded: 8.86% on 2026-10-23 (see [v0.4.0 update](#v040-update-2026-10-23)) | `bench-live` |
+| Resize, context switches/s | 2,473 [2,383–2,518] | 1,411 [1,405–1,411] | -43%; superseded: 2,100 on 2026-10-23 | `bench-live` |
 | Resize, frames in 10 s | 567 | 326 | -43% (fewer frames: see [What changed](#what-changed)) | `bench-live` |
-| Resize, CPU per frame p50 / p95 | 1.42 / 2.04 ms | 0.26 / 0.41 ms | -82% / -80% | `bench-live` |
+| Resize, CPU per frame p50 / p95 | 1.42 / 2.04 ms | 0.26 / 0.41 ms | -82% / -80%; superseded: 1.57 / 2.30 ms on 2026-10-23 | `bench-live` |
 | Stress, full re-render, vsync: frames/s | 163.8 | 165.1 | +0.8% | `bench-live`, 10 s |
 | Stress, full re-render, vsync: CPU per frame avg | 0.97 ms | 0.81 ms | -16% | `bench-live` |
 | Stress, full re-render, vsync: allocated per frame | 936.1 KB | 465.2 KB | -50% | `bench-live` |
@@ -257,7 +300,9 @@ Live, `bench-live`, 10 s of `SetWindowPos` on the demo window without activation
 
 The summary reports no present interval for resize (n/a). The frames fell from 567
 to 326 in 10 s, because a resize step now renders one frame instead of two (see
-the `7ae866d` row of [What changed](#what-changed)).
+the `7ae866d` row of [What changed](#what-changed)). The CPU and context-switch
+figures are superseded by the [v0.4.0 update](#v040-update-2026-10-23): v0.4.0 keeps
+the swap chain's spare room only during a drag, which this benchmark does not make.
 
 ### Stress
 
@@ -318,7 +363,7 @@ limits of 2026-10-21 apply unchanged: one run and one loop.
 
 Summary only. The full runtime, build and binary tables, with the method and the
 earlier passes, are in
-[docs/comparison-gpui.md](docs/comparison-gpui.md#fourth-pass-2026-10-22-current).
+[docs/comparison-gpui.md](docs/comparison-gpui.md#fourth-pass-2026-10-22-history).
 The fourth pass ran hello for jamb and for GPUI on the secondary monitor, without
 activation, three runs each, with jamb at `2124a35`. jamb has the lower idle CPU
 (0.10% against 1.46%) and context switches, the lower pointer CPU (1.41% against
