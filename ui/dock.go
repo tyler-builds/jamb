@@ -1020,7 +1020,7 @@ func (d *DockElement) floatWindow(v *dockView, f DockFloat) DockWindow {
 	open := true // the window counts as attached until it closes
 	return DockWindow{
 		Title: title, X: f.X, Y: f.Y, Width: f.Width, Height: f.Height,
-		Root: d.floatRoot(v.layout, id),
+		Root: d.floatRoot(v.layout, id, v.ctx),
 		OnClose: func() bool {
 			if w := v.windows[id]; w != nil && floatByID(v.layout.Peek(), id) != nil {
 				x, y := w.Position()
@@ -1063,8 +1063,11 @@ func (d *DockElement) floatWindow(v *dockView, f DockFloat) DockWindow {
 // floatRoot returns the content of the window of the floating group id: the group, with
 // its tabs and panels. The window's runtime builds the panels, and takes their instances
 // from the dock's hub, so a panel keeps its state as it moves into the window (see retain.go).
-func (d *DockElement) floatRoot(layout *Signal[DockLayout], id string) func(*Context) Element {
+func (d *DockElement) floatRoot(layout *Signal[DockLayout], id string, owner *Context) func(*Context) Element {
 	return func(ctx *Context) Element {
+		// The group is part of the dock's window: it takes that window's look, bindings and
+		// actions (see follow.go).
+		ctx.rt.follow(owner.rt, owner.inst)
 		v := &dockView{
 			ctx: ctx, d: d, layout: layout, th: ctx.Theme(), strs: ctx.Strings(), scope: d.scope() + "/float:" + id,
 			key: "float:" + id, st: resolveDock(ctx, d.styles), float: true,

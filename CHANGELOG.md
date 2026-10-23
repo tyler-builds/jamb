@@ -7,6 +7,13 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Changed
+
+- The window of a floating dock group is part of the dock's window. It shows that window's
+  theme, text and zoom and keeps them in step both ways, uses its key bindings, and passes the
+  actions it does not handle on to it, from the dock up. Before, a floated panel followed the
+  system theme at 100 percent zoom, and the app's shortcuts did nothing in it.
+
 ### Fixed
 
 - A window no longer shows its content magnified while the user drags its edge. The swap chain
