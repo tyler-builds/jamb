@@ -40,6 +40,19 @@ program that copied it offered one (browsers, Office and the Snipping Tool do)
 and otherwise as a bitmap, and written as both, with its transparency. HTML is
 future work.
 
+A `TextInput` or `TextArea` with `.OnKeyDown(fn)` sees each key press while it has
+focus, before the key bindings run and before the field handles the key. `e.StopPropagation()` keeps the field from handling that key, so a search can
+take Shift+Enter for the previous match:
+
+```go
+ui.TextInput(query).OnKeyDown(func(e *ui.KeyEvent) {
+	if e.Key == input.KeyEnter && e.Mods.Has(input.ModShift) {
+		previous()
+		e.StopPropagation()
+	}
+})
+```
+
 ## Focus and the keyboard
 
 There are three kinds of focus style:

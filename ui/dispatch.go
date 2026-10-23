@@ -596,6 +596,8 @@ type pendingStroke struct {
 // KeyDown handles a key press. Bindings and element handlers run in this
 // order, which docs/input.md describes:
 //
+//  0. the OnKeyDown of the focused text field, if it has one: a stopped key goes
+//     no further
 //  1. a chord in progress: a key that starts a longer binding waits, for up
 //     to chordTimeout, for the rest of the chord; when the keys held back
 //     match nothing, they are replayed and this key is handled again
@@ -635,6 +637,9 @@ func (rt *Runtime) KeyDown(k input.Key, mods input.Modifiers, repeat bool) {
 		}
 		rt.escapeDismissed = false
 	}
+	if k != input.KeyUnknown && rt.fieldKeyDown(k, mods, repeat) {
+		return // the field's OnKeyDown took the key, before any binding saw it
+	}
 	rt.expirePending(rt.now())
 	// Modifier keys on their own (and unmapped keys) arrive as KeyUnknown.
 	// They never match a binding and must not end a chord: users often let go
@@ -642,6 +647,19 @@ func (rt *Runtime) KeyDown(k input.Key, mods input.Modifiers, repeat bool) {
 	if k == input.KeyUnknown || !rt.bindingKey(keystroke{k, mods}) {
 		rt.keyDown(k, mods, repeat)
 	}
+}
+
+// fieldKeyDown runs the OnKeyDown of the text field that has focus, before the
+// bindings and the field's own keys. It reports whether the field's function
+// stopped the key.
+func (rt *Runtime) fieldKeyDown(k input.Key, mods input.Modifiers, repeat bool) bool {
+	n := rt.byID[rt.focusID]
+	if n == nil || n.editor == nil || n.editor.onKeyDown == nil {
+		return false
+	}
+	e := &KeyEvent{Key: k, Mods: mods, Repeat: repeat}
+	n.editor.onKeyDown(e)
+	return e.stopped
 }
 
 // setKeyboardModality records whether input is coming from the keyboard, and
