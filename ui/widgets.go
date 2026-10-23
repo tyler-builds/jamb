@@ -1150,7 +1150,19 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 			OnMouseDown(func(*MouseEvent) { h.Focus() })
 	}
 	box.Tooltip(f.tooltip)
-	if f.icon != nil || f.leadingEl != nil {
+	// A currency field shows the currency's symbol where the region settings put it.
+	// The field's label names what the amount is, so the symbol is drawn only.
+	var symBefore, symAfter Element
+	if f.format != nil && f.format.opts.Currency {
+		sym, after := CurrencySymbol()
+		el := Div().AccessHidden().Child(Text(sym))
+		if after {
+			symAfter = el
+		} else {
+			symBefore = el
+		}
+	}
+	if f.icon != nil || f.leadingEl != nil || symBefore != nil {
 		lead := Div().asPart(f.widget + ".Leading").Style(st.Leading)
 		if f.icon != nil {
 			// The icon takes the Leading part's text color, as text does.
@@ -1158,6 +1170,9 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		}
 		if f.leadingEl != nil {
 			lead.Child(f.leadingEl)
+		}
+		if symBefore != nil {
+			lead.Child(symBefore)
 		}
 		box.Child(lead)
 	}
@@ -1193,8 +1208,12 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 			}
 		})
 	}
-	if len(buttons) > 0 || f.trailingEl != nil {
-		trail := Div().asPart(f.widget + ".Trailing").Style(st.Trailing).Children(buttons...)
+	if len(buttons) > 0 || f.trailingEl != nil || symAfter != nil {
+		trail := Div().asPart(f.widget + ".Trailing").Style(st.Trailing)
+		if symAfter != nil {
+			trail.Child(symAfter)
+		}
+		trail.Children(buttons...)
 		if f.trailingEl != nil {
 			trail.Child(f.trailingEl)
 		}
