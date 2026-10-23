@@ -93,8 +93,9 @@ func (t *dgTree[T]) reread(rows []T, key func(T) string, children func(T) []T) b
 
 // sortLevels orders the top rows, and the children of each row, by cmp (descending
 // when desc is set), stably, so that a group sorts among the groups and a child among
-// its siblings. A nil cmp keeps the order the rows were given in.
-func (t *dgTree[T]) sortLevels(cmp func(a, b T) int, desc bool) {
+// its siblings. A nil cmp keeps the order the rows were given in, and so does keepRoots
+// for the top rows (see DataGridElement.SortChildrenOnly).
+func (t *dgTree[T]) sortLevels(cmp func(a, b T) int, desc, keepRoots bool) {
 	if cmp == nil {
 		t.kidsBy, t.rootsBy = t.kids, t.roots
 		return
@@ -106,8 +107,11 @@ func (t *dgTree[T]) sortLevels(cmp func(a, b T) int, desc bool) {
 		}
 		return r
 	}
-	t.rootsBy = slices.Clone(t.roots)
-	slices.SortStableFunc(t.rootsBy, less)
+	t.rootsBy = t.roots
+	if !keepRoots {
+		t.rootsBy = slices.Clone(t.roots)
+		slices.SortStableFunc(t.rootsBy, less)
+	}
 	t.kidsBy = make([][]int, len(t.kids))
 	for i, ks := range t.kids {
 		t.kidsBy[i] = ks
@@ -158,11 +162,11 @@ func (sh *dgShared[T]) ensureTree(rows []T, key func(T) string, children func(T)
 // ensureTree read: the children are sorted within each level when the sort changes or
 // the shape does, and the order is the rows shown under the open keys, when either
 // changes.
-func (sh *dgShared[T]) updateTree(cols []DataColumn[T], by SortState, open []string) {
-	if sh.ordered && sh.by == by && slices.Equal(sh.open, open) {
+func (sh *dgShared[T]) updateTree(cols []DataColumn[T], by SortState, open []string, keepRoots bool) {
+	if sh.ordered && sh.by == by && sh.keepRoots == keepRoots && slices.Equal(sh.open, open) {
 		return
 	}
-	if !sh.ordered || sh.by != by {
+	if !sh.ordered || sh.by != by || sh.keepRoots != keepRoots {
 		var cmp func(a, b T) int
 		for _, c := range cols {
 			if by.Key != "" && c.key() == by.Key && c.Compare != nil {
@@ -170,9 +174,9 @@ func (sh *dgShared[T]) updateTree(cols []DataColumn[T], by SortState, open []str
 				break
 			}
 		}
-		sh.tree.sortLevels(cmp, by.Desc)
+		sh.tree.sortLevels(cmp, by.Desc, keepRoots)
 	}
-	sh.ordered, sh.by = true, by
+	sh.ordered, sh.by, sh.keepRoots = true, by, keepRoots
 	sh.showOpen(open)
 	sh.dup = sh.tree.dup
 }
@@ -254,7 +258,7 @@ func (g *DataGridElement[T]) refresh(sh *dgShared[T], store *Signal[[]string], c
 			}
 		}
 	}
-	sh.updateTree(cols, by, open)
+	sh.updateTree(cols, by, open, g.childrenOnly)
 	return sh.tree.rows
 }
 
