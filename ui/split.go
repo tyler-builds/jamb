@@ -884,7 +884,7 @@ func (r *splitRender) axis(e *MouseEvent) float64 {
 
 // watchSplit records that the split rendered at a length of total logical pixels along its
 // orientation, so that a change of its length renders it again (see splitsResized).
-func (rt *Runtime) watchSplit(inst *componentInstance, key string, vert bool, total float64) {
+func (rt *Runtime) watchSplit(inst *componentInstance, vert bool, total float64) {
 	if rt.splitWatches == nil {
 		rt.splitWatches = map[*componentInstance]*splitWatch{}
 	}
@@ -893,22 +893,31 @@ func (rt *Runtime) watchSplit(inst *componentInstance, key string, vert bool, to
 		w = &splitWatch{}
 		rt.splitWatches[inst] = w
 	}
-	w.key, w.vert, w.seen = key, vert, total
+	w.vert, w.seen = vert, total
 }
 
-// splitWatch is a split that sizes its panes from its own length. See Runtime.splitsResized. node is
-// the split's box as the last check found it, so the check does not search the tree again.
+// splitWatch is a split that sizes its panes from its own length. See Runtime.splitsResized.
 type splitWatch struct {
-	key  string
 	vert bool
 	seen float64 // the length the split last rendered at
-	node *node
 }
 
-// splitAxis returns the length of the split with key along its orientation, from the last layout. It
-// is zero before the split has been laid out.
-func (rt *Runtime) splitAxis(key string, vert bool) float64 {
-	if n := rt.findKey(rt.tree, key); n != nil {
+// splitBox returns the box of the split that inst renders, as the last build made it: the
+// instance's own root, so a split is never confused with another that has the same key
+// elsewhere in the tree (keys are unique only among siblings). It is nil before the split has
+// been built, and while it is not in the tree, as when a retained panel parks it.
+func (rt *Runtime) splitBox(inst *componentInstance) *node {
+	n := inst.root
+	if n == nil || rt.byID[n.id] != n {
+		return nil
+	}
+	return n
+}
+
+// splitAxis returns the length of the split that inst renders along its orientation, from the
+// last layout. It is zero before the split has been laid out.
+func (rt *Runtime) splitAxis(inst *componentInstance, vert bool) float64 {
+	if n := rt.splitBox(inst); n != nil {
 		return axisLength(n, vert)
 	}
 	return 0
@@ -924,10 +933,8 @@ func axisLength(n *node, vert bool) float64 {
 
 // splitsResized reports whether a split's length changed in the last layout. Such a split is
 // marked for a render, which sizes its panes to the length it has now, before the frame is painted.
-// The box of each split is kept, and it is looked up again only when it is no longer live (the
-// node left the tree, or was built again) or its key changed, so a check costs one map read per
-// split. A split that is not in the tree, such as one parked by a retained panel, is searched for
-// on each check until it is back.
+// Each split's box is its component instance's root, so a check costs a map read per split. A
+// split that is not in the tree, such as one parked by a retained panel, is skipped until it is back.
 func (rt *Runtime) splitsResized() bool {
 	changed := false
 	for inst, w := range rt.splitWatches {
@@ -935,13 +942,11 @@ func (rt *Runtime) splitsResized() bool {
 			delete(rt.splitWatches, inst)
 			continue
 		}
-		if w.node == nil || rt.byID[w.node.id] != w.node || w.node.key != w.key {
-			w.node = rt.findKey(rt.tree, w.key)
-		}
-		if w.node == nil {
+		n := rt.splitBox(inst)
+		if n == nil {
 			continue
 		}
-		if axisLength(w.node, w.vert) != w.seen {
+		if axisLength(n, w.vert) != w.seen {
 			inst.invalidate()
 			changed = true
 		}
@@ -966,14 +971,14 @@ func (s *SplitElement) expand(ctx *Context) Element {
 			drag:   Local(ctx, "drag", splitDrag{}),
 			line:   dividerLine(st, vert),
 		}
-		// The split finds its own box by key, and its length is the last layout's. The
+		// The split's box is its instance's root, and its length is the last layout's. The
 		// layout comes after the render, so a split that has not been laid out yet renders
 		// with no length, and the runtime renders it again once its length is known.
-		total := ctx.rt.splitAxis(key, vert)
+		total := ctx.rt.splitAxis(ctx.inst, vert)
 		if total != r.length.Peek() {
 			r.length.Set(total)
 		}
-		ctx.rt.watchSplit(ctx.inst, key, vert, total)
+		ctx.rt.watchSplit(ctx.inst, vert, total)
 		if len(s.panes) == 0 {
 			return s.size.apply(Div())
 		}

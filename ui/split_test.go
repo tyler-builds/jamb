@@ -698,3 +698,23 @@ func TestSplitPanesMeetAtTheBarAndTheHitAreaReachesOverThem(t *testing.T) {
 	})
 	checkSizes(t, "widths beside a 4 px bar", paneSizes(thick, false), []float64{200, 296})
 }
+
+// TestSplitWithTheKeyOfAnotherMeasuresItsOwnBox checks two splits with the same key in
+// different parts of the tree (keys are unique only among siblings), the first hidden
+// with Display(false), as an app that keeps one view per document builds them. Each
+// split measures its own box, so the shown one sizes its panes and drags; it used to
+// find the hidden one's box, of no width, and ignore the press.
+func TestSplitWithTheKeyOfAnotherMeasuresItsOwnBox(t *testing.T) {
+	sig := NewSignal(Px(200))
+	r := splitRig(t, func() Element {
+		return Div().Column().Size(Full, Full).
+			Child(Div().Key("hidden").Display(false).Child(Split(Pane(Div()).Size(Px(100)), Pane(Div())).Key("same"))).
+			Child(Div().Key("shown").Grow(1).Child(Split(Pane(Div()).SizeSignal(sig), Pane(Div())).Key("same")))
+	})
+	handles := handlesOf(r, false) // the hidden split's divider, then the shown one's
+	if len(handles) != 2 {
+		t.Fatalf("%d dividers, want 2", len(handles))
+	}
+	dragDivider(r, handles[1], 40, 0)
+	wantLength(t, "the shown split's first pane", sig.Peek(), layout.UnitPx, 240)
+}
