@@ -11,9 +11,11 @@ import (
 	"github.com/tyler-builds/jamb/internal/layout"
 )
 
-// splitHit is the width of the divider's hit area, in logical pixels. The bar is
-// drawn in its middle, and the area around it takes the pointer and the focus, so
-// the divider is easy to grab even when the bar is a pixel wide.
+// splitHit is the width of the divider's hit area, in logical pixels. The divider
+// takes only the bar's thickness in the layout (see splitRender.line), so the panes
+// meet at the bar, which is their border. The hit area is centered on the bar and
+// lies over the edges of the panes beside it, so the divider is easy to grab even
+// when the bar is a pixel wide.
 const splitHit = 9
 
 // The keyboard moves a divider by a small step, and by a large one with Shift. A step
@@ -545,6 +547,23 @@ type splitRender struct {
 	length *Signal[float64]
 	memo   *Signal[map[string]paneMemo]
 	drag   *Signal[splitDrag]
+	// line is the room each divider takes in the layout: the bar's thickness, its
+	// Divider Width (Height when vertical) in pixels, or 1.
+	line float64
+}
+
+// dividerLine returns the thickness of the bar of st, in logical pixels: the
+// Divider part's Width, or its Height in a vertical split, when it is in pixels,
+// and 1 otherwise.
+func dividerLine(st SplitStyle, vert bool) float64 {
+	l := st.Divider.Width
+	if vert {
+		l = st.Divider.Height
+	}
+	if l.Unit == layout.UnitPx && l.Value >= 0 {
+		return float64(l.Value)
+	}
+	return 1
 }
 
 // model returns the state of the panes at a split length of total logical pixels. Before the split
@@ -553,7 +572,7 @@ func (r *splitRender) model(total float64) splitModel {
 	panes := r.s.panes
 	m := splitModel{
 		measured: total > 0,
-		avail:    max(total-float64(max(len(panes)-1, 0))*splitHit, 0),
+		avail:    max(total-float64(max(len(panes)-1, 0))*r.line, 0),
 		views:    make([]paneView, len(panes)),
 	}
 	mem := r.memo.Get()
@@ -748,8 +767,10 @@ func (r *splitRender) sizePane(d *DivElement, m splitModel, i int) {
 	d.Shrink(0).MinWidth(Px(0)).MinHeight(Px(0))
 }
 
-// handle returns divider d, between panes d and d+1: its focusable hit area, which holds the bar and
-// the grip. The hit area is the window splitter, with its value and steps.
+// handle returns divider d, between panes d and d+1: a handle as thick as the bar, which holds the bar
+// and is the window splitter, focusable, with its value and steps. Its hit area is a child wider than
+// the handle, which lies over the panes' edges, drawn and hit above them, and holds the grip; the
+// pointer's presses there reach the handle.
 func (r *splitRender) handle(st SplitStyle, d int) Element {
 	return Component(func(ctx *Context) Element {
 		m := r.model(r.length.Get())
@@ -765,15 +786,20 @@ func (r *splitRender) handle(st SplitStyle, d int) Element {
 		if ctx.KeyboardFocus() {
 			bar.Style(st.DividerFocusVisible)
 		}
-		hit := Div().asPart("Split.Handle").Shrink(0).Center()
+		line := float32(r.line)
+		hit := Div().asPart("Split.Handle").Shrink(0).Center().ZIndex(1)
+		area := Div().Absolute().Center()
+		over := (line - splitHit) / 2 // the area's offset from the handle: negative, it reaches past it
 		if r.vert {
-			hit.Column().Height(Px(splitHit)).Cursor(input.CursorResizeNS)
+			hit.Column().Height(Px(line)).Cursor(input.CursorResizeNS)
+			area.Left(0).Right(0).Top(over).Height(Px(splitHit)).Cursor(input.CursorResizeNS)
 		} else {
-			hit.Row().Width(Px(splitHit)).Cursor(input.CursorResizeEW)
+			hit.Row().Width(Px(line)).Cursor(input.CursorResizeEW)
+			area.Top(0).Bottom(0).Left(over).Width(Px(splitHit)).Cursor(input.CursorResizeEW)
 		}
-		hit.Child(bar)
+		hit.Child(bar).Child(area)
 		if r.s.grip == SplitGripShown || r.s.grip == SplitGripOnHover && (ctx.hovered() || dragged || ctx.KeyboardFocus()) {
-			hit.Child(Div().Absolute().Inset(0).Center().Child(Div().asPart("Split.Grip").Style(st.Grip)))
+			area.Child(Div().asPart("Split.Grip").Style(st.Grip))
 		}
 		hit.Role(access.RoleSeparator).Label(r.dividerName(ctx, d)).Focusable()
 		value, lo, hi, small, large := m.rangeOf(d)
@@ -938,6 +964,7 @@ func (s *SplitElement) expand(ctx *Context) Element {
 			length: Local(ctx, "length", 0.0),
 			memo:   Local(ctx, "memo", map[string]paneMemo(nil)),
 			drag:   Local(ctx, "drag", splitDrag{}),
+			line:   dividerLine(st, vert),
 		}
 		// The split finds its own box by key, and its length is the last layout's. The
 		// layout comes after the render, so a split that has not been laid out yet renders

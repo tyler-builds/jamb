@@ -106,7 +106,7 @@ func TestSplitSizesPanesInTurn(t *testing.T) {
 	r := splitRig(t, func() Element {
 		return Split(Pane(Div()).Size(Px(200)), Pane(Div()), Pane(Div()).Size(Percent(20)))
 	})
-	checkSizes(t, "widths", paneSizes(r, false), []float64{200, 185.6, 96.4})
+	checkSizes(t, "widths", paneSizes(r, false), []float64{200, 198.4, 99.6})
 	if n := len(handlesOf(r, false)); n != 2 {
 		t.Fatalf("three panes have %d dividers, want 2", n)
 	}
@@ -135,10 +135,10 @@ func TestSplitWindowResizeKeepsPixelsScalesPercentAndFillAbsorbs(t *testing.T) {
 	r := splitRig(t, func() Element {
 		return Split(Pane(Div()).Size(Px(200)), Pane(Div()).Size(Percent(40)), Pane(Div()))
 	})
-	checkSizes(t, "widths at 500", paneSizes(r, false), []float64{200, 192.8, 89.2})
+	checkSizes(t, "widths at 500", paneSizes(r, false), []float64{200, 199.2, 98.8})
 	r.rt.SetViewport(800, 400, 1)
 	r.frame()
-	checkSizes(t, "widths at 800", paneSizes(r, false), []float64{200, 312.8, 269.2})
+	checkSizes(t, "widths at 800", paneSizes(r, false), []float64{200, 319.2, 278.8})
 }
 
 func TestSplitOverConstrainedPanesShrinkAndUnderConstrainedLastPaneTakesTheRest(t *testing.T) {
@@ -147,7 +147,7 @@ func TestSplitOverConstrainedPanesShrinkAndUnderConstrainedLastPaneTakesTheRest(
 	r := splitRig(t, func() Element {
 		return Split(Pane(Div()).SizeSignal(over), Pane(Div()).SizeSignal(overTwo))
 	})
-	checkSizes(t, "over-constrained widths", paneSizes(r, false), []float64{245.5, 245.5})
+	checkSizes(t, "over-constrained widths", paneSizes(r, false), []float64{249.5, 249.5})
 	wantLength(t, "the first size", over.Peek(), layout.UnitPx, 400)
 
 	under := NewSignal(Px(100))
@@ -155,7 +155,7 @@ func TestSplitOverConstrainedPanesShrinkAndUnderConstrainedLastPaneTakesTheRest(
 	r = splitRig(t, func() Element {
 		return Split(Pane(Div()).SizeSignal(under), Pane(Div()).SizeSignal(underTwo))
 	})
-	checkSizes(t, "under-constrained widths", paneSizes(r, false), []float64{100, 391})
+	checkSizes(t, "under-constrained widths", paneSizes(r, false), []float64{100, 399})
 	wantLength(t, "the stored size of the last pane", underTwo.Peek(), layout.UnitPx, 100)
 }
 
@@ -164,7 +164,7 @@ func TestSplitDragBetweenPixelAndFillStoresPixels(t *testing.T) {
 	r := splitRig(t, func() Element { return Split(Pane(Div()).SizeSignal(sig), Pane(Div())) })
 	dragDivider(r, handlesOf(r, false)[0], 50, 0)
 	wantLength(t, "the pixel pane", sig.Peek(), layout.UnitPx, 250)
-	checkSizes(t, "widths after the drag", paneSizes(r, false), []float64{250, 241})
+	checkSizes(t, "widths after the drag", paneSizes(r, false), []float64{250, 249})
 	if len(r.warnings) != 0 {
 		t.Fatalf("warnings: %v", r.warnings)
 	}
@@ -174,7 +174,7 @@ func TestSplitDragBetweenPercentAndFillStoresPercent(t *testing.T) {
 	sig := NewSignal(Percent(40))
 	r := splitRig(t, func() Element { return Split(Pane(Div()).SizeSignal(sig), Pane(Div())) })
 	dragDivider(r, handlesOf(r, false)[0], 50, 0)
-	wantLength(t, "the percentage pane", sig.Peek(), layout.UnitPercent, (196.4+50)/491*100)
+	wantLength(t, "the percentage pane", sig.Peek(), layout.UnitPercent, (199.6+50)/499*100)
 }
 
 func TestSplitDragBetweenPixelAndPercentMovesBothInTheirUnits(t *testing.T) {
@@ -185,8 +185,8 @@ func TestSplitDragBetweenPixelAndPercentMovesBothInTheirUnits(t *testing.T) {
 	})
 	dragDivider(r, handlesOf(r, false)[0], 50, 0)
 	wantLength(t, "the pixel pane", px.Peek(), layout.UnitPx, 250)
-	// The percentage pane gave up the same 50 pixels of the 491 available to the panes.
-	wantLength(t, "the percentage pane", pct.Peek(), layout.UnitPercent, (0.3*491-50)/491*100)
+	// The percentage pane gave up the same 50 pixels of the 499 available to the panes.
+	wantLength(t, "the percentage pane", pct.Peek(), layout.UnitPercent, (0.3*499-50)/499*100)
 }
 
 func TestSplitDragStopsAtTheLimitOfEachUnit(t *testing.T) {
@@ -204,7 +204,7 @@ func TestSplitDragStopsAtTheLimitOfEachUnit(t *testing.T) {
 			return Split(Pane(Div()).SizeSignal(sig), Pane(Div()).Min(Px(160)))
 		})
 		dragDivider(r, handlesOf(r, false)[0], 400, 0)
-		wantLength(t, "the pixel pane", sig.Peek(), layout.UnitPx, 331)
+		wantLength(t, "the pixel pane", sig.Peek(), layout.UnitPx, 339)
 	})
 	t.Run("least in pixels, dragged back", func(t *testing.T) {
 		sig := NewSignal(Px(200))
@@ -226,9 +226,9 @@ func TestSplitDragStopsAtTheLimitOfEachUnit(t *testing.T) {
 
 func TestSplitDragBetweenTwoFillPanesMovesOnlyThem(t *testing.T) {
 	r := splitRig(t, func() Element { return Split(Pane(Div()), Pane(Div()), Pane(Div())) })
-	checkSizes(t, "widths before the drag", paneSizes(r, false), []float64{160.67, 160.67, 160.67})
+	checkSizes(t, "widths before the drag", paneSizes(r, false), []float64{166, 166, 166})
 	dragDivider(r, handlesOf(r, false)[0], 100, 0)
-	checkSizes(t, "widths after the drag", paneSizes(r, false), []float64{260.67, 60.67, 160.67})
+	checkSizes(t, "widths after the drag", paneSizes(r, false), []float64{266, 66, 166})
 }
 
 func TestSplitDragBetweenPercentPanesInAVerticalSplit(t *testing.T) {
@@ -236,9 +236,9 @@ func TestSplitDragBetweenPercentPanesInAVerticalSplit(t *testing.T) {
 	r := splitRig(t, func() Element {
 		return Split(Pane(Div()).SizeSignal(sig), Pane(Div())).Orientation(SplitVertical)
 	})
-	// The split is 400 high, less the 9 px divider: 391 px for the panes.
+	// The split is 400 high, less the 1 px divider: 399 px for the panes.
 	dragDivider(r, handlesOf(r, true)[0], 0, 40)
-	wantLength(t, "the top pane", sig.Peek(), layout.UnitPercent, (0.3*391+40)/391*100)
+	wantLength(t, "the top pane", sig.Peek(), layout.UnitPercent, (0.3*399+40)/399*100)
 }
 
 func TestSplitOnChangeRunsOncePerChangedDragStep(t *testing.T) {
@@ -329,7 +329,7 @@ func TestSplitDividerIsAccessible(t *testing.T) {
 	if sep.Name != "Resize sidebar" {
 		t.Fatalf("divider name %q", sep.Name)
 	}
-	want := access.Range{Value: 250, Min: 100, Max: 491, SmallChange: 10, LargeChange: 50}
+	want := access.Range{Value: 250, Min: 100, Max: 499, SmallChange: 10, LargeChange: 50}
 	if sep.Range == nil || *sep.Range != want {
 		t.Fatalf("divider range %+v, want %+v", sep.Range, want)
 	}
@@ -374,7 +374,7 @@ func TestSplitDividerRangeOfAPercentagePane(t *testing.T) {
 	}
 	handlesOf(r, false)[0].div.acc.setRange(50)
 	r.frame()
-	checkSizes(t, "widths after the range is set", paneSizes(r, false), []float64{245.5, 245.5})
+	checkSizes(t, "widths after the range is set", paneSizes(r, false), []float64{249.5, 249.5})
 }
 
 func TestSplitEnterCollapsesAndRestoresTheSize(t *testing.T) {
@@ -396,7 +396,7 @@ func TestSplitEnterCollapsesAndRestoresTheSize(t *testing.T) {
 	if collapsed.Peek() {
 		t.Fatal("Enter does not restore the collapsed pane")
 	}
-	checkSizes(t, "the restored widths", paneSizes(r, false), []float64{200, 291})
+	checkSizes(t, "the restored widths", paneSizes(r, false), []float64{200, 299})
 	// The pane's own state survives the collapse: the click count, kept in a Local of the pane,
 	// shows on the next click after the restore.
 	r.clickKey(t, "left")
@@ -422,7 +422,7 @@ func TestSplitDoubleClickCollapsesTheLastPane(t *testing.T) {
 		t.Fatal("a double-click does not collapse the last pane")
 	}
 	// The collapsed pane is not drawn, so the first pane takes the whole length less the divider.
-	checkSizes(t, "widths with the last pane collapsed", paneSizes(r, false), []float64{491})
+	checkSizes(t, "widths with the last pane collapsed", paneSizes(r, false), []float64{499})
 }
 
 func TestSplitKeepsAPaneStateWhenAPaneIsInsertedBefore(t *testing.T) {
@@ -454,14 +454,14 @@ func TestSplitDragWhileOverConstrainedStartsFromTheShownSizes(t *testing.T) {
 	r := splitRig(t, func() Element {
 		return Split(Pane(Div()).SizeSignal(a), Pane(Div()).SizeSignal(b).Min(Px(200)))
 	})
-	// The sizes need 800 px of the 491 available. The excess of 309 px is shared by the panes in
-	// proportion to what each has above its least size (400 and 200 px): 194 and 297 px.
-	checkSizes(t, "shown before the drag", paneSizes(r, false), []float64{194, 297})
+	// The sizes need 800 px of the 499 available. The excess of 301 px is shared by the panes in
+	// proportion to what each has above its least size (400 and 200 px): 199.33 and 299.67 px.
+	checkSizes(t, "shown before the drag", paneSizes(r, false), []float64{199.33, 299.67})
 	dragDivider(r, handlesOf(r, false)[0], 150, 0)
-	// The second pane can give up only 97 px before its least size of 200 px.
-	wantLength(t, "the first pane", a.Peek(), layout.UnitPx, 291)
+	// The second pane can give up only 99.67 px before its least size of 200 px.
+	wantLength(t, "the first pane", a.Peek(), layout.UnitPx, 299)
 	wantLength(t, "the second pane", b.Peek(), layout.UnitPx, 200)
-	checkSizes(t, "shown after the drag", paneSizes(r, false), []float64{291, 200})
+	checkSizes(t, "shown after the drag", paneSizes(r, false), []float64{299, 200})
 	if len(r.warnings) != 0 {
 		t.Fatalf("warnings: %v", r.warnings)
 	}
@@ -469,15 +469,15 @@ func TestSplitDragWhileOverConstrainedStartsFromTheShownSizes(t *testing.T) {
 
 // TestSplitVerticalWindowResizeKeepsPixelsScalesPercentAndFillAbsorbs checks the sizes of a stacked
 // split when the window is resized: a pixel pane keeps its height, a percentage pane scales, and the
-// fill pane takes the change. The split is 400 high, which leaves 382 px for the panes.
+// fill pane takes the change. The split is 400 high, which leaves 398 px for the panes.
 func TestSplitVerticalWindowResizeKeepsPixelsScalesPercentAndFillAbsorbs(t *testing.T) {
 	r := splitRig(t, func() Element {
 		return Split(Pane(Div()).Size(Px(100)), Pane(Div()).Size(Percent(30)), Pane(Div())).Orientation(SplitVertical)
 	})
-	checkSizes(t, "heights at 400", paneSizes(r, true), []float64{100, 114.6, 167.4})
+	checkSizes(t, "heights at 400", paneSizes(r, true), []float64{100, 119.4, 178.6})
 	r.rt.SetViewport(500, 600, 1)
 	r.frame()
-	checkSizes(t, "heights at 600", paneSizes(r, true), []float64{100, 174.6, 307.4})
+	checkSizes(t, "heights at 600", paneSizes(r, true), []float64{100, 179.4, 318.6})
 }
 
 // TestSplitDividerNamedAfterItsLabelledPanes checks the names of the dividers: one between two labelled
@@ -545,9 +545,9 @@ func TestSplitNestedSplitFollowsItsParentDivider(t *testing.T) {
 		}
 		return out
 	}
-	checkSizes(t, "widths before the drag", widths(), []float64{150, 166, 166})
+	checkSizes(t, "widths before the drag", widths(), []float64{150, 174, 174})
 	dragDivider(r, handlesOf(r, false)[0], 50, 0)
-	checkSizes(t, "widths after the drag", widths(), []float64{200, 141, 141})
+	checkSizes(t, "widths after the drag", widths(), []float64{200, 149, 149})
 }
 
 func TestSplitNestedSplitsHaveTheirOwnDividers(t *testing.T) {
@@ -663,4 +663,38 @@ func TestSplitDividerShowsTheResizeCursor(t *testing.T) {
 	if c := handlesOf(r, true)[0].style.Cursor; c != input.CursorResizeNS {
 		t.Fatalf("a vertical split shows cursor %v, want the north-south resize cursor", c)
 	}
+}
+
+// TestSplitPanesMeetAtTheBarAndTheHitAreaReachesOverThem checks that a divider takes
+// only its bar's 1 px in the layout, so the panes meet at the bar, and that a press a
+// few pixels into either pane, beside the bar, still drags the divider: its hit area
+// lies over the panes' edges. A thicker bar takes its own thickness.
+func TestSplitPanesMeetAtTheBarAndTheHitAreaReachesOverThem(t *testing.T) {
+	sig := NewSignal(Px(200))
+	r := splitRig(t, func() Element { return Split(Pane(Div()).SizeSignal(sig), Pane(Div())) })
+	h := r.rt.nodeRect(handlesOf(r, false)[0])
+	if h.X != 200 || h.W != 1 {
+		t.Fatalf("the divider is at %v, %v wide; want at 200, 1 wide", h.X, h.W)
+	}
+	checkSizes(t, "widths", paneSizes(r, false), []float64{200, 299})
+	for _, off := range []float32{-3, 4} {
+		start := sig.Peek().Value
+		h := r.rt.nodeRect(handlesOf(r, false)[0])
+		at, y := h.X+off, h.Y+h.H/2
+		r.rt.PointerMove(at, y, 0)
+		r.rt.PointerDown(at, y, input.ButtonLeft, 1, 0)
+		r.frame()
+		r.rt.PointerMove(at+30, y, 0)
+		r.frame()
+		r.rt.PointerUp(at+30, y, input.ButtonLeft, 0)
+		r.frame()
+		if got := sig.Peek().Value; got != start+30 {
+			t.Errorf("a drag from x %v moved the pane from %v to %v, want %v", at, start, got, start+30)
+		}
+	}
+
+	thick := splitRig(t, func() Element {
+		return Split(Pane(Div()).Size(Px(200)), Pane(Div())).Styles(SplitStyle{Divider: Style{Width: Px(4)}})
+	})
+	checkSizes(t, "widths beside a 4 px bar", paneSizes(thick, false), []float64{200, 296})
 }

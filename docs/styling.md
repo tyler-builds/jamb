@@ -658,7 +658,7 @@ ctx.Toast(ui.ToastSuccess, "Saved").Styles(ui.ToastStyle{Icon: ui.Style{TextColo
 - The caret of a text field is not a part (see "The text frame"). Its width and blink
   follow the system settings.
 - The Slider has no render slot for the thumb (see above).
-- The Split has no render slot: its panes are the app's own elements, and the divider has no content of its own. Its bar is 1 px wide by default, in a 9 px hit area that the style does not change, so a `Divider` style sets the bar's thickness and not the hit area.
+- The Split has no render slot: its panes are the app's own elements, and the divider has no content of its own. Its bar is 1 px wide by default, and the panes meet at it. It sits in a 9 px hit area that lies over the panes' edges and that the style does not change, so a `Divider` style sets the bar's thickness, which is also the room the divider takes between the panes, and not the hit area.
 - The size, the limits and the collapse of a pane are set on the `ui.Pane` (`Size`, `SizeSignal`, `Min`, `Max`, `Collapsible`, `Collapsed`), not in a style. The `Pane` part is the box that holds the pane's content, and it clips the content by default.
 - The Split's grip is a pill by default, not dots. `Split(...).Grip(ui.SplitGripOnHover)` shows it only while the divider is hovered, dragged or focused, and `ui.SplitGripHidden` never shows it; a `Grip` style with `Clear: ui.ClearBackground` removes its color in every mode.
 - The Dock has no render slot for its tabs or groups: its panels are the app's own content, from `DockPanel.Content`. Its dividers are the `Theme.Split`, and the `Preview` of an edge drop is the strip along that edge of the dock.

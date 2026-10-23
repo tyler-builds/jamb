@@ -23,14 +23,14 @@ func TestDockThreeChildrenShareOneSplit(t *testing.T) {
 	if len(partNodes(r.rt, "Split.Pane")) != 3 {
 		t.Fatalf("three children have %d panes, want 3", len(partNodes(r.rt, "Split.Pane")))
 	}
-	// The dock is 500 px wide, so the panes share the 482 px less the two dividers as 1:2:1.
-	checkSizes(t, "widths before the drag", paneSizes(r, false), []float64{120.5, 241, 120.5})
+	// The dock is 500 px wide, so the panes share the 498 px less the two dividers as 1:2:1.
+	checkSizes(t, "widths before the drag", paneSizes(r, false), []float64{124.5, 249, 124.5})
 
 	dragDivider(r, handlesOf(r, false)[0], 40, 0)
 	if saves != 1 {
 		t.Errorf("OnChange ran %d times at the end of the drag, want 1 at once", saves)
 	}
-	checkSizes(t, "widths after the drag", paneSizes(r, false), []float64{160.5, 201, 120.5})
+	checkSizes(t, "widths after the drag", paneSizes(r, false), []float64{164.5, 209, 124.5})
 	got := sig.Peek().Root.Sizes
 	if len(got) != 3 {
 		t.Fatalf("the stored shares are %v, want three", got)
@@ -42,8 +42,8 @@ func TestDockThreeChildrenShareOneSplit(t *testing.T) {
 	if math.Abs(total-1) > 1e-9 {
 		t.Errorf("the stored shares %v sum to %v, want 1", got, total)
 	}
-	if math.Abs(got[0]-160.5/482) > 0.001 || math.Abs(got[1]-201.0/482) > 0.001 || math.Abs(got[2]-0.25) > 0.001 {
-		t.Errorf("the stored shares are %v, want %v, %v and 0.25", got, 160.5/482, 201.0/482)
+	if math.Abs(got[0]-164.5/498) > 0.001 || math.Abs(got[1]-209.0/498) > 0.001 || math.Abs(got[2]-0.25) > 0.001 {
+		t.Errorf("the stored shares are %v, want %v, %v and 0.25", got, 164.5/498, 209.0/498)
 	}
 	if len(r.warnings) != 0 {
 		t.Fatalf("warnings: %v", r.warnings)
