@@ -180,7 +180,11 @@ ui.TextInput(query).Icon(icons.Search).Clearable().Label("Search") // an X while
   de-DE). The signal holds the raw value: the slot characters of a template
   (`"5551234567"`), or the number in ASCII digits with `.` and a leading `-` and no
   groups (`"-1234.5"`), which `strconv.ParseFloat` parses. `f.Display(raw)` gives the
-  shown text, for a grid cell or a label.
+  shown text, for a grid cell or a label. `NumberOptions{Currency: true}` makes the
+  number an amount of money in the user's currency: the decimal point and the group
+  separator of amounts of money, the currency's digits when `Decimals` is 0, and the
+  currency's symbol drawn in the field before or after the number, where the region
+  settings put it. The symbol is drawn only; the field's label says what the amount is.
 
   | Template character | Takes |
   |---|---|
@@ -231,6 +235,7 @@ phone := ui.TemplateFormat("(999) 999-9999")
 ui.TextInput(tel).Format(phone).Label("Phone").Tooltip("10 digits").
 	Validate(ui.Required[string](), phone.Complete("Enter the whole phone number."))
 ui.TextInput(amount).Format(ui.NumberFormat(ui.NumberOptions{Decimals: 2, Signed: true})).Label("Amount")
+ui.TextInput(price).Format(ui.NumberFormat(ui.NumberOptions{Currency: true})).Label("Price") // $ 12.50, 12,50 €
 ui.TextInput(code).Accept(func(next string) bool { return len(next) <= 5 }).Label("Code") // at most 5 bytes
 ```
 

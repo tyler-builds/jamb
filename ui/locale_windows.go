@@ -32,6 +32,13 @@ const (
 	lcThousand        = 0x000F // LOCALE_STHOUSAND: the group separator
 	lcGrouping        = 0x0010 // LOCALE_SGROUPING, such as "3;0" (see parseGrouping)
 	lcNegativeSign    = 0x0051 // LOCALE_SNEGATIVESIGN
+	lcCurrency        = 0x0014 // LOCALE_SCURRENCY: the symbol, such as "$" or "€"
+	lcMonDecimal      = 0x0016 // LOCALE_SMONDECIMALSEP
+	lcMonThousand     = 0x0017 // LOCALE_SMONTHOUSANDSEP
+	lcMonGrouping     = 0x0018 // LOCALE_SMONGROUPING
+	lcCurrDigits      = 0x0019 // LOCALE_ICURRDIGITS
+	lcCurrPositive    = 0x001B // LOCALE_ICURRENCY: where the symbol goes, 0 to 3
+	lcCurrNegative    = 0x001C // LOCALE_INEGCURR: the shape of a negative amount, 0 to 15
 	lcReturnNumber    = 0x20000000
 	dateLongDate      = 0x0002 // DATE_LONGDATE
 	muiLanguageName   = 0x0008 // MUI_LANGUAGE_NAME: the languages as tags such as "it-IT"
@@ -97,6 +104,23 @@ func readSystemLocale() *dateLocale {
 	}
 	if s := localeString(lcNegativeSign); s != "" {
 		l.minus = s
+	}
+	if s := localeString(lcCurrency); s != "" {
+		l.currency = s
+	}
+	l.monDecimal = localeString(lcMonDecimal)
+	l.monGroup = localeString(lcMonThousand)
+	if g, ok := parseGrouping(localeString(lcMonGrouping)); ok {
+		l.monGrouping = g
+	}
+	if v, ok := localeNumber(lcCurrDigits); ok && v <= 9 {
+		l.currDigits = int(v)
+	}
+	if v, ok := localeNumber(lcCurrPositive); ok && v <= 3 {
+		l.currPositive = int(v)
+	}
+	if v, ok := localeNumber(lcCurrNegative); ok && v <= 15 {
+		l.currNeg = int(v)
 	}
 	english := englishLocale()
 	l.longDate = func(t time.Time) string {

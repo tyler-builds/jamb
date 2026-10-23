@@ -42,13 +42,115 @@ func formatNumber(v float64, decimals int, loc *dateLocale) string {
 		return loc.minus + "∞"
 	}
 	decimals = max(decimals, 0)
-	raw := strconv.FormatFloat(v, 'f', decimals, 64)
-	if strings.Trim(raw, "-0.") == "" {
-		raw = strings.TrimPrefix(raw, "-") // -0.001 at two decimals is 0.00, not -0.00
+	raw := roundDecimal(math.Abs(v), decimals)
+	if v < 0 && strings.Trim(raw, "0.") != "" {
+		raw = "-" + raw // -0.001 at two decimals is 0.00, not -0.00
 	}
 	// The same presentation as a NumberFormat field, so that the two agree.
 	f := InputFormat{number: true, opts: NumberOptions{Decimals: decimals, Signed: true}}
 	return f.presentNumber(raw, loc).shown
+}
+
+// FormatCurrency returns amount as an amount of money in the currency of the user's
+// region settings, as Windows formats it: rounded to the currency's digits, with its
+// decimal point and group separator, and its symbol and its sign where the settings
+// put them, such as $1,234.56 and -$5.00 in en-US, 1.234,56 € and -5,00 € in de-DE, or
+// ($5.00) where the settings show negative amounts in parentheses. An amount that
+// rounds to zero has no sign. A NaN is the empty string. Elsewhere than on Windows
+// the currency is the US dollar.
+func FormatCurrency(amount float64) string { return formatCurrency(amount, currentLocale()) }
+
+// CurrencySymbol returns the symbol of the currency of the user's region settings,
+// such as "$" or "€", and reports whether it goes after the amount, as in 5,00 €.
+func CurrencySymbol() (symbol string, after bool) {
+	loc := currentLocale()
+	return loc.currency, loc.currPositive == 1 || loc.currPositive == 3
+}
+
+// formatCurrency returns the text of FormatCurrency in the currency of loc.
+func formatCurrency(v float64, loc *dateLocale) string {
+	if math.IsNaN(v) {
+		return ""
+	}
+	num := formatNumber(math.Abs(v), loc.currDigits, loc.money())
+	neg := v < 0 && strings.Trim(roundDecimal(-v, loc.currDigits), "0.") != ""
+	sym, m := loc.currency, loc.minus
+	if !neg {
+		switch loc.currPositive {
+		case 1:
+			return num + sym
+		case 2:
+			return sym + " " + num
+		case 3:
+			return num + " " + sym
+		}
+		return sym + num
+	}
+	// The sixteen shapes of a negative amount, as LOCALE_INEGCURR numbers them.
+	switch loc.currNeg {
+	case 0:
+		return "(" + sym + num + ")"
+	case 2:
+		return sym + m + num
+	case 3:
+		return sym + num + m
+	case 4:
+		return "(" + num + sym + ")"
+	case 5:
+		return m + num + sym
+	case 6:
+		return num + m + sym
+	case 7:
+		return num + sym + m
+	case 8:
+		return m + num + " " + sym
+	case 9:
+		return m + sym + " " + num
+	case 10:
+		return num + " " + sym + m
+	case 11:
+		return sym + " " + num + m
+	case 12:
+		return sym + " " + m + num
+	case 13:
+		return num + m + " " + sym
+	case 14:
+		return "(" + sym + " " + num + ")"
+	case 15:
+		return "(" + num + " " + sym + ")"
+	}
+	return m + sym + num
+}
+
+// roundDecimal returns v, which is not negative, rounded to decimals places, as
+// Windows rounds numbers and amounts: half away from zero, on the shortest decimal
+// form of v. So 1.005 is 1.01 at two places, as it reads, although its float is a
+// little less than 1.005, which strconv rounds down.
+func roundDecimal(v float64, decimals int) string {
+	s := strconv.FormatFloat(v, 'f', -1, 64)
+	whole, frac, _ := strings.Cut(s, ".")
+	if len(frac) <= decimals {
+		frac += strings.Repeat("0", decimals-len(frac))
+	} else {
+		up := frac[decimals] >= '5'
+		digits := []byte(whole + frac[:decimals])
+		for i := len(digits) - 1; up && i >= 0; i-- {
+			if digits[i] == '9' {
+				digits[i] = '0'
+				continue
+			}
+			digits[i]++
+			up = false
+		}
+		if up {
+			digits = append([]byte{'1'}, digits...)
+		}
+		whole, frac = string(digits[:len(digits)-decimals]), string(digits[len(digits)-decimals:])
+	}
+	if decimals == 0 {
+		return whole
+	}
+	return whole + "." + frac
 }
 
 // FormatBytes returns the size n in bytes as Windows Explorer and Task Manager show

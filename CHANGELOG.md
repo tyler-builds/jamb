@@ -14,6 +14,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   that decorates a number. A click still focuses it, and assistive technology still reads it.
 - `DataGrid.SortChildrenOnly()` keeps the top rows of a tree in the order given and sorts only
   the rows under them, for sections that keep their place while the rows in them sort.
+- `ui.FormatCurrency(amount)` shows an amount of money in the currency of the user's region
+  settings, as Windows formats it: the symbol, its position, the shape of a negative amount
+  and the digits. `ui.CurrencySymbol()` returns the symbol, and `NumberOptions.Currency` makes
+  a number field an amount of money that shows the symbol. See docs/text.md.
 
 ### Changed
 
@@ -26,6 +30,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Fixed
 
+- `ui.FormatNumber` rounds as Windows does, half away from zero on the digits of the shortest
+  decimal form of the value: 1.005 at two places is 1.01, and 0.125 is 0.13. It rounded the
+  binary value, half to even, so both came out a cent low.
 - A keyed component or composite element, such as a chart, kept answering to its key in tests
   and in the inspector only until a component inside it rendered again. A chart's key was lost
   on the first frame of its enter animation.
