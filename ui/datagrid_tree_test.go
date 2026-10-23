@@ -131,6 +131,35 @@ func TestDataGridTreeSortsWithinEachLevel(t *testing.T) {
 	}
 }
 
+// TestDataGridTreeSortChildrenOnlyKeepsTheTopRows checks that SortChildrenOnly keeps
+// the top rows in the order given while the rows under them sort, both ways, and that
+// the top rows sort again without it.
+func TestDataGridTreeSortChildrenOnlyKeepsTheTopRows(t *testing.T) {
+	sort := NewSignal(SortState{Key: "Mem", Desc: true})
+	only := NewSignal(true)
+	r := newAccessRig(func(ctx *Context) Element {
+		g := DataGrid(dgProcTree(), func(x dgProc) string { return x.ID }, dgProcColumns()...).Label("Processes").
+			Sort(sort).Children(func(x dgProc) []dgProc { return x.Kids }).Expanded(NewSignal([]string{"g1"}))
+		if only.Get() {
+			g.SortChildrenOnly()
+		}
+		return g
+	})
+	if got, want := dgRowKeys(r), []string{"g1", "c2", "c1", "g2", "l1"}; !slices.Equal(got, want) {
+		t.Fatalf("by memory, descending: %v, want %v", got, want)
+	}
+	sort.Set(SortState{Key: "Mem"})
+	r.frame()
+	if got, want := dgRowKeys(r), []string{"g1", "c1", "c2", "g2", "l1"}; !slices.Equal(got, want) {
+		t.Errorf("by memory, ascending: %v, want the top rows as given and the children sorted %v", got, want)
+	}
+	only.Set(false)
+	r.frame()
+	if got, want := dgRowKeys(r), []string{"l1", "g2", "g1", "c1", "c2"}; !slices.Equal(got, want) {
+		t.Errorf("without SortChildrenOnly: %v, want the top rows sorted too %v", got, want)
+	}
+}
+
 // TestDataGridTreeKeysOpenMoveAndClose checks the keys of the tree column: Right opens a
 // closed row, and on an open row moves to its first child; Left closes an open row, and
 // on a row that is closed or a leaf moves to its parent. Elsewhere Left and Right move

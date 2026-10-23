@@ -493,41 +493,42 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst D
 // editor is not laid out, but the edit, its text and its focus are kept, and the
 // editor is laid out again when the row comes back (see docs/accessibility-design-phases-i-m.md).
 type DataGridElement[T any] struct {
-	rows        []T
-	key         func(T) string
-	cols        []DataColumn[T]
-	name        string
-	keyStr      string
-	style       Style
-	density     DataGridDensity
-	striped     bool
-	mode        SelectionMode
-	sel         *Signal[[]string]
-	sort        *Signal[SortState]
-	onActivate  func(row T)
-	loading     bool
-	empty       Element
-	styles      DataGridStyle
-	focusHandle *FocusHandle // see FocusHandle
-	size        sizing       // see the sizing methods
-	order       *Signal[[]string]
-	widths      *Signal[map[string]float32]
-	onColumns   func(ColumnState)
-	gridHandle  *DataGridHandle
-	rowMenu     func(row T, column string) []MenuItem
-	headerMenu  func(column string) []MenuItem
-	hasMore     bool
-	loadMore    func()
-	loadingMore bool
-	movable     bool
-	cellOn      bool // the user selects cells (see CellSelection)
-	cellMode    SelectionMode
-	cells       *Signal[[]CellKey]
-	selBoth     bool // both Selection and CellSelection were called, for the warning
-	children    func(row T) []T
-	expanded    *Signal[[]string] // the open rows of a tree, when the app keeps them (see Expanded)
-	onExpand    func(key string)
-	onCollapse  func(key string)
+	rows         []T
+	key          func(T) string
+	cols         []DataColumn[T]
+	name         string
+	keyStr       string
+	style        Style
+	density      DataGridDensity
+	striped      bool
+	mode         SelectionMode
+	sel          *Signal[[]string]
+	sort         *Signal[SortState]
+	onActivate   func(row T)
+	loading      bool
+	empty        Element
+	styles       DataGridStyle
+	focusHandle  *FocusHandle // see FocusHandle
+	size         sizing       // see the sizing methods
+	order        *Signal[[]string]
+	widths       *Signal[map[string]float32]
+	onColumns    func(ColumnState)
+	gridHandle   *DataGridHandle
+	rowMenu      func(row T, column string) []MenuItem
+	headerMenu   func(column string) []MenuItem
+	hasMore      bool
+	loadMore     func()
+	loadingMore  bool
+	movable      bool
+	cellOn       bool // the user selects cells (see CellSelection)
+	cellMode     SelectionMode
+	cells        *Signal[[]CellKey]
+	selBoth      bool // both Selection and CellSelection were called, for the warning
+	children     func(row T) []T
+	childrenOnly bool              // see SortChildrenOnly
+	expanded     *Signal[[]string] // the open rows of a tree, when the app keeps them (see Expanded)
+	onExpand     func(key string)
+	onCollapse   func(key string)
 }
 
 // Movable lets the user move every column of the grid, as DataColumn.Movable does
@@ -747,6 +748,16 @@ func (g *DataGridElement[T]) Sort(s *Signal[SortState]) *DataGridElement[T] { g.
 //		Children(func(g Group) []Group { return g.Members })
 func (g *DataGridElement[T]) Children(fn func(row T) []T) *DataGridElement[T] {
 	g.children = fn
+	return g
+}
+
+// SortChildrenOnly keeps the top rows of a tree in the order they are given, and
+// sorts only the rows under them, each among its siblings. The top rows are then
+// sections, such as Task Manager's Apps, Background processes and Windows processes,
+// which stay in their place while the rows in them sort. It applies to a grid with
+// Children; a grid without them sorts all its rows, as before.
+func (g *DataGridElement[T]) SortChildrenOnly() *DataGridElement[T] {
+	g.childrenOnly = true
 	return g
 }
 
@@ -1011,6 +1022,7 @@ type dgShared[T any] struct {
 	keys           []string       // key of each row of the data
 	sortedKeys     bool           // the keys are in strictly increasing order, so unique
 	by             SortState      // the sort the order is made for
+	keepRoots      bool           // the order keeps the top rows of a tree (see SortChildrenOnly)
 	order          []int          // the row of the data at each displayed position
 	pos            map[string]int // displayed position by key, made when needed (see posOf)
 	dup            string         // a key that is used twice, for the warning

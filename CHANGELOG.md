@@ -12,6 +12,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - `ListOf` and `UniformList` take `Label`, which names the list for assistive technology.
 - `Chart.TabStop(false)` leaves a chart and its legend out of the Tab order, for a sparkline
   that decorates a number. A click still focuses it, and assistive technology still reads it.
+- `DataGrid.SortChildrenOnly()` keeps the top rows of a tree in the order given and sorts only
+  the rows under them, for sections that keep their place while the rows in them sort.
 
 ### Changed
 
