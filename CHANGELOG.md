@@ -18,6 +18,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   shows a size in bytes as Windows Explorer shows it, such as "1.23 GB". Its units are the
   `Byte`, `Bytes` and `KB` to `PB` fields of `Strings`, English in every built-in pack. See
   docs/text.md.
+- `app.FileIcon(path, size)` returns the icon Windows shows for a file, as File Explorer and
+  Task Manager show it: an executable's own icon at the size asked for, or the icon of the file's
+  type. See docs/os-integration.md.
 
 ### Changed
 

@@ -1,6 +1,6 @@
 # OS integration
 
-Jump lists and single instance, the notification area, OS notifications, and opening URLs.
+Jump lists and single instance, the notification area, OS notifications, opening URLs, and file icons.
 
 ## Opening URLs
 
@@ -9,6 +9,31 @@ a help page in the default browser, for a `ui.Link` or a button. Other schemes a
 file paths are refused with an error, because opening them could run a program, so
 a URL built from text the app does not control stays safe. A headless runtime opens
 nothing.
+
+## File icons
+
+`app.FileIcon(path, size)` returns the icon Windows shows for a file, as File Explorer
+and Task Manager show it, as an `image.Image` of `size` pixels square:
+
+```go
+img, err := app.FileIcon(`C:\Windows\explorer.exe`, 32)
+if err == nil {
+	icon := ui.Image(ui.ImageFromImage(img)).Size(ui.Px(16), ui.Px(16))
+}
+```
+
+- **Which icon.** A file that holds icons (an executable, a library or an `.ico` file)
+  gives its first icon, at the size asked for, so it is sharp. Any other file gives the
+  icon of its type, such as a text file's, at the shell's small or large size and scaled
+  to `size`. An executable without an icon of its own gives Windows' generic program icon.
+- **Size.** The size is in pixels of the display. For an icon drawn 16 logical pixels
+  square, ask for 16 times the display scale, or a larger size that the image scales
+  down from.
+- **Cost.** It reads the file. Call it off the UI thread for many files, such as a list
+  of processes, and keep the images by path. It is safe from any goroutine: the shell
+  needs COM, which it starts on the calling thread for the call.
+- **Errors.** A path that does not exist, a file Windows has no icon for, and a size of
+  zero give an error. It is a Windows feature, and gives an error on other platforms.
 
 ## Jump lists and single instance
 

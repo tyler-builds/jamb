@@ -20,6 +20,8 @@ func TestShellStructLayout(t *testing.T) {
 		"hBalloonIcon offset":   {unsafe.Offsetof(nid.HBalloonIcon), 968},
 		"ICONINFO size":         {unsafe.Sizeof(ICONINFO{}), 32},
 		"BITMAPINFOHEADER size": {unsafe.Sizeof(BITMAPINFOHEADER{}), 40},
+		"SHFILEINFOW size":      {unsafe.Sizeof(SHFILEINFOW{}), 696},
+		"BITMAP size":           {unsafe.Sizeof(BITMAP{}), 32},
 		"NIN_KEYSELECT":         {uintptr(NIN_KEYSELECT), 0x401},
 		"NOTIFYICON_VERSION_4":  {NOTIFYICON_VERSION_4, 4},
 	} {
