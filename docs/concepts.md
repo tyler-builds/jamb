@@ -23,6 +23,8 @@ ui.Div()                       // flex container; children stack vertically by d
   .Row() / .Column()           // main axis
   .Wrap()                      // flow children onto more lines (chips, tags, galleries)
   .Gap(8).Padding(16).PaddingX(12).PaddingY(6).Margin(4).MarginTop(8)
+  .PaddingLeft(4).PaddingRight(4).PaddingTop(2).PaddingBottom(2).MarginLeft(2).MarginRight(2)
+                               // each side alone; PaddingEdges sets all four at once
   .Width(ui.Px(240)).Height(ui.Full).Size(w, h).MinWidth(...).MaxWidth(ui.Px(1100))
   .Grow(1).Shrink(0).Basis(ui.Px(0))          // Basis(0)+Grow(1) = equal columns
   .Align(ui.Center).Justify(ui.SpaceBetween).Center().AlignSelf(ui.End)
