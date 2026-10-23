@@ -29,8 +29,14 @@ type DataColumn[T any] struct {
 	// Text is the text of each cell. It is also the cell's accessible name.
 	Text func(row T) string
 	// Cell replaces the text of each cell with what it returns (a render slot).
-	// The content is hidden from assistive technology, so give Text as well.
+	// The content is hidden from assistive technology, so give Text as well. The
+	// content fills the height of its row, so a canvas sized with Full is as tall as
+	// the row. CellStyle sets the look of this column's cells.
 	Cell func(row T) Element
+	// CellStyle is merged over the Cell part for the cells of this column, after the
+	// grid's style, so one column can differ: a graph column clears its padding with
+	// Clear: ClearPadding. Under high contrast it is plain (see plainStyle).
+	CellStyle Style
 	// RenderHeader replaces the text of the header with what it returns, for
 	// sighted users. The state's Selected is set while the column is sorted.
 	RenderHeader func(label string, s PartState) Element
@@ -2373,6 +2379,11 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		spacer()
 		cell := Div().asPart("DataGrid.Cell").Style(st.Cell).
 			Style(Style{Basis: Px(xs[c+1] - xs[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
+		cs := cl.CellStyle
+		if rc.t.HighContrast {
+			cs = plainStyle(cs)
+		}
+		cell.Style(cs)
 		cell.Role(access.RoleDataItem).Label(s).AccessCell(q+1, c+1)
 		if cl.Pin != PinNone {
 			cell.Style(st.CellPinned)
@@ -2453,8 +2464,9 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		case cl.Cell != nil:
 			// A cell aligned to the start fills its width, so the content can take a
 			// percentage of it (as a progress bar does). Other cells keep the content's
-			// width, so their Justify places it.
-			wrap := Div().AccessHidden()
+			// width, so their Justify places it. The wrapper fills the height of the row,
+			// so content sized with Full does too.
+			wrap := Div().AccessHidden().AlignSelf(Stretch)
 			if alignOf(cl.Align) == Start {
 				wrap.Grow(1)
 			}
