@@ -1,6 +1,107 @@
 # Selection and date widgets
 
-The combobox and the date and time pickers.
+The list box, the combobox and the date and time pickers.
+
+## List box
+
+`ui.ListBox` is a list of items the user selects from. Its items are built only
+in view, so it holds as many as the app has. It takes the WAI-ARIA listbox keys,
+and the list is one Tab stop.
+
+```go
+type Repo struct{ Path, Name string }
+
+repos := []Repo{{"~/src/jamb", "jamb"}, {"~/src/notes", "notes"}}
+selected := ui.NewSignal([]string(nil))
+
+ui.ListBox(repos, func(r Repo) string { return r.Path }, selected,
+	func(r Repo, s ui.PartState) ui.Element {
+		return ui.Div().Row().Gap(8).Align(ui.Center).Children(
+			ui.Div().Size(ui.Px(10), ui.Px(10)).Radius(2).Background(accent(r)),
+			ui.Text(r.Name),
+		)
+	}).
+	Label("Repositories").
+	ItemName(func(r Repo) string { return r.Name }).
+	Selection(ui.SelectionMultiple).
+	OnChange(func(keys []string) { refresh(keys) }).
+	OnActivate(func(r Repo) { open(r) }).
+	ContextMenu(func(r Repo) []ui.MenuItem {
+		return []ui.MenuItem{{Label: "Copy path", OnClick: func() { ctx.SetClipboard(r.Path) }}}
+	}).
+	Height(ui.Px(240))
+```
+
+`ListBox(items, key, selected, row)` takes the items, the key of each item, the
+signal of the selected keys and the row function. The row function gets the item
+and a `PartState` (`Selected`, and `Focused` for the item that has keyboard focus
+while the list has it). Its result is the content of the item; the item itself
+is the row, with its fill, hover and focus ring around the content.
+
+The keys are the selection. `selected` holds the keys of the chosen items, so a
+single selection holds one key or none. The app sets the signal to choose items,
+and `OnChange` runs with the keys when the user changes the selection.
+
+A single selection can live in a string signal instead, as a `Tree`'s or a
+`Sidebar`'s does: pass nil for `selected` and give the signal to `SelectedKey`. It
+holds the selected item's key, or "" for none.
+
+```go
+current := ui.NewSignal("~/src/jamb")
+ui.ListBox(repos, func(r Repo) string { return r.Path }, nil, row).SelectedKey(current)
+```
+
+With neither, the list keeps its selection itself, and `OnChange` reports it.
+
+| Method | Does |
+|---|---|
+| `Label(name)` | names the list for assistive technology, such as "Repositories" |
+| `Selection(mode)` | `SelectionSingle` (the default), `SelectionMultiple`, or `SelectionNone` (the user moves through the list but selects nothing) |
+| `ItemName(func(T) string)` | names each item for assistive technology and for type-ahead. The content of an item is then hidden from assistive technology, and the name is what it reads. Without it, the item's own text is its name |
+| `OnChange(func([]string))` | runs with the keys after the user changes the selection. It does not run when the app sets the signal |
+| `OnActivate(func(T))` | runs with an item when the user presses Enter on it or double-clicks it |
+| `ContextMenu(func(T) []ui.MenuItem)` | a menu on an item: a right-press, Shift+F10 or the Menu key. A right-press on an item that is not selected selects it first, as File Explorer does |
+| `Key`, `Styles`, `Style`, the sizing methods | as for the other widgets |
+
+### Keys
+
+The list is one Tab stop. Tab reaches the selected item, or the first item when
+none is selected. The focus then moves with the keys:
+
+| Key | Does |
+|---|---|
+| Up, Down | moves the focus to the previous or next item, without wrapping |
+| Home, End | moves the focus to the first or last item |
+| PageUp, PageDown | moves the focus by ten items |
+| Ctrl with an arrow or page key | moves the focus and keeps the selection |
+| Shift with an arrow, page, Home or End key (multiple selection) | selects the items from the anchor to the focus. The anchor is the last item chosen by a press |
+| Space, Enter | selects the focused item in a single selection, and toggles it in a multiple one, keeping the others |
+| Enter | also activates the focused item (`OnActivate`) |
+| Ctrl+A (multiple selection) | selects every item |
+| Letters | moves the focus to the next item whose name starts with them (needs `ItemName`). A pause of a second starts a new search |
+| Shift+F10, Menu | opens the menu of the focused item |
+
+In a single selection the selection follows the focus, as the items of a
+Windows list box do. In a multiple selection a plain move selects only the item
+the focus reaches. A click selects the item alone. Ctrl+click toggles an item,
+and Shift+click selects from the anchor to it. A double-click activates it.
+
+### Styles
+
+`ListBoxStyle` has the parts `List` (the scrolling list), `Item`, `ItemHover`
+(an item the pointer is over, when it is not selected), `ItemSelected` and
+`ItemFocusVisible` (the item with keyboard focus, while the list has focus).
+The defaults give items a 6 px radius and a fill for hover, selection and focus.
+A state does not change the font weight. Under high contrast the selected item
+is the Accent color with AccentText on it.
+
+```go
+ui.ListBox(...).Styles(ui.ListBoxStyle{
+	ItemSelected: ui.Style{Background: theme.AccentSoft},
+})
+```
+
+Set `Theme.ListBox` to change every list box of the app. See [styling](styling.md).
 
 ## Combobox
 
