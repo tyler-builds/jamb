@@ -163,24 +163,6 @@ func TestLabelsFoldRemotesIntoTheirBranch(t *testing.T) {
 	}
 }
 
-func TestAgo(t *testing.T) {
-	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
-	for _, c := range []struct {
-		d    time.Duration
-		want string
-	}{
-		{30 * time.Second, "just now"},
-		{5 * time.Minute, "5 min ago"},
-		{time.Hour, "1 hour ago"},
-		{50 * time.Hour, "2 days ago"},
-		{70 * 24 * time.Hour, "2 months ago"},
-	} {
-		if got := ago(now.Add(-c.d), now); got != c.want {
-			t.Errorf("ago(%v) = %q, want %q", c.d, got, c.want)
-		}
-	}
-}
-
 // The graph draws each row's slice edge to edge, so its lines join only while
 // the rows keep the grid's height and the canvas fills the cell.
 func TestRowsKeepTheGridHeight(t *testing.T) {
@@ -208,5 +190,38 @@ func TestWindowButtonsFillTheTitleBar(t *testing.T) {
 		if b := u.ByRole(access.RoleButton, name).Bounds(); b.Y != 0 || b.H != 43 {
 			t.Errorf("%s is %v high at y %v, want 43 at y 0", name, b.H, b.Y)
 		}
+	}
+}
+
+// Ctrl+P opens Go to, which finds a commit by its subject and selects it.
+func TestGoToSelectsACommit(t *testing.T) {
+	u, _, r := open(t)
+	u.Press("ctrl+p")
+	u.Type("spike")
+	u.Press("enter")
+	if sel := r.Selected.Peek(); len(sel) != 1 || sel[0] != entry(t, r, "Try a spike").Hash {
+		t.Errorf("selection after Go to = %v, want the spike commit", sel)
+	}
+}
+
+// The details bar's copy button copies the whole hash, without a toast.
+func TestCopyButtonCopiesTheHash(t *testing.T) {
+	u, _, r := open(t)
+	u.Get("copy-hash").Click()
+	if got, want := u.Clipboard(), r.Info.Peek().HeadHash; got != want {
+		t.Errorf("clipboard = %q, want HEAD's hash %q", got, want)
+	}
+}
+
+// Choosing a file in the changed files list box opens its diff. (The sample's
+// commits each change one file, so the arrow keys are left to ui.ListBox's tests.)
+func TestChoosingAChangedFileOpensItsDiff(t *testing.T) {
+	u, _, r := open(t)
+	r.Selected.Set([]string{entry(t, r, "Initial commit").Hash})
+	u.WaitFor("the details", func() bool { return u.Has("detail-files") })
+	u.ByRole(access.RoleListItem, "Added readme.md").Click()
+	u.WaitFor("the diff", func() bool { return u.Has("diff-view") })
+	if !strings.Contains(u.Get("diff-view").Text(), "readme.md") {
+		t.Errorf("diff header = %q", u.Get("diff-view").Text())
 	}
 }

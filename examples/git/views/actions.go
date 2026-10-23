@@ -8,6 +8,7 @@ var (
 	AddRepo     = ui.NewAction("git.add-repo", "Add repository…")
 	Refresh     = ui.NewAction("git.refresh", "Refresh")
 	Find        = ui.NewAction("git.find", "Find commits")
+	GoTo        = ui.NewAction("git.go-to", "Go to branch, tag or commit…")
 	NextMatch   = ui.NewAction("git.next-match", "Next match")
 	PrevMatch   = ui.NewAction("git.prev-match", "Previous match")
 	GoHead      = ui.NewAction("git.go-head", "Go to HEAD")
@@ -23,7 +24,7 @@ var (
 
 // Actions lists every action, for app.Window.Actions.
 func Actions() []*ui.Action {
-	return []*ui.Action{AddRepo, Refresh, Find, NextMatch, PrevMatch, GoHead, CopyHash,
+	return []*ui.Action{AddRepo, Refresh, Find, GoTo, NextMatch, PrevMatch, GoHead, CopyHash,
 		ShowHistory, ShowTags, CloseDiff, PrevRepo, NextRepo, ToggleTheme, Palette}
 }
 
@@ -34,6 +35,7 @@ func Bindings() []ui.Binding {
 		ui.Bind("f5", Refresh),
 		ui.Bind("ctrl+r", Refresh),
 		ui.Bind("ctrl+f", Find),
+		ui.Bind("ctrl+p", GoTo), // as VS Code's quick open
 		ui.Bind("f3", NextMatch),
 		ui.Bind("shift+f3", PrevMatch),
 		ui.Bind("ctrl+h", GoHead),

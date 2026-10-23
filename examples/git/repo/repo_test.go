@@ -3,6 +3,7 @@ package repo_test
 import . "github.com/tyler-builds/jamb/examples/git/repo"
 
 import (
+	"context"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -81,7 +82,7 @@ func TestShowAndDiff(t *testing.T) {
 		t.Fatalf("no commit %q", subject)
 		return Commit{}
 	}
-	d, err := Show(dir, find("Describe the sample").Hash)
+	d, err := Show(context.Background(), dir, find("Describe the sample").Hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,12 +92,12 @@ func TestShowAndDiff(t *testing.T) {
 	if f := d.Files[0]; f.Status != Modified || f.Path != "readme.md" || f.Added != 2 || f.Deleted != 0 {
 		t.Errorf("file = %+v, want readme.md modified with 2 lines added", f)
 	}
-	diff, err := Diff(dir, d.Commit, d.Files[0])
+	diff, err := Diff(context.Background(), dir, d.Commit, d.Files[0])
 	if err != nil || !strings.Contains(diff, "+A sample repository.") {
 		t.Errorf("Diff = %q, %v", diff, err)
 	}
 
-	r, err := Show(dir, find("Rename feature.go").Hash)
+	r, err := Show(context.Background(), dir, find("Rename feature.go").Hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +105,7 @@ func TestShowAndDiff(t *testing.T) {
 		t.Errorf("rename = %+v", r.Files)
 	}
 
-	root, err := Show(dir, find("Initial commit").Hash)
+	root, err := Show(context.Background(), dir, find("Initial commit").Hash)
 	if err != nil || len(root.Files) != 1 || root.Files[0].Status != Added {
 		t.Errorf("root = %+v, %v", root.Files, err)
 	}

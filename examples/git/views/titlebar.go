@@ -2,41 +2,29 @@ package views
 
 import (
 	"github.com/tyler-builds/jamb/icons"
+	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/ui"
 )
 
 // titleBar is the app's own title bar: the mark and the repository's breadcrumb
-// on the left, the search in the middle of the window, and the buttons on the
-// right. The two sides share the rest equally, so the search stays centered. The empty parts
-// drag the window, and it dims while the window is in the background. It is a
-// component of its own, so a change of focus renders only the bar.
+// at the start, the search centered on the window, and Refresh, the theme and the
+// window buttons at the end. ui.TitleBar drags the window from its empty parts
+// and dims while the window is in the background.
 func (a *App) titleBar(ctx *ui.Context) ui.Element {
 	t := ctx.Theme()
-	opacity := float32(1)
-	if !ctx.Window().Focused() {
-		opacity = 0.65
-	}
 	mark := ui.Div().Center().Size(ui.Px(22), ui.Px(22)).Radius(6).Shrink(0).
 		BackgroundGradient(ui.LinearGradient(135, ui.Hex("#7c86f0"), ui.Hex("#4f5bd5")).InOklab()).
 		Child(ui.Icon(icons.GitBranch).Size(13).Color(ui.Hex("#ffffff")))
-	// The left side's padding keeps the mark off the window's edge; the right side
-	// has the same, so the sides stay equal and the search centered.
-	side := func() *ui.DivElement {
-		// AlignSelf(Stretch): a side is as high as the bar, so the window buttons in
-		// the right one can be too.
-		return ui.Div().Row().Align(ui.Center).Gap(10).Grow(1).Basis(ui.Px(0)).MinWidth(ui.Px(0)).
-			AlignSelf(ui.Stretch).PaddingEdges(ui.Edges{Left: 14})
-	}
-	return ui.Div().Row().Align(ui.Center).Height(ui.Px(44)).Shrink(0).Gap(10).
-		Background(t.Panel).BorderEdges(ui.Edges{Bottom: 1}, t.Border).WindowArea(ui.WindowAreaDrag).
-		Child(side().Opacity(opacity).Child(mark).Child(a.crumbs())).
-		Child(a.searchField()).
-		Child(side().Justify(ui.End).
-			Child(ui.IconButton(icons.Refresh).Ghost().Small().Label("Refresh").Tooltip("Refresh (F5)").
-				OnClick(a.refresh)).
-			Child(ui.IconButton(themeIcon(t)).Ghost().Small().Label("Toggle theme").Tooltip("Light or dark theme").
-				OnClick(func() { a.toggleTheme(ctx) })).
-			Child(ui.TitleBarButtons()))
+	return ui.TitleBar().Key("titlebar").Height(ui.Px(44)).
+		Style(ui.Style{Background: t.Panel, BorderEdges: ui.Edges{Bottom: 1}, BorderColor: t.Border}).
+		Child(ui.Div().Row().Align(ui.Center).Gap(10).PaddingLeft(14).MinWidth(ui.Px(0)).
+			Child(mark).Child(a.crumbs())).
+		Center(a.searchField()).
+		Trailing(
+			ui.IconButton(icons.Refresh).Ghost().Small().Label("Refresh").Tooltip("Refresh (F5)").OnClick(a.refresh),
+			ui.IconButton(themeIcon(t)).Ghost().Small().Label("Toggle theme").Tooltip("Light or dark theme").
+				OnClick(func() { a.toggleTheme(ctx) }),
+		)
 }
 
 func themeIcon(t *ui.Theme) *icons.Icon {
@@ -96,6 +84,12 @@ func (a *App) searchField() ui.Element {
 			Placeholder("Find commits, authors, hashes").Icon(icons.Search).Clearable().
 			FocusHandle(a.search).Trailing(trailing).
 			OnSubmit(func(string) { a.step(1) }).
+			OnKeyDown(func(e *ui.KeyEvent) {
+				if e.Key == input.KeyEnter && e.Mods == input.ModShift {
+					a.step(-1)
+					e.StopPropagation()
+				}
+			}).
 			Style(ui.Style{Width: ui.Px(300)})
 	})
 }
