@@ -21,19 +21,20 @@ func (a *App) history(r *store.Repo) ui.Element {
 		query := v.query.Get()
 		loading := r.Loading.Get()
 		now := a.layout.Now()
-		rowH := rowHeight(ctx)
 		// A row that does not match the search is faded, not hidden, so the graph
 		// stays whole.
 		faded := func(e store.Entry) bool { return query != "" && !matches(query, e.Hash, e.Subject, e.Author) }
 		cell := func(e store.Entry, el ui.Element) ui.Element {
-			d := ui.Div().Row().Align(ui.Center).Grow(1).MinWidth(ui.Px(0)).PaddingX(8).Gap(8).Child(el)
+			d := ui.Div().Row().Align(ui.Center).Grow(1).MinWidth(ui.Px(0)).Gap(8).Child(el)
 			if faded(e) {
 				d.Opacity(0.35)
 			}
 			return d
 		}
 		cols := []ui.DataColumn[store.Entry]{
+			// The graph's cells have no padding, so each row's slice meets the next.
 			{Key: "graph", Header: "Graph", Width: graphWidth(r.Lanes.Get()), MinWidth: 40, Resizable: true,
+				CellStyle: ui.Style{Clear: ui.ClearPadding},
 				Text: func(e store.Entry) string {
 					if e.Row.Merge {
 						return "Merge"
@@ -41,9 +42,9 @@ func (a *App) history(r *store.Repo) ui.Element {
 					return ""
 				},
 				Cell: func(e store.Entry) ui.Element {
-					g := graphCell(t, e, e.Hash == info.HeadHash, rowH)
+					g := graphCell(t, e, e.Hash == info.HeadHash)
 					if faded(e) {
-						return ui.Div().Opacity(0.35).Child(g)
+						return ui.Div().Size(ui.Full, ui.Full).Opacity(0.35).Child(g)
 					}
 					return g
 				}},
@@ -74,10 +75,9 @@ func (a *App) history(r *store.Repo) ui.Element {
 						Child(ui.Text(e.Author).TextColor(t.TextMuted).Truncate()))
 				}},
 			{Key: "date", Header: "Date", Width: 120, MinWidth: 70, Resizable: true,
-				Text: func(e store.Entry) string { return ago(e.When, now) },
+				Text: func(e store.Entry) string { return ui.FormatRelative(e.When, now) },
 				Cell: func(e store.Entry) ui.Element {
-					return cell(e, ui.Div().Tooltip(stamp(e.When)).
-						Child(ui.Text(ago(e.When, now)).TextColor(t.TextMuted).Truncate()))
+					return cell(e, ui.Div().TextColor(t.TextMuted).Child(ui.TimeAgo(e.When)))
 				}},
 			{Key: "hash", Header: "Commit", Width: 86, MinWidth: 60, Resizable: true,
 				Text: func(e store.Entry) string { return e.Short() },
@@ -101,8 +101,7 @@ func (a *App) history(r *store.Repo) ui.Element {
 
 // gridStyle is the look of the app's tables: no frame and no lines between
 // rows, a quiet header and a soft fill for the hovered and selected rows. The
-// graph needs rows that meet, so the rows have no border. Cells have no padding
-// of their own; each cell pads its content, except the graph's.
+// graph needs rows that meet, so the rows have no border.
 func gridStyle(t *ui.Theme) ui.DataGridStyle {
 	return ui.DataGridStyle{
 		Grid: ui.Style{Clear: ui.ClearBorder, Background: t.Background},
@@ -112,7 +111,6 @@ func gridStyle(t *ui.Theme) ui.DataGridStyle {
 		Row:             ui.Style{Clear: ui.ClearBorder},
 		RowHover:        ui.Style{Background: t.SurfaceHover},
 		RowSelected:     ui.Style{Background: t.AccentSoft},
-		Cell:            ui.Style{Clear: ui.ClearPadding},
 	}
 }
 

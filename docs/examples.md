@@ -212,15 +212,16 @@ these features (`examples/notes/views/tags.go`, `tags_test.go`).
 `git` command, which must be on PATH, and never changes them. Like the notes
 app, it is built only from the public API to find gaps in it.
 
-- The sidebar lists the repositories. The + button (Ctrl+O) adds one with the
-  folder picker, and a repository's context menu refreshes it, copies its path or
-  removes it from the list. Ctrl+PageUp and Ctrl+PageDown move between them. Each
+- The sidebar lists the repositories in a `ui.ListBox`, so the arrow keys move
+  between them. The + button (Ctrl+O) adds one with the folder picker, and a
+  repository's context menu refreshes it, copies its path or removes it from the list. Ctrl+PageUp and Ctrl+PageDown move between them. Each
   repository keeps its own view, hidden with `Display` while another is shown, so
   its scroll position, selection and search survive the switch. On the first run
   the list starts with the repository the app was started in, if any.
 - Below the repositories, a `ui.Tree` lists the branches, the remote branches by
-  remote, and the tags, with HEAD's branch checked and how far each branch is
-  ahead of and behind its upstream. Choosing one selects its commit.
+  remote, and the tags. A branch's description names its upstream, and its row ends
+  with HEAD's check and how far it is ahead of and behind (`RenderTrailing`). Choosing
+  a ref selects its commit, and its context menu copies its name or hash.
 - The history is a `ui.DataGrid` of every branch's commits in topological order:
   the graph, the message with its branch and tag pills, the author, the date and
   the hash. The `graph` package gives each commit a lane and each row the lines
@@ -231,18 +232,22 @@ app, it is built only from the public API to find gaps in it.
 - The search field in the title bar (Ctrl+F) fades the commits that do not match
   the words typed (in the message, the author or the start of the hash), so the
   graph stays whole. Enter and F3 go to the next match, Shift+F3 to the previous.
-- The detail pane shows the selected commit's message, author and committer,
-  hash, parents (each selects its commit) and refs, and the files it changed with
-  their line counts. A merge is compared with its first parent. Choosing a file
-  shows its diff in place of the history, in a read-only `codeedit` editor with
-  the diff highlighting; Escape goes back.
+- The detail pane shows the selected commit's message, author and committer (with
+  `ui.TimeAgo`), hash (with a `ui.CopyButton`), parents (each selects its commit) and
+  refs, and the files it changed with their line counts, in a list box. A merge is
+  compared with its first parent. The details and each diff load with `ui.Query`, so
+  a commit seen a moment ago shows at once. Choosing a file shows its diff in place of
+  the history, in a read-only `codeedit` editor with the diff highlighting; Escape
+  goes back.
 - The Tags page (Ctrl+2) is a sortable table of the tags, annotated or
   lightweight, newest first. Enter or a double click shows a tag's commit.
-- The window draws its own title bar. The themes are the app's own light and
+- The window draws its own title bar with `ui.TitleBar`, with the search centered on
+  the window. The themes are the app's own light and
   dark themes; they follow Windows until the sun or moon button picks one. The
   repositories, the pane widths, the theme and the zoom are kept in
   `jamb-git\settings.json` in the user's configuration folder.
-- Shortcuts: F5 or Ctrl+R (refresh), Ctrl+H (go to HEAD), Ctrl+Shift+C (copy
+- Shortcuts: Ctrl+P (go to a branch, tag or commit, a quick open built on the command
+  palette's items), F5 or Ctrl+R (refresh), Ctrl+H (go to HEAD), Ctrl+Shift+C (copy
   the selected commit's hash), Ctrl+1 and Ctrl+2 (history and tags), Ctrl+K or
   Ctrl+Shift+P (command palette), Ctrl+Shift+I (the visual inspector).
 - The tests in `examples/git/views` build a small repository with `git` in a
