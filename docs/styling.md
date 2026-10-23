@@ -570,7 +570,7 @@ parts that the code applies.
 | `AlertDialog` | `Scrim`, `Panel`, `Header`, `Icon`, `Title`, `Message`, `Body`, `Footer` | `Intent` (`AlertDialogInfo`, `AlertDialogConfirm`, `AlertDialogWarning`, `AlertDialogDestructive`) | `Body`, `Action` (elements) | done |
 | `Popover` | `Panel` | `Placement` | none | done |
 | `HoverCard` | `Panel` | `Placement` | none | done |
-| `CommandPalette` | `Panel`, `Input`, `List`, `Item`, `ItemHighlighted`, `Label`, `Match`, `Keys`, `Empty` | none | none | done |
+| `CommandPalette` | `Panel`, `Input`, `List`, `Item`, `ItemHighlighted`, `Label`, `Match`, `Keys`, `Detail`, `Empty` | none | none | done |
 | `ProgressBar` | `Track`, `Fill`, `Label` | `Indeterminate()` (the sliding segment is `Fill`) | none | done |
 | `ProgressRing` | `Ring`, `Dot` | sizes (`RingSmall`, `RingMedium`, `RingLarge`) | none | done |
 | `Badge` | `Badge`, `Label`, `Dot` | `Neutral`, `Accent`, `Success`, `Warning`, `Danger` (style per variant in `Theme.Badges`) | none | done |

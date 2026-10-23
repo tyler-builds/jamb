@@ -112,6 +112,7 @@ type Store struct {
 	DrawerOpen   *ui.Signal[bool] // the drawer sample of the Components page
 	AlertOpen    *ui.Signal[bool] // the alert dialog sample of the Components page
 	PaletteOpen  *ui.Signal[bool] // the command palette (Ctrl+Shift+P)
+	QuickOpen    *ui.Signal[bool] // the palette of projects (Ctrl+P)
 	SampleName   *ui.Signal[string]
 	SampleResult *ui.Signal[string]
 	// FindOpen shows the non-modal find sample of the Components page, and FindQuery
@@ -183,6 +184,7 @@ func NewStore() *Store {
 		DrawerOpen:   ui.NewSignal(false),
 		AlertOpen:    ui.NewSignal(false),
 		PaletteOpen:  ui.NewSignal(false),
+		QuickOpen:    ui.NewSignal(false),
 		SampleName:   ui.NewSignal(""),
 		SampleResult: ui.NewSignal(""),
 		FindOpen:     ui.NewSignal(false),
