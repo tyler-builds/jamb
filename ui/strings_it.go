@@ -126,5 +126,26 @@ func italianStrings() *Strings {
 		CodeEditorNoCodeActions: "Nessuna azione disponibile",
 
 		Required: "Questo campo è obbligatorio.",
+
+		// The Italian forms follow CLDR 48.2's relativeTime long forms (it).
+		RelativeNow:       "ora",
+		RelativeYesterday: "ieri",
+		RelativeTomorrow:  "domani",
+		RelativeAgo: func(u RelativeUnit, n int) string {
+			return fmt.Sprintf("%d %s fa", n, relativeWord(italianUnits[u], n))
+		},
+		RelativeIn: func(u RelativeUnit, n int) string {
+			return fmt.Sprintf("tra %d %s", n, relativeWord(italianUnits[u], n))
+		},
 	}
+}
+
+// italianUnits are the one and many nouns of the units of a relative time, by RelativeUnit.
+var italianUnits = [...][2]string{
+	RelativeMinute: {"minuto", "minuti"},
+	RelativeHour:   {"ora", "ore"},
+	RelativeDay:    {"giorno", "giorni"},
+	RelativeWeek:   {"settimana", "settimane"},
+	RelativeMonth:  {"mese", "mesi"},
+	RelativeYear:   {"anno", "anni"},
 }

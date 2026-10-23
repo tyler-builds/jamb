@@ -467,6 +467,16 @@ type Strings struct {
 	MarkdownCode func(language string) string
 	// MarkdownFootnotes names the list of footnotes at the end of a document.
 	MarkdownFootnotes string
+
+	// RelativeNow is a time within a minute of now, in a relative time such as "now".
+	RelativeNow string
+	// RelativeYesterday and RelativeTomorrow name the day before and the day after today.
+	RelativeYesterday string
+	RelativeTomorrow  string
+	// RelativeAgo builds a time in the past from its unit and count, such as "3 days ago"
+	// (see FormatRelative). RelativeIn builds a time in the future, such as "in 3 days".
+	RelativeAgo func(unit RelativeUnit, n int) string
+	RelativeIn  func(unit RelativeUnit, n int) string
 }
 
 // englishStrings returns the English text. It is shared by the fallbacks, so its
@@ -751,7 +761,28 @@ func englishStrings() *Strings {
 			return "Code, " + language
 		},
 		MarkdownFootnotes: "Footnotes",
+
+		// The English forms follow CLDR 48.2's relativeTime long forms (en).
+		RelativeNow:       "now",
+		RelativeYesterday: "yesterday",
+		RelativeTomorrow:  "tomorrow",
+		RelativeAgo: func(u RelativeUnit, n int) string {
+			return englishCount(n, englishUnits[u][0], englishUnits[u][1]) + " ago"
+		},
+		RelativeIn: func(u RelativeUnit, n int) string {
+			return "in " + englishCount(n, englishUnits[u][0], englishUnits[u][1])
+		},
 	}
+}
+
+// englishUnits are the one and many nouns of the units of a relative time, by RelativeUnit.
+var englishUnits = [...][2]string{
+	RelativeMinute: {"minute", "minutes"},
+	RelativeHour:   {"hour", "hours"},
+	RelativeDay:    {"day", "days"},
+	RelativeWeek:   {"week", "weeks"},
+	RelativeMonth:  {"month", "months"},
+	RelativeYear:   {"year", "years"},
 }
 
 // englishCount returns n with the English noun for its number: one for 1, many otherwise.

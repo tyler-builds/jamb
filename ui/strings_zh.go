@@ -122,7 +122,29 @@ func chineseMainlandStrings() *Strings {
 		CodeEditorNoCodeActions: "没有可用的代码操作",
 
 		Required: "此字段为必填项。",
+
+		// The Simplified Chinese forms follow CLDR 48.2's relativeTime long forms (zh).
+		RelativeNow:       "现在",
+		RelativeYesterday: "昨天",
+		RelativeTomorrow:  "明天",
+		RelativeAgo: func(u RelativeUnit, n int) string {
+			return fmt.Sprintf("%d%s前", n, chineseMainlandUnits[u])
+		},
+		RelativeIn: func(u RelativeUnit, n int) string {
+			return fmt.Sprintf("%d%s后", n, chineseMainlandUnits[u])
+		},
 	}
+}
+
+// chineseMainlandUnits are the units of a relative time, by RelativeUnit. Chinese has no
+// plural, so each unit has one word.
+var chineseMainlandUnits = [...]string{
+	RelativeMinute: "分钟",
+	RelativeHour:   "小时",
+	RelativeDay:    "天",
+	RelativeWeek:   "周",
+	RelativeMonth:  "个月",
+	RelativeYear:   "年",
 }
 
 // chineseTaiwanStrings is the Traditional Chinese pack for Taiwan, zh-TW.
@@ -238,7 +260,28 @@ func chineseTaiwanStrings() *Strings {
 		CodeEditorNoCodeActions: "沒有可用的程式碼動作",
 
 		Required: "此欄位為必填。",
+
+		// The Traditional Chinese forms of Taiwan follow CLDR 48.2's relativeTime long forms (zh-Hant).
+		RelativeNow:       "現在",
+		RelativeYesterday: "昨天",
+		RelativeTomorrow:  "明天",
+		RelativeAgo: func(u RelativeUnit, n int) string {
+			return fmt.Sprintf("%d %s前", n, chineseTaiwanUnits[u])
+		},
+		RelativeIn: func(u RelativeUnit, n int) string {
+			return fmt.Sprintf("%d %s後", n, chineseTaiwanUnits[u])
+		},
 	}
+}
+
+// chineseTaiwanUnits are the units of a relative time, by RelativeUnit.
+var chineseTaiwanUnits = [...]string{
+	RelativeMinute: "分鐘",
+	RelativeHour:   "小時",
+	RelativeDay:    "天",
+	RelativeWeek:   "週",
+	RelativeMonth:  "個月",
+	RelativeYear:   "年",
 }
 
 // chineseHongKongStrings is the Traditional Chinese pack for Hong Kong and Macao,
@@ -348,5 +391,26 @@ func chineseHongKongStrings() *Strings {
 		CodeEditorNoMatches:  "無結果",
 
 		Required: "此欄位為必填。",
+
+		// The Hong Kong forms follow CLDR 48.2's relativeTime long forms (zh-Hant-HK).
+		RelativeNow:       "現在",
+		RelativeYesterday: "昨日",
+		RelativeTomorrow:  "明日",
+		RelativeAgo: func(u RelativeUnit, n int) string {
+			return fmt.Sprintf("%d %s前", n, chineseHongKongUnits[u])
+		},
+		RelativeIn: func(u RelativeUnit, n int) string {
+			return fmt.Sprintf("%d %s後", n, chineseHongKongUnits[u])
+		},
 	}
+}
+
+// chineseHongKongUnits are the units of a relative time, by RelativeUnit.
+var chineseHongKongUnits = [...]string{
+	RelativeMinute: "分鐘",
+	RelativeHour:   "小時",
+	RelativeDay:    "日",
+	RelativeWeek:   "星期",
+	RelativeMonth:  "個月",
+	RelativeYear:   "年",
 }
