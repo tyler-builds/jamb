@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/ui"
 	"github.com/tyler-builds/jamb/ui/uitest"
 
 	"github.com/tyler-builds/jamb/examples/monitor/sample"
@@ -207,10 +208,20 @@ const browserGroup = `group:c:\programs\browser.exe`
 func TestProcessesAreGroupedByProgram(t *testing.T) {
 	u, a, s, _ := open(t)
 	grid := u.ByRole(access.RoleDataGrid, "Processes")
-	// csrss, wininit, services, svchost, smss and System are Windows' own; the
-	// three browsers share a group; the rest are alone.
-	if n := grid.Node().GridRows; n != 6 {
-		t.Errorf("%d rows shown, want 6: five programs and the Windows group", n)
+	// The sections are open: Apps holds the four programs with windows (the browser's
+	// three processes in a closed group), Background the build tool, and Windows
+	// processes its six.
+	if n := grid.Node().GridRows; n != 14 {
+		t.Errorf("%d rows shown, want 14: three sections and their eleven entries", n)
+	}
+	// The sections keep their order whichever way the table sorts.
+	for _, by := range []ui.SortState{{Key: colMemory, Desc: true}, {Key: colMemory}, {Key: colName, Desc: true}} {
+		a.layout.Sort.Set(by)
+		u.Frame()
+		order := sectionOrder(u)
+		if want := []string{"Apps (4)", "Background processes (1)", "Windows processes (6)"}; !slices.Equal(order, want) {
+			t.Errorf("sorted by %v, the sections show in the order %q", by, order)
+		}
 	}
 	// The group is named for the program, not its executable.
 	u.ByName("Browser (3)")
@@ -263,4 +274,18 @@ func TestProgramIconsAreReadOncePerExecutable(t *testing.T) {
 	if n := reads[`C:\Programs\browser.exe`]; n != 1 {
 		t.Errorf("the browser's icon was read %d times for its three processes, want once", n)
 	}
+}
+
+// sectionOrder returns the names of the sections' rows, in the order the table
+// shows them.
+func sectionOrder(u *uitest.UI) []string {
+	var out []string
+	u.Tree().Walk(func(n *access.Node) bool {
+		if n.Role == access.RoleDataItem && strings.HasSuffix(n.Name, ")") &&
+			(strings.HasPrefix(n.Name, "Apps") || strings.HasPrefix(n.Name, "Background") || strings.HasPrefix(n.Name, "Windows processes")) {
+			out = append(out, n.Name)
+		}
+		return true
+	})
+	return out
 }

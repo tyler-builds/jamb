@@ -74,14 +74,18 @@ func (c *iconCache) work() {
 
 // nameCell is a row's name with its program's icon, as Task Manager shows it. A
 // process without an executable, and one whose icon is still being read, shows a
-// plain window; the group of Windows' processes shows a monitor.
+// plain window. A section's row is its name alone.
 func (a *App) nameCell(t *ui.Theme, r row) ui.Element {
+	if r.section {
+		// A heading, as Task Manager draws its sections: no icon, and a heavier face,
+		// which marks what the row is, not a state.
+		return ui.Div().Row().Size(ui.Full, ui.Full).Align(ui.Center).MinWidth(ui.Px(0)).
+			Child(ui.Text(groupName(r)).FontWeight(ui.FontSemibold).Truncate())
+	}
 	var mark ui.Element
 	switch src := a.icons.get(r.Path); {
 	case src != nil:
 		mark = ui.Image(src).Size(ui.Px(16), ui.Px(16))
-	case r.key == groupWindows:
-		mark = ui.Icon(icons.MonitorCog).Size(16).Color(t.TextMuted)
 	default:
 		mark = ui.Icon(icons.AppWindow).Size(16).Color(t.TextMuted)
 	}

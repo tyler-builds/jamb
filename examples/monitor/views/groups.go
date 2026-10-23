@@ -15,33 +15,72 @@ type row struct {
 	// count is how many processes a group holds, 0 for a process.
 	count    int
 	children []row
+	// section is set for the rows of the sections: Apps, Background processes and
+	// Windows processes. They keep their order as the table sorts, and show only
+	// their names.
+	section bool
 }
 
 func (r row) isGroup() bool { return r.count > 0 }
 
-// groupWindows is the key of the group of Windows' own processes.
-const groupWindows = "group:windows"
+// The keys of the sections of the grouped table, in their order.
+const (
+	sectionApps       = "group:apps"
+	sectionBackground = "group:background"
+	groupWindows      = "group:windows"
+)
 
-// groupRows groups procs as Task Manager does: the parts of Windows in one group
-// (see sample.Program.Windows), and the processes of each other program, by its executable, in a group
-// of their own when it runs more than one. A group is named for the program, as
-// its version information names it ("Helium" for a chrome.exe that names itself
-// so).
+// sections lists the sections' keys, which are open until the user closes them.
+var sections = []string{sectionApps, sectionBackground, groupWindows}
+
+// groupRows groups procs as Task Manager does, in three sections: Apps, the
+// programs with a window on the taskbar; Windows processes, the parts of Windows
+// (see sample.Program.Windows); and Background processes, the rest. In each, the
+// processes of a program, by its executable, are a group of their own when it runs
+// more than one. A group is named for the program, as its version information
+// names it ("Helium" for a chrome.exe that names itself so).
 func groupRows(procs []sample.Process) []row {
-	var system []sample.Process
-	var apps []sample.Process
-	for _, p := range procs {
-		if p.Windows {
-			system = append(system, p)
-		} else {
-			apps = append(apps, p)
+	var apps, background, system []row
+	for _, r := range byProgram(procs) {
+		switch {
+		case r.hasWindow():
+			apps = append(apps, r)
+		case r.Windows:
+			system = append(system, r)
+		default:
+			background = append(background, r)
 		}
 	}
-	rows := byProgram(apps)
-	if len(system) > 0 {
-		rows = append(rows, group(groupWindows, "Windows processes", byProgram(system)))
+	var rows []row
+	for _, s := range []struct {
+		key, name string
+		rows      []row
+	}{
+		{sectionApps, "Apps", apps},
+		{sectionBackground, "Background processes", background},
+		{groupWindows, "Windows processes", system},
+	} {
+		if len(s.rows) > 0 {
+			sec := group(s.key, s.name, s.rows)
+			sec.section = true
+			rows = append(rows, sec)
+		}
 	}
 	return rows
+}
+
+// hasWindow reports whether the process, or a process of the group, has a window
+// on the taskbar.
+func (r row) hasWindow() bool {
+	if r.HasWindow {
+		return true
+	}
+	for _, c := range r.children {
+		if c.hasWindow() {
+			return true
+		}
+	}
+	return false
 }
 
 // byProgram is the rows of procs, one for each executable: the process itself
@@ -68,7 +107,8 @@ func byProgram(procs []sample.Process) []row {
 			children[i] = processRow(p)
 		}
 		g := group("group:"+exe, members[0].Label(), children)
-		g.Path = members[0].Path // for the program's icon
+		g.Path = members[0].Path       // for the program's icon
+		g.Windows = members[0].Windows // the processes of one executable are all parts of Windows, or none
 		rows = append(rows, g)
 	}
 	return rows
@@ -141,15 +181,20 @@ func findRow(rows []row, key string) (row, bool) {
 	return row{}, false
 }
 
-// groupName is a group's name with its count, as "chrome.exe (16)".
+// groupName is a group's name with its count, as "chrome.exe (16)": its processes,
+// or a section's entries, as Task Manager counts them.
 func groupName(r row) string {
 	if !r.isGroup() {
 		return r.Label()
 	}
+	n := r.count
+	if r.section {
+		n = len(r.children)
+	}
 	var b strings.Builder
 	b.WriteString(r.Label())
 	b.WriteString(" (")
-	b.WriteString(count(r.count))
+	b.WriteString(count(n))
 	b.WriteString(")")
 	return b.String()
 }

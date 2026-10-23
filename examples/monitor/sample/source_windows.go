@@ -66,6 +66,10 @@ func (s *System) Read() (Raw, error) {
 	if raw.Procs, err = s.readProcs(); err != nil {
 		return Raw{}, fmt.Errorf("reading the processes: %w", err)
 	}
+	shown := windowPIDs()
+	for i := range raw.Procs {
+		raw.Procs[i].HasWindow = shown[raw.Procs[i].PID]
+	}
 	// A machine without a network interface table still has the rest.
 	raw.NetIn, raw.NetOut, _ = readNetwork()
 	if !s.utilTried {

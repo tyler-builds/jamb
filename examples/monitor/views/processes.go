@@ -65,28 +65,34 @@ func (a *App) processPanel() ui.Element {
 			ui.DataColumn[row]{Key: colPID, Header: "PID", Text: pidText,
 				Compare: ui.SortBy(func(r row) uint32 { return r.PID }),
 				Width:   80, Align: ui.End, Resizable: true, Movable: true},
-			ui.DataColumn[row]{Key: colCPU, Header: "CPU", Text: func(r row) string { return percent(r.CPU) },
-				Cell:      func(r row) ui.Element { return heat(t, hc, r.CPU/100, percent(r.CPU)) },
+			ui.DataColumn[row]{Key: colCPU, Header: "CPU", Text: value(func(r row) string { return percent(r.CPU) }),
+				Cell: func(r row) ui.Element {
+					if r.section {
+						return ui.Div()
+					}
+					return heat(t, hc, r.CPU/100, percent(r.CPU))
+				},
 				CellStyle: ui.Style{Clear: ui.ClearPadding},
 				Compare:   ui.SortBy(func(r row) float64 { return r.CPU }),
 				Width:     80, Align: ui.End, Resizable: true, Movable: true},
-			ui.DataColumn[row]{Key: colMemory, Header: "Memory", Text: func(r row) string { return ui.FormatBytes(r.Private) },
+			ui.DataColumn[row]{Key: colMemory, Header: "Memory", Text: value(func(r row) string { return ui.FormatBytes(r.Private) }),
 				Compare: ui.SortBy(func(r row) uint64 { return r.Private }),
 				Width:   100, Align: ui.End, Resizable: true, Movable: true},
-			ui.DataColumn[row]{Key: colIO, Header: "I/O", Text: func(r row) string { return rate(r.IORead + r.IOWrite) },
+			ui.DataColumn[row]{Key: colIO, Header: "I/O", Text: value(func(r row) string { return rate(r.IORead + r.IOWrite) }),
 				Compare: ui.SortBy(func(r row) float64 { return r.IORead + r.IOWrite }),
 				Width:   100, Align: ui.End, Resizable: true, Movable: true},
-			ui.DataColumn[row]{Key: colThreads, Header: "Threads", Text: func(r row) string { return count(int(r.Threads)) },
+			ui.DataColumn[row]{Key: colThreads, Header: "Threads", Text: value(func(r row) string { return count(int(r.Threads)) }),
 				Compare: ui.SortBy(func(r row) uint32 { return r.Threads }),
 				Width:   80, Align: ui.End, Resizable: true, Movable: true},
-			ui.DataColumn[row]{Key: colHandles, Header: "Handles", Text: func(r row) string { return count(int(r.Handles)) },
+			ui.DataColumn[row]{Key: colHandles, Header: "Handles", Text: value(func(r row) string { return count(int(r.Handles)) }),
 				Compare: ui.SortBy(func(r row) uint32 { return r.Handles }),
 				Width:   90, Align: ui.End, Resizable: true, Movable: true},
-			ui.DataColumn[row]{Key: colStarted, Header: "Started", Text: startedText,
+			ui.DataColumn[row]{Key: colStarted, Header: "Started", Text: value(startedText),
 				Compare: func(x, y row) int { return x.Started.Compare(y.Started) },
 				Width:   150, Resizable: true, Movable: true},
 		).Key("processes").Label("Processes").
 			Children(func(r row) []row { return r.children }).
+			SortChildrenOnly().
 			Expanded(a.expanded).
 			Selection(ui.SelectionSingle, a.selected).
 			Sort(a.layout.Sort).
@@ -136,6 +142,17 @@ func (a *App) toggleGroup(key string) {
 	a.expanded.Set(append(slices.Clone(open), key))
 }
 
+// value is a column's text, which a section's row leaves empty: a section is a
+// heading, as in Task Manager, and its sums would only repeat the overview.
+func value(text func(r row) string) func(r row) string {
+	return func(r row) string {
+		if r.section {
+			return ""
+		}
+		return text(r)
+	}
+}
+
 func pidText(r row) string {
 	if r.isGroup() {
 		return ""
@@ -171,6 +188,9 @@ func (a *App) processMenu(ctx *ui.Context) func(r row, column string) []ui.MenuI
 			label := "Expand"
 			if slices.Contains(a.expanded.Peek(), key) {
 				label = "Collapse"
+			}
+			if r.section {
+				return []ui.MenuItem{{Label: label, OnClick: func() { a.toggleGroup(key) }}}
 			}
 			return []ui.MenuItem{
 				{Label: label, OnClick: func() { a.toggleGroup(key) }},
