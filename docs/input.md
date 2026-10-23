@@ -57,6 +57,11 @@ There are three kinds of focus style:
 ui.Div().Focusable().FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}})
 ```
 
+A focusable `Div` with an `OnClick` and no `FocusVisible` of its own shows that
+standard ring (a 2 px spread in the theme's `FocusRing`, the color the built-in
+controls use, and the high contrast focus color under high contrast) while it has
+keyboard focus. `ClearShadows` removes it, and a `FocusVisible` style replaces it.
+
 Custom elements ask `ctx.KeyboardFocus()` (true when this element has focus and
 focus is keyboard-driven) and draw their own ring; the component re-renders
 when that changes.

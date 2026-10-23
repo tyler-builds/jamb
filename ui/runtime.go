@@ -1646,6 +1646,11 @@ func (rt *Runtime) resolveStyle(n *node) Style {
 	if e.focusVisible != nil && rt.focusID == n.id && rt.keyboardModality {
 		s = s.Merge(rt.inState(*e.focusVisible, "focus visible"))
 	}
+	if e.defaultFocusRing() && rt.focusID == n.id && rt.keyboardModality && s.Clear&ClearShadows == 0 {
+		// The ring keeps the element's own shadows, and is drawn after them. ClearShadows
+		// removes it too.
+		s.Shadows = append(slices.Clip(s.Shadows), Shadow{Spread: 2, Color: rt.theme.FocusRing})
+	}
 	if e.focusWithin != nil && rt.focusInside(n.id) {
 		s = s.Merge(rt.inState(*e.focusWithin, "focus within"))
 	}
@@ -1762,7 +1767,7 @@ func (rt *Runtime) restyle(id uint64) {
 	}
 	d := n.div
 	if d.hover == nil && d.pressed == nil && d.focused == nil && d.focusWithin == nil && d.focusVisible == nil &&
-		d.dragging == nil && len(d.drops) == 0 && !rt.hasLiveEdit(id) {
+		!d.defaultFocusRing() && d.dragging == nil && len(d.drops) == 0 && !rt.hasLiveEdit(id) {
 		return
 	}
 	rt.restyleNode(n)
