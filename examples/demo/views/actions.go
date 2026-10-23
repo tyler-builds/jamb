@@ -19,6 +19,9 @@ var (
 	// ShowPalette opens the command palette. It is hidden, so the palette does not
 	// list itself.
 	ShowPalette = ui.NewAction("palette.show", "Command palette").Hide()
+	// QuickOpen opens the palette of projects, which lists the projects by name and
+	// opens one. It is hidden, as ShowPalette is.
+	QuickOpen = ui.NewAction("palette.quick-open", "Go to project").Hide()
 )
 
 // Bindings returns the main window's key bindings for app.Window.Bindings.
@@ -34,6 +37,7 @@ func Bindings() []ui.Binding {
 		ui.Bind("ctrl+shift+l", ToggleTheme),
 		ui.Bind("ctrl+f", FilterComponents),
 		ui.Bind("ctrl+shift+p", ShowPalette),
+		ui.Bind("ctrl+p", QuickOpen),
 		// The code editor's own Ctrl+F (find) wins on its text, which is in a
 		// deeper key context; in its find bar, which is outside that context,
 		// Ctrl+F does nothing rather than leave the editor for the filter.

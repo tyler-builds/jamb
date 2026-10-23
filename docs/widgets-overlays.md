@@ -340,6 +340,13 @@ ui.Div().Size(ui.Full, ui.Full).
 		Commands(func() []*ui.Action {    // optional; runs each time the palette opens
 			return appCommands
 		}))
+
+quickOpen := ui.NewSignal(false)                  // a quick open of branches, tags and commits
+ui.CommandPalette(quickOpen).ItemsOnly().
+	Placeholder("Go to a branch, tag or commit").
+	Items(func(query string) []ui.PaletteItem {  // the app's own things, listed before the commands
+		return refItems(query)
+	})
 ```
 
 - When it opens it lists the actions available where focus is
@@ -349,6 +356,21 @@ ui.Div().Size(ui.Full, ui.Full).
 - A command matches when every word of the query occurs in its name, ignoring case
   and in any order: "note new" finds "New note". The matches are highlighted in the
   names, as in a `Combobox`.
+- `Items` lists the app's own things, such as branches, tags, files or commits, as
+  `ui.PaletteItem{Key, Label, Detail, Icon, Keywords, Run}` before the matching
+  commands. The function gets the query as it is typed, and runs each time the query
+  changes. The palette keeps the items whose label, detail or keywords contain every
+  word of the query, ignoring case and in any order, so the function may return all
+  its items or filter them itself, which is cheaper for a long list. Every item kept
+  is built as a row, so keep the list to what a user can scroll. The label is
+  matched and highlighted; the detail (such as a commit's short hash and author) is
+  matched but not highlighted, and it is read as the row's description. `Run` runs
+  when the item is chosen, after the palette has closed and focus is back where it
+  was, as a command does. Enter, or a click, chooses it.
+- `ItemsOnly()` hides the commands, so the palette is a quick open, as VS Code's Ctrl+P
+  is. Typing ">" first switches to the commands, which are then matched against the
+  rest of the query, as VS Code does. Set a `Placeholder` that names what the palette
+  opens.
 - Up and Down move the highlight and stop at the ends of the list; PageUp and
   PageDown move it by `MaxRows`. Home and End stay with the field. Typing moves the
   highlight back to the first match. The pointer highlights the row it is over.
@@ -364,6 +386,7 @@ ui.Div().Size(ui.Full, ui.Full).
   (`Strings.CommandPalette`) holding a combo box: the field keeps focus, and the
   highlighted command is reported as the focused, selected item of its list, as in
   a `Combobox`. Each command is read by its name, with its key binding as the
-  description. The empty message is `Strings.NoMatchingCommands`.
+  description. The empty message is `Strings.NoMatchingCommands`, or
+  `Strings.NoResults` when the palette lists the app's items too.
 - Its keys are the actions bound in `"CommandPalette > Editor"` (see
   [Palettes](input.md#actions-and-key-bindings)).
