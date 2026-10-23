@@ -26,6 +26,7 @@ ui.Tabs(doc, tabs...).OverflowMenu().TabMaxWidth(ui.Px(180)). // a menu of every
 	Suffix(ui.IconButton(icons.Plus).Label("New tab").OnClick(newTab)) // beside the strip, not scrolled
 ui.Tab[string]{Value: "sales", Label: "Sales", Panel: salesPanel,
 	Popup: func(close func()) ui.Element { return tabActions(close) }} // anything, in a panel under the tab
+ui.Tabs(doc, tabs...).OnClose(func(v string) { closeDoc(v) }) // a Closable tab shows a close button; the app drops it
 
 ui.Collapsible("Advanced options", open, content).Key("advanced") // *ui.Signal[bool]
 ui.Accordion(sectionA, sectionB, sectionC).SingleOpen()          // one section open at a time
@@ -114,6 +115,18 @@ th.Reveal("src/main.go") // opens the nodes above it and scrolls it into view
   applies). `Prefix` and `Suffix` put elements before and after the strip, in
   the same row (the `Bar` part), outside the tab list and outside what scrolls.
   A segmented strip stays as wide as its tabs until it reaches the width it has.
+  A tab with `Closable: true` can be closed when the Tabs has `OnClose`. Its close
+  button (named "Close Sales", `Strings.CloseTab`) shows on the selected tab and on
+  the tab under the pointer, and is kept in the layout otherwise, so the tab does not
+  change width. A middle click on the tab closes it, Delete closes the focused tab,
+  and Ctrl+W or Ctrl+F4 close the selected tab while the focus is in the tab list or
+  its panel, as TabView's keys do. The Tabs does not remove the tab. `OnClose` gets
+  its value, and the app drops the tab from its own list, selecting another tab in
+  the same handler when the selected one was closed, as the example on `OnClose`
+  shows. Focus then moves to the selected tab. The close button is not a Tab stop:
+  assistive technology reaches it inside the tab item. A disabled tab cannot be
+  closed, and without `OnClose` no tab shows a button. The close works with
+  `Reorderable` and `OverflowMenu`, which see the tabs as the app gives them.
 - **Collapsible.** The header is a button with the Expanded state. Space and
   Enter open and close it, as a click does, and its chevron points right when closed
   and down when open. The content is not built while the section is closed. With

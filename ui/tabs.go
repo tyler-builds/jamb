@@ -23,6 +23,10 @@ type Tab[T comparable] struct {
 	Icon *icons.Icon
 	// Disabled makes the tab unable to be chosen.
 	Disabled bool
+	// Closable lets the user close the tab, when the Tabs has OnClose: a close button
+	// shows on the selected tab and on the tab under the pointer, and the tab can be
+	// closed from the keys (see OnClose). A disabled tab cannot be closed.
+	Closable bool
 	// Panel builds the content of the tab, which is shown while the tab is selected.
 	Panel func() Element
 	// Popup builds what a floating panel under the tab shows, such as a menu of
@@ -181,7 +185,8 @@ type TabsElement[T comparable] struct {
 	onReselect  func(T)
 	reorder     bool // see Reorderable
 	onReorder   func([]T)
-	keep        bool // see KeepMounted
+	onClose     func(T) // see OnClose
+	keep        bool    // see KeepMounted
 	variant     TabsVariant
 	styles      TabsStyle
 	renderTab   func(Tab[T], PartState) Element
@@ -239,6 +244,30 @@ func (t *TabsElement[T]) Reorderable() *TabsElement[T] { t.reorder = true; retur
 // user moves a tab (see Reorderable), for example to save it. Passing the tabs
 // in that order next time restores it.
 func (t *TabsElement[T]) OnReorder(fn func(order []T)) *TabsElement[T] { t.onReorder = fn; return t }
+
+// OnClose runs fn with the value of a closable tab (see Tab.Closable) when the user
+// asks to close it: by the tab's close button, by a middle click on the tab, by Delete
+// on the focused tab, or by Ctrl+W or Ctrl+F4 while the focus is in the tab list or
+// its panel. The Tabs does not remove the tab. The app does, from its own list, and
+// when the selected tab is the one closed the app selects another in the same
+// handler, so the selection never names a missing tab. Here open holds the open
+// documents, in order, and the tabs are built from it on each render:
+//
+//	open := ui.NewSignal([]string{"main.go", "tabs.go"})
+//	doc := ui.NewSignal("main.go")
+//	ui.Tabs(doc, tabsOf(open.Get())...). // one Closable tab per document
+//		OnClose(func(v string) {
+//			i := slices.Index(open.Get(), v)
+//			list := slices.Delete(slices.Clone(open.Get()), i, i+1)
+//			open.Set(list)
+//			if doc.Peek() == v && len(list) > 0 {
+//				doc.Set(list[min(i, len(list)-1)]) // the tab that took its place, or the last
+//			}
+//		})
+//
+// Without OnClose no tab shows a close button, and the keys do nothing. After a tab is
+// closed the focus moves to the selected tab.
+func (t *TabsElement[T]) OnClose(fn func(T)) *TabsElement[T] { t.onClose = fn; return t }
 
 // KeepMounted keeps each panel once it has been built. A panel is built the first
 // time its tab is selected, as it is by default, and then stays in the tree while
@@ -338,6 +367,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 	panels := map[T]*ComponentElement{}
 	return Component(func(ctx *Context) Element {
 		th := ctx.Theme()
+		strs := ctx.Strings()
 		st := resolveTabs(ctx, t.variant, t.styles)
 		cur := t.selected.Get()
 		// order is the order of the values once the user has moved a tab (see
@@ -475,6 +505,17 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			}
 			Announce(ctx.Strings().TabMoved(tabs[from].Label, to+1, len(vals)), access.Polite)
 		}
+		// canClose reports whether the tab at index i can be closed: it is closable, not
+		// disabled, and the app has an OnClose. closeTab asks the app to close it, and
+		// moves focus to the selected tab, where the app's next selection lands.
+		canClose := func(i int) bool { return t.onClose != nil && tabs[i].Closable && !tabs[i].Disabled }
+		closeTab := func(i int) {
+			if !canClose(i) {
+				return
+			}
+			t.onClose(tabs[i].Value)
+			focus.Focus()
+		}
 		// mark is where a dragged tab would land: before or after the tab with
 		// the key, which draws the drop line on that side.
 		mark := Local(ctx, "dropMark", tabDropMark{})
@@ -528,6 +569,22 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 					ind.Background(th.Disabled) // a disabled tab's line is GrayText under high contrast
 				}
 				tab.Child(ind)
+			}
+			if canClose(i) {
+				// The close button is not a Tab stop, as TabView's is not: Delete, Ctrl+W and
+				// Ctrl+F4 close the tab from the keys, and assistive technology reaches the
+				// button inside the tab. It is shown on the selected tab and under the
+				// pointer, and kept in the layout otherwise, so the tab does not change width;
+				// it is transparent then, and a click on it can only come from a hovered tab.
+				// Under high contrast it is always drawn, as the system draws its buttons.
+				shown := on || ps.Hovered || ps.Focused || th.HighContrast
+				x := IconButton(icons.X).Small().Label(strs.CloseTab(tb.Label)).Key("close").
+					Style(Style{Transition: th.Motion.hover()}).OnClick(func() { closeTab(i) })
+				x.noFocus = true
+				if !shown {
+					x.Style(Style{Opacity: 0.0001})
+				}
+				tab.Child(x)
 			}
 			if on && tb.Popup != nil {
 				open := popupFor.Get() == selKey
@@ -588,6 +645,13 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			if !on {
 				tab.Hover(st.TabHover)
 			}
+			if canClose(i) {
+				tab.OnMouseDown(func(e *MouseEvent) {
+					if e.Button == input.ButtonMiddle {
+						closeTab(i) // a middle click closes the tab, as browsers' tabs do
+					}
+				})
+			}
 			tab.Cursor(CursorPointer).Focusable().FocusVisible(st.TabFocusVisible).
 				OnClick(func() { choose(i) }).
 				OnKeyDown(func(e *KeyEvent) {
@@ -607,6 +671,11 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 						} else {
 							move(i, i+1)
 						}
+						return
+					}
+					if e.Key == input.KeyDelete && e.Mods == 0 && canClose(i) {
+						e.StopPropagation()
+						closeTab(i)
 						return
 					}
 					if e.Mods != 0 {
@@ -663,12 +732,13 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			})
 		}
 		for i, tb := range tabs {
-			if t.renderTab == nil {
+			if t.renderTab == nil && !canClose(i) {
 				strip.Child(drawTab(i, PartState{Selected: i == sel, Disabled: tb.Disabled, HighContrast: th.HighContrast}))
 				continue
 			}
-			// With a render slot the tab is its own component, so that it re-renders
-			// when its pointer or focus state changes, and the slot gets the new state.
+			// With a render slot, or a close button shown under the pointer, the tab is its
+			// own component, so that it re-renders when its pointer or focus state changes,
+			// and the slot gets the new state.
 			i := i
 			strip.Child(Component(func(ctx *Context) Element {
 				return drawTab(i, PartState{Hovered: ctx.hovered(), Pressed: ctx.pressed(), Focused: ctx.isFocused(),
@@ -680,6 +750,14 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			// Ctrl+Tab and Ctrl+Shift+Tab reach here from the tab list and from the
 			// panel, since both are inside the group.
 			OnKeyDown(func(e *KeyEvent) {
+				if (e.Key == input.KeyW || e.Key == input.KeyF4) && e.Mods == input.ModCtrl && !e.Repeat && !inPopup() {
+					// Ctrl+W and Ctrl+F4 close the selected tab, as TabView's keys do.
+					if sel >= 0 && canClose(sel) {
+						e.StopPropagation()
+						closeTab(sel)
+					}
+					return
+				}
 				if e.Key != input.KeyTab || e.Repeat || (e.Mods != input.ModCtrl && e.Mods != input.ModCtrl|input.ModShift) || inPopup() {
 					return
 				}
