@@ -429,6 +429,13 @@ type Runtime struct {
 	chordFocus  uint64
 	swallowText bool
 
+	// owner is the window this one belongs to, such as the main window of a floating
+	// dock group, and ownerAt the component in it that this window's actions continue
+	// from; followers are the windows that belong to this one (see follow.go).
+	owner     *Runtime
+	ownerAt   *componentInstance
+	followers []*Runtime
+
 	// Menus (see menu.go). ctxMenu is the open context menu. menuReturn is the
 	// focus that the open menu chain returns to when it closes. pointerFocus is
 	// the focus before the latest press, which a menu opened by the pointer
@@ -664,6 +671,10 @@ func (rt *Runtime) Zoom() float32 { return rt.zoom }
 // SetZoom scales the whole UI, clamped to 50%–300%. Text and shapes are
 // re-rendered at the new size, so they stay sharp.
 func (rt *Runtime) SetZoom(z float32) {
+	if rt.owner != nil {
+		rt.owner.SetZoom(z)
+		return
+	}
 	z = min(max(z, ZoomLevels[0]), ZoomLevels[len(ZoomLevels)-1])
 	if z == rt.zoom {
 		return
@@ -675,6 +686,7 @@ func (rt *Runtime) SetZoom(z float32) {
 		rt.onZoom(z)
 	}
 	rt.requestFrame()
+	rt.lookChanged()
 }
 
 // ZoomIn and ZoomOut move to the next zoom level; ResetZoom returns to 100%.
@@ -723,10 +735,15 @@ func (rt *Runtime) hostInvalidateAll() {
 
 // SetTheme switches the theme and re-renders all components.
 func (rt *Runtime) SetTheme(t *Theme) {
+	if rt.owner != nil {
+		rt.owner.SetTheme(t)
+		return
+	}
 	rt.themes = nil
 	rt.appTheme = t
 	rt.applyTheme()
 	rt.hostInvalidateAll()
+	rt.lookChanged()
 }
 
 // SetThemes makes the runtime follow the system's app mode: it uses dark while
@@ -734,17 +751,27 @@ func (rt *Runtime) SetTheme(t *Theme) {
 // switches when the setting changes. SetTheme stops following and sets one
 // theme. Under high contrast the high contrast theme is built from the one in use.
 func (rt *Runtime) SetThemes(light, dark *Theme) {
+	if rt.owner != nil {
+		rt.owner.SetThemes(light, dark)
+		return
+	}
 	rt.themes = &[2]*Theme{light, dark}
 	rt.applyTheme()
 	rt.hostInvalidateAll()
+	rt.lookChanged()
 }
 
 // SetStrings sets the text the built-in controls show and announce, and re-renders all
 // components. Fields that s leaves empty show the English text (see Strings). A nil s
 // is English. A new runtime is English until SetStrings is called.
 func (rt *Runtime) SetStrings(s *Strings) {
+	if rt.owner != nil {
+		rt.owner.SetStrings(s)
+		return
+	}
 	rt.strings = completeStrings(s)
 	rt.hostInvalidateAll()
+	rt.lookChanged()
 }
 
 // AppTheme returns the theme the app set with SetTheme. Under high contrast the

@@ -347,7 +347,7 @@ func (rt *Runtime) bindingsOn(path []*node) []Binding {
 		depth, order int
 	}
 	var out []ranked
-	for i, b := range rt.keymap {
+	for i, b := range rt.bindings() {
 		depth := 0
 		if b.pred != nil {
 			d, ok := b.pred.depthOf(stack)
@@ -429,7 +429,7 @@ func (rt *Runtime) SetBindings(layer string, bs []Binding) {
 // or the root when nothing is focused): the deepest element with an OnAction
 // handler for a runs it. It reports whether a handler ran.
 func (rt *Runtime) Dispatch(a *Action) bool {
-	fn := handlerOn(rt.focusPath(), a)
+	fn := handlerOn(rt.withOwner(rt.focusPath()), a)
 	if fn == nil {
 		return false
 	}
@@ -441,8 +441,9 @@ func (rt *Runtime) Dispatch(a *Action) bool {
 // such as "Ctrl+Shift+P" or "Ctrl+K Ctrl+T", or "" if a is not bound. A
 // binding that a later NoAction or Unbind turns off does not count.
 func (rt *Runtime) KeysFor(a *Action) string {
-	for i := len(rt.keymap) - 1; i >= 0; i-- {
-		if b := rt.keymap[i]; b.action == a && !a.disables() && !rt.turnedOffLater(i) {
+	keymap := rt.bindings()
+	for i := len(keymap) - 1; i >= 0; i-- {
+		if b := keymap[i]; b.action == a && !a.disables() && !turnedOffLater(keymap, i) {
 			labels := make([]string, len(b.strokes))
 			for j, s := range b.strokes {
 				labels[j] = strokeLabel(s)
@@ -456,9 +457,9 @@ func (rt *Runtime) KeysFor(a *Action) string {
 // turnedOffLater reports whether a binding added after keymap[i] turns it off:
 // a NoAction, or an Unbind of its action, with the same keys in the same
 // context expression.
-func (rt *Runtime) turnedOffLater(i int) bool {
-	b := rt.keymap[i]
-	for _, u := range rt.keymap[i+1:] {
+func turnedOffLater(keymap []Binding, i int) bool {
+	b := keymap[i]
+	for _, u := range keymap[i+1:] {
 		if u.expr == b.expr && slices.Equal(u.strokes, b.strokes) && (u.action == NoAction || u.action.unbinds == b.action) {
 			return true
 		}
@@ -470,7 +471,7 @@ func (rt *Runtime) turnedOffLater(i int) bool {
 // element first, without duplicates. Menus and the command palette use it.
 func (rt *Runtime) AvailableActions() []*Action {
 	var out []*Action
-	for _, n := range rt.focusPath() {
+	for _, n := range rt.withOwner(rt.focusPath()) {
 		if n.div == nil {
 			continue
 		}

@@ -476,4 +476,5 @@ func (rt *Runtime) hostClose() {
 	if rt.queries != nil {
 		rt.queries.close()
 	}
+	rt.unfollow()
 }

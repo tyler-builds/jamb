@@ -756,7 +756,7 @@ func (rt *Runtime) bindingKey(s keystroke) bool {
 	if len(rt.pending) > 0 && rt.focusID != rt.chordFocus {
 		rt.pending = nil // focus moved: the chord is dropped, not replayed
 	}
-	path := rt.keyPath()
+	path := rt.withOwner(rt.keyPath())
 	bs := rt.bindingsOn(path)
 	if s == (keystroke{input.KeyEscape, 0}) && rt.escapeDismisses() {
 		// The field's own Cancel would blur it. While an overlay or tooltip is
@@ -882,7 +882,7 @@ func (rt *Runtime) longestRun(held []pendingStroke) (func(), int) {
 		for i := range seq {
 			seq[i] = held[i].s
 		}
-		path := rt.keyPath()
+		path := rt.withOwner(rt.keyPath())
 		if fn := exactRun(path, rt.bindingsOn(path), seq); fn != nil {
 			return fn, n
 		}

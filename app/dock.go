@@ -11,8 +11,10 @@ import "github.com/tyler-builds/jamb/ui"
 // handlers are the dock's, so the layout records the window's place as it moves and when it
 // closes, and the group's panels return to the dock when the window closes. A window that
 // opens at a place off its monitor is moved in from the monitor's edges (on Windows). The
-// window is not quit with the app's last window: the main window should set QuitWhenClosed,
-// so that closing it closes the floating windows too.
+// window takes the dock window's theme, text, zoom and key bindings, and the actions it does
+// not handle go on to the dock window (see the Docking section of docs/layout.md). It is not
+// quit with the app's last window: the main window should set QuitWhenClosed, so that closing
+// it closes the floating windows too.
 func OpenDockWindow(w ui.DockWindow) ui.Window {
 	return Open(Window{
 		Title:        w.Title,

@@ -269,6 +269,15 @@ into the main window, so no panel is lost with its window. Set `QuitWhenClosed` 
 the main window, so that closing it closes the floating windows too, and their
 positions are saved as they close.
 
+A floating window is part of the dock's window. It shows that window's theme, text and
+zoom, whatever the opener sets, and keeps them in step both ways: `SetTheme`, `SetThemes`,
+`SetStrings` and a zoom in either window apply to both, and the dock window's `OnZoom`
+hears of a zoom made in a floating one. The dock window's key bindings and keymap file apply
+in the floating window, and an action that nothing in the floating window handles goes on
+to the dock window: from the dock up to its root, as if the panel were still docked. So the
+app's shortcuts and its command palette work from a floated panel, and they act in the
+dock's window. A floating window's own bindings are not used.
+
 **State.** A panel keeps its state wherever it goes: to another group, split off,
 dropped on an edge, floated into a window and docked back, or put back by a layout
 reset. Its components keep their `Local` state, their signals and their `OnDispose`
