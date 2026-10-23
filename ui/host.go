@@ -79,6 +79,10 @@ func (h *runtimeHost) PointerLeave() { h.rt().hostPointerLeave() }
 // saves what it has not yet saved (see Runtime.at).
 func (h *runtimeHost) FlushTimers() { h.rt().runTimers(time.Time{}, true) }
 
+// Close tells the runtime that its window has closed: the fetches of its Query calls
+// are canceled, and none starts again (see Query).
+func (h *runtimeHost) Close() { h.rt().hostClose() }
+
 // WindowFocus reports that the window gained or lost focus.
 func (h *runtimeHost) WindowFocus(focused bool) { h.rt().hostWindowFocus(focused) }
 
