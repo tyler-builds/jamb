@@ -113,6 +113,17 @@ func orZero(v float32) float32 {
 	return v
 }
 
+// crossLimit clamps a stretched item's cross size to the item's minimum and
+// maximum on the cross axis, as CSS does: a stretched item in a row is at least
+// its MinHeight, and one in a column is at most its MaxWidth.
+func crossLimit(cs *Style, row bool, cbCross, v float32) float32 {
+	minL, maxL := cs.MinWidth, cs.MaxWidth
+	if row {
+		minL, maxL = cs.MinHeight, cs.MaxHeight
+	}
+	return clamp(v, orZero(minL.resolve(cbCross)), orInf(maxL.resolve(cbCross)))
+}
+
 func same(a, b float32) bool { return a == b || (isNaN(a) && isNaN(b)) }
 
 func (n *Node) padH() float32 {
@@ -433,7 +444,7 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 		if it.align == AlignStretch && crossLen.IsAuto() && !(cs.FitWidth && !row) {
 			// Wrapped items stretch to their line, which is only known later.
 			if !isNaN(crossSize) && !s.Wrap {
-				it.forcedCross = max(crossSize-it.marginCross, 0)
+				it.forcedCross = crossLimit(cs, row, crossSize, max(crossSize-it.marginCross, 0))
 			} else {
 				it.stretchCrossLater = true
 			}
@@ -540,7 +551,7 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 		for i := range its {
 			it := &its[i]
 			if it.stretchCrossLater {
-				it.cross = max(ln.cross-it.marginCross, 0)
+				it.cross = crossLimit(&it.n.Style, row, crossSize, max(ln.cross-it.marginCross, 0))
 				it.forcedCross = it.cross
 			}
 		}
