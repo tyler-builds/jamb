@@ -22,7 +22,10 @@ type ListElement struct {
 	handle     *ListHandle
 	bottom     bool
 	onAtEnd    func(atEnd bool)
-	size       sizing // see the sizing methods
+	// decorate, when set, adjusts the scroll container. A ListBox sets its focus,
+	// keys and name with it (see UniformListElement.decorate).
+	decorate func(c *DivElement)
+	size     sizing // see the sizing methods
 }
 
 // The sizing methods give the list's outer box a size, over its Style. See Sizing
@@ -320,6 +323,9 @@ func (l *ListElement) expand(ctx *Context) Element {
 	container := l.size.apply(Div().ScrollY().Style(l.style)).Role(access.RoleList)
 	container.access().container = l.selectable
 	container.vrows = vs
+	if l.decorate != nil {
+		l.decorate(container)
+	}
 	return container.Child(spacer)
 }
 

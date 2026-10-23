@@ -44,7 +44,7 @@ layer wins, and a zero field is unset and leaves the layer below in place.
    `Theme.Tabs`, `Theme.Select`, `Theme.Combobox`, `Theme.DatePicker`, `Theme.DateRangePicker`, `Theme.Calendar`, `Theme.TimePicker`, `Theme.Slider`, `Theme.Split`, `Theme.Dock`, `Theme.Field` (the frame of every
    `TextInput`, `TextArea` and `NumberInput`), `Theme.NumberInput`, `Theme.OTPInput`, `Theme.Button`
    and `Theme.Buttons` (per variant), `Theme.Checkbox`, `Theme.RadioGroup`,
-   `Theme.Switch`, `Theme.Toggle`, `Theme.ToggleGroup`, `Theme.Rating`, `Theme.Collapsible`, `Theme.Tree`, `Theme.DataGrid`, `Theme.Menu`,
+   `Theme.Switch`, `Theme.Toggle`, `Theme.ToggleGroup`, `Theme.Rating`, `Theme.Collapsible`, `Theme.Tree`, `Theme.ListBox`, `Theme.DataGrid`, `Theme.Menu`,
    `Theme.MenuBar`, `Theme.Modal`, `Theme.Drawer`, `Theme.AlertDialog`, `Theme.Popover`, `Theme.CommandPalette`, `Theme.ProgressBar`, `Theme.ProgressRing`,
    `Theme.Badge` and `Theme.Badges` (per variant), `Theme.Toast` and `Theme.Toasts`
    (per kind), `Theme.Tooltip`, `Theme.Avatar`, `Theme.Tag`, `Theme.Skeleton`, `Theme.Sidebar`, `Theme.Breadcrumbs`, `Theme.Pagination`, `Theme.Stepper`, `Theme.Carousel`, `Theme.ColorPicker`, and `Theme.FormField` (the label, help text and error
@@ -562,6 +562,7 @@ parts that the code applies.
 | `RadioGroup` | `Group`, `Radio`, `RadioFocusVisible`, `RadioDisabled`, `Ring`, `RingChecked`, `RingDisabled`, `RingInvalid`, `Dot`, `DotDisabled`, `Label`, `LabelDisabled` | none | none | done |
 | `Collapsible`, `Accordion` | `Section`, `Header`, `HeaderHover`, `HeaderOpen`, `HeaderFocusVisible`, `HeaderDisabled`, `Chevron`, `Content` | none | `RenderHeader` | done |
 | `Tree` | `Row`, `RowHover`, `RowSelected`, `Chevron`, `Icon`, `Label`, `Description`, `TreeFocusVisible` | none | `RenderRow`, `RenderLabel`, `RenderTrailing` | done |
+| `ListBox` | `List`, `Item`, `ItemHover`, `ItemSelected`, `ItemFocusVisible` | none | `row` (the item's content, a function of its `PartState`) | done |
 | `DataGrid` | `Grid`, `GridFocusVisible`, `Header`, `HeaderCell`, `HeaderCellHover`, `HeaderCellSorted`, `SortIndicator`, `ResizeHandle`, `Row`, `RowHover`, `RowSelected`, `RowAlternate`, `Cell`, `CellFocused`, `Empty`, `CellEditing`, `Editor`, `EditorMessage`, `DropIndicator`, `CellPinned`, `PinnedEdge`, `HeaderGroup`, `CellSelected` | `DataGridComfortable`, `DataGridCompact`, `Striped()` | `DataColumn.Cell`, `DataColumn.RenderHeader` | done |
 | `DropdownMenu`, `ContextMenu` | `Panel`, `Item`, `ItemHighlighted`, `ItemDisabled`, `Separator`, `SectionLabel`, `Shortcut`, `Check`, `SubmenuChevron` | none | none | done |
 | `MenuBar` | `BarItem`, `BarItemHover`, `BarItemFocusVisible`, `BarItemOpen` | none | none | done |

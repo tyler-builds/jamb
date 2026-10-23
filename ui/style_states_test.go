@@ -59,6 +59,7 @@ func documentedStateOf(p string, documented []string) (base, label string, ok bo
 // table reaches, with the reason. Each such part is logged by the test; a reason is
 // what the table cannot do headlessly, not a claim that the state is wrong.
 var layerStateNotDrawn = map[string]string{
+	"ListBox.ItemFocusVisible":        "the focused item is drawn while the list has keyboard focus; the table focuses each element itself, and an item is not focusable (TestEveryPartIsApplied focuses the list)",
 	"NumberInput.SpinButtonDisabled":  "a spin button is disabled only at the limit of its value, which the table does not reach",
 	"Form.SummaryItemHover":           "the form summary lists the errors of a form that has failed validation",
 	"Form.SummaryItemFocusVisible":    "the form summary lists the errors of a form that has failed validation",

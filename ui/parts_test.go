@@ -204,6 +204,7 @@ func TestEveryPartIsApplied(t *testing.T) {
 	t.Run("Rating", func(t *testing.T) { testRatingParts(t, applied) })
 	t.Run("Collapsible", func(t *testing.T) { testCollapsibleParts(t, applied) })
 	t.Run("Tree", func(t *testing.T) { testTreeParts(t, applied) })
+	t.Run("ListBox", func(t *testing.T) { testListBoxParts(t, applied) })
 	t.Run("Menu", func(t *testing.T) { testMenuParts(t, applied) })
 	t.Run("MenuBar", func(t *testing.T) { testMenuBarParts(t, applied) })
 	t.Run("Modal", func(t *testing.T) { testModalParts(t, applied) })
