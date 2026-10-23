@@ -43,36 +43,53 @@ func heading(t *ui.Theme, text string, end ui.Element) ui.Element {
 	return row
 }
 
-// repoList is the list of repositories. A click shows one, and its context menu
-// removes it from the list.
+// repoList is the list of repositories. Choosing one shows it, and its context
+// menu refreshes it, copies its path or removes it from the list.
 func (a *App) repoList() ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
 		repos := a.s.Repos.Get()
-		cur := a.s.Current.Get()
-		list := ui.Div().Column().Gap(2).Padding(6).
-			Role(access.RoleList).Label("Repositories")
-		for i, r := range repos {
-			list.Child(a.repoRow(t, r, r.Path == cur, i, len(repos)))
-		}
+		list := ui.ListBox(repos, func(r *store.Repo) string { return r.Path }, a.repoSel,
+			func(r *store.Repo, _ ui.PartState) ui.Element { return a.repoRow(t, r) }).
+			Key("repos").Label("Repositories").
+			ItemName(func(r *store.Repo) string { return r.Info.Peek().Name }).
+			Styles(ui.ListBoxStyle{Item: ui.Style{MinHeight: ui.Px(40)}}).
+			OnChange(func(keys []string) {
+				if len(keys) == 1 {
+					a.s.Current.Set(keys[0])
+					a.changed()
+				}
+			}).
+			ContextMenu(func(r *store.Repo) []ui.MenuItem {
+				return []ui.MenuItem{
+					{Label: "Refresh", Icon: icons.Refresh, OnClick: r.Reload},
+					{Label: "Copy path", Icon: icons.Copy, OnClick: func() { ctx.SetClipboard(r.Info.Peek().Root) }},
+					ui.MenuSeparator(),
+					{Label: "Remove from list", Icon: icons.X, OnClick: func() {
+						a.s.Remove(r.Path)
+						delete(a.views, r.Path)
+						a.syncRepos()
+						a.changed()
+					}},
+				}
+			}).
+			Style(ui.Style{Padding: ui.All(6), MaxHeight: ui.Px(260)})
 		return ui.Div().Column().Shrink(0).
 			Child(heading(t, "Repositories", ui.IconButton(icons.Plus).Ghost().Small().
 				Label("Add repository").Tooltip("Add repository (Ctrl+O)").
 				OnClick(func() { a.addRepo(ctx) }))).
-			Child(ui.Div().Column().MaxHeight(ui.Px(260)).ScrollY().Child(list))
+			Child(list)
 	})
 }
 
-func (a *App) repoRow(t *ui.Theme, r *store.Repo, selected bool, i, n int) ui.Element {
+// repoRow is one repository in the list: a colored square with its initial, its
+// name and branch, and whether it is loading or failed to load.
+func (a *App) repoRow(t *ui.Theme, r *store.Repo) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		info := r.Info.Get()
 		branch := info.Head
 		if branch == "" && len(info.HeadHash) >= 7 {
 			branch = info.HeadHash[:7]
-		}
-		show := func() {
-			a.s.Current.Set(r.Path)
-			a.changed()
 		}
 		square := ui.Div().Center().Size(ui.Px(24), ui.Px(24)).Radius(6).Shrink(0).
 			Background(laneColor(t, int(hashName(info.Name)))).
@@ -85,30 +102,12 @@ func (a *App) repoRow(t *ui.Theme, r *store.Repo, selected bool, i, n int) ui.El
 		case r.Loading.Get():
 			status = ui.ProgressRing().Size(12).Label("Loading")
 		}
-		return ui.Div().Key(r.Path).Row().Align(ui.Center).Gap(10).Height(ui.Px(40)).PaddingX(8).Radius(6).
-			Role(access.RoleListItem).Label(info.Name).AccessSelected(selected).AccessPosition(i+1, n).
-			TabIndex(0).Cursor(ui.CursorPointer).Tooltip(info.Root).
-			Hover(ui.Style{Background: t.SurfaceHover}).
-			FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
-			When(selected, func(d *ui.DivElement) { d.Background(t.SurfaceActive) }).
+		return ui.Div().Row().Align(ui.Center).Gap(10).Grow(1).MinWidth(ui.Px(0)).Tooltip(info.Root).
 			Child(square).
 			Child(ui.Div().Column().Grow(1).MinWidth(ui.Px(0)).
 				Child(ui.Text(info.Name).Weight(ui.FontMedium).Truncate()).
 				Child(ui.If(branch != "", ui.Text(branch).FontSize(11.5).TextColor(t.TextSubtle).Truncate()))).
-			Child(ui.If(status != nil, status)).
-			OnClick(show).
-			ContextMenu(func() []ui.MenuItem {
-				return []ui.MenuItem{
-					{Label: "Refresh", Icon: icons.Refresh, OnClick: r.Reload},
-					{Label: "Copy path", Icon: icons.Copy, OnClick: func() { ctx.SetClipboard(info.Root) }},
-					ui.MenuSeparator(),
-					{Label: "Remove from list", Icon: icons.X, OnClick: func() {
-						a.s.Remove(r.Path)
-						delete(a.views, r.Path)
-						a.changed()
-					}},
-				}
-			})
+			Child(ui.If(status != nil, status))
 	})
 }
 
@@ -140,7 +139,9 @@ func refKey(r repo.Ref) string {
 }
 
 // refTree lists the refs of r by kind, remote branches under their remote. Choosing
-// one selects its commit in the history.
+// one selects its commit in the history. A branch's description names its upstream,
+// and its row ends with how far it is ahead and behind; a group's row ends with its
+// count.
 func (a *App) refTree(r *store.Repo) ui.Element {
 	v := a.viewOf(r)
 	return ui.Component(func(ctx *ui.Context) ui.Element {
@@ -156,7 +157,11 @@ func (a *App) refTree(r *store.Repo) ui.Element {
 			byKey[k] = ref
 			switch ref.Kind {
 			case repo.Branch:
-				branches = append(branches, ui.TreeNode{Key: k, Label: ref.Name, Icon: icons.GitBranch})
+				desc := ref.Upstream
+				if ref.Name == info.Head {
+					desc = strings.TrimSpace("current " + desc)
+				}
+				branches = append(branches, ui.TreeNode{Key: k, Label: ref.Name, Icon: icons.GitBranch, Description: desc})
 			case repo.Remote:
 				remote, name, _ := strings.Cut(ref.Name, "/")
 				if _, ok := remotes[remote]; !ok {
@@ -186,45 +191,55 @@ func (a *App) refTree(r *store.Repo) ui.Element {
 		return ui.Div().Column().Grow(1).MinHeight(ui.Px(0)).PaddingEdges(ui.Edges{Top: 6, Bottom: 6}).
 			Child(ui.Tree(nodes, v.refSel).Key("refs").Label("Branches and tags").Expanded(v.refOpen).
 				Styles(ui.TreeStyle{Row: ui.Style{Height: ui.Px(28), Radius: 6}, RowSelected: ui.Style{Background: t.SurfaceActive}}).
-				RenderLabel(func(n ui.TreeNode, _ ui.PartState) ui.Element {
-					return refLabel(t, n, byKey, counts, info)
+				RenderTrailing(func(n ui.TreeNode, _ ui.PartState) ui.Element {
+					return refTrailing(t, n, byKey, counts, info)
 				}).
-				OnChange(func(key string) {
+				ContextMenu(func(key string) []ui.MenuItem {
 					ref, ok := byKey[key]
 					if !ok {
-						return
+						return nil
 					}
-					if !a.selectCommit(r, ref.Target) {
-						ctx.Toast(ui.ToastInfo, ref.Name+" is further back than the history loaded so far.")
+					return []ui.MenuItem{
+						{Label: "Show in history", Icon: icons.Activity, OnClick: func() { a.revealRef(ctx, r, ref) }},
+						{Label: "Copy name", Icon: icons.Copy, OnClick: func() { ctx.SetClipboard(ref.Name) }},
+						{Label: "Copy commit hash", OnClick: func() { ctx.SetClipboard(ref.Target) }},
+					}
+				}).
+				OnChange(func(key string) {
+					if ref, ok := byKey[key]; ok {
+						a.revealRef(ctx, r, ref)
 					}
 				}).
 				Style(ui.Style{Grow: 1, Padding: ui.XY(6, 0)}))
 	})
 }
 
-// refLabel is a tree row's text: the name, a mark on HEAD's branch, and how far a
-// branch is ahead of and behind its upstream.
-func refLabel(t *ui.Theme, n ui.TreeNode, byKey map[string]repo.Ref, counts map[string]int, info repo.Info) ui.Element {
+// revealRef selects the commit a ref points at, or says it is not loaded yet.
+func (a *App) revealRef(ctx *ui.Context, r *store.Repo, ref repo.Ref) {
+	if !a.selectCommit(r, ref.Target) {
+		ctx.Toast(ui.ToastInfo, ref.Name+" is further back than the history loaded so far.")
+	}
+}
+
+// refTrailing ends a tree row: a group's count, or a branch's mark when HEAD is on
+// it and how far it is ahead of and behind its upstream.
+func refTrailing(t *ui.Theme, n ui.TreeNode, byKey map[string]repo.Ref, counts map[string]int, info repo.Info) ui.Element {
+	row := ui.Div().Row().Align(ui.Center).Gap(6).FontSize(11.5).TextColor(t.TextSubtle)
+	if c, ok := counts[n.Key]; ok {
+		return row.Child(ui.Text(itoa(c)))
+	}
 	ref, ok := byKey[n.Key]
 	if !ok {
-		row := ui.Div().Row().Align(ui.Center).Gap(6).Grow(1).MinWidth(ui.Px(0)).
-			Child(ui.Text(n.Label).Weight(ui.FontMedium).Truncate())
-		if c, ok := counts[n.Key]; ok {
-			row.Child(ui.Div().Grow(1)).Child(ui.Text(itoa(c)).FontSize(11.5).TextColor(t.TextSubtle))
-		}
-		return row
+		return nil
 	}
-	row := ui.Div().Row().Align(ui.Center).Gap(6).Grow(1).MinWidth(ui.Px(0)).
-		Child(ui.Text(n.Label).Truncate())
 	if ref.Kind == repo.Branch && ref.Name == info.Head {
 		row.Child(ui.Icon(icons.Check).Size(12).Color(t.Accent))
 	}
-	row.Child(ui.Div().Grow(1))
 	if ref.Ahead > 0 {
-		row.Child(ui.Text("↑" + itoa(ref.Ahead)).FontSize(11).TextColor(t.TextMuted))
+		row.Child(ui.Text("↑" + itoa(ref.Ahead)))
 	}
 	if ref.Behind > 0 {
-		row.Child(ui.Text("↓" + itoa(ref.Behind)).FontSize(11).TextColor(t.TextMuted))
+		row.Child(ui.Text("↓" + itoa(ref.Behind)))
 	}
 	return row
 }

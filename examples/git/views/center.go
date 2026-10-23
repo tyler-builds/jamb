@@ -41,7 +41,6 @@ func (a *App) repoView(r *store.Repo) ui.Element {
 	v := a.viewOf(r)
 	detailSize := ui.NewSignal(ui.Px(float32(a.layout.Detail.Peek())))
 	return ui.Component(func(ctx *ui.Context) ui.Element {
-		t := ctx.Theme()
 		page := v.page.Get()
 		diff := v.diff.Get()
 		var body ui.Element
@@ -65,7 +64,7 @@ func (a *App) repoView(r *store.Repo) ui.Element {
 			ui.Pane(center).Label("Commits").Min(ui.Px(360)),
 			ui.Pane(a.detail(r)).Label("Commit details").SizeSignal(detailSize).
 				Min(ui.Px(280)).Max(ui.Percent(55)).Collapsible(),
-		).Key("detail-split").Label("Resize details").Styles(splitStyle(t)).OnChange(func() {
+		).Key("detail-split").Label("Resize details").OnChange(func() {
 			a.layout.Detail.Set(float64(detailSize.Peek().Value))
 			a.changed()
 		})
@@ -95,20 +94,9 @@ func (a *App) toolbar(r *store.Repo, page Page) ui.Element {
 			Child(ui.Tabs(v.page,
 				ui.Tab[Page]{Value: PageHistory, Label: history, Icon: icons.Activity},
 				ui.Tab[Page]{Value: PageTags, Label: "Tags  " + itoa(tags), Icon: icons.Tag},
-			).Key("page").Label("Page").Variant(ui.TabsSegmented).Styles(segmented(t)).
-				OnChange(func(Page) { v.diff.Set(nil) })).
+			).Key("page").Label("Page").Variant(ui.TabsSegmented).
+				OnChange(func(Page) { v.closeDiff() })).
 			Child(ui.Div().Grow(1)).
 			Child(ui.Button("HEAD").Icon(icons.Home).Ghost().Small().Tooltip("Go to HEAD (Ctrl+H)").OnClick(a.goHead))
 	})
-}
-
-// segmented is a quieter segmented control than the default: a raised segment
-// on a sunken track, not an accent fill.
-func segmented(t *ui.Theme) ui.TabsStyle {
-	return ui.TabsStyle{
-		List:        ui.Style{Background: t.Panel, Radius: 7, Padding: ui.All(2), BorderWidth: 1, BorderColor: t.Border},
-		Tab:         ui.Style{Height: ui.Px(26), Padding: ui.XY(10, 0), Radius: 5, FontSize: 12.5, TextColor: t.TextMuted},
-		TabSelected: ui.Style{Background: t.SurfaceActive, TextColor: t.Text},
-		TabHover:    ui.Style{TextColor: t.Text},
-	}
 }

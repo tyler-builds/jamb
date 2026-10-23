@@ -45,10 +45,10 @@ func (a *App) tags(r *store.Repo) ui.Element {
 					return pad(ui.Tag(kindText(g)))
 				}},
 			{Key: "date", Header: "Date", Width: 130, Resizable: true,
-				Text:    func(g repo.Ref) string { return ago(g.When, now) },
+				Text:    func(g repo.Ref) string { return ui.FormatRelative(g.When, now) },
 				Compare: ui.SortBy(func(g repo.Ref) int64 { return g.When.Unix() }),
 				Cell: func(g repo.Ref) ui.Element {
-					return pad(ui.Div().Tooltip(stamp(g.When)).Child(ui.Text(ago(g.When, now)).TextColor(t.TextMuted)))
+					return pad(ui.Div().TextColor(t.TextMuted).Child(ui.TimeAgo(g.When)))
 				}},
 			{Key: "commit", Header: "Commit", Width: 90, Resizable: true,
 				Text: func(g repo.Ref) string { return g.Target[:min(7, len(g.Target))] },

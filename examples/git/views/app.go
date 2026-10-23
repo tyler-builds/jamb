@@ -40,12 +40,12 @@ const (
 
 // view is the state of the UI for one repository: what it shows and its search.
 type view struct {
-	page    *ui.Signal[Page]
-	query   *ui.Signal[string]
-	grid    *ui.DataGridHandle
-	diff    *ui.Signal[*diffTarget] // the file whose diff replaces the history, or nil
-	details *ui.Signal[repo.Details]
-	pending string // the hash whose details are being read, on the UI thread
+	page  *ui.Signal[Page]
+	query *ui.Signal[string]
+	grid  *ui.DataGridHandle
+	diff  *ui.Signal[*diffTarget] // the file whose diff replaces the history, or nil
+	// fileSel is the changed files list's selection: the path of the open diff.
+	fileSel *ui.Signal[[]string]
 	// The ref tree's selection and its open nodes.
 	refSel  *ui.Signal[string]
 	refOpen *ui.Signal[[]string]
@@ -61,8 +61,12 @@ type App struct {
 	views   map[string]*view
 	search  *ui.FocusHandle
 	palette *ui.Signal[bool]
+	goTo    *ui.Signal[bool] // the Go to palette is open
 	// themeChoice is "light", "dark" or "" to follow Windows.
 	themeChoice *ui.Signal[string]
+	// repoSel is the repository list's selection, the store's Current as a list
+	// box holds it. syncRepos copies Current into it after each change.
+	repoSel *ui.Signal[[]string]
 }
 
 // Root returns the window's render function.
@@ -80,7 +84,8 @@ func Root(s *store.Store, layout Layout, theme *ui.Signal[string]) func(*ui.Cont
 		theme = ui.NewSignal("")
 	}
 	a := &App{s: s, layout: layout, views: map[string]*view{}, search: ui.NewFocusHandle(),
-		palette: ui.NewSignal(false), themeChoice: theme}
+		palette: ui.NewSignal(false), goTo: ui.NewSignal(false), themeChoice: theme, repoSel: ui.NewSignal([]string(nil))}
+	a.syncRepos()
 	sidebarSize := ui.NewSignal(ui.Px(float32(layout.Sidebar.Peek())))
 	return func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
@@ -100,25 +105,23 @@ func Root(s *store.Store, layout Layout, theme *ui.Signal[string]) func(*ui.Cont
 			OnAction(NextRepo, func() { a.cycle(1) }).
 			OnAction(ToggleTheme, func() { a.toggleTheme(ctx) }).
 			OnAction(Palette, func() { a.palette.Set(true) }).
+			OnAction(GoTo, func() { a.goTo.Set(true) }).
 			Child(ui.Component(a.titleBar)).
 			Child(ui.Div().Row().Grow(1).MinHeight(ui.Px(0)).
 				Child(ui.Split(
 					ui.Pane(a.sidebar()).Label("Repositories and refs").SizeSignal(sidebarSize).
 						Min(ui.Px(200)).Max(ui.Px(420)),
 					ui.Pane(a.main()).Label("History").Min(ui.Px(420)),
-				).Key("outer").Label("Resize sidebar").Styles(splitStyle(t)).OnChange(func() {
+				).Key("outer").Label("Resize sidebar").OnChange(func() {
 					a.layout.Sidebar.Set(float64(sidebarSize.Peek().Value))
 					a.changed()
 				}))).
 			Child(a.statusBar()).
 			Child(ui.CommandPalette(a.palette).Placeholder("Type a command or search…")).
+			Child(ui.CommandPalette(a.goTo).Key("go-to").ItemsOnly().
+				Placeholder("Go to a branch, tag or commit; > for commands").Items(a.goToItems)).
 			Child(ui.Toaster().Key("toaster"))
 	}
-}
-
-// splitStyle keeps the divider's hairline and leaves out the grip mark.
-func splitStyle(*ui.Theme) ui.SplitStyle {
-	return ui.SplitStyle{Grip: ui.Style{Clear: ui.ClearBackground}}
 }
 
 // viewOf returns the UI state of r, making it on first use.
@@ -126,12 +129,19 @@ func (a *App) viewOf(r *store.Repo) *view {
 	v := a.views[r.Path]
 	if v == nil {
 		v = &view{page: ui.NewSignal(PageHistory), query: ui.NewSignal(""), grid: ui.NewDataGridHandle(),
-			diff: ui.NewSignal[*diffTarget](nil), details: ui.NewSignal(repo.Details{}),
+			diff: ui.NewSignal[*diffTarget](nil), fileSel: ui.NewSignal([]string(nil)),
 			refSel: ui.NewSignal(""), refOpen: ui.NewSignal([]string{keyBranches, keyRemotes}),
 			widths: ui.NewSignal(map[string]float32(nil)), tagSort: ui.NewSignal(ui.SortState{Key: "date", Desc: true})}
 		a.views[r.Path] = v
 	}
 	return v
+}
+
+// closeDiff goes back from a file's diff to the history, and clears the changed
+// files' selection with it.
+func (v *view) closeDiff() {
+	v.diff.Set(nil)
+	v.fileSel.Set(nil)
 }
 
 // current returns the repository shown and its UI state, or nil. It does not
@@ -142,6 +152,15 @@ func (a *App) current() (*store.Repo, *view) {
 		return nil, nil
 	}
 	return r, a.viewOf(r)
+}
+
+// syncRepos makes the repository list select the store's current repository.
+func (a *App) syncRepos() {
+	var sel []string
+	if cur := a.s.Current.Peek(); cur != "" {
+		sel = []string{cur}
+	}
+	a.repoSel.Set(sel)
 }
 
 func (a *App) changed() {
@@ -169,6 +188,7 @@ func (a *App) openPath(ctx *ui.Context, path string) {
 				return
 			}
 			a.s.Add(info.Root)
+			a.syncRepos()
 			a.changed()
 		})
 	}()
@@ -182,14 +202,14 @@ func (a *App) refresh() {
 
 func (a *App) show(p Page) {
 	if _, v := a.current(); v != nil {
-		v.diff.Set(nil)
+		v.closeDiff()
 		v.page.Set(p)
 	}
 }
 
 func (a *App) closeDiff() {
 	if _, v := a.current(); v != nil {
-		v.diff.Set(nil)
+		v.closeDiff()
 	}
 }
 
@@ -201,6 +221,7 @@ func (a *App) cycle(by int) {
 	}
 	i := slices.IndexFunc(repos, func(r *store.Repo) bool { return r.Path == a.s.Current.Peek() })
 	a.s.Current.Set(repos[((i+by)%len(repos)+len(repos))%len(repos)].Path)
+	a.syncRepos()
 	a.changed()
 }
 
@@ -211,7 +232,7 @@ func (a *App) selectCommit(r *store.Repo, hash string) bool {
 	if !slices.ContainsFunc(r.Entries.Peek(), func(e store.Entry) bool { return e.Hash == hash }) {
 		return false
 	}
-	v.diff.Set(nil)
+	v.closeDiff()
 	v.page.Set(PageHistory)
 	r.Selected.Set([]string{hash})
 	v.grid.ScrollToRow(hash)
@@ -297,4 +318,46 @@ func (a *App) statusBar() ui.Element {
 				ui.Text(info.Root).Truncate()).
 			End(end...)
 	})
+}
+
+// goToMax is the most items the Go to palette lists, since each one is a row.
+const goToMax = 200
+
+// goToItems lists the shown repository's branches, tags and loaded commits that
+// match the query, refs first. Choosing one selects its commit in the history.
+func (a *App) goToItems(query string) []ui.PaletteItem {
+	r, _ := a.current()
+	if r == nil {
+		return nil
+	}
+	var items []ui.PaletteItem
+	// add keeps it when it matches, and reports whether there is room for more.
+	add := func(it ui.PaletteItem, hash, subject, author string) bool {
+		if matches(query, hash, subject, author) {
+			items = append(items, it)
+		}
+		return len(items) < goToMax
+	}
+	for _, ref := range r.Refs.Peek() {
+		ic, kind := icons.GitBranch, "branch"
+		switch ref.Kind {
+		case repo.Remote:
+			kind = "remote branch"
+		case repo.Tag:
+			ic, kind = icons.Tag, "tag"
+		}
+		target := ref.Target
+		if !add(ui.PaletteItem{Key: "ref:" + refKey(ref), Label: ref.Name, Detail: kind, Icon: ic,
+			Run: func() { a.selectCommit(r, target) }}, "", ref.Name, "") {
+			return items
+		}
+	}
+	for _, e := range r.Entries.Peek() {
+		hash := e.Hash
+		if !add(ui.PaletteItem{Key: "commit:" + hash, Label: e.Subject, Detail: e.Short() + " · " + e.Author,
+			Icon: icons.GitCommitHorizontal, Run: func() { a.selectCommit(r, hash) }}, hash, e.Subject, e.Author) {
+			return items
+		}
+	}
+	return items
 }

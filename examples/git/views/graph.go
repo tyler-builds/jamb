@@ -26,18 +26,12 @@ func graphWidth(lanes int) float32 {
 // laneX is the middle of lane i.
 func laneX(i int) float32 { return graphPad + float32(i)*laneWidth + laneWidth/2 }
 
-// rowHeight is the height of a history row: a comfortable DataGrid row, 36 px at
-// the Text size of 100 percent. The grid wraps a Cell's content in a box that
-// does not stretch to the row, so the canvas cannot take the row's height with
-// ui.Full and is given it here.
-func rowHeight(ctx *ui.Context) float32 { return 36 * float32(ctx.TextScale()) / 100 }
-
-// graphCell draws one row's slice of the graph, h pixels high. The rows of the
-// grid sit edge to edge, so the lines of one row meet the lines of the next.
-func graphCell(t *ui.Theme, e store.Entry, head bool, h float32) ui.Element {
+// graphCell draws one row's slice of the graph, as high as the row. The rows of
+// the grid sit edge to edge, so the lines of one row meet the lines of the next.
+func graphCell(t *ui.Theme, e store.Entry, head bool) ui.Element {
 	return ui.Canvas(func(p *ui.Painter, w, h float32) {
 		drawRow(p, t, e, head, h)
-	}).Key("graph-"+e.Hash).Size(ui.Full, ui.Px(h)).AccessHidden()
+	}).Key("graph-"+e.Hash).Size(ui.Full, ui.Full).AccessHidden()
 }
 
 func drawRow(p *ui.Painter, t *ui.Theme, e store.Entry, head bool, h float32) {
@@ -91,7 +85,7 @@ func drawRow(p *ui.Painter, t *ui.Theme, e store.Entry, head bool, h float32) {
 	if t.HighContrast {
 		ink = t.Background
 	}
-	p.Text(node, mid, initials(e.Author), ui.TextFormat{FontSize: 8, Weight: ui.FontSemibold, Color: ink,
+	p.Text(node, mid, ui.AvatarInitials(e.Author), ui.TextFormat{FontSize: 8, Weight: ui.FontSemibold, Color: ink,
 		Align: ui.Center, VAlign: ui.Center})
 }
 

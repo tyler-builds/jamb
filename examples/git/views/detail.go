@@ -1,6 +1,9 @@
 package views
 
 import (
+	"context"
+	"time"
+
 	"github.com/tyler-builds/jamb/access"
 
 	"github.com/tyler-builds/jamb/icons"
@@ -12,9 +15,9 @@ import (
 
 // detail is the pane beside the history: the selected commit's message, who
 // made it and when, its parents and refs, and the files it changed. The details
-// are read off the UI thread when the selection changes.
+// are read with ui.Query, keyed by the repository and the commit, so moving back
+// to a commit seen a moment ago shows it at once.
 func (a *App) detail(r *store.Repo) ui.Element {
-	v := a.viewOf(r)
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		t := ctx.Theme()
 		e, ok := r.Selection()
@@ -24,26 +27,27 @@ func (a *App) detail(r *store.Repo) ui.Element {
 				Child(ui.Div().Column().Center().Grow(1).Child(ui.Empty("No commit selected").Icon(icons.Info).
 					Description("Select a commit to see its changes.")))
 		}
-		d := v.details.Get()
-		if d.Hash != e.Hash && v.pending != e.Hash {
-			v.pending = e.Hash
-			a.loadDetails(ctx, r, e)
-		}
 		info := r.Info.Get()
+		res := ui.Query(ctx, "commit:"+info.Root+":"+e.Hash, func(c context.Context) (repo.Details, error) {
+			return repo.Show(c, info.Root, e.Hash)
+		})
+		d := res.Data
 		body := ui.Div().Column().Gap(18).Padding(20).
 			Child(ui.Div().Column().Gap(8).
 				Child(ui.Text(e.Subject).FontSize(15).Weight(ui.FontSemibold).Selectable()).
-				Child(ui.If(d.Hash == e.Hash && d.Body != "",
-					ui.Text(d.Body).TextColor(t.TextMuted).Selectable()))).
+				Child(ui.If(d.Body != "", ui.Text(d.Body).TextColor(t.TextMuted).Selectable()))).
 			Child(a.people(t, e, d)).
 			Child(a.facts(ctx, r, e, info))
-		if d.Hash == e.Hash {
-			body.Child(a.files(t, r, d))
-		} else {
+		switch {
+		case res.Err != nil:
+			body.Child(ui.Alert("Could not read the commit").Danger().Description(res.Err.Error()))
+		case res.Loading:
 			body.Child(ui.Div().Column().Gap(8).
 				Child(ui.Skeleton().Height(ui.Px(14)).Width(ui.Percent(60))).
 				Child(ui.Skeleton().Height(ui.Px(14)).Width(ui.Percent(80))).
 				Child(ui.Skeleton().Height(ui.Px(14)).Width(ui.Percent(45))))
+		default:
+			body.Child(a.files(t, r, d))
 		}
 		return pane.Child(detailBar(ctx, &e)).
 			Child(ui.Div().Column().Grow(1).MinHeight(ui.Px(0)).ScrollY().Child(body))
@@ -60,55 +64,27 @@ func detailBar(ctx *ui.Context, e *store.Entry) ui.Element {
 	if e == nil {
 		return bar
 	}
-	hash := e.Hash
 	return bar.
-		Child(ui.Text(hash[:min(12, len(hash))]).Mono().FontSize(12.5).Selectable()).
+		Child(ui.Text(e.Hash[:min(12, len(e.Hash))]).Mono().FontSize(12.5).Selectable()).
 		Child(ui.Div().Grow(1)).
-		Child(ui.IconButton(icons.Copy).Ghost().Small().Label("Copy commit hash").Tooltip("Copy hash (Ctrl+Shift+C)").
-			OnClick(func() {
-				ctx.SetClipboard(hash)
-				ctx.Toast(ui.ToastSuccess, "Copied "+hash[:min(7, len(hash))])
-			}))
+		Child(ui.CopyButton(e.Hash).Key("copy-hash").Ghost().Small().Tooltip("Copy hash (Ctrl+Shift+C)"))
 }
 
-// loadDetails reads the details of e in the background. A read that finishes
-// after the selection moved on is still kept, and the pane shows the details
-// of whatever is selected when it renders.
-func (a *App) loadDetails(ctx *ui.Context, r *store.Repo, e store.Entry) {
-	v := a.viewOf(r)
-	root := r.Info.Peek().Root
-	go func() {
-		d, err := repo.Show(root, e.Hash)
-		if err != nil {
-			d = repo.Details{Commit: e.Commit, Body: "Could not read the commit: " + err.Error()}
-		}
-		ctx.Post(func() {
-			if v.pending == e.Hash {
-				v.pending = ""
-			}
-			if sel := r.Selected.Peek(); len(sel) > 0 && sel[0] == e.Hash {
-				v.details.Set(d)
-			}
-		})
-	}()
-}
-
-// people shows the author and, when it is someone else, the committer.
+// people shows the author and, when it is someone else or much later, the committer.
 func (a *App) people(t *ui.Theme, e store.Entry, d repo.Details) ui.Element {
-	now := a.layout.Now()
-	person := func(name, email, verb string, when interface{ IsZero() bool }, ago, full string) ui.Element {
+	person := func(name, email, verb string, when time.Time) ui.Element {
 		return ui.Div().Row().Align(ui.Center).Gap(10).
 			Child(ui.Avatar(name).Size(30).AccessHidden()).
 			Child(ui.Div().Column().Gap(2).MinWidth(ui.Px(0)).
 				Child(ui.Div().Row().Gap(6).Align(ui.Center).
 					Child(ui.Text(name).Weight(ui.FontMedium).Truncate()).
 					Child(ui.Text(email).FontSize(12).TextColor(t.TextSubtle).Truncate())).
-				Child(ui.Div().Tooltip(full).Child(ui.Text(verb + " " + ago).FontSize(12).TextColor(t.TextMuted))))
+				Child(ui.Div().Row().Gap(4).FontSize(12).TextColor(t.TextMuted).
+					Child(ui.Text(verb)).Child(ui.TimeAgo(when))))
 	}
-	col := ui.Div().Column().Gap(12).
-		Child(person(e.Author, e.Email, "authored", e.When, ago(e.When, now), stamp(e.When)))
-	if d.Hash == e.Hash && (d.Committer != e.Author || d.Committed.Sub(e.When).Abs().Hours() > 1) && d.Committer != "" {
-		col.Child(person(d.Committer, d.CommitterEmail, "committed", d.Committed, ago(d.Committed, now), stamp(d.Committed)))
+	col := ui.Div().Column().Gap(12).Child(person(e.Author, e.Email, "authored", e.When))
+	if d.Hash == e.Hash && d.Committer != "" && (d.Committer != e.Author || d.Committed.Sub(e.When).Abs().Hours() > 1) {
+		col.Child(person(d.Committer, d.CommitterEmail, "committed", d.Committed))
 	}
 	return col
 }
@@ -147,7 +123,8 @@ func (a *App) facts(ctx *ui.Context, r *store.Repo, e store.Entry, info repo.Inf
 	return list
 }
 
-// files lists the files the commit changed, each opening its diff.
+// files lists the files the commit changed. Choosing one, with the pointer or
+// the arrow keys, shows its diff in place of the history.
 func (a *App) files(t *ui.Theme, r *store.Repo, d repo.Details) ui.Element {
 	v := a.viewOf(r)
 	added, deleted := 0, 0
@@ -167,36 +144,40 @@ func (a *App) files(t *ui.Theme, r *store.Repo, d repo.Details) ui.Element {
 		Child(ui.Div().Grow(1)).
 		Child(ui.Text("+" + itoa(added)).Mono().FontSize(12).TextColor(t.Success)).
 		Child(ui.Text("−" + itoa(deleted)).Mono().FontSize(12).TextColor(t.Danger))
-	list := ui.Div().Column().Gap(1).Role(access.RoleList).Label("Changed files")
-	open := v.diff.Get()
+	byPath := map[string]repo.FileChange{}
 	for _, f := range d.Files {
-		dir, base := splitPath(f.Path)
-		selected := open != nil && open.commit.Hash == d.Hash && open.file.Path == f.Path
-		counts := ui.Div().Row().Gap(6).Shrink(0)
-		if f.Added < 0 {
-			counts.Child(ui.Text("binary").FontSize(11.5).TextColor(t.TextSubtle))
-		} else {
-			counts.Child(ui.Text("+" + itoa(f.Added)).Mono().FontSize(11.5).TextColor(t.Success)).
-				Child(ui.Text("−" + itoa(f.Deleted)).Mono().FontSize(11.5).TextColor(t.Danger))
-		}
-		name := f.Path
-		if f.OldPath != "" {
-			name = f.OldPath + " → " + f.Path
-		}
-		row := ui.Div().Key(f.Path).Row().Align(ui.Center).Gap(8).Height(ui.Px(30)).PaddingX(8).Radius(6).
-			Cursor(ui.CursorPointer).TabIndex(0).Role(access.RoleListItem).Label(statusWord(f.Status)+" "+name).
-			AccessSelected(selected).
-			Hover(ui.Style{Background: t.SurfaceHover}).
-			FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
-			When(selected, func(d *ui.DivElement) { d.Background(t.AccentSoft) }).
-			Child(statusMark(t, f.Status)).
-			Child(ui.Div().Row().Grow(1).MinWidth(ui.Px(0)).
-				Child(ui.Text(dir).TextColor(t.TextSubtle).Truncate()).
-				Child(ui.Div().Shrink(0).Child(ui.Text(base)))).
-			Child(counts).
-			OnClick(func() { v.diff.Set(&diffTarget{commit: d.Commit, file: f}) })
-		list.Child(row)
+		byPath[f.Path] = f
 	}
+	list := ui.ListBox(d.Files, func(f repo.FileChange) string { return f.Path }, v.fileSel,
+		func(f repo.FileChange, _ ui.PartState) ui.Element {
+			dir, base := splitPath(f.Path)
+			counts := ui.Div().Row().Gap(6).Shrink(0)
+			if f.Added < 0 {
+				counts.Child(ui.Text("binary").FontSize(11.5).TextColor(t.TextSubtle))
+			} else {
+				counts.Child(ui.Text("+" + itoa(f.Added)).Mono().FontSize(11.5).TextColor(t.Success)).
+					Child(ui.Text("−" + itoa(f.Deleted)).Mono().FontSize(11.5).TextColor(t.Danger))
+			}
+			return ui.Div().Row().Align(ui.Center).Gap(8).Grow(1).MinWidth(ui.Px(0)).
+				Child(statusMark(t, f.Status)).
+				Child(ui.Div().Row().Grow(1).MinWidth(ui.Px(0)).
+					Child(ui.Text(dir).TextColor(t.TextSubtle).Truncate()).
+					Child(ui.Div().Shrink(0).Child(ui.Text(base)))).
+				Child(counts)
+		}).
+		Key("files").Label("Changed files").
+		ItemName(func(f repo.FileChange) string {
+			name := f.Path
+			if f.OldPath != "" {
+				name = f.OldPath + " → " + f.Path
+			}
+			return statusWord(f.Status) + " " + name
+		}).
+		OnChange(func(keys []string) {
+			if len(keys) == 1 {
+				v.diff.Set(&diffTarget{commit: d.Commit, file: byPath[keys[0]]})
+			}
+		})
 	return ui.Div().Key("detail-files").Column().Gap(8).Child(head).Child(list)
 }
 

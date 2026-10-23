@@ -5,6 +5,7 @@ package repo
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -237,9 +238,10 @@ func Base(c Commit) string {
 	return emptyTree
 }
 
-// Show returns the details of the commit hash.
-func Show(dir, hash string) (Details, error) {
-	out, err := git(dir, "show", "-s", "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%cn%x1f%ce%x1f%ct%x1f%s%x1f%b", hash)
+// Show returns the details of the commit hash. Canceling ctx stops the git
+// commands it runs.
+func Show(ctx context.Context, dir, hash string) (Details, error) {
+	out, err := gitCtx(ctx, dir, "show", "-s", "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%cn%x1f%ce%x1f%ct%x1f%s%x1f%b", hash)
 	if err != nil {
 		return Details{}, err
 	}
@@ -253,13 +255,13 @@ func Show(dir, hash string) (Details, error) {
 		Committer: f[5], CommitterEmail: f[6], Committed: unix(f[7]),
 		Body: strings.TrimSpace(f[9]),
 	}
-	d.Files, err = changes(dir, Base(d.Commit), d.Hash)
+	d.Files, err = changes(ctx, dir, Base(d.Commit), d.Hash)
 	return d, err
 }
 
 // changes lists the files that differ between base and hash, with line counts.
-func changes(dir, base, hash string) ([]FileChange, error) {
-	names, err := git(dir, "diff", "--name-status", "-z", "-M", base, hash)
+func changes(ctx context.Context, dir, base, hash string) ([]FileChange, error) {
+	names, err := gitCtx(ctx, dir, "diff", "--name-status", "-z", "-M", base, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +281,7 @@ func changes(dir, base, hash string) ([]FileChange, error) {
 		}
 		files = append(files, fc)
 	}
-	nums, err := git(dir, "diff", "--numstat", "-z", "-M", base, hash)
+	nums, err := gitCtx(ctx, dir, "diff", "--numstat", "-z", "-M", base, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -314,12 +316,13 @@ func count(s string) int {
 }
 
 // Diff returns the unified diff of one file of a commit, against the commit's base.
-func Diff(dir string, c Commit, f FileChange) (string, error) {
+// Canceling ctx stops git.
+func Diff(ctx context.Context, dir string, c Commit, f FileChange) (string, error) {
 	args := []string{"diff", "-M", "--no-color", Base(c), c.Hash, "--", f.Path}
 	if f.OldPath != "" {
 		args = append(args, f.OldPath)
 	}
-	return git(dir, args...)
+	return gitCtx(ctx, dir, args...)
 }
 
 func unix(s string) time.Time {
@@ -336,11 +339,19 @@ var ErrNoGit = errors.New("git was not found on PATH")
 // git runs git in dir and returns its standard output. A failure returns the
 // first line git wrote to its standard error.
 func git(dir string, args ...string) (string, error) {
-	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "core.quotepath=off", "-c", "log.showSignature=false"}, args...)...)
+	return gitCtx(context.Background(), dir, args...)
+}
+
+// gitCtx is git, stopped when ctx is canceled.
+func gitCtx(ctx context.Context, dir string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir, "-c", "core.quotepath=off", "-c", "log.showSignature=false"}, args...)...)
 	hideWindow(cmd)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
 		if errors.Is(err, exec.ErrNotFound) {
 			return "", ErrNoGit
 		}
