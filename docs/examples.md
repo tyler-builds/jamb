@@ -1,6 +1,6 @@
 # Examples
 
-The demo app, the notes app, the Git app and the monitor in this repository.
+The demo app, the notes app, the Git app, the monitor and the budget in this repository.
 
 ## The demo app
 
@@ -311,3 +311,49 @@ follow the window of their dock, tree rows in `ui.DataGrid` for its groups, and
 - The settings are kept in `jamb-monitor\settings.json` in the user's configuration
   folder. The tests in `examples/monitor/views` drive the app headlessly over the
   made-up machine.
+
+## The budget
+
+`examples/budget/` keeps a household budget: accounts, transactions sorted into
+categories, an amount for each category each month, and how the month is going against
+it. Where the monitor shows data that changes by itself, the budget is about entering it:
+forms, an editable table, validation, undo and import. It is built only from the public
+API, and it found the gaps that became `ui.FormatCurrency`, `NumberOptions.Currency`,
+`ui.ParseNumber` and `ui.ParseDate`, and a fix that lets a combo box take focus from
+assistive technology.
+
+- Money is in the currency of Windows' region settings: the symbol, its place, the shape
+  of a negative amount and the digits (`ui.FormatCurrency`). An amount field shows the
+  symbol where the region puts it (`NumberOptions.Currency`).
+- The title bar shows the month the pages show, with arrows (Alt+Left and Alt+Right) and
+  a way back to this month. Undo and Redo (Ctrl+Z, Ctrl+Y) take back every change to the
+  ledger, and their tooltips name it ("Undo Delete 3 transactions"); in a text field the
+  keys undo its typing.
+- **Overview**: the month's income, spending, what is left in the budget and the net
+  worth; a warning with a Review button when transactions need a category; a donut of
+  where the money went and a bar chart of six months against their budgets; the
+  categories over budget; the latest transactions.
+- **Transactions**: a `DataGrid` whose cells edit in place: the date with a date picker,
+  the category and the account with a select, the payee, the memo and the amount as
+  text, read in the locale (`ui.ParseNumber`). The cleared mark is a button in the cell.
+  The search, the account, the category ("Needs a category") and the period filter the
+  table, and its foot sums what it shows. Several selected rows can be given a category
+  or deleted at once; a delete asks first, and its toast offers Undo.
+- **Add transaction** (Ctrl+N) is a form in a modal: money out or in, the amount, the
+  date, the payee (a combo box of the payees used before, which brings the payee's last
+  category), the category, the account, a memo and the cleared mark. Submitting checks
+  every field and lists what needs attention.
+- **Budget**: the month's categories by group, as tree rows whose groups keep their order
+  as the table sorts (`SortChildrenOnly`); the budgeted amount edits in place, and a bar
+  shows how much is used, in the warning color past 90 percent and the danger color over
+  budget. The month's budget can be copied from the month before.
+- **Accounts**: a card for each account with its balance; a form adds and edits them,
+  and an account with transactions cannot be deleted.
+- **Import from CSV** (Ctrl+I) reads a bank's export: a comma or a semicolon file, the
+  columns guessed from the header (each can be changed), one amount column or money out
+  and money in, dates and amounts in the region's format or ISO dates (`ui.ParseDate`,
+  `ui.ParseNumber`). It shows what it will add, skips what the account has already, and
+  lists the rows it cannot read, before it adds anything.
+- The ledger is kept in `jamb-budget\budget.json` in the user's configuration folder
+  (`JAMB_BUDGET_FILE` names another). The first run starts from a made-up household's last
+  six months. The tests in `examples/budget/views` drive the app headlessly.
