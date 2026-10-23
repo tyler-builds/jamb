@@ -120,12 +120,12 @@ func (a *App) accountDialog(ctx *ui.Context) ui.Element {
 			title = "Edit account"
 		}
 		save := ui.Button("Save").Key("save-account").Primary().OnClick(f.Submit)
-		return ui.Modal(title, ui.Div().Column().Gap(14).Width(ui.Px(380)).
+		return ui.Modal(title, ui.Div().Column().Gap(14).Width(ui.Full).
 			Child(f.Summary()).
-			Child(f.Field("name", "Name", ui.TextInput(name).Key("account-name").Placeholder("Everyday checking").
+			Child(f.Field("name", "Name", ui.TextInput(name).Key("account-name").Placeholder("Everyday checking").Width(ui.Full).
 				Validate(ui.Required[string](), ui.MaxLength(60))).Required()).
 			Child(f.Field("kind", "Kind", ui.RadioGroup(kind, kinds...).Key("account-kind"))).
-			Child(f.Field("opening", "Opening balance", ui.TextInput(opening).Key("account-opening").
+			Child(f.Field("opening", "Opening balance", ui.TextInput(opening).Key("account-opening").Width(ui.Full).
 				Format(ui.NumberFormat(ui.NumberOptions{Currency: true, Signed: true}))).
 				Description("What the account held before its first transaction here. A card's debt is negative."))).
 			Key("account-form").

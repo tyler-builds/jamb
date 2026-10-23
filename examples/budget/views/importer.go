@@ -98,9 +98,11 @@ func (a *App) importDialog(ctx *ui.Context) ui.Element {
 	d := a.s.Data.Get()
 	header := st.header.Get()
 	var body *ui.DivElement
+	var width float32
 	var got ledger.Imported
 	if len(header) == 0 {
-		body = ui.Div().Column().Gap(12).Width(ui.Px(520)).
+		width = 520
+		body = ui.Div().Column().Gap(12).Width(ui.Full).
 			Child(ui.Text("Choose a CSV file of transactions, such as one your bank exports. Dates and amounts are read in your region's format, and ISO dates (2026-10-13) too.").
 				TextColor(t.TextMuted)).
 			Child(ui.Button("Choose a CSV file…").Key("choose-file").Icon(icons.FileUp).OnClick(func() { a.chooseFile(ctx) }))
@@ -142,7 +144,8 @@ func (a *App) importDialog(ctx *ui.Context) ui.Element {
 		if got.Duplicates > 0 {
 			summary += ", " + pluralize(got.Duplicates, "row") + " already in the account"
 		}
-		body = ui.Div().Column().Gap(12).Width(ui.Px(640)).
+		width = 680
+		body = ui.Div().Column().Gap(12).Width(ui.Full).
 			Child(ui.Div().Row().Gap(10).
 				Child(ui.Field("Into the account", ui.Select(st.account, acctOpts...).Key("import-account").Small().Width(ui.Full)).Grow(1)).
 				Child(pick("date", "Date", func(c ledger.Columns) int { return c.Date }, func(c *ledger.Columns, i int) { c.Date = i })).
@@ -179,7 +182,7 @@ func (a *App) importDialog(ctx *ui.Context) ui.Element {
 			a.page.Set(pageTransactions)
 			a.toast(ui.ToastSuccess, "Imported "+pluralize(n, "transaction")).Action("Undo", a.s.Undo)
 		})
-	return ui.Modal("Import from CSV", body).Key("import-dialog").
+	return ui.Modal("Import from CSV", body).Key("import-dialog").Width(ui.Px(width)).
 		Footer(ui.Button("Cancel").Secondary().OnClick(a.closeImport), doImport).
 		Default(doImport).
 		OnClose(a.closeImport)
