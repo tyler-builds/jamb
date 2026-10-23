@@ -24,9 +24,11 @@ func hiddenWindow(t *testing.T, w, h int32) uintptr {
 	return hwnd
 }
 
-// A window's swap chain keeps headroom for a drag, so a drag within it takes no
-// ResizeBuffers. A shrink gives the room back, and a capture copies only the
-// frame's own size, not the larger buffers.
+// A window's swap chain keeps headroom during a live resize, so a drag within it
+// takes no ResizeBuffers. The end of the drag fits the buffers to the window, and
+// any other change of size (a maximize, a restore) takes exact buffers, so the
+// shown part is never smaller than the buffers at rest. A capture copies only the
+// frame's own size.
 func TestResizeKeepsBuffers(t *testing.T) {
 	d, err := NewDevice()
 	if err != nil {
@@ -54,30 +56,41 @@ func TestResizeKeepsBuffers(t *testing.T) {
 			t.Fatalf("EndFrame at %d×%d: %v", w, h, err)
 		}
 	}
+	exact := func(when string, w, h int) {
+		t.Helper()
+		if r.bufW != w || r.bufH != h {
+			t.Errorf("buffers %s = %d×%d, want exactly %d×%d", when, r.bufW, r.bufH, w, h)
+		}
+	}
 
 	draw(800, 600)
+	r.SetLiveResize(true)
 	for w := 810; w <= 1000; w += 10 {
 		draw(w, 600)
 	}
 	if r.resizeBuffersCalls > 1 {
 		t.Errorf("a drag from 800 to 1000 called ResizeBuffers %d times, want 1 (the headroom takes the rest)", r.resizeBuffersCalls)
 	}
-
 	draw(400, 300)
+	r.SetLiveResize(false)
 	calls := r.resizeBuffersCalls
-	shrunk, err := r.ShrinkBuffers()
-	if err != nil || !shrunk {
-		t.Fatalf("ShrinkBuffers after a shrink to 400×300 = %t, %v; want true, nil", shrunk, err)
+	fitted, err := r.FitBuffers()
+	if err != nil || !fitted {
+		t.Fatalf("FitBuffers after a drag = %t, %v; want true, nil", fitted, err)
 	}
-	if r.bufW != headroom(400) || r.bufH != headroom(300) {
-		t.Errorf("buffers after the shrink = %d×%d, want %d×%d", r.bufW, r.bufH, headroom(400), headroom(300))
-	}
-	if again, _ := r.ShrinkBuffers(); again {
-		t.Error("a second ShrinkBuffers changed the buffers")
+	exact("after the drag", 400, 300)
+	if again, _ := r.FitBuffers(); again {
+		t.Error("a second FitBuffers changed the buffers")
 	}
 	if r.resizeBuffersCalls != calls+1 {
 		t.Errorf("ResizeBuffers calls = %d, want %d", r.resizeBuffersCalls, calls+1)
 	}
+
+	// A maximize and a restore are not live: each takes exact buffers.
+	draw(1600, 1000)
+	exact("after a maximize", 1600, 1000)
+	draw(400, 300)
+	exact("after a restore", 400, 300)
 
 	var got *image.RGBA
 	r.CaptureNextFrame(func(img *image.RGBA, err error) {

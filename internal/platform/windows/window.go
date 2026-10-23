@@ -457,6 +457,11 @@ func (w *window) ToggleMaximize() {
 // Maximized implements platform.Window.
 func (w *window) Maximized() bool { return win32.IsZoomed(w.hwnd) }
 
+// LiveResize reports whether the user is moving or resizing the window, between
+// WM_ENTERSIZEMOVE and WM_EXITSIZEMOVE. The renderer keeps headroom in its
+// buffers only then.
+func (w *window) LiveResize() bool { return w.inSizeMove }
+
 // restoreForGeometry leaves fullscreen and maximized, so a new size or
 // position applies to the restored window.
 func (w *window) restoreForGeometry() {

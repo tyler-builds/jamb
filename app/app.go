@@ -614,7 +614,7 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 	case platform.EventMoved:
 		h.saveGeometry(w)
 		h.reportGeometry(w)
-		h.shrinkBuffers(w)
+		h.fitBuffers(w)
 	case platform.EventSettingsChanged:
 		h.applySettings()
 	case platform.EventWindowState:
@@ -768,24 +768,47 @@ func (h *host) TitleArea(w platform.Window, x, y float32) platform.TitleArea {
 // window needs no repaint on WM_PAINT at its size.
 func (h *host) Presented() bool { return h.presented }
 
-// shrinkBuffers gives the window's swap chain back the room that a larger size
-// took, once the user has finished moving or resizing it (see
-// d3d11.Renderer.ShrinkBuffers). The window then draws into the smaller buffers.
-func (h *host) shrinkBuffers(w platform.Window) {
-	s, ok := h.r.(interface{ ShrinkBuffers() (bool, error) })
+// liveResizer is a renderer whose buffers keep headroom while the user drags
+// the window's edge, and fit the window otherwise (see d3d11.Renderer.resize).
+type liveResizer interface {
+	SetLiveResize(on bool)
+	FitBuffers() (bool, error)
+}
+
+// liveWindow is a window that reports a live resize: the user dragging its edge
+// or moving it.
+type liveWindow interface{ LiveResize() bool }
+
+// setLiveResize tells the renderer whether the window is in a live resize, before
+// a frame that may resize its buffers.
+func (h *host) setLiveResize(w platform.Window) {
+	r, ok := h.r.(liveResizer)
 	if !ok {
 		return
 	}
-	shrunk, err := s.ShrinkBuffers()
+	lw, ok := w.(liveWindow)
+	r.SetLiveResize(ok && lw.LiveResize())
+}
+
+// fitBuffers makes the window's swap chain buffers exactly the window's size once
+// the user has finished moving or resizing it (see d3d11.Renderer.FitBuffers), and
+// draws a frame into them.
+func (h *host) fitBuffers(w platform.Window) {
+	r, ok := h.r.(liveResizer)
+	if !ok {
+		return
+	}
+	r.SetLiveResize(false)
+	fitted, err := r.FitBuffers()
 	if err != nil {
 		if errors.Is(err, render.ErrDeviceLost) {
 			loseGPU(err)
 		} else {
-			fmt.Fprintln(os.Stderr, "jamb: shrinking the window's buffers failed:", err)
+			fmt.Fprintln(os.Stderr, "jamb: fitting the window's buffers failed:", err)
 		}
 		return
 	}
-	if shrunk {
+	if fitted {
 		w.Wake()
 	}
 }
@@ -800,6 +823,7 @@ func (h *host) OnFrame(w platform.Window) bool {
 		return false
 	}
 	h.updateViewport(w)
+	h.setLiveResize(w)
 	// The native title bar follows the theme: the app may switch it, or the
 	// system's app mode may, when the window follows it.
 	if dark := h.rt.Theme().Dark; dark != h.darkFrame {

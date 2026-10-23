@@ -158,8 +158,11 @@ type Renderer struct {
 	swapFlags uint32
 	resized   bool // the swap chain changed size this frame
 	// bufW and bufH are the size of the swap chain's buffers, which are at least
-	// width×height. They differ from it only with swap2; see resize.
+	// width×height. They differ from it only with swap2, during a live resize;
+	// see resize.
 	bufW, bufH int
+	// live is set while the user drags the window's edge (see SetLiveResize).
+	live bool
 	// resizeBuffersCalls counts the ResizeBuffers calls, for the tests.
 	resizeBuffersCalls int
 	// presentStart and presentEnd are when the last Present call started and
@@ -417,25 +420,29 @@ func (r *Renderer) createTarget() error {
 	return nil
 }
 
-// resize makes w×h the size of the frame. A window that grows takes buffers with
-// headroom (see headroom), and a size that the buffers still hold only moves the
-// shown part of them (IDXGISwapChain2::SetSourceSize). ResizeBuffers drops the
-// buffers' contents and costs most of a resize step, so a drag that keeps within
-// the headroom calls it only when the window outgrows it. A chain without swap2
-// has buffers of exactly the window's size, as it always had.
+// resize makes w×h the size of the frame. During a live resize, a window that
+// grows takes buffers with headroom (see headroom), and a size that the buffers
+// still hold only moves the shown part of them (IDXGISwapChain2::SetSourceSize).
+// ResizeBuffers drops the buffers' contents and costs most of a resize step, so a
+// drag that keeps within the headroom calls it only when the window outgrows it.
+//
+// Any other change of size (maximize, restore, snap, SetSize, a change of scale)
+// takes buffers of exactly the window's size. A shown part smaller than the
+// buffers is only for the drag: left in place, Windows has been seen to show it
+// magnified, so a window maximized and restored looked zoomed in until the
+// buffers were resized. A chain without swap2 always has exact buffers.
 func (r *Renderer) resize(w, h int) error {
-	if r.swap2 != nil && w <= r.bufW && h <= r.bufH {
+	if !r.live || r.swap2 == nil {
+		return r.resizeBuffers(w, h, w, h)
+	}
+	if w <= r.bufW && h <= r.bufH {
 		if err := r.setSourceSize(w, h); err != nil {
 			return err
 		}
 		r.width, r.height = w, h
 		return nil
 	}
-	bw, bh := w, h
-	if r.swap2 != nil {
-		bw, bh = headroom(w), headroom(h)
-	}
-	return r.resizeBuffers(bw, bh, w, h)
+	return r.resizeBuffers(headroom(w), headroom(h), w, h)
 }
 
 // resizeBuffers sets the buffers to bw×bh and shows the top-left w×h of them.
@@ -465,19 +472,19 @@ func (r *Renderer) resizeBuffers(bw, bh, w, h int) error {
 // window that keeps growing takes a new buffer once per 25 percent of growth.
 func headroom(n int) int { return n + n/4 }
 
-// ShrinkBuffers gives back the buffers' room beyond the headroom of the visible
-// size, when the window is at most half the size of its buffers in a dimension,
-// as after a resize that made it smaller. The buffers' contents are lost, so the
-// caller draws a frame, and it reports whether the buffers changed. A chain
-// without swap2 has no spare room, so it reports false.
-func (r *Renderer) ShrinkBuffers() (bool, error) {
-	if r.swap2 == nil || r.width <= 0 || r.height <= 0 {
+// SetLiveResize tells the renderer whether the user is dragging the window's
+// edge, which is when its buffers keep headroom (see resize).
+func (r *Renderer) SetLiveResize(on bool) { r.live = on }
+
+// FitBuffers makes the buffers exactly the frame's size, as when a live resize
+// ends, so the shown part is the whole of them. The buffers' contents are lost,
+// so the caller draws a frame; it reports whether the buffers changed. A chain
+// without swap2 always fits, so it reports false.
+func (r *Renderer) FitBuffers() (bool, error) {
+	if r.swap2 == nil || r.width <= 0 || r.height <= 0 || (r.bufW == r.width && r.bufH == r.height) {
 		return false, nil
 	}
-	if r.bufW <= 2*r.width && r.bufH <= 2*r.height {
-		return false, nil
-	}
-	if err := r.resizeBuffers(headroom(r.width), headroom(r.height), r.width, r.height); err != nil {
+	if err := r.resizeBuffers(r.width, r.height, r.width, r.height); err != nil {
 		return false, err
 	}
 	return true, nil

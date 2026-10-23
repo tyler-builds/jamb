@@ -77,10 +77,12 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 - Font files are parsed with the outlines of their glyphs cut, since shaping needs only each glyph's
   bounding box and jamb reads the outlines from the file itself. The hello app's private memory is
   about 2.5 MB smaller when idle. The binary grows by 12 KB.
-- A window keeps its swap chain buffers with room to spare when it is resized, moves only the part of
-  them that is shown for a size they still hold, and gives the room back when the user finishes the
-  resize. A window does not paint again after a size change it has already shown. In the benchmark's
-  10-second programmatic resize, CPU fell from 13.9% of a core to 4.5%.
+- While the user drags a window's edge, its swap chain buffers keep room to spare, and a size they
+  still hold moves only the part of them that is shown; the end of the drag fits the buffers to the
+  window again. Any other change of size, such as a maximize, a restore or a resize from code, takes
+  buffers of exactly the window's size: with room to spare at rest, a window maximized by a
+  double-click on its title bar and then restored was shown zoomed in. A window does not paint again
+  after a size change it has already shown.
 - The renderer's instance buffers start at 4 KB, not 64 KB, and grow as before.
 - A window's first frame is built while its GPU device is created, and is drawn before the window
   is shown. In the commit measurements, the blank gap of a warm launch fell from a median of 36.5 ms
