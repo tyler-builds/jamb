@@ -17,7 +17,8 @@ type ListElement struct {
 	keyAt      func(i int) string
 	rowAt      func(i int) Element
 	key        string
-	selectable bool // see SelectionContainer
+	label      string // see Label
+	selectable bool   // see SelectionContainer
 	style      Style
 	handle     *ListHandle
 	bottom     bool
@@ -89,6 +90,10 @@ func (l *ListElement) elementKey() string { return l.key }
 
 // Key gives the list a stable identity among its siblings.
 func (l *ListElement) Key(k string) *ListElement { l.key = k; return l }
+
+// Label names the list for assistive technology, such as "Alerts", which reads it
+// with the list's role and its number of items.
+func (l *ListElement) Label(name string) *ListElement { l.label = name; return l }
 
 // Style is merged into the scroll container: size it with Height, Grow or MaxHeight.
 func (l *ListElement) Style(s Style) *ListElement { l.style = l.style.Merge(s); return l }
@@ -321,6 +326,9 @@ func (l *ListElement) expand(ctx *Context) Element {
 	vs.rows = rows
 	vs.builtFrom, vs.built = from, to
 	container := l.size.apply(Div().ScrollY().Style(l.style)).Role(access.RoleList)
+	if l.label != "" {
+		container.Label(l.label)
+	}
 	container.access().container = l.selectable
 	container.vrows = vs
 	if l.decorate != nil {

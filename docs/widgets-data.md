@@ -14,6 +14,9 @@ ui.UniformList(len(events), func(i int) ui.Element { return eventRow(events[i]) 
 h.ScrollToItem(5000)                    // scrolls the least amount that shows row 5000
 ```
 
+Assistive technology reads a list with its number of items. `Label` names it, such as
+"Search results"; both kinds of list take it.
+
 ## Variable-height lists
 
 When rows differ in height, use `ui.ListOf`. It takes the items, a key for each
