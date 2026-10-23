@@ -121,12 +121,12 @@ const (
 type SplitGrip uint8
 
 const (
-	// SplitGripShown always shows the grip. It is the default.
-	SplitGripShown SplitGrip = iota
 	// SplitGripOnHover shows the grip only while the pointer is over the divider, while it is
 	// dragged, and while it has keyboard focus. Otherwise the divider is the bar alone, a line
-	// between the panes like a border.
-	SplitGripOnHover
+	// between the panes like a border. It is the default.
+	SplitGripOnHover SplitGrip = iota
+	// SplitGripShown always shows the grip.
+	SplitGripShown
 	// SplitGripHidden never shows the grip: the divider is the bar alone. It still changes color
 	// when the pointer is over it (DividerHover), so it can be found.
 	SplitGripHidden
@@ -312,8 +312,8 @@ func (s *SplitElement) Orientation(o SplitOrientation) *SplitElement { s.orient 
 // and Editor", and any other divider is named with the Resize panes text of the window's Strings.
 func (s *SplitElement) Label(name string) *SplitElement { s.name = name; return s }
 
-// Grip sets when the divider shows its grip: always (SplitGripShown, the default), only while
-// the pointer is over the divider or it is dragged or focused (SplitGripOnHover), or never
+// Grip sets when the divider shows its grip: only while the pointer is over the divider or it
+// is dragged or focused (SplitGripOnHover, the default), always (SplitGripShown), or never
 // (SplitGripHidden). Without the grip, the divider is a line between the panes.
 func (s *SplitElement) Grip(g SplitGrip) *SplitElement { s.grip = g; return s }
 
