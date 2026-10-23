@@ -33,8 +33,11 @@ ui.Accordion(sectionA, sectionB, sectionC).SingleOpen()          // one section 
 
 ui.Tree(nodes, selected).Key("files").Label("Project files"). // *ui.Signal[string]: the selected node's key
 	Style(ui.Style{MaxHeight: ui.Px(320)}).OnChange(func(key string) { ... })
-// ui.TreeNode{Key: "src", Label: "src", Icon: icons.Folder,
+// ui.TreeNode{Key: "src", Label: "src", Icon: icons.Folder, Description: "Source code",
 //	Children: func() []ui.TreeNode { return loadSrc() }}   // nil Children: a leaf
+ui.Tree(nodes, selected).RenderTrailing(func(n ui.TreeNode, s ui.PartState) ui.Element {
+	return ui.Text(fmt.Sprint(counts[n.Key])) // a count or badge at the end of each row
+}).ContextMenu(func(key string) []ui.MenuItem { return rowMenu(key) }) // right click, Shift+F10, Menu key
 th := ui.NewTreeHandle()                                    // code opens, closes, reveals and selects nodes
 ui.Tree(nodes, selected).Key("files").Handle(th).Expanded(openKeys). // *ui.Signal[[]string]: the open keys
 	OnExpand(func(key string) { ... }).OnCollapse(func(key string) { ... })
@@ -155,6 +158,14 @@ th.Reveal("src/main.go") // opens the nodes above it and scrolls it into view
   selects a node, and a click on its chevron opens or closes it without selecting.
   A double-click opens or closes it. Keys are kept by node key, so focus and the
   selection stay with their node as the rows scroll.
+  A node's `Description` is muted text after its label, such as a count or a path.
+  Assistive technology reads it as the row's description. `RenderTrailing` puts
+  your own content, such as a count or a badge, at the end of each row, after the
+  description; it is hidden from assistive technology, and it is called again when
+  the row's pointer state changes. `ContextMenu` opens a menu for a row, built with
+  its key: a right click selects the row first, as File Explorer does, and Shift+F10
+  or the Menu key opens the menu of the selected row while the tree has focus. An
+  empty result opens nothing. The description part is `Description` in `TreeStyle`.
 - **Tree from code.** A `TreeHandle` (`NewTreeHandle`, passed with `Tree.Handle`)
   opens and closes nodes by key with `Expand` and `Collapse`, opens or closes all of
   them with `ExpandAll` and `CollapseAll`, and opens the nodes above a key and scrolls
