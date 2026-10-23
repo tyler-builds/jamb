@@ -127,17 +127,13 @@ func (a *App) sidebar(ctx *ui.Context) ui.Element {
 	t := ctx.Theme()
 	d := a.s.Data.Get()
 	uncat := len(d.NeedCategory(a.month.Get()))
-	return ui.Div().Column().Width(ui.Px(220)).Shrink(0).Background(t.Panel).
-		BorderEdges(ui.Edges{Right: 1}, t.Border).
-		Child(ui.Sidebar(a.page,
-			ui.SidebarHeading("Budget"),
-			ui.SidebarItem{Key: pageOverview, Label: "Overview", Icon: icons.LayoutDashboard},
-			ui.SidebarItem{Key: pageTransactions, Label: "Transactions", Icon: icons.Receipt, Badge: uncat},
-			ui.SidebarItem{Key: pageBudget, Label: "Budget", Icon: icons.PiggyBank},
-			ui.SidebarItem{Key: pageAccounts, Label: "Accounts", Icon: icons.Landmark},
-		).Key("nav").Label("Pages")).
-		Child(ui.Spacer()).
-		Child(a.saveState(t))
+	return ui.Sidebar(a.page,
+		ui.SidebarHeading("Budget"),
+		ui.SidebarItem{Key: pageOverview, Label: "Overview", Icon: icons.LayoutDashboard},
+		ui.SidebarItem{Key: pageTransactions, Label: "Transactions", Icon: icons.Receipt, Badge: uncat},
+		ui.SidebarItem{Key: pageBudget, Label: "Budget", Icon: icons.PiggyBank},
+		ui.SidebarItem{Key: pageAccounts, Label: "Accounts", Icon: icons.Landmark},
+	).Key("nav").Label("Pages").Width(ui.Px(220)).Footer(a.saveState(t))
 }
 
 // saveState says when the ledger could not be saved, at the foot of the sidebar.
