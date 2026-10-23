@@ -225,3 +225,27 @@ func TestChoosingAChangedFileOpensItsDiff(t *testing.T) {
 		t.Errorf("diff header = %q", u.Get("diff-view").Text())
 	}
 }
+
+// Go to a tag whose commit is not loaded yet loads the history until it is, then
+// selects it.
+func TestGoToLoadsTheHistoryUntilTheTarget(t *testing.T) {
+	defer func(n int) { store.PageSize = n }(store.PageSize)
+	store.PageSize = 2
+	u, _, r := open(t)
+	if n := len(r.Entries.Peek()); n != 2 {
+		t.Fatalf("%d commits loaded, want the first page of 2", n)
+	}
+	u.Press("ctrl+p")
+	u.Type("v0.1.0")
+	u.Press("enter")
+	root := ""
+	u.WaitFor("the tag's commit to load and be selected", func() bool {
+		for _, e := range r.Entries.Peek() {
+			if e.Subject == "Initial commit" {
+				root = e.Hash
+			}
+		}
+		sel := r.Selected.Peek()
+		return root != "" && len(sel) == 1 && sel[0] == root
+	})
+}

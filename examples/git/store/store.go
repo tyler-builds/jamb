@@ -13,8 +13,9 @@ import (
 	"github.com/tyler-builds/jamb/examples/git/repo"
 )
 
-// PageSize is how many commits one read of the history loads.
-const PageSize = 1500
+// PageSize is how many commits one read of the history loads. Tests lower it to
+// page through a small repository.
+var PageSize = 1500
 
 // Entry is one row of the history: a commit, its slice of the graph and the
 // refs that point at it.
@@ -146,21 +147,53 @@ func (r *Repo) LoadMore() {
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		defer r.Loading.Set(false)
-		if gen != r.gen {
-			return
+		if gen == r.gen {
+			r.loadPage()
 		}
-		have := r.Entries.Peek()
-		commits, err := repo.Log(r.Info.Peek().Root, len(have), PageSize)
-		if err != nil {
-			r.fail(err)
-			return
-		}
-		more := r.entries(commits, r.Refs.Peek())
-		// A new slice, so the grid sees the change.
-		r.Entries.Set(append(slices.Clip(have), more...))
-		r.Lanes.Set(max(1, r.builder.Widest()))
-		r.More.Set(len(commits) == PageSize)
 	}()
+}
+
+// LoadUntil reads pages of the history until the commit hash is among the entries
+// or the history ends, then calls done with whether it was found. done runs on the
+// loader's goroutine; hand it to the UI thread with Post.
+func (r *Repo) LoadUntil(hash string, done func(found bool)) {
+	r.Loading.Set(true)
+	r.mu.Lock()
+	gen := r.gen
+	r.mu.Unlock()
+	go func() {
+		r.mu.Lock()
+		found := false
+		for gen == r.gen {
+			if slices.ContainsFunc(r.Entries.Peek(), func(e Entry) bool { return e.Hash == hash }) {
+				found = true
+				break
+			}
+			if !r.More.Peek() || !r.loadPage() {
+				break
+			}
+		}
+		r.mu.Unlock()
+		r.Loading.Set(false)
+		done(found)
+	}()
+}
+
+// loadPage reads the next page of the history and appends it, with r.mu held. It
+// reports whether the read succeeded.
+func (r *Repo) loadPage() bool {
+	have := r.Entries.Peek()
+	commits, err := repo.Log(r.Info.Peek().Root, len(have), PageSize)
+	if err != nil {
+		r.fail(err)
+		return false
+	}
+	more := r.entries(commits, r.Refs.Peek())
+	// A new slice, so the grid sees the change.
+	r.Entries.Set(append(slices.Clip(have), more...))
+	r.Lanes.Set(max(1, r.builder.Widest()))
+	r.More.Set(len(commits) == PageSize)
+	return true
 }
 
 func (r *Repo) fail(err error) {

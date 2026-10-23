@@ -103,13 +103,8 @@ func (a *App) facts(ctx *ui.Context, r *store.Repo, e store.Entry, info repo.Inf
 			Background(t.SurfaceActive).Cursor(ui.CursorPointer).TabIndex(0).
 			Role(access.RoleButton).Label("Go to parent " + short).Tooltip("Go to " + short).
 			Hover(ui.Style{Background: t.SurfaceHover.Mix(t.Text, 0.08)}).
-			FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}).
 			Child(ui.Text(short).Mono().FontSize(12)).
-			OnClick(func() {
-				if !a.selectCommit(r, p) {
-					ctx.Toast(ui.ToastInfo, "That commit is further back than the history loaded so far.")
-				}
-			}))
+			OnClick(func() { a.revealCommit(ctx, r, p, short) }))
 	}
 	list := ui.DescriptionList().
 		Item("Parents", parents)
