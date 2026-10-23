@@ -18,6 +18,10 @@ dismissed by ID, trees open and close from code, and the code editor offers quic
 
 ### Changed
 
+- A `Split` divider takes only its bar's thickness in the layout, 1 px by default, instead of 9 px, so
+  the panes meet at the bar and it reads as the border between them. Each pane is 8 px wider than
+  before beside each divider. The 9 px hit area is unchanged in size; it lies over the panes' edges,
+  as VS Code's and Zed's do, so a press a few pixels into a pane beside the bar drags the divider.
 - **Breaking:** The visual inspector is linked only into a program that imports
   `github.com/tyler-builds/jamb/devtools`. Every app used to carry the inspector's code. An app
   that calls `App.DevTools(true)` and expects Ctrl+Shift+I to work in a release build must add
