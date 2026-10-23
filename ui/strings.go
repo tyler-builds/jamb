@@ -484,6 +484,13 @@ type Strings struct {
 	// (see FormatRelative). RelativeIn builds a time in the future, such as "in 3 days".
 	RelativeAgo func(unit RelativeUnit, n int) string
 	RelativeIn  func(unit RelativeUnit, n int) string
+
+	// Byte is the size of one byte, "1 byte", and Bytes the size of any other count of
+	// bytes below 1024, such as "512 bytes" (see FormatBytes). KB to PB are the units of
+	// the larger sizes, such as "1.00 KB".
+	Byte, Bytes string
+	KB, MB, GB  string
+	TB, PB      string
 }
 
 // englishStrings returns the English text. It is shared by the fallbacks, so its
@@ -782,6 +789,14 @@ func englishStrings() *Strings {
 		RelativeIn: func(u RelativeUnit, n int) string {
 			return "in " + englishCount(n, englishUnits[u][0], englishUnits[u][1])
 		},
+
+		Byte:  "byte",
+		Bytes: "bytes",
+		KB:    "KB",
+		MB:    "MB",
+		GB:    "GB",
+		TB:    "TB",
+		PB:    "PB",
 	}
 }
 

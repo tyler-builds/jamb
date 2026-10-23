@@ -7,6 +7,14 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Added
+
+- `ui.FormatNumber` shows a number rounded to a number of decimals, with the group separator,
+  decimal point and minus sign of the user's locale, as `NumberFormat` does. `ui.FormatBytes`
+  shows a size in bytes as Windows Explorer shows it, such as "1.23 GB". Its units are the
+  `Byte`, `Bytes` and `KB` to `PB` fields of `Strings`, English in every built-in pack. See
+  docs/text.md.
+
 ### Changed
 
 - The window of a floating dock group is part of the dock's window. It shows that window's
