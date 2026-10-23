@@ -110,9 +110,21 @@ func TestDockLayoutOperations(t *testing.T) {
 		{"float a panel that floats alone only moves its window", base.Float("a", 10, 20, 300, 200),
 			func(l DockLayout) DockLayout { return l.Float("a", 40, 50, 320, 240) },
 			"H{0.50 [b*], 0.50 V{0.50 [c*], 0.50 [d*]}} float(float-1 40,50 320x240 [a*])"},
-		{"dock back a floating panel on the right edge", base.Float("a", 10, 20, 300, 200),
+		{"dock back a floating panel into the tab it left", base.Float("a", 10, 20, 300, 200),
 			func(l DockLayout) DockLayout { return l.Dock("a") },
-			"H{0.33 [b*], 0.33 V{0.50 [c*], 0.50 [d*]}, 0.33 [a*]}"},
+			"H{0.50 [a* b], 0.50 V{0.50 [c*], 0.50 [d*]}}"},
+		{"dock back a later tab into its place", base.Float("b", 10, 20, 300, 200),
+			func(l DockLayout) DockLayout { return l.Dock("b") },
+			"H{0.50 [a b*], 0.50 V{0.50 [c*], 0.50 [d*]}}"},
+		{"dock back a panel that was alone in its group beside its neighbour", base.Float("d", 10, 20, 300, 200),
+			func(l DockLayout) DockLayout { return l.Dock("d") },
+			"H{0.50 [a* b], 0.50 V{0.50 [c*], 0.50 [d*]}}"},
+		{"dock back a panel that was alone above its neighbour", base.Float("c", 10, 20, 300, 200),
+			func(l DockLayout) DockLayout { return l.Dock("c") },
+			"H{0.50 [a* b], 0.50 V{0.50 [c*], 0.50 [d*]}}"},
+		{"dock back on the right edge when the place is gone", base.Float("a", 10, 20, 300, 200).Close("b"),
+			func(l DockLayout) DockLayout { return l.Dock("a") },
+			"H{0.50 V{0.50 [c*], 0.50 [d*]}, 0.50 [a*]}"},
 		{"dock back a panel that is docked does nothing", base, func(l DockLayout) DockLayout { return l.Dock("a") },
 			"H{0.50 [a* b], 0.50 V{0.50 [c*], 0.50 [d*]}}"},
 		{"move a panel to the side group, the first one in the direction", base, func(l DockLayout) DockLayout {
@@ -192,6 +204,10 @@ func TestDockLayoutJSONRoundTrip(t *testing.T) {
 	}
 	if !reflect.DeepEqual(back, l) {
 		t.Errorf("round trip changed the layout:\n got %s\nwant %s", layoutText(back), layoutText(l))
+	}
+	// A saved floating panel still docks back where it was.
+	if got, want := layoutText(back.Dock("a")), layoutText(dockBase()); got != want {
+		t.Errorf("a loaded floating panel docked back as %s, want %s", got, want)
 	}
 }
 
