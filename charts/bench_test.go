@@ -54,6 +54,35 @@ func BenchmarkArea100k(b *testing.B) {
 	benchChart(b, c)
 }
 
+// benchRedraw runs a chart as benchChart does, but each iteration changes the width of
+// the window by a pixel, which lays the chart out again and redraws its plot, as a
+// resize or new data does.
+func benchRedraw(b *testing.B, c *Chart) {
+	b.Helper()
+	rt := ui.NewRuntime(func(*ui.Context) ui.Element { return ui.Div().Child(c) }, ui.DarkTheme(), nil)
+	rt.SetSystemSettings(ui.SystemSettings{ReducedMotion: true})
+	rt.SetViewport(800, 600, 1)
+	now := time.Unix(1_000_000, 0)
+	rt.Frame(now)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rt.SetViewport(float32(800-i%2), 600, 1)
+		now = now.Add(16 * time.Millisecond)
+		rt.Frame(now)
+	}
+}
+
+// BenchmarkLineRedraw100k redraws the plot of a line of 100,000 points per frame.
+func BenchmarkLineRedraw100k(b *testing.B) {
+	benchRedraw(b, Line(Series[float64]{Name: "Walk", Data: walk100k(), Y: func(v float64) float64 { return v }}))
+}
+
+// BenchmarkAreaRedraw100k redraws the plot of an area of 100,000 points per frame.
+func BenchmarkAreaRedraw100k(b *testing.B) {
+	benchRedraw(b, Area(Series[float64]{Name: "Walk", Data: walk100k(), Y: func(v float64) float64 { return v }}))
+}
+
 // TestLargeLineFrameIsDrawn checks that a line of 100,000 points is drawn, and reduced: the
 // geometry of the draw holds the plot, and the points it drew are downsampled to about two per
 // pixel, which the benchmarks time.

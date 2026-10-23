@@ -214,8 +214,10 @@ The crosshair, the hover highlight and the tooltip are drawn on a layer of their
 own, above the plot. Moving the pointer re-renders only that layer, so the plot's
 canvas is not redrawn: a hover frame on a 100,000-point line or area takes about
 0.5 ms on the development machine. A frame that redraws the plot itself, such as
-a resize or a change of data, takes about 12 ms for 100,000 points; most of that
-is the vector rasterizer in `internal/vector` sorting the crossings of the stroke.
+a resize or a change of data, takes about 5 ms for a 100,000-point line and 7.5 ms
+for an area (`BenchmarkLineRedraw100k` and `BenchmarkAreaRedraw100k`); most of that
+is the vector rasterizer in `internal/vector`, which samples each row of pixels 16
+times and keeps the edges that cross it in order from one sample to the next.
 
 ## Limits
 
