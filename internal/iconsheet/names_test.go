@@ -5,19 +5,22 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/tyler-builds/jamb/icons"
 )
 
-// The icon list in docs/drawing.md names every icon; keep it in sync with icons.All.
-func TestDrawingDocListsEveryIcon(t *testing.T) {
+// docs/drawing.md names the icons that are not plain Lucide names (the aliases
+// and the hand-made icons); keep its list in sync with icons/set.go and
+// icons/lucide_gen.go.
+func TestDrawingDocListsRenamedIcons(t *testing.T) {
 	readme, err := os.ReadFile(filepath.Join("..", "..", "docs", "drawing.md"))
 	if err != nil {
 		t.Skip("docs/drawing.md not found:", err)
 	}
-	for _, ic := range icons.All {
-		if !strings.Contains(string(readme), ic.Name) {
-			t.Errorf("docs/drawing.md icon list is missing %q", ic.Name)
+	for _, name := range []string{
+		"Alert", "Dashboard", "Filter", "Home", "MoreHorizontal", "Refresh",
+		"Maximize", "Minimize", "Restore", "StarFilled", "LucideMaximize", "LucideMinimize",
+	} {
+		if !strings.Contains(string(readme), "icons."+name) {
+			t.Errorf("docs/drawing.md does not mention icons.%s", name)
 		}
 	}
 }
