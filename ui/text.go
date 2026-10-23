@@ -49,17 +49,22 @@ func (t *TextElement) Key(k string) *TextElement { t.key = k; return t }
 // FontSize sets the font size in logical pixels.
 func (t *TextElement) FontSize(px float32) *TextElement { t.style.FontSize = px; return t }
 
-// Weight sets the font weight.
-func (t *TextElement) Weight(w FontWeight) *TextElement { t.style.FontWeight = w; return t }
+// FontWeight sets the font weight, as DivElement.FontWeight does for the text inside a Div.
+func (t *TextElement) FontWeight(w FontWeight) *TextElement { t.style.FontWeight = w; return t }
 
-// Medium, Semibold and Bold are shorthands for Weight.
-func (t *TextElement) Medium() *TextElement { return t.Weight(FontMedium) }
+// Weight sets the font weight.
+//
+// Deprecated: use FontWeight, the name a Div uses for the same setting.
+func (t *TextElement) Weight(w FontWeight) *TextElement { return t.FontWeight(w) }
+
+// Medium, Semibold and Bold are shorthands for FontWeight.
+func (t *TextElement) Medium() *TextElement { return t.FontWeight(FontMedium) }
 
 // Semibold sets the text's weight to FontSemibold.
-func (t *TextElement) Semibold() *TextElement { return t.Weight(FontSemibold) }
+func (t *TextElement) Semibold() *TextElement { return t.FontWeight(FontSemibold) }
 
 // Bold sets the text's weight to FontBold.
-func (t *TextElement) Bold() *TextElement { return t.Weight(FontBold) }
+func (t *TextElement) Bold() *TextElement { return t.FontWeight(FontBold) }
 
 // TextColor sets the text color.
 func (t *TextElement) TextColor(c Color) *TextElement { t.style.TextColor = c; return t }
