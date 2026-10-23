@@ -127,6 +127,10 @@ var layerBuilders = []layerBuilder{
 		func(st any) Element { return partCollapsible(false, true, st.(CollapsibleStyle), false, nil) }},
 	{"Tree", func(th *Theme) any { return &th.Tree },
 		func(st any) Element { return partTree(NewSignal("docs"), st.(TreeStyle), nil, nil) }},
+	{"ListBox", func(th *Theme) any { return &th.ListBox },
+		func(st any) Element {
+			return listBoxDemo(NewSignal([]string{"c"}), SelectionSingle, st.(ListBoxStyle), nil, nil, nil)
+		}},
 	{"Tabs", func(th *Theme) any { return &th.Tabs },
 		func(st any) Element { return partTabs(NewSignal("a"), TabsUnderline, st.(TabsStyle)) }},
 	{"Tabs", func(th *Theme) any { return &th.Tabs },
