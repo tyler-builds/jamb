@@ -250,6 +250,12 @@ func (t *Toast) Styles(st ToastStyle) *Toast {
 // queues its announcement for the next frame. When the stack is over its maximum,
 // the oldest toast that is not hovered or focused goes. An update takes no room.
 func (rt *Runtime) toast(id string, v ToastVariant, text string) *Toast {
+	if !rt.hasToaster && !rt.toastWarned && rt.warn != nil {
+		// Reported once: a window without a Toaster shows no toast at all, which is
+		// easy to miss in development.
+		rt.toastWarned = true
+		rt.warn("ctx.Toast was called in a window with no Toaster; add ui.Toaster() as the last child of the root element, or no toast is shown")
+	}
 	if !rt.toastsTimed() {
 		rt.toastAt = rt.now() // the first timed toast's time starts now, not at the last frame
 	}
@@ -546,6 +552,7 @@ func (tv *ToasterElement) Placement(p ToastPlacement) *ToasterElement { tv.place
 func (tv *ToasterElement) expand(ctx *Context) Element {
 	rt := ctx.rt
 	rt.toastVer.Get() // re-render when the stack changes
+	rt.hasToaster = true
 	if tv.max > 0 {
 		rt.toastMax = tv.max
 	}
