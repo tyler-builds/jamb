@@ -33,6 +33,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Fixed
 
+- A combo box takes focus for its text when assistive technology asks to focus it, as UI
+  Automation's SetFocus on a combo box does. It offered no focus, so it could only be reached
+  with Tab.
 - `ui.FormatNumber` rounds as Windows does, half away from zero on the digits of the shortest
   decimal form of the value: 1.005 at two places is 1.01, and 0.125 is 0.13. It rounded the
   binary value, half to even, so both came out a cent low.

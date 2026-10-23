@@ -631,6 +631,8 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 		}
 		a := root.access()
 		root.Role(access.RoleComboBox).AccessExpanded(open.Get())
+		// Focus asked of the combo box, by assistive technology, goes to its text.
+		a.focusInside = !c.disabled
 		if c.tooltip != "" && w.description == "" {
 			root.Description(c.tooltip) // the combo box is the node assistive technology reads
 		}
