@@ -31,7 +31,7 @@ func (a *App) tags(r *store.Repo) ui.Element {
 				Cell: func(g repo.Ref) ui.Element {
 					return pad(ui.Div().Row().Align(ui.Center).Gap(8).MinWidth(ui.Px(0)).
 						Child(ui.Icon(icons.Tag).Size(13).Color(t.TextMuted)).
-						Child(ui.Text(g.Name).Weight(ui.FontMedium).Truncate()))
+						Child(ui.Text(g.Name).FontWeight(ui.FontMedium).Truncate()))
 				}},
 			{Key: "message", Header: "Message", Width: 360, Grow: 1, MinWidth: 120, Resizable: true,
 				Text: func(g repo.Ref) string { return g.Subject },

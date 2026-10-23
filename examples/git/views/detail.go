@@ -34,7 +34,7 @@ func (a *App) detail(r *store.Repo) ui.Element {
 		d := res.Data
 		body := ui.Div().Column().Gap(18).Padding(20).
 			Child(ui.Div().Column().Gap(8).
-				Child(ui.Text(e.Subject).FontSize(15).Weight(ui.FontSemibold).Selectable()).
+				Child(ui.Text(e.Subject).FontSize(15).FontWeight(ui.FontSemibold).Selectable()).
 				Child(ui.If(d.Body != "", ui.Text(d.Body).TextColor(t.TextMuted).Selectable()))).
 			Child(a.people(t, e, d)).
 			Child(a.facts(ctx, r, e, info))
@@ -77,7 +77,7 @@ func (a *App) people(t *ui.Theme, e store.Entry, d repo.Details) ui.Element {
 			Child(ui.Avatar(name).Size(30).AccessHidden()).
 			Child(ui.Div().Column().Gap(2).MinWidth(ui.Px(0)).
 				Child(ui.Div().Row().Gap(6).Align(ui.Center).
-					Child(ui.Text(name).Weight(ui.FontMedium).Truncate()).
+					Child(ui.Text(name).FontWeight(ui.FontMedium).Truncate()).
 					Child(ui.Text(email).FontSize(12).TextColor(t.TextSubtle).Truncate())).
 				Child(ui.Div().Row().Gap(4).FontSize(12).TextColor(t.TextMuted).
 					Child(ui.Text(verb)).Child(ui.TimeAgo(when))))
@@ -140,7 +140,7 @@ func (a *App) files(t *ui.Theme, r *store.Repo, d repo.Details) ui.Element {
 		title += " from the first parent"
 	}
 	head := ui.Div().Row().Align(ui.Center).Gap(8).
-		Child(ui.Text(title).Weight(ui.FontMedium)).
+		Child(ui.Text(title).FontWeight(ui.FontMedium)).
 		Child(ui.Div().Grow(1)).
 		Child(ui.Text("+" + itoa(added)).Mono().FontSize(12).TextColor(t.Success)).
 		Child(ui.Text("−" + itoa(deleted)).Mono().FontSize(12).TextColor(t.Danger))
@@ -193,7 +193,7 @@ func statusMark(t *ui.Theme, s repo.FileStatus) ui.Element {
 		c = t.Link
 	}
 	return ui.Div().Center().Size(ui.Px(18), ui.Px(18)).Radius(4).Shrink(0).Background(c.Alpha(0.14)).
-		Child(ui.Text(string(rune(s))).FontSize(11).Weight(ui.FontSemibold).TextColor(c)).
+		Child(ui.Text(string(rune(s))).FontSize(11).FontWeight(ui.FontSemibold).TextColor(c)).
 		Tooltip(statusWord(s))
 }
 

@@ -36,7 +36,7 @@ func heading(t *ui.Theme, text string, end ui.Element) ui.Element {
 	row := ui.Div().Row().Align(ui.Center).Height(ui.Px(barHeight)).Shrink(0).
 		PaddingEdges(ui.Edges{Left: 14, Right: 8}).BorderEdges(ui.Edges{Bottom: 1}, t.Border).
 		Child(ui.Div().Grow(1).Role(access.RoleHeading).Label(text).
-			Child(ui.Text(text).FontSize(11.5).Weight(ui.FontMedium).TextColor(t.TextSubtle)))
+			Child(ui.Text(text).FontSize(11.5).FontWeight(ui.FontMedium).TextColor(t.TextSubtle)))
 	if end != nil {
 		row.Child(end)
 	}
@@ -105,7 +105,7 @@ func (a *App) repoRow(t *ui.Theme, r *store.Repo) ui.Element {
 		return ui.Div().Row().Align(ui.Center).Gap(10).Grow(1).MinWidth(ui.Px(0)).Tooltip(info.Root).
 			Child(square).
 			Child(ui.Div().Column().Grow(1).MinWidth(ui.Px(0)).
-				Child(ui.Text(info.Name).Weight(ui.FontMedium).Truncate()).
+				Child(ui.Text(info.Name).FontWeight(ui.FontMedium).Truncate()).
 				Child(ui.If(branch != "", ui.Text(branch).FontSize(11.5).TextColor(t.TextSubtle).Truncate()))).
 			Child(ui.If(status != nil, status))
 	})
