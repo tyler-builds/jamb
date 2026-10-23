@@ -9,6 +9,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Added
 
+- `charts.Axis.Hidden` hides an axis: no axis line, tick labels or title, and no margin for them.
+  With `GridAuto` a hidden axis draws no grid lines, and `GridOn` still draws them. A line or area
+  with both axes hidden, no legend and no title is a sparkline, and a chart sized to less than 120
+  pixels high is drawn at its own height. See docs/charts.md.
 - `ui.FormatNumber` shows a number rounded to a number of decimals, with the group separator,
   decimal point and minus sign of the user's locale, as `NumberFormat` does. `ui.FormatBytes`
   shows a size in bytes as Windows Explorer shows it, such as "1.23 GB". Its units are the
