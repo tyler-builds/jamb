@@ -152,7 +152,8 @@ func (c *Canvas) Stroke(p *Path, paint Paint, s Stroke) {
 }
 
 // polys flattens p in the current coordinates, strokes it when s is set, and
-// returns its polygons in pixels.
+// returns its polygons in pixels. Flattening and stroking make new polygons, so
+// they are moved to pixels in place.
 func (c *Canvas) polys(p *Path, s *Stroke) [][]Point {
 	m := c.top().m
 	tol := c.Tolerance
@@ -171,15 +172,15 @@ func (c *Canvas) polys(p *Path, s *Stroke) [][]Point {
 			polys = append(polys, l.pts)
 		}
 	}
-	out := make([][]Point, len(polys))
-	for i, poly := range polys {
-		q := make([]Point, len(poly))
-		for j, pt := range poly {
-			q[j] = m.Apply(pt)
-		}
-		out[i] = q
+	if m == Identity {
+		return polys
 	}
-	return out
+	for _, poly := range polys {
+		for j, pt := range poly {
+			poly[j] = m.Apply(pt)
+		}
+	}
+	return polys
 }
 
 // draw paints the coverage of polys.

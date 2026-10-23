@@ -1,6 +1,7 @@
 package vector
 
 import (
+	"cmp"
 	"math"
 	"slices"
 )
@@ -33,11 +34,19 @@ type crossing struct {
 
 // rasterizer computes the coverage of polygons, reusing its buffers.
 type rasterizer struct {
-	edges     []edge
-	active    []int
-	crossings []crossing
-	frac      []float32 // per pixel: the partial coverage of span ends
-	run       []float32 // per pixel boundary: where full coverage starts and stops
+	edges []edge
+	// sorted and counts are the buffers of sortEdges.
+	sorted []edge
+	counts []int32
+	// active holds the edges that the current scanline crosses, as their indexes in
+	// edges, and xs where each crosses it, in the same order: from left to right.
+	// From one scanline to the next the edges move little, so the order is kept
+	// with an insertion sort that has almost nothing to do.
+	active    []int32
+	xs        []float32
+	crossings []crossing // used by fillReference in the tests
+	frac      []float32  // per pixel: the partial coverage of span ends
+	run       []float32  // per pixel boundary: where full coverage starts and stops
 }
 
 // fill sets cov (w*h values from 0 to 1) to the coverage of polys under rule,
@@ -64,15 +73,7 @@ func (r *rasterizer) fill(polys [][]Point, rule FillRule, w, h int, cov []float3
 	if len(r.edges) == 0 {
 		return 0, 0
 	}
-	slices.SortFunc(r.edges, func(a, b edge) int {
-		switch {
-		case a.y0 < b.y0:
-			return -1
-		case a.y0 > b.y0:
-			return 1
-		}
-		return 0
-	})
+	r.sortEdges(h)
 	y0 = max(int(math.Floor(float64(minY))), 0)
 	y1 = min(int(math.Ceil(float64(maxY))), h)
 	if y0 >= y1 {
@@ -83,7 +84,7 @@ func (r *rasterizer) fill(polys [][]Point, rule FillRule, w, h int, cov []float3
 		r.run = make([]float32, w+2)
 	}
 	frac, run := r.frac[:w+2], r.run[:w+2]
-	r.active = r.active[:0]
+	r.active, r.xs = r.active[:0], r.xs[:0]
 	next := 0
 	const weight = 1.0 / subsamples
 	for y := y0; y < y1; y++ {
@@ -93,45 +94,36 @@ func (r *rasterizer) fill(polys [][]Point, rule FillRule, w, h int, cov []float3
 		for s := range subsamples {
 			sy := float32(y) + (float32(s)+0.5)/subsamples
 			for next < len(r.edges) && r.edges[next].y0 <= sy {
-				r.active = append(r.active, next)
+				r.active = append(r.active, int32(next))
+				r.xs = append(r.xs, 0)
 				next++
 			}
-			r.crossings = r.crossings[:0]
+			// Drop the edges that ended above this scanline, and place the others on it.
 			j := 0
 			for _, i := range r.active {
 				e := &r.edges[i]
 				if e.y1 <= sy {
-					continue // ended above this scanline
+					continue
 				}
 				r.active[j] = i
+				r.xs[j] = e.x0 + (sy-e.y0)*e.dxdy
 				j++
-				if e.y0 <= sy {
-					r.crossings = append(r.crossings, crossing{e.x0 + (sy-e.y0)*e.dxdy, e.dir})
-				}
 			}
-			r.active = r.active[:j]
-			if len(r.crossings) < 2 {
+			r.active, r.xs = r.active[:j], r.xs[:j]
+			if j < 2 {
 				continue
 			}
-			slices.SortFunc(r.crossings, func(a, b crossing) int {
-				switch {
-				case a.x < b.x:
-					return -1
-				case a.x > b.x:
-					return 1
-				}
-				return 0
-			})
+			sortActive(r.active, r.xs)
 			wind := 0
 			var start float32
-			for _, c := range r.crossings {
+			for k, i := range r.active {
 				was := inside(wind, rule)
-				wind += int(c.dir)
+				wind += int(r.edges[i].dir)
 				now := inside(wind, rule)
 				if !was && now {
-					start = c.x
+					start = r.xs[k]
 				} else if was && !now {
-					span(frac, run, start, c.x, w, weight)
+					span(frac, run, start, r.xs[k], w, weight)
 					touched = true
 				}
 			}
@@ -147,6 +139,74 @@ func (r *rasterizer) fill(polys [][]Point, rule FillRule, w, h int, cov []float3
 		}
 	}
 	return y0, y1
+}
+
+// sortEdges sorts r.edges by y0, as the scanlines take them up. It counts the edges
+// of each row of pixels, places them by row, and sorts each row's few with an
+// insertion sort: linear in the edges, where a comparison sort of them was a
+// tenth of the time of a chart's stroke. Edges above the first row or below the
+// last share the row they are clamped to.
+func (r *rasterizer) sortEdges(h int) {
+	if cap(r.counts) < h+2 {
+		r.counts = make([]int32, h+2)
+	}
+	counts := r.counts[:h+2]
+	clear(counts)
+	row := func(e *edge) int { return min(max(int(e.y0), -1), h) + 1 }
+	for i := range r.edges {
+		counts[row(&r.edges[i])]++
+	}
+	start := int32(0)
+	for i, n := range counts {
+		counts[i] = start
+		start += n
+	}
+	if cap(r.sorted) < len(r.edges) {
+		r.sorted = make([]edge, len(r.edges))
+	}
+	sorted := r.sorted[:len(r.edges)]
+	for i := range r.edges {
+		k := row(&r.edges[i])
+		sorted[counts[k]] = r.edges[i]
+		counts[k]++
+	}
+	// Each row's edges now end where the next row's start; sort within each. A row
+	// with many edges, such as the first when a path lies mostly above the canvas,
+	// takes a comparison sort, so no row costs the square of its edges.
+	from := 0
+	for _, end := range counts {
+		if int(end)-from > 32 {
+			slices.SortFunc(sorted[from:end], func(a, b edge) int { return cmp.Compare(a.y0, b.y0) })
+			from = int(end)
+			continue
+		}
+		for i := from + 1; i < int(end); i++ {
+			e := sorted[i]
+			j := i
+			for j > from && sorted[j-1].y0 > e.y0 {
+				sorted[j] = sorted[j-1]
+				j--
+			}
+			sorted[j] = e
+		}
+		from = int(end)
+	}
+	r.edges, r.sorted = sorted, r.edges
+}
+
+// sortActive sorts the active edges by xs, keeping the two slices in step. They
+// come mostly in order from the scanline before, which an insertion sort takes in
+// close to one pass.
+func sortActive(active []int32, xs []float32) {
+	for i := 1; i < len(xs); i++ {
+		x, e := xs[i], active[i]
+		j := i
+		for j > 0 && xs[j-1] > x {
+			xs[j], active[j] = xs[j-1], active[j-1]
+			j--
+		}
+		xs[j], active[j] = x, e
+	}
 }
 
 func inside(wind int, rule FillRule) bool {
