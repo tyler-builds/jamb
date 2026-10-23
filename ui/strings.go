@@ -130,6 +130,11 @@ type Strings struct {
 	Maximize string
 	// Restore is the name of the button that restores a maximized window.
 	Restore string
+	// Copy is the name of a copy button that has no text of its own (see CopyButton).
+	Copy string
+	// Copied is the confirmation of a copy: the label of a copy button with text,
+	// and the text announced after a copy (see CopyButton.Copied).
+	Copied string
 	// Increase is the name of the button that increases a number.
 	Increase string
 	// Decrease is the name of the button that decreases a number.
@@ -537,6 +542,8 @@ func englishStrings() *Strings {
 		Minimize:            "Minimize",
 		Maximize:            "Maximize",
 		Restore:             "Restore",
+		Copy:                "Copy",
+		Copied:              "Copied",
 		Increase:            "Increase",
 		Decrease:            "Decrease",
 		ShowPassword:        "Show password",
