@@ -7,6 +7,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Fixed
+
+- A keyed component or composite element, such as a chart, kept answering to its key in tests
+  and in the inspector only until a component inside it rendered again. A chart's key was lost
+  on the first frame of its enter animation.
+
 ## [0.5.0] - 2026-10-23
 
 This release fixes the magnified content that v0.4.0 showed while a window's edge was dragged,

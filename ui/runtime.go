@@ -1151,9 +1151,15 @@ func (rt *Runtime) rerender(inst *componentInstance) {
 	}
 	// An owner whose output is this instance's output (a UniformList returned
 	// directly from a component) realized to the same node. It has to follow
-	// the new one, or its next rebuild cannot find the node in its parent.
+	// the new one, or its next rebuild cannot find the node in its parent. A keyed
+	// owner's key goes with it, as the first build gave it, so that a keyed
+	// composite (a chart) keeps answering to its key when a component inside it
+	// renders again.
 	for o := inst.parent; o != nil && o.root == old; o = o.parent {
 		o.root = n
+		if k, ok := o.el.(keyed); ok && n.key == "" {
+			n.key = k.elementKey()
+		}
 	}
 	if p := inst.parentNode; p == nil {
 		rt.setTree(n)
