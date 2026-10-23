@@ -2,8 +2,8 @@ package ui
 
 import "testing"
 
-// The grip is drawn always by default, only while the divider is hovered with SplitGripOnHover,
-// and never with SplitGripHidden; the bar is drawn in every mode.
+// The grip is drawn always with SplitGripShown, only while the divider is hovered with
+// SplitGripOnHover (the default), and never with SplitGripHidden; the bar is drawn in every mode.
 func TestSplitGripModes(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
@@ -13,9 +13,14 @@ func TestSplitGripModes(t *testing.T) {
 		{"shown", SplitGripShown, true, true},
 		{"on hover", SplitGripOnHover, false, true},
 		{"hidden", SplitGripHidden, false, false},
+		{"default", SplitGripOnHover, false, true},
 	} {
 		r := splitRig(t, func() Element {
-			return Split(Pane(Text("Left")), Pane(Text("Right"))).Grip(tc.grip)
+			s := Split(Pane(Text("Left")), Pane(Text("Right")))
+			if tc.name == "default" {
+				return s // no Grip call: the default is on hover
+			}
+			return s.Grip(tc.grip)
 		})
 		r.frame()
 		if got := partNodeOrNil(r.rt, "Split.Grip") != nil; got != tc.idle {

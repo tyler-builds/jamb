@@ -529,7 +529,8 @@ func testSplitParts(t *testing.T, applied map[string]bool) {
 			act: func(t *testing.T, r *accessRig) { pressNode(r, partNode(t, r.rt, "Split.Handle", "")) }},
 		{part: "Split.DividerFocusVisible", set: func(s *SplitStyle, m Style) { s.DividerFocusVisible = m },
 			act: func(t *testing.T, r *accessRig) { focusNode(r, partNode(t, r.rt, "Split.Handle", "")) }},
-		{part: "Split.Grip", set: func(s *SplitStyle, m Style) { s.Grip = m }},
+		{part: "Split.Grip", set: func(s *SplitStyle, m Style) { s.Grip = m },
+			act: func(t *testing.T, r *accessRig) { hoverNode(r, partNode(t, r.rt, "Split.Divider", "")) }}, // the default shows it on hover
 		{part: "Split.Pane", set: func(s *SplitStyle, m Style) { s.Pane = m }},
 	}
 	for _, c := range cases {

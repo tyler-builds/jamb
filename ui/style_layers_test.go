@@ -144,7 +144,9 @@ var layerBuilders = []layerBuilder{
 	{"RangeSlider", func(th *Theme) any { return &th.RangeSlider },
 		func(st any) Element { return partRangeSlider(st.(RangeSliderStyle)) }},
 	{"Split", func(th *Theme) any { return &th.Split },
-		func(st any) Element { return partSplit(st.(SplitStyle)) }},
+		func(st any) Element { // the grip is shown, so the layer table draws it while idle
+			return Div().Column().Child(Split(Pane(Div()), Pane(Div())).Grip(SplitGripShown).Styles(st.(SplitStyle)))
+		}},
 	{"Dock", func(th *Theme) any { return &th.Dock },
 		func(st any) Element {
 			layout := DockLayout{Root: DockNode{Sizes: []float64{0.5, 0.5}, Children: []DockNode{
