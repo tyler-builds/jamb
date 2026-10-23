@@ -385,7 +385,7 @@ func (a *App) noteRow(t *ui.Theme, n *store.Note, selected bool) ui.Element {
 		Gap(3).PaddingX(10).PaddingY(9).Radius(8).Transition(fast).
 		Hover(ui.Style{Background: t.SurfaceHover}).
 		When(selected, func(d *ui.DivElement) { d.Background(t.SurfaceActive) }).
-		Focusable().FocusVisible(focusRing(t)).
+		Focusable().
 		OnClick(func() { a.s.Selected.Set(n.ID) }).
 		ContextMenu(func() []ui.MenuItem { return a.noteMenu(n) }).
 		OnDrag(ui.Drag(n).Preview(func() ui.Element {

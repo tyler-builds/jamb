@@ -27,7 +27,7 @@ func (a *App) tagChips() ui.Element {
 				When(on, func(d *ui.DivElement) {
 					d.Background(t.AccentSoft).Border(1, t.Accent).TextColor(t.Accent)
 				}).
-				Focusable().FocusVisible(focusRing(t)). // Tab reaches it; Enter toggles it
+				Focusable(). // Tab reaches it; Enter toggles it
 				OnClick(func() { a.s.ToggleTagFilter(tag) }).
 				OnDrop(ui.Drop(func(n *store.Note, e *ui.DropEvent) { a.s.AddTag(n, tag) }).
 					Over(ui.Style{Background: t.AccentSoft, BorderColor: t.Accent})).
@@ -37,12 +37,6 @@ func (a *App) tagChips() ui.Element {
 		}
 		return chips
 	})
-}
-
-// focusRing is the keyboard focus ring for rows and chips: a spread shadow in
-// the theme's focus color, so it adds no layout shift.
-func focusRing(t *ui.Theme) ui.Style {
-	return ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: t.FocusRing}}}
 }
 
 // tagEditor shows a note's tags as removable pills plus an "Add tag" field.
