@@ -253,3 +253,55 @@ func TestEveryPageAndDialogBuildsWithoutWarnings(t *testing.T) {
 		t.Errorf("warnings: %q", w)
 	}
 }
+
+// TestDialogsHoldTheirFields checks that no control of a dialog reaches past the
+// dialog's sides.
+func TestDialogsHoldTheirFields(t *testing.T) {
+	u, a, _ := open(t)
+	check := func(name string) {
+		t.Helper()
+		tree := u.Tree()
+		var dlg *access.Node
+		tree.Walk(func(n *access.Node) bool {
+			if n.Role == access.RoleDialog {
+				dlg = n
+				return false
+			}
+			return true
+		})
+		if dlg == nil {
+			t.Fatalf("%s: no dialog", name)
+		}
+		left, right := dlg.Bounds.X, dlg.Bounds.X+dlg.Bounds.W
+		var inside func(id access.ID)
+		inside = func(id access.ID) {
+			n := tree.Node(id)
+			if n == nil {
+				return
+			}
+			if b := n.Bounds; b.W > 0 && (b.X < left-0.5 || b.X+b.W > right+0.5) {
+				t.Errorf("%s: %v %q at %v is outside the dialog's %v", name, n.Role, n.Name, b, dlg.Bounds)
+			}
+			for _, c := range n.Children {
+				inside(c)
+			}
+		}
+		for _, c := range dlg.Children {
+			inside(c)
+		}
+	}
+	a.newTransaction()
+	u.Frame()
+	check("transaction form")
+	a.form.Set(nil)
+	a.accountDlg.Set(&ledger.Account{Kind: ledger.Savings})
+	u.Frame()
+	check("account form")
+	a.accountDlg.Set(nil)
+	a.importing.Set(true)
+	u.Frame()
+	check("import, choosing a file")
+	a.loadCSV("bank.csv", strings.NewReader("Date,Payee,Amount\n2026-10-21,Cafe,-3\n"))
+	u.Frame()
+	check("import, matching columns")
+}

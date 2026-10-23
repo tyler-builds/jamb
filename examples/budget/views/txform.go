@@ -124,23 +124,23 @@ func (a *App) txFormDialog(ctx *ui.Context) ui.Element {
 		title = "Edit transaction"
 	}
 	save := ui.Button("Save").Key("save").Primary().OnClick(f.Submit)
-	body := ui.Div().Column().Gap(14).Width(ui.Px(440)).
+	body := ui.Div().Column().Gap(14).Width(ui.Full).
 		Child(f.Summary()).
 		Child(f.Field("direction", "Type", ui.ToggleGroup(dr.income,
 			ui.Option[bool]{Value: false, Label: "Money out", Icon: icons.ArrowUpRight},
 			ui.Option[bool]{Value: true, Label: "Money in", Icon: icons.ArrowDownLeft},
 		).Key("direction"))).
 		Child(ui.Div().Row().Gap(12).
-			Child(f.Field("amount", "Amount", ui.TextInput(dr.amount).Key("amount").Format(moneyFormat).
+			Child(f.Field("amount", "Amount", ui.TextInput(dr.amount).Key("amount").Format(moneyFormat).Width(ui.Full).
 				Validate(ui.Required[string](), ui.Custom(func(s string) error {
 					if m, ok := ledger.ParseRaw(s); !ok || m <= 0 {
 						return errors.New("Enter an amount above zero.")
 					}
 					return nil
 				}))).Required().Grow(1)).
-			Child(f.Field("date", "Date", ui.DatePicker(dr.date).Key("date").Validate(ui.Required[time.Time]())).
-				Required())).
-		Child(f.Field("payee", "Payee", ui.Combobox(dr.payee, suggest).Key("payee").
+			Child(f.Field("date", "Date", ui.DatePicker(dr.date).Key("date").Width(ui.Full).Validate(ui.Required[time.Time]())).
+				Required().Grow(1))).
+		Child(f.Field("payee", "Payee", ui.Combobox(dr.payee, suggest).Key("payee").Width(ui.Full).
 			Placeholder("Who was paid, or who paid").Validate(ui.Required[string]()).
 			OnChange(func(p string) {
 				// A payee used before brings its category, while none is chosen.
@@ -158,9 +158,9 @@ func (a *App) txFormDialog(ctx *ui.Context) ui.Element {
 				Grow(1)).
 			Child(f.Field("account", "Account", ui.Select(dr.account, acctOpts...).Key("account").Width(ui.Full).
 				Validate(ui.Required[string]())).Required().Grow(1))).
-		Child(f.Field("memo", "Memo", ui.TextArea(dr.memo).Key("memo").MinRows(2).Placeholder("Optional"))).
+		Child(f.Field("memo", "Memo", ui.TextArea(dr.memo).Key("memo").Width(ui.Full).MinRows(2).Placeholder("Optional"))).
 		Child(ui.Checkbox("Cleared by the bank", dr.cleared).Key("cleared"))
-	return ui.Modal(title, body).Key("tx-form").
+	return ui.Modal(title, body).Key("tx-form").Width(ui.Px(480)).
 		Footer(ui.Button("Cancel").Secondary().OnClick(func() { a.form.Set(nil) }), save).
 		Default(save).
 		OnClose(func() { a.form.Set(nil) })
