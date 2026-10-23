@@ -219,7 +219,7 @@ func Main(s *Store) ui.Element {
 		}
 		// MinWidth 0: the main column fits the window instead of forcing it wider.
 		return ui.Div().Grow(1).MinWidth(ui.Px(0)).Height(ui.Full).
-			Child(titleBar(t, focused, "")).
+			Child(titleBar(t, "")).
 			Child(header(ctx, s, page, focused)).
 			Child(ui.Div().Height(ui.Px(1)).Background(t.Border)).
 			Child(content).
@@ -253,15 +253,13 @@ var pageTitles = map[Page]string{
 // optional title on the left and the caption buttons on the right. Apart from
 // the title, the strip drags the window. It dims while the window is
 // unfocused. Main and project windows both use it.
-func titleBar(t *ui.Theme, focused bool, title string) ui.Element {
-	bar := ui.Div().Row().Align(ui.Center).MinHeight(ui.Px(32)).Shrink(0).WindowArea(ui.WindowAreaDrag)
+func titleBar(t *ui.Theme, title string) ui.Element {
+	bar := ui.TitleBar().Height(ui.Px(32))
 	if title != "" {
-		bar.Child(ui.Div().Grow(1).MinWidth(ui.Px(0)).PaddingX(12).Opacity(focusOpacity(focused)).
+		bar.Child(ui.Div().Shrink(1).MinWidth(ui.Px(0)).PaddingX(12).
 			Child(ui.Text(title).FontSize(12).Medium().TextColor(t.TextSubtle).Truncate()))
-	} else {
-		bar.Child(ui.Div().Grow(1))
 	}
-	return bar.Child(ui.TitleBarButtons())
+	return bar
 }
 
 // focusOpacity dims the title bar slightly while the window is unfocused.
