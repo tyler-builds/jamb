@@ -78,6 +78,8 @@ type componentInstance struct {
 
 	// locals holds signals created by Local, by name.
 	locals map[string]any
+	// queries are the entries the component's Query calls use (see query.go).
+	queries *queryUses
 }
 
 func (inst *componentInstance) invalidate() {
@@ -114,6 +116,7 @@ func (inst *componentInstance) render() {
 	inst.tr.o = inst
 	prev := tracking.Swap(&inst.tr)
 	defer tracking.Store(prev)
+	inst.beginQueries()
 	switch e := inst.el.(type) {
 	case *ComponentElement:
 		inst.out = e.fn(ctx)
@@ -122,6 +125,7 @@ func (inst *componentInstance) render() {
 	case Renderer:
 		inst.out = e.Render(ctx)
 	}
+	inst.endQueries()
 	inst.rt.stats.Rendered++
 }
 

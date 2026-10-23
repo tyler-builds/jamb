@@ -310,6 +310,8 @@ type Runtime struct {
 	// Functions queued by Post, run at the start of the next frame.
 	postMu sync.Mutex
 	posted []func()
+	// queries are the Query entries of the window, made on first use (see query.go).
+	queries *queryCache
 
 	needLayout, needPaint bool
 	animating             bool                               // something animates: the next frame must come
@@ -1260,6 +1262,7 @@ func (rt *Runtime) disposeInstance(inst *componentInstance) {
 	for _, fn := range disposers {
 		fn()
 	}
+	inst.releaseQueries()
 	if rt.instances[inst.id] == inst {
 		delete(rt.instances, inst.id)
 		delete(rt.states, inst.id)
