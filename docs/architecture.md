@@ -113,9 +113,12 @@ Each concern is replaceable independently:
    Gaussian shadows are analytic SDFs in the pixel shader. Glyphs and icons
    come from one alpha atlas, and images use a second pipeline. The swap
    chain is flip-model with no scaling. Its buffers have a quarter more room
-   than the window, so a drag mostly moves the shown part of them
-   (`IDXGISwapChain2::SetSourceSize`) instead of reallocating them; the room
-   is given back when the user finishes the move or resize. While a window
+   than the window during a drag, so a drag mostly draws a frame of the new size
+   in their top-left corner, which the unscaled chain shows 1:1, instead of
+   reallocating them; the room is given back when the user finishes the move or
+   resize. The shown part is not set with `IDXGISwapChain2::SetSourceSize`,
+   since Windows scales a source size that differs from the window's, which
+   magnified the content. While a window
    edge is dragged, the previous frame stays pinned 1:1 instead of being
    stretched, and frames for a new size are presented without waiting for
    vsync.

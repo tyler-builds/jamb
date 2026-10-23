@@ -7,6 +7,14 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Fixed
+
+- A window no longer shows its content magnified while the user drags its edge. The swap chain
+  kept larger buffers during the drag and showed part of them with
+  `IDXGISwapChain2::SetSourceSize`, which Windows scales to the window. The frame is now drawn in
+  the buffers' top-left corner, which the unscaled swap chain shows 1:1, so the drag keeps its
+  headroom without the scaling.
+
 ## [0.4.0] - 2026-10-23
 
 The code editor highlights with @pierre/highlights instead of tree-sitter: 76 languages built in,

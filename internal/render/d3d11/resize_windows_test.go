@@ -42,8 +42,8 @@ func TestResizeKeepsBuffers(t *testing.T) {
 		t.Fatalf("NewRenderer: %v", err)
 	}
 	defer r.Close()
-	if r.swap2 == nil {
-		t.Skip("the swap chain has no IDXGISwapChain2, so it has no source size")
+	if !r.swap1 {
+		t.Skip("the swap chain scales, so it keeps exact buffers")
 	}
 	// The frame is only its clear color, so a capture shows whether it holds the frame.
 	orange := scene.Color{R: 1, G: 0.5, A: 1}
