@@ -89,7 +89,7 @@ func TestComponentsFilterShowsMatches(t *testing.T) {
 	tr := r.tree()
 	accesstest.Find(t, tr, access.RoleHeading, "More widgets")
 	accesstest.Absent(t, tr, access.RoleHeading, "Feedback")
-	if !hasText(r, "1 of 26 sections") {
+	if !hasText(r, "1 of 27 sections") {
 		t.Error("the bar does not show the count")
 	}
 	r.s.SectionQuery.Set("zzz")
@@ -100,7 +100,7 @@ func TestComponentsFilterShowsMatches(t *testing.T) {
 	r.s.SectionQuery.Set("")
 	tr = r.tree()
 	accesstest.Find(t, tr, access.RoleHeading, "Notification area and taskbar")
-	if hasText(r, "26 sections") {
+	if hasText(r, "27 sections") {
 		t.Error("the count shows while nothing is filtered")
 	}
 }
@@ -121,10 +121,10 @@ func TestComponentsFilterAnnouncesCount(t *testing.T) {
 	}
 	r.s.Notice.Set(notice{Text: "12 matching events", Seq: 100, Page: PageActivity})
 	r.frame()
-	r.s.Notice.Set(notice{Text: "1 of 26 sections", Seq: 101, Page: PageComponents})
+	r.s.Notice.Set(notice{Text: "1 of 27 sections", Seq: 101, Page: PageComponents})
 	r.frame()
 	r.frame()
-	if !announced("1 of 26 sections") {
+	if !announced("1 of 27 sections") {
 		t.Error("the page did not announce its count")
 	}
 	if announced("12 matching events") {
