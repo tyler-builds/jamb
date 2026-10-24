@@ -41,6 +41,12 @@ type NumberOptions struct {
 	Decimals   int  // the most digits after the decimal point; 0 takes whole numbers only
 	Signed     bool // allow a leading minus
 	NoGrouping bool // show no group separators
+	// Currency makes the number an amount of money in the currency of the user's
+	// region settings: it takes the decimal point, the group separator and the
+	// grouping of amounts of money, and a zero Decimals is the currency's digits. A
+	// TextInput with the format shows the currency's symbol before or after the
+	// number, where the settings put it (see CurrencySymbol).
+	Currency bool
 }
 
 // TemplateFormat returns the format of the template spec, in which each character is
@@ -89,7 +95,19 @@ func TemplateFormat(spec string) InputFormat {
 // and "7".
 func NumberFormat(o NumberOptions) InputFormat {
 	o.Decimals = max(o.Decimals, 0)
+	if o.Currency && o.Decimals == 0 {
+		o.Decimals = currentLocale().currDigits
+	}
 	return InputFormat{number: true, opts: o}
+}
+
+// locale returns the locale a number is shown and read in: the user's, with the
+// decimal point and the group separator of amounts of money for a currency.
+func (f *InputFormat) locale() *dateLocale {
+	if f.opts.Currency {
+		return currentLocale().money()
+	}
+	return currentLocale()
 }
 
 // zero reports whether f is the zero InputFormat, which shows the text as it is.
@@ -197,7 +215,7 @@ func (f *InputFormat) present(raw string) presented {
 		return presented{}
 	}
 	if f.number {
-		return f.presentNumber(raw, currentLocale())
+		return f.presentNumber(raw, f.locale())
 	}
 	if !f.fits(raw) {
 		return presented{shown: raw}
@@ -575,7 +593,7 @@ func numberFromDisplay(text string, loc *dateLocale) (string, bool) {
 
 // editNumber is edit for a number.
 func (f *InputFormat) editNumber(raw string, a, b int, ins string, paste bool) (string, int, bool) {
-	loc := currentLocale()
+	loc := f.locale()
 	cur, pos := raw[:a]+raw[b:], a
 	signLen := func() int {
 		if strings.HasPrefix(cur, "-") {
@@ -710,7 +728,7 @@ func (f *InputFormat) normalize(raw string) string {
 // "(555) 123-4567" or "1,234.5", and whether it is one.
 func (f *InputFormat) fromDisplay(text string) (string, bool) {
 	if f.number {
-		s, ok := numberFromDisplay(text, currentLocale())
+		s, ok := numberFromDisplay(text, f.locale())
 		return s, ok && f.numberFits(s)
 	}
 	return f.templateFromDisplay(text)

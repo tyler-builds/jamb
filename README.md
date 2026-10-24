@@ -77,7 +77,7 @@ The `jamb` command is a separate module, whose latest release is `cmd/jamb/v0.4.
 go install github.com/tyler-builds/jamb/cmd/jamb@v0.4.0
 ```
 
-The repository includes five examples. From a clone of the repository, run them with:
+The repository includes six examples. From a clone of the repository, run them with:
 
 ```
 go run ./examples/hello    # the smallest complete app: one window, a signal and a button
@@ -85,6 +85,7 @@ go run ./examples/demo     # a tour of the widgets, layouts, and pages
 go run ./examples/notes    # a note-taking app
 go run ./examples/git      # a Git history browser with a commit graph
 go run ./examples/monitor  # a system monitor with live charts and a process table
+go run ./examples/budget   # a household budget with forms, an editable table and CSV import
 ```
 
 The [getting started guide](docs/getting-started.md) covers the commands for building and packaging,
@@ -162,8 +163,9 @@ The examples are in [examples/](examples/). `examples/hello` is the minimal app 
 the packaging guide. `examples/notes` is a note-taking app with persistence, a command palette,
 and a keymap file. `examples/git` browses the history of Git repositories, with a commit graph, branches,
 tags and diffs. `examples/monitor` shows the machine's load, memory, network and processes as they
-change, in panels that can be rearranged and floated. [docs/examples.md](docs/examples.md) describes
-the demo, notes, Git and monitor apps.
+change, in panels that can be rearranged and floated. `examples/budget` keeps a household budget,
+with forms, an editable transaction table and CSV import. [docs/examples.md](docs/examples.md)
+describes the demo, notes, Git, monitor and budget apps.
 
 ## Documentation
 
@@ -201,8 +203,8 @@ Development needs Go 1.27.1 or later and Windows. Run the headless tests with:
 
 ```
 gofmt -l .
-go vet ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/hello/... ./examples/git/... ./examples/monitor/...
-go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/hello/... ./examples/git/... ./examples/monitor/...
+go vet ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/hello/... ./examples/git/... ./examples/monitor/... ./examples/budget/...
+go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/hello/... ./examples/git/... ./examples/monitor/... ./examples/budget/...
 ```
 
 `gofmt -l .` should print nothing. The `go test` runs need no display. A few tests open a window; set

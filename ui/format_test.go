@@ -52,9 +52,10 @@ func TestFormatNumberRoundsToDecimals(t *testing.T) {
 		decimals int
 		want     string
 	}{
-		{2.5, 0, "2"}, // ties go to even, as strconv rounds the binary value
-		{3.5, 0, "4"}, // ties go to even
-		{0.125, 2, "0.12"},
+		{2.5, 0, "3"}, // ties go away from zero, as Windows rounds
+		{3.5, 0, "4"},
+		{0.125, 2, "0.13"},
+		{1.005, 2, "1.01"}, // the digits as written, though the float is a little less
 		{0.126, 2, "0.13"},
 		{999.999, 2, "1,000.00"},
 		{1.5, -3, "2"}, // a negative decimals is 0

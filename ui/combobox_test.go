@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1094,5 +1095,29 @@ func TestComboboxClearRemovesDefaults(t *testing.T) {
 	}
 	if n := partNode(t, r.rt, "Combobox.Frame", ""); n.style.BorderWidth != 0 {
 		t.Fatal("the frame keeps its border under ClearBorder")
+	}
+}
+
+// TestComboboxTakesFocusForItsText checks that a request from assistive technology to
+// focus a combo box focuses its text, as UI Automation's SetFocus on a combo box does.
+func TestComboboxTakesFocusForItsText(t *testing.T) {
+	text := NewSignal("")
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Child(Combobox(text, func(string) []Option[string] { return nil }).Label("Fruit"))
+	})
+	var combo *access.Node
+	r.tree().Walk(func(n *access.Node) bool {
+		if n.Role == access.RoleComboBox {
+			combo = n
+		}
+		return true
+	})
+	if combo == nil || !slices.Contains(combo.Actions, access.ActionFocus) {
+		t.Fatalf("the combo box does not offer focus: %+v", combo)
+	}
+	r.bridge.Do(combo.ID, access.Request{Action: access.ActionFocus})
+	r.frame()
+	if n := r.rt.byID[r.rt.focusID]; n == nil || n.kind != kindEditor {
+		t.Error("focusing the combo box did not focus its text")
 	}
 }

@@ -121,8 +121,29 @@ its words do not change with the count. `TimeAgo` uses the window's `Strings`;
 
 `ui.FormatNumber(v, decimals)` returns `v` rounded to `decimals` places, with the group
 separators, the decimal point and the minus sign of the user's locale: `12,345.68` in
-en-US and `12.345,68` in de-DE. A value that rounds to zero has no minus sign. A NaN is
-the empty string, and an infinity is `∞` or `-∞`.
+en-US and `12.345,68` in de-DE. It rounds as Windows does: half away from zero, on the
+digits of the shortest decimal form of `v`, so `1.005` at two places is `1.01`. A value
+that rounds to zero has no minus sign. A NaN is the empty string, and an infinity is `∞`
+or `-∞`.
+
+`ui.FormatCurrency(amount)` returns an amount of money in the currency of the user's
+region settings, as Windows formats it: rounded to the currency's digits, with the
+decimal point and group separator of amounts of money, and the symbol and the sign
+where the settings put them. That is `$1,234.56` and `-$5.00` in en-US, `1.234,56 €` and
+`-5,00 €` in de-DE, `¥1,235` in ja-JP, or `($5.00)` where the settings show negative
+amounts in parentheses; Windows has four positions for the symbol and sixteen shapes
+of a negative amount, and each is followed. `ui.CurrencySymbol()` returns the symbol and
+whether it goes after the amount. Elsewhere than on Windows the currency is the US
+dollar. A field for an amount of money is a `TextInput` with
+`NumberFormat(NumberOptions{Currency: true})` (see [Form controls](widgets-forms.md)).
+
+`ui.ParseNumber(text)` and `ui.ParseDate(text)` read numbers and dates written in the
+user's locale, for text from outside the app such as a CSV file. `ParseNumber` takes the
+locale's decimal point and group separators, or those of amounts of money, a leading
+sign, and what `FormatCurrency` writes: the currency symbol is dropped, and parentheses
+or a trailing minus make the number negative (`($5.00)` is -5). `ParseDate` reads a short
+date as a date picker reads typed text, in the locale's order, and an ISO 8601 date such
+as `2026-10-13`. Both report false for text they cannot read.
 
 `ui.FormatBytes(n)` returns a size in bytes as Windows Explorer and Task Manager show
 it, in 1024-based units with three significant digits: `512 bytes`, `1.00 KB`,
