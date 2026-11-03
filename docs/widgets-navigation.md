@@ -229,12 +229,14 @@ pages of a checkout. Its look is `ui.StepperStyle`, set on the theme as
 `Theme.Stepper` or with `Styles`, and it follows high contrast and the Text size.
 
 ```go
+step := ui.Local(ctx, "step", 0) // or a signal of the app's model
 ui.Stepper(step, // *ui.Signal[int]: the current step, from 0
 	ui.Step{Title: "Account", Description: "Sign in or create one"},
 	ui.Step{Title: "Shipping", Icon: icons.Home},
 	ui.Step{Title: "Payment"},
 ).Key("checkout").Label("Checkout steps").
 	Vertical().                                  // stacked, with the line running down between the indicators
+	Compact().                                   // or: only the current step's title, for a narrow window
 	OnSelect(func(i int) { step.Set(i) })        // the steps can be chosen; the app sets the signal
 ```
 
@@ -247,7 +249,12 @@ ui.Stepper(step, // *ui.Signal[int]: the current step, from 0
   color. A current step equal to the number of steps marks every step complete.
 - **Width.** A horizontal stepper fits the width it is given: when its steps do not
   fit, they shrink down to their indicators, and their titles and descriptions end
-  with an ellipsis. A vertical stepper wraps its texts instead.
+  with an ellipsis. A vertical stepper wraps its texts instead. In a narrow window,
+  `Compact()` shows the title and description of the current step only, and the other
+  steps as their indicators with their title as a tooltip.
+- **The current step.** Keep its signal outside the render: in the app's model, or
+  with `ui.Local`. A `ui.NewSignal` made inside a component's render is a new signal
+  each time the component renders, so the stepper would go back to its first value.
 - **Choosing.** Without `OnSelect` the stepper only shows the progress, and it takes
   no focus. With it, a click, or Enter or Space on the focused step, runs `OnSelect`
   with the step's index. The signal is not set by the stepper, so the app decides

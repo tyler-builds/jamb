@@ -21,6 +21,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `Show` prints an error and leaves the icon hidden when the desktop has no tray.
 - `App.KeepRunning(true)` keeps an app running after its last window closes, and `app.Quit()`
   closes every window (asking their `OnClose`) and ends the app.
+- `uitest.UI.Screenshot()` returns a frame as an image, drawn by the CPU renderer, with no
+  window or GPU, on every platform.
+- `Stepper.Compact()` shows only the current step's title, for narrow windows.
+- `Switch.ShowLabel()` draws the switch's label beside it; a click on the label toggles it.
 - On Linux, `App.AppID` sets the Wayland app ID of the windows (the executable's name without
   it), so the desktop matches the app to its `.desktop` file without `StartupWMClass`.
 - `examples/budget`, a household budget: accounts, transactions sorted into categories, a

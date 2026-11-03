@@ -113,6 +113,8 @@ var layerBuilders = []layerBuilder{
 		func(st any) Element { return partSwitch(true, st.(SwitchStyle), false) }},
 	{"Switch", func(th *Theme) any { return &th.Switch },
 		func(st any) Element { return partSwitch(false, st.(SwitchStyle), true) }},
+	{"Switch", func(th *Theme) any { return &th.Switch },
+		func(st any) Element { return partSwitchLabeled(st.(SwitchStyle)) }},
 	{"Toggle", func(th *Theme) any { return &th.Toggle },
 		func(st any) Element { return partToggle(true, st.(ToggleStyle), false) }},
 	{"Toggle", func(th *Theme) any { return &th.Toggle },

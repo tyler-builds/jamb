@@ -18,6 +18,7 @@ Their looks are `ui.CheckboxStyle`, `ui.RadioGroupStyle`, `ui.SwitchStyle`,
 ui.Checkbox("Email alerts", email)                // *ui.Signal[bool]
 ui.CheckboxTri("All alerts", all)                 // *ui.Signal[ui.CheckState]: CheckOff, CheckOn or CheckMixed
 ui.Switch("Dark mode", dark).OnChange(func(on bool) { ... })
+ui.Switch("Start when I log in", autostart).ShowLabel() // draws its label beside the track
 ui.Toggle("Pin", pinned).Icon(icons.Pin).IconOnly().Small() // *ui.Signal[bool]; Ghost (default) or Secondary
 ui.ToggleGroup(view,                              // *ui.Signal[T]; the options of a RadioGroup, with an Icon
 	ui.Option[string]{Value: "list", Label: "List", Icon: icons.Menu},
@@ -46,7 +47,9 @@ ui.NumberInput(hour, 0, 23, 1).Label("Quiet hours from").SpinButtons(ui.SpinStac
   tri-state box goes from mixed to on, as Windows check boxes do. Enter does not
   toggle it: Enter goes on to the modal's default button or the form, as on Windows.
 - A switch is drawn as a track and a knob, with no text: its label is its
-  accessible name, so put the title beside it. Space toggles it; Enter does not.
+  accessible name, so put the title beside it, as a settings row does, or call
+  `ShowLabel()` to draw the label to the right of the track (the `Label` part), where
+  a click on it toggles the switch. Space toggles it; Enter does not.
 - A toggle is a button that stays pressed while it is on, such as a Bold button in a
   toolbar. It has the size and look of a Ghost button (or, with `Secondary()`, a
   Secondary one), so it lines up with buttons, and `Small()` and `Large()` are the

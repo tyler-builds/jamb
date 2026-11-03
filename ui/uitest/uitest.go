@@ -24,6 +24,9 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/internal/render"
+	"github.com/tyler-builds/jamb/internal/render/soft"
+	"github.com/tyler-builds/jamb/internal/scene"
 	"github.com/tyler-builds/jamb/internal/uihost"
 	"github.com/tyler-builds/jamb/ui"
 )
@@ -46,6 +49,7 @@ type host interface {
 	TextOf(string) (string, bool)
 	AccessNode(*access.Tree, string) *access.Node
 	Perform(access.ID, access.Request)
+	Frame(time.Time) *scene.Scene
 }
 
 // UI is a root component rendered in a headless runtime for a test. Create one
@@ -55,6 +59,7 @@ type UI struct {
 	rt       *ui.Runtime
 	host     host
 	now      time.Time
+	w, h     float32
 	scale    float32
 	warnings []string
 }
@@ -103,7 +108,7 @@ func New(tb testing.TB, root func(*ui.Context) ui.Element, opts ...Option) *UI {
 	for _, opt := range opts {
 		opt(&o)
 	}
-	u := &UI{tb: tb, now: o.start, scale: o.scale}
+	u := &UI{tb: tb, now: o.start, w: o.w, h: o.h, scale: o.scale}
 	u.rt = ui.NewRuntime(root, o.theme, nil)
 	u.host = uihost.Of(u.rt).(host)
 	u.host.SetClock(func() time.Time { return u.now })
@@ -141,6 +146,24 @@ func (u *UI) Now() time.Time { return u.now }
 // Frame runs one frame at the current time: changes made to signals since the
 // last frame are rendered, laid out and painted.
 func (u *UI) Frame() { u.rt.Frame(u.now) }
+
+// Screenshot runs a frame at the current time and returns it as an image, drawn
+// by jamb's CPU renderer, the one the Linux adapter uses. The image is the size
+// of the window (see Size) times its scale (see Scale), with the window's
+// background filling it. It needs no window and no GPU, so it runs in plain go
+// test on every platform, for checking a layout by eye or comparing it with a
+// saved image. Text and images are drawn as a window draws them; on Windows,
+// whose GPU renderer draws text with ClearType, the text differs slightly.
+func (u *UI) Screenshot() *image.RGBA {
+	u.tb.Helper()
+	sc := u.host.Frame(u.now)
+	w, h := int(u.w*u.scale+0.5), int(u.h*u.scale+0.5)
+	r := soft.New(nil)
+	if err := render.Draw(r, sc, w, h); err != nil {
+		u.tb.Fatalf("uitest: Screenshot: %v", err)
+	}
+	return r.Image()
+}
 
 // Advance moves the clock forward by d, running a frame every 16 ms of it, as
 // a window does: transitions, animations, timers, tooltip delays and toasts

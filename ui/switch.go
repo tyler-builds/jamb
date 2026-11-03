@@ -14,7 +14,8 @@ import (
 // their own: TrackChecked when the switch is on, TrackHover while the pointer is
 // over an enabled switch, TrackFocusVisible while it has keyboard focus,
 // TrackDisabled and KnobDisabled when it cannot change, and KnobChecked for the
-// knob of an on switch.
+// knob of an on switch. Label is the text beside the track of a switch with
+// ShowLabel.
 type SwitchStyle struct {
 	Track             Style // the track: its size, shape, fill and border
 	TrackChecked      Style // the track when the switch is on
@@ -24,6 +25,7 @@ type SwitchStyle struct {
 	Knob              Style // the knob: its size, color and shadow
 	KnobChecked       Style // the knob when the switch is on
 	KnobDisabled      Style // the knob when the switch is disabled
+	Label             Style // the text beside the track, with ShowLabel
 }
 
 // merge returns s with the set fields of o applied on top, part by part.
@@ -37,6 +39,7 @@ func (s SwitchStyle) merge(o SwitchStyle) SwitchStyle {
 		Knob:              s.Knob.Merge(o.Knob),
 		KnobChecked:       s.KnobChecked.Merge(o.KnobChecked),
 		KnobDisabled:      s.KnobDisabled.Merge(o.KnobDisabled),
+		Label:             s.Label.Merge(o.Label),
 	}
 }
 
@@ -51,6 +54,7 @@ func (s SwitchStyle) plain() SwitchStyle {
 		Knob:              plainStyle(s.Knob),
 		KnobChecked:       plainStyle(s.KnobChecked),
 		KnobDisabled:      plainStyle(s.KnobDisabled),
+		Label:             plainStyle(s.Label),
 	}
 }
 
@@ -67,6 +71,7 @@ func switchDefaults(t *Theme, on, disabled bool) SwitchStyle {
 		TrackFocusVisible: Style{Shadows: []Shadow{ring}},
 		Knob: Style{Absolute: true, Width: Px(16), Height: Px(16), NoShrink: true, Radius: 8,
 			Background: Hex("#ffffff")},
+		Label: Style{TextColor: t.Text},
 	}
 	if t.HighContrast {
 		d.Track.Background, d.Track.BorderWidth, d.Track.BorderColor = t.Surface, 2, t.Text
@@ -84,6 +89,7 @@ func switchDefaults(t *Theme, on, disabled bool) SwitchStyle {
 	}
 	if disabled {
 		if t.HighContrast {
+			d.Label.TextColor = t.Disabled
 			d.TrackDisabled = Style{BorderColor: t.Disabled}
 			d.KnobDisabled = Style{Background: t.Disabled}
 			if on {
@@ -92,6 +98,7 @@ func switchDefaults(t *Theme, on, disabled bool) SwitchStyle {
 			}
 		} else {
 			d.TrackDisabled = Style{Opacity: 0.5}
+			d.Label.Opacity = 0.5
 		}
 	}
 	return d
@@ -108,7 +115,8 @@ func resolveSwitch(ctx *Context, on, disabled bool, inst SwitchStyle) SwitchStyl
 
 // SwitchElement is an on/off switch bound to a bool signal. It is drawn as a
 // track and a knob, without text: its label is what assistive technology reads,
-// and the text beside it is drawn by the app.
+// and the text beside it is drawn by the app, as a settings row does. ShowLabel
+// draws the label beside the track instead.
 type SwitchElement struct {
 	label       string
 	on          *Signal[bool]
@@ -119,6 +127,15 @@ type SwitchElement struct {
 	size        sizing       // the track's sizes, from the sizing methods (see Sizing in docs/styling.md)
 	focusHandle *FocusHandle // see FocusHandle
 	tooltip     string       // see Tooltip
+	showLabel   bool         // see ShowLabel
+}
+
+// ShowLabel draws the label to the right of the track, as a check box draws its
+// own. A click on it changes the switch, as a click on the track does. Without it
+// the switch shows no text, and the label only names it for assistive technology.
+func (s *SwitchElement) ShowLabel() *SwitchElement {
+	s.showLabel = true
+	return s
 }
 
 // Tooltip shows s below the switch after the pointer rests on it. Assistive
@@ -136,7 +153,7 @@ func (s *SwitchElement) FocusHandle(h *FocusHandle) *SwitchElement {
 }
 
 // Switch creates a switch that is on while on is true. label names the switch
-// for assistive technology.
+// for assistive technology; it is not drawn unless ShowLabel is set.
 func Switch(label string, on *Signal[bool]) *SwitchElement {
 	return &SwitchElement{label: label, on: on}
 }
@@ -200,20 +217,37 @@ func (s *SwitchElement) expand(ctx *Context) Element {
 	d.Child(k)
 	// A tooltip also shows on a disabled switch, to say why it is disabled.
 	d.Tooltip(s.tooltip)
+	toggle := func() {
+		s.on.Set(!on)
+		if s.onChange != nil {
+			s.onChange(!on)
+		}
+	}
 	if s.disabled {
 		d.Style(st.TrackDisabled).Cursor(CursorNotAllowed)
 		d.access().disabled = true
-		return s.size.apply(d)
+		return s.withLabel(st, s.size.apply(d), nil)
 	}
 	d.Hover(st.TrackHover)
 	if s.focusHandle != nil {
 		d.FocusHandle(s.focusHandle)
 	}
-	return s.size.apply(d.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
-		OnClick(func() {
-			s.on.Set(!on)
-			if s.onChange != nil {
-				s.onChange(!on)
-			}
-		}))
+	return s.withLabel(st, s.size.apply(d.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
+		OnClick(toggle)), toggle)
+}
+
+// withLabel returns track, in a row with the label beside it when ShowLabel is
+// set. A click on the label runs toggle, unless it is nil. The label is hidden from
+// assistive technology, which reads it as the track's name.
+func (s *SwitchElement) withLabel(st SwitchStyle, track Element, toggle func()) Element {
+	if !s.showLabel {
+		return track
+	}
+	label := Div().asPart("Switch.Label").Style(st.Label).AccessHidden().Child(Text(s.label))
+	if toggle != nil {
+		label.Cursor(CursorPointer).OnClick(toggle)
+	} else {
+		label.Cursor(CursorNotAllowed)
+	}
+	return Div().Row().Align(Center).Gap(10).Child(track).Child(label)
 }
