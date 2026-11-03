@@ -407,17 +407,21 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 			ps = PartState{Hovered: ctx.hovered(), Pressed: ctx.pressed(), Focused: ctx.isFocused(),
 				Disabled: s.disabled, HighContrast: t.HighContrast}
 		}
+		// The value may shrink below its text, so that a label wider than the field
+		// ends with an ellipsis and the chevron stays inside the frame. A rendered
+		// value that does not fit is clipped.
 		var shown Element
 		switch {
 		case sel >= 0 && s.renderValue != nil:
 			ps.Selected = true
-			shown = Div().asPart("Select.Value").Grow(1).AccessHidden().Style(st.Value).
+			shown = Div().asPart("Select.Value").Grow(1).MinWidth(Px(0)).ClipContent().AccessHidden().Style(st.Value).
 				Child(s.renderValue(s.options[sel], ps))
 		case sel >= 0:
-			shown = Div().asPart("Select.Value").Grow(1).AccessHidden().Style(st.Value).Child(Text(label).NoWrap())
+			shown = Div().asPart("Select.Value").Grow(1).MinWidth(Px(0)).AccessHidden().Style(st.Value).
+				Child(Text(label).Truncate())
 		default:
-			shown = Div().asPart("Select.Placeholder").Grow(1).AccessHidden().Style(st.Placeholder).
-				Child(Text(s.placeholder).NoWrap())
+			shown = Div().asPart("Select.Placeholder").Grow(1).MinWidth(Px(0)).AccessHidden().Style(st.Placeholder).
+				Child(Text(s.placeholder).Truncate())
 		}
 		field := Div().asPart("Select.Trigger").Style(st.Trigger).Tooltip(s.tooltip).
 			Child(shown).
