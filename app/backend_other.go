@@ -49,3 +49,5 @@ func clockNow() int64 { return int64(time.Since(processStart)) }
 
 // processMemory reports no memory counters on this platform yet.
 func processMemory() (privateBytes, workingSet uint64) { return 0, 0 }
+
+func setPlatformAppID(string) {}

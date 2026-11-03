@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
@@ -159,6 +160,8 @@ type App struct {
 	onArgs         func(args []string, dir string)
 	// notifyHandler is called for clicks on notifications; see OnNotification.
 	notifyHandler func(NotificationActivation)
+	// keepRunning keeps the app running without windows; see KeepRunning.
+	keepRunning bool
 }
 
 // appFont is a font given to App.Font.
@@ -203,8 +206,45 @@ func (a *App) DevTools(on bool) *App {
 	return a
 }
 
+// KeepRunning keeps the app running after its last window closes, until Quit is
+// called or a QuitWhenClosed window closes. It suits an app that lives in the
+// notification area, or that opens a window again on a single instance handoff
+// or a notification click. Such an app must offer a way to quit, such as a Quit
+// item in its tray menu, since without a window the user may have no other.
+func (a *App) KeepRunning(on bool) *App {
+	a.keepRunning = on
+	return a
+}
+
+// Quit closes every window and ends the app, so Run returns. The OnClose of each
+// window is asked first, as for a QuitWhenClosed window; if one returns false,
+// nothing closes and the app keeps running. A CloseToTray window closes rather
+// than hides. It is safe from any goroutine; a call made before Run takes effect
+// once the app starts.
+func Quit() {
+	postUI(func() {
+		if application.quitting {
+			return
+		}
+		for _, o := range application.windows {
+			if o.cfg.OnClose != nil && !o.cfg.OnClose() {
+				return
+			}
+		}
+		application.quitting = true
+		if len(application.windows) == 0 {
+			quitUI()
+			return
+		}
+		for _, o := range slices.Clone(application.windows) {
+			o.win.Close()
+		}
+	})
+}
+
 // Run opens the window and blocks until the app quits: when the last window
-// closes, or when a QuitWhenClosed window closes. On failure it prints the
+// closes (unless KeepRunning is set), when a QuitWhenClosed window closes, or
+// when Quit is called. On failure it prints the
 // error and exits with status 1. Use RunE to handle errors yourself. A later
 // launch of a SingleInstance app returns at once, without a window, after its
 // command line has been handed to the running app.
@@ -215,11 +255,33 @@ func (a *App) Run(w Window) {
 	}
 }
 
-// RunE is Run returning an error instead of exiting. Call it once per process.
+// errRunAgain is returned by a second Run in the same process.
+var errRunAgain = errors.New("app.Run was called again: an app runs once per process. " +
+	"To show windows after the first closes, keep the app running with App.KeepRunning, " +
+	"open windows with app.Open, and end it with app.Quit")
+
+// runOnce reports whether this is the process's first Run.
+func runOnce(ran *atomic.Bool) error {
+	if !ran.CompareAndSwap(false, true) {
+		return errRunAgain
+	}
+	return nil
+}
+
+// ran is set by the first Run.
+var ran atomic.Bool
+
+// RunE is Run returning an error instead of exiting. Call it once per process:
+// a later call returns an error at once. An app that shows windows one after
+// another, such as a setup window and then a settings window from a tray icon,
+// runs once with KeepRunning and opens the later windows with Open.
 func (a *App) RunE(w Window) error {
 	// jamb package asks for the AppID before anything starts (see printAppIDFlag).
 	if printAppID(os.Args, a.appID, os.Stdout) {
 		os.Exit(0)
+	}
+	if err := runOnce(&ran); err != nil {
+		return err
 	}
 	if w.Root == nil {
 		return fmt.Errorf("app.Window.Root is nil; set it to a func(*ui.Context) ui.Element that returns your UI")
@@ -242,6 +304,7 @@ func (a *App) RunE(w Window) error {
 		startHeapLog(d.heapLog, time.Duration(d.heapSecs*float64(time.Second)))
 	}
 	application.devTools = a.devTools
+	application.keepRunning = a.keepRunning
 	application.gpu.adapter = gpuAdapter
 	prepareDevice()
 	// Parse fonts and warm the shaper while the first window and GPU device
@@ -298,16 +361,17 @@ func openFailed(w Window, h *appWindow, err error) {
 // application is the state of the process's App. It is only used on the UI
 // thread, except textReady, which the goroutine started by RunE fills once.
 var application struct {
-	dev       devOptions
-	textReady chan textResult
-	text      *text.System // the shared text system, once received
-	windows   []*host      // open windows, in the order they opened
-	opened    int          // windows opened so far
-	script    *script      // JAMB_SCRIPT, which drives the windows
-	quitting  bool         // a QuitWhenClosed window is closing all windows
-	appID     string       // the AppID, which names the tray icons' identity (see Tray)
-	gpu       gpuRecovery  // the shared GPU device, while it is lost; see recovery.go
-	devTools  bool         // the visual inspector may open (see App.DevTools and inspect.go)
+	dev         devOptions
+	textReady   chan textResult
+	text        *text.System // the shared text system, once received
+	windows     []*host      // open windows, in the order they opened
+	opened      int          // windows opened so far
+	script      *script      // JAMB_SCRIPT, which drives the windows
+	quitting    bool         // a QuitWhenClosed window, or Quit, is closing all windows
+	keepRunning bool         // the app runs on without windows (see App.KeepRunning)
+	appID       string       // the AppID, which names the tray icons' identity (see Tray)
+	gpu         gpuRecovery  // the shared GPU device, while it is lost; see recovery.go
+	devTools    bool         // the visual inspector may open (see App.DevTools and inspect.go)
 }
 
 func withDefaults(w Window) Window {
@@ -917,7 +981,8 @@ func (h *host) OnFrame(w platform.Window) bool {
 }
 
 // OnDestroy implements platform.Handler. The app quits when its last window
-// closes, or when a QuitWhenClosed window does.
+// closes (unless it keeps running; see App.KeepRunning), when a QuitWhenClosed
+// window does, or when the last window that Quit closed is gone.
 func (h *host) OnDestroy(w platform.Window) {
 	if h.fs != nil {
 		h.fs.finish()
@@ -946,11 +1011,22 @@ func (h *host) OnDestroy(w platform.Window) {
 	if h.cfg.OnClosed != nil {
 		h.cfg.OnClosed()
 	}
-	// While a QuitWhenClosed window is closing the others, the app quits with the
-	// last of them.
-	if len(application.windows) == 0 || (h.cfg.QuitWhenClosed && !application.quitting) {
+	// While a QuitWhenClosed window, or Quit, is closing the others, the app quits
+	// with the last of them.
+	if quitsOnDestroy(len(application.windows), application.keepRunning, application.quitting, h.cfg.QuitWhenClosed) {
 		quitUI()
 	}
+}
+
+// quitsOnDestroy reports whether the app quits as a window closes, with left
+// windows still open: none are left and the app does not keep running without
+// windows, or none are left of those a quit closed, or the window is a
+// QuitWhenClosed window that closed alone.
+func quitsOnDestroy(left int, keepRunning, quitting, quitWhenClosed bool) bool {
+	if left == 0 && (!keepRunning || quitting) {
+		return true
+	}
+	return quitWhenClosed && !quitting
 }
 
 // FrameWaitable implements platform.FrameWaiter: the window's swap chain

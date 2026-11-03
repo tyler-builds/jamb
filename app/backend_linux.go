@@ -26,6 +26,10 @@ func onUIThread() bool { return linux.OnUIThread() }
 
 func quitUI() { linux.Quit() }
 
+// setPlatformAppID makes the AppID the Wayland app ID of the windows, which the
+// desktop matches to the app's .desktop file.
+func setPlatformAppID(id string) { linux.SetAppID(id) }
+
 func prepareDevice() {}
 
 // softWindow is a window whose frames the CPU renderer draws.

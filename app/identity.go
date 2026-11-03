@@ -19,6 +19,11 @@ const maxAppIDLen = 128
 // versions. A packaged (MSIX) app has an identity from its package, and the
 // package's ID is used instead; see docs/os-integration.md, Jump lists and single instance
 // section.
+//
+// On Linux the AppID is the Wayland app ID of the app's windows (else the
+// executable's name), which the desktop matches to a .desktop file of the same
+// name, such as JambExamples.Notes.desktop, for the app's icon and name in the
+// task manager. It also names the app's tray icons.
 func (a *App) AppID(id string) *App {
 	a.appID = id
 	return a

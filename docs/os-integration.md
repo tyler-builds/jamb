@@ -244,6 +244,26 @@ back.
 - **Raising windows.** A click's activation token is not used yet, so on Wayland a
   window that `OnClick` shows may not come to the front.
 
+### Running without windows
+
+`Run` runs once per process; a second call returns an error. An app quits when its last window closes. `App.KeepRunning(true)` keeps it running,
+for an app that lives in the notification area or opens its window again on a
+handoff or a notification click. `app.Quit()` ends it: it asks the `OnClose` of every
+window, as a `QuitWhenClosed` window does, and if none refuses, closes them all and
+returns from `Run`. Give the user a way to quit, such as a tray menu's Quit item.
+
+```go
+tray := app.NewTray(app.TrayOptions{
+    OnClick: openMainWindow, // app.Open, or Show on a window that is hidden
+    Menu: func() []app.TrayItem {
+        return []app.TrayItem{{Label: "Quit", OnClick: app.Quit}}
+    },
+})
+tray.Show()
+
+app.New().KeepRunning(true).Run(mainWindow)
+```
+
 ### Hide to the tray
 
 `Window.CloseToTray` is a signal the app owns. While it holds true, the window hides
