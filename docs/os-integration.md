@@ -323,9 +323,19 @@ a menu or a taskbar button. These need a person at a Windows desktop:
 
 ## OS notifications
 
-Windows only. `app.Notify` shows a Windows toast, which the Notification Center
-keeps. It needs an `AppID`, and the app must be running: call it from a window, an
-action, or a goroutine started after `Run`. Without an `AppID` it returns an error.
+Windows and Linux. On Windows, `app.Notify` shows a Windows toast, which the
+Notification Center keeps. It needs an `AppID`, and the app must be running: call it
+from a window, an action, or a goroutine started after `Run`. Without an `AppID` it
+returns an error.
+
+On Linux (experimental), `app.Notify` sends the notification to the desktop's
+notification server (`org.freedesktop.Notifications` on the session bus), which KDE,
+GNOME and the other desktops run. The `AppID` names the app to the server, and is
+optional: without one, the executable's name is used. Title, body, image, buttons,
+`Tag` (to replace and remove), and `Silent` work as on Windows. A click reaches
+`OnNotification` while the app runs, without `SingleInstance`; a click after the
+app has closed does nothing. The server decides how the image is shown, and an
+image larger than 512 pixels is scaled down before it is sent.
 
 ```go
 app.New().

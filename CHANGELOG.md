@@ -12,7 +12,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Experimental Linux support for Wayland compositors: windows with server-side or the app's own
   decorations, fractional scaling, mouse and keyboard input with the desktop's keyboard layout and
   compose (dead) keys, the clipboard, the desktop's dark mode, high contrast and reduced motion
-  settings, and file dialogs through the desktop portal. Frames are drawn on the CPU. It needs
+  settings, file dialogs through the desktop portal, and OS notifications through the desktop's
+  notification server. Frames are drawn on the CPU. It needs
   libxkbcommon, which every Wayland desktop has; it is loaded at run time, so builds still need no
   cgo. See docs/status.md for what is missing.
 - `examples/budget`, a household budget: accounts, transactions sorted into categories, a

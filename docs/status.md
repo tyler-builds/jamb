@@ -69,7 +69,7 @@ The milestone status, and the known limitations and next steps.
   draws on the CPU (`internal/render/soft`) into shared memory. It has windows,
   server or client-side decorations, fractional scaling, pointer, keyboard with
   compose, the clipboard (text and PNG), the desktop's dark mode, high contrast
-  and reduced motion, and file dialogs through the portal. It lacks a GPU
+  and reduced motion, file dialogs through the portal, and OS notifications. It lacks a GPU
   renderer, input methods (text-input-v3), message boxes, accessibility
   (AT-SPI), drag and drop, X11, and title bars on compositors without
   server-side decorations (GNOME) for windows that do not draw their own.
