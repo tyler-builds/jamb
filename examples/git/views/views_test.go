@@ -218,9 +218,12 @@ func TestCopyButtonCopiesTheHash(t *testing.T) {
 func TestChoosingAChangedFileOpensItsDiff(t *testing.T) {
 	u, _, r := open(t)
 	r.Selected.Set([]string{entry(t, r, "Initial commit").Hash})
-	u.WaitFor("the details", func() bool { return u.Has("detail-files") })
+	// HEAD's details already show a files list, so wait for the initial commit's.
+	u.WaitFor("the details", func() bool {
+		return u.Has("detail-files") && strings.Contains(u.Get("detail-files").Text(), "readme.md")
+	})
 	u.ByRole(access.RoleListItem, "Added readme.md").Click()
-	u.WaitFor("the diff", func() bool { return u.Has("diff-view") })
+	u.WaitFor("the diff", func() bool { return u.Has("diff-view") && !u.Has("diff-loading") })
 	if !strings.Contains(u.Get("diff-view").Text(), "readme.md") {
 		t.Errorf("diff header = %q", u.Get("diff-view").Text())
 	}
