@@ -37,8 +37,9 @@ func TestTextFieldReadOnly(t *testing.T) {
 	r.key(input.KeyHome, 0)
 	r.key(input.KeyRight, ctrl|shift)
 	r.key(input.KeyC, ctrl)
-	if r.rt.memClipboard != "alpha " {
-		t.Fatalf("copied %q from a read-only field, want %q", r.rt.memClipboard, "alpha ")
+	// The first word, with its space on Windows (see wordForward).
+	if want := v.Peek()[:wordForward(v.Peek(), 0)]; r.rt.memClipboard != want {
+		t.Fatalf("copied %q from a read-only field, want %q", r.rt.memClipboard, want)
 	}
 
 	ar := newAccessRig(func(ctx *Context) Element { return TextInput(v).Label("Code").ReadOnly(true) })

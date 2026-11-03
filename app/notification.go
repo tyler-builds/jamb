@@ -417,7 +417,11 @@ func writeNotificationImage(dir string, img image.Image) (string, error) {
 // fileURI returns the file URI of the absolute path, as the toast image source
 // takes it: file:///C:/dir/name.png, with spaces and other characters escaped.
 func fileURI(path string) string {
-	u := url.URL{Scheme: "file", Path: "/" + filepath.ToSlash(path)}
+	p := filepath.ToSlash(path)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p // a Windows path starts with its drive: C:/x becomes /C:/x
+	}
+	u := url.URL{Scheme: "file", Path: p}
 	return u.String()
 }
 

@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -92,13 +93,21 @@ func TestLocalPathRefusesURLsAndNetworkPaths(t *testing.T) {
 			t.Errorf("%q was accepted as %q", src, p)
 		}
 	}
+	// The base and the absolute source are native paths, so they are absolute on
+	// every platform: C:\docs on Windows and /docs elsewhere.
+	root := string(filepath.Separator)
+	if runtime.GOOS == "windows" {
+		root = `C:\`
+	}
+	base := filepath.Join(root, "docs")
+	abs := filepath.Join(root, "pictures", "abs.png")
 	for src, want := range map[string]string{
-		"a.png":               filepath.Join(`C:\docs`, "a.png"),
-		"img/a%20b.png":       filepath.Join(`C:\docs`, "img", "a b.png"),
-		"../up.png#fragment":  filepath.Join(`C:\`, "up.png"),
-		`C:\pictures\abs.png`: `C:\pictures\abs.png`,
+		"a.png":              filepath.Join(base, "a.png"),
+		"img/a%20b.png":      filepath.Join(base, "img", "a b.png"),
+		"../up.png#fragment": filepath.Join(root, "up.png"),
+		abs:                  abs,
 	} {
-		if got, err := localPath(`C:\docs`, src); err != nil || got != want {
+		if got, err := localPath(base, src); err != nil || got != want {
 			t.Errorf("localPath(%q) = %q, %v; want %q", src, got, err, want)
 		}
 	}

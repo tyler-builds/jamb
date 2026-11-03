@@ -63,10 +63,19 @@ The milestone status, and the known limitations and next steps.
 - **Inspector.** An element picked in the window inside a collapsed branch of the
   tree is selected, but its row is not revealed: `ui.Tree` cannot open nodes from
   outside yet. The breadcrumb of the details and the tree filter reach it.
-- **Platforms.** Only the Windows adapter exists. macOS (Cocoa + Metal) and
-  Linux (Wayland/X11 + Vulkan or GL) adapters plug in behind
-  `platform.Window` and `render.Renderer`. Since there is no cgo today,
-  macOS will need either a small cgo shim or purego-style Objective-C calls.
+- **Platforms.** Windows is the supported platform. A Linux adapter for Wayland
+  compositors is experimental (`internal/platform/linux`): it speaks the Wayland
+  protocol in pure Go, loads libxkbcommon with purego for keyboard layouts, and
+  draws on the CPU (`internal/render/soft`) into shared memory. It has windows,
+  server or client-side decorations, fractional scaling, pointer, keyboard with
+  compose, the clipboard (text and PNG), the desktop's dark mode, high contrast
+  and reduced motion, file dialogs through the portal, and OS notifications. It lacks a GPU
+  renderer, input methods (text-input-v3), message boxes, accessibility
+  (AT-SPI), drag and drop, X11, and title bars on compositors without
+  server-side decorations (GNOME) for windows that do not draw their own.
+  macOS (Cocoa + Metal) plugs in the same way, behind `platform.Window` and
+  `render.Renderer`; it will need a small cgo shim or purego-style
+  Objective-C calls.
 - **Windows, multiple windows and custom title bars.** Checked on Windows 11
   with real mouse input: the caption buttons (hover, press, maximize and
   restore), double-clicking the title bar, the hit-test answers for the title

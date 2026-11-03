@@ -52,7 +52,10 @@ func TestActivityScrollsToLastEvent(t *testing.T) {
 		t.Fatal("the last event is not built after scrolling to the bottom")
 	}
 	list, _ = rt.Find("events")
-	if last.Y < list.Y || last.Y+last.H > list.Y+list.H {
+	// The list is about 600,000 pixels tall, where float32 offsets are exact only to
+	// 1/16 of a pixel, so the last row may end a fraction past the list. Allow half a pixel.
+	const slack = 0.5
+	if last.Y < list.Y-slack || last.Y+last.H > list.Y+list.H+slack {
 		t.Errorf("last event %+v is not inside the list %+v", last, list)
 	}
 }

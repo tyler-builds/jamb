@@ -21,15 +21,17 @@ func TestActivityProjectLinkOpensProjectSelected(t *testing.T) {
 	if !ok {
 		t.Fatal("the first event is not on screen")
 	}
-	// The link is somewhere in the row's text; sweep for it. Plain text does
-	// nothing, so only the link opens a project.
-	y := row.Y + row.H/2
-	for x := row.X + 60; x < row.X+row.W-60 && s.Page.Get() == PageActivity; x += 3 {
-		rt.PointerMove(x, y, 0)
-		rt.PointerDown(x, y, input.ButtonLeft, 1, 0)
-		rt.PointerUp(x, y, input.ButtonLeft, 0)
-		now = now.Add(16 * time.Millisecond)
-		rt.Frame(now)
+	// The link is somewhere in the row's header line; sweep for it. Plain text
+	// does nothing, so only the link opens a project. The line's height depends
+	// on the platform's fonts, so the sweep tries several heights in the row.
+	for y := row.Y + 2; y < row.Y+row.H && s.Page.Get() == PageActivity; y += 4 {
+		for x := row.X + 60; x < row.X+row.W-60 && s.Page.Get() == PageActivity; x += 3 {
+			rt.PointerMove(x, y, 0)
+			rt.PointerDown(x, y, input.ButtonLeft, 1, 0)
+			rt.PointerUp(x, y, input.ButtonLeft, 0)
+			now = now.Add(16 * time.Millisecond)
+			rt.Frame(now)
+		}
 	}
 	if s.Page.Get() != PageProjects {
 		t.Fatal("no point in the first event's row opened Projects")
