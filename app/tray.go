@@ -33,7 +33,8 @@ type TrayOptions struct {
 	Menu func() []TrayItem
 }
 
-// TrayItem is an item of a tray menu. A tray menu is Windows' native menu, so it is a
+// TrayItem is an item of a tray menu. A tray menu is the system's native menu (on Linux,
+// the panel's, through dbusmenu), so it is a
 // subset of what the menus of ui can show: an item has a label, a disabled state, a check
 // mark and a submenu, but no icon, shortcut or action. Its OnClick runs on the UI thread
 // after the menu closes, when the user chooses the item. A separator is made by
@@ -62,7 +63,10 @@ func TraySeparator() TrayItem { return TrayItem{separator: true} }
 // The methods are safe from any goroutine. They run on the UI thread in the order
 // they are called, so a call before the app runs waits for it to start.
 //
-// A tray icon needs no window. The icon, its tooltip and its menu are Windows'
+// On Linux the icon is a StatusNotifierItem, which KDE Plasma and most panels show,
+// and GNOME with the AppIndicator extension; see docs/os-integration.md.
+//
+// A tray icon needs no window. On Windows the icon, its tooltip and its menu are Windows'
 // own: the menu follows the system theme, and assistive technology reads it as
 // the system's menus. Windows keeps the user's choice to show or hide an icon
 // by its identity: with an AppID, the identity is derived from the AppID and the
@@ -80,8 +84,8 @@ type Tray struct {
 	actions map[uint32]func() // the actions of the menu last shown, by item ID
 }
 
-// trayIcon is the platform's notification area icon. Windows has one (see
-// tray_windows.go); elsewhere the app has none.
+// trayIcon is the platform's notification area icon. Windows and Linux have one
+// (see tray_windows.go and tray_linux.go); elsewhere the app has none.
 type trayIcon interface {
 	Show() error
 	SetTooltip(s string)

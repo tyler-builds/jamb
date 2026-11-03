@@ -16,6 +16,17 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   notification server. Frames are drawn on the CPU. It needs
   libxkbcommon, which every Wayland desktop has; it is loaded at run time, so builds still need no
   cgo. See docs/status.md for what is missing.
+- Tray icons on Linux: `app.NewTray` shows a StatusNotifierItem with a dbusmenu menu, which KDE
+  Plasma and most panels host (GNOME with the AppIndicator extension). `CloseToTray` works with it.
+  `Show` prints an error and leaves the icon hidden when the desktop has no tray.
+- `App.KeepRunning(true)` keeps an app running after its last window closes, and `app.Quit()`
+  closes every window (asking their `OnClose`) and ends the app.
+- `uitest.UI.Screenshot()` returns a frame as an image, drawn by the CPU renderer, with no
+  window or GPU, on every platform.
+- `Stepper.Compact()` shows only the current step's title, for narrow windows.
+- `Switch.ShowLabel()` draws the switch's label beside it; a click on the label toggles it.
+- On Linux, `App.AppID` sets the Wayland app ID of the windows (the executable's name without
+  it), so the desktop matches the app to its `.desktop` file without `StartupWMClass`.
 - `examples/budget`, a household budget: accounts, transactions sorted into categories, a
   budget for each category each month, an editable transaction table, forms with validation,
   undo, and CSV import. See docs/examples.md.
@@ -34,6 +45,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Changed
 
+- A second `app.Run` (or `RunE`) in a process returns an error instead of returning at once
+  without a window. Use `App.KeepRunning` and `app.Open` to show windows one after another.
 - The vector rasterizer, which draws charts, SVG images and canvases, keeps the edges that
   cross a row of pixels in order from one sample of the row to the next, instead of sorting
   them afresh at each of its 16 samples, and sorts the edges into rows in linear time. It

@@ -345,3 +345,36 @@ func testStepperParts(t *testing.T, applied map[string]bool) {
 		wantBackground(t, partNode(t, r.rt, "Stepper.Step", "steps/step:2"), "Stepper.StepDisabled", markBG)
 	})
 }
+
+// A compact stepper shows the title of the current step only, at its full width in
+// a stepper too narrow for every title (420 pixels cut them), and the others as their indicators. Every step keeps its name.
+func TestStepperCompact(t *testing.T) {
+	cur := NewSignal(1)
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Row().Child(Div().Width(Px(420)).Child(Stepper(cur, checkoutSteps...).Compact().Key("steps")))
+	})
+	titles := partNodes(r.rt, "Stepper.Title")
+	if len(titles) != 1 {
+		t.Fatalf("%d titles shown; want the current step's only", len(titles))
+	}
+	wide := newAccessRig(func(ctx *Context) Element {
+		return Div().Row().Child(Div().Width(Px(2000)).Child(Stepper(cur, checkoutSteps...).Key("steps")))
+	})
+	full := orderedParts(wide.rt, "Stepper.Title")[1]
+	if got, want := r.rt.nodeRect(titles[0]).W, wide.rt.nodeRect(full).W; got < want-0.5 {
+		t.Errorf("the current title is %.1f wide; want its full %.1f", got, want)
+	}
+	if n := len(partNodes(r.rt, "Stepper.Indicator")); n != 4 {
+		t.Errorf("%d indicators; want 4", n)
+	}
+	tr := r.tree()
+	accesstest.Find(t, tr, access.RoleListItem, "Step 1 of 4: Account, completed")
+	accesstest.Find(t, tr, access.RoleListItem, "Step 4 of 4: Review, not started")
+
+	// Once every step is complete, the last step's title shows.
+	cur.Set(4)
+	r.rt.Frame(r.rt.lastFrame.Add(16e6))
+	if titles := partNodes(r.rt, "Stepper.Title"); len(titles) != 1 {
+		t.Errorf("%d titles shown when complete; want the last step's", len(titles))
+	}
+}

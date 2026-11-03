@@ -218,6 +218,25 @@ the text inside it has the key, give the row a key too. The notes example keys
 its note rows `row-<id>` for this. Outside uitest, `rt.StyleOf(key)` returns the
 same `DrawnStyle` from a `ui.Runtime`.
 
+### Screenshots
+
+`u.Screenshot()` runs a frame and returns it as an `*image.RGBA`, the window's
+size times its scale. It is drawn by jamb's CPU renderer, which the Linux adapter
+uses for windows too, so it needs no window, display or GPU and runs in plain
+`go test` on every platform. Use it to look at a page by eye, or to compare it with
+a saved image. On Windows a window's text is drawn with ClearType by the GPU, so
+its text differs slightly from a screenshot's.
+
+```go
+u := uitest.New(t, setup.Root(model), uitest.Size(640, 720), uitest.Scale(1.25))
+f, _ := os.Create(filepath.Join(t.TempDir(), "done.png"))
+defer f.Close()
+png.Encode(f, u.Screenshot())
+```
+
+A running app can also save its own frames with `JAMB_SCRIPT="idle; shot a.png;
+exit"` (see [Tools](tools.md)).
+
 ## Time
 
 The UI has a clock of its own, which starts at a fixed time so dates the UI

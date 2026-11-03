@@ -721,3 +721,35 @@ func TestRadioGroupOnChangeRunsForSelection(t *testing.T) {
 
 // fmtList joins the values for a comparison.
 func fmtList(vs []string) string { return strings.Join(vs, ",") }
+
+// A switch with ShowLabel draws its label beside the track, and a click on the
+// label changes it, unless it is disabled. The label is not read a second time.
+func TestSwitchShowLabel(t *testing.T) {
+	on, off := NewSignal(false), NewSignal(false)
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().
+			Child(Switch("Start when I log in", on).ShowLabel().Key("login")).
+			Child(Switch("Unavailable", off).ShowLabel().Disabled(true).Key("off")).
+			Child(Switch("Hidden label", NewSignal(false)).Key("plain"))
+	})
+	labels := orderedParts(r.rt, "Switch.Label") // top to bottom
+	if len(labels) != 2 {
+		t.Fatalf("%d labels drawn; want the two switches with ShowLabel", len(labels))
+	}
+	clickNode(r, labels[0])
+	if !on.Peek() {
+		t.Error("a click on the label did not turn the switch on")
+	}
+	clickNode(r, labels[1])
+	if off.Peek() {
+		t.Error("a click on a disabled switch's label changed it")
+	}
+	accesstest.Check(t, r.stateOf(t, access.RoleSwitch, "Start when I log in"), access.RoleSwitch,
+		"Start when I log in", access.StateToggle|access.StateFocusable|access.StateChecked)
+	r.tree().Walk(func(n *access.Node) bool {
+		if n.Role == access.RoleStaticText && n.Name == "Start when I log in" {
+			t.Error("the label is read as text besides naming the switch")
+		}
+		return true
+	})
+}

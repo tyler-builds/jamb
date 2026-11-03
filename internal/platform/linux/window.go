@@ -136,9 +136,21 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 	return w, nil
 }
 
-// appID names the app for the compositor (its icon and its .desktop file):
-// the executable's name.
+// appIDOverride is the app ID that SetAppID set, or "". UI thread only.
+var appIDOverride string
+
+// SetAppID names the app for the compositor, in place of the executable's name.
+// It applies to the windows opened after it, so call it before the first. The
+// desktop matches it to the .desktop file of the same name, which gives the
+// app's icon and name in the task manager.
+func SetAppID(id string) { appIDOverride = id }
+
+// appID names the app for the compositor (its icon and its .desktop file): the
+// ID that SetAppID set, else the executable's name.
 func appID() string {
+	if appIDOverride != "" {
+		return appIDOverride
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return "jamb"

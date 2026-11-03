@@ -126,6 +126,12 @@ func testRadioGroupParts(t *testing.T, applied map[string]bool) {
 	}
 }
 
+// partSwitchLabeled is a switch with ShowLabel, so its Label part is drawn.
+func partSwitchLabeled(st SwitchStyle) Element {
+	sig := NewSignal(false)
+	return Div().Column().Child(Switch("Notifications", sig).ShowLabel().Key("sw").Styles(st))
+}
+
 // partSwitch is a switch, on or off, disabled or not, with the instance style st.
 func partSwitch(on bool, st SwitchStyle, disabled bool) Element {
 	sig := NewSignal(on)
@@ -138,6 +144,7 @@ func testSwitchParts(t *testing.T, applied map[string]bool) {
 		set      func(*SwitchStyle, Style)
 		on       bool
 		disabled bool
+		label    bool // the switch has ShowLabel
 		drawn    string
 		act      func(*testing.T, *accessRig, *node)
 	}
@@ -152,13 +159,19 @@ func testSwitchParts(t *testing.T, applied map[string]bool) {
 		{part: "Switch.Knob", set: func(s *SwitchStyle, m Style) { s.Knob = m }, drawn: "Switch.Knob"},
 		{part: "Switch.KnobChecked", set: func(s *SwitchStyle, m Style) { s.KnobChecked = m }, on: true, drawn: "Switch.Knob"},
 		{part: "Switch.KnobDisabled", set: func(s *SwitchStyle, m Style) { s.KnobDisabled = m }, disabled: true, drawn: "Switch.Knob"},
+		{part: "Switch.Label", set: func(s *SwitchStyle, m Style) { s.Label = m }, label: true, drawn: "Switch.Label"},
 	}
 	for _, c := range cases {
 		applied[c.part] = true
 		t.Run(c.part, func(t *testing.T) {
 			var st SwitchStyle
 			c.set(&st, Style{Background: markBG, TextColor: markFG})
-			r := newAccessRig(func(ctx *Context) Element { return partSwitch(c.on, st, c.disabled) })
+			r := newAccessRig(func(ctx *Context) Element {
+				if c.label {
+					return partSwitchLabeled(st)
+				}
+				return partSwitch(c.on, st, c.disabled)
+			})
 			n := partNode(t, r.rt, c.drawn, "")
 			if c.act != nil {
 				c.act(t, r, n)

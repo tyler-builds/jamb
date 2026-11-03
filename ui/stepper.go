@@ -155,6 +155,7 @@ type StepperElement struct {
 	current  *Signal[int]
 	steps    []Step
 	vertical bool
+	compact  bool // see Compact
 	key      string
 	name     string // the accessible name of the list, see Label
 	disabled bool
@@ -168,6 +169,12 @@ type StepperElement struct {
 
 // Stepper creates a stepper over steps, shown left to right, with the step at
 // index current (from 0) as the current one.
+//
+// current is state that outlives a render: a signal of the app's model, or a
+// Local of the component that shows the stepper, such as
+// ui.Local(ctx, "step", 0). A signal made with NewSignal inside a render is a
+// new signal each time the component renders, so the stepper would go back to
+// its first value.
 func Stepper(current *Signal[int], steps ...Step) *StepperElement {
 	return &StepperElement{current: current, steps: steps}
 }
@@ -188,6 +195,13 @@ func (s *StepperElement) Label(name string) *StepperElement { s.name = name; ret
 // down from each indicator to the next, and the up and down arrows moving between
 // them.
 func (s *StepperElement) Vertical() *StepperElement { s.vertical = true; return s }
+
+// Compact shows the title and description of the current step only (the last
+// step's, once every step is complete); the other steps show their indicator,
+// and their title as a tooltip. It suits a narrow window, where the titles of
+// every step would be cut short. Assistive technology still reads each step's
+// title. A vertical stepper ignores it.
+func (s *StepperElement) Compact() *StepperElement { s.compact = true; return s }
 
 // OnSelect makes the steps choosable: a click, or Enter or Space on the focused
 // step, runs fn with the index of the step. The current signal is not set: fn sets
@@ -372,6 +386,10 @@ func (s *StepperElement) step(strs *Strings, st StepperStyle, i, cur int, last b
 	}
 	item := Div().asPart("Stepper.Step").Key(s.scope() + fmt.Sprintf("/step:%d", i)).Style(st.Step).
 		Role(access.RoleListItem).Label(label)
+	if s.compact && !s.vertical && i != min(cur, n-1) {
+		// Only the indicator, which does not shrink, so the step keeps its size.
+		return item.Child(ind).Tooltip(step.Title)
+	}
 	if !s.vertical {
 		return item.Child(ind).Child(texts)
 	}

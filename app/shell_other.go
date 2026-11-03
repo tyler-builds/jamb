@@ -26,7 +26,8 @@ func dialHandoff(string, time.Duration) (io.ReadWriteCloser, uint32, error) {
 
 func allowForeground(uint32) {}
 
-func setAppID(string) error { return nil }
+// setAppID gives the platform the AppID (on Linux, the Wayland app ID).
+func setAppID(id string) error { setPlatformAppID(id); return nil }
 
 func commitJumpList(*JumpList) error { return nil }
 

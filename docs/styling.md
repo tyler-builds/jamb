@@ -557,7 +557,7 @@ parts that the code applies.
 | `TextInput` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing`, `Button`, `ButtonHover` (see "The text frame") | `Masked()`, `Revealable()`, `Clearable()` | `Leading`, `Trailing` (elements) | done |
 | `TextArea` | `Frame`, `FrameHover`, `FrameFocusWithin`, `FrameDisabled`, `FrameReadOnly`, `FrameInvalid`, `Text`, `Placeholder`, `Selection`, `Leading`, `Trailing` (see "The text frame") | none | `Leading`, `Trailing` (elements) | done |
 | `Checkbox`, `CheckboxTri` | `Control`, `ControlFocusVisible`, `ControlDisabled`, `Box`, `BoxHover`, `BoxChecked`, `BoxMixed`, `BoxDisabled`, `BoxInvalid`, `Mark`, `Dash`, `Label`, `LabelDisabled` | none | none | done |
-| `Switch` | `Track`, `TrackChecked`, `TrackHover`, `TrackFocusVisible`, `TrackDisabled`, `Knob`, `KnobChecked`, `KnobDisabled` | none | none | done |
+| `Switch` | `Track`, `TrackChecked`, `TrackHover`, `TrackFocusVisible`, `TrackDisabled`, `Knob`, `KnobChecked`, `KnobDisabled`, `Label` | `ShowLabel()` | none | done |
 | `Toggle` | `Root`, `RootChecked`, `RootHover`, `RootPressed`, `RootDisabled`, `RootFocusVisible`, `Label`, `Icon` | `Ghost`, `Secondary` (the looks of those buttons) | none | done |
 | `ToggleGroup` | `Group`, `GroupInvalid`, `Item`, `ItemSelected`, `ItemHover`, `ItemPressed`, `ItemFocusVisible`, `ItemDisabled`, `Label`, `Icon` | none | none | done |
 | `Rating` | `Root`, `RootFocusVisible`, `RootDisabled`, `Star`, `StarChecked`, `StarHover`, `StarDisabled` | none | none | done |
@@ -589,7 +589,7 @@ parts that the code applies.
 | `Sidebar` | `Pane`, `Item`, `ItemHover`, `ItemSelected`, `ItemFocusVisible`, `ItemDisabled`, `Indicator`, `Heading`, `Toggle` | none | `Header`, `Footer` (elements) | done |
 | `Breadcrumbs` | `Bar`, `Item`, `ItemHover`, `Current`, `Separator`, `Overflow` | none | none | done |
 | `Pagination` | `Bar`, `Page`, `PageHover`, `PageCurrent`, `Nav`, `Ellipsis` | none | none | done |
-| `Stepper` | `Stepper`, `Step`, `StepHover`, `StepFocusVisible`, `StepDisabled`, `Indicator`, `IndicatorComplete`, `IndicatorCurrent`, `Title`, `Description`, `Connector`, `ConnectorComplete` | `Vertical()` | none | done |
+| `Stepper` | `Stepper`, `Step`, `StepHover`, `StepFocusVisible`, `StepDisabled`, `Indicator`, `IndicatorComplete`, `IndicatorCurrent`, `Title`, `Description`, `Connector`, `ConnectorComplete` | `Vertical()`, `Compact()` | none | done |
 | `StatusBar` | `Bar`, `Start`, `End` | none | `Start`, `End` (elements) | done |
 | `Toolbar` | `Bar`, `Separator` | none | none | done |
 | `Empty` | `Empty`, `Icon`, `Title`, `Description`, `Action` | none | none | done |

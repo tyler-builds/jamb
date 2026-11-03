@@ -78,3 +78,20 @@ func TestPrintable(t *testing.T) {
 		t.Error("text was dropped")
 	}
 }
+
+// The app ID is the one SetAppID set, else the executable's name.
+func TestAppID(t *testing.T) {
+	defer SetAppID("")
+	exe := appID()
+	if exe == "" {
+		t.Fatal("no app ID without SetAppID")
+	}
+	SetAppID("JambExamples.Notes")
+	if got := appID(); got != "JambExamples.Notes" {
+		t.Errorf("app ID %q; want the one set", got)
+	}
+	SetAppID("")
+	if got := appID(); got != exe {
+		t.Errorf("app ID %q after clearing; want the executable's %q", got, exe)
+	}
+}
