@@ -31,7 +31,8 @@ small program that shows it is worth more than anything else. Report security pr
 
 ## Checks
 
-Development needs Go 1.27.1 or later and Windows. Before sending a change, run:
+Development needs Go 1.27.1 or later. Apps run on Windows only, but the headless tests also pass on
+Linux, and CI runs them there. Before sending a change, run:
 
 ```
 gofmt -l .
@@ -39,8 +40,8 @@ go vet ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/
 go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples/hello/... ./examples/git/... ./examples/monitor/... ./examples/budget/...
 ```
 
-`gofmt -l .` should print nothing. CI runs the same checks, the race detector, the window tests and
-builds for Linux and macOS.
+`gofmt -l .` should print nothing. CI runs the same checks on Windows and Linux, the race detector,
+the window tests and builds for macOS.
 
 ## Commits
 
