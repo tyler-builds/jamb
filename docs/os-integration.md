@@ -252,6 +252,22 @@ handoff or a notification click. `app.Quit()` ends it: it asks the `OnClose` of 
 window, as a `QuitWhenClosed` window does, and if none refuses, closes them all and
 returns from `Run`. Give the user a way to quit, such as a tray menu's Quit item.
 
+With `KeepRunning(true)`, `Run` can start with no window: pass `app.Window{}`, with no
+`Root`. A tray app launched at login does this, and opens its windows with `app.Open`
+from the tray, in the same process.
+
+```go
+tray := app.NewTray(app.TrayOptions{
+    OnClick: func() { app.Open(setupWindow) },
+    Menu: func() []app.TrayItem {
+        return []app.TrayItem{{Label: "Quit", OnClick: app.Quit}}
+    },
+})
+tray.Show()
+
+app.New().KeepRunning(true).Run(app.Window{}) // no window until the tray opens one
+```
+
 ```go
 tray := app.NewTray(app.TrayOptions{
     OnClick: openMainWindow, // app.Open, or Show on a window that is hidden

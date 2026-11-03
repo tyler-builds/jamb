@@ -21,6 +21,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `Show` prints an error and leaves the icon hidden when the desktop has no tray.
 - `App.KeepRunning(true)` keeps an app running after its last window closes, and `app.Quit()`
   closes every window (asking their `OnClose`) and ends the app.
+- With `App.KeepRunning(true)`, `Run(app.Window{})` starts the app with no window, as a tray app
+  launched at login does; it opens its windows later with `app.Open`.
 - `uitest.UI.Screenshot()` returns a frame as an image, drawn by the CPU renderer, with no
   window or GPU, on every platform.
 - `Stepper.Compact()` shows only the current step's title, for narrow windows.
