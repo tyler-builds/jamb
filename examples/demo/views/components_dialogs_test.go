@@ -2,6 +2,7 @@ package views
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,16 +13,19 @@ import (
 // The Dialogs section names files by their file name only: the folders they
 // are in never reach the page, which may be screenshotted.
 func TestDialogResultsShowFileNamesOnly(t *testing.T) {
+	// Native paths, so filepath.Base splits them as the dialogs' results would be.
+	notes := filepath.Join(string(filepath.Separator)+"home", "someone", "Notes")
+	other := filepath.Join(string(filepath.Separator)+"other", "b.txt")
 	cases := []struct {
 		name string
 		got  string
 		want string
 	}{
-		{"two files", describeFiles(dialog.FileResult{Paths: []string{`C:\Users\someone\Notes\a.md`, `D:\other\b.txt`}}), "Selected 2 files: a.md, b.txt"},
-		{"one file", describeFiles(dialog.FileResult{Paths: []string{`C:\Users\someone\Notes\a.md`}}), "Selected 1 file: a.md"},
+		{"two files", describeFiles(dialog.FileResult{Paths: []string{filepath.Join(notes, "a.md"), other}}), "Selected 2 files: a.md, b.txt"},
+		{"one file", describeFiles(dialog.FileResult{Paths: []string{filepath.Join(notes, "a.md")}}), "Selected 1 file: a.md"},
 		{"canceled", describeFiles(dialog.FileResult{Canceled: true}), "Canceled."},
-		{"save", describeSave(dialog.FileResult{Paths: []string{`C:\Users\someone\Notes\Untitled.md`}}), "Saved as Untitled.md"},
-		{"folder", describeFolder(dialog.FileResult{Paths: []string{`C:\Users\someone\Notes`}}), "Folder: Notes"},
+		{"save", describeSave(dialog.FileResult{Paths: []string{filepath.Join(notes, "Untitled.md")}}), "Saved as Untitled.md"},
+		{"folder", describeFolder(dialog.FileResult{Paths: []string{notes}}), "Folder: Notes"},
 	}
 	for _, c := range cases {
 		if c.got != c.want {

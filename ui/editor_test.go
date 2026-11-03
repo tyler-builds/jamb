@@ -122,10 +122,13 @@ func TestEditorClipboard(t *testing.T) {
 		t.Fatalf("after copy/paste: %q", v.Peek())
 	}
 	r.key(input.KeyHome, 0)
-	r.key(input.KeyRight, ctrl|shift) // select "alpha " with its space, as Windows does
+	// Select the first word: "alpha " with its space on Windows, "alpha" elsewhere
+	// (see wordForward).
+	before := v.Peek()
+	r.key(input.KeyRight, ctrl|shift)
 	r.key(input.KeyX, ctrl)
-	if v.Peek() != "beta alpha beta" {
-		t.Errorf("after cut: %q", v.Peek())
+	if want := before[wordForward(before, 0):]; v.Peek() != want {
+		t.Errorf("after cut: %q, want %q", v.Peek(), want)
 	}
 	// Pasting multi-line text into a single-line field flattens it.
 	r.rt.memClipboard = "a\nb"
