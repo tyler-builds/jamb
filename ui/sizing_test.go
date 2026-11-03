@@ -558,3 +558,25 @@ func sizedGrid() *DataGridElement[string] {
 func sizedListOf() *ListElement {
 	return ListOf([]string{"a", "b"}, func(s string) string { return s }, func(_ int, s string) Element { return Text(s) })
 }
+
+// A select whose chosen label, or placeholder, is wider than the field shortens
+// the text with an ellipsis: the chevron stays inside the field's frame.
+func TestSelectLongLabelKeepsTheChevronInTheField(t *testing.T) {
+	const long = "Quarterly reconciliation of every outstanding account"
+	for _, chosen := range []bool{true, false} {
+		v := NewSignal("")
+		if chosen {
+			v = NewSignal("a")
+		}
+		rt := sizedFrame(400, Select(v, Option[string]{Value: "a", Label: long}).
+			Placeholder(long).Width(Px(140)))
+		field := partNode(t, rt, "Select.Trigger", "")
+		chev := partNode(t, rt, "Select.Chevron", "")
+		if field.lay.W != 140 {
+			t.Errorf("chosen %v: field is %v wide, want 140", chosen, field.lay.W)
+		}
+		if right := chev.lay.X + chev.lay.W; right > field.lay.W {
+			t.Errorf("chosen %v: chevron ends at %v, past the field's %v", chosen, right, field.lay.W)
+		}
+	}
+}

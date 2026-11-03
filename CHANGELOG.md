@@ -58,6 +58,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Fixed
 
+- A `Select` whose chosen label or placeholder is wider than the field ends the text with an
+  ellipsis. The text pushed the chevron past the field's right edge; a `RenderValue` that does
+  not fit is now clipped.
 - A chart with `LegendRight` keeps its legend inside its box. A legend wider than the room
   beside the plot pushed past the chart's right edge; the plot now takes the width the legend
   leaves, and a legend taller than the chart scrolls.
