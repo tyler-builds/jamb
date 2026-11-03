@@ -1,13 +1,14 @@
 # jamb
 
-A declarative, GPU-accelerated desktop UI framework for Go. Tested only on Windows.
+A declarative, GPU-accelerated desktop UI framework for Go. Runs on Windows; Linux (Wayland) support is experimental.
 
 jamb is a small, declarative, GPU-rendered desktop UI framework written in plain Go. An app is a tree
 of elements built by components, and its state lives in signals, so a change re-renders only the
 parts that depend on it.
 
-> **Status:** jamb is pre-1.0. The API may change between versions. It runs on Windows 10 and 11
-> today; other platforms are planned.
+> **Status:** jamb is pre-1.0. The API may change between versions. It runs on Windows 10 and 11.
+> Linux support for Wayland desktops is experimental: it draws on the CPU and lacks some features
+> (see [docs/status.md](docs/status.md)). macOS is planned.
 
 ## Highlights
 
@@ -32,7 +33,7 @@ parts that depend on it.
 
 ## Install
 
-jamb needs Windows 10 or 11 and Go 1.27.1 or later. A minimal `main.go` opens a window with a
+jamb needs Windows 10 or 11, or experimentally a Linux desktop running Wayland, and Go 1.27.1 or later. A minimal `main.go` opens a window with a
 greeting and a button that counts its clicks:
 
 ```go

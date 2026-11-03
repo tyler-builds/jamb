@@ -19,8 +19,8 @@ input/             platform-neutral keys, buttons, modifiers, cursors
 internal/          packages apps don't import, so they can change without breaking apps:
   layout/          flexbox-subset layout engine (no drawing, no text)
   scene/           GPU-friendly primitives (Quad/shadow, Glyph, Image, Clip, Transform)
-  render/          Renderer interface; render/d3d11 = Direct3D 11 backend
-  platform/        adapter contract; platform/windows (Win32), darwin + linux placeholders
+  render/          Renderer interface; render/d3d11 = Direct3D 11 backend, render/soft = CPU renderer
+  platform/        adapter contract; platform/windows (Win32), platform/linux (Wayland, experimental), darwin placeholder
   text/            fonts and fallback, shaping and line breaking (go-text/typesetting),
                    caret/selection geometry, glyph atlas
 internal/win32/    minimal cgo-free Win32 bindings
@@ -67,7 +67,9 @@ app code ──► ui (elements, signals, components)
                │
                ▼
              render.Renderer ◄── internal/render/d3d11 (only package that knows Direct3D)
+                             internal/render/soft (CPU, pure Go: Linux, and screenshots in tests)
 platform.Window/Handler ◄── internal/platform/windows (only package that knows Win32)
+                             internal/platform/linux (Wayland, experimental)
 ```
 
 Package rule: a concept gets its own package when it stands on its own; it
