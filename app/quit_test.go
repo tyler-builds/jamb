@@ -4,6 +4,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/tyler-builds/jamb/ui"
 )
 
 func TestQuitsOnDestroy(t *testing.T) {
@@ -37,5 +39,23 @@ func TestRunOnce(t *testing.T) {
 	err := runOnce(&ran)
 	if err == nil || !strings.Contains(err.Error(), "KeepRunning") {
 		t.Errorf("the second run gave %v; want an error that names KeepRunning", err)
+	}
+}
+
+// A Window without a Root starts the app with no window when it keeps running,
+// and is an error that says how to start with no window otherwise.
+func TestFirstWindow(t *testing.T) {
+	root := func(*ui.Context) ui.Element { return nil }
+	if open, err := firstWindow(Window{Root: root}, false); !open || err != nil {
+		t.Errorf("a window with a Root: open %v, %v; want true, nil", open, err)
+	}
+	if open, err := firstWindow(Window{Root: root}, true); !open || err != nil {
+		t.Errorf("a window with a Root, keeping running: open %v, %v; want true, nil", open, err)
+	}
+	if open, err := firstWindow(Window{}, true); open || err != nil {
+		t.Errorf("no Root, keeping running: open %v, %v; want false, nil", open, err)
+	}
+	if _, err := firstWindow(Window{}, false); err == nil || !strings.Contains(err.Error(), "KeepRunning") {
+		t.Errorf("no Root: %v; want an error that names KeepRunning", err)
 	}
 }

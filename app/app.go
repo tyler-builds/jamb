@@ -244,7 +244,8 @@ func Quit() {
 
 // Run opens the window and blocks until the app quits: when the last window
 // closes (unless KeepRunning is set), when a QuitWhenClosed window closes, or
-// when Quit is called. On failure it prints the
+// when Quit is called. With KeepRunning, a Window with no Root, such as
+// app.Window{}, starts the app with no window (see RunE). On failure it prints the
 // error and exits with status 1. Use RunE to handle errors yourself. A later
 // launch of a SingleInstance app returns at once, without a window, after its
 // command line has been handed to the running app.
@@ -275,6 +276,10 @@ var ran atomic.Bool
 // a later call returns an error at once. An app that shows windows one after
 // another, such as a setup window and then a settings window from a tray icon,
 // runs once with KeepRunning and opens the later windows with Open.
+//
+// With KeepRunning, w may have no Root, such as app.Window{}: the app starts with
+// no window, as a tray app launched at login does, and opens its windows with Open.
+// Such an app must show a way to quit, such as a tray icon with a Quit item.
 func (a *App) RunE(w Window) error {
 	// jamb package asks for the AppID before anything starts (see printAppIDFlag).
 	if printAppID(os.Args, a.appID, os.Stdout) {
@@ -283,8 +288,9 @@ func (a *App) RunE(w Window) error {
 	if err := runOnce(&ran); err != nil {
 		return err
 	}
-	if w.Root == nil {
-		return fmt.Errorf("app.Window.Root is nil; set it to a func(*ui.Context) ui.Element that returns your UI")
+	open, err := firstWindow(w, a.keepRunning)
+	if err != nil {
+		return err
 	}
 	if err := a.checkIdentity(); err != nil {
 		return err
@@ -316,16 +322,31 @@ func (a *App) RunE(w Window) error {
 	defer endUI() // a read that waits for the UI thread stops waiting
 	return runPlatform(func() error {
 		a.setIdentity()
-		if _, err := openWindow(w, nil); err != nil {
-			return err
+		if open {
+			if _, err := openWindow(w, nil); err != nil {
+				return err
+			}
 		}
 		if owned != nil {
-			// A notification click that started this process is delivered after the window.
+			// A notification click that started this process is delivered after the window, if any.
 			a.notificationArgs(os.Args[1:])
 			a.serveHandoffs(owned)
 		}
 		return nil
 	})
+}
+
+// firstWindow reports whether Run opens w. A Window without a Root opens no
+// window when the app keeps running without windows, and is an error otherwise.
+func firstWindow(w Window, keepRunning bool) (bool, error) {
+	switch {
+	case w.Root != nil:
+		return true, nil
+	case keepRunning:
+		return false, nil
+	}
+	return false, errors.New("app.Window.Root is nil; set it to a func(*ui.Context) ui.Element that returns your UI, " +
+		"or start with no window by passing app.Window{} with App.KeepRunning(true)")
 }
 
 // Open opens another window. It is safe from event handlers and from
