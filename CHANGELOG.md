@@ -16,6 +16,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   notification server. Frames are drawn on the CPU. It needs
   libxkbcommon, which every Wayland desktop has; it is loaded at run time, so builds still need no
   cgo. See docs/status.md for what is missing.
+- Tray icons on Linux: `app.NewTray` shows a StatusNotifierItem with a dbusmenu menu, which KDE
+  Plasma and most panels host (GNOME with the AppIndicator extension). `CloseToTray` works with it.
+  `Show` prints an error and leaves the icon hidden when the desktop has no tray.
 - `examples/budget`, a household budget: accounts, transactions sorted into categories, a
   budget for each category each month, an editable transaction table, forms with validation,
   undo, and CSV import. See docs/examples.md.

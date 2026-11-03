@@ -1,10 +1,10 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package app
 
 import "image"
 
-// newTrayIcon returns the icon of t. Tray icons are supported on Windows only.
+// newTrayIcon returns the icon of t. Tray icons are supported on Windows and Linux only.
 func newTrayIcon(*Tray) trayIcon { return unsupportedTray{} }
 
 // unsupportedTray is the tray icon of a platform without one. It does not show.

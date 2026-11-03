@@ -148,8 +148,8 @@ category's list itself.
 
 ## Notification area, taskbar progress and badges
 
-Windows only. The tray icon and the taskbar calls are Windows features, and the
-framework has no window adapter for other platforms yet.
+The tray icon works on Windows and, experimentally, on Linux (see
+[Linux tray icons](#linux-tray-icons)). The taskbar calls are Windows only.
 
 ### The notification area icon
 
@@ -219,6 +219,30 @@ tray.Hide()              // Show adds the icon again
   one until the pointer passes over it.
 - **Limits.** Each icon has an ID of at most 65535. The tooltip shows at most 127
   UTF-16 units. The icon shows no balloon notifications.
+
+### Linux tray icons
+
+On Linux the icon is a StatusNotifierItem on the session bus, and its menu is
+exported with the dbusmenu protocol. KDE Plasma, most other panels, and GNOME with
+the AppIndicator extension show it. Without a StatusNotifierWatcher (plain GNOME,
+for example), `Show` prints an error and the icon is not shown, so `Shown` is false
+and `CloseToTray` windows close rather than hide where the user could not bring them
+back.
+
+- **Icon.** The image is sent at 16 to 64 pixels, and the panel picks a size. Nil
+  shows the theme's generic program icon.
+- **Menu.** The panel draws it, in its own style. `Menu` runs when the panel says the
+  menu is about to open, and again after an item is chosen, so a check mark changes
+  even on panels that do not ask.
+- **Clicks.** A click runs `OnClick`. Panels report no double clicks, so a second
+  click within 400 ms runs `OnDoubleClick` instead, as on Windows. With a `Menu` and
+  neither click action, a click opens the menu.
+- **Identity.** Each icon has its own bus connection and the name
+  `org.kde.StatusNotifierItem-<pid>-<n>`. Its ID is the `AppID`, or the executable's
+  name, which panels use to remember the user's choice to show or hide it.
+- **Panel restarts.** The icon is registered again when the watcher restarts.
+- **Raising windows.** A click's activation token is not used yet, so on Wayland a
+  window that `OnClick` shows may not come to the front.
 
 ### Hide to the tray
 
