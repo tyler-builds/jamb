@@ -465,6 +465,18 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 			// their content size, so scrollable lists don't squash their rows.
 			if minL.IsAuto() && c.overflowMain(row) == OverflowVisible {
 				it.minMain = -1 // computed lazily, only if shrinking happens
+				// An explicit Basis can be below the content, so the minimum
+				// holds up the item's hypothetical size, as CSS's min-width
+				// and min-height auto do: a column item with Basis(0) keeps
+				// its content's height. A basis from the content or from
+				// Width/Height is never below it, so the minimum can wait.
+				if !cs.Basis.IsAuto() {
+					limit := mainSize
+					if isNaN(limit) {
+						limit = availInnerW
+					}
+					it.minMain = e.autoMin(c, row, innerW, innerH, crossAvail-it.marginCross, it.forcedCross, it.basis, limit)
+				}
 			}
 		}
 		it.maxMain = orInf(maxL.resolve(cbMain))
@@ -515,8 +527,21 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 		target := mainSize
 		if isNaN(target) {
 			target = used
-			if row && used > availInnerW {
-				target = availInnerW // fit-content: shrink into the available width
+			if row {
+				// fit-content: a growing item with an explicit Basis asks for its
+				// max-content width, as CSS sizes a flex container from its items'
+				// content and not from a Basis(0); it then flexes in that width.
+				for i := range its {
+					it := &its[i]
+					if it.grow > 0 && !it.n.Style.Basis.IsAuto() {
+						if w := e.mainContent(it.n, row, innerW, innerH, crossAvail-it.marginCross, it.forcedCross); w > it.hyp {
+							target += min(w, it.maxMain) - it.hyp
+						}
+					}
+				}
+				if target > availInnerW {
+					target = availInnerW // shrink into the available width
+				}
 			}
 		}
 		free := target - used
@@ -524,7 +549,7 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 			its[i].main = its[i].hyp
 		}
 		if free > 0 {
-			e.grow(its, free)
+			e.grow(its, target-gaps)
 		} else if free < 0 {
 			for i := range its {
 				it := &its[i]
@@ -690,38 +715,76 @@ func (e *Engine) crossContent(c *Node, row bool, innerW, innerH, main, crossAvai
 	return w
 }
 
-func (e *Engine) grow(items []item, free float32) {
+// grow fills space, the line's main size less its gaps, as CSS resolves
+// flexible lengths: an item that grows starts from its basis and takes its share
+// of the space the others leave, and an item that its share would put below its
+// minimum or above its maximum is held there and frozen, and the rest share
+// again. Items that do not grow keep their hypothetical size, so equal Basis(0)
+// items stay equal until one reaches its content's minimum.
+func (e *Engine) grow(items []item, space float32) {
 	for i := range items {
-		items[i].frozen = items[i].grow <= 0
+		it := &items[i]
+		// An item that does not grow, or whose maximum is below its basis, keeps
+		// its hypothetical size.
+		it.frozen = it.grow <= 0 || it.basis > it.hyp
+		if it.frozen {
+			it.main = it.hyp
+		}
 	}
-	for iter := 0; iter < 4 && free > 0.01; iter++ {
-		var total float32
+	initial := float32(-1)
+	for iter := 0; iter <= len(items); iter++ {
+		free, total := space, float32(0)
 		for i := range items {
-			if !items[i].frozen {
-				total += items[i].grow
+			it := &items[i]
+			free -= it.marginMain
+			if it.frozen {
+				free -= it.main
+			} else {
+				free -= it.basis
+				total += it.grow
 			}
 		}
 		if total <= 0 {
 			return
 		}
-		share := free
+		if initial < 0 {
+			initial = free
+		}
 		if total < 1 {
-			share = free * total // fractional grow sums take only that fraction
+			// Fractional grow sums take only that fraction of the free space.
+			free = min(free, initial*total)
 			total = 1
 		}
-		free = 0
+		var violation float32
 		for i := range items {
 			it := &items[i]
 			if it.frozen {
 				continue
 			}
-			want := it.main + share*it.grow/total
-			if want > it.maxMain {
-				free += want - it.maxMain
-				want = it.maxMain
-				it.frozen = true
+			want := it.basis + max(free, 0)*it.grow/total
+			clamped := min(want, it.maxMain)
+			clamped = max(clamped, it.minMain, 0)
+			it.main = clamped
+			violation += clamped - want
+		}
+		done := true
+		for i := range items {
+			it := &items[i]
+			if it.frozen {
+				continue
 			}
-			it.main = want
+			want := it.basis + max(free, 0)*it.grow/total
+			switch {
+			case violation == 0,
+				violation > 0 && it.main > want,
+				violation < 0 && it.main < want:
+				it.frozen = true
+			default:
+				done = false
+			}
+		}
+		if done || violation == 0 {
+			return
 		}
 	}
 }

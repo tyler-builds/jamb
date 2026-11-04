@@ -23,8 +23,43 @@ import "slices"
 // tracks leave.
 func Fr(v float32) Length { return Length{v, UnitFr} }
 
+// AutoFill returns a column track that repeats as many times as fit the grid's
+// width, each column at least min wide and all of them sharing the width
+// equally, as CSS's repeat(auto-fill, minmax(min, 1fr)) does. It must be the
+// grid's only column track. A grid of indefinite width has one column.
+func AutoFill(min float32) Length { return Length{min, UnitAutoFill} }
+
 // isGrid reports whether n lays out its children as a grid.
 func (n *Node) isGrid() bool { return n.Style.Grid != nil && len(n.Style.Grid.Columns) > 0 }
+
+// autoFill returns the smallest column width of n's AutoFill grid, or 0 when its
+// columns are fixed.
+func (n *Node) autoFill() float32 {
+	if c := n.Style.Grid.Columns; len(c) == 1 && c[0].Unit == UnitAutoFill {
+		return max(c[0].Value, 1)
+	}
+	return 0
+}
+
+// columns returns the column tracks of n's grid for a content width of width:
+// its Columns, or for an AutoFill grid as many Fr(1) columns as fit, at least one.
+func (n *Node) columns(width float32) []Length {
+	g := n.Style.Grid
+	fill := n.autoFill()
+	if fill == 0 {
+		return g.Columns
+	}
+	count := 1
+	if !isNaN(width) && width < inf {
+		gap := n.Style.Gap
+		count = max(1, int((width+gap+0.01)/(fill+gap)))
+	}
+	cols := make([]Length, count)
+	for i := range cols {
+		cols[i] = Fr(1)
+	}
+	return cols
+}
 
 type gridItem struct {
 	n          *Node
@@ -32,10 +67,9 @@ type gridItem struct {
 	rows, cols int // how many it covers
 }
 
-// place puts the in-flow children of n in cells, and returns them and the
-// number of rows.
-func (n *Node) place() ([]gridItem, int) {
-	nc := len(n.Style.Grid.Columns)
+// place puts the in-flow children of n in cells of nc columns, and returns them
+// and the number of rows.
+func (n *Node) place(nc int) ([]gridItem, int) {
 	var items []gridItem
 	var occ [][]bool
 	free := func(r, c, rs, cs int) bool {
@@ -145,8 +179,13 @@ func tracks(defs []Length, count int, space, gap float32, maxC, minC []float32) 
 // flex, whose arguments and results it shares.
 func (e *Engine) grid(n *Node, innerW, innerH, availInnerW float32, arrange bool) (float32, float32) {
 	s := &n.Style
-	items, nr := n.place()
-	nc := len(s.Grid.Columns)
+	width := innerW
+	if isNaN(width) {
+		width = availInnerW
+	}
+	cols := n.columns(width)
+	nc := len(cols)
+	items, nr := n.place(nc)
 
 	// Columns, from the widest and narrowest content of their own items.
 	maxW, minW := make([]float32, nc), make([]float32, nc)
@@ -161,11 +200,7 @@ func (e *Engine) grid(n *Node, innerW, innerH, availInnerW float32, arrange bool
 		maxW[it.c] = max(maxW[it.c], w+m)
 		minW[it.c] = max(minW[it.c], min(mc, w)+m)
 	}
-	width := innerW
-	if isNaN(width) {
-		width = availInnerW
-	}
-	colW := tracks(s.Grid.Columns, nc, width, s.Gap, maxW, minW)
+	colW := tracks(cols, nc, width, s.Gap, maxW, minW)
 	colX := make([]float32, nc+1)
 	for i := range nc {
 		colX[i+1] = colX[i] + colW[i] + s.Gap
@@ -259,8 +294,19 @@ func (e *Engine) grid(n *Node, innerW, innerH, availInnerW float32, arrange bool
 // content, or its size when it has one, and the gaps.
 func (e *Engine) gridMinContent(n *Node) float32 {
 	s := &n.Style
-	items, _ := n.place()
+	if fill := n.autoFill(); fill > 0 {
+		// One column, as narrow as AutoFill allows.
+		items, _ := n.place(1)
+		w := fill
+		for _, it := range items {
+			cs := &it.n.Style
+			mc, _ := e.minContentSize(it.n, nan)
+			w = max(w, mc+cs.Margin.Left+cs.Margin.Right)
+		}
+		return w
+	}
 	nc := len(s.Grid.Columns)
+	items, _ := n.place(nc)
 	col := make([]float32, nc)
 	for _, it := range items {
 		if it.cols != 1 {
