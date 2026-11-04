@@ -7,6 +7,15 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-04
+
+This release brings preliminary Linux support: windows on Wayland desktops, drawn on the CPU,
+with input, the clipboard, file dialogs, notifications, tray icons, system fonts through
+fontconfig and color emoji. See docs/status.md for what is missing. Building a desktop app on
+Fedora also brought cards, icons from your own SVGs, responsive grid columns and scoped lookups
+in `uitest`. Two changes can break code: a `Basis(0)` flex item now keeps its content's minimum
+size, as in CSS, and a `uitest` click on a disabled or busy element fails the test.
+
 ### Added
 
 - Experimental Linux support for Wayland compositors: windows with server-side or the app's own
@@ -44,6 +53,29 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - `ui.ParseNumber(text)` and `ui.ParseDate(text)` read numbers, amounts and dates written in
   the user's locale, the counterparts of `FormatNumber`, `FormatCurrency` and `FormatDate`.
   `ParseDate` reads ISO 8601 dates too.
+- On Linux, fonts come from fontconfig (libfontconfig, loaded at run time), so Fedora-family
+  systems get their system fonts instead of the embedded Go fonts. A character the font lacks
+  falls back to a font fontconfig finds for it, and emoji to the desktop's emoji font.
+- Color glyphs off Windows: COLRv0, COLRv1 (gradients, transforms and composites; the hue,
+  saturation, color and luminosity modes draw as normal) and CBDT/sbix bitmaps, so color emoji
+  show on Linux. Variable fonts use their default instance.
+- `App.FallbackFont(data)` adds a font for the characters a text's font lacks, tried before the
+  platform's fallback fonts. See docs/text.md.
+- `ui.AutoFill(min)` as a grid's only column track makes as many equal columns as fit the
+  grid's width, each at least `min` wide, as CSS `repeat(auto-fill, minmax(min, 1fr))` does.
+  See docs/layout.md.
+- `ui.Card()`, a filled or outlined surface for related content. With `OnClick` the whole card
+  is one button. Its look is `CardStyle`, in `Theme.Card` and per variant in `Theme.Cards`.
+- `icons.New(name, svg)` and `icons.MustNew` make an icon from a whole SVG document, such as a
+  brand mark; `icons.KeepColors` keeps its own colors instead of tinting it. See docs/drawing.md.
+- `access.StateBusy`, set on a loading `Button` and exposed as aria-busy through UI Automation.
+- `uitest`: `HasRole` and `HasName` never fail, so they can be polled in `WaitFor`;
+  `Element.ByRole`, `ByName` and `HasRole` search inside an element, to tell apart two controls
+  of the same name; `WaitForQueries` waits for `ui.Query` fetches. `Runtime.Fetching` reports
+  a fetch in flight.
+- `Button.IconEnd`, `Badge.Tooltip` (also the badge's accessible description),
+  `ProgressBar.HideValue`, `ui.SidebarDivider()` with the `Divider` part,
+  `Sidebar.NoIndicator()`, and `Basis` and margins on `Text`.
 
 ### Changed
 
@@ -55,6 +87,16 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   draws the same pixels. A chart's plot redraws about 2.5 times as fast: a 100,000-point line
   in 5 ms instead of 12.3, an area in 7.5 ms instead of 18, and the system monitor's resize
   frame fell from 6.6 to 4.0 ms. A stroke allocates a third less.
+- Flex items follow CSS for an explicit `Basis`: an item keeps its automatic minimum, so a
+  `Basis(0)` child of an auto-height column is as tall as its content instead of 0 px, and
+  growing items start from their basis and stop at their minimum. Equal `Basis(0)` columns stay
+  equal until one reaches its longest word, which it now keeps. A row that sizes to its
+  content sizes a growing `Basis(0)` item from its content, so a centered page no longer
+  shrinks to its fixed items.
+- `uitest` `Click` and `DoubleClick` fail the test on a disabled or busy element, instead of
+  doing nothing.
+- The `JAMB_SCRIPT` `idle` step also waits for `ui.Query` fetches, and the `wait` step is
+  documented.
 
 ### Fixed
 
@@ -73,6 +115,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - A keyed component or composite element, such as a chart, kept answering to its key in tests
   and in the inspector only until a component inside it rendered again. A chart's key was lost
   on the first frame of its enter animation.
+- Spaces at the start of a span stay in the fallback font of the text before them, so right-to-left
+  text that a fallback font draws keeps its order across spans.
 
 ## [0.5.0] - 2026-10-23
 
@@ -740,7 +784,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/tyler-builds/jamb/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/tyler-builds/jamb/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tyler-builds/jamb/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tyler-builds/jamb/compare/v0.2.0...v0.3.0
