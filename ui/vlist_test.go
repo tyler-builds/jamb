@@ -260,8 +260,10 @@ func TestListOfAnchorItemRemoved(t *testing.T) {
 	src := ids(1000)
 	v.items.Set(append(append([]int{}, src[:300]...), src[301:]...))
 	v.frame()
-	// The anchor resolves to the item now at its old index (item 301).
-	if got := v.find(t, vKey(301)).Y; math.Abs(float64(got-before)) > 0.5 {
+	// The anchor resolves to the item now at its old index (item 301). Each
+	// position is drawn at a scroll offset rounded to whole pixels, so they may
+	// differ by up to a pixel.
+	if got := v.find(t, vKey(301)).Y; math.Abs(float64(got-before)) > 1 {
 		t.Fatalf("item 301 at %v after item 300 was removed, want %v", got, before)
 	}
 	// Removing every item must not panic either.

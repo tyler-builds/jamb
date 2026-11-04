@@ -19,6 +19,11 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Fixed
 
+- Scroll containers move their content by whole device pixels. Text and icons each rounded
+  their own position to the pixel grid, so a fractional scroll offset moved an icon a pixel
+  more or less than the label beside it. In a list that scrolls by a few pixels, such as a
+  sidebar that barely overflows, the icons and headings moved while the labels seemed not to.
+  At the end of its range an offset rounds up, so the end of the content stays in view.
 - A canvas's drawing takes the canvas's `Radius` on its corners. It kept square corners, and
   `ClipContent` on the canvas clipped only its children.
 - docs/drawing.md's example of decorative canvas art padded the canvas, which insets the
