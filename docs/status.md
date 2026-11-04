@@ -65,8 +65,10 @@ The milestone status, and the known limitations and next steps.
   outside yet. The breadcrumb of the details and the tree filter reach it.
 - **Platforms.** Windows is the supported platform. A Linux adapter for Wayland
   compositors is experimental (`internal/platform/linux`): it speaks the Wayland
-  protocol in pure Go, loads libxkbcommon with purego for keyboard layouts, and
-  draws on the CPU (`internal/render/soft`) into shared memory. It has windows,
+  protocol in pure Go, loads libxkbcommon with purego for keyboard layouts and
+  libfontconfig for the desktop's fonts (the UI, monospace and emoji fonts, and
+  a font for any character the others lack), and draws on the CPU
+  (`internal/render/soft`) into shared memory. It has windows,
   server or client-side decorations, fractional scaling, pointer, keyboard with
   compose, the clipboard (text and PNG), the desktop's dark mode, high contrast
   and reduced motion, file dialogs through the portal, OS notifications, and tray icons (StatusNotifierItem,
@@ -103,13 +105,19 @@ The milestone status, and the known limitations and next steps.
   - **Paragraph direction.** It is always left-to-right, so an Arabic-only
     paragraph is right-to-left inside but left-aligned. Arrow keys move in
     logical order through mixed-direction text.
-  - **Emoji.** Drawn in color on Windows, from the color layers (COLR
-    version 0) of Segoe UI Emoji, through DirectWrite; they fade with the text
-    color's alpha. Skin tones, VS16 and ZWJ sequences (such as woman
-    technologist, U+1F469 U+200D U+1F4BB) shape to one emoji. Not drawn in
-    color: emoji fonts with only bitmap or SVG glyphs, and COLR version 1
-    gradients. Keycaps (a digit, U+FE0F, U+20E3) take the digit from the text
-    font, and Windows has no flag emoji, so flags show as letters.
+  - **Emoji.** Drawn in color; they fade with the text color's alpha. On
+    Windows, DirectWrite draws the color layers (COLR version 0) of Segoe UI
+    Emoji. Elsewhere, a pure-Go rasterizer draws COLR version 0 layers, the
+    COLR version 1 paint graph (gradients, transforms and composites) and PNG
+    bitmap glyphs (CBDT and sbix), so Noto Color Emoji in both its COLRv1 and
+    bitmap builds is in color on Linux. The non-separable blend modes of COLR
+    version 1 (hue, saturation, color, luminosity) are drawn as source-over,
+    and variable color fonts in their default instance. Skin tones, VS16 and
+    ZWJ sequences (such as woman technologist, U+1F469 U+200D U+1F4BB) shape
+    to one emoji. Not drawn in color: fonts with only SVG color glyphs, and
+    COLR version 1 gradients on Windows. Keycaps (a digit, U+FE0F, U+20E3)
+    take the digit from the text font, and Windows has no flag emoji, so flags
+    show as letters.
   - **Rendering.** On Windows, glyph masks come from DirectWrite (hinted
     vertically: crossbars and x-height/cap-height edges land on whole pixels
     while stems keep their subpixel position). When the user has ClearType

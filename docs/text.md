@@ -70,6 +70,28 @@ ui.Text(body).HighlightMatches(query, ui.Highlight{Background: t.AccentSoft, Col
   has Regular and Semibold faces, is drawn Semibold. The family's own faces
   always come before the embedded Go fonts, so text never switches typeface
   because of its weight.
+- A character the text's font lacks is drawn with a fallback font. An app adds
+  its own with `app.New().FallbackFont(data)`, for example an emoji font or a CJK
+  font it needs on every system:
+
+  ```go
+  //go:embed fonts/NotoColorEmoji.ttf
+  var emoji []byte
+
+  app.New().FallbackFont(emoji).Run(app.Window{...})
+  ```
+
+  Fallback fonts registered this way are tried in order, before the platform's.
+  On Windows, the platform's are Segoe UI Emoji and the fonts for each script.
+  On Linux, fontconfig gives the UI font (`sans-serif`), the monospace font
+  (`monospace`), the emoji font (`emoji`) and a font for any other character;
+  without libfontconfig, jamb looks for Noto Sans and DejaVu at fixed paths, and
+  uses the embedded Go fonts when they are missing.
+- Emoji are drawn in color, and fade with the text color's alpha. On Windows,
+  DirectWrite draws the color layers of COLR version 0 fonts, such as Segoe UI
+  Emoji. Elsewhere, jamb draws COLR versions 0 and 1 (gradients included) and
+  PNG bitmap glyphs (CBDT and sbix) itself, so Noto Color Emoji and Twemoji are
+  in color. Fonts with only SVG color glyphs are drawn in one color.
 - Rich text is display-only. `TextArea` stays single-style.
 
 ## Selectable text

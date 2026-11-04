@@ -70,7 +70,7 @@ func TestChatStartsAtTheLatestMessage(t *testing.T) {
 	}
 	last, ok := c.rt.Find(rowKey(c.thread()[len(c.thread())-1]))
 	list, _ := c.rt.Find("thread")
-	if !ok || last.Y < list.Y || last.Y+last.H > list.Y+list.H {
+	if !ok || !inView(last, list) {
 		t.Errorf("the latest message is not in view (row %+v, list %+v)", last, list)
 	}
 }
@@ -128,7 +128,7 @@ func TestChatFollowsTheEndWhenAtIt(t *testing.T) {
 	c.settle()
 	row, ok := c.rt.Find(rowKey(m))
 	list, _ := c.rt.Find("thread")
-	if !ok || row.Y < list.Y || row.Y+row.H > list.Y+list.H {
+	if !ok || !inView(row, list) {
 		t.Errorf("the new message is not in view (row %+v, list %+v)", row, list)
 	}
 	if _, ok := c.rt.Find("jump-latest"); ok {
@@ -212,4 +212,11 @@ func TestSeededThreadsVary(t *testing.T) {
 			t.Errorf("%s has only %d distinct message lengths", p.Name, len(lengths))
 		}
 	}
+}
+
+// inView reports whether row lies inside list, give or take half a pixel, so
+// that the rounding of fractional line heights does not count as out of view.
+func inView(row, list ui.Rect) bool {
+	const slack = 0.5
+	return row.Y >= list.Y-slack && row.Y+row.H <= list.Y+list.H+slack
 }

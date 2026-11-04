@@ -29,3 +29,16 @@ func TestAppFontRegistersFaces(t *testing.T) {
 		t.Fatalf("error %v, want one that names the font", res.err)
 	}
 }
+
+// App.FallbackFont adds a fallback font to the text system, and data that is
+// not a font is an error.
+func TestAppFallbackFont(t *testing.T) {
+	res := loadText(New().FallbackFont(goregular.TTF).fonts, 14)
+	if res.err != nil {
+		t.Fatal(res.err)
+	}
+	res = loadText(New().FallbackFont([]byte("not a font")).fonts, 14)
+	if res.err == nil || !strings.Contains(res.err.Error(), "FallbackFont") {
+		t.Fatalf("error %v, want one that names FallbackFont", res.err)
+	}
+}

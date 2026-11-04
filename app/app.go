@@ -164,11 +164,13 @@ type App struct {
 	keepRunning bool
 }
 
-// appFont is a font given to App.Font.
+// appFont is a font given to App.Font, or to App.FallbackFont when fallback is
+// set.
 type appFont struct {
-	family string
-	weight ui.FontWeight
-	data   []byte
+	family   string
+	weight   ui.FontWeight
+	data     []byte
+	fallback bool
 }
 
 // New creates an application.
@@ -188,7 +190,23 @@ func New() *App { return &App{} }
 // The fonts are parsed while the first window opens. Data that is not a font
 // makes RunE return an error, and Run print it and exit.
 func (a *App) Font(family string, weight ui.FontWeight, data []byte) *App {
-	a.fonts = append(a.fonts, appFont{family, weight, data})
+	a.fonts = append(a.fonts, appFont{family: family, weight: weight, data: data})
+	return a
+}
+
+// FallbackFont registers a font file (TrueType or OpenType data) for the
+// characters that the font of a text lacks, for every window of the app: an
+// emoji font, or a font for a script the app needs on every system, such as a
+// CJK font. Fallback fonts are tried in the order they were registered, before
+// the platform's own fallback fonts. A color font draws in color where jamb
+// draws color glyphs (see docs/text.md).
+//
+//	app.New().FallbackFont(notoColorEmoji).Run(app.Window{...})
+//
+// Like Font, the fonts are parsed while the first window opens, and data that
+// is not a font makes RunE return an error.
+func (a *App) FallbackFont(data []byte) *App {
+	a.fonts = append(a.fonts, appFont{data: data, fallback: true})
 	return a
 }
 
@@ -480,7 +498,15 @@ func origin(cfg Window) *platform.Point {
 // it at the theme's font size.
 func loadText(fonts []appFont, size float32) textResult {
 	ts := text.NewSystem()
+	n := 0 // fallback fonts so far
 	for _, f := range fonts {
+		if f.fallback {
+			n++
+			if err := ts.Registry().AddFallback(fmt.Sprintf("fallback font %d", n), f.data); err != nil {
+				return textResult{err: fmt.Errorf("app.FallbackFont (fallback font %d): %w", n, err)}
+			}
+			continue
+		}
 		if err := ts.Registry().Register(f.family, f.weight, f.data); err != nil {
 			return textResult{err: fmt.Errorf("app.Font(%q, %d): %w", f.family, f.weight, err)}
 		}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-text/typesetting/di"
 	tsfont "github.com/go-text/typesetting/font"
+	"github.com/go-text/typesetting/harfbuzz"
 	"github.com/go-text/typesetting/language"
 	"github.com/go-text/typesetting/shaping"
 	"golang.org/x/image/font/sfnt"
@@ -355,6 +356,8 @@ func (sys *System) shapePieces(text []rune, plain *Font, pcs []piece, size fixed
 		return outs
 	}
 	for _, in := range ins {
+		// The face the previous part ended in, when it was a fallback face.
+		var carry *tsfont.Face
 		for _, p := range pcs {
 			a, b := max(in.RunStart, p.start), min(in.RunEnd, p.end)
 			if a >= b {
@@ -367,21 +370,46 @@ func (sys *System) shapePieces(text []rune, plain *Font, pcs []piece, size fixed
 				sub.RunStart, sub.RunEnd, sub.Face = from, to, face
 				outs = append(outs, sys.shaper.Shape(sub))
 			}
+			// Spaces and other characters that never switch the font stay in
+			// the face before them, as the segmenter keeps them for plain
+			// text. At the start of a part, they stay in the fallback face
+			// the part before ended in, so that a span does not move the
+			// spaces of right-to-left text out of its fallback font, and
+			// otherwise take the face of what follows.
 			from := a
-			var face *tsfont.Face
+			face := carry
 			for i := a; i < b; i++ {
-				f := fm.ResolveFace(text[i])
-				if i > from && f != face {
-					emit(from, i, face)
-					from = i
+				if keepsFace(text[i]) && (face != nil || i < b-1) {
+					continue
 				}
-				face = f
+				f := fm.ResolveFace(text[i])
+				if face == nil {
+					face = f
+				}
+				if f != face {
+					if i > from {
+						emit(from, i, face)
+					}
+					from, face = i, f
+				}
 			}
 			emit(from, b, face)
+			carry = nil
+			if face != p.font.face {
+				carry = face
+			}
 		}
 	}
 	sys.outs = outs
 	return outs
+}
+
+// keepsFace reports whether r never switches the font of the text around it:
+// go-text's segmenter rule for spaces, controls and default-ignorable
+// characters.
+func keepsFace(r rune) bool {
+	return unicode.In(r, unicode.Cc, unicode.Cs, unicode.Zl, unicode.Zp) ||
+		unicode.Is(unicode.Zs, r) && r != '\u1680' || harfbuzz.IsDefaultIgnorable(r)
 }
 
 // wrapParagraph shapes runes [start, end) (no newlines) and appends its lines.
