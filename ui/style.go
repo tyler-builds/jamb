@@ -67,6 +67,11 @@ const (
 	SpaceAround
 	// SpaceEvenly spreads the children with equal space between and around them. It applies to Justify only.
 	SpaceEvenly
+	// Baseline lines up the first lines of text of a row's children, so text of
+	// two sizes sits on one line (Align and AlignSelf in a row only). A child with
+	// no text sits with its bottom edge on the line. In a column or a grid it is
+	// Start.
+	Baseline
 )
 
 // Overflow controls clipping and scrolling.
@@ -554,6 +559,8 @@ func align(a Alignment) layout.Align {
 		return layout.AlignEnd
 	case Stretch:
 		return layout.AlignStretch
+	case Baseline:
+		return layout.AlignBaseline
 	}
 	return layout.AlignAuto
 }

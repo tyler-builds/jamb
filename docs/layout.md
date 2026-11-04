@@ -33,10 +33,27 @@ follows CSS Flexbox's automatic minimum size of flex items
 - The minimums of text grow with the Text size (`JAMB_TEXT_SCALE`). A control whose label
   is wider than a fixed `Width` should use `MinWidth` instead, so the control grows with
   its label.
+- **`Shrink(0)` keeps an item at its full size**, on a `Div` or a `Text`: a name keeps
+  its width while a `Truncate()` text beside it gives up the room.
 - **A stretched item keeps its cross-axis limits.** An item that stretches across a row
   (its height) or a column (its width) takes the line's size, but never less than its
   `MinHeight` or `MinWidth`, nor more than its `MaxHeight` or `MaxWidth`, as in CSS. A
   row 24 px tall holds a child with `MinHeight(ui.Px(32))` at 32 px.
+
+## Baseline alignment
+
+`Align(ui.Baseline)` on a row (or `AlignSelf(ui.Baseline)` on an item) lines up the
+first line of text of each item, so text of two sizes sits on one line, as CSS's
+`align-items: baseline` does. A container's baseline is that of the first text in
+it, and an item with no text, such as an icon, sits on the line with its bottom
+edge. The row is as tall as the tallest part above the line plus the tallest part
+below it. In a column or a grid, `Baseline` is `Start`.
+
+```go
+ui.Div().Row().Align(ui.Baseline).Gap(8).
+	Child(ui.Text(app.Name).FontSize(18).Semibold().Shrink(0)).
+	Child(ui.Text("by " + app.Developer).FontSize(13).TextColor(t.TextMuted).Truncate())
+```
 
 ## Grid layout
 
@@ -58,6 +75,9 @@ ui.Div().Grid(ui.Auto, ui.Fr(1), ui.Px(120)).Gap(12).
   as its window widens. It follows the grid's own width, so it needs no knowledge
   of the window or a sidebar. It must be the only column track. A grid with no
   width of its own, such as one a row sizes to its content, has one column.
+  `OnGridColumns(fn)` reports the count when it is first laid out and each time it
+  changes, for a strip that shows one row of as many cards as fit: what `fn` sets is
+  built again before the frame ends.
 - **Rows** are as tall as their tallest item. `GridRows(...)` sizes the first rows
   the same way (an `Fr` row shares the grid's height, when it has one); the rest
   fit their content.

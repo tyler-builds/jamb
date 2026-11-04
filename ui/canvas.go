@@ -30,7 +30,9 @@ import (
 // stay in the accessibility tree, inside the image. Role(access.RoleUnknown)
 // makes the drawing decoration: the canvas has no node, and its children are
 // read as the children of a plain Div are. The default size wins over insets,
-// so a canvas that fills its parent needs Size(Full, Full).
+// so a canvas that fills its parent needs Size(Full, Full). The drawing fills the
+// content box, inside any padding, with the canvas's Radius on its corners; to
+// lay text over art that reaches the edges, pad a child Div, not the canvas.
 //
 //	ui.Canvas(func(p *ui.Painter, w, h float32) {
 //		line := ui.NewPath().MoveTo(0, h).LineTo(w/2, 10).LineTo(w, h/2)
@@ -486,7 +488,17 @@ func (rt *Runtime) paintCanvas(n *node, x, y, w, h float32, fg Color, opacity fl
 	} else if !cs.caret.due.IsZero() {
 		rt.noteDue(cs.caret.due) // the drawing is kept, and its caret's next change is still due
 	}
-	rt.scene.AddImage(scene.ImageDraw{Bounds: dst, Texture: cs.tex, Opacity: opacity})
+	// The drawing takes the canvas's rounded corners, made smaller by the border
+	// and padding between them and the content box, as CSS rounds a content box.
+	r := s.radii()
+	inner := func(rad, a, b float32) float32 { return max(rad-max(a, b), 0) }
+	radii := Corners{
+		TopLeft:     inner(r.TopLeft, be.Left+s.Padding.Left, be.Top+s.Padding.Top),
+		TopRight:    inner(r.TopRight, be.Right+s.Padding.Right, be.Top+s.Padding.Top),
+		BottomRight: inner(r.BottomRight, be.Right+s.Padding.Right, be.Bottom+s.Padding.Bottom),
+		BottomLeft:  inner(r.BottomLeft, be.Left+s.Padding.Left, be.Bottom+s.Padding.Bottom),
+	}
+	rt.scene.AddImage(scene.ImageDraw{Bounds: dst, Texture: cs.tex, Radii: rt.corners(radii), Opacity: opacity})
 	if len(cs.texts) == 0 {
 		return
 	}

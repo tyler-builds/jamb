@@ -105,10 +105,15 @@ well as `Absolute().Inset(0)`. For art that is only decoration, behind text and
 controls of its own, take away the image with `Role(access.RoleUnknown)`: the
 canvas then has no node, and its children are read as if it were a plain `Div`.
 
+The drawing fills the canvas's content box, inside any padding, as a `<canvas>`
+does in CSS, and takes the canvas's `Radius` on its corners. To lay text over art
+that reaches the edges, put the padding on a child `Div`, not on the canvas:
+
 ```go
-ui.Canvas(drawBanner).Size(ui.Full, ui.Px(220)).Role(access.RoleUnknown).Padding(24).
-	Child(ui.Text("Featured").FontSize(22)).
-	Child(ui.Button("Open").OnClick(open))
+ui.Canvas(drawBanner).Size(ui.Full, ui.Px(220)).Radius(20).Role(access.RoleUnknown).
+	Child(ui.Div().Column().Gap(12).Padding(24).
+		Child(ui.Text("Featured").FontSize(22)).
+		Child(ui.Button("Open").OnClick(open)))
 ```
 
 ## Charts

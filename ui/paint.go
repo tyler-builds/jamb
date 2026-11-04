@@ -260,6 +260,13 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 			n.div.vlist.before(n)
 		}
 		sx, sy = rt.scrollStep(n, dt)
+		// The content moves by whole device pixels. Each element inside rounds
+		// its own position to the pixel grid (text at its baseline, an icon at its
+		// top), so a fractional offset moved some of them a pixel more than the
+		// others: in a list that scrolls by a pixel or two, the icons moved and
+		// the labels beside them did not.
+		sx = rt.snapScroll(sx, max(n.lay.ContentW-n.lay.W, 0))
+		sy = rt.snapScroll(sy, max(n.lay.ContentH-n.lay.H, 0))
 		if n.div != nil && n.div.vlist != nil && n.div.vlist.sticky && len(n.children) > 1 {
 			// The header is the child after the rows. It is moved to the top of
 			// the viewport before the children are painted.
@@ -699,4 +706,17 @@ func (rt *Runtime) imageTexture(n *node) *scene.Texture {
 		rt.wakeAt(due)
 	}
 	return tex
+}
+
+// snapScroll rounds a scroll offset to whole device pixels. An offset at the end
+// of its range, end, rounds up, so the end of the content stays in view.
+func (rt *Runtime) snapScroll(v, end float32) float32 {
+	if rt.scale <= 0 || v == 0 {
+		return v
+	}
+	d := float64(v * rt.scale)
+	if v >= end-0.001 {
+		return float32(math.Ceil(d-0.001)) / rt.scale
+	}
+	return float32(math.Round(d)) / rt.scale
 }

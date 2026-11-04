@@ -168,6 +168,15 @@ func (t *TextElement) GridSpan(cols, rows int) *TextElement {
 	return t
 }
 
+// Shrink sets how much the text gives up when its row is too narrow, relative
+// to the items beside it; 1 by default. Shrink(0) keeps the text at its full
+// width, so a name keeps its width while the text beside it truncates.
+func (t *TextElement) Shrink(f float32) *TextElement {
+	t.style.Shrink = f
+	t.style.NoShrink = f == 0
+	return t
+}
+
 // Basis sets the text's starting size along its parent's main axis, before free
 // space is shared out, as DivElement.Basis does. Grow(1).Basis(Px(0)) shares a
 // row equally with the items beside it.

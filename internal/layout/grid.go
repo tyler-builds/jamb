@@ -41,6 +41,16 @@ func (n *Node) autoFill() float32 {
 	return 0
 }
 
+// GridColumns returns the number of columns n's grid has at its laid-out width:
+// as many as an AutoFill track made, or the number of its tracks. It is 0 when n
+// is not a grid.
+func (n *Node) GridColumns() int {
+	if !n.isGrid() {
+		return 0
+	}
+	return len(n.columns(max(n.W-n.padH(), 0)))
+}
+
 // columns returns the column tracks of n's grid for a content width of width:
 // its Columns, or for an AutoFill grid as many Fr(1) columns as fit, at least one.
 func (n *Node) columns(width float32) []Length {

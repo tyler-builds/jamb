@@ -7,6 +7,29 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-04
+
+### Added
+
+- `ui.Baseline` for `Align` and `AlignSelf` in a row lines up the first line of text of each
+  item, so text of two sizes sits on one line. See docs/layout.md.
+- `Text.Shrink`, as on a `Div`: `Shrink(0)` keeps a text at its full width in a shrinking row.
+- `DivElement.OnGridColumns(fn)` reports the number of columns of a grid, as many as an
+  `AutoFill` track made, when it is first laid out and each time it changes.
+
+### Fixed
+
+- Scroll containers move their content by whole device pixels. Text and icons each rounded
+  their own position to the pixel grid, so a fractional scroll offset moved an icon a pixel
+  more or less than the label beside it. In a list that scrolls by a few pixels, such as a
+  sidebar that barely overflows, the icons and headings moved while the labels seemed not to.
+  At the end of its range an offset rounds up, so the end of the content stays in view.
+- A canvas's drawing takes the canvas's `Radius` on its corners. It kept square corners, and
+  `ClipContent` on the canvas clipped only its children.
+- docs/drawing.md's example of decorative canvas art padded the canvas, which insets the
+  drawing; the padding now goes on a child `Div`. The drawing fills the content box, as
+  documented on `ui.Canvas`.
+
 ## [0.6.0] - 2026-11-04
 
 This release brings preliminary Linux support: windows on Wayland desktops, drawn on the CPU,
@@ -784,7 +807,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/tyler-builds/jamb/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/tyler-builds/jamb/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/tyler-builds/jamb/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tyler-builds/jamb/compare/v0.3.0...v0.4.0

@@ -96,6 +96,7 @@ type DivElement struct {
 	actions      []actionHandler // see OnAction
 	drops        []DropTarget    // see OnDrop
 	handle       *FocusHandle
+	onGridCols   func(n int)  // see OnGridColumns
 	extent       *extentWatch // set by Tabs: paint reports the element's scroll offset and range (see extentWatch)
 	vlist        *listState   // set on the scroll container of a UniformList
 	vrows        *varState    // set on the scroll container of a ListOf
@@ -264,6 +265,20 @@ func (d *DivElement) Grid(columns ...Length) *DivElement {
 	return d
 }
 
+// OnGridColumns calls fn with the number of columns of the element's grid when
+// it is first laid out and each time it changes, as with an AutoFill track whose
+// window is resized. fn may set signals: what it changes is built and laid out
+// again before the frame ends, so it is never shown a frame late. Use it for a
+// strip that shows one row of as many cards as fit:
+//
+//	cols := ui.Local(ctx, "cols", 1)
+//	ui.Div().Grid(ui.AutoFill(260)).Gap(16).OnGridColumns(cols.Set).
+//		Children(cards(apps[:min(cols.Get(), len(apps))])...)
+//
+// The count depends only on the grid's width and gap, not on its children, so
+// changing the children in fn does not change it again.
+func (d *DivElement) OnGridColumns(fn func(n int)) *DivElement { d.onGridCols = fn; return d }
+
 // GridRows sizes the first rows of a grid, as Grid sizes its columns; rows
 // past them fit their content. Fr rows share the grid's height, when it has
 // one.
@@ -386,7 +401,8 @@ func (d *DivElement) Shrink(f float32) *DivElement {
 	return d
 }
 
-// Align positions children on the cross axis: Start, Center, End, Stretch.
+// Align positions children on the cross axis: Start, Center, End, Stretch, or, in
+// a row, Baseline.
 func (d *DivElement) Align(a Alignment) *DivElement { d.style.Align = a; return d }
 
 // AlignSelf overrides the parent's Align for this element.
