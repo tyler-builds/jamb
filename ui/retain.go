@@ -101,6 +101,7 @@ func (rt *Runtime) park(inst *componentInstance) {
 	forNodes(inst.root, func(n *node) {
 		if rt.byID[n.id] == n {
 			delete(rt.byID, n.id)
+			delete(rt.gridWatches, n.id)
 		}
 		if n.flags&flagOutside != 0 {
 			rt.outside = slices.DeleteFunc(rt.outside, func(o *node) bool { return o.id == n.id })

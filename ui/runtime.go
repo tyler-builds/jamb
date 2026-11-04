@@ -45,7 +45,8 @@ const (
 
 // nodeState is per-element state that survives rebuilds, keyed by element ID.
 type nodeState struct {
-	gen uint32
+	gridCols int // the column count last reported to OnGridColumns
+	gen      uint32
 
 	// imageStart is when an animated image was first drawn (see imageTexture).
 	imageStart time.Time
@@ -209,6 +210,23 @@ func (n *node) Measure(maxWidth float32) (float32, float32) {
 	return 0, 0
 }
 
+// Baseline implements layout.Baseliner: the baseline of a text's first line, or
+// of a text field's.
+func (n *node) Baseline(width float32) (float32, bool) {
+	switch n.kind {
+	case kindText:
+		if width <= 0 {
+			width = float32(math.Inf(1))
+		}
+		l := n.textLayout(width)
+		if len(l.Lines) == 0 {
+			return 0, false
+		}
+		return l.Lines[0].Baseline, true
+	}
+	return 0, false
+}
+
 // MinContentWidth implements layout.MinContenter. Text wraps, and so does a text
 // field: its min-content width is the room for fieldMinChars characters, so a field
 // does not shrink to a letter in a shrinking row. The other kinds do not wrap.
@@ -324,6 +342,7 @@ type Runtime struct {
 	pausedAnims           map[*componentInstance]struct{}    // running Animate instances the last paint did not draw (see settleAnims)
 	graceAnims            map[*componentInstance]struct{}    // Animate instances the last paint did not draw, given one more render first
 	listStale             bool                               // a UniformList (or a strip whose extent changed) must rebuild before the frame ends
+	gridWatches           map[uint64]*node                   // the grids with OnGridColumns, by node ID (see reportGridColumns)
 	splitWatches          map[*componentInstance]*splitWatch // the splits that size their panes from their length (see splitsResized)
 	titleWatches          map[*componentInstance]float32     // the title bars with a centered element, and the inset each rendered with (see titleBarsResized)
 	toasts                []*toastEntry                      // the stack of toasts, oldest first (see Context.Toast)
@@ -960,6 +979,7 @@ func (rt *Runtime) layout() {
 	rt.markAccess()
 	rt.engine.Compute(&rt.tree.lay, rt.viewW, rt.viewH)
 	rt.needLayout, rt.needPaint = false, true
+	rt.reportGridColumns()
 	rt.stats.LaidOut = true
 	rt.stats.LayoutTime += time.Since(t0)
 	rt.stats.NodesLaidOut += rt.engine.Arranged
@@ -1258,6 +1278,7 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	leaving := rt.byID[n.id] == n
 	if leaving {
 		delete(rt.byID, n.id)
+		delete(rt.gridWatches, n.id)
 		if n.st != nil {
 			// What the element would have reported at its end will not come.
 			n.st.enterDone.cancel()
@@ -1467,6 +1488,14 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		}
 		if e.noDisplay {
 			n.flags |= flagNoDisplay
+		}
+		if e.onGridCols != nil {
+			if rt.gridWatches == nil {
+				rt.gridWatches = map[uint64]*node{}
+			}
+			rt.gridWatches[n.id] = n
+		} else if rt.gridWatches != nil {
+			delete(rt.gridWatches, n.id)
 		}
 		rt.attachFocus(n)
 		n.style = rt.resolveStyle(n)
@@ -1871,3 +1900,21 @@ func contains(ids []uint64, id uint64) bool {
 
 func (rt *Runtime) isHovered(id uint64) bool { return contains(rt.hoverIDs, id) }
 func (rt *Runtime) isPressed(id uint64) bool { return contains(rt.pressIDs, id) }
+
+// reportGridColumns calls the OnGridColumns of each grid whose column count has
+// changed since it was last reported. It runs after layout, whether or not the
+// grid is drawn, since an empty grid has no height to be drawn in. What the
+// functions change is built before the frame ends (see listStale).
+func (rt *Runtime) reportGridColumns() {
+	for id, n := range rt.gridWatches {
+		if rt.byID[id] != n || n.div == nil || n.div.onGridCols == nil || n.flags&flagNoDisplay != 0 {
+			continue
+		}
+		st := rt.state(id)
+		if cols := n.lay.GridColumns(); cols > 0 && cols != st.gridCols {
+			st.gridCols = cols
+			n.div.onGridCols(cols)
+			rt.listStale = true
+		}
+	}
+}

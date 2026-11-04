@@ -434,6 +434,9 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 				it.align = AlignStretch
 			}
 		}
+		if it.align == AlignBaseline && !row {
+			it.align = AlignStart
+		}
 		crossLen := cs.Width
 		mainLen := cs.Height
 		minL, maxL := cs.MinHeight, cs.MaxHeight
@@ -570,6 +573,23 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 			ln.cross = max(ln.cross, it.cross+it.marginCross)
 		}
 		ln.main += gaps
+		// Baseline items share a line: the line is as tall as the tallest part
+		// above the shared baseline plus the tallest part below it.
+		var above, below float32
+		baseline := false
+		for i := range its {
+			it := &its[i]
+			if it.align != AlignBaseline {
+				continue
+			}
+			baseline = true
+			b := e.baselineOf(it.n, it.main, false) + it.n.Style.Margin.Top
+			above = max(above, b)
+			below = max(below, it.cross+it.marginCross-b)
+		}
+		if baseline {
+			ln.cross = max(ln.cross, above+below)
+		}
 		if !s.Wrap && !isNaN(crossSize) {
 			ln.cross = crossSize // a single line spans the container
 		}
@@ -644,6 +664,23 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 			}
 			cursor += it.main + it.marginMain + between
 			e.arrange(c)
+		}
+		// Baseline items move down so that their first baselines meet, now that
+		// their children are placed and their baselines known.
+		var shared float32
+		baseline := false
+		for i := range its {
+			if its[i].align == AlignBaseline {
+				baseline = true
+				shared = max(shared, e.baselineOf(its[i].n, its[i].main, true))
+			}
+		}
+		if baseline {
+			for i := range its {
+				if c := its[i].n; its[i].align == AlignBaseline {
+					c.Y += shared - e.baselineOf(c, its[i].main, true)
+				}
+			}
 		}
 		lineStart += ln.cross + s.Gap
 	}
@@ -875,4 +912,48 @@ func (e *Engine) arrangeAbsolute(n *Node) {
 		c.X, c.Y, c.W, c.H = x, y, w, h
 		e.arrange(c)
 	}
+}
+
+// baselineOf returns the distance from the top of n's border box to its first
+// baseline, for an item width wide. A leaf's comes from its Baseliner; a
+// container's is that of its first in-flow child with one, where the child sits
+// once arranged (arranged) or at the top of the content box (while the line's
+// height is measured). A node with no text has its bottom edge as its baseline.
+func (e *Engine) baselineOf(n *Node, width float32, arranged bool) float32 {
+	if b, ok := e.firstBaseline(n, width, arranged); ok {
+		return b
+	}
+	if arranged {
+		return n.H
+	}
+	_, h := e.measure(n, nan, nan, inf, width, nan)
+	return h
+}
+
+func (e *Engine) firstBaseline(n *Node, width float32, arranged bool) (float32, bool) {
+	s := &n.Style
+	top := s.Padding.Top + s.Border.Top
+	if n.Measure != nil {
+		if bl, ok := n.Measure.(Baseliner); ok {
+			if b, ok := bl.Baseline(max(width-n.padH(), 0)); ok {
+				return top + b, true
+			}
+		}
+		return 0, false
+	}
+	for _, c := range n.Children {
+		cs := &c.Style
+		if cs.Position != Relative || cs.Hidden {
+			continue
+		}
+		cw := max(width-n.padH()-cs.Margin.Left-cs.Margin.Right, 0)
+		y := top + cs.Margin.Top
+		if arranged {
+			cw, y = c.W, c.Y
+		}
+		if b, ok := e.firstBaseline(c, cw, arranged); ok {
+			return y + b, true
+		}
+	}
+	return 0, false
 }

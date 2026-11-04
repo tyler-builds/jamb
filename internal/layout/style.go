@@ -78,6 +78,11 @@ const (
 	AlignCenter
 	AlignEnd
 	AlignStretch
+	// AlignBaseline lines up the first baselines of a row's items: the first
+	// line of text in each (see Baseliner). An item with no text is aligned at
+	// its bottom edge, as CSS synthesizes a baseline. In a column, and in a
+	// grid, it is AlignStart.
+	AlignBaseline
 )
 
 // Justify distributes items on the main axis.
@@ -189,6 +194,13 @@ type Grid struct {
 // should wrap to maxWidth where they can and return the size they need.
 type Measurer interface {
 	Measure(maxWidth float32) (width, height float32)
+}
+
+// Baseliner is implemented by a leaf with text. Baseline returns the distance
+// from the top of its content box to the baseline of its first line, laid out
+// width wide, and false when it has no text.
+type Baseliner interface {
+	Baseline(width float32) (float32, bool)
 }
 
 // MinContenter is implemented by a leaf whose content wraps. MinContentWidth
