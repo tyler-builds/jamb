@@ -207,6 +207,21 @@ type queryCache struct {
 	entries map[string]*queryEntry
 }
 
+// Fetching reports whether a Query of the window has a fetch in flight or waits to
+// retry one. Settled does not count fetches, since they run in real time; the
+// JAMB_SCRIPT idle step waits for both. Call it on the UI goroutine.
+func (rt *Runtime) Fetching() bool {
+	if rt.queries == nil {
+		return false
+	}
+	for _, e := range rt.queries.entries {
+		if e.fetching {
+			return true
+		}
+	}
+	return false
+}
+
 // queryCache returns the runtime's cache, making it on first use.
 func (rt *Runtime) queryCache() *queryCache {
 	if rt.queries == nil {

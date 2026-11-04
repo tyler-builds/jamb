@@ -197,6 +197,7 @@ func resolveButton(ctx *Context, v ButtonVariant, size controlSize, iconOnly boo
 type ButtonElement struct {
 	label    string
 	icon     *icons.Icon
+	iconEnd  bool // the icon follows the label (see IconEnd)
 	variant  ButtonVariant
 	ctlSize  controlSize // see Small and Large
 	disabled bool
@@ -232,7 +233,14 @@ func (b *ButtonElement) Key(k string) *ButtonElement { b.key = k; return b }
 func (b *ButtonElement) OnClick(fn func()) *ButtonElement { b.onClick = fn; return b }
 
 // Icon sets an icon drawn before the button's label.
-func (b *ButtonElement) Icon(ic *icons.Icon) *ButtonElement { b.icon = ic; return b }
+func (b *ButtonElement) Icon(ic *icons.Icon) *ButtonElement { b.icon, b.iconEnd = ic, false; return b }
+
+// IconEnd sets an icon drawn after the button's label, as in "See all →". It
+// replaces an icon set with Icon. A loading button's ring takes its place.
+func (b *ButtonElement) IconEnd(ic *icons.Icon) *ButtonElement {
+	b.icon, b.iconEnd = ic, true
+	return b
+}
 
 // Variant sets the button's look (see ButtonVariant).
 func (b *ButtonElement) Variant(v ButtonVariant) *ButtonElement { b.variant = v; return b }
@@ -263,7 +271,9 @@ func (b *ButtonElement) Disabled(d bool) *ButtonElement { b.disabled = d; return
 // UIA Invoke and a modal's Default do nothing. It keeps focus, its Tab stop and
 // its width: the ring takes the icon's place, or sits over the label, which is
 // hidden. Assistive technology hears the same name, with the status
-// Strings.Loading; announce the wait if it needs to be heard (see Announce).
+// Strings.Loading and access.StateBusy (aria-busy through UI Automation's
+// AriaProperties); announce the wait if it needs to be heard (see Announce).
+// A uitest Click on it fails the test.
 // Disabled(true) wins over Loading.
 func (b *ButtonElement) Loading(on bool) *ButtonElement { b.loading = on; return b }
 
@@ -378,14 +388,17 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 	if busy {
 		ring = loadingRing(iconSize, st.Root.Merge(st.RootLoading).TextColor, t)
 	}
+	var ic *DivElement
 	if b.icon != nil {
-		ic := Div().asPart("Button.Icon").Style(st.Icon)
+		ic = Div().asPart("Button.Icon").Style(st.Icon)
 		if ring != nil {
 			ic.Child(ring) // the ring takes the icon's place, at its size
 		} else {
 			ic.Child(Icon(b.icon).Size(iconSize))
 		}
-		d.Child(ic)
+		if !b.iconEnd {
+			d.Child(ic)
+		}
 	}
 	if b.label != "" {
 		label := Div().asPart("Button.Label").Style(st.Label).Child(Text(b.label).NoWrap())
@@ -399,11 +412,14 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 			d.Child(label)
 		}
 	}
+	if ic != nil && b.iconEnd {
+		d.Child(ic)
+	}
 	d.Tooltip(b.tooltip)
 	a := d.access()
 	a.role, a.name, a.disabled, a.inert = access.RoleButton, b.name, b.disabled, b.inert
 	if busy {
-		a.status = ctx.Strings().Loading
+		a.status, a.busy = ctx.Strings().Loading, true
 	}
 	if b.toggle {
 		a.toggle, a.checked, a.checkedSet = true, b.checked, true

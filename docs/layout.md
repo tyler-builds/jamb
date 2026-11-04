@@ -52,6 +52,12 @@ ui.Div().Grid(ui.Auto, ui.Fr(1), ui.Px(120)).Gap(12).
 - **Columns.** `ui.Px` and `ui.Percent` take that width. `ui.Auto` fits the widest
   item in the column, and shrinks towards the narrowest wrap of its text when the
   grid is too narrow. `ui.Fr(n)` takes n shares of what the others leave.
+- **Responsive columns.** `Grid(ui.AutoFill(280))` makes as many equal columns as
+  fit the grid's width, each at least 280 px wide, as CSS's
+  `repeat(auto-fill, minmax(280px, 1fr))` does, so a grid of cards gains a column
+  as its window widens. It follows the grid's own width, so it needs no knowledge
+  of the window or a sidebar. It must be the only column track. A grid with no
+  width of its own, such as one a row sizes to its content, has one column.
 - **Rows** are as tall as their tallest item. `GridRows(...)` sizes the first rows
   the same way (an `Fr` row shares the grid's height, when it has one); the rest
   fit their content.

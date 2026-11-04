@@ -21,6 +21,17 @@ func Percent(v float32) Length { return layout.Percent(v) }
 // tracks leave (see DivElement.Grid). Elsewhere it acts as Auto.
 func Fr(v float32) Length { return layout.Fr(v) }
 
+// AutoFill is a grid column track that repeats as many times as fit the grid's
+// width, each column at least minWidth wide and all of them sharing the width
+// equally, as CSS's repeat(auto-fill, minmax(minWidth, 1fr)) does: a grid of
+// cards that gains a column as its window widens. The columns follow the grid's
+// own width, not the window's. It must be the grid's only column track; a grid
+// with no width of its own, such as one a row sizes to its content, has one
+// column.
+//
+//	ui.Div().Grid(ui.AutoFill(280)).Gap(16).Children(cards...)
+func AutoFill(minWidth float32) Length { return layout.AutoFill(minWidth) }
+
 // Auto sizes from content (or stretches, depending on alignment).
 var Auto = layout.Auto
 
@@ -358,6 +369,7 @@ func (s Style) Merge(o Style) Style {
 	if o.GridRows != nil {
 		s.GridRows = o.GridRows
 	}
+
 	if o.ColSpan != 0 {
 		s.ColSpan = o.ColSpan
 	}

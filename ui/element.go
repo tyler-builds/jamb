@@ -247,7 +247,8 @@ func (d *DivElement) Row() *DivElement { d.style.Direction = Row; return d }
 
 // Grid lays the children out in a grid, in place of a row or column: one cell
 // each, row by row, with a column for each size in columns. A column of Px or
-// Percent takes that width; Auto fits its widest item (shrinking towards the
+// Percent takes that width; AutoFill, as the only track, makes as many equal
+// columns as fit; Auto fits its widest item (shrinking towards the
 // narrowest wrap of its text when the grid is too narrow); Fr takes a share of
 // what the others leave. Rows are as tall as their tallest item, unless
 // GridRows sizes them. Gap separates rows and columns. A child covers more

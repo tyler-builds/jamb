@@ -183,6 +183,11 @@ type Theme struct {
 	Tag TagStyle
 	// GroupBox is the look of every group box, outlined or filled.
 	GroupBox GroupBoxStyle
+	// Card is the look of every card, whatever its variant. Cards is the look of
+	// each variant, and merges over Card.
+	Card CardStyle
+	// Cards is the look of each card variant, and merges over Card.
+	Cards CardVariants
 	// DescriptionList is the look of every description list.
 	DescriptionList DescriptionListStyle
 	// Kbd is the look of every keyboard shortcut drawn as key caps.

@@ -68,6 +68,7 @@ const (
 	propOrientation          = 30023
 	propIsRequiredForForm    = 30025 // UIA_IsRequiredForFormPropertyId
 	propIsDataValidForForm   = 30103 // UIA_IsDataValidForFormPropertyId
+	propAriaProperties       = 30102 // UIA_AriaPropertiesPropertyId
 	propPositionInSet        = 30152
 	propSizeOfSet            = 30153
 	propLevel                = 30154
@@ -527,6 +528,11 @@ func nodeProperty(id int32, n *access.Node, focused bool) variant {
 	case propItemStatus:
 		if n.ItemStatus != "" {
 			return variantBSTR(n.ItemStatus)
+		}
+	case propAriaProperties:
+		// UIA has no busy property; screen readers read aria-busy from here.
+		if n.States.Has(access.StateBusy) {
+			return variantBSTR("busy=true")
 		}
 	case propWindowIsModal:
 		if n.Role.IsDialog() {

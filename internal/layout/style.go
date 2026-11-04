@@ -23,6 +23,9 @@ const (
 	UnitPercent
 	// UnitFr is a share of a grid's free space (see Fr); elsewhere it is Auto.
 	UnitFr
+	// UnitAutoFill is a grid's only column track that repeats as often as it
+	// fits (see AutoFill); elsewhere it is Auto.
+	UnitAutoFill
 )
 
 // Length is a size or offset.

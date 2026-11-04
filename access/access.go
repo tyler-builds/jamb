@@ -162,6 +162,7 @@ const (
 	StatePassword                             // a password field: its text is hidden (UI Automation IsPassword), as in a masked OTPInput
 	StateMultiSelectable                      // the selection container takes more than one item (see StateSelectionContainer)
 	StateNonModal                             // a dialog that leaves the window behind it usable, so it is not a modal window
+	StateBusy                                 // the node is working and takes no input until it is done, such as a loading button
 )
 
 // Has reports whether all the flags in f are set.
@@ -190,6 +191,7 @@ var stateNames = [...]struct {
 	{StatePassword, "password"},
 	{StateMultiSelectable, "multi-selectable"},
 	{StateNonModal, "non-modal"},
+	{StateBusy, "busy"},
 }
 
 // String lists the flags that are set, such as "focusable focused".

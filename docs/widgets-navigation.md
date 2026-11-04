@@ -284,6 +284,7 @@ ui.Sidebar(page, // *ui.Signal[string]: the selected item's key
 	ui.SidebarHeading("Mail"),
 	ui.SidebarItem{Key: "inbox", Label: "Inbox", Icon: icons.Inbox, Badge: 4},
 	ui.SidebarItem{Key: "sent", Label: "Sent", Icon: icons.Home, Disabled: true},
+	ui.SidebarDivider(), // a plain rule between groups, not read by assistive technology
 	ui.SidebarHeading("Tags"),
 	ui.SidebarItem{Key: "archive", Label: "Archive", Icon: icons.Search},
 ).Key("main-nav").Label("Main navigation").
@@ -295,7 +296,7 @@ ui.Sidebar(page, // *ui.Signal[string]: the selected item's key
 
 - **Selection.** A click on an item, or Enter or Space on it, selects it and runs
   `OnChange`. Up and Down move the focus to the previous and next enabled item,
-  without wrapping, and skip the headings and the disabled items. Home and End go
+  without wrapping, and skip the headings, the dividers and the disabled items. Home and End go
   to the first and last enabled item. Focus follows the keys, but the selection
   does not change until Enter, Space or a click, as NavigationView does.
 - **Tab stop.** The pane is one Tab stop, at the selected item, or at the first
@@ -311,9 +312,37 @@ ui.Sidebar(page, // *ui.Signal[string]: the selected item's key
   "Expand navigation", which reports the expanded state. `Tooltip(s)` shows s over
   the pane and is read as its description; an item of a collapsed pane shows its own
   label instead.
+- **Selection bar.** The selected item has a bar at its left, so the selection is not
+  shown by color alone. `NoIndicator()` leaves it out of one sidebar, and the theme's
+  `Sidebar.Indicator: ui.Style{Clear: ui.ClearBackground}` out of every one; give
+  `ItemSelected` another mark that is not a color, such as a bold label, when you do.
 - **Layout.** The pane takes the height of its row, so put it in a row beside the
   content. Its items scroll when they do not fit, and the header and the footer stay
   in place.
+
+## Cards
+
+`ui.Card()` is a surface that holds related content, such as one result in a grid. It is
+filled with the `Surface` color by default; `Outlined()` draws a border instead. The
+children are laid out in a column with a gap of 8 and padding of 16; `Row()`, `Gap`,
+`Padding` and `Align` change that, and `Padding(0)` removes the padding. Its look is
+`ui.CardStyle`: per app in `Theme.Card`, per variant in `Theme.Cards`, or per instance with
+`Styles`.
+
+```go
+ui.Card().Child(ui.Text("Storage").Semibold()).Child(usageBar)
+ui.Card().Outlined().Row().Gap(12).Label("Firefox, web browser").
+	OnClick(func() { open("firefox") }).
+	Child(ui.Image(icon).Size(ui.Px(48), ui.Px(48))).
+	Child(ui.Text("Firefox"))
+```
+
+- **Clickable.** With `OnClick` the whole card is one button: it takes keyboard focus,
+  runs on a click, Enter and Space, and shows `CardHover`, `CardPressed` and
+  `CardFocusVisible`. Assistive technology reads it as a button named by `Label`, or by
+  its text when it has no label. Put no other control inside a clickable card.
+- **High contrast.** Both variants are the window color outlined in the text color, and a
+  hovered or pressed clickable card's border is the highlight color.
 
 ## Group boxes
 

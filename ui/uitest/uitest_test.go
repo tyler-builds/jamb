@@ -257,3 +257,65 @@ func firstLine(s string) string {
 	first, _, _ := strings.Cut(s, "\n")
 	return first
 }
+
+// scopedRoot has two buttons named Remove, one on the page and one in a named
+// group, and a loading and a disabled button.
+func scopedRoot(removed *string) func(*ui.Context) ui.Element {
+	return func(*ui.Context) ui.Element {
+		return ui.Div().Column().
+			Child(ui.Div().Key("page").Child(ui.Button("Remove").OnClick(func() { *removed = "page" }))).
+			Child(ui.Div().Role(access.RoleGroup).Label("Confirm").
+				Child(ui.Button("Remove").OnClick(func() { *removed = "dialog" }))).
+			Child(ui.Button("Install").Key("install").Loading(true)).
+			Child(ui.Button("Save").Key("save").Disabled(true))
+	}
+}
+
+// A search inside an element finds the control of that name in it, by role or
+// by key, and HasRole never fails.
+func TestFindingInsideAnElement(t *testing.T) {
+	var removed string
+	u := uitest.New(t, scopedRoot(&removed))
+	u.ByRole(access.RoleGroup, "Confirm").ByRole(access.RoleButton, "Remove").Click()
+	if removed != "dialog" {
+		t.Errorf("clicked the %q Remove, want the dialog's", removed)
+	}
+	u.Get("page").ByRole(access.RoleButton, "Remove").Click()
+	if removed != "page" {
+		t.Errorf("clicked the %q Remove, want the page's", removed)
+	}
+	if !u.HasRole(access.RoleButton, "Remove") || u.HasRole(access.RoleButton, "Delete") {
+		t.Error("HasRole: want true for Remove and false for Delete")
+	}
+	if !u.HasName("Confirm") || u.HasName("Nobody") {
+		t.Error("HasName: want true for Confirm and false for Nobody")
+	}
+	if u.Get("page").HasRole(access.RoleButton, "Install") {
+		t.Error(`page.HasRole("Install") = true, want false: it is not on the page`)
+	}
+	msg := fails(t, func(tb testing.TB) {
+		uitest.New(tb, scopedRoot(&removed)).Get("page").ByRole(access.RoleButton, "Install")
+	})
+	if want := `no button named "Install" inside the element with key "page"`; !strings.Contains(msg, want) {
+		t.Errorf("failure %q, want it to contain %q", firstLine(msg), want)
+	}
+}
+
+// A loading button is busy to assistive technology, and clicking it or a
+// disabled button fails the test instead of doing nothing.
+func TestClickFailsOnBusyOrDisabledTarget(t *testing.T) {
+	var removed string
+	u := uitest.New(t, scopedRoot(&removed))
+	if s := u.Get("install").States(); !s.Has(access.StateBusy) {
+		t.Errorf("loading button states %v, want busy", s)
+	}
+	for key, want := range map[string]string{
+		"install": `cannot click the element with key "install": it is busy`,
+		"save":    `cannot click the element with key "save": it is disabled`,
+	} {
+		msg := fails(t, func(tb testing.TB) { uitest.New(tb, scopedRoot(&removed)).Get(key).Click() })
+		if !strings.Contains(msg, want) {
+			t.Errorf("%s: failure %q, want it to contain %q", key, firstLine(msg), want)
+		}
+	}
+}

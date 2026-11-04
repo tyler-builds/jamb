@@ -9,6 +9,7 @@ package text
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"runtime"
 	"slices"
@@ -57,6 +58,10 @@ type Font struct {
 	path      string
 	faceIndex int
 	dw        dwFace
+
+	// colorTables is set when the font has color glyphs that the pure-Go
+	// color rasterizer draws: COLR with CPAL, CBDT or sbix (see colr.go).
+	colorTables bool
 }
 
 // faces maps shaping faces back to fonts, for rasterization. It holds both
@@ -65,25 +70,30 @@ type Font struct {
 // as those of a closed window, for the life of the process.
 var faces sync.Map // weak.Pointer[tsfont.Face] -> weak.Pointer[Font]
 
-// ParseFont parses TrueType/OpenType data.
-func ParseFont(name string, data []byte) (*Font, error) {
+// ParseFont parses TrueType/OpenType data. Of a collection, it uses the first
+// font.
+func ParseFont(name string, data []byte) (*Font, error) { return parseFontIndex(name, data, 0) }
+
+// parseFontIndex is ParseFont for font index of a collection; index is ignored
+// for a single font.
+func parseFontIndex(name string, data []byte, index int) (*Font, error) {
 	var sf *sfnt.Font
 	var face *tsfont.Face
 	if bytes.HasPrefix(data, []byte("ttcf")) {
-		// A collection: use its first font.
 		c, err := sfnt.ParseCollection(data)
 		if err == nil {
-			sf, err = c.Font(0)
+			sf, err = c.Font(index)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("text: cannot parse font collection %q: %w", name, err)
 		}
 		fs, err := tsfont.ParseTTC(bytes.NewReader(data))
-		if err != nil || len(fs) == 0 {
+		if err != nil || index >= len(fs) {
 			return nil, fmt.Errorf("text: cannot load font collection %q for shaping: %v", name, err)
 		}
-		face = fs[0]
+		face = fs[index]
 	} else {
+		index = 0
 		var err error
 		if sf, err = sfnt.Parse(data); err != nil {
 			return nil, fmt.Errorf("text: cannot parse font %q: %w (expected a .ttf, .otf or .ttc file)", name, err)
@@ -92,7 +102,8 @@ func ParseFont(name string, data []byte) (*Font, error) {
 			return nil, fmt.Errorf("text: cannot load font %q for shaping: %w", name, err)
 		}
 	}
-	f := &Font{Name: name, sf: sf, face: face, upem: float32(sf.UnitsPerEm())}
+	f := &Font{Name: name, sf: sf, face: face, upem: float32(sf.UnitsPerEm()), faceIndex: index,
+		colorTables: hasColorTables(data, index)}
 	var buf sfnt.Buffer
 	m, err := sf.Metrics(&buf, fixed.Int26_6(f.upem*64), font.HintingNone)
 	if err != nil {
@@ -155,6 +166,17 @@ type family struct {
 type Registry struct {
 	families  map[string]*family
 	fallbacks []fallback
+	// appFallbacks is the number of fallbacks at the front of fallbacks that
+	// the app added with AddFallback.
+	appFallbacks int
+	// last is the fallback of last resort, the embedded Go Regular.
+	last *lazyFont
+
+	// Per-character fallback from the platform (fontconfig on Linux): the
+	// font found for each character (nil when there is none) and the fonts
+	// loaded so far, by file.
+	byRune map[rune]*Font
+	byFile map[fontFile]*lazyFont
 }
 
 // fallback is a font used for characters the primary font lacks. covers is
@@ -165,10 +187,51 @@ type fallback struct {
 	covers func(r rune) bool
 }
 
+// fontFile is a font file and the index of a font in it, for a collection.
+type fontFile struct {
+	path  string
+	index int
+}
+
 // fallbackSpec names a fallback font file and the characters it is for.
 type fallbackSpec struct {
 	path   string
 	covers func(r rune) bool
+}
+
+// fileFallback is a fallbackSpec for a font of a collection, as fontconfig
+// finds them.
+type fileFallback struct {
+	file   fontFile
+	covers func(r rune) bool
+}
+
+// hasColorTables reports whether font index of the font file data (a
+// collection or a single font) has color glyphs that the pure-Go color
+// rasterizer can draw: a COLR table with a CPAL table, a CBDT table or an sbix
+// table. It reads only the table directory.
+func hasColorTables(data []byte, index int) bool {
+	be := binary.BigEndian
+	off := 0
+	if bytes.HasPrefix(data, []byte("ttcf")) {
+		if len(data) < 12 || index < 0 || uint32(index) >= be.Uint32(data[8:]) || 12+4*index+4 > len(data) {
+			return false
+		}
+		off = int(be.Uint32(data[12+4*index:]))
+	}
+	if off+12 > len(data) {
+		return false
+	}
+	n := int(be.Uint16(data[off+4:]))
+	has := map[string]bool{}
+	for i := range n {
+		rec := off + 12 + 16*i
+		if rec+16 > len(data) {
+			break
+		}
+		has[string(data[rec:rec+4])] = true
+	}
+	return has["COLR"] && has["CPAL"] || has["CBDT"] || has["sbix"]
 }
 
 func inTables(ts ...*unicode.RangeTable) func(rune) bool {
@@ -186,10 +249,31 @@ func anyRune(rune) bool { return true }
 // monospace fonts, falling back to the embedded Go fonts when they are
 // missing.
 func NewRegistry() *Registry {
-	r := &Registry{families: map[string]*family{}}
-	for fam, faces := range systemFonts() {
+	r := &Registry{families: map[string]*family{}, byRune: map[rune]*Font{}, byFile: map[fontFile]*lazyFont{}}
+	// The faces fontconfig finds (on Linux) come before the fixed paths of
+	// systemFonts, which stay as a last resort.
+	found := fontconfigFaces()
+	fixed := systemFonts()
+	for fam, faces := range found {
+		if fixed[fam] == nil {
+			fixed[fam] = map[faceKey][]string{}
+		}
+		for k := range faces {
+			if _, ok := fixed[fam][k]; !ok {
+				fixed[fam][k] = nil
+			}
+		}
+	}
+	for fam, faces := range fixed {
 		for k, paths := range faces {
-			r.addSource(fam, k, func() (*Font, error) { return loadFirst(paths) })
+			var files []fontFile
+			if f, ok := found[fam][k]; ok {
+				files = append(files, f)
+			}
+			for _, p := range paths {
+				files = append(files, fontFile{p, 0})
+			}
+			r.addSource(fam, k, func() (*Font, error) { return loadFirst(files) })
 		}
 	}
 	// Embedded fonts guarantee text renders on every platform. They are a
@@ -198,40 +282,47 @@ func NewRegistry() *Registry {
 	for _, e := range embeddedFonts() {
 		r.addEmbedded(e.family, e.key, e.name, e.data)
 	}
-	for _, spec := range systemFallbackFonts() {
-		path := spec.path
-		r.fallbacks = append(r.fallbacks, fallback{
-			font:   &lazyFont{load: func() (*Font, error) { return loadFile(path) }},
-			covers: spec.covers,
-		})
+	for _, spec := range fontconfigFallbacks() {
+		r.fallbacks = append(r.fallbacks, fallback{font: r.fileFont(spec.file), covers: spec.covers})
 	}
-	r.fallbacks = append(r.fallbacks, fallback{
-		font:   &lazyFont{load: func() (*Font, error) { return ParseFont("Go Regular", goregular.TTF) }},
-		covers: anyRune,
-	})
+	for _, spec := range systemFallbackFonts() {
+		r.fallbacks = append(r.fallbacks, fallback{font: r.fileFont(fontFile{spec.path, 0}), covers: spec.covers})
+	}
+	r.last = &lazyFont{load: func() (*Font, error) { return ParseFont("Go Regular", goregular.TTF) }}
 	return r
 }
 
-func loadFile(path string) (*Font, error) {
-	data, err := readFontFile(path)
-	if err != nil {
-		return nil, err
+// fileFont returns the lazily loaded font of file, shared by every fallback
+// that names the same file.
+func (r *Registry) fileFont(file fontFile) *lazyFont {
+	if l := r.byFile[file]; l != nil {
+		return l
 	}
-	f, err := ParseFont(path, data)
-	if err != nil {
-		return nil, err
-	}
-	f.path = path
-	return f, nil // faceIndex 0: ParseFont uses the first face of a collection
+	l := &lazyFont{load: func() (*Font, error) { return loadFile(file) }}
+	r.byFile[file] = l
+	return l
 }
 
-func loadFirst(paths []string) (*Font, error) {
-	for _, p := range paths {
-		if f, err := loadFile(p); err == nil {
+func loadFile(file fontFile) (*Font, error) {
+	data, err := readFontFile(file.path)
+	if err != nil {
+		return nil, err
+	}
+	f, err := parseFontIndex(file.path, data, file.index)
+	if err != nil {
+		return nil, err
+	}
+	f.path = file.path
+	return f, nil
+}
+
+func loadFirst(files []fontFile) (*Font, error) {
+	for _, file := range files {
+		if f, err := loadFile(file); err == nil {
 			return f, nil
 		}
 	}
-	return nil, fmt.Errorf("text: none of the font files %v could be loaded", paths)
+	return nil, fmt.Errorf("text: none of the font files %v could be loaded", files)
 }
 
 func (r *Registry) fam(name string) *family {
@@ -283,6 +374,22 @@ func (r *Registry) Register(familyName string, w Weight, data []byte) error {
 	f := r.fam(familyName)
 	f.sources[faceKey{w, false}] = &lazyFont{font: font, done: true}
 	clear(f.resolved)
+	return nil
+}
+
+// AddFallback adds a font for the characters that the fonts of the text lack,
+// such as an emoji or CJK font shipped with an application. The fallbacks
+// added this way are tried in the order they were added, before those of the
+// platform. name names the font in errors.
+func (r *Registry) AddFallback(name string, data []byte) error {
+	font, err := ParseFont(name, data)
+	if err != nil {
+		return err
+	}
+	fb := fallback{font: &lazyFont{font: font, done: true}, covers: anyRune}
+	r.fallbacks = slices.Insert(r.fallbacks, r.appFallbacks, fb)
+	r.appFallbacks++
+	clear(r.byRune)
 	return nil
 }
 
@@ -351,10 +458,11 @@ func weightRank(want, have Weight) int {
 	return int(want-have)*2 + 1
 }
 
-// fallbackFonts returns the fallback chain, loading it on first use.
 // fallbackFor returns a font that has a glyph for c, or nil. Fallbacks whose
 // script hint matches are tried (and loaded) first; others only if already
-// loaded, so a stray character never pulls in every font on the system.
+// loaded, so a stray character never pulls in every font on the system. Then
+// the platform is asked for a font with the character (fontconfig on Linux),
+// and last comes the embedded Go Regular.
 func (r *Registry) fallbackFor(c rune) *Font {
 	for _, fb := range r.fallbacks {
 		if fb.covers(c) {
@@ -368,5 +476,27 @@ func (r *Registry) fallbackFor(c rune) *Font {
 			return fb.font.font
 		}
 	}
+	if f := r.platformFallback(c); f != nil {
+		return f
+	}
+	if f, err := r.last.get(); err == nil && f.has(c) {
+		return f
+	}
 	return nil
+}
+
+// platformFallback returns the font the platform has for c, or nil, and
+// remembers the answer for c.
+func (r *Registry) platformFallback(c rune) *Font {
+	if f, ok := r.byRune[c]; ok {
+		return f
+	}
+	var font *Font
+	if file, ok := fontconfigRune(c); ok {
+		if f, err := r.fileFont(file).get(); err == nil && f.has(c) {
+			font = f
+		}
+	}
+	r.byRune[c] = font
+	return font
 }

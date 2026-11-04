@@ -123,6 +123,9 @@ canceled (see [Loading data](data.md)).
 | `u.ByName(name)` | the first accessibility node with that accessible name, whatever its role |
 | `u.Focused()` | the accessibility node that has keyboard focus |
 | `u.Has(key)` | reports whether an element has the key, without failing |
+| `u.HasRole(role, name)`, `u.HasName(name)` | report whether such a node is in the accessibility tree, without failing, so they can be polled in `WaitFor` |
+| `e.ByRole(role, name)`, `e.ByName(name)` | the first node of that kind in element `e`'s subtree, its own node included |
+| `e.HasRole(role, name)` | reports whether `e`'s subtree has such a node, without failing |
 
 Keys are the most stable way to find an element: give the elements a test
 needs a `Key`. A component's or composite element's key (`Button`,
@@ -138,12 +141,25 @@ keyed element has no node of its own, as with the box a `TextInput` draws
 around its field, the node is the first one inside it. An element found by role
 or name reads `Text` and `Style` through its key, so it needs one.
 
+`ByRole` returns the first match in reading order. When two controls share a
+name, such as a page's Remove button and the one in its confirmation dialog,
+search inside the one you mean. An element found by key scopes the search to
+the nodes of everything inside it, so a plain layout container works too:
+
+```go
+u.ByRole(access.RoleAlertDialog, "Remove app?").ByRole(access.RoleButton, "Remove").Click()
+u.Get("toolbar").ByRole(access.RoleButton, "Remove").Click()
+```
+
 ## Acting
 
 On an element, at its center:
 
 - `e.Click()`, `e.DoubleClick()`, `e.RightClick()`. A right click opens the
-  element's context menu.
+  element's context menu. `Click` and `DoubleClick` fail the test when the
+  element is disabled, or busy as a `Button` with `Loading(true)` is, since the
+  click would do nothing; wait for it with `WaitFor(..., func() bool { return
+  !e.Disabled() && !e.States().Has(access.StateBusy) })`.
 - `e.Hover()` moves the pointer there. Advance the clock to show a tooltip.
 - `e.Scroll(dx, dy)` turns the wheel over it by logical pixels. A positive `dy`
   shows what is below. The scroll container moves at once.
@@ -256,6 +272,9 @@ transitions and motions run on it, and it moves only when the test moves it:
   that reaches the UI with `Post`, such as a background load or a combobox's
   debounced suggestions. It sleeps briefly between frames and advances the
   clock by a frame each time.
+- `u.WaitForQueries()` waits, as `WaitFor` does, until no `ui.Query` has a
+  fetch in flight or a retry waiting (`rt.Fetching()`), then settles. `Settle`
+  alone does not wait for fetches, which run in real time.
 - `u.Now()` is the clock's time.
 
 ```go

@@ -595,6 +595,12 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 				s.idleCount = 0
 				return true
 			}
+			if rt.Fetching() {
+				// A Query's result comes back through Post, which wakes a
+				// frame, so there is no need to draw while it is on its way.
+				s.idleCount = 0
+				return false
+			}
 			if s.idleCount++; s.idleCount < 3 {
 				return true
 			}

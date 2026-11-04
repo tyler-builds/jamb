@@ -307,6 +307,10 @@ var layerBuilders = []layerBuilder{
 		func(st any) Element {
 			return GroupBox("Sample").Description("Details").Child(Text("Body")).Styles(st.(GroupBoxStyle))
 		}},
+	{"Card", func(th *Theme) any { return &th.Card },
+		func(st any) Element {
+			return Card().Label("Sample").OnClick(func() {}).Child(Text("Body")).Styles(st.(CardStyle))
+		}},
 	{"StatusBar", func(th *Theme) any { return &th.StatusBar },
 		func(st any) Element {
 			return StatusBar().Start(Text("Ready")).End(Text("Ln 1")).Styles(st.(StatusBarStyle))

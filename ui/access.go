@@ -83,6 +83,9 @@ type accessInfo struct {
 	multiSelect bool
 	// nonModal is set on the panel of a non-modal dialog (see NonModal).
 	nonModal bool
+	// busy is set on a control that is working and takes no input, such as a
+	// loading button (see ButtonElement.Loading).
+	busy bool
 	// selectWith chooses the item with the modifier Ctrl (true) or without it. A data
 	// grid row sets it, so that AddToSelection and RemoveFromSelection keep the others.
 	selectWith func(ctrl bool)
@@ -1061,6 +1064,9 @@ func (b *accessBuilder) states(n *node, id access.ID, role access.Role) access.S
 	}
 	if a != nil && a.nonModal {
 		s |= access.StateNonModal
+	}
+	if a != nil && a.busy {
+		s |= access.StateBusy
 	}
 	return s
 }

@@ -26,7 +26,11 @@ import (
 // pointer with OnMouseMove and the others (MouseEvent.LocalX and LocalY are in
 // the canvas's coordinates when it has no padding or border), and add children
 // to lay elements over the drawing. Assistive technology sees an image; name
-// it with Label, such as "Sales by month, rising from 12 to 30".
+// it with Label, such as "Sales by month, rising from 12 to 30". The children
+// stay in the accessibility tree, inside the image. Role(access.RoleUnknown)
+// makes the drawing decoration: the canvas has no node, and its children are
+// read as the children of a plain Div are. The default size wins over insets,
+// so a canvas that fills its parent needs Size(Full, Full).
 //
 //	ui.Canvas(func(p *ui.Painter, w, h float32) {
 //		line := ui.NewPath().MoveTo(0, h).LineTo(w/2, 10).LineTo(w, h/2)
