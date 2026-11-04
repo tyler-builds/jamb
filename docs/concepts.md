@@ -59,6 +59,7 @@ ui.Div()                       // flex container; children stack vertically by d
   .Key("stable-id").Child(el).Children(els...)
 
 ui.Text("hi").FontSize(15).Semibold().Italic().TextColor(c).Truncate().MaxLines(2).Align(ui.Center)
+ui.Text("Other sources:").MarginTop(6).Grow(1).Basis(ui.Px(0)).MinWidth(ui.Px(0)) // the flex sizing and margins of a Div
 ui.Textf("Count: %d", n)
 ui.Text("Total").Font("Inter")                    // a family registered with app.New().Font (below); .Mono() for code
 ui.Icon(icons.Folder).Size(16).Color(c)          // color defaults to the inherited text color
@@ -67,6 +68,7 @@ ui.Image(src).Size(ui.Px(34), ui.Px(34)).Radius(17).Fit(ui.FitCover)
                                                  // src := ui.MustImage(data): PNG, JPEG, WebP or GIF; an animated
                                                  // GIF plays while drawn, and stays on its first frame under reduced motion
 ui.Button("Save").Icon(icons.Check).Secondary().Small().OnClick(fn)   // Primary|Secondary|Ghost|Danger; Small|Large
+ui.Button("See all").IconEnd(icons.ArrowRight).Ghost()                // the icon after the label
 ui.IconButton(icons.Bell)
 ui.Button("Save").Loading(saving)                // a busy ring; inert, but keeps its focus, Tab stop and width
 ui.TextInput(signal).Placeholder("Search…").Icon(icons.Search).OnSubmit(fn).OnChange(fn)

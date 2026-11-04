@@ -585,8 +585,9 @@ parts that the code applies.
 | `Kbd` | `Kbd`, `Key` | none | none | done |
 | `DescriptionList` | `DescriptionList`, `Item`, `Term`, `Value` | `Vertical()`, `Bordered()`, `Columns(n)` | none | done |
 | `GroupBox` | `GroupBox`, `Header`, `Title`, `Description`, `Content` | `Fill()` | none | done |
+| `Card` | `Card`, `CardHover`, `CardPressed`, `CardFocusVisible` | `Filled`, `Outlined` (style per variant in `Theme.Cards`) | none | done |
 | `Skeleton` | `Bone` | none | none | done |
-| `Sidebar` | `Pane`, `Item`, `ItemHover`, `ItemSelected`, `ItemFocusVisible`, `ItemDisabled`, `Indicator`, `Heading`, `Toggle` | none | `Header`, `Footer` (elements) | done |
+| `Sidebar` | `Pane`, `Item`, `ItemHover`, `ItemSelected`, `ItemFocusVisible`, `ItemDisabled`, `Indicator`, `Heading`, `Divider`, `Toggle` | none | `Header`, `Footer` (elements) | done |
 | `Breadcrumbs` | `Bar`, `Item`, `ItemHover`, `Current`, `Separator`, `Overflow` | none | none | done |
 | `Pagination` | `Bar`, `Page`, `PageHover`, `PageCurrent`, `Nav`, `Ellipsis` | none | none | done |
 | `Stepper` | `Stepper`, `Step`, `StepHover`, `StepFocusVisible`, `StepDisabled`, `Indicator`, `IndicatorComplete`, `IndicatorCurrent`, `Title`, `Description`, `Connector`, `ConnectorComplete` | `Vertical()`, `Compact()` | none | done |

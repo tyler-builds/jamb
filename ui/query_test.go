@@ -424,3 +424,25 @@ func TestQueryKeyHoldsOneType(t *testing.T) {
 	ui.SetQueryData(ctxOf, "typed", "text")
 	t.Error("SetQueryData with another type did not panic")
 }
+
+// Fetching reports a fetch in flight until its result arrives, and
+// WaitForQueries waits for it.
+func TestRuntimeFetchingAndWaitForQueries(t *testing.T) {
+	release := make(chan struct{})
+	var last ui.QueryResult[string]
+	u := uitest.New(t, func(ctx *ui.Context) ui.Element {
+		last = ui.Query(ctx, "slow", func(context.Context) (string, error) {
+			<-release
+			return "done", nil
+		})
+		return ui.Div().Key("root")
+	})
+	if !u.Runtime().Fetching() {
+		t.Fatal("Fetching() = false while the fetch is blocked, want true")
+	}
+	close(release)
+	u.WaitForQueries()
+	if u.Runtime().Fetching() || last.Data != "done" {
+		t.Errorf("after WaitForQueries: Fetching %v, Data %q; want false, \"done\"", u.Runtime().Fetching(), last.Data)
+	}
+}

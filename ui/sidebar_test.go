@@ -10,7 +10,7 @@ import (
 	"github.com/tyler-builds/jamb/input"
 )
 
-// sidebarDemo is a sidebar of two headings, five items and one disabled item. The
+// sidebarDemo is a sidebar of two headings, a divider, five items and one disabled item. The
 // inbox has a badge of 4, and "sent" is disabled. The selection is sel, the
 // collapsed state collapsed, the instance style st, and onChange is called with
 // each selected key. It has a Toggle, and a Footer that names "Settings".
@@ -20,6 +20,7 @@ func sidebarDemo(sel *Signal[string], collapsed *Signal[bool], st SidebarStyle, 
 		SidebarItem{Key: "inbox", Label: "Inbox", Icon: icons.Inbox, Badge: 4},
 		SidebarItem{Key: "drafts", Label: "Drafts", Icon: icons.Star},
 		SidebarItem{Key: "sent", Label: "Sent", Icon: icons.Home, Disabled: true},
+		SidebarDivider(),
 		SidebarHeading("Tags"),
 		SidebarItem{Key: "archive", Label: "Archive", Icon: icons.Search},
 	).Key("nav").Styles(st).Collapsed(collapsed).Toggle().Footer(Text("Settings")).OnChange(onChange))
@@ -345,6 +346,7 @@ func testSidebarParts(t *testing.T, applied map[string]bool) {
 			act: func(t *testing.T, r *accessRig) { focusNode(r, keyNode(t, r.rt, "nav/item:drafts")) }},
 		{part: "Sidebar.Indicator", set: func(s *SidebarStyle, m Style) { s.Indicator = m }, drawn: "Sidebar.Indicator"},
 		{part: "Sidebar.Heading", set: func(s *SidebarStyle, m Style) { s.Heading = m }, key: "nav/heading:0", drawn: "Sidebar.Heading"},
+		{part: "Sidebar.Divider", set: func(s *SidebarStyle, m Style) { s.Divider = m }, key: "nav/divider:4", drawn: "Sidebar.Divider"},
 		{part: "Sidebar.Toggle", set: func(s *SidebarStyle, m Style) { s.Toggle = m }, key: "nav/toggle", drawn: "Sidebar.Toggle"},
 	}
 	for _, c := range cases {
@@ -374,5 +376,32 @@ func TestSidebarOnChangeIsCalledOnceForAReselect(t *testing.T) {
 	r.clickKey(t, "nav/item:drafts")
 	if got := strings.Join(picked, ","); got != "drafts" {
 		t.Fatalf("OnChange got %q, want drafts once", got)
+	}
+}
+
+// A divider is drawn but is neither focusable nor in the access tree, and
+// NoIndicator leaves out the selected item's bar.
+func TestSidebarDividerAndNoIndicator(t *testing.T) {
+	sel := NewSignal("inbox")
+	r := newAccessRig(func(ctx *Context) Element { return sidebarDemo(sel, NewSignal(false), SidebarStyle{}, nil) })
+	if _, ok := r.rt.Find("nav/divider:4"); !ok {
+		t.Fatal("the divider is not drawn")
+	}
+	if strings.Contains(r.rt.AccessTree().Dump(), "separator") {
+		t.Error("the divider is in the access tree; it is decoration")
+	}
+	r.focusKey(t, "nav/item:drafts")
+	r.press(input.KeyDown, 0) // past the disabled item, the divider and the heading
+	if got := r.focusedKey(); got != "nav/item:archive" {
+		t.Errorf("Down moved focus to %q, want archive", got)
+	}
+	if partNodeOrNil(r.rt, "Sidebar.Indicator") == nil {
+		t.Fatal("the selected item has no indicator by default")
+	}
+	r = newAccessRig(func(ctx *Context) Element {
+		return Sidebar(sel, SidebarItem{Key: "inbox", Label: "Inbox"}).Key("nav").NoIndicator()
+	})
+	if partNodeOrNil(r.rt, "Sidebar.Indicator") != nil {
+		t.Error("NoIndicator: the selected item still has an indicator")
 	}
 }

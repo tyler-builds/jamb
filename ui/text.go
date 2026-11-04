@@ -168,6 +168,38 @@ func (t *TextElement) GridSpan(cols, rows int) *TextElement {
 	return t
 }
 
+// Basis sets the text's starting size along its parent's main axis, before free
+// space is shared out, as DivElement.Basis does. Grow(1).Basis(Px(0)) shares a
+// row equally with the items beside it.
+func (t *TextElement) Basis(l Length) *TextElement { t.style.Basis = l; return t }
+
+// Margin sets the space outside the text on every side, as DivElement.Margin does.
+func (t *TextElement) Margin(px float32) *TextElement { t.style.Margin = All(px); return t }
+
+// MarginX sets the space outside the text on the left and right.
+func (t *TextElement) MarginX(px float32) *TextElement {
+	t.style.Margin.Left, t.style.Margin.Right = px, px
+	return t
+}
+
+// MarginY sets the space outside the text above and below.
+func (t *TextElement) MarginY(px float32) *TextElement {
+	t.style.Margin.Top, t.style.Margin.Bottom = px, px
+	return t
+}
+
+// MarginTop sets the space above the text.
+func (t *TextElement) MarginTop(px float32) *TextElement { t.style.Margin.Top = px; return t }
+
+// MarginRight sets the space to the right of the text.
+func (t *TextElement) MarginRight(px float32) *TextElement { t.style.Margin.Right = px; return t }
+
+// MarginBottom sets the space below the text.
+func (t *TextElement) MarginBottom(px float32) *TextElement { t.style.Margin.Bottom = px; return t }
+
+// MarginLeft sets the space to the left of the text.
+func (t *TextElement) MarginLeft(px float32) *TextElement { t.style.Margin.Left = px; return t }
+
 // Width sets a fixed width, or a Percent or Full width of the parent. Text has no
 // defaults of its own, so a size set here is the one the text has (see Style).
 func (t *TextElement) Width(l Length) *TextElement { t.style.Width = l; return t }

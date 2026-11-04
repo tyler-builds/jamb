@@ -16,10 +16,12 @@ ui.ProgressBar(0.45).Label("Upload").Color(accent)    // 0 to 1, or set .Min(lo)
 ui.BadgeText("Active").Variant(ui.BadgeAccent).StatusDot() // a word with a dot in front
 ui.ProgressBar(3).Min(0).Max(8).Label("Setup steps").
 	Format(func(v float64) string { return fmt.Sprintf("%.0f of 8", v) })
+ui.ProgressBar(0.84).Label("Trust").HideValue()        // no readout: the track takes the whole width
 ui.ProgressBar(0).Indeterminate().Label("Searching")      // work of unknown length
 ui.ProgressRing().Size(ui.RingSmall).Label("Sending reply") // busy: RingSmall, RingMedium, RingLarge
 ui.Badge(6).Noun("items").Variant(ui.BadgeAccent)     // a count; above Max (99) it shows 99+
 ui.BadgeText("New").Variant(ui.BadgeSuccess)          // a word
+ui.BadgeText("Verified").Tooltip("Signed by the publisher") // a tooltip, read as the badge's description
 ui.BadgeDot().Variant(ui.BadgeDanger)                 // a dot only
 ui.Div().Label("Projects").Badged(ui.Badge(6).Noun("items")) // a badge on an element
 ui.Toaster().Key("toaster")                           // once, as the last child of the window's root

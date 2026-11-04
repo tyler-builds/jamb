@@ -123,6 +123,7 @@ type ProgressBarElement struct {
 	key           string
 	size          sizing
 	format        func(float64) string
+	hideValue     bool  // see HideValue
 	color         Color // the fill, when set (see Color); zero is the theme accent
 	styles        ProgressBarStyle
 }
@@ -189,9 +190,18 @@ func (p *ProgressBarElement) Color(c Color) *ProgressBarElement {
 }
 
 // Format sets the readout beside the bar. The default shows the share of the
-// range that is done, as a percentage. An indeterminate bar has no readout.
+// range that is done, as a percentage. An indeterminate bar has no readout, and
+// neither has a bar whose Format returns "" (see HideValue).
 func (p *ProgressBarElement) Format(fn func(float64) string) *ProgressBarElement {
 	p.format = fn
+	return p
+}
+
+// HideValue leaves out the readout, so the track takes the bar's whole width, as
+// when the text beside the bar already says "21/25". A Format that returns ""
+// does the same. Assistive technology still reads the value through the range.
+func (p *ProgressBarElement) HideValue() *ProgressBarElement {
+	p.hideValue = true
 	return p
 }
 
@@ -254,11 +264,13 @@ func (p *ProgressBarElement) expand(ctx *Context) Element {
 	// The bar's default minimum keeps it visible in a container with no width of its
 	// own, where a percentage has nothing to take.
 	root := Div().Row().Align(Center).Gap(12).Width(Full).Style(Style{MinWidth: Px(progressBarMinWidth)}).Child(track)
-	if !p.indeterminate {
+	if !p.indeterminate && !p.hideValue {
 		// The value is what assistive technology reads through the range, so the
 		// readout is hidden from it.
-		root.Child(Div().asPart("ProgressBar.Label").AccessHidden().MinWidth(Px(44)).Align(End).Style(st.Label).
-			Child(Text(p.readout())))
+		if text := p.readout(); text != "" {
+			root.Child(Div().asPart("ProgressBar.Label").AccessHidden().MinWidth(Px(44)).Align(End).Style(st.Label).
+				Child(Text(text)))
+		}
 	}
 	return p.size.apply(root)
 }

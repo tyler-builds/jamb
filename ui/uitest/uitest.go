@@ -48,6 +48,7 @@ type host interface {
 	Close()
 	TextOf(string) (string, bool)
 	AccessNode(*access.Tree, string) *access.Node
+	AccessNodes(*access.Tree, string) []*access.Node
 	Perform(access.ID, access.Request)
 	Frame(time.Time) *scene.Scene
 }
@@ -208,6 +209,16 @@ func (u *UI) WaitFor(what string, cond func() bool) {
 	}
 }
 
+// WaitForQueries runs frames until no ui.Query of the UI has a fetch in flight
+// or waits to retry one (see ui.Runtime.Fetching), then settles the UI, and fails
+// the test if that takes more than 10 seconds of real time. Retry delays run on
+// the UI's clock, which WaitFor advances.
+func (u *UI) WaitForQueries() {
+	u.tb.Helper()
+	u.WaitFor("the queries to finish fetching", func() bool { return !u.rt.Fetching() })
+	u.Settle()
+}
+
 // ---- keyboard ----
 
 // Type types text into the focused element, one character at a time, and
@@ -289,6 +300,24 @@ func (u *UI) ByRole(role access.Role, name string) *Element {
 	return u.byNode(fmt.Sprintf("%s named %q", role, name), func(t *access.Tree) *access.Node {
 		return t.Find(role, name)
 	})
+}
+
+// HasRole reports whether the accessibility tree has a node with the role and
+// the accessible name. Unlike ByRole it never fails, so it can be polled in
+// WaitFor.
+func (u *UI) HasRole(role access.Role, name string) bool {
+	return u.Tree().Find(role, name) != nil
+}
+
+// HasName reports whether the accessibility tree has a node whose accessible
+// name is name. Unlike ByName it never fails.
+func (u *UI) HasName(name string) bool {
+	found := false
+	u.Tree().Walk(func(n *access.Node) bool {
+		found = n.Name == name
+		return !found
+	})
+	return found
 }
 
 // Focused returns the node that has keyboard focus, and fails the test if

@@ -193,6 +193,29 @@ func (h *runtimeHost) AccessNode(tree *access.Tree, key string) *access.Node {
 	return nil
 }
 
+// AccessNodes returns the outermost nodes of tree that stand for the first
+// element whose key is key or for elements inside it, in tree order: the
+// element's own node when it has one, or else the nodes of the elements inside
+// it, such as the controls of a plain layout container.
+func (h *runtimeHost) AccessNodes(tree *access.Tree, key string) []*access.Node {
+	rt := h.rt()
+	var out []*access.Node
+	var walk func(n *node)
+	walk = func(n *node) {
+		if an := tree.Node(accID(n.id)); an != nil {
+			out = append(out, an)
+			return
+		}
+		for _, c := range n.children {
+			walk(c)
+		}
+	}
+	if n := rt.findKey(rt.tree, key); n != nil {
+		walk(n)
+	}
+	return out
+}
+
 // Perform runs an access action on a node of the current access tree (see
 // AccessTree) at once, as an assistive technology's request runs at the next
 // frame. It does nothing when the node is gone.

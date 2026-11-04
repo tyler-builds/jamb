@@ -20,7 +20,7 @@ const (
 // SidebarItem is one entry of a Sidebar: a page or a command, with its key, its
 // label, an optional icon and an optional count. Selecting an item sets the
 // selected signal to its Key. A disabled item is shown but cannot be selected.
-// A heading is made with SidebarHeading instead.
+// A heading is made with SidebarHeading, and a rule with SidebarDivider.
 type SidebarItem struct {
 	// Key identifies the item among the items of the sidebar.
 	Key string
@@ -32,12 +32,22 @@ type SidebarItem struct {
 	// Disabled makes the item unable to be chosen.
 	Disabled bool
 	heading  bool // set by SidebarHeading
+	divider  bool // set by SidebarDivider
 }
+
+// spacer reports whether the item is a heading or a divider, which cannot be
+// chosen or focused.
+func (it SidebarItem) spacer() bool { return it.heading || it.divider }
 
 // SidebarHeading returns a heading of a Sidebar: a line of text that names the
 // group of items below it. A heading is not selectable, and in a collapsed
 // sidebar it is drawn as a thin rule.
 func SidebarHeading(label string) SidebarItem { return SidebarItem{Label: label, heading: true} }
+
+// SidebarDivider returns a thin rule between two groups of items of a Sidebar,
+// for groups that need no name. It is not selectable, and assistive technology
+// does not see it; a group it should hear named needs a SidebarHeading.
+func SidebarDivider() SidebarItem { return SidebarItem{divider: true} }
 
 // SidebarStyle is the look of each part of a sidebar. A part's style merges over
 // the built-in defaults, then over the theme's Sidebar, then over the Styles
@@ -55,6 +65,7 @@ type SidebarStyle struct {
 	ItemFocusVisible Style // an item that has keyboard focus
 	Indicator        Style // the bar at the left of the selected item
 	Heading          Style // each heading of an expanded sidebar
+	Divider          Style // each divider, and each heading of a collapsed sidebar, which is drawn as a rule
 	Toggle           Style // the button that collapses and expands the sidebar
 }
 
@@ -69,6 +80,7 @@ func (s SidebarStyle) merge(o SidebarStyle) SidebarStyle {
 		ItemFocusVisible: s.ItemFocusVisible.Merge(o.ItemFocusVisible),
 		Indicator:        s.Indicator.Merge(o.Indicator),
 		Heading:          s.Heading.Merge(o.Heading),
+		Divider:          s.Divider.Merge(o.Divider),
 		Toggle:           s.Toggle.Merge(o.Toggle),
 	}
 }
@@ -84,6 +96,7 @@ func (s SidebarStyle) plain() SidebarStyle {
 		ItemFocusVisible: plainStyle(s.ItemFocusVisible),
 		Indicator:        plainStyle(s.Indicator),
 		Heading:          plainStyle(s.Heading),
+		Divider:          plainStyle(s.Divider),
 		Toggle:           plainStyle(s.Toggle),
 	}
 }
@@ -103,6 +116,7 @@ func sidebarDefaults(t *Theme) SidebarStyle {
 		Indicator:        Style{Width: Px(3), Background: t.Accent, Radius: 2},
 		Heading: Style{FontSize: 12, FontWeight: FontSemibold, TextColor: t.TextMuted,
 			Padding: Edges{Top: 12, Right: 10, Bottom: 4, Left: 10}},
+		Divider: Style{Height: Px(1), NoShrink: true, Margin: Edges{Top: 6, Bottom: 6}, Background: t.Border},
 		Toggle: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(36), Height: Px(36),
 			NoShrink: true, Radius: t.Radius / 2, TextColor: t.Text},
 	}
@@ -148,18 +162,19 @@ func resolveSidebar(ctx *Context, inst SidebarStyle) SidebarStyle {
 // The pane takes the height of its row, so put it in a Row beside the content.
 // Its items scroll when they do not fit, and a Header and a Footer stay in place.
 type SidebarElement struct {
-	selected  *Signal[string]
-	items     []SidebarItem
-	name      string // the accessible name of the pane, see Label
-	key       string
-	onChange  func(key string)
-	styles    SidebarStyle
-	collapsed *Signal[bool] // see Collapsed
-	toggle    bool          // see Toggle
-	header    Element       // see Header
-	footer    Element       // see Footer
-	size      sizing        // the expanded width, from the sizing methods (see Sizing in docs/styling.md)
-	tooltip   string        // see Tooltip
+	selected    *Signal[string]
+	items       []SidebarItem
+	name        string // the accessible name of the pane, see Label
+	key         string
+	onChange    func(key string)
+	styles      SidebarStyle
+	collapsed   *Signal[bool] // see Collapsed
+	toggle      bool          // see Toggle
+	header      Element       // see Header
+	footer      Element       // see Footer
+	size        sizing        // the expanded width, from the sizing methods (see Sizing in docs/styling.md)
+	tooltip     string        // see Tooltip
+	noIndicator bool          // see NoIndicator
 }
 
 // Sidebar creates a navigation pane of items, with the item whose key equals
@@ -178,6 +193,13 @@ func (s *SidebarElement) Key(k string) *SidebarElement { s.key = k; return s }
 // Label names the pane for assistive technology, such as "Main navigation". The
 // default is the Navigation text of the window's Strings.
 func (s *SidebarElement) Label(name string) *SidebarElement { s.name = name; return s }
+
+// NoIndicator leaves out the bar at the left of the selected item. The bar marks
+// the selection by more than its color, so give ItemSelected a mark that does not
+// rely on color alone, such as a bold label or a border, when it is left out. To
+// leave it out of every sidebar, set the theme's Sidebar.Indicator to
+// Style{Clear: ClearBackground}.
+func (s *SidebarElement) NoIndicator() *SidebarElement { s.noIndicator = true; return s }
 
 // Tooltip shows s below the pane after the pointer rests on it; an item of a
 // collapsed sidebar shows its own label instead. Assistive technology reads it as
@@ -253,13 +275,13 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 			name = strs.Navigation
 		}
 		scope := s.scope()
-		// opts are the items as options. A heading is an option that cannot be
+		// opts are the items as options. A heading or a divider is an option that cannot be
 		// chosen, so the steps and the edges skip it as they skip a disabled item.
 		opts := make([]Option[string], len(s.items))
 		size := 0
 		for i, it := range s.items {
-			opts[i] = Option[string]{Value: it.Key, Label: it.Label, Disabled: it.Disabled || it.heading}
-			if !it.heading {
+			opts[i] = Option[string]{Value: it.Key, Label: it.Label, Disabled: it.Disabled || it.spacer()}
+			if !it.spacer() {
 				size++
 			}
 		}
@@ -298,6 +320,8 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 				listItem(pos, size).Label(it.Label).AccessSelected(on)
 			if on {
 				row.Style(st.ItemSelected)
+			}
+			if on && !s.noIndicator {
 				// The bar is the selection's mark that is not a color, in the expanded and
 				// the collapsed sidebar alike.
 				row.Child(Div().asPart("Sidebar.Indicator").Absolute().Left(0).Top(8).Bottom(8).Style(st.Indicator))
@@ -358,12 +382,16 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 		list := Div().Column().Gap(2).Grow(1).MinHeight(Px(0)).ScrollY().Role(access.RoleList).SelectionContainer()
 		pos := 0
 		for i, it := range s.items {
+			if it.divider {
+				list.Child(Div().asPart("Sidebar.Divider").Keyf("%s/divider:%d", scope, i).AccessHidden().Style(st.Divider))
+				continue
+			}
 			if it.heading {
 				h := Div().asPart("Sidebar.Heading").Keyf("%s/heading:%d", scope, i).Heading(2).Label(it.Label)
 				if collapsed {
 					// A heading is a thin rule when the sidebar is collapsed, and its label is
 					// not drawn.
-					h.Style(Style{Height: Px(1), Margin: Edges{Top: 6, Bottom: 6}, Background: t.Border})
+					h.Style(st.Divider)
 				} else {
 					h.Style(st.Heading).Child(Text(it.Label).NoWrap())
 				}

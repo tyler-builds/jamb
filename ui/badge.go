@@ -118,8 +118,9 @@ type BadgeElement struct {
 	variant  BadgeVariant
 	noun     string
 	key      string
-	attached bool // set by DivElement.Badged: the owner names the badge
-	leadDot  bool // a dot before the text (see StatusDot)
+	attached bool   // set by DivElement.Badged: the owner names the badge
+	leadDot  bool   // a dot before the text (see StatusDot)
+	tooltip  string // see Tooltip
 	styles   BadgeStyle
 	size     sizing // the badge's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
@@ -160,6 +161,12 @@ func (b *BadgeElement) Noun(s string) *BadgeElement { b.noun = s; return b }
 // StatusDot puts a dot in front of the text, in the text color, as a status chip does.
 // The dot is hidden from assistive technology: the text is what is read.
 func (b *BadgeElement) StatusDot() *BadgeElement { b.leadDot = true; return b }
+
+// Tooltip shows s in a small floating label below the badge after the pointer
+// has rested on it for half a second, such as who verified a "Verified" badge. A
+// badge that stands alone also gets s as its accessible description, so
+// assistive technology reads it after the badge's text. An empty string means none.
+func (b *BadgeElement) Tooltip(s string) *BadgeElement { b.tooltip = s; return b }
 
 // The sizing methods give the badge's outer box a size. A badge is as wide as its
 // text by default; see Sizing in docs/styling.md.
@@ -230,12 +237,12 @@ func (b *BadgeElement) expand(ctx *Context) Element {
 	strs := ctx.Strings()
 	if b.kind == badgeDot {
 		st := resolveBadge(ctx, b.variant, true, b.styles)
-		d := Div().asPart("Badge.Dot").Style(st.Dot)
+		d := Div().asPart("Badge.Dot").Style(st.Dot).Tooltip(b.tooltip)
 		b.decorate(strs, d)
 		return b.size.apply(d)
 	}
 	st := resolveBadge(ctx, b.variant, false, b.styles)
-	pill := Div().asPart("Badge.Badge")
+	pill := Div().asPart("Badge.Badge").Tooltip(b.tooltip)
 	if b.leadDot {
 		pill.Style(Style{Gap: 4})
 	}

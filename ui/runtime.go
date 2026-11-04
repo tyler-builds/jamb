@@ -261,6 +261,10 @@ type FrameStats struct {
 // from one goroutine (the UI thread). Signals are the exception and may be
 // set from anywhere.
 type Runtime struct {
+	// colorIcons holds the drawings of the icons that keep their own colors
+	// (icons.KeepColors), by name and pixel size.
+	colorIcons map[text.MaskKey]*scene.Texture
+
 	rootEl   *ComponentElement
 	rootInst *componentInstance
 	theme    *Theme   // the effective theme: the app's, or the high contrast one

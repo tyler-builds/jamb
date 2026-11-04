@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"math"
 
 	"github.com/tyler-builds/jamb/internal/layout"
@@ -228,7 +229,7 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 				// High contrast draws icons in the text color, as Microsoft's guidance asks.
 				c = n.icon.color
 			}
-			rt.paintIcon(n, x, y, c.Alpha(opacity))
+			rt.paintIcon(n, x, y, c.Alpha(opacity), opacity)
 		}
 	case kindImage:
 		if visible {
@@ -366,12 +367,34 @@ func (rt *Runtime) paintLinkRing(n *node, l *text.Layout, x, y, opacity float32)
 	}
 }
 
-func (rt *Runtime) paintIcon(n *node, x, y float32, c Color) {
+func (rt *Runtime) paintIcon(n *node, x, y float32, c Color, opacity float32) {
 	size := int(round(n.icon.size * rt.scale))
 	if size <= 0 || n.icon.icon == nil {
 		return
 	}
 	ic := n.icon.icon
+	if ic.Colored() && !rt.sys.HighContrast {
+		// An icon that keeps its colors is an image of them. High contrast draws
+		// it in the text color, as every other icon.
+		k := text.MaskKey{Name: ic.Name, W: size, H: size}
+		tex := rt.colorIcons[k]
+		if tex == nil {
+			m := image.NewRGBA(image.Rect(0, 0, size, size))
+			ic.RasterizeRGBA(m)
+			tex = scene.NewTexture(size, size, scene.FormatRGBA8)
+			copy(tex.Pix, m.Pix)
+			if rt.colorIcons == nil {
+				rt.colorIcons = map[text.MaskKey]*scene.Texture{}
+			}
+			rt.colorIcons[k] = tex
+		}
+		rt.scene.AddImage(scene.ImageDraw{
+			Bounds:  scene.Rect{X: round(x * rt.scale), Y: round(y * rt.scale), W: float32(size), H: float32(size)},
+			Texture: tex,
+			Opacity: opacity,
+		})
+		return
+	}
 	tex, src, ok := rt.text.Mask(text.MaskKey{Name: ic.Name, W: size, H: size}, ic.Rasterize)
 	if !ok {
 		return

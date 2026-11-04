@@ -25,7 +25,10 @@ These environment variables work with any jamb app, with no code changes:
 `menu` (the Apps key), `f1` to `f12`, `a` to `z`, `0` to `9`, `=` and `-`, with the modifiers `ctrl`,
 `shift`, `alt` and `super`. An unknown key or modifier stops the script with an
 error when the script is loaded. `idle` waits for `rt.Settled()`, which ignores
-repeating animations, so a screen with a spinner does not hold the script.
+repeating animations, so a screen with a spinner does not hold the script, and
+for every `ui.Query` fetch in flight or waiting to retry (`rt.Fetching()`), so a
+screenshot after it shows the fetched data. `wait N` pauses the script for N
+milliseconds without drawing, for work that neither of those tracks.
 
 For tests of an app, the `ui/uitest` package wraps these headless tools with a
 clock, a clipboard and failure messages of its own; see

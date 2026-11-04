@@ -96,7 +96,20 @@ at 800x400 pixels takes about 10 ms to draw.
 The canvas is a `Div` (300x150 by default): size it with `Size`, take the pointer
 with `OnMouseMove` and the others, whose `LocalX` and `LocalY` are canvas
 coordinates when it has no padding or border, and add children to lay elements
-over the drawing. Assistive technology sees an image named by `Label`.
+over the drawing. Assistive technology sees an image named by `Label`, and the
+children stay in the accessibility tree, inside the image.
+
+The default size wins over insets, as an explicit size does in CSS, so a canvas
+that fills its parent as a background layer needs `Size(ui.Full, ui.Full)` as
+well as `Absolute().Inset(0)`. For art that is only decoration, behind text and
+controls of its own, take away the image with `Role(access.RoleUnknown)`: the
+canvas then has no node, and its children are read as if it were a plain `Div`.
+
+```go
+ui.Canvas(drawBanner).Size(ui.Full, ui.Px(220)).Role(access.RoleUnknown).Padding(24).
+	Child(ui.Text("Featured").FontSize(22)).
+	Child(ui.Button("Open").OnClick(open))
+```
 
 ## Charts
 
@@ -167,3 +180,22 @@ Three names keep their own drawings, because Lucide has no match for the Windows
 caption buttons: `icons.Maximize`, `icons.Minimize` and `icons.Restore`, which
 `ui.TitleBarButtons` draws. Lucide's `maximize` and `minimize` are `icons.LucideMaximize`
 and `icons.LucideMinimize`. `icons.StarFilled` is the filled `star`.
+
+### Icons of your own
+
+`icons.New(name, svg)` makes an icon from a whole SVG document, with its own
+`viewBox`, fills and strokes, such as a brand mark from Simple Icons, and
+`icons.MustNew` panics instead of returning an error, for an SVG that is part of
+the program. The drawing is fitted to the icon's square and centered. Every part
+it paints is drawn in the icon's color, so a one-color logo takes `Color` and
+the text color as a Lucide icon does. `icons.KeepColors` keeps the SVG's own
+colors instead, for a logo of several colors; under high contrast it is still
+drawn in the text color. The name identifies the drawing in the glyph cache, so
+give each drawing its own, such as `brand-github`.
+
+```go
+var flathub = icons.MustNew("brand-flathub", flathubSVG)                    // tinted
+var fedora = icons.MustNew("brand-fedora", fedoraSVG, icons.KeepColors)     // its own colors
+
+ui.Icon(flathub).Size(16).Color(t.TextMuted)
+```

@@ -1,6 +1,7 @@
 package uitest
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/tyler-builds/jamb/access"
@@ -137,15 +138,18 @@ func (e *Element) Bounds() ui.Rect {
 // ---- acting ----
 
 // Click moves the pointer to the center of the element and clicks the left
-// button.
+// button. It fails the test when the element is disabled or busy (a loading
+// button), since the click would do nothing; wait for it to be ready with WaitFor.
 func (e *Element) Click() {
 	e.u.tb.Helper()
+	e.mustTakeInput("click")
 	e.press(input.ButtonLeft, 1)
 }
 
 // DoubleClick clicks the left button twice at the center of the element.
 func (e *Element) DoubleClick() {
 	e.u.tb.Helper()
+	e.mustTakeInput("double-click")
 	e.press(input.ButtonLeft, 1)
 	e.press(input.ButtonLeft, 2)
 }
@@ -252,6 +256,31 @@ func (e *Element) keyed(method string) string {
 	return k
 }
 
+// mustTakeInput fails the test when the element's node says that it takes no
+// input: it is disabled, or busy as a loading button is. An element with no node
+// passes.
+func (e *Element) mustTakeInput(action string) {
+	e.u.tb.Helper()
+	t := e.u.Tree()
+	var n *access.Node
+	if e.find != nil {
+		n = e.find(t)
+		if n == nil {
+			e.gone()
+		}
+	} else {
+		e.mustExist()
+		n = e.u.host.AccessNode(t, e.key)
+	}
+	switch {
+	case n == nil:
+	case n.States.Has(access.StateDisabled):
+		e.u.tb.Fatalf("uitest: cannot %s the %s: it is disabled", action, e.desc)
+	case n.States.Has(access.StateBusy):
+		e.u.tb.Fatalf("uitest: cannot %s the %s: it is busy (%s) and takes no input; wait for it with WaitFor", action, e.desc, n.ItemStatus)
+	}
+}
+
 // mustExist fails the test when an element found by key has gone.
 func (e *Element) mustExist() {
 	e.u.tb.Helper()
@@ -264,4 +293,83 @@ func (e *Element) mustExist() {
 func (e *Element) gone() {
 	e.u.tb.Helper()
 	e.u.tb.Fatalf("uitest: the %s is gone; the element tree is:\n%s", e.desc, e.u.dump())
+}
+
+// ---- finding inside ----
+
+// ByRole returns the first node of the element's subtree (the element's own node
+// and the nodes inside it), in reading order, with the
+// role and the accessible name, and fails the test if there is none. Use it to
+// tell apart controls of the same name, such as the Remove button of a page and
+// the one in its confirmation dialog:
+//
+//	u.ByRole(access.RoleAlertDialog, "Remove app?").ByRole(access.RoleButton, "Remove").Click()
+func (e *Element) ByRole(role access.Role, name string) *Element {
+	e.u.tb.Helper()
+	return e.inside(fmt.Sprintf("%s named %q", role, name), func(n *access.Node) bool {
+		return n.Role == role && n.Name == name
+	})
+}
+
+// ByName returns the first node of the element's subtree, in reading order, whose
+// accessible name is name, and fails the test if there is none.
+func (e *Element) ByName(name string) *Element {
+	e.u.tb.Helper()
+	return e.inside(fmt.Sprintf("node named %q", name), func(n *access.Node) bool { return n.Name == name })
+}
+
+// HasRole reports whether a node of the element's subtree has the role and the
+// accessible name. It never fails, so it can be polled in WaitFor; it reports
+// false when the element itself has gone.
+func (e *Element) HasRole(role access.Role, name string) bool {
+	return e.findInside(e.u.Tree(), func(n *access.Node) bool { return n.Role == role && n.Name == name }) != nil
+}
+
+// inside returns an element for the first node inside e that match accepts.
+func (e *Element) inside(what string, match func(*access.Node) bool) *Element {
+	e.u.tb.Helper()
+	desc := what + " inside the " + e.desc
+	found := &Element{u: e.u, desc: desc, find: func(t *access.Tree) *access.Node { return e.findInside(t, match) }}
+	if t := e.u.Tree(); found.find(t) == nil {
+		if !e.Exists() {
+			e.gone()
+		}
+		e.u.tb.Fatalf("uitest: no %s in the access tree:\n%s", desc, t.Dump())
+	}
+	return found
+}
+
+// findInside returns the first node of e's subtree in the access tree, in
+// reading order, that match accepts, or nil. The subtree of an element found by
+// key holds the nodes of every element inside it, so a plain layout container,
+// which has no node of its own, can scope a search too.
+func (e *Element) findInside(t *access.Tree, match func(*access.Node) bool) *access.Node {
+	var roots []*access.Node
+	if e.find != nil {
+		if n := e.find(t); n != nil {
+			roots = []*access.Node{n}
+		}
+	} else {
+		roots = e.u.host.AccessNodes(t, e.key)
+	}
+	var walk func(n *access.Node) *access.Node
+	walk = func(n *access.Node) *access.Node {
+		if match(n) {
+			return n
+		}
+		for _, id := range n.Children {
+			if c := t.Node(id); c != nil {
+				if m := walk(c); m != nil {
+					return m
+				}
+			}
+		}
+		return nil
+	}
+	for _, r := range roots {
+		if m := walk(r); m != nil {
+			return m
+		}
+	}
+	return nil
 }
