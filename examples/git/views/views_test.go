@@ -234,6 +234,9 @@ func TestChoosingAChangedFileOpensItsDiff(t *testing.T) {
 func TestGoToLoadsTheHistoryUntilTheTarget(t *testing.T) {
 	defer func(n int) { store.PageSize = n }(store.PageSize)
 	store.PageSize = 2
+	// The grid would load the next pages by itself; only Go to may here.
+	store.PauseLoadMore = true
+	defer func() { store.PauseLoadMore = false }()
 	u, _, r := open(t)
 	if n := len(r.Entries.Peek()); n != 2 {
 		t.Fatalf("%d commits loaded, want the first page of 2", n)
