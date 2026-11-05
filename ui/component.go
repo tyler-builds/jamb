@@ -8,6 +8,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"weak"
+
+	"github.com/tyler-builds/jamb/internal/devhook"
 )
 
 // ComponentElement is a re-render boundary. Its function runs when the
@@ -298,6 +301,15 @@ func Local[T any](ctx *Context, name string, initial T) *Signal[T] {
 	}
 	s := NewSignal(initial)
 	inst.locals[name] = s
+	if devhook.Local != nil { // jamb dev restores it after a restart
+		wi := weak.Make(inst)
+		devhook.Local(inst.id, name, s, func() any {
+			if i := wi.Value(); i != nil && !i.disposed {
+				return i.locals[name]
+			}
+			return nil
+		})
+	}
 	return s
 }
 
