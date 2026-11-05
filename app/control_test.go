@@ -3,11 +3,13 @@ package app
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -501,4 +503,57 @@ func TestControlSocket(t *testing.T) {
 			t.Errorf("%s is left after close: %v", p, err)
 		}
 	}
+}
+
+var testSaveAction = ui.NewAction("test.save", "Save")
+
+type ctlNoteIn struct {
+	Title string `json:"title" desc:"The title"`
+}
+
+var ctlNotes = ui.NewSignal([]string{})
+
+var testCreate = ui.NewCommand("test.notes.create", "Create a note", func(in ctlNoteIn) (map[string]int, error) {
+	if in.Title == "" {
+		return nil, errors.New("a note needs a title")
+	}
+	ctlNotes.Set(append(slices.Clone(ctlNotes.Peek()), in.Title))
+	return map[string]int{"count": len(ctlNotes.Peek())}, nil
+})
+
+func TestControlActionsAndCommands(t *testing.T) {
+	saved := 0
+	f := newCtlFixture(t, func(ctx *ui.Context) ui.Element {
+		return ui.Div().Padding(10).OnAction(testSaveAction, func() { saved++ }).
+			Child(ui.Button("Focus me").Key("b"))
+	})
+	f.rt.AddBindings(ui.Bind("ctrl+s", testSaveAction))
+	acts := f.must(ctlRequest{Op: "actions"}).(map[string]any)["actions"].([]ctlActionInfo)
+	if len(acts) != 1 || acts[0].Name != "test.save" || acts[0].Keys != "Ctrl+S" {
+		t.Fatalf("actions: %+v", acts)
+	}
+	if got := f.must(ctlRequest{Op: "dispatch", Action: "test.save"}).(map[string]any); got["handled"] != true || saved != 1 {
+		t.Fatalf("dispatch: %v, saved %d", got, saved)
+	}
+	f.fails(ctlRequest{Op: "dispatch", Action: "test.nope"}, "not_found")
+	f.fails(ctlRequest{Op: "dispatch"}, "bad_request")
+
+	cmds := f.must(ctlRequest{Op: "commands"}).(map[string]any)["commands"].([]ctlCommandInfo)
+	var found *ctlCommandInfo
+	for i := range cmds {
+		if cmds[i].Name == testCreate.Name() {
+			found = &cmds[i]
+		}
+	}
+	if found == nil || found.Description != "Create a note" || found.Input["required"] == nil {
+		t.Fatalf("commands: %+v", cmds)
+	}
+	got := f.must(ctlRequest{Op: "run", Command: "test.notes.create", Args: []byte(`{"title":"Hi"}`)}).(map[string]any)
+	if got["result"].(map[string]int)["count"] != 1 || ctlNotes.Peek()[0] != "Hi" {
+		t.Fatalf("run: %v; notes %v", got, ctlNotes.Peek())
+	}
+	f.fails(ctlRequest{Op: "run", Command: "test.notes.create", Args: []byte(`{"name":"x"}`)}, "bad_request")
+	f.fails(ctlRequest{Op: "run", Command: "test.notes.create", Args: []byte(`{"title":""}`)}, "failed")
+	f.fails(ctlRequest{Op: "run", Command: "test.missing"}, "not_found")
+	f.fails(ctlRequest{Op: "run"}, "bad_request")
 }

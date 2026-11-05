@@ -25,6 +25,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "jamb-notes:", err)
 		os.Exit(1)
 	}
+	// notes.list, notes.create and the others, for coding agents (jamb ctl run).
+	views.RegisterCommands(s)
 	settingsPath := store.SettingsPath(path)
 	settings := store.LoadSettings(settingsPath)
 	// The sidebar's width is kept with the other settings. It is saved shortly after

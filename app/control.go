@@ -275,6 +275,10 @@ type ctlRequest struct {
 	TimeoutMS int    `json:"timeout_ms,omitempty"` // wait, shot, and how long an input op's target may take to be ready
 
 	Path string `json:"path,omitempty"` // shot: where to write the PNG; absolute
+
+	Action  string          `json:"action,omitempty"`  // dispatch: the action's name
+	Command string          `json:"command,omitempty"` // run: the command's name
+	Args    json.RawMessage `json:"args,omitempty"`    // run: the command's input, a JSON value
 }
 
 type ctlResponse struct {
@@ -359,7 +363,7 @@ type ctlReply func(result any, err *ctlError)
 
 // ctlOps are the ops. They are a list and run's switch rather than a map of
 // functions, so that a program that never opens the channel links none of them.
-var ctlOps = []string{"click", "drag", "find", "info", "key", "move", "scroll", "shot", "tree", "type", "wait"}
+var ctlOps = []string{"actions", "click", "commands", "dispatch", "drag", "find", "info", "key", "move", "run", "scroll", "shot", "tree", "type", "wait"}
 
 func ctlOpList() string {
 	b, _ := json.Marshal(ctlOps)
@@ -369,8 +373,15 @@ func ctlOpList() string {
 // run runs a request on the UI thread.
 func (c *control) run(req ctlRequest, reply ctlReply) {
 	wins := c.windows()
-	if req.Op == "info" {
+	switch req.Op {
+	case "info":
 		reply(c.info(wins), nil)
+		return
+	case "commands":
+		c.opCommands(req, reply)
+		return
+	case "run":
+		c.opRun(req, reply)
 		return
 	}
 	i := req.Window
@@ -445,6 +456,10 @@ func (c *control) exec(w *ctlWin, i int, req ctlRequest, reply ctlReply) {
 		c.opMove(w, i, req, reply)
 	case "drag":
 		c.opDrag(w, i, req, reply)
+	case "actions":
+		c.opActions(w, req, reply)
+	case "dispatch":
+		c.opDispatch(w, req, reply)
 	case "shot":
 		c.opShot(w, req, reply)
 	case "wait":
