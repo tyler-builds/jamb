@@ -14,7 +14,7 @@ import (
 
 func segoe(t *testing.T) *Font {
 	t.Helper()
-	f, err := loadFile(fontFile{winFont("segoeui.ttf"), 0})
+	f, err := loadFile(fontFile{path: winFont("segoeui.ttf")})
 	if err != nil {
 		t.Skipf("Segoe UI not available: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestDirectWriteHintsHorizontalEdges(t *testing.T) {
 
 func emojiFont(t *testing.T) *Font {
 	t.Helper()
-	f, err := loadFile(fontFile{winFont("seguiemj.ttf"), 0})
+	f, err := loadFile(fontFile{path: winFont("seguiemj.ttf")})
 	if err != nil {
 		t.Skipf("Segoe UI Emoji not available: %v", err)
 	}

@@ -123,7 +123,7 @@ type fcFace struct {
 	// itself, which jamb does not do: the font is not the face asked for.
 	synthetic bool
 	// variable is set for a variable font or one of its named instances.
-	// jamb draws a variable font only in its default instance.
+	// jamb draws it at the weight asked for (see fontFile.wght).
 	variable bool
 	scalable bool
 }
@@ -289,10 +289,15 @@ func fcFaceFor(pattern string, k faceKey) (fcFace, bool) {
 	}
 	defer fc.patternDestroy(m)
 	f, ok := fcDescribe(m)
-	if !ok || f.synthetic || f.variable || !f.scalable {
+	if !ok || f.synthetic || !f.scalable {
 		return fcFace{}, false
 	}
-	if d := otWeight(f.weight) - int32(k.w); d <= -50 || d >= 50 {
+	if f.variable {
+		// A variable font, as Fedora ships Noto Sans, has every weight in one
+		// file: it is drawn at the weight asked for, and loading it fails when
+		// its weight axis does not reach that weight (see Font.setWeight).
+		f.file.wght = k.w
+	} else if d := otWeight(f.weight) - int32(k.w); d <= -50 || d >= 50 {
 		return fcFace{}, false
 	}
 	if italic := f.slant == fcSlantItalic || f.slant == fcSlantOblique; italic != k.italic || !italic && f.slant != fcSlantRoman {

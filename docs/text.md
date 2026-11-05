@@ -86,7 +86,9 @@ ui.Text(body).HighlightMatches(query, ui.Highlight{Background: t.AccentSoft, Col
   On Linux, fontconfig gives the UI font (`sans-serif`), the monospace font
   (`monospace`), the emoji font (`emoji`) and a font for any other character;
   without libfontconfig, jamb looks for Noto Sans and DejaVu at fixed paths, and
-  uses the embedded Go fonts when they are missing.
+  uses the embedded Go fonts when they are missing. A variable UI or monospace
+  font, as Fedora's Noto Sans is, gives every weight from its one file: jamb
+  draws it at the weight asked for, on its weight axis.
 - Emoji are drawn in color, and fade with the text color's alpha. On Windows,
   DirectWrite draws the color layers of COLR version 0 fonts, such as Segoe UI
   Emoji. Elsewhere, jamb draws COLR versions 0 and 1 (gradients included) and

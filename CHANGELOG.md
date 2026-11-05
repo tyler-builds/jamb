@@ -16,6 +16,11 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - On a Linux desktop that draws window frames, such as KDE, a window with `ChromeCustom` gets the
   desktop's frame above its title bar, and the bar leaves out its caption buttons.
 
+### Fixed
+
+- On Linux, bold, medium and semibold text in a variable UI font, such as Fedora's Noto Sans, is drawn in
+  that font at the weight asked for. It was drawn in the embedded Go fonts, a different typeface.
+
 ## [0.6.2] - 2026-11-05
 
 The `jamb` command is released with it as `cmd/jamb/v0.4.1`, with `jamb ctl` and the state that

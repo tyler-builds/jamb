@@ -27,7 +27,7 @@ func systemEmojiFont(t *testing.T) *Font {
 		"/usr/share/fonts/noto/NotoColorEmoji.ttf",
 		"/System/Library/Fonts/Apple Color Emoji.ttc",
 	} {
-		files = append(files, fontFile{p, 0})
+		files = append(files, fontFile{path: p})
 	}
 	for _, file := range files {
 		if f, err := loadFile(file); err == nil && f.hasColor() {
