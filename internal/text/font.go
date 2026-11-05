@@ -23,6 +23,7 @@ import (
 	"golang.org/x/image/math/fixed"
 
 	tsfont "github.com/go-text/typesetting/font"
+	ot "github.com/go-text/typesetting/font/opentype"
 )
 
 // Weight is a font weight on the usual 100–900 scale.
@@ -62,6 +63,12 @@ type Font struct {
 	// colorTables is set when the font has color glyphs that the pure-Go
 	// color rasterizer draws: COLR with CPAL, CBDT or sbix (see colr.go).
 	colorTables bool
+
+	// varied is set for a variable font drawn at another weight than its
+	// default one (see setWeight). Its glyphs are drawn from go-text's
+	// outlines, which apply the variations; sf and DirectWrite draw only the
+	// default instance.
+	varied bool
 }
 
 // faces maps shaping faces back to fonts, for rasterization. It holds both
@@ -188,9 +195,11 @@ type fallback struct {
 }
 
 // fontFile is a font file and the index of a font in it, for a collection.
+// wght, when set, is the weight to draw a variable font at, on its wght axis.
 type fontFile struct {
 	path  string
 	index int
+	wght  Weight
 }
 
 // fallbackSpec names a fallback font file and the characters it is for.
@@ -211,27 +220,80 @@ type fileFallback struct {
 // rasterizer can draw: a COLR table with a CPAL table, a CBDT table or an sbix
 // table. It reads only the table directory.
 func hasColorTables(data []byte, index int) bool {
+	has := func(tag string) bool { return fontTable(data, index, tag) != nil }
+	return has("COLR") && has("CPAL") || has("CBDT") || has("sbix")
+}
+
+// fontTable returns the table tag of font index of the font file data (a
+// collection or a single font), or nil. It reads only the table directory.
+func fontTable(data []byte, index int, tag string) []byte {
 	be := binary.BigEndian
 	off := 0
 	if bytes.HasPrefix(data, []byte("ttcf")) {
 		if len(data) < 12 || index < 0 || uint32(index) >= be.Uint32(data[8:]) || 12+4*index+4 > len(data) {
-			return false
+			return nil
 		}
 		off = int(be.Uint32(data[12+4*index:]))
 	}
 	if off+12 > len(data) {
-		return false
+		return nil
 	}
 	n := int(be.Uint16(data[off+4:]))
-	has := map[string]bool{}
 	for i := range n {
 		rec := off + 12 + 16*i
 		if rec+16 > len(data) {
 			break
 		}
-		has[string(data[rec:rec+4])] = true
+		if string(data[rec:rec+4]) == tag {
+			start, size := int64(be.Uint32(data[rec+8:])), int64(be.Uint32(data[rec+12:]))
+			if start+size > int64(len(data)) {
+				return nil
+			}
+			return data[start : start+size]
+		}
 	}
-	return has["COLR"] && has["CPAL"] || has["CBDT"] || has["sbix"]
+	return nil
+}
+
+// wghtAxis returns the range and default of the weight axis (wght) of a
+// variable font, from its fvar table, or ok false when it has none.
+func wghtAxis(data []byte, index int) (lo, def, hi float32, ok bool) {
+	fvar := fontTable(data, index, "fvar")
+	if len(fvar) < 16 {
+		return 0, 0, 0, false
+	}
+	be := binary.BigEndian
+	fixed := func(b []byte) float32 { return float32(int32(be.Uint32(b))) / 65536 }
+	off, n, size := int(be.Uint16(fvar[4:])), int(be.Uint16(fvar[8:])), int(be.Uint16(fvar[10:]))
+	for i := range n {
+		rec := off + i*size
+		if size < 20 || rec+20 > len(fvar) {
+			break
+		}
+		if string(fvar[rec:rec+4]) == "wght" {
+			return fixed(fvar[rec+4:]), fixed(fvar[rec+8:]), fixed(fvar[rec+12:]), true
+		}
+	}
+	return 0, 0, 0, false
+}
+
+// setWeight sets the variable font f, parsed from data, to weight w on its
+// weight axis. It fails when the font has no weight axis, or one that does not
+// reach w, so that the face is not taken for a weight it cannot draw.
+func (f *Font) setWeight(data []byte, w Weight) error {
+	lo, def, hi, ok := wghtAxis(data, f.faceIndex)
+	if !ok {
+		return fmt.Errorf("text: font %q has no weight axis", f.Name)
+	}
+	if float32(w) < lo || float32(w) > hi {
+		return fmt.Errorf("text: the weight axis of font %q is %v to %v, without %d", f.Name, lo, hi, w)
+	}
+	if float32(w) == def {
+		return nil // the default instance, which sf and DirectWrite draw too
+	}
+	f.face.SetVariations([]tsfont.Variation{{Tag: ot.MustNewTag("wght"), Value: float32(w)}})
+	f.varied = true
+	return nil
 }
 
 func inTables(ts ...*unicode.RangeTable) func(rune) bool {
@@ -271,7 +333,7 @@ func NewRegistry() *Registry {
 				files = append(files, f)
 			}
 			for _, p := range paths {
-				files = append(files, fontFile{p, 0})
+				files = append(files, fontFile{path: p})
 			}
 			r.addSource(fam, k, func() (*Font, error) { return loadFirst(files) })
 		}
@@ -286,7 +348,7 @@ func NewRegistry() *Registry {
 		r.fallbacks = append(r.fallbacks, fallback{font: r.fileFont(spec.file), covers: spec.covers})
 	}
 	for _, spec := range systemFallbackFonts() {
-		r.fallbacks = append(r.fallbacks, fallback{font: r.fileFont(fontFile{spec.path, 0}), covers: spec.covers})
+		r.fallbacks = append(r.fallbacks, fallback{font: r.fileFont(fontFile{path: spec.path}), covers: spec.covers})
 	}
 	r.last = &lazyFont{load: func() (*Font, error) { return ParseFont("Go Regular", goregular.TTF) }}
 	return r
@@ -311,6 +373,11 @@ func loadFile(file fontFile) (*Font, error) {
 	f, err := parseFontIndex(file.path, data, file.index)
 	if err != nil {
 		return nil, err
+	}
+	if file.wght != 0 {
+		if err := f.setWeight(data, file.wght); err != nil {
+			return nil, err
+		}
 	}
 	f.path = file.path
 	return f, nil

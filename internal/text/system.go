@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	tsfont "github.com/go-text/typesetting/font"
 	"github.com/go-text/typesetting/segmenter"
 	"github.com/go-text/typesetting/shaping"
 	"golang.org/x/image/font/sfnt"
@@ -350,7 +351,8 @@ func (sys *System) glyph(k glyphKey, physSize float32) (maskEntry, bool) {
 		}
 		// Not a color glyph: a mask, tinted with the text color.
 	}
-	if k.aa == aaSubpixel {
+	// DirectWrite draws a variable font only in its default instance.
+	if k.aa == aaSubpixel && !k.font.varied {
 		if dx, dy, m, ok := dwriteGlyphClearType(k.font, k.id, physSize, float32(k.bin)/subpixelBins, sys.subBGR, sys.rgbaScratch); ok {
 			e := maskEntry{gen: sys.sub.Generation, dx: dx, dy: dy, in: inSubpixel}
 			if m == nil {
@@ -362,7 +364,7 @@ func (sys *System) glyph(k glyphKey, physSize float32) (maskEntry, bool) {
 		// DirectWrite cannot do this glyph; draw it grayscale (kept under the
 		// same key).
 	}
-	if dx, dy, m, ok := dwriteGlyph(k.font, k.id, physSize, float32(k.bin)/subpixelBins, sys.alphaScratch); ok {
+	if dx, dy, m, ok := dwriteGlyph(k.font, k.id, physSize, float32(k.bin)/subpixelBins, sys.alphaScratch); ok && !k.font.varied {
 		e := maskEntry{gen: sys.atlas.Generation, dx: dx, dy: dy}
 		if m == nil {
 			sys.glyphs[k] = e // whitespace
@@ -370,8 +372,7 @@ func (sys *System) glyph(k glyphKey, physSize float32) (maskEntry, bool) {
 		}
 		return sys.storeAlpha(&e, m.Rect.Dx(), m.Rect.Dy(), m, func() { sys.glyphs[k] = e })
 	}
-	ppem := fixed.Int26_6(physSize * 64)
-	segs, err := k.font.sf.LoadGlyph(&sys.buf, k.id, ppem, nil)
+	segs, err := k.font.outline(&sys.buf, k.id, physSize)
 	if err != nil {
 		return maskEntry{}, false
 	}
@@ -502,4 +503,27 @@ func (sys *System) Warm(size float32) {
 	for _, w := range []Weight{Regular, Medium, Semibold} {
 		sys.Layout("Warm up the shaper: Ag 0123", Style{Size: size, Weight: w}, 1e6)
 	}
+}
+
+// outline returns the outline of glyph id at size pixels per em, in 26.6 pixels
+// with the y axis down, as sfnt gives it. A variable font set to another weight
+// than its default one (varied) has its outline from go-text, which applies the
+// variations; sfnt draws only the default instance.
+func (f *Font) outline(buf *sfnt.Buffer, id sfnt.GlyphIndex, size float32) (sfnt.Segments, error) {
+	if !f.varied {
+		return f.sf.LoadGlyph(buf, id, fixed.Int26_6(size*64), nil)
+	}
+	o, ok := f.face.GlyphDataOutline(tsfont.GID(id))
+	if !ok {
+		return nil, fmt.Errorf("text: font %q has no outline for glyph %d", f.Name, id)
+	}
+	s := size / f.upem * 64
+	segs := make(sfnt.Segments, len(o.Segments))
+	for i, g := range o.Segments {
+		segs[i].Op = sfnt.SegmentOp(g.Op) // move, line, quad, cubic in both
+		for j, a := range g.Args {
+			segs[i].Args[j] = fixed.Point26_6{X: fixed.Int26_6(math.Round(float64(a.X * s))), Y: fixed.Int26_6(math.Round(float64(-a.Y * s)))}
+		}
+	}
+	return segs, nil
 }
