@@ -35,11 +35,14 @@ type window struct {
 
 	surface    *wl.Proxy
 	xdgSurface *wl.Proxy
-	toplevel   *wl.Proxy
-	decoration *wl.Proxy
-	fractional *wl.Proxy
-	viewport   *wl.Proxy
-	swap       *swapchain
+	// toplevelSession is the window's entry in the window session (see
+	// session.go), or nil.
+	toplevelSession *wl.Proxy
+	toplevel        *wl.Proxy
+	decoration      *wl.Proxy
+	fractional      *wl.Proxy
+	viewport        *wl.Proxy
+	swap            *swapchain
 
 	// The size in logical (surface) pixels, and the scale: physical pixels
 	// are their product. scale120 is the fractional scale in 120ths, or 0.
@@ -116,6 +119,7 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 		w.decoration.Send(1, mode) // set_mode
 	}
 	w.swap = &swapchain{w: w}
+	d.placeWindow(w) // before the first commit, as restoring requires
 	d.windows = append(d.windows, w)
 
 	// The initial commit, with no buffer, asks for the first configure.

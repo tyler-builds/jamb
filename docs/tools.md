@@ -107,6 +107,13 @@ the value it had before. The app declares nothing for this.
   never gone between the two, and on Windows the new one opens where the old
   one is. Under `jamb dev`, `SingleInstance` is off, so that the two can run at
   once.
+- On Wayland an app cannot place its windows, so `jamb dev` uses a window
+  session (`xdg-session-management-v1`, which KWin has from Plasma 6.7) to have
+  the compositor put the new build's windows where the old build's were. The
+  compositor keeps a window's place when the window closes, so there the old
+  build's windows close as `jamb dev` takes its state, and the screen is
+  without them until the new build has drawn. A compositor without window
+  sessions places the new windows itself.
 - If the app ends within 5 seconds of a restart that gave it state, `jamb dev`
   starts it again without that state, and says so.
 - None of this is in a release build: the rewrite happens only in `jamb dev`,

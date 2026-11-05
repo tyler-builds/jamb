@@ -24,6 +24,10 @@ func postUI(fn func()) { linux.Post(fn) }
 
 func onUIThread() bool { return linux.OnUIThread() }
 
+// releaseWindowSession lets go of the compositor's window session, for the
+// build of jamb dev that takes this one's place (see platform/linux/session.go).
+func releaseWindowSession() { linux.ReleaseSession() }
+
 func quitUI() { linux.Quit() }
 
 // setPlatformAppID makes the AppID the Wayland app ID of the windows, which the

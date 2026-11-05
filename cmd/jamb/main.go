@@ -271,6 +271,9 @@ func (r *runner) start(exe string, changedAt time.Time) {
 	cmd.Env = append(os.Environ(),
 		"JAMB_GEOMETRY_FILE="+r.geometry,
 		"JAMB_CONTROL=1", // the devtools link includes the control channel
+		// Wayland places windows itself; a window session puts the new build's
+		// windows where the old build's were (see platform/linux/session.go).
+		"JAMB_WL_SESSION_FILE="+filepath.Join(r.work, "wl-session"),
 		"JAMB_DEV_CHANGED_AT="+strconv.FormatInt(changedAt.UnixNano(), 10),
 	)
 	r.lastExe, r.restored = exe, time.Time{}

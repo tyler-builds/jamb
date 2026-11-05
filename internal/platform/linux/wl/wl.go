@@ -204,8 +204,8 @@ func (p *Proxy) Destroyed() {
 // Send queues a request. Its arguments are encoded by type:
 //
 //	int32 → int; uint32 → uint; Fixed → fixed; string → string (NUL-terminated);
-//	[]byte → array; *Proxy → object (nil for a null object); NewID → new_id;
-//	FD → fd.
+//	*string → string, nil for a null string; []byte → array; *Proxy → object
+//	(nil for a null object); NewID → new_id; FD → fd.
 //
 // Requests are written by Flush.
 func (p *Proxy) Send(opcode uint16, args ...any) {
@@ -224,6 +224,15 @@ func (p *Proxy) Send(opcode uint16, args ...any) {
 		case string:
 			c.out = binary.LittleEndian.AppendUint32(c.out, uint32(len(v)+1))
 			c.out = append(c.out, v...)
+			c.out = append(c.out, 0)
+			c.out = pad(c.out)
+		case *string:
+			if v == nil {
+				c.out = binary.LittleEndian.AppendUint32(c.out, 0) // a null string
+				break
+			}
+			c.out = binary.LittleEndian.AppendUint32(c.out, uint32(len(*v)+1))
+			c.out = append(c.out, *v...)
 			c.out = append(c.out, 0)
 			c.out = pad(c.out)
 		case []byte:
