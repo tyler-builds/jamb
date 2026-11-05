@@ -26,12 +26,14 @@ failed request exits with status 1.
 
   list     the running apps that have the channel open
   OP       one request: info, tree, find, click, move, drag, type, key, scroll,
-           shot or wait,
+           shot, wait, actions, dispatch, commands or run,
            with its arguments as name=value, such as
              jamb ctl find role=button name=Save
              jamb ctl click key=save
              jamb ctl type text="hello world"
              jamb ctl wait for=found key=done timeout_ms=2000
+             jamb ctl dispatch action=notes.new
+             jamb ctl run command=notes.create args='{"title":"Hi"}'
   -        requests as JSON lines on stdin, answers as JSON lines on stdout
 
 With one app running, -app is not needed.`
@@ -91,6 +93,11 @@ func ctlRequest(op string, args []string) (map[string]any, error) {
 				return nil, fmt.Errorf("%s must be a number, not %q", name, value)
 			}
 			req[name] = n
+		case name == "args":
+			if !json.Valid([]byte(value)) {
+				return nil, fmt.Errorf("args must be JSON, such as args='{\"title\":\"Hi\"}', not %q", value)
+			}
+			req[name] = json.RawMessage(value)
 		case name == "path" && value != "":
 			abs, err := filepath.Abs(value) // the app's working directory may differ
 			if err != nil {

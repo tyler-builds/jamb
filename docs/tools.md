@@ -119,6 +119,10 @@ top left, as in `JAMB_SCRIPT`.
 | `scroll` | `dx`, `dy`, and `x` and `y` or what `find` takes | Scrolls by `dx` and `dy` logical pixels at the point |
 | `shot` | `path` (absolute; `jamb ctl` makes it so), `timeout_ms` | Writes the next frame as a PNG, to `path` or a new file in the control directory, and returns its path and size in physical pixels |
 | `wait` | `for`: `idle`, `found` or `gone`; what `find` takes; `timeout_ms` (5000, at most 60000) | Answers when the window has settled and no `ui.Query` is fetching (`idle`, as the `idle` step of `JAMB_SCRIPT`), when a node matches (`found`, with the matches), or when none does (`gone`) |
+| `actions` | none | The actions handled where the window's focus is, deepest element first, with their labels and keys: what the command palette lists |
+| `dispatch` | `action`, an action's name | Runs the action where the focus is, as its key binding does, and says whether something handled it |
+| `commands` | none | The app's commands (see below), with the JSON Schemas of their input and output; it takes no `window` |
+| `run` | `command`, `args` (the input, a JSON value) | Runs the command and returns its `result`; it takes no `window` |
 
 A node has an `id`, its `parent`, `role`, `name`, `key`, `value`, `description`,
 `states` (such as `focused`, `disabled` or `offscreen`), `bounds` and the number
@@ -145,6 +149,39 @@ retried, since a click that may have landed must not land twice.
 The error codes are `bad_request`, `unknown_op`, `no_window`, `not_found`,
 `not_visible` (a point outside the window, or a hidden window), `stale`,
 `timeout`, `failed` and `quit`.
+
+### Commands
+
+An agent can do anything a user can by clicking and typing, and anything the
+keys and the command palette can with `dispatch`. For what would be slow or
+ambiguous that way, an app registers commands: operations with typed input and
+output, which `commands` describes with JSON Schemas made from the Go types.
+
+```go
+type CreateIn struct {
+	Title string   `json:"title" desc:"The note's title"`
+	Tags  []string `json:"tags,omitempty"`
+}
+
+var _ = ui.NewCommand("notes.create", "Create a note and show it in the editor",
+	func(in CreateIn) (NoteInfo, error) { ... })
+```
+
+```
+jamb ctl commands
+jamb ctl run command=notes.create args='{"title":"Release checklist","tags":["work"]}'
+```
+
+- `run` calls the function on the UI thread, with `args` decoded into its input
+  type, and encodes what it returns as `result`.
+- A field without `omitempty` (or `omitzero`) is required, and a field's `desc`
+  tag is its description in the schema. Unknown fields, missing required
+  fields and values of the wrong type fail with `bad_request`, before the
+  function runs; an error the function returns fails with `failed`.
+- A command is app-wide: it does not depend on the focus, as an action does.
+  The notes example registers `notes.list`, `notes.get`, `notes.create`,
+  `notes.update`, `notes.delete` and `notes.select` (see
+  `examples/notes/views/commands.go`).
 
 ### Limits
 

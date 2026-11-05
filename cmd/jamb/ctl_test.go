@@ -24,7 +24,10 @@ func TestCtlRequest(t *testing.T) {
 			t.Errorf("%s = %#v; want %#v", k, req[k], v)
 		}
 	}
-	for _, bad := range []string{"novalue", "=x", "x=1e", "limit=many"} {
+	if req, err := ctlRequest("run", []string{`args={"a":[1]}`}); err != nil || string(req["args"].(json.RawMessage)) != `{"a":[1]}` {
+		t.Errorf("args: %v %v", req, err)
+	}
+	for _, bad := range []string{"novalue", "=x", "x=1e", "limit=many", "args={nope"} {
 		if _, err := ctlRequest("tree", []string{bad}); err == nil {
 			t.Errorf("%q was accepted", bad)
 		}

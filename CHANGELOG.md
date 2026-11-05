@@ -17,6 +17,11 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   app that `jamb dev` runs has it open; other programs open it when they link package
   `devtools` and set `JAMB_CONTROL=1`. Release builds that do not import `devtools` carry
   none of it. See docs/tools.md, "Control channel".
+- `ui.NewCommand` registers a command with typed input and output for coding agents, which
+  the control channel lists with JSON Schemas made from the Go types (`jamb ctl commands`)
+  and runs (`jamb ctl run`). The channel also lists and dispatches the actions handled
+  where the focus is (`actions`, `dispatch`). The notes example has commands to list, get,
+  create, update, delete and select notes.
 - `ui.Runtime.ScrollIntoView(id)` scrolls the element of an access tree node into view, as
   an assistive technology's ScrollIntoView does, for tests and tools.
 
