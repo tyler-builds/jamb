@@ -123,7 +123,8 @@ func (t *TitleBarElement) Center(e Element) *TitleBarElement {
 }
 
 // Buttons sets whether the caption buttons (minimize, maximize or restore, and
-// close, see TitleBarButtons) are at the end of the bar. They are shown by
+// close, see TitleBarButtons) are at the end of the bar, or where
+// SystemSettings.CaptionButtons puts them. They are shown by
 // default. Turn them off when the window has no caption buttons of its own.
 func (t *TitleBarElement) Buttons(show bool) *TitleBarElement { t.noButtons = !show; return t }
 
@@ -177,6 +178,13 @@ func (t *TitleBarElement) expand(*Context) Element {
 		// what does not fit, so a long title truncates instead of covering the end.
 		start := Div().Key(titleStartKey).Row().Align(Center).Gap(10).Shrink(1).MinWidth(Px(0)).ClipContent().
 			Opacity(dim).Children(t.children...)
+		if startButtons, _ := parseCaptionLayout(ctx.rt.sys.CaptionButtons); !t.noButtons && !ctx.rt.systemCaption && len(startButtons) > 0 {
+			// The desktop puts caption buttons at the start, as GNOME's button-layout
+			// can: they go before the items, and keep full opacity.
+			items := start.Key("")
+			start = Div().Key(titleStartKey).Row().Align(Center).AlignSelf(Stretch).Gap(10).Shrink(1).MinWidth(Px(0)).
+				ClipContent().Child(captionButtons(true)).Child(items)
+		}
 		end := Div().Key(titleEndKey).Row().Align(Center).Gap(10).Shrink(0).AlignSelf(Stretch).
 			Child(Div().Row().Align(Center).Gap(10).Opacity(dim).Children(t.trailing...))
 		if !t.noButtons {

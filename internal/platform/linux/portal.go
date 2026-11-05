@@ -20,6 +20,7 @@ const (
 	portalSettings = "org.freedesktop.portal.Settings"
 	appearance     = "org.freedesktop.appearance"
 	gnomeInterface = "org.gnome.desktop.interface"
+	gnomeWM        = "org.gnome.desktop.wm.preferences"
 )
 
 var session struct {
@@ -59,10 +60,15 @@ func readSetting(namespace, key string) any {
 }
 
 // ReadSettings reads the desktop's settings from the settings portal: the
-// dark style, high contrast, reduced motion, and on GNOME the text scale and
-// caret blink. What the portal does not report keeps its default.
+// dark style, high contrast, reduced motion, and on GNOME the text scale, caret
+// blink and the title bar's buttons. What the portal does not report keeps its
+// default. The caption buttons the app draws are GNOME's round ones.
 func ReadSettings() platform.Settings {
 	s := platform.DefaultSettings()
+	s.RoundCaptionButtons = true
+	if v, ok := readSetting(gnomeWM, "button-layout").(string); ok {
+		s.CaptionButtons = v
+	}
 	if v, ok := readSetting(appearance, "color-scheme").(uint32); ok {
 		s.Dark = v == 1 // 1 prefers dark, 2 prefers light, 0 has no preference
 	}
@@ -104,7 +110,7 @@ func watchSettings() {
 			if sig.Name != portalSettings+".SettingChanged" || len(sig.Body) < 1 {
 				continue
 			}
-			if ns, _ := sig.Body[0].(string); ns != appearance && ns != gnomeInterface {
+			if ns, _ := sig.Body[0].(string); ns != appearance && ns != gnomeInterface && ns != gnomeWM {
 				continue
 			}
 			Post(func() {

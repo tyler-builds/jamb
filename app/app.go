@@ -660,6 +660,11 @@ func (h *host) OnCreate(w platform.Window) error {
 		h.rt.SetDefaultTitleBar(true, h.cfg.Title)
 	}
 	h.rh.SetNativeCaption(h.cfg.Chrome == ChromeCustom || ownBar) // the platform presses the title-bar buttons
+	// A desktop that draws the frame of a window with the app's title bar, as
+	// KDE does, puts the caption buttons in it: the app's bar leaves them out.
+	if sc, ok := w.(interface{ SystemCaption() bool }); ok && sc.SystemCaption() {
+		h.rh.SetSystemCaption(true)
+	}
 	h.rh.SetCancelComposition(w.CancelComposition)
 	h.rh.SetClientOrigin(func() (int, int) { p := w.ClientOrigin(); return p.X, p.Y })
 	h.rt.SetWindow(h.handle)
@@ -1199,6 +1204,7 @@ type runtimeHost interface {
 	Compose(text string, cursor, clauseStart, clauseEnd int)
 	SetMaximized(on bool)
 	SetNativeCaption(on bool)
+	SetSystemCaption(on bool)
 	OnZoom(fn func(float32))
 	Invalidate()
 	InvalidateAll()

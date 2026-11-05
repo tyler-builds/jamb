@@ -1,8 +1,9 @@
 package ui
 
 // DefaultTitleBarHeight is the height of the title bar that SetDefaultTitleBar
-// draws, in logical pixels.
-const DefaultTitleBarHeight = 34
+// draws, in logical pixels: GNOME's header bar height, as the bar is drawn on
+// GNOME.
+const DefaultTitleBarHeight = 46
 
 // placeWindow places an overlay at the window's top left corner, not kept
 // inside a margin (see placeOverlay). The default title bar uses it.
@@ -40,10 +41,10 @@ func (rt *Runtime) SetDefaultTitleBar(on bool, title string) {
 }
 
 // defaultTitleBar renders the default title bar: a TitleBar, which drags the
-// window and holds the caption buttons, with the title in its middle, pinned to
-// the top of the window above the app.
+// window and holds the caption buttons, with the title in bold in its middle, as
+// GNOME's header bar has it, pinned to the top of the window above the app.
 func (rt *Runtime) defaultTitleBar(ctx *Context) Element {
 	h := Px(rt.titleBarHeight)
 	return Div().Overlay(placeWindow).Width(Percent(100)).Height(h).Child(
-		TitleBar().Width(Percent(100)).Height(h).Center(Text(rt.titleBarText.Get()).NoWrap()))
+		TitleBar().Width(Percent(100)).Height(h).Center(Text(rt.titleBarText.Get()).Bold().NoWrap()))
 }

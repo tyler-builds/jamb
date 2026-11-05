@@ -7,6 +7,15 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Changed
+
+- On Linux the caption buttons are GNOME's round ones, and the title bar shows the buttons GNOME's
+  `button-layout` setting names, on the side it names. The default title bar is 46 px high, as GNOME's
+  header bars are, with the title in bold. New `ui.SystemSettings` fields `RoundCaptionButtons` and
+  `CaptionButtons` carry the setting.
+- On a Linux desktop that draws window frames, such as KDE, a window with `ChromeCustom` gets the
+  desktop's frame above its title bar, and the bar leaves out its caption buttons.
+
 ## [0.6.2] - 2026-11-05
 
 The `jamb` command is released with it as `cmd/jamb/v0.4.1`, with `jamb ctl` and the state that
