@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/scene"
 )
@@ -168,6 +169,21 @@ func (rt *Runtime) ClickKey(key string) error {
 	rt.PointerUp(x, y, input.ButtonLeft, 0)
 	rt.Frame(rt.now())
 	return nil
+}
+
+// ScrollIntoView scrolls the element whose node in AccessTree has the ID into
+// view, as an assistive technology's ScrollIntoView does: its nearest scroll
+// container moves the least amount that shows it. The scroll is applied by the
+// frames that follow. It reports whether the tree has an element with the ID.
+func (rt *Runtime) ScrollIntoView(id access.ID) bool {
+	for _, n := range rt.byID {
+		if accID(n.id) == id {
+			rt.scrollIntoView(n)
+			rt.requestFrame()
+			return true
+		}
+	}
+	return false
 }
 
 // Type types text into the focused element, character by character.

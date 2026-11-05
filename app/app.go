@@ -338,8 +338,16 @@ func (a *App) RunE(w Window) error {
 	fonts, size := a.fonts, w.themeFor(false).FontSize
 	go func() { ready <- loadText(fonts, size) }()
 	defer endUI() // a read that waits for the UI thread stops waiting
+	defer func() {
+		if stop := application.controlStop; stop != nil {
+			stop()
+		}
+	}()
 	return runPlatform(func() error {
 		a.setIdentity()
+		if controlStart != nil && application.dev.control {
+			controlStart()
+		}
 		if open {
 			if _, err := openWindow(w, nil); err != nil {
 				return err
@@ -411,6 +419,10 @@ var application struct {
 	appID       string       // the AppID, which names the tray icons' identity (see Tray)
 	gpu         gpuRecovery  // the shared GPU device, while it is lost; see recovery.go
 	devTools    bool         // the visual inspector may open (see App.DevTools and inspect.go)
+	// controlFrame and controlStop are set while the control channel is open
+	// (see control.go): every window reports its frames to it, and Run closes it.
+	controlFrame func(h *host) bool
+	controlStop  func()
 }
 
 func withDefaults(w Window) Window {
@@ -1023,6 +1035,9 @@ func (h *host) OnFrame(w platform.Window) bool {
 	}
 	if script != nil {
 		again = script.afterDraw(h, w) || again
+	}
+	if f := application.controlFrame; f != nil {
+		again = f(h) || again
 	}
 	return again
 }

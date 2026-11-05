@@ -1,13 +1,19 @@
 // Command jamb is the development and packaging companion for jamb applications.
 //
 //	jamb dev [package dir]
+//	jamb ctl [-app PID] OP [name=value ...]
 //	jamb package [flags] [package dir]
 //
 // dev builds the application, runs it, and watches the source of every
 // non-standard-library package it depends on (including the framework in a
 // go.work workspace). When a file changes it rebuilds — only then — and
 // restarts the app, keeping the window where you left it. A failed build
-// prints the compiler errors and leaves the running app alone.
+// prints the compiler errors and leaves the running app alone. The app runs
+// with its control channel open (JAMB_CONTROL=1).
+//
+// ctl reads and drives a running app through its control channel: its windows,
+// accessibility tree, clicks, typing, keys, scrolling, screenshots and waits,
+// with JSON answers, for coding agents and scripts (see docs/tools.md).
 //
 // package builds a Windows release of the application into dist/: a zip, and
 // optionally an NSIS installer (--installer) and an MSIX (--msix). A sign command
@@ -37,16 +43,24 @@ import (
 
 func usage() {
 	fmt.Fprintln(os.Stderr, `usage: jamb dev [package dir]
+       jamb ctl [-app PID] OP [name=value ...]
        jamb package [flags] [package dir]
 
   dev      build, run, and rebuild/restart on source changes
+  ctl      read and drive a running app, for agents and scripts (jamb ctl -h)
   package  build the Windows zip of an app, and optionally an installer and an MSIX (see docs/packaging.md)`)
 	os.Exit(2)
 }
 
 func main() {
-	if len(os.Args) < 2 || (os.Args[1] != "dev" && os.Args[1] != "package") {
+	if len(os.Args) < 2 || (os.Args[1] != "dev" && os.Args[1] != "package" && os.Args[1] != "ctl") {
 		usage()
+	}
+	if os.Args[1] == "ctl" {
+		if err := ctlCmd(os.Args[2:]); err != nil {
+			fatal(err)
+		}
+		return
 	}
 	if os.Args[1] == "package" {
 		if err := packageCmd(os.Args[2:]); err != nil {
@@ -234,6 +248,7 @@ func (r *runner) start(exe string, changedAt time.Time) {
 	cmd.Stdout, cmd.Stderr, cmd.Stdin = os.Stdout, os.Stderr, os.Stdin
 	cmd.Env = append(os.Environ(),
 		"JAMB_GEOMETRY_FILE="+r.geometry,
+		"JAMB_CONTROL=1", // the devtools link includes the control channel
 		"JAMB_DEV_CHANGED_AT="+strconv.FormatInt(changedAt.UnixNano(), 10),
 	)
 	if err := cmd.Start(); err != nil {
@@ -255,7 +270,12 @@ func (r *runner) stop() {
 		return
 	}
 	exited := r.exited
+	pid := r.child.Process.Pid
 	r.child.Process.Kill()
 	<-exited
 	r.child, r.exited = nil, nil
+	// The killed app could not remove its control socket and description.
+	for _, ext := range []string{".sock", ".json"} {
+		os.Remove(filepath.Join(ctlDir(), strconv.Itoa(pid)+ext))
+	}
 }

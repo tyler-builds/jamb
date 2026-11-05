@@ -1,7 +1,8 @@
 # Tools for humans and coding agents
 
-The `jamb` command in `cmd/jamb` has two commands: `jamb dev`, the watch-and-restart
-runner, and `jamb package`, which builds the Windows release (see [Packaging](packaging.md#packaging)).
+The `jamb` command in `cmd/jamb` has three commands: `jamb dev`, the watch-and-restart
+runner; `jamb ctl`, which reads and drives a running app (see [Control channel](#control-channel));
+and `jamb package`, which builds the Windows release (see [Packaging](packaging.md#packaging)).
 
 These environment variables work with any jamb app, with no code changes:
 
@@ -10,6 +11,7 @@ These environment variables work with any jamb app, with no code changes:
 | `JAMB_TRACE=1` | Prints startup timings, per-frame build/layout/paint cost, and frames per second of activity, so you can confirm the app is idle. Also turns on the accessibility warnings (see [Accessibility](accessibility.md#accessibility)). |
 | `JAMB_A11Y_WARN=1` | Prints accessibility warnings: an interactive element with no name, and an image without `Alt`. Each is reported once. On by default under `jamb dev`. |
 | `JAMB_INSPECT=1` | Opens the visual inspector for the first window at start, if the program links it. Under `jamb dev` the inspector is linked, and Ctrl+Shift+I opens it (see [Visual inspector](#visual-inspector)). |
+| `JAMB_CONTROL=1` | Opens the control channel, which `jamb ctl` and coding agents use to read and drive the running app, if the program links it. `jamb dev` links it and sets this (see [Control channel](#control-channel)). |
 | `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `type TEXT` types everything after the one space that follows `type`, spaces included. `devicelost` simulates a GPU device loss; see [GPU device loss](architecture.md#gpu-device-loss). `mark` sets a loop point and `repeat N` goes back to the last mark N more times, or loops until the window closes with `repeat 0`; a `repeat` needs a `mark` before it. `a11ydump PATH` writes the accessibility tree as text (see [Accessibility](accessibility.md#accessibility)). |
 | `JAMB_STRESS=rebuild\|paint` | Measures sustained frame cost, allocation and GC, prints the results, then exits. Its frame times come from the performance counter. |
 | `JAMB_FRAMESTATS=PATH` | Records every frame of the first window, from its first frame until it closes, and writes `PATH` with one row per frame (CPU time, the interval between Presents, whether the frame rebuilt, updated or repainted the tree, and whether it came with no idle gap). The summary's present interval covers only the frames with no idle gap, so a pause between frames does not count as an interval. It writes `PATH-input.csv` beside it, with the latency of each input event that caused a frame, from its arrival to the start and the return of `Present`, and prints a summary to stderr. Time to the screen is not measured. |
@@ -57,6 +59,117 @@ See `ui/runtime_test.go`, `ui/editor_test.go`,
 `examples/demo/views/dump_test.go` and `examples/notes/views/views_test.go` (the notes app
 driven headlessly: Ctrl+N, typing, search, saving), and
 `examples/notes/views/keyboard_test.go` for the same with `ui/uitest`.
+
+## Control channel
+
+The control channel lets a coding agent, a script or you read and drive a
+running app: list its windows, read their accessibility trees, find elements,
+click, type, press keys, scroll, take screenshots, and wait until the UI has
+settled or an element appears. It is `JAMB_SCRIPT` made interactive, and every
+answer is JSON.
+
+Every app that `jamb dev` runs has it open. Another program opens it when it
+links package `devtools` (`import _ "github.com/tyler-builds/jamb/devtools"`)
+and runs with `JAMB_CONTROL=1`. A program that does not import `devtools`, such
+as a release build, carries none of its code.
+
+```
+jamb ctl list                                   # the running apps that have it open
+jamb ctl info                                   # the app's windows
+jamb ctl find role=button name=Save
+jamb ctl click key=save
+jamb ctl wait for=idle
+jamb ctl type text="hello world"
+jamb ctl key keys="ctrl+a backspace"
+jamb ctl wait for=found contains="saved" timeout_ms=2000
+jamb ctl shot path=after.png
+```
+
+With one app running, `jamb ctl` talks to it; with several, `-app PID` picks one.
+`jamb ctl -` reads requests as JSON lines on stdin and writes the answers as JSON
+lines, over one connection, which suits an agent that sends many requests.
+
+### Requests
+
+A request is a JSON object on one line, and so is its answer. The answer carries
+the request's `id` back, and either a `result` or an `error` with a `code` and a
+`message`:
+
+```
+{"id":1,"op":"click","key":"save"}
+{"id":1,"result":{"accepted":true,"x":412,"y":96}}
+{"id":2,"op":"click","key":"missing"}
+{"id":2,"error":{"code":"not_found","message":"no element matches; read the tree to see what is on screen"}}
+```
+
+`window` picks a window by its place in the order the windows opened, 1 for the
+first (the default). Coordinates and bounds are logical pixels from the window's
+top left, as in `JAMB_SCRIPT`.
+
+| Op | Arguments | Result |
+|---|---|---|
+| `info` | none | The protocol version, the process ID and the windows, with their titles, sizes and scale |
+| `tree` | `limit` (100, at most 256), `offset`, `revision` | A page of the accessibility tree, depth first in reading order. A later page passes the first page's `revision`; if the tree changed, it fails with `stale` |
+| `find` | `node`, `key`, `role`, `name`, `contains`, `limit` | The nodes that match all the arguments given: `key` and `name` exactly, `role` (such as `button` or `text field`) in any case, and `contains` in the name or value, in any case |
+| `click` | `x` and `y`, or what `find` takes; `button` (`left`, `right`, `middle`), `count` (1 to 3), `timeout_ms` | Moves the pointer to the point, or to the center of the first match on screen, and clicks |
+| `move` | `x` and `y`, or what `find` takes | Moves the pointer there, as a hover does: tooltips and hover cards open |
+| `drag` | `x` and `y`, or what `find` takes; `dx`, `dy` | Presses the left button there, moves by `dx` and `dy` in steps, and releases |
+| `type` | `text` (at most 16 KiB) | Types into the focused element |
+| `key` | `keys`: names as in `JAMB_SCRIPT`, such as `enter` or `ctrl+shift+left`, separated by spaces | Presses and releases each key in order |
+| `scroll` | `dx`, `dy`, and `x` and `y` or what `find` takes | Scrolls by `dx` and `dy` logical pixels at the point |
+| `shot` | `path` (absolute; `jamb ctl` makes it so), `timeout_ms` | Writes the next frame as a PNG, to `path` or a new file in the control directory, and returns its path and size in physical pixels |
+| `wait` | `for`: `idle`, `found` or `gone`; what `find` takes; `timeout_ms` (5000, at most 60000) | Answers when the window has settled and no `ui.Query` is fetching (`idle`, as the `idle` step of `JAMB_SCRIPT`), when a node matches (`found`, with the matches), or when none does (`gone`) |
+
+A node has an `id`, its `parent`, `role`, `name`, `key`, `value`, `description`,
+`states` (such as `focused`, `disabled` or `offscreen`), `bounds` and the number
+of its `children`. An item of a set, such as a row of a list, has `pos_in_set`
+and `set_size`, and a scroll container that can scroll has `scroll`, its position
+in percent of its range on each axis it scrolls on. IDs are strings, because
+they use all 64 bits. A name, value or description longer than 512 bytes is cut,
+and the node says `truncated`.
+
+Each request sees the effects of the requests before it on the same window: a
+request that arrives while earlier input is still to be drawn runs after the
+next frame, so a `find` right after a `type` finds what the typing changed.
+Effects that take longer than a frame, such as a `ui.Query` fetch or an
+animation, need `wait for=idle` or `wait for=found`.
+
+`click`, `move`, `drag` and `scroll` aimed at a node wait for the node to be
+ready before they act: on screen, scrolled into view if a scroll container has
+it out of view, and still, in the same place in two frames in a row, so the
+input never lands where a moving node was. A node that is not ready within
+`timeout_ms` (5000) fails with `not_visible`. Input at `x` and `y` acts at once.
+The input ops answer when the input has reached the app. A request is never
+retried, since a click that may have landed must not land twice.
+
+The error codes are `bad_request`, `unknown_op`, `no_window`, `not_found`,
+`not_visible` (a point outside the window, or a hidden window), `stale`,
+`timeout`, `failed` and `quit`.
+
+### Limits
+
+- `find`, `wait` and the targets of the input ops match the accessibility
+  tree, so an element with no accessible role, such as a plain `Div`, is not
+  found by them. The input ops with only a `key` fall back to the element's
+  layout, so `click key=...` works for any keyed element, but without waiting
+  for it to be ready.
+- A virtualized list (`ListOf`, `UniformList`) builds only the rows near its
+  view, so a row far from it is not in the tree until the list is scrolled
+  toward it. The rows' `set_size` tells how many there are.
+- A window that is hidden, minimized or (on Windows) covered by other windows
+  draws no frames, so `shot` and `wait for=idle` time out on it.
+- A connection answers its requests one at a time, in order. To act while a
+  `wait` is in progress, open a second connection.
+
+### Where it listens
+
+The app listens on a Unix domain socket named after its process ID (Windows 10
+1803 and later have them too), in a directory that only its user may use:
+`JAMB_CONTROL_DIR`, or `jamb-UID` in the temporary directory (`jamb-control` on
+Windows). Beside the socket, `PID.json` describes the app: its executable, its
+working directory and when it started. The app removes both when it ends; `jamb
+dev` removes them when it restarts the app, and the next app to open its channel
+removes those that a crashed app left.
 
 ## Visual inspector
 
