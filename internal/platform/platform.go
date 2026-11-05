@@ -269,6 +269,13 @@ type Settings struct {
 	CaretBlink    time.Duration // GetCaretBlinkTime in ms; 0 means the caret does not blink (INFINITE)
 	CaretWidth    int           // SPI_GETCARETWIDTH, in device pixels (the text cursor thickness; default 1)
 	Dark          bool          // apps use the dark mode (Settings > Personalization > Colors)
+	// RoundCaptionButtons draws the caption buttons of a title bar the app draws
+	// as GNOME's are: small round buttons, not Windows' wide ones.
+	RoundCaptionButtons bool
+	// CaptionButtons is which caption buttons such a title bar shows, and on
+	// which side, in GNOME's button-layout syntax ("icon:minimize,maximize,close").
+	// Empty means minimize, maximize and close at the end.
+	CaptionButtons string
 }
 
 // SystemColors are the system colors of the current theme, each as a 0x00RRGGBB

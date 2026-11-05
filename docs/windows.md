@@ -169,13 +169,26 @@ ui.Div().Row().Height(ui.Px(32)).WindowArea(ui.WindowAreaDrag).Justify(ui.End).
   the top and bottom of a taller bar, with hover and pressed styles, a red close button and the restore icon
   while the window is maximized. The buttons are native hit-test areas, which is what
   lets Windows 11 show Snap Layouts over the maximize button.
+- On Linux the buttons are GNOME's instead: 24 px circles with a light fill, centered
+  in the bar, 12 px apart and 6 px from the window's edge. Which buttons show, and on
+  which side, follows GNOME's `button-layout` setting
+  (`org.gnome.desktop.wm.preferences`), read from the settings portal and followed
+  when it changes: `appmenu:close` shows only a close button, and `close,minimize:`
+  puts the buttons at the bar's start. `ui.SystemSettings.RoundCaptionButtons` and
+  `CaptionButtons` carry these, so a test can set them.
+- Where the desktop draws window frames, as KDE does, a window with `ChromeCustom`
+  gets the desktop's frame too, above the app's title bar: its caption buttons
+  match the desktop's theme and side, and the app's `TitleBar` and
+  `TitleBarButtons` draw none. The bar keeps its items and still moves the window.
+  GNOME draws no frames, so there the app's bar has GNOME's buttons, as above.
 - Windows with the operating system's title bar ignore areas.
 
 ### Default title bar
 
 Some desktops draw no window frames: GNOME leaves them to the apps. There, a
 window with the system's title bar (the default `Chrome`) gets a title bar from
-jamb instead, with its `Title` in the middle and the caption buttons at the end.
+jamb instead: 46 px high, as GNOME's header bars are, with its `Title` in bold in the
+middle and GNOME's caption buttons where `button-layout` puts them.
 It moves the window when dragged, maximizes it on a double-click, opens the
 window menu on a right-click, and the window has resize edges, as a custom title
 bar does. The app is laid out under the bar, in the rest of the window, and

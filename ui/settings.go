@@ -34,6 +34,16 @@ type SystemSettings struct {
 	// pixels. Zero means 1. A display's scale is applied as for the rest of
 	// the UI.
 	CaretWidth int
+	// RoundCaptionButtons draws the caption buttons of a title bar as GNOME's
+	// are: small round buttons in the bar, not Windows' 46 px wide ones that fill
+	// its height (see TitleBarButtons).
+	RoundCaptionButtons bool
+	// CaptionButtons is which caption buttons a title bar shows, and on which
+	// side, in GNOME's button-layout syntax: the names before the colon go at the
+	// bar's start, those after it at its end, in order, as in
+	// "icon:minimize,maximize,close". Names other than minimize, maximize and
+	// close are skipped. Empty means minimize, maximize and close at the end.
+	CaptionButtons string
 }
 
 // SystemColors are the Windows system colors that a high contrast theme uses

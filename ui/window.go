@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image"
+	"strings"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
@@ -408,34 +409,146 @@ func (rt *Runtime) SetWindow(w Window) { rt.windowCtl = w }
 // read Context.Window().Maximized(). Call it on the UI thread.
 func (rt *Runtime) hostSetMaximized(on bool) { rt.maximized.Set(on) }
 
-// TitleBarButtons returns the minimize, maximize-or-restore and close buttons
-// of a custom title bar, for its right end. They are 46 logical pixels wide, as
-// Windows 11's are, and take the height of the bar they are in, so in a taller bar
-// they still reach its top and bottom edges and the close button's red meets the
-// window's corner. A bar whose height comes from its content gets 32 px buttons. Their areas are marked, so the native hit
-// testing presses them, shows Snap Layouts over the maximize button, and
-// performs their actions on release. The close button turns red on hover.
-func TitleBarButtons() Element {
+// TitleBarButtons returns the caption buttons of a custom title bar, for its
+// right end: minimize, maximize-or-restore and close, or those that
+// SystemSettings.CaptionButtons puts at the end. Their areas are marked, so the
+// native hit testing presses them and performs their actions on release.
+//
+// By default they are 46 logical pixels wide, as Windows 11's are, and take the
+// height of the bar they are in, so in a taller bar they still reach its top and
+// bottom edges and the close button's red meets the window's corner. A bar whose
+// height comes from its content gets 32 px buttons. Windows shows Snap Layouts
+// over the maximize button, and the close button turns red on hover. With
+// SystemSettings.RoundCaptionButtons, as on Linux, they are GNOME's instead:
+// 24 px circles with a light fill, centered in the bar.
+//
+// Where the desktop draws the window's frame above the app's title bar, as KDE
+// does, the frame has the buttons, and TitleBarButtons draws none.
+func TitleBarButtons() Element { return captionButtons(false) }
+
+// hostSetSystemCaption records whether the desktop's frame has the caption
+// buttons, and renders the title bars again. Call it on the UI thread.
+func (rt *Runtime) hostSetSystemCaption(on bool) {
+	if rt.systemCaption != on {
+		rt.systemCaption = on
+		rt.hostInvalidateAll()
+	}
+}
+
+// captionButton is one of a title bar's caption buttons.
+type captionButton uint8
+
+const (
+	captionMinimize captionButton = iota + 1
+	captionMaximize
+	captionClose
+)
+
+// parseCaptionLayout reads GNOME's button-layout syntax (see
+// SystemSettings.CaptionButtons) into the buttons at the bar's start and end.
+func parseCaptionLayout(s string) (start, end []captionButton) {
+	if s == "" {
+		return nil, []captionButton{captionMinimize, captionMaximize, captionClose}
+	}
+	names := func(side string) []captionButton {
+		var bs []captionButton
+		for _, name := range strings.Split(side, ",") {
+			switch strings.TrimSpace(name) {
+			case "minimize":
+				bs = append(bs, captionMinimize)
+			case "maximize":
+				bs = append(bs, captionMaximize)
+			case "close":
+				bs = append(bs, captionClose)
+			}
+		}
+		return bs
+	}
+	before, after, found := strings.Cut(s, ":")
+	if !found {
+		return nil, names(before) // no colon: GNOME puts them all at the end
+	}
+	return names(before), names(after)
+}
+
+// captionButtons returns the caption buttons of one side of a title bar, the
+// start when atStart is set: a row, or nil when the side has none.
+func captionButtons(atStart bool) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		win := ctx.Window()
 		strs := ctx.Strings()
-		maximize, maximizeKey, maximizeLabel := icons.Maximize, "Maximize", strs.Maximize
-		if win.Maximized() {
-			maximize, maximizeKey, maximizeLabel = icons.Restore, "Restore", strs.Restore
+		sys := ctx.rt.sys
+		if ctx.rt.systemCaption {
+			return nil // the desktop's frame has them
 		}
-		// key is the identity of the button, which stays English; label is its text.
-		button := func(ic *icons.Icon, area WindowArea, key, label string) *DivElement {
-			d := Div().Key(key).Width(Px(46)).MinHeight(Px(32)).AlignSelf(Stretch).Center().
-				TextColor(t.TextMuted).Transition(120 * time.Millisecond).
-				Hover(Style{Background: t.SurfaceHover, TextColor: t.Text}).
-				Pressed(Style{Background: t.SurfaceActive, TextColor: t.Text}).
-				WindowArea(area).
-				Child(Icon(ic).Size(10)).
-				// The native hit test does the press, and the runtime leaves a
-				// pointer click on the button to it (see nativeCaption), so the
-				// click handler serves the keyboard and assistive technology.
-				Role(access.RoleButton).Label(label).OnClick(func() {
+		startSide, endSide := parseCaptionLayout(sys.CaptionButtons)
+		side := endSide
+		if atStart {
+			side = startSide
+		}
+		if len(side) == 0 {
+			return nil
+		}
+		round := sys.RoundCaptionButtons
+		row := Div().Row().Align(Center)
+		if round {
+			// GNOME's buttons sit 12 px apart, inset 6 px from the window's edge.
+			row.Gap(12)
+			if atStart {
+				row.PaddingLeft(6)
+			} else {
+				row.PaddingRight(6)
+			}
+		} else {
+			// The row stretches to the bar's height, whatever the bar aligns its children to.
+			row.MinHeight(Px(32)).AlignSelf(Stretch)
+		}
+		for _, b := range side {
+			var (
+				ic         *icons.Icon
+				area       WindowArea
+				key, label string
+			)
+			switch b {
+			case captionMinimize:
+				ic, area, key, label = icons.Minimize, WindowAreaMinimize, "Minimize", strs.Minimize
+			case captionMaximize:
+				ic, area, key, label = icons.Maximize, WindowAreaMaximize, "Maximize", strs.Maximize
+				if win.Maximized() {
+					ic, key, label = icons.Restore, "Restore", strs.Restore
+				}
+			case captionClose:
+				ic, area, key, label = icons.X, WindowAreaClose, "Close", strs.Close
+			}
+			// key is the identity of the button, which stays English; label is its text.
+			d := Div().Key(key).Center().Transition(120 * time.Millisecond).WindowArea(area)
+			if round {
+				// A 24 px circle in the text color at 10 percent, darker under the
+				// pointer and while pressed, as libadwaita draws them.
+				icon := Icon(ic).Size(14)
+				if b == captionMinimize {
+					icon.Style(Style{Margin: Edges{Top: 7}}) // GNOME's minimize is a low line
+				}
+				d.Size(Px(24), Px(24)).Radius(12).Shrink(0).TextColor(t.Text).
+					Background(t.Text.Alpha(0.1)).
+					Hover(Style{Background: t.Text.Alpha(0.15)}).
+					Pressed(Style{Background: t.Text.Alpha(0.3)}).
+					Child(icon)
+			} else {
+				d.Width(Px(46)).MinHeight(Px(32)).AlignSelf(Stretch).TextColor(t.TextMuted).
+					Hover(Style{Background: t.SurfaceHover, TextColor: t.Text}).
+					Pressed(Style{Background: t.SurfaceActive, TextColor: t.Text}).
+					Child(Icon(ic).Size(10))
+				if b == captionClose {
+					d.Hover(Style{Background: Hex("#e81123"), TextColor: Hex("#ffffff")}).
+						Pressed(Style{Background: Hex("#f1707a"), TextColor: Hex("#ffffff")})
+				}
+			}
+			// The native hit test does the press, and the runtime leaves a
+			// pointer click on the button to it (see nativeCaption), so the
+			// click handler serves the keyboard and assistive technology.
+			d.Role(access.RoleButton).Label(label).OnClick(func() {
 				switch area {
 				case WindowAreaMinimize:
 					win.Minimize()
@@ -447,18 +560,11 @@ func TitleBarButtons() Element {
 			})
 			// Windows shows its own Snap Layouts flyout over the maximize button, so
 			// that button gets no tooltip of ours.
-			if area != WindowAreaMaximize {
+			if area != WindowAreaMaximize || round {
 				d.Tooltip(label)
 			}
-			return d
+			row.Child(d)
 		}
-		closeButton := button(icons.X, WindowAreaClose, "Close", strs.Close).
-			Hover(Style{Background: Hex("#e81123"), TextColor: Hex("#ffffff")}).
-			Pressed(Style{Background: Hex("#f1707a"), TextColor: Hex("#ffffff")})
-		// The row stretches to the bar's height, whatever the bar aligns its children to.
-		return Div().Row().MinHeight(Px(32)).AlignSelf(Stretch).
-			Child(button(icons.Minimize, WindowAreaMinimize, "Minimize", strs.Minimize)).
-			Child(button(maximize, WindowAreaMaximize, maximizeKey, maximizeLabel)).
-			Child(closeButton)
+		return row
 	})
 }

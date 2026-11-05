@@ -115,11 +115,11 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 			}
 		})
 		d.decoration.Send(1, wl.NewID{P: w.decoration}, w.toplevel) // get_toplevel_decoration
-		mode := uint32(2)                                           // server_side
-		if opts.CustomTitleBar {
-			mode = 1 // client_side: the app draws its own title bar
-		}
-		w.decoration.Send(1, mode) // set_mode
+		// The compositor is asked for its frame even when the app draws a
+		// title bar: the desktop's caption buttons, in its theme and on its side,
+		// stand in for the app's, which it hides (see SystemCaption). KDE draws
+		// it; a compositor that answers client_side leaves the frame to the app.
+		w.decoration.Send(1, uint32(2)) // set_mode(server_side)
 	}
 	w.swap = &swapchain{w: w}
 	d.placeWindow(w) // before the first commit, as restoring requires
@@ -320,6 +320,12 @@ func (w *window) present(b *shmBuffer) {
 // it, which the window treats as a custom one (moves, caption buttons, resize
 // edges). The host asks it after the window is created.
 func (w *window) NeedsTitleBar() bool { return w.ownTitleBar }
+
+// SystemCaption reports whether the compositor draws the frame of a window
+// whose app draws a title bar, as KDE does: the frame has the caption buttons,
+// so the app's title bar leaves them out. The host asks it after the window is
+// created.
+func (w *window) SystemCaption() bool { return w.opts.CustomTitleBar && w.serverFrame }
 
 func (w *window) clientFrame() bool { return w.opts.CustomTitleBar && !w.serverFrame }
 

@@ -65,6 +65,11 @@ func (h *runtimeHost) SetMaximized(on bool) { h.rt().hostSetMaximized(on) }
 // draws, so the runtime does not run their OnClick for the pointer as well.
 func (h *runtimeHost) SetNativeCaption(on bool) { h.rt().nativeCaption = on }
 
+// SetSystemCaption tells the runtime that the desktop draws the window's frame,
+// with its caption buttons, above the app's title bar, as KDE does: title bars
+// and TitleBarButtons leave the buttons out.
+func (h *runtimeHost) SetSystemCaption(on bool) { h.rt().hostSetSystemCaption(on) }
+
 // OnZoom sets the function called when the zoom changes.
 func (h *runtimeHost) OnZoom(fn func(float32)) { h.rt().hostOnZoom(fn) }
 
