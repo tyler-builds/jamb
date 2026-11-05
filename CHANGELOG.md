@@ -34,12 +34,24 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   Release builds carry none of it. See docs/tools.md, "State across restarts".
 - `ui.Runtime.ScrollIntoView(id)` scrolls the element of an access tree node into view, as
   an assistive technology's ScrollIntoView does, for tests and tools.
+- `app.Window.Unsaved` and `app.Changes`: a window that would lose work by closing asks
+  first, Save, Don't save or Cancel, before it closes or the app quits. Every window is
+  answered before any closes, Cancel keeps them all open, a failed save offers Try again,
+  and a window edited after its answer is asked again. See docs/windows.md, "Unsaved
+  changes".
+- `ui.Runtime.SetHostLayer` gives the host a layer above the app's UI, for dialogs of its
+  own, without changing the app's elements, and `HostLayerShown` reports whether it shows.
+- `ui.Strings` has the prompt's words: `SaveChanges`, `DiscardChanges`, `UnsavedLost`,
+  `UnsavedNoSave`, `SaveFailed`, `Save`, `DontSave`, `Discard` and `TryAgain`.
 
 ### Fixed
 
 - The key of a `TextInput`, `TextArea`, `Slider` or `ColorPicker` is the automation ID of its
   accessible node. The key stayed on the frame the control renders around that node, so UI
   Automation, `LabelledBy` and `DescribedBy` could not find the control by its key.
+- The notes example kept nothing pending after a failed write, so the next save, and the
+  save as the app closed, reported success without writing the changes. A failed write now
+  leaves them pending, and a failed save as the window closes asks to try again.
 
 ## [0.6.1] - 2026-11-04
 

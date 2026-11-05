@@ -105,6 +105,13 @@ type Window struct {
 	// the ui.Window that Open returns, or by the app. Return false to keep the window
 	// open, for example to ask about unsaved changes first.
 	OnClose func() bool
+	// Unsaved reports the work in the window that closing it would lose, or nil
+	// when there is none. When the window is about to close, or the app to quit,
+	// and every OnClose has let it, a window that reports changes asks the user
+	// first: Save, Don't save or Cancel, in a dialog over the window. Nothing
+	// closes until every window is answered, and Cancel keeps them all open.
+	// It is called on the UI thread. See Changes, and docs/windows.md.
+	Unsaved func() *Changes
 	// OnClosed is called on the UI thread after the window has closed, or
 	// after Open failed to open it.
 	OnClosed func()
@@ -250,15 +257,23 @@ func Quit() {
 				return
 			}
 		}
-		application.quitting = true
-		if len(application.windows) == 0 {
-			quitUI()
-			return
+		if guardClose(application.windows, finishQuit) {
+			return // finishQuit runs once the unsaved changes are answered
 		}
-		for _, o := range slices.Clone(application.windows) {
-			o.win.Close()
-		}
+		finishQuit()
 	})
+}
+
+// finishQuit closes every window, which ends the app.
+func finishQuit() {
+	application.quitting = true
+	if len(application.windows) == 0 {
+		quitUI()
+		return
+	}
+	for _, o := range slices.Clone(application.windows) {
+		o.win.Close()
+	}
 }
 
 // Run opens the window and blocks until the app quits: when the last window
@@ -430,6 +445,7 @@ var application struct {
 	// replaces it: the windows take no more input (see control.go).
 	frozen      bool
 	controlStop func()
+	closing     *closeOp // a close or quit waiting for answers about unsaved changes (see quit.go)
 }
 
 func withDefaults(w Window) Window {
@@ -573,6 +589,15 @@ type host struct {
 	// closeAsked is set by the window handle's Close, so a CloseToTray window
 	// closes rather than hides; OnClose clears it.
 	closeAsked bool
+	// approved is set when the questions about unsaved changes let the window
+	// close (see quit.go): the close that follows asks nothing again.
+	approved bool
+	// inputSeq counts the key presses, text, clicks and drops the window has
+	// had, so that an answer about unsaved changes given before an edit is not
+	// taken for one after it.
+	inputSeq uint64
+	// prompt is the open prompt about unsaved changes, or nil (see quit.go).
+	prompt *ui.Signal[*closePrompt]
 
 	win platform.Window
 	rt  *ui.Runtime
@@ -631,6 +656,8 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rh.SetCancelComposition(w.CancelComposition)
 	h.rh.SetClientOrigin(func() (int, int) { p := w.ClientOrigin(); return p.X, p.Y })
 	h.rt.SetWindow(h.handle)
+	h.prompt = ui.NewSignal[*closePrompt](nil)
+	h.rt.SetHostLayer(h.closeLayer)
 	h.rt.SetAccessWarnings(h.dev.a11yWarn)
 	h.applySettings()
 	h.rh.SetMaximized(w.Maximized())
@@ -739,6 +766,10 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 	}
 	s := w.Scale()
 	x, y := e.X/s, e.Y/s
+	switch e.Kind {
+	case platform.EventKeyDown, platform.EventTextInput, platform.EventMouseDown, platform.EventFileDrop, platform.EventComposition:
+		h.inputSeq++
+	}
 	switch e.Kind {
 	case platform.EventResize, platform.EventScaleChanged:
 		h.updateViewport(w)
@@ -850,6 +881,11 @@ func (h *host) OnClose(w platform.Window) bool {
 	if application.quitting {
 		return true
 	}
+	if h.approved {
+		// The unsaved changes are answered: close without asking again.
+		h.approved = false
+		return h.closeNow()
+	}
 	// A CloseToTray window hides for a close the user asks for; the app's own
 	// Close, and the quit of the app, still close it.
 	if closeHides(h.cfg.CloseToTray, shownTrays, asked) {
@@ -866,6 +902,21 @@ func (h *host) OnClose(w platform.Window) bool {
 	if h.cfg.OnClose != nil && !h.cfg.OnClose() {
 		return false
 	}
+	closing := []*host{h}
+	if h.cfg.QuitWhenClosed {
+		closing = slices.Clone(application.windows)
+	}
+	if guardClose(closing, func() {
+		h.approved = true
+		h.win.Close()
+	}) {
+		return false // the window closes once its unsaved changes are answered
+	}
+	return h.closeNow()
+}
+
+// closeNow lets the window close, with the others when it quits the app.
+func (h *host) closeNow() bool {
 	if h.cfg.QuitWhenClosed {
 		application.quitting = true
 		for _, o := range application.windows {
@@ -1090,6 +1141,9 @@ func (h *host) OnDestroy(w platform.Window) {
 		postUI(ins.win.Close)
 	}
 	application.windows = slices.DeleteFunc(application.windows, func(o *host) bool { return o == h })
+	if op := application.closing; op != nil {
+		op.forget(h)
+	}
 	h.handle.closed.Store(true)
 	h.handle.host = nil
 	if h.cfg.OnClosed != nil {

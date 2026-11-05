@@ -15,6 +15,28 @@ import (
 	"github.com/tyler-builds/jamb/examples/notes/views"
 )
 
+// closeErr is the error of the write as the window closed, which Unsaved
+// reports; Save runs off the UI thread, so it is guarded.
+var closeErr lockedErr
+
+type lockedErr struct {
+	mu  sync.Mutex
+	err error
+}
+
+func (l *lockedErr) set(err error) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.err = err
+	return err
+}
+
+func (l *lockedErr) get() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.err
+}
+
 // newNoteArg is the argument of the "New note" task in the jump list.
 const newNoteArg = "--new-note"
 
@@ -99,13 +121,21 @@ func main() {
 				settingsMu.Unlock()
 				saveSettings()
 			},
-			// Pending edits are written as the window closes; there is no prompt.
+			// Pending edits are written as the window closes; there is no prompt,
+			// unless that write fails: then Unsaved reports the notes, and the
+			// window asks to save them again or to discard them.
 			OnClose: func() bool {
 				saveSettings()
-				if err := s.Flush(); err != nil {
+				if err := closeErr.set(s.Flush()); err != nil {
 					fmt.Fprintln(os.Stderr, "jamb-notes: saving before close failed:", err)
 				}
 				return true
+			},
+			Unsaved: func() *app.Changes {
+				if closeErr.get() == nil {
+					return nil
+				}
+				return &app.Changes{Save: func() error { return closeErr.set(s.Flush()) }}
 			},
 		})
 	if err := s.Flush(); err != nil {
