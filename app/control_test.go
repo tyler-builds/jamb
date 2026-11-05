@@ -23,14 +23,16 @@ import (
 // ctlFixture is a control channel over one headless window, with a clock and
 // timers of its own.
 type ctlFixture struct {
-	t       *testing.T
-	c       *control
-	w       *ctlWin
-	rt      *ui.Runtime
-	now     time.Time
-	timers  []func()
-	redraws int
-	shot    func(fn func(*image.RGBA, error)) // what capture does; nil captures nothing
+	t          *testing.T
+	c          *control
+	w          *ctlWin
+	rt         *ui.Runtime
+	now        time.Time
+	timers     []func()
+	timerDurs  []time.Duration // how long each of timers waits
+	redraws    int
+	offscreens int                               // undrawn frames the control channel ran
+	shot       func(fn func(*image.RGBA, error)) // what capture does; nil captures nothing
 }
 
 func newCtlFixture(t *testing.T, root func(ctx *ui.Context) ui.Element) *ctlFixture {
@@ -47,12 +49,16 @@ func newCtlFixture(t *testing.T, root func(ctx *ui.Context) ui.Element) *ctlFixt
 				f.shot(fn)
 			}
 		},
+		offscreen: func() { f.offscreens++; f.frame() },
 	}
 	f.c = &control{dir: t.TempDir(), pid: 7, quit: make(chan struct{}),
 		post:    func(fn func()) { fn() },
 		windows: func() []*ctlWin { return []*ctlWin{f.w} },
 		now:     func() time.Time { return f.now },
-		after:   func(_ time.Duration, fn func()) { f.timers = append(f.timers, fn) },
+		after: func(d time.Duration, fn func()) {
+			f.timers = append(f.timers, fn)
+			f.timerDurs = append(f.timerDurs, d)
+		},
 	}
 	return f
 }
@@ -581,4 +587,56 @@ func TestControlCheckpointFreezes(t *testing.T) {
 		t.Error("isInput: key down is input, a resize is not")
 	}
 	f.fails(ctlRequest{Op: "checkpoint", Path: "relative.json"}, "bad_request")
+}
+
+// A window that draws no frames, as GNOME makes a covered one, still answers:
+// a read after input runs an undrawn frame first, and a wait runs them until it
+// is answered.
+func TestControlCoveredWindow(t *testing.T) {
+	q := ui.NewSignal("")
+	f := newCtlFixture(t, func(ctx *ui.Context) ui.Element {
+		d := ui.Div().Column().Child(ui.TextInput(q).Key("q").Label("Search"))
+		for _, s := range []string{"apple", "banana", "cherry"} {
+			if strings.Contains(s, q.Get()) {
+				d.Child(ui.Button(s))
+			}
+		}
+		return d
+	})
+	f.w.visible = false
+	f.must(ctlRequest{Op: "click", Key: "q"})
+	f.must(ctlRequest{Op: "type", Text: "an"})
+	if got := f.must(ctlRequest{Op: "find", Role: "button"}).(ctlFound); got.Total != 1 || f.offscreens == 0 {
+		t.Fatalf("find on a covered window after typing: %d buttons, %d undrawn frames; want banana alone", got.Total, f.offscreens)
+	}
+
+	_, ch, ok := f.call(ctlRequest{Op: "wait", For: "idle"})
+	for i := 0; !ok && i < 20; i++ {
+		// The newest timer of the pump's period is its next frame.
+		tick := -1
+		for j := range f.timers {
+			if f.timerDurs[j] == ctlPumpEvery && f.timers[j] != nil {
+				tick = j
+			}
+		}
+		if tick < 0 {
+			t.Fatal("nothing runs the covered window's frames")
+		}
+		fn := f.timers[tick]
+		f.timers[tick] = nil
+		f.now = f.now.Add(ctlPumpEvery)
+		fn()
+		select {
+		case g := <-ch:
+			if g.err != nil {
+				t.Fatalf("wait for idle: %v", g.err)
+			}
+			ok = true
+		default:
+		}
+	}
+	if !ok {
+		t.Fatal("a wait for idle on a covered window never answered")
+	}
+	f.fails(ctlRequest{Op: "shot"}, "not_visible")
 }
