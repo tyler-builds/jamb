@@ -99,6 +99,15 @@ type runner struct {
 	child    *exec.Cmd
 	exited   chan struct{}
 	watched  []string
+
+	// State across restarts (see hotrewrite.go and devtools/hot): the module
+	// whose signals are rewritten, the checkpoint file, whether the last stop
+	// wrote one, and when the app last started with one.
+	modRoot  string
+	state    string
+	stateOK  bool
+	restored time.Time
+	lastExe  string
 }
 
 func dev(dir string) error {
@@ -111,7 +120,8 @@ func dev(dir string) error {
 	if err != nil {
 		return err
 	}
-	r := &runner{dir: dir, work: work, geometry: filepath.Join(work, "geometry"), overlay: overlay}
+	r := &runner{dir: dir, work: work, geometry: filepath.Join(work, "geometry"), overlay: overlay,
+		state: filepath.Join(work, "state.json"), modRoot: moduleRoot(dir)}
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
@@ -136,6 +146,14 @@ func dev(dir string) error {
 			r.stop()
 			return nil
 		case <-r.exitedChan():
+			if !r.restored.IsZero() && time.Since(r.restored) < 5*time.Second {
+				// It may have failed on the state it was given: once more without it.
+				logf("the app ended %v after it started with the state of the last run; starting it again without that state",
+					time.Since(r.restored).Round(time.Millisecond))
+				r.child, r.exited, r.stateOK = nil, nil, false
+				r.start(r.lastExe, time.Now())
+				continue
+			}
 			logf("app exited; stopping")
 			return nil
 		case <-tick.C:
@@ -226,13 +244,16 @@ func (r *runner) build() (string, bool) {
 	}
 	exe := filepath.Join(r.work, name)
 	t0 := time.Now()
+	r.rewrite()
 	cmd := exec.Command("go", "build", "-overlay", r.overlay, "-o", exe, ".")
 	cmd.Dir = r.dir
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	if err := cmd.Run(); err != nil {
 		os.Stderr.Write(out.Bytes())
-		if bytes.Contains(out.Bytes(), []byte(devtoolsImport)) {
+		if bytes.Contains(out.Bytes(), []byte(hotImport)) {
+			logf("the app's jamb module has no devtools/hot package, which keeps state across restarts; update the jamb module")
+		} else if bytes.Contains(out.Bytes(), []byte(devtoolsImport)) {
 			logf("the app's jamb module has no devtools package, which jamb dev links into every app; update the jamb module")
 		}
 		logf("build failed after %v; keeping the previous version running", time.Since(t0).Round(time.Millisecond))
@@ -251,6 +272,11 @@ func (r *runner) start(exe string, changedAt time.Time) {
 		"JAMB_CONTROL=1", // the devtools link includes the control channel
 		"JAMB_DEV_CHANGED_AT="+strconv.FormatInt(changedAt.UnixNano(), 10),
 	)
+	r.lastExe, r.restored = exe, time.Time{}
+	if r.stateOK {
+		cmd.Env = append(cmd.Env, "JAMB_STATE_FILE="+r.state)
+		r.restored = time.Now()
+	}
 	if err := cmd.Start(); err != nil {
 		logf("cannot start %s: %v", exe, err)
 		return
@@ -271,6 +297,7 @@ func (r *runner) stop() {
 	}
 	exited := r.exited
 	pid := r.child.Process.Pid
+	r.stateOK = r.checkpoint(pid)
 	r.child.Process.Kill()
 	<-exited
 	r.child, r.exited = nil, nil

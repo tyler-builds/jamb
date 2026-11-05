@@ -22,6 +22,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   and runs (`jamb ctl run`). The channel also lists and dispatches the actions handled
   where the focus is (`actions`, `dispatch`). The notes example has commands to list, get,
   create, update, delete and select notes.
+- `jamb dev` keeps the app's state across its restarts, with no code in the app: every
+  `ui.NewSignal` and `ui.Local` has the value it had before the save. Signals are named
+  from the source by a rewrite of the copies `jamb dev` builds from, values are copied whole
+  (unexported fields and shared pointers too), and a value the app's own startup sets
+  differently than last time takes the new value. Release builds carry none of it. See
+  docs/tools.md, "State across restarts".
 - `ui.Runtime.ScrollIntoView(id)` scrolls the element of an access tree node into view, as
   an assistive technology's ScrollIntoView does, for tests and tools.
 
