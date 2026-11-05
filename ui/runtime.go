@@ -287,10 +287,14 @@ type Runtime struct {
 	// pendingView is a view state kept across a jamb dev restart, applied
 	// after the first layout (see devstate.go).
 	pendingView *viewState
-	rootInst    *componentInstance
-	theme       *Theme   // the effective theme: the app's, or the high contrast one
-	appTheme    *Theme   // the theme the app set with SetTheme
-	strings     *Strings // the text the built-in controls show, complete (see SetStrings)
+	// layerEl and layerInst are the host layer, attached after the app's root
+	// element (see SetHostLayer).
+	layerEl   *ComponentElement
+	layerInst *componentInstance
+	rootInst  *componentInstance
+	theme     *Theme   // the effective theme: the app's, or the high contrast one
+	appTheme  *Theme   // the theme the app set with SetTheme
+	strings   *Strings // the text the built-in controls show, complete (see SetStrings)
 	// imageDue is when the next frame of a drawn animated image, or of a canvas's
 	// blinking caret, is due; a frame at or after it repaints (see imageTexture
 	// and noteDue).
@@ -1164,7 +1168,11 @@ func (rt *Runtime) rootTextStyle() textStyle {
 	return textStyle{size: rt.theme.FontSize, weight: FontRegular}
 }
 
-func (rt *Runtime) setTree(n *node) { rt.tree = n }
+// setTree makes n the tree's root node, with the host layer attached to it.
+func (rt *Runtime) setTree(n *node) {
+	rt.tree = n
+	rt.attachLayer()
+}
 
 // emptyDiv realizes components whose output is nil.
 var emptyDiv = Div().Absolute()
@@ -1175,6 +1183,11 @@ func (rt *Runtime) rerender(inst *componentInstance) {
 		inst.inh = rt.rootTextStyle()
 	}
 	old := inst.root
+	if inst.parentNode == nil && inst != rt.drag.preview {
+		// The tree's root is rebuilt: the host layer leaves the old one first,
+		// and setTree attaches it to the new one.
+		rt.detachLayer()
+	}
 	rt.renderInstance(inst)
 	n := inst.root
 	if inst == rt.drag.preview {
