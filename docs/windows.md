@@ -53,6 +53,10 @@ from another goroutine waits for the UI thread to answer it.
   false, the whole close is cancelled and every window stays open. Otherwise
   the other windows close too, each without being asked again, and their
   `OnClosed` runs.
+- `Unsaved` guards a window's work. When the window is about to close, or the
+  app to quit, and every `OnClose` has let it, a window whose `Unsaved` reports
+  changes asks first, in a dialog over the window (see
+  [Unsaved changes](#unsaved-changes)).
 - `X` and `Y` place a window in logical screen pixels. Left at zero, the
   first window is centered and a later one is cascaded 32 px from the last.
 - `OnGeometry` is called on the UI thread as the window moves, resizes or changes
@@ -84,6 +88,59 @@ taskbar button, and `Visible()` reports whether it is shown: it has opened, is n
 hidden by `Hide` or by a `CloseToTray` close, and has not closed. A minimized window
 is visible. A headless runtime (in tests) has no window, so the actions do nothing,
 `Size()` is the viewport's, and `Visible()` is true.
+
+### Unsaved changes
+
+A window whose work would be lost by closing it reports that work with
+`Unsaved`. It returns nil when there is nothing to lose:
+
+```go
+app.Window{
+    Title: "Editor",
+    Root:  root,
+    Unsaved: func() *app.Changes {
+        if !doc.Dirty() {
+            return nil
+        }
+        return &app.Changes{
+            Name: doc.Name(), // "Save changes to “Report.txt”?"; empty asks about "your changes"
+            Save: doc.Save,   // nil when the changes cannot be saved, only discarded
+        }
+    },
+}
+```
+
+Closing the window, a `QuitWhenClosed` window or `app.Quit` then asks before
+anything closes:
+
+- Every `OnClose` is asked first, as before. If all of them let the windows
+  close, each window that reports changes is asked about them in turn, in its
+  own window, which comes to the front.
+- The prompt offers **Save**, **Don't save** and **Cancel**, or **Discard** and
+  **Cancel** when `Save` is nil. Cancel keeps every window open, including those
+  already answered.
+- `Save` runs on a goroutine of its own, so the window keeps drawing and the Save
+  button shows that it is working. Signals are safe to read there (use `Peek`).
+  If it returns an error, the prompt stays open with the error and offers **Try
+  again**.
+- Nothing closes until every window is answered, and the answers are checked
+  again just before: a window that still reports changes after its save, or that
+  was edited after **Don't save**, is asked again.
+- One close is asked about at a time. Another close or quit while the prompt is
+  open brings the prompt to the front and is otherwise dropped.
+
+The prompt is an `AlertDialog` in the window's host layer (see
+`ui.Runtime.SetHostLayer`), so it takes the window's theme, strings
+(`SaveChanges`, `UnsavedLost`, `Save`, `DontSave` and the others in
+`ui.Strings`) and keyboard behavior. Screen readers, `uitest` and the control
+channel find it as they find any dialog. A window whose root element is not a
+`Div` has no host layer and asks with the system's message box (Yes saves, No
+discards), which the Linux adapter does not have yet: there the window stays
+open and a warning is printed.
+
+An app that saves as it goes, such as the notes example, has nothing to report
+while its writes succeed. Its `Unsaved` reports the notes only when the write as
+the window closes fails, so the user can try again rather than lose them.
 
 ## Custom title bars
 

@@ -124,6 +124,21 @@ type Strings struct {
 	OK string
 	// Cancel is the label of the button that cancels an alert dialog.
 	Cancel string
+	// The prompt about unsaved changes when a window closes or the app quits (see
+	// app.Window.Unsaved). SaveChanges and DiscardChanges are its titles, given
+	// what is unsaved, such as a document's name, or "" when the app names
+	// nothing. UnsavedLost is its message when the changes can be saved, and
+	// UnsavedNoSave when they cannot. SaveFailed is its message after a save
+	// failed, given the error. Save, DontSave, Discard and TryAgain label its buttons.
+	SaveChanges    func(name string) string
+	DiscardChanges func(name string) string
+	UnsavedLost    string
+	UnsavedNoSave  string
+	SaveFailed     func(err string) string
+	Save           string
+	DontSave       string
+	Discard        string
+	TryAgain       string
 	// Minimize is the name of the button that minimizes a window.
 	Minimize string
 	// Maximize is the name of the button that maximizes a window.
@@ -548,23 +563,42 @@ func englishStrings() *Strings {
 		Close:               "Close",
 		OK:                  "OK",
 		Cancel:              "Cancel",
-		Minimize:            "Minimize",
-		Maximize:            "Maximize",
-		Restore:             "Restore",
-		Copy:                "Copy",
-		Copied:              "Copied",
-		Increase:            "Increase",
-		Decrease:            "Decrease",
-		ShowPassword:        "Show password",
-		HidePassword:        "Hide password",
-		Clear:               "Clear",
-		Minimum:             "Minimum",
-		Maximum:             "Maximum",
-		MoreOptions:         "More options",
-		AllTabs:             "All tabs",
-		ScrollTabsBack:      "Scroll tabs back",
-		ScrollTabsForward:   "Scroll tabs forward",
-		CloseTab:            func(tab string) string { return "Close " + tab },
+		SaveChanges: func(name string) string {
+			if name == "" {
+				return "Save your changes?"
+			}
+			return "Save changes to “" + name + "”?"
+		},
+		DiscardChanges: func(name string) string {
+			if name == "" {
+				return "Discard your changes?"
+			}
+			return "Discard changes to “" + name + "”?"
+		},
+		UnsavedLost:       "Your changes will be lost if you don't save them.",
+		UnsavedNoSave:     "They cannot be saved, so closing loses them.",
+		SaveFailed:        func(err string) string { return "Saving failed: " + err + ". Your changes are not saved yet." },
+		Save:              "Save",
+		DontSave:          "Don't save",
+		Discard:           "Discard",
+		TryAgain:          "Try again",
+		Minimize:          "Minimize",
+		Maximize:          "Maximize",
+		Restore:           "Restore",
+		Copy:              "Copy",
+		Copied:            "Copied",
+		Increase:          "Increase",
+		Decrease:          "Decrease",
+		ShowPassword:      "Show password",
+		HidePassword:      "Hide password",
+		Clear:             "Clear",
+		Minimum:           "Minimum",
+		Maximum:           "Maximum",
+		MoreOptions:       "More options",
+		AllTabs:           "All tabs",
+		ScrollTabsBack:    "Scroll tabs back",
+		ScrollTabsForward: "Scroll tabs forward",
+		CloseTab:          func(tab string) string { return "Close " + tab },
 
 		PanelGroup:      "Panels",
 		MovePanelLeft:   "Move left",
