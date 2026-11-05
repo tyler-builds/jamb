@@ -99,9 +99,14 @@ the value it had before. The app declares nothing for this.
   not rebuild cannot be kept, and starts again. `jamb dev` names the app's
   signals that it could not keep; components' locals are counted, and named
   with `JAMB_TRACE=1`. After each restart it says how many values it kept.
-- After the checkpoint, the app's windows run their `OnClose` and their pending
-  timers, as they do when they close, so what the app saves as it closes is on
-  disk too.
+- After the checkpoint, the app takes no more input, and its windows run their
+  `OnClose` and their pending timers, as they do when they close, so what the
+  app saves as it closes is on disk too.
+- The new build starts beside the old one, which stays on screen until the new
+  one has drawn and settled; then `jamb dev` stops the old one. The window is
+  never gone between the two, and on Windows the new one opens where the old
+  one is. Under `jamb dev`, `SingleInstance` is off, so that the two can run at
+  once.
 - If the app ends within 5 seconds of a restart that gave it state, `jamb dev`
   starts it again without that state, and says so.
 - None of this is in a release build: the rewrite happens only in `jamb dev`,

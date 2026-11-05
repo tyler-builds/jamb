@@ -333,7 +333,7 @@ func (r *runner) checkpoint(pid int) bool {
 	}
 	defer conn.Close()
 	conn.SetDeadline(time.Now().Add(time.Second))
-	req, _ := json.Marshal(map[string]any{"op": "checkpoint", "path": r.state})
+	req, _ := json.Marshal(map[string]any{"op": "checkpoint", "path": r.state, "freeze": true})
 	if _, err := conn.Write(append(req, '\n')); err != nil {
 		return false
 	}
@@ -353,4 +353,51 @@ func (r *runner) checkpoint(pid int) bool {
 		return false
 	}
 	return true
+}
+
+// swap replaces the running app with the build exe: it takes the old app's
+// state, starts the new one beside it, and stops the old one once the new one
+// has drawn and settled, so the window is never gone between the two.
+func (r *runner) swap(exe string, changedAt time.Time) {
+	old, oldExited := r.child, r.exited
+	if old == nil {
+		r.start(exe, changedAt)
+		return
+	}
+	r.stateOK = r.checkpoint(old.Process.Pid)
+	r.start(exe, changedAt)
+	if r.child != nil && !r.waitReady(r.child.Process.Pid, r.exited) {
+		logf("the new build did not settle in time; it replaces the old one all the same")
+	}
+	old.Process.Kill()
+	<-oldExited
+	for _, ext := range []string{".sock", ".json"} {
+		os.Remove(filepath.Join(ctlDir(), strconv.Itoa(old.Process.Pid)+ext))
+	}
+}
+
+// waitReady waits up to 10 seconds for the app pid to open its control channel
+// and settle. It reports whether it did; false also when the app ended.
+func (r *runner) waitReady(pid int, exited <-chan struct{}) bool {
+	socket := filepath.Join(ctlDir(), strconv.Itoa(pid)+".sock")
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case <-exited:
+			return false
+		case <-time.After(50 * time.Millisecond):
+		}
+		conn, err := net.DialTimeout("unix", socket, 200*time.Millisecond)
+		if err != nil {
+			continue
+		}
+		conn.SetDeadline(deadline)
+		req, _ := json.Marshal(map[string]any{"op": "wait", "for": "idle", "timeout_ms": 5000})
+		conn.Write(append(req, '\n'))
+		line, err := bufio.NewReader(conn).ReadBytes('\n')
+		conn.Close()
+		var resp struct{ Error *struct{ Code string } }
+		return err == nil && json.Unmarshal(line, &resp) == nil && resp.Error == nil
+	}
+	return false
 }

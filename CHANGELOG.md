@@ -27,8 +27,9 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   from the source by a rewrite of the copies `jamb dev` builds from, values are copied whole
   (unexported fields and shared pointers too), and a value the app's own startup sets
   differently than last time takes the new value. The focus, carets and scroll positions come
-  back too, and a component's locals follow it when it moves. Release builds carry none of
-  it. See docs/tools.md, "State across restarts".
+  back too, and a component's locals follow it when it moves. The new build starts beside
+  the old one and replaces it once it has drawn, so the window is never gone between them.
+  Release builds carry none of it. See docs/tools.md, "State across restarts".
 - `ui.Runtime.ScrollIntoView(id)` scrolls the element of an access tree node into view, as
   an assistive technology's ScrollIntoView does, for tests and tools.
 

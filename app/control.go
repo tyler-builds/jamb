@@ -280,6 +280,8 @@ type ctlRequest struct {
 	Action  string          `json:"action,omitempty"`  // dispatch: the action's name
 	Command string          `json:"command,omitempty"` // run: the command's name
 	Args    json.RawMessage `json:"args,omitempty"`    // run: the command's input, a JSON value
+
+	Freeze bool `json:"freeze,omitempty"` // checkpoint: drop input from now on, as the app is about to stop
 }
 
 type ctlResponse struct {
@@ -559,6 +561,11 @@ func (c *control) opCheckpoint(req ctlRequest, reply ctlReply) {
 	if err != nil {
 		reply(nil, ctlErr("failed", "%v", err))
 		return
+	}
+	if req.Freeze {
+		// The new build takes over from this state: input from now on would be
+		// lost with this process, so the windows take none.
+		application.frozen = true
 	}
 	// jamb dev stops the app next, as a close does: what the app saves as its
 	// windows close is saved, so that data it writes on a timer is not older on

@@ -426,7 +426,10 @@ var application struct {
 	// controlFrame and controlStop are set while the control channel is open
 	// (see control.go): every window reports its frames to it, and Run closes it.
 	controlFrame func(h *host) bool
-	controlStop  func()
+	// frozen is set when jamb dev has taken the app's state for the build that
+	// replaces it: the windows take no more input (see control.go).
+	frozen      bool
+	controlStop func()
 }
 
 func withDefaults(w Window) Window {
@@ -731,6 +734,9 @@ func (h *host) updateViewport(w platform.Window) {
 
 // OnEvent implements platform.Handler.
 func (h *host) OnEvent(w platform.Window, e platform.Event) {
+	if application.frozen && isInput(e.Kind) {
+		return
+	}
 	s := w.Scale()
 	x, y := e.X/s, e.Y/s
 	switch e.Kind {
@@ -785,6 +791,18 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 	if needsFrame {
 		w.Wake()
 	}
+}
+
+// isInput reports whether an event is the user's input, which a frozen app
+// drops (see application.frozen).
+func isInput(k platform.EventKind) bool {
+	switch k {
+	case platform.EventMouseMove, platform.EventMouseDown, platform.EventMouseUp, platform.EventScroll,
+		platform.EventGesture, platform.EventKeyDown, platform.EventKeyUp, platform.EventTextInput,
+		platform.EventComposition, platform.EventFileDrop:
+		return true
+	}
+	return false
 }
 
 // gesturePhase maps the phase of a platform gesture to the one the UI runtime uses.
