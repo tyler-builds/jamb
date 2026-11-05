@@ -7,6 +7,25 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Added
+
+- A control channel for coding agents and scripts. `jamb ctl` reads and drives a running
+  app: its windows, its accessibility tree, finding elements, clicks, hovering, dragging,
+  typing, keys, scrolling, screenshots, and waits for the UI to settle or for an element to
+  appear or go, each answered as JSON. Each request sees the effects of the ones before it,
+  and input aimed at an element scrolls it into view and waits for it to stop moving. Every
+  app that `jamb dev` runs has it open; other programs open it when they link package
+  `devtools` and set `JAMB_CONTROL=1`. Release builds that do not import `devtools` carry
+  none of it. See docs/tools.md, "Control channel".
+- `ui.Runtime.ScrollIntoView(id)` scrolls the element of an access tree node into view, as
+  an assistive technology's ScrollIntoView does, for tests and tools.
+
+### Fixed
+
+- The key of a `TextInput`, `TextArea`, `Slider` or `ColorPicker` is the automation ID of its
+  accessible node. The key stayed on the frame the control renders around that node, so UI
+  Automation, `LabelledBy` and `DescribedBy` could not find the control by its key.
+
 ## [0.6.1] - 2026-11-04
 
 ### Added

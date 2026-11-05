@@ -69,6 +69,10 @@ import (
 //	                    and in an app that sets App.DevTools. The program must
 //	                    link the inspector (package devtools, which `jamb dev`
 //	                    does); otherwise a warning is printed instead
+//	JAMB_CONTROL=1      open the control channel, which `jamb ctl` and coding
+//	                    agents use to read and drive the app (see control.go).
+//	                    The program must link package devtools, as for
+//	                    JAMB_INSPECT; `jamb dev` links it and sets this
 //
 // Settings overrides, for testing only. The real Windows settings are used in
 // normal use, and each variable below replaces the matching setting for this
@@ -132,6 +136,7 @@ type devOptions struct {
 	devStarted int64           // unix nanos when the dev runner noticed a change
 	a11yWarn   bool            // development warnings about accessibility (see ui.Runtime.SetAccessWarnings)
 	inspect    bool            // JAMB_INSPECT=1: the inspector opens for the first window
+	control    bool            // JAMB_CONTROL=1: the control channel opens, if the program links it (see control.go)
 	// The settings overrides (see the package comment): highContrast is the
 	// variable's value, textScale is a percent (0 when unset), reducedMotion
 	// the variable's value.
@@ -156,6 +161,7 @@ func loadDevOptions() devOptions {
 		reducedMotion: os.Getenv("JAMB_REDUCED_MOTION"),
 		dark:          os.Getenv("JAMB_DARK"),
 		inspect:       os.Getenv("JAMB_INSPECT") == "1",
+		control:       os.Getenv("JAMB_CONTROL") == "1",
 	}
 	if v, err := strconv.Atoi(os.Getenv("JAMB_TEXT_SCALE")); err == nil && v > 0 {
 		d.textScale = min(max(v, 100), 225)
