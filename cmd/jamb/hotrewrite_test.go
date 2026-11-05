@@ -26,7 +26,7 @@ func (f *Form) Root(ctx *jui.Context) jui.Element {
 	clicks := jui.NewSignal(0)
 	clicks = jui.NewSignal(1)
 	use(jui.NewSignal(true), jui.NewSignal(2))
-	return nil
+	return jui.Div().Children(jui.Component(f.Root).Key("a"), jui.Component(f.Root))
 }
 
 func use(...any) {}
@@ -46,6 +46,7 @@ func TestRewriteFile(t *testing.T) {
 		`clicks := jambhot__.Signal(jui.NewSignal(0), "views:Form.Root/clicks")`,
 		`clicks = jambhot__.Signal(jui.NewSignal(1), "views:Form.Root/clicks~2")`,
 		`use(jambhot__.Signal(jui.NewSignal(true), "views:Form.Root/#1"), jambhot__.Signal(jui.NewSignal(2), "views:Form.Root/#2"))`,
+		`jambhot__.Component(jui.Component(f.Root), "views:Form.Root/c1").Key("a"), jambhot__.Component(jui.Component(f.Root), "views:Form.Root/c2")`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %s\nin\n%s", want, out)

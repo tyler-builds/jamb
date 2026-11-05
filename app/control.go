@@ -544,7 +544,8 @@ func (h *host) ctlWin() *ctlWin {
 }
 
 // opCheckpoint writes the state that survives a restart to path, for jamb dev,
-// which asks for it before it stops the app (see devtools/hot).
+// which asks for it before it stops the app (see devtools/hot), and then lets
+// the windows save as they close.
 func (c *control) opCheckpoint(req ctlRequest, reply ctlReply) {
 	if devhook.Checkpoint == nil {
 		reply(nil, ctlErr("failed", "the program keeps no state across restarts: it does not link package devtools/hot"))
@@ -558,6 +559,18 @@ func (c *control) opCheckpoint(req ctlRequest, reply ctlReply) {
 	if err != nil {
 		reply(nil, ctlErr("failed", "%v", err))
 		return
+	}
+	// jamb dev stops the app next, as a close does: what the app saves as its
+	// windows close is saved, so that data it writes on a timer is not older on
+	// disk than in the checkpoint. A window that would rather stay open is
+	// stopped all the same; its state is in the checkpoint.
+	for _, h := range application.windows {
+		if h.rh != nil {
+			h.rh.FlushTimers()
+		}
+		if h.cfg.OnClose != nil {
+			h.cfg.OnClose()
+		}
 	}
 	reply(map[string]any{"values": n}, nil)
 }

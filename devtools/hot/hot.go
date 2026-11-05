@@ -38,12 +38,15 @@ import (
 )
 
 // stateVersion is the version of the checkpoint file.
-const stateVersion = 2
+const stateVersion = 3
 
 // file is a checkpoint.
 type file struct {
 	Version int      `json:"version"`
 	Entries []*entry `json:"entries"`
+	// Views are the windows' view states (focus, scroll, carets), in the order
+	// their runtimes were made; null for a window closed since.
+	Views []json.RawMessage `json:"views,omitempty"`
 }
 
 // entry is one kept value: a signal, by its key and how many signals of that
@@ -75,15 +78,18 @@ var state = struct {
 	dec      *decoder
 	started  bool // the app's startup code has run (see started)
 	kept     int
-	fresh    int      // values that took the app's new startup value
-	reset    []string // why values were not restored
-	summary  bool     // the summary is scheduled
+	fresh    int               // values that took the app's new startup value
+	reset    []string          // why values were not restored
+	summary  bool              // the summary is scheduled
+	runtimes []func() any      // the windows' runtimes, in the order they were made
+	views    []json.RawMessage // the checkpoint's view states, by that order
 }{counts: map[string]int{}, restored: map[string]*entry{}}
 
 func init() {
 	devhook.Local = local
 	devhook.Checkpoint = Checkpoint
 	devhook.Started = started
+	devhook.Runtime = runtime
 	if path := os.Getenv("JAMB_STATE_FILE"); path != "" {
 		if err := load(path); err != nil && !os.IsNotExist(err) {
 			fmt.Fprintln(os.Stderr, "jamb dev: the state from before the restart was not read:", err)
@@ -105,6 +111,7 @@ func load(path string) error {
 		return fmt.Errorf("version %d, not %d", f.Version, stateVersion)
 	}
 	state.dec = newDecoder()
+	state.views = f.Views
 	for _, e := range f.Entries {
 		state.restored[e.ID] = e
 		state.dec.index(e.Value)
@@ -132,16 +139,41 @@ func Signal[T any](s *ui.Signal[T], key string) *ui.Signal[T] {
 	return s
 }
 
-// local is ui.Local's hook: a component's local, by the component's ID and the
-// local's name. Components render after the app has started, so it is
-// restored at once.
-func local(component uint64, name string, signal any, current func() any) {
+// local is ui.Local's hook: a component's local, by the component's path in
+// the tree and the local's name. Components render after the app has started,
+// so it is restored at once.
+func local(path, name string, signal any, current func() any) {
 	state.Lock()
 	defer state.Unlock()
-	track("local:"+strconv.FormatUint(component, 16)+":"+name, reflect.ValueOf(signal), func() (reflect.Value, bool) {
+	track("local:"+path+":"+name, reflect.ValueOf(signal), func() (reflect.Value, bool) {
 		s := current()
 		return reflect.ValueOf(s), s != nil
 	})
+}
+
+// Component is what `jamb dev` makes of each ui.Component call: it names the
+// component by its call in the source, site, so that its locals are found again
+// after a restart even when components around it moved (see ui's sitePath).
+func Component(c *ui.ComponentElement, site string) *ui.ComponentElement {
+	if devhook.TagComponent != nil {
+		devhook.TagComponent(c, site)
+	}
+	return c
+}
+
+// runtime is ui.NewRuntime's hook: the runtimes of the windows, in the order
+// they open, take back the view states of the windows that opened in that
+// order before the restart.
+func runtime(current func() any) {
+	state.Lock()
+	defer state.Unlock()
+	state.runtimes = append(state.runtimes, current)
+	i := len(state.runtimes) - 1
+	if i < len(state.views) && state.views[i] != nil && devhook.ViewRestore != nil {
+		if rt := current(); rt != nil {
+			devhook.ViewRestore(rt, state.views[i])
+		}
+	}
 }
 
 // track starts keeping the signal p, and restores it now or, while the app
@@ -293,6 +325,15 @@ func Checkpoint(path string) (int, error) {
 		f.Entries = append(f.Entries, &entry{ID: t.id, Value: n, Base: base})
 	}
 	state.tracked = alive
+	if devhook.ViewCapture != nil {
+		for _, current := range state.runtimes {
+			var v json.RawMessage
+			if rt := current(); rt != nil {
+				v = devhook.ViewCapture(rt)
+			}
+			f.Views = append(f.Views, v)
+		}
+	}
 	b, err := json.Marshal(f)
 	if err != nil {
 		return 0, err

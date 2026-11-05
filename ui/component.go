@@ -21,6 +21,9 @@ type ComponentElement struct {
 	fn     func(ctx *Context) Element
 	key    string
 	retain *retainSlot // set for a retained component (see retain.go)
+	// site names the ui.Component call in the app's source, under jamb dev,
+	// which tags it (see devtools/hot and sitePath).
+	site string
 }
 
 // Component wraps a render function as a re-render boundary:
@@ -303,7 +306,7 @@ func Local[T any](ctx *Context, name string, initial T) *Signal[T] {
 	inst.locals[name] = s
 	if devhook.Local != nil { // jamb dev restores it after a restart
 		wi := weak.Make(inst)
-		devhook.Local(inst.id, name, s, func() any {
+		devhook.Local(inst.sitePath(), name, s, func() any {
 			if i := wi.Value(); i != nil && !i.disposed {
 				return i.locals[name]
 			}

@@ -21,7 +21,8 @@ import (
 // The rewrite that keeps state across restarts (see devtools/hot). Each
 // ui.NewSignal call in the app's own module becomes, in a copy that go build
 // reads through its overlay, a call of hot.Signal with a key named after the
-// source. The copies keep every line where it was, so compiler errors, stack
+// source, and each ui.Component call a call of hot.Component that names the
+// component by its call. The copies keep every line where it was, so compiler errors, stack
 // traces and the inspector's source locations still point at the app's files.
 
 const (
@@ -112,10 +113,21 @@ func rewriteFile(src []byte, pkg string) ([]byte, bool, error) {
 		}
 		stack = append(stack, n)
 		call, ok := n.(*ast.CallExpr)
-		if !ok || !isNewSignal(call.Fun, ui) {
+		if !ok {
 			return true
 		}
 		fn := enclosingFunc(stack)
+		if isUICall(call.Fun, ui, "Component") {
+			// A component is named by its call: the function and the
+			// component calls before it there (see ui's sitePath).
+			ordinal["component:"+fn]++
+			site := pkg + ":" + fn + "/c" + strconv.Itoa(ordinal["component:"+fn])
+			edits = append(edits, insert{off(call.Pos()), hotName + ".Component("}, insert{off(call.End()), ", " + strconv.Quote(site) + ")"})
+			return true
+		}
+		if !isUICall(call.Fun, ui, "NewSignal") {
+			return true
+		}
 		target := targetName(stack)
 		if target == "" {
 			ordinal[fn]++
@@ -144,8 +156,8 @@ func rewriteFile(src []byte, pkg string) ([]byte, bool, error) {
 	return out, true, nil
 }
 
-// isNewSignal reports whether fun is ui.NewSignal, or ui.NewSignal[T].
-func isNewSignal(fun ast.Expr, ui string) bool {
+// isUICall reports whether fun is ui.<name>, or ui.<name>[T].
+func isUICall(fun ast.Expr, ui, name string) bool {
 	switch e := fun.(type) {
 	case *ast.IndexExpr:
 		fun = e.X
@@ -153,7 +165,7 @@ func isNewSignal(fun ast.Expr, ui string) bool {
 		fun = e.X
 	}
 	sel, ok := fun.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "NewSignal" {
+	if !ok || sel.Sel.Name != name {
 		return false
 	}
 	x, ok := sel.X.(*ast.Ident)
