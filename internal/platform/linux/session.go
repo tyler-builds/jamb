@@ -93,8 +93,12 @@ func (d *display) placeWindow(w *window) {
 // while its entry in the session lives, so the windows go first, then their
 // entries, then the session. The windows are gone from the screen at once;
 // the process is about to be replaced. It runs on the UI thread, at once when
-// called there, and waits until the compositor has handled it.
+// called there, and waits until the compositor has handled it. Before the
+// loop runs, or without one, as in tests, it does nothing.
 func ReleaseSession() {
+	if uiThread.Load() == 0 {
+		return // no loop: no windows, and nothing would run the release
+	}
 	if OnUIThread() {
 		releaseSession()
 		return
