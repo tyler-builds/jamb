@@ -394,6 +394,8 @@ func (e *Engine) flex(n *Node, innerW, innerH, availInnerW float32, arrange bool
 	}
 	items := e.scratch[e.depth-1][:0]
 	defer func() {
+		// Cleared so the reused memory keeps no node alive after it leaves the tree.
+		clear(items)
 		e.scratch[e.depth-1] = items[:0]
 		e.depth--
 	}()

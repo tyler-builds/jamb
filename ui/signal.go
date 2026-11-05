@@ -106,8 +106,10 @@ func (s *Signal[T]) unsubscribe(o observer) {
 	defer s.mu.Unlock()
 	for i, sub := range s.subs {
 		if sub == o {
-			s.subs[i] = s.subs[len(s.subs)-1]
-			s.subs = s.subs[:len(s.subs)-1]
+			last := len(s.subs) - 1
+			s.subs[i] = s.subs[last]
+			s.subs[last] = nil // the spare capacity must not keep the observer alive
+			s.subs = s.subs[:last]
 			return
 		}
 	}
