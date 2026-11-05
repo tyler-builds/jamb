@@ -115,6 +115,10 @@ type ctlWin struct {
 	redraw func()
 	// capture hands the next frame drawn to fn (see render.Renderer.CaptureNextFrame).
 	capture func(fn func(*image.RGBA, error))
+	// offscreen runs a frame of the runtime without drawing it: it builds and
+	// lays out the tree, for a window that draws no frames because it is
+	// hidden, minimized or, on GNOME, covered by other windows.
+	offscreen func()
 }
 
 // control is an open control channel. Its waits are touched only on the UI thread.
@@ -132,6 +136,8 @@ type control struct {
 	waits    []*ctlWait                  // UI thread only
 	actions  []*ctlAction                // input ops waiting for their targets; UI thread only
 	deferred []*ctlDeferred              // requests waiting for a frame; UI thread only
+	pumping  map[int]bool                // windows whose undrawn frames pump runs
+	drew     map[int]time.Time           // when each window last drew a frame
 	shots    int                         // screenshots taken, which name the files of those without a path
 	now      func() time.Time            // the clock of waits, replaced by tests
 	after    func(time.Duration, func()) // runs a function later, replaced by tests
@@ -399,6 +405,11 @@ func (c *control) run(req ctlRequest, reply ctlReply) {
 		return
 	}
 	w := wins[i-1]
+	if !w.visible && w.rt.NeedsFrame() {
+		// The window draws no frames of its own (see pump): one undrawn frame
+		// brings its tree up to the input before this request.
+		w.offscreen()
+	}
 	if w.visible && w.rt.NeedsFrame() {
 		// Input sent before this request has not been drawn yet, and the tree
 		// would not show it: run the request after the next frame, so that every
@@ -406,6 +417,7 @@ func (c *control) run(req ctlRequest, reply ctlReply) {
 		d := &ctlDeferred{window: i, req: req, reply: reply}
 		c.deferred = append(c.deferred, d)
 		w.wake()
+		c.pump(i, w)
 		// A window that stops drawing, such as one covered by others, runs it anyway.
 		c.after(ctlFreshWait, func() { c.post(func() { c.runDeferred(d, nil) }) })
 		return
@@ -506,6 +518,10 @@ func (c *control) hostFrame(h *host) bool {
 	if i < 0 {
 		return false
 	}
+	if c.drew == nil {
+		c.drew = map[int]time.Time{}
+	}
+	c.drew[i+1] = c.now()
 	return c.frame(i+1, h.ctlWin())
 }
 
@@ -541,7 +557,8 @@ func (h *host) ctlWin() *ctlWin {
 			h.rh.Invalidate()
 			h.win.Wake()
 		},
-		capture: h.r.CaptureNextFrame,
+		capture:   h.r.CaptureNextFrame,
+		offscreen: func() { h.rh.Frame(time.Now()) },
 	}
 }
 

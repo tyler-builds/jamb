@@ -46,6 +46,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Fixed
 
+- The control channel works with a window that draws no frames of its own: hidden,
+  minimized, just opened, or covered by other windows, which GNOME stops drawing. It builds
+  and lays out the window's frames without drawing them, so reads after input, waits and
+  input aimed at an element answer as on screen. Before, they answered from the tree as it
+  was before the input, or timed out, and `jamb dev` waited 10 seconds for each new build on
+  GNOME before replacing the old one.
 - The key of a `TextInput`, `TextArea`, `Slider` or `ColorPicker` is the automation ID of its
   accessible node. The key stayed on the frame the control renders around that node, so UI
   Automation, `LabelledBy` and `DescribedBy` could not find the control by its key.

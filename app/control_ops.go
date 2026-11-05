@@ -330,6 +330,7 @@ func (c *control) target(w *ctlWin, index int, req ctlRequest, reply ctlReply, a
 	}
 	a := &ctlAction{window: index, req: req, reply: reply, act: act}
 	c.actions = append(c.actions, a)
+	c.pump(index, w)
 	c.advance(a, w)
 	w.redraw()
 	c.after(d, func() {
@@ -540,7 +541,8 @@ func (c *control) opShot(w *ctlWin, req ctlRequest, reply ctlReply) {
 		return
 	}
 	if !w.visible {
-		reply(nil, ctlErr("not_visible", "the window is hidden or minimized, so it draws no frames"))
+		reply(nil, ctlErr("not_visible", "the window draws no frames: it is hidden, minimized or covered by other windows "+
+			"(GNOME stops a covered window drawing); bring it to the front"))
 		return
 	}
 	w.capture(func(img *image.RGBA, err error) {
@@ -611,6 +613,7 @@ func (c *control) opWait(w *ctlWin, index int, req ctlRequest, reply ctlReply) {
 		return
 	}
 	c.waits = append(c.waits, wt)
+	c.pump(index, w)
 	if wt.kind == "idle" {
 		w.redraw() // the frames that follow tell whether the window has settled
 	}
@@ -687,4 +690,66 @@ func (c *control) expire(wt *ctlWait, d time.Duration) {
 	c.waits = slices.Delete(c.waits, i, i+1)
 	what := map[string]string{"idle": "the window did not settle", "found": "nothing matched", "gone": "a match was still there"}[wt.kind]
 	wt.reply(nil, ctlErr("timeout", "%s after %v", what, d))
+}
+
+// ctlPumpEvery is how often pump runs a covered window's undrawn frame.
+const ctlPumpEvery = 16 * time.Millisecond
+
+// pump runs undrawn frames of window index while requests wait for its
+// frames (waits, input waiting for its target, reads waiting for input to be
+// drawn) and the window draws none of its own. A hidden or minimized window
+// draws nothing, GNOME stops a window drawing while other windows cover it,
+// which is where an app often is while an agent or jamb dev drives it, and a
+// window that has just opened may not be asked to draw yet. The frames build
+// and lay out the tree, run its animations and settle it, so the requests
+// answer as they do on screen. A window that drew a frame of its own since the
+// last tick is left to its own frames.
+func (c *control) pump(index int, w *ctlWin) {
+	if c.pumping[index] {
+		return
+	}
+	if c.pumping == nil {
+		c.pumping = map[int]bool{}
+	}
+	c.pumping[index] = true
+	var tick func()
+	tick = func() {
+		c.post(func() {
+			wins := c.windows()
+			if index > len(wins) || !c.waitingOn(index) {
+				delete(c.pumping, index)
+				return
+			}
+			if w := wins[index-1]; !w.visible || c.now().Sub(c.drew[index]) > ctlPumpStale {
+				w.offscreen()
+				c.frame(index, w)
+			}
+			c.after(ctlPumpEvery, tick)
+		})
+	}
+	c.after(ctlPumpEvery, tick)
+}
+
+// ctlPumpStale is how long a window may go without drawing before pump draws
+// for it.
+const ctlPumpStale = 100 * time.Millisecond
+
+// waitingOn reports whether requests wait for frames of window index.
+func (c *control) waitingOn(index int) bool {
+	for _, w := range c.waits {
+		if w.window == index {
+			return true
+		}
+	}
+	for _, a := range c.actions {
+		if a.window == index {
+			return true
+		}
+	}
+	for _, d := range c.deferred {
+		if d.window == index {
+			return true
+		}
+	}
+	return false
 }

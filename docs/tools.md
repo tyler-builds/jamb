@@ -253,8 +253,11 @@ jamb ctl run command=notes.create args='{"title":"Release checklist","tags":["wo
 - A virtualized list (`ListOf`, `UniformList`) builds only the rows near its
   view, so a row far from it is not in the tree until the list is scrolled
   toward it. The rows' `set_size` tells how many there are.
-- A window that is hidden, minimized or (on Windows) covered by other windows
-  draws no frames, so `shot` and `wait for=idle` time out on it.
+- A window that is hidden, minimized or covered by other windows (Windows and
+  GNOME stop drawing a covered window) draws no frames of its own. The channel
+  then builds and lays out its frames without drawing them, so requests, waits
+  and input work as on screen, but `shot` fails with `not_visible`: bring the
+  window to the front to take a screenshot.
 - A connection answers its requests one at a time, in order. To act while a
   `wait` is in progress, open a second connection.
 
