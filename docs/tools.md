@@ -74,8 +74,16 @@ the value it had before. The app declares nothing for this.
   name from the source, such as `views:NewForm/Form.Name` or
   `main:main/clicks`. Moving code or adding lines does not change the names;
   renaming a variable starts that signal again. The copies keep every line
-  where it was, so compiler errors and stack traces point at your files. A
-  local is known by its component's place in the tree and its name.
+  where it was, so compiler errors and stack traces point at your files.
+- A local is known by its component and its name. The rewrite names each
+  `ui.Component` call too, and a component is known by the calls of the
+  components around it, with its key, or its place among its siblings from the
+  same call. A component that moves keeps its locals, and one that takes
+  another's place does not take them.
+- The view comes back too: the element that had the focus has it again, text
+  fields have their carets and selections where they were, and scroll
+  containers are scrolled where they were. A `ListOf` keeps the item at the top
+  of its view, since it estimates the heights of the items it has not measured.
 - The values are copied whole, unexported fields included, and a pointer that
   two signals share is shared again after the restart.
 - **Startup code.** Go apps often make a signal and then set it as they start,
@@ -91,16 +99,14 @@ the value it had before. The app declares nothing for this.
   not rebuild cannot be kept, and starts again. `jamb dev` names the app's
   signals that it could not keep; components' locals are counted, and named
   with `JAMB_TRACE=1`. After each restart it says how many values it kept.
+- After the checkpoint, the app's windows run their `OnClose` and their pending
+  timers, as they do when they close, so what the app saves as it closes is on
+  disk too.
 - If the app ends within 5 seconds of a restart that gave it state, `jamb dev`
   starts it again without that state, and says so.
 - None of this is in a release build: the rewrite happens only in `jamb dev`,
   and the code that keeps the values (package `devtools/hot`) is linked only
   with package `devtools`.
-
-Not yet kept: scroll positions, focus and the text caret, and the place of a
-component that moves (a component without a key is known by its index among
-its siblings, so one that moves can take another's locals when their types
-match).
 
 ## Control channel
 
