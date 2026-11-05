@@ -383,6 +383,9 @@ func (s *Store) saver() {
 		s.mu.Unlock()
 		s.Save.Set(SaveState{Saving: true, At: s.Save.Peek().At})
 		err := s.write()
+		if err != nil {
+			s.repend()
+		}
 		s.saving.Unlock()
 		st := SaveState{At: time.Now()}
 		if err != nil {
@@ -403,7 +406,20 @@ func (s *Store) Flush() error {
 	if !pending {
 		return nil
 	}
-	return s.write()
+	if err := s.write(); err != nil {
+		s.repend()
+		return err
+	}
+	return nil
+}
+
+// repend marks the changes pending again after a write failed, so that the
+// next save, and Flush as the app closes, writes them rather than reporting
+// nothing to do.
+func (s *Store) repend() {
+	s.mu.Lock()
+	s.pending = true
+	s.mu.Unlock()
 }
 
 func (s *Store) write() error {
