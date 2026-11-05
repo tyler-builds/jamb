@@ -7,6 +7,12 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-05
+
+The `jamb` command is released with it as `cmd/jamb/v0.4.1`, with `jamb ctl` and the state that
+`jamb dev` keeps across restarts. They need this release of the module: on an older one, `jamb dev`
+stops with a message to update it.
+
 ### Added
 
 - On desktops that draw no window frames, such as GNOME, a window with the system's title bar
@@ -863,7 +869,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/tyler-builds/jamb/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/tyler-builds/jamb/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/tyler-builds/jamb/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/tyler-builds/jamb/compare/v0.4.0...v0.5.0
