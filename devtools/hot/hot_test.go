@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -35,6 +36,7 @@ func fresh() {
 	defer state.Unlock()
 	state.counts = map[string]int{}
 	state.tracked = nil
+	state.runtimes, state.views = nil, nil
 	state.restored = map[string]*entry{}
 	state.dec = nil
 	state.started = true
@@ -243,5 +245,128 @@ func TestMapsEncodeInOrder(t *testing.T) {
 		if !bytes.Equal(baseOf(reflect.ValueOf(&m)), first) {
 			t.Fatal("a map encoded differently twice")
 		}
+	}
+}
+
+// A component's locals follow it when the components around it move: a local
+// is known by the component's call in the source, not its index.
+func TestLocalsFollowTheirComponent(t *testing.T) {
+	fresh()
+	t.Cleanup(fresh)
+	swapped := false
+	var a, b *ui.Signal[int]
+	root := func(ctx *ui.Context) ui.Element {
+		ca := Component(ui.Component(func(ctx *ui.Context) ui.Element {
+			a = ui.Local(ctx, "n", 0)
+			return ui.Text("a")
+		}), "views:Root/A")
+		cb := Component(ui.Component(func(ctx *ui.Context) ui.Element {
+			b = ui.Local(ctx, "n", 0)
+			return ui.Text("b")
+		}), "views:Root/B")
+		if swapped {
+			return ui.Div().Children(cb, ca)
+		}
+		return ui.Div().Children(ca, cb)
+	}
+	frame := func() {
+		rt := ui.NewRuntime(root, nil, nil)
+		rt.SetViewport(100, 100, 1)
+		rt.Frame(time.Now())
+	}
+	frame()
+	a.Set(1)
+	b.Set(2)
+	restart(t)
+	swapped = true // the code changed: B comes first now
+	frame()
+	if a.Peek() != 1 || b.Peek() != 2 {
+		t.Errorf("after the components swapped places: a %d, b %d; want 1 and 2", a.Peek(), b.Peek())
+	}
+}
+
+// The focus, a scroll container's position and a text field's caret survive.
+func TestViewStateKept(t *testing.T) {
+	fresh()
+	t.Cleanup(fresh)
+	text := ui.NewSignal("hello world")
+	root := func(ctx *ui.Context) ui.Element {
+		list := ui.Div().Column().ScrollY().Height(ui.Px(100)).Key("list")
+		for i := range 40 {
+			list.Child(ui.Text("row " + strconv.Itoa(i)).Key("row" + strconv.Itoa(i)))
+		}
+		return ui.Div().Column().Children(ui.TextInput(text).Key("field").Label("Field"), list)
+	}
+	rt := ui.NewRuntime(root, nil, nil)
+	rt.SetViewport(300, 300, 1)
+	rt.Frame(time.Now())
+	rt.ClickKey("field")
+	rt.Press(input.KeyHome, 0)
+	rt.Press(input.KeyRight, 0)
+	rt.Press(input.KeyRight, 0) // the caret after "he"
+	r, _ := rt.Find("list")
+	rt.Scroll(r.X+10, r.Y+10, 0, 300, true, 0)
+	rt.Frame(time.Now())
+	before, _ := rt.Find("row0")
+
+	restart(t)
+	rt2 := ui.NewRuntime(root, nil, nil)
+	rt2.SetViewport(300, 300, 1)
+	rt2.Frame(time.Now())
+	rt2.Frame(time.Now())
+	if after, _ := rt2.Find("row0"); after.Y != before.Y {
+		t.Errorf("the list scrolled to %v; it was at %v", after.Y, before.Y)
+	}
+	rt2.Type("X")
+	if text.Peek() != "heXllo world" {
+		t.Errorf("typing after the restart gave %q; want the focus and caret kept, \"heXllo world\"", text.Peek())
+	}
+}
+
+// A ListOf of rows of different heights comes back with the same row at the
+// top, though a new process estimates the rows it has not measured anew.
+func TestListScrollKept(t *testing.T) {
+	fresh()
+	t.Cleanup(fresh)
+	items := make([]int, 300)
+	for i := range items {
+		items[i] = i
+	}
+	root := func(ctx *ui.Context) ui.Element {
+		return ui.Div().Height(ui.Px(300)).Child(
+			ui.ListOf(items, func(i int) string { return "item" + strconv.Itoa(i) }, func(_ int, i int) ui.Element {
+				return ui.Div().Height(ui.Px(float32(20+(i%5)*15))).Key("row" + strconv.Itoa(i)).Child(ui.Text("row " + strconv.Itoa(i)))
+			}).Key("list").Grow(1))
+	}
+	topRow := func(rt *ui.Runtime) string {
+		lr, _ := rt.Find("list")
+		best, bestY := "", float32(1e9)
+		for i := range items {
+			if r, ok := rt.Find("row" + strconv.Itoa(i)); ok && r.H > 0 && r.Y+r.H > lr.Y && r.Y < bestY {
+				best, bestY = strconv.Itoa(i), r.Y
+			}
+		}
+		return best
+	}
+	rt := ui.NewRuntime(root, nil, nil)
+	rt.SetViewport(300, 300, 1)
+	rt.Frame(time.Now())
+	lr, _ := rt.Find("list")
+	for range 30 {
+		rt.Scroll(lr.X+10, lr.Y+10, 0, 400, true, 0)
+		rt.Frame(time.Now())
+	}
+	before := topRow(rt)
+	if before == "" || before == "0" {
+		t.Fatalf("the list did not scroll (top row %q)", before)
+	}
+	restart(t)
+	rt2 := ui.NewRuntime(root, nil, nil)
+	rt2.SetViewport(300, 300, 1)
+	for range 3 {
+		rt2.Frame(time.Now())
+	}
+	if after := topRow(rt2); after != before {
+		t.Errorf("the top row is %s after the restart; it was %s", after, before)
 	}
 }

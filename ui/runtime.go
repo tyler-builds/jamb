@@ -283,11 +283,14 @@ type Runtime struct {
 	// (icons.KeepColors), by name and pixel size.
 	colorIcons map[text.MaskKey]*scene.Texture
 
-	rootEl   *ComponentElement
-	rootInst *componentInstance
-	theme    *Theme   // the effective theme: the app's, or the high contrast one
-	appTheme *Theme   // the theme the app set with SetTheme
-	strings  *Strings // the text the built-in controls show, complete (see SetStrings)
+	rootEl *ComponentElement
+	// pendingView is a view state kept across a jamb dev restart, applied
+	// after the first layout (see devstate.go).
+	pendingView *viewState
+	rootInst    *componentInstance
+	theme       *Theme   // the effective theme: the app's, or the high contrast one
+	appTheme    *Theme   // the theme the app set with SetTheme
+	strings     *Strings // the text the built-in controls show, complete (see SetStrings)
 	// imageDue is when the next frame of a drawn animated image, or of a canvas's
 	// blinking caret, is due; a frame at or after it repaints (see imageTexture
 	// and noteDue).
@@ -595,7 +598,7 @@ func NewRuntime(root func(ctx *Context) Element, theme *Theme, ts *text.System) 
 	if ts == nil {
 		ts = text.NewSystem()
 	}
-	return &Runtime{
+	rt := &Runtime{
 		rootEl:     Component(root),
 		theme:      theme,
 		appTheme:   theme,
@@ -618,6 +621,8 @@ func NewRuntime(root func(ctx *Context) Element, theme *Theme, ts *text.System) 
 		zoomKeys:   true,
 		warn:       func(s string) { fmt.Fprintln(os.Stderr, "jamb:", s) },
 	}
+	announceRuntime(rt)
+	return rt
 }
 
 // hostSetWakeFunc registers the function called (from any goroutine) when the
@@ -927,6 +932,10 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 			rt.buildDirty()
 		}
 		rt.layout()
+	}
+	if v := rt.pendingView; v != nil && rt.tree != nil {
+		rt.pendingView = nil
+		rt.applyView(v)
 	}
 	rt.layoutPreview()
 	// A drag near a scroll container's edge scrolls it; the target under the
