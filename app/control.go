@@ -566,6 +566,7 @@ func (c *control) opCheckpoint(req ctlRequest, reply ctlReply) {
 		// The new build takes over from this state: input from now on would be
 		// lost with this process, so the windows take none.
 		application.frozen = true
+		releaseWindowSession() // the new build takes over where the windows are
 	}
 	// jamb dev stops the app next, as a close does: what the app saves as its
 	// windows close is saved, so that data it writes on a timer is not older on

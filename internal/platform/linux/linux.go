@@ -29,10 +29,12 @@ type display struct {
 	compositor *wl.Proxy
 	shm        *wl.Proxy
 	wmBase     *wl.Proxy
-	decoration *wl.Proxy // zxdg_decoration_manager_v1, or nil
-	cursor     *wl.Proxy // wp_cursor_shape_manager_v1, or nil
-	fractional *wl.Proxy // wp_fractional_scale_manager_v1, or nil
-	viewporter *wl.Proxy // wp_viewporter, or nil
+	decoration *wl.Proxy   // zxdg_decoration_manager_v1, or nil
+	cursor     *wl.Proxy   // wp_cursor_shape_manager_v1, or nil
+	fractional *wl.Proxy   // wp_fractional_scale_manager_v1, or nil
+	viewporter *wl.Proxy   // wp_viewporter, or nil
+	sessions   *wl.Proxy   // xdg_session_manager_v1, or nil
+	session    *winSession // the window session under jamb dev (see session.go), or nil
 	seat       *seat
 	clip       *clipboard // nil without wl_data_device_manager
 
@@ -136,6 +138,8 @@ func connect() (*display, error) {
 	d.cursor = bind("wp_cursor_shape_manager_v1", 1, 1, nil)
 	d.fractional = bind("wp_fractional_scale_manager_v1", 1, 1, nil)
 	d.viewporter = bind("wp_viewporter", 1, 1, nil)
+	d.sessions = bind("xdg_session_manager_v1", 1, 1, nil)
+	d.openSession()
 	if d.fractional != nil && d.viewporter == nil {
 		d.fractional = nil // a fractional scale needs a viewport to size the buffer
 	}

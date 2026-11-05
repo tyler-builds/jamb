@@ -42,6 +42,9 @@ With one app running, -app is not needed.`
 var ctlNumbers = map[string]bool{"window": true, "x": true, "y": true, "dx": true, "dy": true,
 	"count": true, "limit": true, "offset": true, "timeout_ms": true}
 
+// ctlBools are the request fields that take true or false.
+var ctlBools = map[string]bool{"freeze": true}
+
 // ctlDial is how long ctl waits for an app to answer a connection.
 const ctlDial = 2 * time.Second
 
@@ -98,6 +101,12 @@ func ctlRequest(op string, args []string) (map[string]any, error) {
 				return nil, fmt.Errorf("args must be JSON, such as args='{\"title\":\"Hi\"}', not %q", value)
 			}
 			req[name] = json.RawMessage(value)
+		case ctlBools[name]:
+			b, err := strconv.ParseBool(value)
+			if err != nil {
+				return nil, fmt.Errorf("%s must be true or false, not %q", name, value)
+			}
+			req[name] = b
 		case name == "path" && value != "":
 			abs, err := filepath.Abs(value) // the app's working directory may differ
 			if err != nil {

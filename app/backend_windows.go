@@ -42,6 +42,9 @@ func openPlatform(opts platform.WindowOptions, h platform.Handler) (platform.Win
 
 func postUI(fn func()) { windows.Post(fn) }
 
+// releaseWindowSession does nothing: windows are placed by their geometry here.
+func releaseWindowSession() {}
+
 func onUIThread() bool { return windows.OnUIThread() }
 
 func quitUI() { windows.Quit() }
