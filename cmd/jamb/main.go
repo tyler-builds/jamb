@@ -7,7 +7,9 @@
 // dev builds the application, runs it, and watches the source of every
 // non-standard-library package it depends on (including the framework in a
 // go.work workspace). When a file changes it rebuilds — only then — and
-// restarts the app, keeping the window where you left it. A failed build
+// replaces the app with the new build, which starts beside the old one and
+// takes its place once it has drawn, with the window where you left it and the
+// app's state as it was (see docs/tools.md, "State across restarts"). A failed build
 // prints the compiler errors and leaves the running app alone. The app runs
 // with its control channel open (JAMB_CONTROL=1).
 //
@@ -169,8 +171,7 @@ func dev(dir string) error {
 			if !ok {
 				continue
 			}
-			r.stop()
-			r.start(exe, changedAt)
+			r.swap(exe, changedAt)
 			if err := r.refreshWatchList(); err != nil {
 				logf("warning: %v", err)
 			}

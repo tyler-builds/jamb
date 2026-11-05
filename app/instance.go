@@ -101,6 +101,11 @@ func (a *App) SingleInstance(onArgs func(args []string, dir string)) *App {
 // window. Problems are printed. A launch that cannot join runs on its own, so a
 // fault here never stops the app.
 func (a *App) joinInstance() (owned *instanceNames, handed bool) {
+	if os.Getenv("JAMB_DEV_CHANGED_AT") != "" {
+		// jamb dev runs the old build and the new one side by side for a
+		// moment, while the new one takes the old one's place.
+		return nil, false
+	}
 	names, err := currentInstanceNames(a.appID)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "jamb: single instance is off for this launch:", err)

@@ -121,3 +121,24 @@ func TestCtlFindsAndAsks(t *testing.T) {
 		t.Errorf("two apps: %v", err)
 	}
 }
+
+// The swap waits for the new app's channel and its settled answer, and stops
+// waiting when the app ends.
+func TestWaitReady(t *testing.T) {
+	dir, err := os.MkdirTemp("", "jc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Setenv("JAMB_CONTROL_DIR", dir)
+	r := &runner{}
+	exited := make(chan struct{})
+	fakeApp(t, dir, 5)
+	if !r.waitReady(5, exited) {
+		t.Error("an app that answers was not ready")
+	}
+	close(exited)
+	if r.waitReady(6, exited) {
+		t.Error("an app that ended was ready")
+	}
+}

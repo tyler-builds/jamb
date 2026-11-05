@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/internal/devhook"
+	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -556,4 +558,27 @@ func TestControlActionsAndCommands(t *testing.T) {
 	f.fails(ctlRequest{Op: "run", Command: "test.notes.create", Args: []byte(`{"title":""}`)}, "failed")
 	f.fails(ctlRequest{Op: "run", Command: "test.missing"}, "not_found")
 	f.fails(ctlRequest{Op: "run"}, "bad_request")
+}
+
+// A checkpoint for jamb dev's swap freezes the app: the build that replaces it
+// has its state, so the input it would take now would be lost.
+func TestControlCheckpointFreezes(t *testing.T) {
+	f := newCtlFixture(t, func(ctx *ui.Context) ui.Element { return ui.Div() })
+	saved := ""
+	old := devhook.Checkpoint
+	devhook.Checkpoint = func(path string) (int, error) { saved = path; return 3, nil }
+	t.Cleanup(func() { devhook.Checkpoint = old; application.frozen = false })
+	path := filepath.Join(t.TempDir(), "state.json")
+	got := f.must(ctlRequest{Op: "checkpoint", Path: path}).(map[string]any)
+	if got["values"] != 3 || saved != path || application.frozen {
+		t.Fatalf("checkpoint: %v, saved to %q, frozen %v", got, saved, application.frozen)
+	}
+	f.must(ctlRequest{Op: "checkpoint", Path: path, Freeze: true})
+	if !application.frozen {
+		t.Error("a checkpoint with freeze left the app taking input")
+	}
+	if !isInput(platform.EventKeyDown) || isInput(platform.EventResize) {
+		t.Error("isInput: key down is input, a resize is not")
+	}
+	f.fails(ctlRequest{Op: "checkpoint", Path: "relative.json"}, "bad_request")
 }
