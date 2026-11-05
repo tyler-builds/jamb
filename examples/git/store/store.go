@@ -17,6 +17,12 @@ import (
 // page through a small repository.
 var PageSize = 1500
 
+// PauseLoadMore, while set, makes LoadMore do nothing, so that a test sees only
+// the pages that it, or LoadUntil, reads. The history grid asks LoadMore for the
+// next page as soon as the last rows are near, which with a test's small pages
+// is at once, and would race with what the test checks.
+var PauseLoadMore bool
+
 // Entry is one row of the history: a commit, its slice of the graph and the
 // refs that point at it.
 type Entry struct {
@@ -136,7 +142,7 @@ func (r *Repo) Reload() {
 // LoadMore reads the next page of the history and appends it. It does nothing
 // while a read is running or when the history is complete.
 func (r *Repo) LoadMore() {
-	if r.Loading.Peek() || !r.More.Peek() {
+	if PauseLoadMore || r.Loading.Peek() || !r.More.Peek() {
 		return
 	}
 	r.Loading.Set(true)
