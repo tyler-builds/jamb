@@ -744,6 +744,7 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 		if d.acc != nil && d.acc.details != "" {
 			b.describeTrigger(kids, d.acc.details)
 		}
+		b.passKey(n.key, kids)
 		return kids
 	}
 	id := accID(n.id)
@@ -864,6 +865,27 @@ func (a *accessInfo) descriptionOr(tooltip, name string) string {
 		return tooltip
 	}
 	return ""
+}
+
+// passKey gives the key of an element that is flattened away, a layout
+// container without semantics, to the one node it contributes, if that node
+// has no key of its own. A TextInput's key is on the frame it renders, around
+// the field's node, and this makes it the field's automation ID, so that UI
+// Automation, LabelledBy and the control channel find the field by its key.
+// A container that contributes several nodes keeps its key to itself, since
+// no one of them is the element the key names.
+func (b *accessBuilder) passKey(key string, kids []access.ID) {
+	if key == "" || len(kids) != 1 {
+		return
+	}
+	an := b.byID[kids[0]]
+	if an == nil || an.Key != "" {
+		return
+	}
+	an.Key = key
+	if _, ok := b.keys[key]; !ok {
+		b.keys[key] = an.ID
+	}
 }
 
 // add records an exposed node and its targets, and makes it the parent of its
