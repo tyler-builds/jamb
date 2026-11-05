@@ -171,6 +171,18 @@ ui.Div().Row().Height(ui.Px(32)).WindowArea(ui.WindowAreaDrag).Justify(ui.End).
   lets Windows 11 show Snap Layouts over the maximize button.
 - Windows with the operating system's title bar ignore areas.
 
+### Default title bar
+
+Some desktops draw no window frames: GNOME leaves them to the apps. There, a
+window with the system's title bar (the default `Chrome`) gets a title bar from
+jamb instead, with its `Title` in the middle and the caption buttons at the end.
+It moves the window when dragged, maximizes it on a double-click, opens the
+window menu on a right-click, and the window has resize edges, as a custom title
+bar does. The app is laid out under the bar, in the rest of the window, and
+otherwise does not change: it needs no code for it, and `SetTitle` changes the
+bar's title. A window with `ChromeCustom` draws its own and gets none.
+`ctx.WindowSize()` still reports the whole window, bar included.
+
 ### TitleBar
 
 `ui.TitleBar()` is a window's own title bar as a container: a row whose children

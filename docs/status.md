@@ -74,8 +74,9 @@ The milestone status, and the known limitations and next steps.
   and reduced motion, file dialogs through the portal, OS notifications, and tray icons (StatusNotifierItem,
   hosted by KDE Plasma and, with the AppIndicator extension, GNOME). It lacks a GPU
   renderer, input methods (text-input-v3), message boxes, accessibility
-  (AT-SPI), drag and drop, X11, and title bars on compositors without
-  server-side decorations (GNOME) for windows that do not draw their own.
+  (AT-SPI), drag and drop, and X11. On compositors that draw no window frames
+  (GNOME), a window that does not draw its own title bar gets jamb's default one
+  (see [Default title bar](windows.md#default-title-bar)).
   macOS (Cocoa + Metal) plugs in the same way, behind `platform.Window` and
   `render.Renderer`; it will need a small cgo shim or purego-style
   Objective-C calls.

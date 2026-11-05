@@ -75,11 +75,19 @@ func readUI[T any](zero T, fn func() T) T {
 	}
 }
 
-func (w *appWindow) Minimize()             { w.do(func(h *host) { h.win.Minimize() }) }
-func (w *appWindow) ToggleMaximize()       { w.do(func(h *host) { h.win.ToggleMaximize() }) }
-func (w *appWindow) Focus()                { w.do(func(h *host) { h.win.Focus() }) }
-func (w *appWindow) SetTitle(title string) { w.do(func(h *host) { h.win.SetTitle(title) }) }
-func (w *appWindow) Closed() bool          { return w.closed.Load() }
+func (w *appWindow) Minimize()       { w.do(func(h *host) { h.win.Minimize() }) }
+func (w *appWindow) ToggleMaximize() { w.do(func(h *host) { h.win.ToggleMaximize() }) }
+func (w *appWindow) Focus()          { w.do(func(h *host) { h.win.Focus() }) }
+func (w *appWindow) SetTitle(title string) {
+	w.do(func(h *host) {
+		h.win.SetTitle(title)
+		h.cfg.Title = title
+		if nb, ok := h.win.(interface{ NeedsTitleBar() bool }); ok && nb.NeedsTitleBar() {
+			h.rt.SetDefaultTitleBar(true, title) // the title bar the runtime draws
+		}
+	})
+}
+func (w *appWindow) Closed() bool { return w.closed.Load() }
 
 // Close closes the window even when it is a CloseToTray window; see host.OnClose.
 func (w *appWindow) Close() { w.do(func(h *host) { h.closeAsked = true; h.win.Close() }) }

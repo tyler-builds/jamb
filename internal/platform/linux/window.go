@@ -65,6 +65,9 @@ type window struct {
 	maximized, fullscreen, activated, suspended bool
 	// serverFrame is set when the compositor draws the window's frame.
 	serverFrame bool
+	// ownTitleBar is set when the window asked for the system's title bar and
+	// the compositor draws none: the app draws one (see NeedsTitleBar).
+	ownTitleBar bool
 
 	cursor  input.Cursor
 	wakeAt  time.Time
@@ -129,6 +132,13 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 			w.destroy()
 			return nil, err
 		}
+	}
+	if !w.opts.CustomTitleBar && !w.serverFrame {
+		// The compositor draws no frame, as GNOME's does not: the window gets
+		// the client's frame, as a custom title bar does, and the app draws a
+		// title bar for it (see NeedsTitleBar).
+		w.opts.CustomTitleBar = true
+		w.ownTitleBar = true
 	}
 	if err := h.OnCreate(w); err != nil {
 		w.destroy()
@@ -305,6 +315,12 @@ func (w *window) present(b *shmBuffer) {
 
 // clientFrame reports whether the window draws its own frame, so it resizes
 // itself from its edges: a custom title bar the compositor does not cover.
+// NeedsTitleBar reports whether the window asked for the system's title bar on
+// a compositor that draws none, such as GNOME's: the app draws a title bar for
+// it, which the window treats as a custom one (moves, caption buttons, resize
+// edges). The host asks it after the window is created.
+func (w *window) NeedsTitleBar() bool { return w.ownTitleBar }
+
 func (w *window) clientFrame() bool { return w.opts.CustomTitleBar && !w.serverFrame }
 
 // renderer returns the target the CPU renderer draws the window's frames into.

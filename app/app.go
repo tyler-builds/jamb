@@ -652,7 +652,14 @@ func (h *host) OnCreate(w platform.Window) error {
 	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
 	h.rh.SetImageClipboard(w.ClipboardImage, w.SetClipboardImage, w.HasClipboardImage)
 	h.rh.SetOpenURL(w.OpenURL)
-	h.rh.SetNativeCaption(h.cfg.Chrome == ChromeCustom) // the platform presses the title-bar buttons
+	// A desktop that draws no window frames, such as GNOME, leaves a window that
+	// asked for the system's title bar without one: the runtime draws it.
+	ownBar := false
+	if nb, ok := w.(interface{ NeedsTitleBar() bool }); ok && nb.NeedsTitleBar() {
+		ownBar = true
+		h.rt.SetDefaultTitleBar(true, h.cfg.Title)
+	}
+	h.rh.SetNativeCaption(h.cfg.Chrome == ChromeCustom || ownBar) // the platform presses the title-bar buttons
 	h.rh.SetCancelComposition(w.CancelComposition)
 	h.rh.SetClientOrigin(func() (int, int) { p := w.ClientOrigin(); return p.X, p.Y })
 	h.rt.SetWindow(h.handle)
