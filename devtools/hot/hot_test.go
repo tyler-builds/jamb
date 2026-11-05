@@ -335,7 +335,7 @@ func TestListScrollKept(t *testing.T) {
 	root := func(ctx *ui.Context) ui.Element {
 		return ui.Div().Height(ui.Px(300)).Child(
 			ui.ListOf(items, func(i int) string { return "item" + strconv.Itoa(i) }, func(_ int, i int) ui.Element {
-				return ui.Div().Height(ui.Px(float32(20+(i%5)*15))).Key("row" + strconv.Itoa(i)).Child(ui.Text("row " + strconv.Itoa(i)))
+				return ui.Div().Height(ui.Px(float32(20 + (i%5)*15))).Key("row" + strconv.Itoa(i)).Child(ui.Text("row " + strconv.Itoa(i)))
 			}).Key("list").Grow(1))
 	}
 	topRow := func(rt *ui.Runtime) string {
