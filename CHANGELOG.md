@@ -9,6 +9,10 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Added
 
+- On desktops that draw no window frames, such as GNOME, a window with the system's title bar
+  gets a title bar from jamb, with its title and the caption buttons, which moves, maximizes
+  and resizes the window as a custom title bar does. The app needs no code for it. See
+  docs/windows.md, "Default title bar". `ui.Runtime.SetDefaultTitleBar` draws it.
 - A control channel for coding agents and scripts. `jamb ctl` reads and drives a running
   app: its windows, its accessibility tree, finding elements, clicks, hovering, dragging,
   typing, keys, scrolling, screenshots, and waits for the UI to settle or for an element to

@@ -53,6 +53,8 @@ type overlayItem struct {
 // overlayMargin inside the view.
 func placeOverlay(p Placement, gap float32, a scene.Rect, w, h float32, view scene.Rect) (x, y float32) {
 	switch p {
+	case placeWindow:
+		return view.X, view.Y
 	case edgeLeft, edgeTop:
 		return a.X, a.Y
 	case edgeRight:

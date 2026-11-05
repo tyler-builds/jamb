@@ -2,9 +2,20 @@ package ui
 
 import "slices"
 
-// hostLayerID is the ID of the host layer's component. The IDs of the app's
-// elements derive from rootID, so they do not meet it.
-const hostLayerID = 0x1a7e5
+// The IDs of the host's layers' components. The IDs of the app's elements
+// derive from rootID, so they do not meet them.
+const (
+	hostLayerID     = 0x1a7e5
+	titleBarLayerID = 0x1a7e6
+)
+
+// hostLayer is a component of the host's, attached beside the app's root
+// element (see SetHostLayer).
+type hostLayer struct {
+	id   uint64
+	el   *ComponentElement
+	inst *componentInstance
+}
 
 // SetHostLayer gives the host of the runtime, such as package app, a layer of
 // its own above the app's UI. fn is a component that renders the layer: it runs
@@ -21,53 +32,68 @@ const hostLayerID = 0x1a7e5
 // closes (see app.Window.Unsaved). Call it on the UI thread. A nil fn removes
 // the layer.
 func (rt *Runtime) SetHostLayer(fn func(ctx *Context) Element) {
+	rt.setLayer(hostLayerID, fn)
+}
+
+// setLayer sets, replaces or, with a nil fn, removes the host layer with the
+// ID. Layers are attached in the order of their IDs, so the default title bar
+// comes before the host's layer, whose dialogs paint over it.
+func (rt *Runtime) setLayer(id uint64, fn func(ctx *Context) Element) {
 	rt.detachLayer()
-	if fn == nil {
-		if inst := rt.layerInst; inst != nil {
-			rt.layerInst = nil
+	i := slices.IndexFunc(rt.layers, func(l *hostLayer) bool { return l.id == id })
+	switch {
+	case fn == nil && i >= 0:
+		if inst := rt.layers[i].inst; inst != nil {
 			rt.retireChild(inst)
 		}
-		rt.layerEl = nil
-		rt.needLayout = true
-		rt.requestFrame()
-		return
+		rt.layers = slices.Delete(rt.layers, i, i+1)
+	case fn != nil && i >= 0:
+		rt.layers[i].el = Component(fn)
+	case fn != nil:
+		rt.layers = append(rt.layers, &hostLayer{id: id, el: Component(fn)})
+		slices.SortFunc(rt.layers, func(a, b *hostLayer) int { return int(a.id) - int(b.id) })
 	}
-	rt.layerEl = Component(fn)
 	rt.attachLayer()
+	rt.needLayout = true
 	rt.requestFrame()
 }
 
-// attachLayer builds the host layer, if it is set and not yet built, and adds
-// its node as the last child of the tree's root node.
+// attachLayer builds the host layers, those not yet built, and adds their
+// nodes as the last children of the tree's root node.
 func (rt *Runtime) attachLayer() {
 	root := rt.tree
-	if rt.layerEl == nil || root == nil || root.kind != kindDiv {
+	if root == nil || root.kind != kindDiv {
 		return // a Text or another leaf lays out no children
 	}
-	inst := rt.instance(hostLayerID, rt.layerEl, nil, root, rt.rootTextStyle())
-	rt.layerInst = inst
-	n := inst.root
-	n.parent = root
-	root.children = append(root.children, n)
-	root.lay.Children = append(root.lay.Children, &n.lay)
-	rt.reorder(root)
-	rt.invalidateLayout(root)
-	rt.needLayout = true
+	for _, l := range rt.layers {
+		l.inst = rt.instance(l.id, l.el, nil, root, rt.rootTextStyle())
+		n := l.inst.root
+		n.parent = root
+		root.children = append(root.children, n)
+		root.lay.Children = append(root.lay.Children, &n.lay)
+	}
+	if len(rt.layers) > 0 {
+		rt.reorder(root)
+		rt.invalidateLayout(root)
+		rt.needLayout = true
+	}
 }
 
-// detachLayer takes the host layer's node out of its parent, so that a rebuild
-// of the tree's root does not retire it with the rest of the old tree.
+// detachLayer takes the host layers' nodes out of their parent, so that a
+// rebuild of the tree's root does not retire them with the rest of the old tree.
 func (rt *Runtime) detachLayer() {
-	inst := rt.layerInst
-	if inst == nil || inst.root == nil || inst.parentNode == nil {
-		return
-	}
-	p := inst.parentNode
-	if i := slices.Index(p.children, inst.root); i >= 0 {
-		p.children = slices.Delete(p.children, i, i+1)
-		p.lay.Children = slices.Delete(p.lay.Children, i, i+1)
-		rt.reorder(p)
-		rt.invalidateLayout(p)
+	for _, l := range rt.layers {
+		inst := l.inst
+		if inst == nil || inst.root == nil || inst.parentNode == nil {
+			continue
+		}
+		p := inst.parentNode
+		if i := slices.Index(p.children, inst.root); i >= 0 {
+			p.children = slices.Delete(p.children, i, i+1)
+			p.lay.Children = slices.Delete(p.lay.Children, i, i+1)
+			rt.reorder(p)
+			rt.invalidateLayout(p)
+		}
 	}
 }
 
@@ -75,7 +101,11 @@ func (rt *Runtime) detachLayer() {
 // tree, so that what it renders shows. It is false before SetHostLayer, before
 // the first frame, and while the app's root element is not a Div.
 func (rt *Runtime) HostLayerShown() bool {
-	inst := rt.layerInst
+	i := slices.IndexFunc(rt.layers, func(l *hostLayer) bool { return l.id == hostLayerID })
+	if i < 0 {
+		return false
+	}
+	inst := rt.layers[i].inst
 	return inst != nil && inst.root != nil && inst.parentNode != nil && inst.parentNode == rt.tree &&
 		slices.Contains(rt.tree.children, inst.root)
 }

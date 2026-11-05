@@ -287,14 +287,18 @@ type Runtime struct {
 	// pendingView is a view state kept across a jamb dev restart, applied
 	// after the first layout (see devstate.go).
 	pendingView *viewState
-	// layerEl and layerInst are the host layer, attached after the app's root
-	// element (see SetHostLayer).
-	layerEl   *ComponentElement
-	layerInst *componentInstance
-	rootInst  *componentInstance
-	theme     *Theme   // the effective theme: the app's, or the high contrast one
-	appTheme  *Theme   // the theme the app set with SetTheme
-	strings   *Strings // the text the built-in controls show, complete (see SetStrings)
+	// layers are the host's layers, attached after the app's root element
+	// (see SetHostLayer and SetDefaultTitleBar).
+	layers []*hostLayer
+	// titleBarHeight is the height of the default title bar above the app's
+	// root element, 0 without one, and titleBarText its title (see
+	// SetDefaultTitleBar).
+	titleBarHeight float32
+	titleBarText   *Signal[string]
+	rootInst       *componentInstance
+	theme          *Theme   // the effective theme: the app's, or the high contrast one
+	appTheme       *Theme   // the theme the app set with SetTheme
+	strings        *Strings // the text the built-in controls show, complete (see SetStrings)
 	// imageDue is when the next frame of a drawn animated image, or of a canvas's
 	// blinking caret, is due; a frame at or after it repaints (see imageTexture
 	// and noteDue).
@@ -990,7 +994,10 @@ func (rt *Runtime) buildDirty() {
 func (rt *Runtime) layout() {
 	t0 := time.Now()
 	rt.markAccess()
-	rt.engine.Compute(&rt.tree.lay, rt.viewW, rt.viewH)
+	// The default title bar, if there is one, takes the top of the window: the
+	// app's root element is laid out in the rest (see SetDefaultTitleBar).
+	rt.engine.Compute(&rt.tree.lay, rt.viewW, max(rt.viewH-rt.titleBarHeight, 0))
+	rt.tree.lay.Y = rt.titleBarHeight
 	rt.needLayout, rt.needPaint = false, true
 	rt.reportGridColumns()
 	rt.stats.LaidOut = true
