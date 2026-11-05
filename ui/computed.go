@@ -140,8 +140,10 @@ func (c *Computed[T]) unsubscribe(o observer) {
 	defer c.mu.Unlock()
 	for i, sub := range c.subs {
 		if sub == o {
-			c.subs[i] = c.subs[len(c.subs)-1]
-			c.subs = c.subs[:len(c.subs)-1]
+			last := len(c.subs) - 1
+			c.subs[i] = c.subs[last]
+			c.subs[last] = nil // the spare capacity must not keep the observer alive
+			c.subs = c.subs[:last]
 			return
 		}
 	}
