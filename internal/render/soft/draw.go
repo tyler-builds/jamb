@@ -146,18 +146,6 @@ func (c *clipper) coverage(px, py float32) float32 {
 	return v
 }
 
-// solid returns the pixel centers [x0, x1) × [y0, y1) where the clip covers
-// fully, as a range of pixels (empty when there are none).
-func (c *clipper) solid() (x0, y0, x1, y1 float32) {
-	x0, y0, x1, y1 = c.x0+0.5, c.y0+0.5, c.x1-0.5, c.y1-0.5
-	if c.rounded {
-		m := min(maxRadius(c.radii), min(c.hx, c.hy)) + 0.5
-		x0, y0 = max(x0, c.cx-c.hx+m), max(y0, c.cy-c.hy+m)
-		x1, y1 = min(x1, c.cx+c.hx-m), min(y1, c.cy+c.hy-m)
-	}
-	return
-}
-
 // ---- quads, borders, shadows and gradients ----
 
 // quadShader holds what quad_ps reads, prepared once per quad.
@@ -228,36 +216,43 @@ func (rr *band) drawQuad(q *scene.Quad, cl *clipper) {
 		return
 	}
 
-	// Inside the box away from its corners and borders, and inside the clip,
-	// every pixel is the plain fill: those spans are filled without shading.
-	sx0, sx1, sy0, sy1 := px1, px1, py1, py1 // empty
-	if s.sigma <= 0 && !s.gradient {
-		m := min(maxRadius(s.radii), min(s.hx, s.hy)) + 0.5
-		if s.hasSides {
-			m += max(s.sides[0], s.sides[1], s.sides[2], s.sides[3])
-		}
-		cx0, cy0, cx1, cy1 := cl.solid()
-		lx0, ly0 := max(b.X+m, cx0), max(b.Y+m, cy0)
-		lx1, ly1 := min(b.Right()-m, cx1), min(b.Bottom()-m, cy1)
-		// Pixel i's center is i+0.5: the pixels whose centers lie in [lo, hi].
-		ax, bx := int(math.Ceil(float64(lx0-0.5))), int(math.Floor(float64(lx1-0.5)))+1
-		ay, by := int(math.Ceil(float64(ly0-0.5))), int(math.Floor(float64(ly1-0.5)))+1
-		if ax < bx && ay < by {
-			sx0, sx1 = max(ax, px0), min(bx, px1)
-			sy0, sy1 = max(ay, py0), min(by, py1)
-		}
-	}
-
 	if s.sigma > 0 {
 		rr.drawShadow(&s, cl, px0, px1, py0, py1)
 		return
 	}
+	// Inside the box away from its corners and borders, and inside the clip,
+	// every pixel is the plain fill (or the gradient's color there): those spans
+	// are drawn without shading. Per row, the span is inset by the border on the
+	// straight sides and by the corner radius only in the rows near a corner.
+	edge, corner := float32(0.5), min(maxRadius(s.radii), min(s.hx, s.hy))+0.5
+	if s.hasSides {
+		w := max(s.sides[0], s.sides[1], s.sides[2], s.sides[3])
+		edge += w
+		corner += w
+	}
 	for y := py0; y < py1; y++ {
 		py := float32(y) + 0.5
-		inSolid := y >= sy0 && y < sy1 && sx0 < sx1
+		sx0, sx1 := px1, px1 // empty
+		lo, hi := solidRow(py, s.cx, s.cy, s.hx, s.hy, edge, corner)
+		clo, chi := cl.solidRow(py)
+		lo, hi = max(lo, clo), min(hi, chi)
+		if lo <= hi && !shadeEveryPixel {
+			ax, bx := int(math.Ceil(float64(lo-0.5))), int(math.Floor(float64(hi-0.5)))+1
+			if a, b := max(ax, px0), min(bx, px1); a < b {
+				sx0, sx1 = a, b
+			}
+		}
 		for x := px0; x < px1; x++ {
-			if inSolid && x == sx0 {
-				rr.fillSpan(y, sx0, sx1, s.fill[0], s.fill[1], s.fill[2], s.fill[3])
+			if x == sx0 {
+				if s.gradient {
+					qy := py - s.cy
+					for k := sx0; k < sx1; k++ {
+						c := premul(s.gradientFill(float32(k)+0.5-s.cx, qy))
+						rr.blend(y*rr.stride+k*4, c[0], c[1], c[2], c[3])
+					}
+				} else {
+					rr.fillSpan(y, sx0, sx1, s.fill[0], s.fill[1], s.fill[2], s.fill[3])
+				}
 				x = sx1 - 1
 				continue
 			}
@@ -270,6 +265,39 @@ func (rr *band) drawQuad(q *scene.Quad, cl *clipper) {
 			rr.blend(y*rr.stride+x*4, c[0]*cc, c[1]*cc, c[2]*cc, c[3]*cc)
 		}
 	}
+}
+
+// shadeEveryPixel turns off the solid spans, so that tests can check that they
+// draw what shading every pixel draws.
+var shadeEveryPixel = false
+
+// solidRow returns the pixel centers [lo, hi] of the row centered at py that lie
+// at least edge inside the straight sides of the rounded box (center cx, cy, half
+// size hx, hy) and, in the rows within corner of its top or bottom, at least corner
+// inside its left and right sides. lo > hi when there are none.
+func solidRow(py, cx, cy, hx, hy, edge, corner float32) (lo, hi float32) {
+	y0, y1 := cy-hy, cy+hy
+	switch {
+	case py >= y0+corner && py <= y1-corner:
+		return cx - hx + edge, cx + hx - edge
+	case py >= y0+edge && py <= y1-edge:
+		return cx - hx + corner, cx + hx - corner
+	}
+	return 1, 0
+}
+
+// solidRow returns the pixel centers [lo, hi] of the row centered at py that the
+// clip covers fully. lo > hi when there are none.
+func (c *clipper) solidRow(py float32) (lo, hi float32) {
+	if py < c.y0+0.5 || py > c.y1-0.5 {
+		return 1, 0
+	}
+	lo, hi = c.x0+0.5, c.x1-0.5
+	if c.rounded {
+		l, h := solidRow(py, c.cx, c.cy, c.hx, c.hy, 0.5, min(maxRadius(c.radii), min(c.hx, c.hy))+0.5)
+		lo, hi = max(lo, l), min(hi, h)
+	}
+	return lo, hi
 }
 
 // drawShadow draws a shadow quad. What shadowAlpha computes for a pixel
