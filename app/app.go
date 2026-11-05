@@ -26,6 +26,7 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/internal/devhook"
 	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/render"
 	"github.com/tyler-builds/jamb/internal/scene"
@@ -343,6 +344,9 @@ func (a *App) RunE(w Window) error {
 			stop()
 		}
 	}()
+	if devhook.Started != nil {
+		devhook.Started() // jamb dev's kept state goes over the startup code's (see devtools/hot)
+	}
 	return runPlatform(func() error {
 		a.setIdentity()
 		if controlStart != nil && application.dev.control {

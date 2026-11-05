@@ -12,7 +12,7 @@ The milestone status, and the known limitations and next steps.
 | 3: grow/shrink, align, justify, gap, margins, percentages, clipping, vertical and horizontal scrolling | ✅ |
 | 4: rounded corners, borders, shadows, icons, images, hover transitions, dark/light themes | ✅ |
 | 5: profiling | ✅, see [BENCHMARKS.md](../BENCHMARKS.md) |
-| Dev runner (`jamb dev`): watch, rebuild only on change, restart, keep window geometry | ✅ (development state is not preserved yet) |
+| Dev runner (`jamb dev`): watch, rebuild only on change, restart, keep window geometry and the app's signals and locals | ✅ (scroll, focus and the caret are not kept yet; see [State across restarts](tools.md#state-across-restarts)) |
 | Multiple windows and custom title bars (Windows) | ✅ see [Windows](windows.md#windows) and [Custom title bars](windows.md#custom-title-bars) |
 
 ## Known limitations and next steps

@@ -60,6 +60,48 @@ See `ui/runtime_test.go`, `ui/editor_test.go`,
 driven headlessly: Ctrl+N, typing, search, saving), and
 `examples/notes/views/keyboard_test.go` for the same with `ui/uitest`.
 
+## State across restarts
+
+`jamb dev` restarts the app on each save, and the app comes back as you left
+it: every signal the app makes with `ui.NewSignal`, and every `ui.Local`, has
+the value it had before. The app declares nothing for this.
+
+- Before it stops the app, `jamb dev` asks it for a checkpoint over the control
+  channel. The new build reads it (`JAMB_STATE_FILE`) and gives each signal its
+  old value as it is made.
+- A signal is known by where it is made: `jamb dev` rewrites, in copies that it
+  builds from, each `ui.NewSignal` call of the app's module into one with a
+  name from the source, such as `views:NewForm/Form.Name` or
+  `main:main/clicks`. Moving code or adding lines does not change the names;
+  renaming a variable starts that signal again. The copies keep every line
+  where it was, so compiler errors and stack traces point at your files. A
+  local is known by its component's place in the tree and its name.
+- The values are copied whole, unexported fields included, and a pointer that
+  two signals share is shared again after the restart.
+- **Startup code.** Go apps often make a signal and then set it as they start,
+  for example to the first note read from disk. The restart compares what the
+  app gives each signal itself, its initial value and what the startup code
+  sets, with what it gave it last time. When it is the same, the value from
+  before the restart wins: the note you had selected stays selected. When it
+  differs, the app's new value wins: a default you changed in the code takes
+  effect, and data read at startup is not covered by older data. A struct
+  field added or removed does not count as a difference, and a field added
+  keeps its default.
+- A value that holds a func, a channel or an interface of a type the app could
+  not rebuild cannot be kept, and starts again. `jamb dev` names the app's
+  signals that it could not keep; components' locals are counted, and named
+  with `JAMB_TRACE=1`. After each restart it says how many values it kept.
+- If the app ends within 5 seconds of a restart that gave it state, `jamb dev`
+  starts it again without that state, and says so.
+- None of this is in a release build: the rewrite happens only in `jamb dev`,
+  and the code that keeps the values (package `devtools/hot`) is linked only
+  with package `devtools`.
+
+Not yet kept: scroll positions, focus and the text caret, and the place of a
+component that moves (a component without a key is known by its index among
+its siblings, so one that moves can take another's locals when their types
+match).
+
 ## Control channel
 
 The control channel lets a coding agent, a script or you read and drive a

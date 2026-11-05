@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tyler-builds/jamb/internal/devhook"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -363,7 +364,7 @@ type ctlReply func(result any, err *ctlError)
 
 // ctlOps are the ops. They are a list and run's switch rather than a map of
 // functions, so that a program that never opens the channel links none of them.
-var ctlOps = []string{"actions", "click", "commands", "dispatch", "drag", "find", "info", "key", "move", "run", "scroll", "shot", "tree", "type", "wait"}
+var ctlOps = []string{"actions", "checkpoint", "click", "commands", "dispatch", "drag", "find", "info", "key", "move", "run", "scroll", "shot", "tree", "type", "wait"}
 
 func ctlOpList() string {
 	b, _ := json.Marshal(ctlOps)
@@ -382,6 +383,9 @@ func (c *control) run(req ctlRequest, reply ctlReply) {
 		return
 	case "run":
 		c.opRun(req, reply)
+		return
+	case "checkpoint":
+		c.opCheckpoint(req, reply)
 		return
 	}
 	i := req.Window
@@ -537,4 +541,23 @@ func (h *host) ctlWin() *ctlWin {
 		},
 		capture: h.r.CaptureNextFrame,
 	}
+}
+
+// opCheckpoint writes the state that survives a restart to path, for jamb dev,
+// which asks for it before it stops the app (see devtools/hot).
+func (c *control) opCheckpoint(req ctlRequest, reply ctlReply) {
+	if devhook.Checkpoint == nil {
+		reply(nil, ctlErr("failed", "the program keeps no state across restarts: it does not link package devtools/hot"))
+		return
+	}
+	if req.Path == "" || !filepath.IsAbs(req.Path) {
+		reply(nil, ctlErr("bad_request", "checkpoint needs path, an absolute file name"))
+		return
+	}
+	n, err := devhook.Checkpoint(req.Path)
+	if err != nil {
+		reply(nil, ctlErr("failed", "%v", err))
+		return
+	}
+	reply(map[string]any{"values": n}, nil)
 }
