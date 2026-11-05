@@ -73,10 +73,10 @@ func TestCommandRunJSON(t *testing.T) {
 		t.Fatalf("run: %+v %v (input %+v)", out, err, got)
 	}
 	for args, want := range map[string]string{
-		`{}`:                          `"title" is required`,
-		``:                            `"title" is required`,
+		`{}`:                           `"title" is required`,
+		``:                             `"title" is required`,
 		`{"title":"T","colour":"red"}`: `unknown field "colour"`,
-		`{"title":3}`:                 `cannot unmarshal number`,
+		`{"title":3}`:                  `cannot unmarshal number`,
 	} {
 		_, err := c.RunJSON([]byte(args))
 		var ce *CommandError
