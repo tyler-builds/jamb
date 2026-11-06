@@ -564,7 +564,13 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 	strs := ctx.Strings()
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	rt.toastRegion = expandedID(ctx.id)
+	// The stack grows and shrinks from its anchored edge, so a toast that comes
+	// or goes moves the region as well as the toasts in it. Both spring, so
+	// the toasts that stay glide to their new places: a toast that stays where
+	// it was on screen moves as much in the region as the region moves.
+	reflow := t.Motion.ReflowSpring()
 	region := Div().Key("jamb.toasts").Absolute().Column().Gap(8).
+		LayoutSpring(reflow).ChildrenLayoutSpring(reflow).
 		Role(access.RoleGroup).Label(strs.Notifications).
 		Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
 		OnKeyDown(func(e *KeyEvent) {

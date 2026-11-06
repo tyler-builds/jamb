@@ -161,10 +161,12 @@ The milestone status, and the known limitations and next steps.
   and all sides share one color. Clipping to a rounded shape is exact for one
   rounded container; a nested one keeps only its own corners, and hit testing
   uses the rectangle (see Borders and rounded clipping). Colors, opacity,
-  offset and scale ease with `Transition`. Layout
+  offset and scale ease with `Transition` or a `Spring`. An element's
+  place in the layout can spring to where a new layout puts it
+  (`LayoutSpring`), but a change of its size is not animated; other layout
   properties (sizes, padding and so on) animate only through `ui.Animate`,
-  which re-lays out each frame. There are no springs yet, no rotation, and
-  scale is not hit-tested.
+  which re-lays out each frame. There is no rotation, and scale is not
+  hit-tested.
 - **Events.** Bubbling only; there's no capture phase.
 - **Drag and drop.** Files dragged in from outside the app get no drag
   feedback: `Over`, `Move` and `Leave` do not run, because OLE drag feedback

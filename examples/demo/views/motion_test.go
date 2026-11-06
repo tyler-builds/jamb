@@ -27,8 +27,8 @@ func TestDialogsMotion(t *testing.T) {
 	rec.Check(t)
 }
 
-// Toasts slide in and fade out. When the older one times out, the one above it
-// drops into its place in one frame.
+// Toasts slide in and fade out. When one times out, the others glide into its
+// place (the theme's Reflow spring).
 func TestToastsMotion(t *testing.T) {
 	u := demoUI(t, PageComponents, "Feedback")
 	rec := u.Record()
@@ -38,9 +38,7 @@ func TestToastsMotion(t *testing.T) {
 	u.Settle()
 	u.Advance(8 * time.Second) // both time out
 	u.Settle()
-	rec.Check(t, uitest.Allow{Kind: uitest.Jump, Element: "toaster/jamb.toast",
-		Reason: "a toast that leaves exits as a ghost outside the Toaster's layout, so the toasts after it " +
-			"move into its place at once (docs/animation.md, Cost); the Toaster does not yet glide them"})
+	rec.Check(t)
 }
 
 // A tooltip fades in after its delay and out when the pointer leaves.

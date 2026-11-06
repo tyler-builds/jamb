@@ -30,23 +30,23 @@ const (
 // nodeFlags mark what a div node needs from paint and hit testing beyond
 // drawing itself. They are checked for every node on every repaint, so they
 // live on the node: reading the element instead costs a cache miss per node.
-type nodeFlags uint8
+type nodeFlags uint16
 
 const (
-	flagOverlay   nodeFlags = 1 << iota // Overlay: painted and hit-tested from the overlay list
-	flagOutside                         // has OnClickOutside
-	flagList                            // a UniformList's or ListOf's scroll container
-	flagExit                            // has Exit: paint records what a ghost of it needs
-	flagDrag                            // has OnDrag: a press on it can start a drag
-	flagDrop                            // has OnDrop: a drag can end over it
-	flagRich                            // rich text with a clickable or hoverable segment
-	flagNoDisplay                       // Display(false): the node and its subtree are not laid out, painted or focusable
+	flagOverlay      nodeFlags = 1 << iota // Overlay: painted and hit-tested from the overlay list
+	flagOutside                            // has OnClickOutside
+	flagList                               // a UniformList's or ListOf's scroll container
+	flagExit                               // has Exit: paint records what a ghost of it needs
+	flagDrag                               // has OnDrag: a press on it can start a drag
+	flagDrop                               // has OnDrop: a drag can end over it
+	flagRich                               // rich text with a clickable or hoverable segment
+	flagNoDisplay                          // Display(false): the node and its subtree are not laid out, painted or focusable
+	flagLayoutSpring                       // has a layout spring: paint springs it to its laid-out place (see layoutSpring)
 )
 
 // nodeState is per-element state that survives rebuilds, keyed by element ID.
 type nodeState struct {
 	gridCols int // the column count last reported to OnGridColumns
-	gen      uint32
 
 	// imageStart is when an animated image was first drawn (see imageTexture).
 	imageStart time.Time
@@ -61,9 +61,10 @@ type nodeState struct {
 
 	scrollX, scrollY float32
 	targetX, targetY float32
+	gen              uint32
 
-	animReady      bool
 	bg, border, fg Color
+	animReady      bool
 
 	edit     *editState
 	focus    *FocusHandle  // default handle of a text field
@@ -87,6 +88,12 @@ type nodeState struct {
 	// vel is the velocity of a spring's opacity, offset X and Y and scale,
 	// per second (see Runtime.spring).
 	vel [4]float32
+	// baseX and baseY are where an element with an Exit was last painted,
+	// before its own offset, so that its ghost is painted there.
+	baseX, baseY float32
+	// lay is the layout spring's state, made for an element that has one (see
+	// layoutSpring).
+	lay *layoutSpringState
 
 	// The largest ink overhang and scale growth this element has had, kept
 	// for an element with a Transition: its displayed values ease from the
@@ -102,10 +109,9 @@ type node struct {
 	rt       *Runtime
 	id       uint64
 	kind     nodeKind
-	flags    nodeFlags // copied from the element so paint and hit testing need not load it
 	fresh    bool      // the element did not exist before this build
+	flags    nodeFlags // copied from the element so paint and hit testing need not load it
 	reused   bool      // rebuilt in place by the build under way; retire has yet to deal with oldKids
-	gen      uint32    // frame in which the node was built
 	parent   *node
 	children []*node
 	order    []*node // paint order: children sorted by ZIndex
@@ -131,20 +137,18 @@ type node struct {
 	style Style
 	ts    textStyle
 
-	// Written by paint, read by hit testing. base is the position before the
-	// element's own offset; inOpacity and inFg are what its parent passed down.
-	// They let an exiting element be painted where it was. opacity is the
-	// opacity it was drawn with, its own included (see StyleOf).
+	// Written by paint, read by hit testing. inOpacity and inFg are what its
+	// parent passed down; with nodeState.baseX and baseY they let an exiting
+	// element be painted where it was. opacity is the opacity it was drawn
+	// with, its own included (see StyleOf).
 	abs       scene.Rect
 	hit       scene.Rect // the box hit testing uses; see paintNode
 	clip      scene.Rect
-	baseX     float32
-	baseY     float32
 	inOpacity float32
 	opacity   float32
 	inFg      Color
-	shownBG   Color   // the background it was painted with, for a child that fills from it (see fillFromParent)
 	scale     float32 // the element's own scale as drawn, read by StyleOf
+	gen       uint32  // frame in which the node was built
 
 	// paintGen is the paint in which the node was last painted, and painted
 	// lists the children it painted in that paint, in paint order. Only
@@ -352,29 +356,38 @@ type Runtime struct {
 	queries *queryCache
 
 	needLayout, needPaint bool
-	animating             bool                               // something animates: the next frame must come
-	looping               bool                               // a repeating Animate runs: the next frame must come, but it never ends
-	animInsts             []*componentInstance               // Animate instances that were running; re-rendered by the next Frame
-	pausedAnims           map[*componentInstance]struct{}    // running Animate instances the last paint did not draw (see settleAnims)
-	graceAnims            map[*componentInstance]struct{}    // Animate instances the last paint did not draw, given one more render first
-	listStale             bool                               // a UniformList (or a strip whose extent changed) must rebuild before the frame ends
-	gridWatches           map[uint64]*node                   // the grids with OnGridColumns, by node ID (see reportGridColumns)
-	splitWatches          map[*componentInstance]*splitWatch // the splits that size their panes from their length (see splitsResized)
-	titleWatches          map[*componentInstance]float32     // the title bars with a centered element, and the inset each rendered with (see titleBarsResized)
-	toasts                []*toastEntry                      // the stack of toasts, oldest first (see Context.Toast)
-	toastNext             uint64                             // the ID of the last toast made
-	toastVer              *Signal[int]                       // changes when the stack changes; the Toaster renders it
-	toastAt               time.Time                          // when the toasts last ran their time
-	toastMax              int                                // how many toasts show at once (0: the default)
-	toastRegion           uint64                             // the node ID of the toast region, 0 when none is shown
-	hasToaster            bool                               // a Toaster has been rendered in this runtime's window
-	toastWarned           bool                               // the warning for a toast without a Toaster has been reported
-	toastReturn           uint64                             // the focus before the toast region took it (F6)
-	scrolled              bool
-	wake                  func()
-	warn                  func(string)
-	lastFrame             time.Time
-	timers                []*timer // functions due at a time, run by Frame (see at)
+	animating             bool // something animates: the next frame must come
+	// reflowSnap snaps the layout springs to their places in the next frame's
+	// paints: the window's size, zoom or text scale changed (see layoutSpring).
+	// reflowSnapIn is above zero while painting inside a UniformList that has
+	// just placed its rows with a new row height.
+	reflowSnap   bool
+	reflowSnapIn int
+	// reflowAcc is the motion of the layout springs of the ancestors of the
+	// node being painted (see layoutSpring).
+	reflowAcc    reflowMotion
+	looping      bool                               // a repeating Animate runs: the next frame must come, but it never ends
+	animInsts    []*componentInstance               // Animate instances that were running; re-rendered by the next Frame
+	pausedAnims  map[*componentInstance]struct{}    // running Animate instances the last paint did not draw (see settleAnims)
+	graceAnims   map[*componentInstance]struct{}    // Animate instances the last paint did not draw, given one more render first
+	listStale    bool                               // a UniformList (or a strip whose extent changed) must rebuild before the frame ends
+	gridWatches  map[uint64]*node                   // the grids with OnGridColumns, by node ID (see reportGridColumns)
+	splitWatches map[*componentInstance]*splitWatch // the splits that size their panes from their length (see splitsResized)
+	titleWatches map[*componentInstance]float32     // the title bars with a centered element, and the inset each rendered with (see titleBarsResized)
+	toasts       []*toastEntry                      // the stack of toasts, oldest first (see Context.Toast)
+	toastNext    uint64                             // the ID of the last toast made
+	toastVer     *Signal[int]                       // changes when the stack changes; the Toaster renders it
+	toastAt      time.Time                          // when the toasts last ran their time
+	toastMax     int                                // how many toasts show at once (0: the default)
+	toastRegion  uint64                             // the node ID of the toast region, 0 when none is shown
+	hasToaster   bool                               // a Toaster has been rendered in this runtime's window
+	toastWarned  bool                               // the warning for a toast without a Toaster has been reported
+	toastReturn  uint64                             // the focus before the toast region took it (F6)
+	scrolled     bool
+	wake         func()
+	warn         func(string)
+	lastFrame    time.Time
+	timers       []*timer // functions due at a time, run by Frame (see at)
 
 	// motionDue is when the first delayed motion that the last paint drew
 	// starts (see waitFor). staggers counts the elements that entered with a
@@ -695,6 +708,7 @@ func (rt *Runtime) applyZoom() {
 	rt.viewW, rt.viewH = rt.devW/rt.zoom, rt.devH/rt.zoom
 	rt.scale = rt.devScale * rt.zoom
 	rt.needLayout = true
+	rt.reflowSnap = true // what the new size moves is not a change to animate
 	// Overlays are sized against the window, so a resize can change them
 	// even when nothing around them changed.
 	for _, n := range rt.byID {
@@ -981,6 +995,9 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 		rt.updateHover()
 	}
 	rt.settleAnims(painted)
+	if painted {
+		rt.reflowSnap = false // the frame of the change is drawn
+	}
 	rt.publishAccess()
 	rt.stats.Nodes = len(rt.byID)
 	rt.stats.Quads, rt.stats.Glyphs = len(rt.scene.Quads), len(rt.scene.Glyphs)
@@ -1468,11 +1485,18 @@ func (rt *Runtime) instance(id uint64, el Element, owner *componentInstance, par
 
 func (rt *Runtime) buildNode(el Element, parent *node, id uint64, depth int, inh textStyle, owner *componentInstance) *node {
 	n := rt.buildNodeKind(el, parent, id, depth, inh, owner)
-	if n != nil && n.key == "" {
+	if n == nil {
+		return nil
+	}
+	if n.key == "" {
 		// The output of a keyed component or field answers to its key.
 		if k, ok := el.(keyed); ok {
 			n.key = k.elementKey()
 		}
+	}
+	if n.style.LayoutSpring.Duration > 0 || n.flags&flagLayoutSpring != 0 ||
+		parent != nil && parent.div != nil && parent.div.kidsSpring.Duration > 0 {
+		rt.setLayoutSpring(n, parent)
 	}
 	return n
 }

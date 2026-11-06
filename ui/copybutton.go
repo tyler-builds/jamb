@@ -113,6 +113,12 @@ func (c *CopyButtonElement) Height(l Length) *CopyButtonElement { c.button.Heigh
 // Style sets the look of the button's Root part, for this instance only (see Button.Style).
 func (c *CopyButtonElement) Style(s Style) *CopyButtonElement { c.button.Style(s); return c }
 
+// LayoutSpring moves the copy button to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (c *CopyButtonElement) LayoutSpring(s Spring) *CopyButtonElement {
+	return c.Style(Style{LayoutSpring: s})
+}
+
 // Styles sets the look of the parts of the button, for this instance only (see Button.Styles).
 func (c *CopyButtonElement) Styles(st ButtonStyle) *CopyButtonElement { c.button.Styles(st); return c }
 

@@ -87,7 +87,10 @@ func (rt *Runtime) SetSystemSettings(s SystemSettings) {
 		s.Colors = HighContrastBlack()
 	}
 	rt.sys = s
-	rt.textFactor = float32(s.TextScale) / 100
+	if f := float32(s.TextScale) / 100; f != rt.textFactor {
+		rt.textFactor = f
+		rt.reflowSnap = true // text that grows moves what follows it, at once
+	}
 	rt.caretWidth = defaultCaretWidth * float32(s.CaretWidth)
 	rt.applyTheme()
 	rt.hostInvalidateAll()

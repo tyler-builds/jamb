@@ -98,6 +98,12 @@ func (l *UniformListElement) Label(name string) *UniformListElement { l.label = 
 // Style is merged into the scroll container: size it with Height, Grow or MaxHeight.
 func (l *UniformListElement) Style(s Style) *UniformListElement { l.style = l.style.Merge(s); return l }
 
+// LayoutSpring moves the list to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (l *UniformListElement) LayoutSpring(s Spring) *UniformListElement {
+	return l.Style(Style{LayoutSpring: s})
+}
+
 // Handle connects h so the list can be scrolled from code.
 func (l *UniformListElement) Handle(h *ListHandle) *UniformListElement { l.handle = h; return l }
 
@@ -232,6 +238,13 @@ type listState struct {
 	sticky   bool // the header is kept at the top of the viewport
 	before   func(n *node)
 	pin      func(n *node, sx float32)
+	// builtH is the row height the last build placed the rows with. A build
+	// that places them with a new one sets snap: every row moves, by a
+	// measurement rather than a reorder, so the rows' layout springs snap to
+	// their places (see layoutSpring). The rows a scroll brings in are new, so
+	// they snap anyway, and the rows already there do not move.
+	builtH float32
+	snap   bool
 }
 
 // listOverscan is the number of rows built beyond the viewport on each side.
@@ -254,6 +267,7 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 		from = min(max(ls.from, 0), l.count)
 		to = max(min(ls.to, l.count), from)
 	}
+	ls.snap, ls.builtH = ls.rowH != ls.builtH, ls.rowH
 	slots := l.count
 	if l.tail != nil {
 		slots++
@@ -269,6 +283,9 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 			key = "jamb.row:" + k.elementKey()
 		}
 		wrap := Div().Key(key).Absolute().Top(float32(i) * ls.rowH).Left(0).Right(0).Child(r)
+		// A row with a layout spring moves with its wrapper, which the list
+		// places: the wrapper springs.
+		wrap.style.LayoutSpring = layoutSpringOf(r)
 		if !l.ownPos {
 			setListPosition(wrap, r, i+1, l.count)
 		}

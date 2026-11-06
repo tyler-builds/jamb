@@ -247,6 +247,12 @@ func (l *ListBoxElement[T]) Styles(st ListBoxStyle) *ListBoxElement[T] {
 // MaxHeight. The list fills that box.
 func (l *ListBoxElement[T]) Style(s Style) *ListBoxElement[T] { l.style = l.style.Merge(s); return l }
 
+// LayoutSpring moves the list box to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (l *ListBoxElement[T]) LayoutSpring(s Spring) *ListBoxElement[T] {
+	return l.Style(Style{LayoutSpring: s})
+}
+
 // The sizing methods give the list box's outer box a size, over its Style. See Sizing
 // in docs/styling.md.
 func (l *ListBoxElement[T]) Width(v Length) *ListBoxElement[T] { l.size.setWidth(v); return l }

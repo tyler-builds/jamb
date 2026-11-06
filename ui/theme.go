@@ -249,6 +249,20 @@ type MotionTokens struct {
 	// or grows them would change them) as this spring. The zero Spring keeps
 	// their transitions.
 	Spring Spring
+	// Reflow is the layout spring of the built-in widgets whose items move
+	// when the layout changes, as the toasts of a Toaster when one leaves
+	// (see DivElement.LayoutSpring). The zero Spring is 350 ms with no bounce.
+	Reflow Spring
+}
+
+// ReflowSpring returns the layout spring the built-in widgets use (see
+// Reflow): Reflow, or 350 ms with no bounce when it is zero. Apps use it to
+// move their own items as the built-in ones move.
+func (m MotionTokens) ReflowSpring() Spring {
+	if m.Reflow.Duration > 0 {
+		return m.Reflow
+	}
+	return Spring{Duration: 350 * time.Millisecond}
 }
 
 // hover returns the duration of the built-in controls' hover transitions.

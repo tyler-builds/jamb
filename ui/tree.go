@@ -220,6 +220,10 @@ func (tv *TreeElement) Label(name string) *TreeElement { tv.name = name; return 
 // Style is merged into the scroll container: size it with Height, Grow or MaxHeight.
 func (tv *TreeElement) Style(s Style) *TreeElement { tv.style = tv.style.Merge(s); return tv }
 
+// LayoutSpring moves the tree to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (tv *TreeElement) LayoutSpring(s Spring) *TreeElement { return tv.Style(Style{LayoutSpring: s}) }
+
 // Styles sets the look of the parts of the tree, for this instance only. Set
 // fields win over the theme's Tree and the defaults; see TreeStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.

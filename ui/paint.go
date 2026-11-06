@@ -92,32 +92,43 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		n.painted = n.painted[:0]
 	}
 	rt.stats.NodesPainted++
-	if n.flags&flagExit != 0 {
+	if n.flags&flagExit != 0 && n.st != nil {
 		// Kept so the element can be drawn as a ghost after it is removed.
-		n.baseX, n.baseY = bx, by
+		n.st.baseX, n.st.baseY = bx, by
 	}
 	n.inOpacity, n.inFg = opacity, fg // also read by StyleOf
 	if !s.TextColor.IsZero() {
 		fg = s.TextColor
 	}
 	v := rt.visual(n, fg, dt)
+	var lx, ly float32 // where a layout spring draws the element, from its laid-out place
+	if n.flags&flagLayoutSpring != 0 && n.st != nil && n.st.lay != nil {
+		lx, ly = rt.layoutSpring(n, dt)
+		v.offX += lx
+		v.offY += ly
+		if lx != 0 || ly != 0 || n.st.lay.moving {
+			prev := rt.enterReflow(lx, ly, n.st.lay)
+			defer func() { rt.reflowAcc = prev }()
+		}
+	}
 	x, y := bx+v.offX, by+v.offY
 	w, h := n.lay.W, n.lay.H
 	n.abs = scene.Rect{X: x, Y: y, W: w, H: h}
-	// The hit box is the layout box moved by the element's own offset, not by
-	// its hover, focus or press styles, transitions or motion. Those move the
-	// paint only, so a hover that lifts an element cannot move the pointer off
-	// it, end the hover, and bring the element back under the pointer.
+	// The hit box is the layout box moved by the element's own offset and its
+	// layout spring, not by its hover, focus or press styles, transitions or
+	// motion. Those move the paint only, so a hover that lifts an element
+	// cannot move the pointer off it, end the hover, and bring the element back
+	// under the pointer. A layout spring moves the element itself, as Offset
+	// does: what is clicked is what is under the pointer.
 	own := &n.style
 	if n.div != nil {
 		own = &n.div.style
 	}
-	n.hit = scene.Rect{X: bx + own.OffsetX, Y: by + own.OffsetY, W: w, H: h}
+	n.hit = scene.Rect{X: bx + own.OffsetX + lx, Y: by + own.OffsetY + ly, W: w, H: h}
 	n.clip = clip
 	opacity *= v.opacity
 	n.opacity, n.scale = opacity, v.scale
 	bg, border, fg := v.bg, v.border, v.fg
-	n.shownBG = bg
 	if v.scale != 1 {
 		// Scale about the element's center. Transforms are in device pixels and
 		// compose with the transform of any enclosing element, so the element's
@@ -175,7 +186,7 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 			// An opaque fill under the element: the base color, then the fill its
 			// parent is drawn with, so that a pinned cell hides what scrolls under it
 			// and still shows the state of its row (see DataGrid).
-			for _, c := range [2]Color{n.div.fillBase, n.parent.shownBG} {
+			for _, c := range [2]Color{n.div.fillBase, n.parent.shownBG()} {
 				if c.A > 0 {
 					sc.AddQuad(scene.Quad{Bounds: rt.px(n.abs), Background: c.Alpha(opacity).scene(), Radii: radii})
 				}
@@ -259,6 +270,10 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		if n.div != nil && n.div.vlist != nil && n.div.vlist.before != nil && !rt.inGhost {
 			n.div.vlist.before(n)
 		}
+		if n.div != nil && n.div.vlist != nil && n.div.vlist.snap {
+			rt.reflowSnapIn++
+			defer func() { rt.reflowSnapIn-- }()
+		}
 		sx, sy = rt.scrollStep(n, dt)
 		// The content moves by whole device pixels. Each element inside rounds
 		// its own position to the pixel grid (text at its baseline, an icon at its
@@ -297,7 +312,8 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		// (they are registered when built), and an element that was not drawn
 		// has no ghost to fade out when it is removed.
 		if rt.unculled == 0 && !rt.inGhost && c.keepGen != rt.paintGen &&
-			!inkVisible(&c.lay, x-sx, y-sy, childClip) {
+			!inkVisible(&c.lay, x-sx, y-sy, childClip) &&
+			(c.flags&flagLayoutSpring == 0 || !springInk(c, x-sx, y-sy, childClip)) {
 			continue
 		}
 		rt.paintNode(c, x-sx, y-sy, childClip, opacity, fg, dt)
@@ -721,4 +737,15 @@ func (rt *Runtime) snapScroll(v, end float32) float32 {
 		return float32(math.Ceil(d-0.001)) / rt.scale
 	}
 	return float32(math.Round(d)) / rt.scale
+}
+
+// shownBG returns the background n was last painted with, after its
+// transition or spring, for a child that fills from it (see fillFromParent).
+// visual eases the background only for an element with a Transition or a
+// Spring, so the others were painted with their style's.
+func (n *node) shownBG() Color {
+	if st := n.st; st != nil && st.animReady && (n.style.Transition > 0 || n.style.Spring.Duration > 0) {
+		return st.shown.bg
+	}
+	return n.style.Background
 }

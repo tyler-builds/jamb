@@ -682,6 +682,12 @@ func (g *DataGridElement[T]) Label(name string) *DataGridElement[T] { g.name = n
 // Style is merged into the grid's outer box: size it with Height, Grow or MaxHeight.
 func (g *DataGridElement[T]) Style(s Style) *DataGridElement[T] { g.style = g.style.Merge(s); return g }
 
+// LayoutSpring moves the grid to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (g *DataGridElement[T]) LayoutSpring(s Spring) *DataGridElement[T] {
+	return g.Style(Style{LayoutSpring: s})
+}
+
 // Density sets the height of the rows: DataGridComfortable (the default) or DataGridCompact.
 func (g *DataGridElement[T]) Density(d DataGridDensity) *DataGridElement[T] { g.density = d; return g }
 

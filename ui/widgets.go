@@ -341,6 +341,10 @@ func (b *ButtonElement) Style(s Style) *ButtonElement {
 	return b
 }
 
+// LayoutSpring moves the button to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (b *ButtonElement) LayoutSpring(s Spring) *ButtonElement { return b.Style(Style{LayoutSpring: s}) }
+
 // Styles sets the look of the parts of the button, for this instance only. Set
 // fields win over the theme's Button and Buttons and the defaults of the
 // variant; see ButtonStyle and docs/styling.md. Calling Styles again merges with
@@ -825,6 +829,12 @@ func (ti *TextInputElement) Style(s Style) *TextInputElement {
 	return ti
 }
 
+// LayoutSpring moves the field to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (ti *TextInputElement) LayoutSpring(s Spring) *TextInputElement {
+	return ti.Style(Style{LayoutSpring: s})
+}
+
 // Styles sets the look of the parts of the field, for this instance only. Set
 // fields win over the theme's Field and the defaults; see FieldStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
@@ -976,6 +986,12 @@ func (ta *TextAreaElement) Disabled(d bool) *TextAreaElement { ta.disabled = d; 
 func (ta *TextAreaElement) Style(s Style) *TextAreaElement {
 	ta.styles.Frame = ta.styles.Frame.Merge(s)
 	return ta
+}
+
+// LayoutSpring moves the editor to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (ta *TextAreaElement) LayoutSpring(s Spring) *TextAreaElement {
+	return ta.Style(Style{LayoutSpring: s})
 }
 
 // The sizing methods give the editor's frame a size, as for TextInput. A text area
