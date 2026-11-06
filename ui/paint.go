@@ -434,9 +434,11 @@ func (rt *Runtime) paintImage(n *node, opacity float32) {
 	if img.style.Opacity > 0 {
 		opacity *= img.style.Opacity
 	}
+	bounds := rt.px(dst)
+	tex, srcR := rt.fitImage(n, rt.imageTexture(n), srcR, bounds)
 	rt.scene.AddImage(scene.ImageDraw{
-		Bounds:  rt.px(dst),
-		Texture: rt.imageTexture(n),
+		Bounds:  bounds,
+		Texture: tex,
 		Src:     srcR,
 		Radii:   rt.corners(img.style.radii()),
 		Opacity: opacity,
