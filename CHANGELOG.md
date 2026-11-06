@@ -3,7 +3,9 @@
 All notable changes to jamb are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
-version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Changes not yet
+released are in [changelog/unreleased](changelog/README.md), one file each, until a release merges
+them in here.
 
 ## [Unreleased]
 

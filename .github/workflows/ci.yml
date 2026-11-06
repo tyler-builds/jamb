@@ -41,6 +41,8 @@ jobs:
           if [ -n "$out" ]; then echo "Not gofmt'ed:"; echo "$out"; exit 1; fi
       - name: go vet
         run: for m in $MODULES; do (cd "$m" && go vet ./...); done
+      - name: changelog fragments
+        run: go run ./internal/changelog check
       - name: go mod tidy
         run: for m in $MODULES; do (cd "$m" && go mod tidy -diff); done
       - name: govulncheck
