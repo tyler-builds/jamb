@@ -80,6 +80,9 @@ func parseIcon(icon string) (path string, index int) {
 // Windows needs the full path. Windows keeps the list and drops old entries itself.
 // It does nothing on platforms other than Windows.
 func AddRecentDocument(path string) {
+	if headlessOn {
+		return // a headless run leaves the user's recent documents alone
+	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "jamb: AddRecentDocument:", err)

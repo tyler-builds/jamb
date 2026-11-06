@@ -34,6 +34,9 @@ type shownNotification struct {
 // window, an action, or a goroutine started after Run. A notification with the
 // Tag of one that is shown replaces it. It is safe from any goroutine.
 func Notify(n Notification) error {
+	if headlessOn {
+		return headlessNotify(n)
+	}
 	s := notifyCurrent.Load()
 	if s == nil {
 		return errors.New("app.Notify: the app is not running; call it from a window or after Run has started")

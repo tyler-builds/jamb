@@ -202,3 +202,28 @@ func TestRepeatAgainCountsTheLoops(t *testing.T) {
 		t.Errorf("repeat 0 is remembered: %v", s.repeats)
 	}
 }
+
+// #KEY in place of X Y aims a pointer step at an element; tree takes a path.
+func TestScriptReadsKeyTargets(t *testing.T) {
+	s, err := parseScript("click #save; rclick #row-3; move #menu; scroll #list 120; tree out.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []struct {
+		op, key string
+		n       float32
+	}{{"click", "save", 0}, {"rclick", "row-3", 0}, {"move", "menu", 0}, {"scroll", "list", 120}, {"tree", "", 0}}
+	for i, w := range want {
+		if st := s.steps[i]; st.op != w.op || st.key != w.key || st.n != w.n {
+			t.Errorf("step %d = %+v; want %s at %q, n %v", i, st, w.op, w.key, w.n)
+		}
+	}
+	if s.steps[4].arg != "out.json" {
+		t.Errorf("tree path = %q", s.steps[4].arg)
+	}
+	for _, bad := range []string{"click #", "scroll #list", "tree"} {
+		if _, err := parseScript(bad); err == nil {
+			t.Errorf("parseScript(%q) is not an error", bad)
+		}
+	}
+}

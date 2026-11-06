@@ -94,6 +94,9 @@ func (a *App) checkIdentity() error {
 // the window appears. A failure is printed, and the app runs without the feature.
 func (a *App) setIdentity() {
 	application.appID = a.appID
+	if headlessOn {
+		return // a headless run registers nothing with the system
+	}
 	if a.appID != "" {
 		if err := setAppID(a.appID); err != nil {
 			fmt.Fprintln(os.Stderr, "jamb: AppID:", err)
