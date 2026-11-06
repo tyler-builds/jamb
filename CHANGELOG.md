@@ -9,6 +9,87 @@ them in here.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-11-06
+
+The `jamb` command is released with it as `cmd/jamb/v0.4.2`: `jamb dev` builds with the `jambdev` tag,
+which scenes need, and stops the app when it gets SIGTERM.
+
+### Added
+
+- Headless runs: `JAMB_HEADLESS=1` runs an app with no window on the screen. Its windows exist in
+  memory and the CPU renderer draws them, so nothing takes the focus or appears on the desktop, and
+  `JAMB_SCRIPT`, scenes, the control channel and `jamb dev` work as in a window. A headless run uses
+  the default platform settings and touches nothing of the system's: the clipboard is the process's
+  own, and no dialog, tray icon, notification or jump list is shown or registered.
+  `JAMB_HEADLESS_SCALE` sets its scale. See docs/tools.md, "Headless runs".
+- `JAMB_SCRIPT` steps aim at an element by key with `#KEY` in place of `X Y` (`click #save`), and
+  the `tree PATH` step writes the accessibility tree as JSON.
+- `DivElement.LayoutSpring` and `Style.LayoutSpring` move an element to a new place in the layout as a
+  spring: a list reordered, a row added or removed above it, a parent that grew. The element keeps
+  where it is drawn and its velocity, so a move mid-flight bends the motion. It is paint-only: nothing
+  is laid out again while it moves, and hit testing and `Find` follow it. A scroll, a window resize,
+  zoom, text scale and reduced motion never make it spring.
+  `DivElement.ChildrenLayoutSpring` gives the spring to a parent's direct children. Debug builds warn
+  about a springing element with no key. See Layout springs in docs/animation.md.
+- `MotionTokens.Reflow` is the layout spring of the built-in widgets, 350 ms with no bounce by
+  default, and `MotionTokens.ReflowSpring` returns it for an app's own lists.
+- A layout spring now springs an element's size too. When the layout resizes an element with
+  `LayoutSpring` (its own, or from `ChildrenLayoutSpring`), its own box (background, border, shadows,
+  corners and focus ring) springs to the new size, keeping its velocity when the size changes
+  mid-flight. What it holds keeps its final layout and moves with it, so text never scales, and is
+  clipped to the drawn box only when the element clips. Hit testing, `Find`, `DrawnStyle.Bounds` and
+  the accessibility bounds follow the drawn box. It is paint-only, and snaps where a move does: on
+  first appearance, a window resize, zoom, text scale and reduced motion. See Layout springs in
+  docs/animation.md.
+- The demo's Motion section has an expanding card sample.
+- `Matched(id)` on `Div` and `Button` gives an element a shared-element id.
+  When a build removes an element with the id and adds another one with it, anywhere in the window,
+  the new element flies from where the old one was drawn, with its velocity, opacity, corner radius
+  and fill, to its own place and size, with its `LayoutSpring` or the theme's `Motion.Reflow`. Its
+  content keeps its final layout, scaled uniformly to cover the moving frame and clipped to it, so a
+  picture zooms without distortion. A flight is drawn above the rest of the window, outside its
+  ancestors' opacity and scale but inside the rectangular clips of where it is going, replaces the
+  old element's `Exit` and the new one's `Enter`, and can be matched back mid-flight with its
+  velocity. Hit testing, `Find` and the accessibility bounds follow it. With reduced motion nothing
+  flies. Two elements drawn at once with one id give a warning. See Shared-element motion in
+  docs/animation.md.
+- The demo's Motion section has a grid of pictures that open on the stage and close back into their
+  tiles.
+- `uitest.Sample.Matched` holds an element's shared-element id; the motion checks count an element
+  that leaves where its match comes, and that match, as neither popping out nor in.
+- `uitest.UI.Record` records the frames a test runs, with how every element was drawn in each, and
+  `Recording.Check` fails the test on motion a person would notice: an element that pops in or out
+  with no transition, is cut off partway through its exit fade, jumps in one frame, overshoots, or
+  keeps moving long after the last input. `Recording.Findings` only reports, and `uitest.Allow`
+  accepts an intended finding with its reason. See the Motion section of docs/testing.md.
+- Scenes: named starting states of an app's UI, made from synthetic data, that development tools
+  open the app straight into. Package `scene` registers them (`scene.Add`) from files built with the
+  `jambdev` tag, so release builds compile none of them. `JAMB_SCENE=NAME` opens the first window on
+  one, and the control channel lists them and switches between them (`jamb ctl scenes`, `jamb ctl
+  scene name=...`). `jamb dev` builds with the `jambdev` tag. The notes example has scenes. See
+  docs/tools.md, "Scenes".
+- `TruncateMiddle()` keeps both ends of a one-line text that does not fit, with "…" in place of the
+  middle, for file paths and names, and `TruncateHead()` keeps its end. The cuts fall between
+  characters and refit as the text resizes; selecting, copying and the accessible name keep the whole
+  text. The last of `Truncate`, `TruncateMiddle`, `TruncateHead` and `MaxLines` wins. The git example
+  shows file paths cut in the middle.
+
+### Changed
+
+- `Collapsible` and `Accordion` spring open and closed, and `Sidebar` springs to its new width as it
+  collapses and expands, with the theme's `Motion.Reflow`. The box clips its content while it moves,
+  so the content is revealed and covered rather than popping in and out; what the widget removes is
+  drawn inside the box, fading, until it comes to rest. With reduced motion they still open and close
+  at once. Content still being revealed can only be clicked where it is drawn.
+
+### Fixed
+
+- `jamb dev` stops the app when it gets SIGTERM, as it does on Ctrl+C; the app kept running.
+- When a toast leaves, the toasts that stay glide to their new places instead of jumping there in one
+  frame, and a new toast appears in its place while the others move up to make room.
+- A `TimePicker`'s list fades in and out as a `Select`'s and a `Combobox`'s do, instead of appearing
+  and disappearing at once.
+
 ## [0.6.3] - 2026-11-06
 
 ### Changed
@@ -897,7 +978,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/tyler-builds/jamb/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/tyler-builds/jamb/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/tyler-builds/jamb/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/tyler-builds/jamb/compare/v0.6.0...v0.6.1
