@@ -148,11 +148,11 @@ func (n *node) describe() string {
 	switch n.kind {
 	case kindText:
 		if n.textEl != nil {
-			t := n.textEl.text
+			t := []rune(n.textEl.text)
 			if len(t) > 24 {
-				t = t[:24] + "…"
+				t = append(t[:24], '…') // whole characters, never a cut UTF-8 sequence
 			}
-			return fmt.Sprintf("text %q", t)
+			return fmt.Sprintf("text %q", string(t))
 		}
 		return "text"
 	case kindIcon:
