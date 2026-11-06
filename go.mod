@@ -7,7 +7,7 @@ require (
 	github.com/go-text/typesetting v0.3.5
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/tetratelabs/wazero v1.12.0
-	github.com/yuin/goldmark v1.8.6
+	github.com/yuin/goldmark v1.8.7
 	golang.org/x/image v0.47.0
 	golang.org/x/sys v0.49.0
 )
