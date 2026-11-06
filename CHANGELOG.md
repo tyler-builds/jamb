@@ -7,6 +7,8 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-06
+
 ### Changed
 
 - On Linux the caption buttons are GNOME's round ones, and the title bar shows the buttons GNOME's
@@ -15,9 +17,19 @@ version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `CaptionButtons` carry the setting.
 - On a Linux desktop that draws window frames, such as KDE, a window with `ChromeCustom` gets the
   desktop's frame above its title bar, and the bar leaves out its caption buttons.
+- On Linux and macOS, font files are mapped into memory instead of read into the heap.
+- The software renderer used on Linux draws the inside of each box, border and gradient without
+  shading every pixel, about twice as fast for a busy frame. The pixels are the same.
 
 ### Fixed
 
+- A component that left the tree, and everything it held, can be garbage collected. A long-lived
+  `ui.Signal` or `ui.Computed` it had read, such as a cached `ui.Query`'s, or the layout engine's
+  reused memory kept a pointer to it, which kept its whole subtree alive.
+- A still image drawn smaller than its pixels, such as a 128 px icon at 36 px, is sharp. It is
+  resampled once to the device pixels it covers, a large one off the UI thread, and drawn from that
+  copy; it was sampled from its full pixels, which aliased. While its size changes it is drawn from
+  its full pixels until the size settles.
 - On Linux, bold, medium and semibold text in a variable UI font, such as Fedora's Noto Sans, is drawn in
   that font at the weight asked for. It was drawn in the embedded Go fonts, a different typeface.
 
@@ -883,7 +895,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/tyler-builds/jamb/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/tyler-builds/jamb/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/tyler-builds/jamb/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/tyler-builds/jamb/compare/v0.5.0...v0.6.0
