@@ -5,6 +5,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // TextElement is a run of text. Unset properties (color, size, weight...)
@@ -14,8 +16,10 @@ type TextElement struct {
 	style    Style
 	maxLines int
 	noWrap   bool
-	italic   bool
-	key      string
+	// truncation is where a Truncate, TruncateMiddle or TruncateHead text is cut.
+	truncation text.Truncation
+	italic     bool
+	key        string
 	// selectable lets the user select and copy the text (see Selectable).
 	selectable bool
 	// segs and highlights make the text rich (see Rich and Highlight).
@@ -145,12 +149,33 @@ func (t *TextElement) LineHeight(m float32) *TextElement { t.style.LineHeight = 
 // Align aligns lines within the element: Start, Center or End.
 func (t *TextElement) Align(a Alignment) *TextElement { t.style.TextAlign = a; return t }
 
-// MaxLines limits the number of lines, ending with an ellipsis.
-func (t *TextElement) MaxLines(n int) *TextElement { t.maxLines = n; return t }
+// MaxLines wraps the text and stops after n lines (CSS line-clamp): when more
+// would follow, "…" ends the last line, and the text measures at most n lines
+// tall. A word too wide for the box is cut between characters. 0 removes the
+// limit. It replaces Truncate, TruncateMiddle and TruncateHead; the last of
+// these calls wins.
+func (t *TextElement) MaxLines(n int) *TextElement {
+	t.maxLines, t.truncation = n, text.TruncateEnd
+	return t
+}
 
 // Truncate keeps the text on one line, ending with an ellipsis if it does not fit.
-func (t *TextElement) Truncate() *TextElement {
-	t.noWrap, t.maxLines = true, 1
+// Its minimum width is zero, so it gives up room in a shrinking row.
+func (t *TextElement) Truncate() *TextElement { return t.truncate(text.TruncateEnd) }
+
+// TruncateMiddle keeps the text on one line, and when it does not fit keeps both
+// ends with "…" in place of the middle (AppKit's NSLineBreakByTruncatingMiddle),
+// for file paths and names. Line breaks in the text show as spaces. Otherwise it
+// is Truncate: the last of Truncate, TruncateMiddle, TruncateHead and MaxLines
+// wins.
+func (t *TextElement) TruncateMiddle() *TextElement { return t.truncate(text.TruncateMiddle) }
+
+// TruncateHead keeps the text on one line, and when it does not fit keeps its end
+// with "…" at the start. It is TruncateMiddle with nothing kept of the start.
+func (t *TextElement) TruncateHead() *TextElement { return t.truncate(text.TruncateHead) }
+
+func (t *TextElement) truncate(at text.Truncation) *TextElement {
+	t.noWrap, t.maxLines, t.truncation = true, 1, at
 	t.style.MinWidth = Px(0)
 	return t
 }

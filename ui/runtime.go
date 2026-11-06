@@ -190,6 +190,7 @@ func (n *node) textStyle() text.Style {
 	if n.textEl != nil {
 		st.MaxLines = n.textEl.maxLines
 		st.NoWrap = n.textEl.noWrap
+		st.Truncation = n.textEl.truncation
 		st.Italic = n.textEl.italic
 	}
 	return st

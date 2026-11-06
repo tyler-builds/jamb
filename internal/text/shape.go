@@ -1,6 +1,7 @@
 package text
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"slices"
@@ -31,7 +32,23 @@ type Style struct {
 	MaxLines int
 	// NoWrap keeps text on one line (it may still be truncated by MaxLines).
 	NoWrap bool
+	// Truncation says where a text with MaxLines 1 loses its characters when
+	// it does not fit. With other MaxLines it is ignored: the text ends with
+	// the ellipsis.
+	Truncation Truncation
 }
+
+// Truncation is where a one-line text that does not fit is cut.
+type Truncation uint8
+
+const (
+	// TruncateEnd keeps the start and ends the line with "…".
+	TruncateEnd Truncation = iota
+	// TruncateMiddle keeps both ends, with "…" in place of the middle.
+	TruncateMiddle
+	// TruncateHead keeps the end and starts the line with "…".
+	TruncateHead
+)
 
 // Span gives a byte range of a text its own font family, weight or slant.
 // Only attributes that change shaping belong here; colors and decorations are
@@ -82,6 +99,9 @@ type Line struct {
 	// hardEnd is set when the line ends a paragraph (newline or end of text),
 	// so a caret at RuneEnd belongs to this line rather than the next.
 	hardEnd bool
+	// hideStart and hideEnd are the runes [hideStart, hideEnd) that a middle
+	// or head truncation left out of the line; they draw as its ellipsis.
+	hideStart, hideEnd int
 }
 
 // Layout is shaped, wrapped text. Layouts are cached and shared: treat them
@@ -195,7 +215,11 @@ func (sys *System) build(s string, st Style, spans []Span, maxWidth float32) *La
 	}
 	size := fixed.Int26_6(st.Size*64 + 0.5)
 
-	for start := 0; ; {
+	oneLine := st.MaxLines == 1 && st.Truncation != TruncateEnd
+	if oneLine {
+		sys.truncateOneLine(l, size, wrapW)
+	}
+	for start := 0; !oneLine; {
 		if st.MaxLines > 0 && len(l.Lines) >= st.MaxLines {
 			l.Truncated = true
 			break
@@ -553,6 +577,191 @@ type ellipsisKey struct {
 	size fixed.Int26_6
 }
 
+// truncateOneLine lays the text out on one line no wider than maxWidth, cutting
+// it in the middle or at the head as l.Style.Truncation says. Line breaks are
+// shown as spaces. The cuts fall between grapheme clusters, and outside the
+// clusters the shaper made (a ligature stays whole). The line keeps the whole
+// text's rune range; the runes it leaves out are its hidden range, drawn as the
+// ellipsis.
+func (sys *System) truncateOneLine(l *Layout, size fixed.Int26_6, maxWidth float32) {
+	n := len(l.runes)
+	text := l.runes
+	if slices.Contains(text, '\n') {
+		text = slices.Clone(text)
+		for i, r := range text {
+			if r == '\n' {
+				text[i] = ' '
+			}
+		}
+	}
+	full := sys.shapeLine(l, text, 0, n, size)
+	full.hardEnd = true
+	if n == 0 || full.Width <= maxWidth {
+		l.Lines = append(l.Lines, full)
+		return
+	}
+	l.Truncated = true
+
+	// The advance of each rune, the whole cluster's on its first rune, and
+	// where a cut may fall: at a grapheme boundary not inside a cluster.
+	adv := make([]float32, n)
+	inside := make([]bool, n+1)
+	for _, run := range full.Runs {
+		for _, g := range run.Glyphs {
+			adv[g.Cluster] += g.Adv
+			for r := g.Cluster + 1; r < g.Cluster+g.Runes && r < n; r++ {
+				inside[r] = true
+			}
+		}
+	}
+	var stops []int // rune offsets, ascending, from 0 to n
+	for _, b := range sys.graphemes(l.Text) {
+		if r := l.runeAt(b); !inside[r] && (len(stops) == 0 || stops[len(stops)-1] != r) {
+			stops = append(stops, r)
+		}
+	}
+	at := make([]float32, n+1) // at[r] is the width of runes [0, r)
+	for r := range n {
+		at[r+1] = at[r] + adv[r]
+	}
+	tailW := func(b int) float32 { return at[n] - at[b] }
+
+	plain := sys.reg.Font(l.Style.Family, l.Style.Weight, l.Style.Italic)
+	ellW := float32(0)
+	for _, g := range sys.ellipsis(plain, size).Glyphs {
+		ellW += fx(g.Advance)
+	}
+	room := max(maxWidth, 0) - ellW
+
+	// a is the end of the kept head and b the start of the kept tail, both
+	// indices into stops. A cut can grow the text by a little (kerning or a
+	// contextual form at the edge), so a line that comes out too wide gives up
+	// one more character and is shaped again.
+	a, b := 0, len(stops)-1
+	headRoom := room / 2
+	if l.Style.Truncation == TruncateHead {
+		headRoom = 0
+	}
+	for a+1 < len(stops) && at[stops[a+1]] <= headRoom {
+		a++
+	}
+	for b > a && tailW(stops[b-1]) <= room-at[stops[a]] {
+		b--
+	}
+	if l.Style.Truncation == TruncateMiddle {
+		for a+1 < b && at[stops[a+1]]+tailW(stops[b]) <= room {
+			a++
+		}
+	}
+	for {
+		ln := sys.joinTruncated(l, text, size, stops[a], stops[b])
+		if ln.Width <= maxWidth || a == 0 && b == len(stops)-1 {
+			l.Lines = append(l.Lines, ln)
+			return
+		}
+		// Give up the character on the side that keeps more.
+		if b < len(stops)-1 && (a == 0 || tailW(stops[b]) >= at[stops[a]]) {
+			b++
+		} else {
+			a--
+		}
+	}
+}
+
+// joinTruncated returns the line of runes [0, ha), an ellipsis, and runes
+// [tb, n). Spaces next to the ellipsis are left out with the middle.
+func (sys *System) joinTruncated(l *Layout, text []rune, size fixed.Int26_6, ha, tb int) Line {
+	n := len(l.runes)
+	for ha > 0 && unicode.IsSpace(text[ha-1]) {
+		ha--
+	}
+	for tb < n && unicode.IsSpace(text[tb]) {
+		tb++
+	}
+	out := Line{RuneStart: 0, RuneEnd: n, hardEnd: true, hideStart: ha, hideEnd: tb}
+	var x float32
+	add := func(ln Line) {
+		for _, r := range ln.Runs {
+			r.X += x
+			out.Runs = append(out.Runs, r)
+		}
+	}
+	if ha > 0 {
+		head := sys.shapeLine(l, text, 0, ha, size)
+		add(head)
+		x += head.Width
+	}
+	// The ellipsis takes the font and the span of the text it follows, or of
+	// the text after it at the head.
+	span := -1
+	if ha > 0 {
+		span = l.spanAt(ha - 1)
+	} else if tb < n {
+		span = l.spanAt(tb)
+	}
+	f := sys.reg.Font(l.Style.Family, l.Style.Weight, l.Style.Italic)
+	if span >= 0 {
+		sp := l.runeSpans[span]
+		f = sys.reg.Font(sp.family, sp.weight, sp.italic)
+	}
+	ell := sys.ellipsis(f, size)
+	run := Run{X: x, RuneStart: ha, RuneEnd: ha, Span: span, ellipsis: true}
+	var pen float32
+	for _, g := range ell.Glyphs {
+		a := fx(g.Advance)
+		run.Glyphs = append(run.Glyphs, Glyph{
+			font: fontOf(ell.Face), ID: sfnt.GlyphIndex(g.GlyphID),
+			Pen: pen, X: pen + fx(g.XOffset), Y: -fx(g.YOffset), Adv: a,
+			Cluster: ha, Runes: 1,
+		})
+		pen += a
+	}
+	run.Width = pen
+	out.Runs = append(out.Runs, run)
+	x += pen
+	out.Width = x
+	if tb < n {
+		tail := sys.shapeLine(l, text, tb, n, size)
+		add(tail)
+		out.Width = x + tail.Width
+	}
+	return out
+}
+
+// shapeLine shapes runes [start, end) of text, the layout's runes or a copy
+// with the same length, as one line that does not wrap.
+func (sys *System) shapeLine(l *Layout, text []rune, start, end int, size fixed.Int26_6) Line {
+	if start >= end {
+		return Line{RuneStart: start, RuneEnd: start}
+	}
+	pcs := sys.pieces(l, start, end)
+	plain := sys.reg.Font(l.Style.Family, l.Style.Weight, l.Style.Italic)
+	outs := sys.shapePieces(text[start:end], plain, pcs, size)
+	cfg := shaping.WrapConfig{Direction: di.DirectionLTR, DisableTrailingWhitespaceTrim: true}
+	lines, _ := sys.wrapper.WrapParagraphF(cfg, fixed.Int26_6(unbounded*64), text[start:end], shaping.NewSliceIterator(outs))
+	if len(lines) == 0 {
+		return Line{RuneStart: start, RuneEnd: start}
+	}
+	ln := l.convertLine(lines[0], start, pcs, -1, false, false)
+	// A forced break (U+2028 and the like) still splits the text; the parts
+	// go on the one line.
+	for _, more := range lines[1:] {
+		var x float32
+		if k := len(ln.Runs); k > 0 {
+			x = ln.Runs[k-1].X + ln.Runs[k-1].Width
+		}
+		m := l.convertLine(more, start, pcs, -1, false, false)
+		for _, r := range m.Runs {
+			r.X += x
+			ln.Runs = append(ln.Runs, r)
+		}
+		ln.RuneStart = min(ln.RuneStart, m.RuneStart)
+		ln.RuneEnd = max(ln.RuneEnd, m.RuneEnd)
+		ln.Width = x + m.Width
+	}
+	return ln
+}
+
 // ---- positions ----
 
 // runeAt converts a byte offset to a rune index (rounding down inside a rune).
@@ -705,6 +914,9 @@ func (l *Layout) PositionInLine(i int, x float32) int {
 		if r > ln.RuneStart && r < len(l.runes) && isMark(l.runes[r]) {
 			continue // not a caret stop
 		}
+		if r > ln.hideStart && r < ln.hideEnd {
+			continue // left out of the line: the ellipsis has its two ends
+		}
 		d := l.caretX(ln, r) - x
 		if d < 0 {
 			d = -d
@@ -744,6 +956,28 @@ func (l *Layout) SelectionRects(a, b int, dst []Rect) []Rect {
 				x0, x1 = x1, x0
 			}
 			dst = mergeRect(dst, start, Rect{x0, ln.Top, x1 - x0, l.LineHeight})
+		}
+		// The ellipsis of a middle or head truncation stands for the runes it
+		// hides, so it is selected with any of them.
+		if lo < ln.hideEnd && hi > ln.hideStart {
+			for _, run := range ln.Runs {
+				if run.ellipsis {
+					dst = mergeRect(dst, start, Rect{run.X, ln.Top, run.Width, l.LineHeight})
+				}
+			}
+			// The ellipsis joins the rectangles on its two sides.
+			line := dst[start:]
+			slices.SortFunc(line, func(a, b Rect) int { return cmp.Compare(a.X, b.X) })
+			k := 0
+			for _, r := range line {
+				if k > 0 && r.X <= line[k-1].X+line[k-1].W+0.5 {
+					line[k-1].W = max(line[k-1].W, r.X+r.W-line[k-1].X)
+					continue
+				}
+				line[k] = r
+				k++
+			}
+			dst = dst[:start+k]
 		}
 		// Show a selected line break as a small block at the end of the line.
 		if ln.hardEnd && rb > ln.RuneEnd && ra <= ln.RuneEnd && ln.RuneEnd < len(l.runes) {
