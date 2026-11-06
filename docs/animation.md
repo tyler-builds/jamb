@@ -80,6 +80,59 @@ it has no velocity, and it ends at the animation's `Duration`, exactly at 1.
 ui.Div().Enter(ui.Grow(0.9), ui.Animation{Duration: 400 * time.Millisecond, Easing: ease.Spring(0.3)})
 ```
 
+## Layout springs
+
+`.LayoutSpring(s)` moves an element to a new place in the layout as a spring
+rather than at once: a list reordered, a row added or removed above it, a
+parent that grew. `.ChildrenLayoutSpring(s)` on a parent gives the spring to
+its direct children that set none of their own.
+
+```go
+list := ui.Div().Column().ChildrenLayoutSpring(ctx.Theme().Motion.ReflowSpring())
+for _, it := range items {
+	list.Child(row(it).Key(it.ID)) // keyed, so each row keeps its identity as it moves
+}
+```
+
+- The layout is not animated. It puts the element at its new place at once,
+  and paint draws the element where its spring has brought it, adding the
+  difference to its offset as `Offset` is added. Nothing is laid out again
+  while it moves.
+- When the place changes, the element keeps where it is drawn and its
+  velocity and springs from there, with the spring's `Duration` and `Bounce`
+  (see Springs). A move that comes mid-flight bends the motion rather than
+  restarting it. It rests within 0.05 px of its place and then asks for no
+  frames.
+- The place is the element's position in its parent's layout box. A parent
+  that moves carries its children, so they do not spring as well; a parent
+  with a spring of its own moves them with it. A scroll moves the parent's
+  content, not the places in it, so it never springs.
+- It snaps to its place, with no motion, when it first appears (an `Enter`
+  moves it in), when the window's size, zoom or text scale changes, with reduced
+  motion, when it is drawn again after being off screen or hidden, and in a
+  `UniformList` whose rows take a new height. A row a scroll brings into a
+  `UniformList` is new, so it appears at its place. An element that appears
+  inside ancestors that are springing is drawn where it will be on screen and
+  holds still while they glide to it: a toast added to a stack that grows from
+  the bottom of the window appears in its place.
+- An element that is removed leaves at once (its `Exit` still plays as a
+  ghost), and its siblings spring into the gap.
+- Hit testing, `Find`, `DrawnStyle.Bounds` and the accessibility bounds follow
+  where the element is drawn, as with `Offset`.
+- A change of size is not animated: the element is drawn at its new size from
+  the frame of the change.
+- Give each springing element a key. Without one it takes the identity, and
+  the place, of whichever sibling is built where it was, so a reorder moves
+  nothing; the runtime's warnings (debug builds and `uitest`) name it.
+- `Style.LayoutSpring` sets it in a style; a zero `Spring` is unset. The
+  elements that take a `Style` (`Button`, `TextInput`, `Text`, `Icon`, the
+  lists and others) have a `LayoutSpring` method too. In a `UniformList`, a row
+  that is a `Div` with a layout spring moves with the box the list places it
+  in. An overlay is placed by its anchor and does not take one.
+
+The built-in widgets use the theme's `Motion.Reflow` (see Theme motion tokens):
+the toasts of a `Toaster` glide to their places when one leaves.
+
 ## Keyframes (Play)
 
 `.Play(key, frames, a)` runs an element through keyframes: at each stop's `At`
@@ -189,6 +242,7 @@ today's timing:
 | `Enter` | 140 ms; 120 ms | menus, lists, dialogs and drawers; popovers, hover cards and tooltips |
 | `Exit` | 90 ms; 80 ms | the same, as they go |
 | `Spring` | unset | when set, the opacity, offset and scale of those controls move as this spring |
+| `Reflow` | 350 ms, no bounce | the layout spring of the built-in items that move when the layout changes: the toasts of a `Toaster` |
 
 ```go
 t := ui.DarkTheme()
@@ -197,12 +251,16 @@ t.Motion.Exit = 120 * time.Millisecond
 ```
 
 Setting `Enter` or `Exit` gives every built-in entrance or exit that duration.
-Reduced motion still turns the motion off.
+`MotionTokens.ReflowSpring()` returns the `Reflow` spring, its default when it
+is zero, for an app's own lists to move as the built-in ones do. Reduced motion
+still turns the motion off.
 
 ## Cost
 
-`Opacity`, `Offset`, `Scale`, transitions, springs, enter and exit and keyframes
-are paint-only, so they cost no layout. A timeline costs what `Animate` costs:
+`Opacity`, `Offset`, `Scale`, transitions, springs, layout springs, enter and
+exit and keyframes are paint-only, so they cost no layout. An element without a
+layout spring pays one flag check per paint for them; one with a spring keeps a
+little state and asks for frames only while it moves. A timeline costs what `Animate` costs:
 a render of its function per frame, and a re-layout if what it changes is
 layout. A property that changes the layout (`Width`,
 `Padding`, ...) costs a re-layout of the path to the root on each frame of its
@@ -216,8 +274,9 @@ it waits: no frames are drawn until it ends.
 
 With Windows' Animation effects turned off (Settings, Accessibility, Visual
 effects), jamb asks for reduced motion (`ctx.ReducedMotion()`). Then `Transition`,
-`Enter` and `Exit` jump to their end, a spring jumps to its target and stops, and
-smooth scrolling jumps to its target. An `Animate`, `Play` or `AnimateTimeline`
+`Enter` and `Exit` jump to their end, a spring jumps to its target and stops, an
+element with a layout spring takes its new place at once, and smooth scrolling
+jumps to its target. An `Animate`, `Play` or `AnimateTimeline`
 that is finite jumps to its last frame (the last stop, every step at 1), and a
 repeating one stops at its first frame, so nothing asks for more frames. Delays
 and stagger are ignored, and an `OnDone` runs at the next frame. Apps should check `ctx.ReducedMotion()`

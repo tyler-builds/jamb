@@ -157,11 +157,11 @@ func TestDataGridPinnedCellsShowTheRowState(t *testing.T) {
 				fills = append(fills, Color{qd.Background.R, qd.Background.G, qd.Background.B, qd.Background.A})
 			}
 		}
-		if len(fills) < 2 || fills[0].scene() != st.Grid.Background.scene() || fills[1].scene() != row.shownBG.scene() {
+		if len(fills) < 2 || fills[0].scene() != st.Grid.Background.scene() || fills[1].scene() != row.shownBG().scene() {
 			t.Errorf("row %d: the pinned cell is filled with %v, want the grid's %v and then the row's %v",
-				q, fills, st.Grid.Background, row.shownBG)
+				q, fills, st.Grid.Background, row.shownBG())
 		}
-		if row.shownBG.A == 0 {
+		if row.shownBG().A == 0 {
 			t.Errorf("row %d has no fill to show", q)
 		}
 	}

@@ -2,9 +2,12 @@ package views
 
 import (
 	"fmt"
+	"math/rand/v2"
+	"slices"
 	"time"
 
 	"github.com/tyler-builds/jamb/ease"
+	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -15,6 +18,7 @@ import (
 func motionTimingSamples(t *ui.Theme) []ui.Element {
 	return []ui.Element{
 		springSample(t),
+		reorderSample(t),
 		keyframeSample(t),
 		timelineSample(t),
 		loopSample(t),
@@ -39,6 +43,48 @@ func springSample(t *ui.Theme) ui.Element {
 			Child(still).
 			Child(bouncy).
 			Child(ui.Button("Move").Key("motion-move").Secondary().Small().OnClick(func() { right.Set(!right.Peek()) })))
+	})
+}
+
+// reorderSample is a list whose rows glide to their new places when it is
+// reordered: ChildrenLayoutSpring gives each row the theme's Reflow spring. The
+// layout moves a row at once, and the row is drawn where the spring has brought
+// it, so a second press mid-flight bends the motion. Each row is keyed, so it
+// keeps its identity as it moves.
+func reorderSample(t *ui.Theme) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		order := ui.Local(ctx, "motion.order", []string{"Alpha", "Bravo", "Charlie", "Delta", "Echo"})
+		items := order.Get()
+		list := ui.Div().Key("motion-reorder").Column().Gap(4).Width(ui.Px(240)).
+			ChildrenLayoutSpring(t.Motion.ReflowSpring())
+		for i, name := range items {
+			list.Child(ui.Div().Key("motion-row-"+name).Row().Align(ui.Center).Gap(8).Height(ui.Px(32)).
+				PaddingX(10).Radius(8).Background(t.Surface).Border(1, t.Border).
+				Child(ui.Div().Grow(1).Child(ui.Text(name).FontSize(12))).
+				Child(ui.IconButton(icons.ArrowUp).Label("Move " + name + " up").Small().Disabled(i == 0).OnClick(func() {
+					next := slices.Clone(order.Peek())
+					if j := slices.Index(next, name); j > 0 {
+						next[j-1], next[j] = next[j], next[j-1]
+						order.Set(next)
+					}
+				})))
+		}
+		// The shuffles are the same in every run of the demo, so its tests see them.
+		rng := ui.Local(ctx, "motion.rng", (*rand.Rand)(nil))
+		shuffle := func() {
+			if rng.Peek() == nil {
+				rng.Set(rand.New(rand.NewPCG(1, 2)))
+			}
+			r := rng.Peek()
+			next := slices.Clone(order.Peek())
+			for slices.Equal(next, order.Peek()) {
+				r.Shuffle(len(next), func(i, j int) { next[i], next[j] = next[j], next[i] })
+			}
+			order.Set(next)
+		}
+		return sample(t, "Layout spring: reorder", ui.Div().Column().Gap(10).Width(ui.Px(240)).
+			Child(list).
+			Child(ui.Button("Shuffle").Key("motion-shuffle").Secondary().Small().OnClick(shuffle)))
 	})
 }
 

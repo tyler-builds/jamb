@@ -102,6 +102,10 @@ func (e *SVGElement) Alt(s string) *SVGElement { e.alt = s; return e }
 // Style merges layout fields (margins, alignment, opacity...) of s.
 func (e *SVGElement) Style(s Style) *SVGElement { e.style = e.style.Merge(s); return e }
 
+// LayoutSpring moves the drawing to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (e *SVGElement) LayoutSpring(s Spring) *SVGElement { return e.Style(Style{LayoutSpring: s}) }
+
 // svgKey is what an SVG's drawing depends on besides its size and the
 // inherited text color.
 type svgKey struct {

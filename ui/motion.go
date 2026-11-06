@@ -315,7 +315,7 @@ func (rt *Runtime) paintGhosts(dt float32) {
 func (rt *Runtime) paintGhost(n *node, dt float32) {
 	prev := rt.inGhost
 	rt.inGhost = true
-	rt.paintNode(n, n.baseX-n.lay.X, n.baseY-n.lay.Y, n.clip, n.inOpacity, n.inFg, dt)
+	rt.paintNode(n, n.st.baseX-n.lay.X, n.st.baseY-n.lay.Y, n.clip, n.inOpacity, n.inFg, dt)
 	rt.inGhost = prev
 }
 

@@ -64,3 +64,31 @@ func TestMotionSamplesMoveSmoothly(t *testing.T) {
 	rec.Check(t, uitest.Allow{Kind: uitest.Overshoot, Element: "section:Motion",
 		Reason: "the Bounce 0.5 spring tile passes its target by design; the Bounce 0 one beside it does not"})
 }
+
+// The rows of the reorder sample glide to their new places when the list is
+// shuffled, and when a row moves up, also while a move is still in flight:
+// none of them jumps, and each moves over many frames.
+func TestReorderSampleGlides(t *testing.T) {
+	u := demoUI(t, PageComponents, "Motion")
+	rec := u.Record()
+	u.ByRole(access.RoleButton, "Move Echo up").Click()
+	u.Advance(100 * time.Millisecond)
+	u.ByRole(access.RoleButton, "Move Echo up").Click() // retargeted mid-flight
+	u.Settle()
+	u.Click("motion-shuffle")
+	u.Settle()
+	rec.Check(t)
+
+	// Echo moved, and over many frames: the rows glide rather than jump.
+	var ys []float32
+	for _, f := range rec.Frames() {
+		for _, s := range f.Elements {
+			if s.Key == "motion-row-Echo" && !s.Exiting && (len(ys) == 0 || ys[len(ys)-1] != s.Bounds.Y) {
+				ys = append(ys, s.Bounds.Y)
+			}
+		}
+	}
+	if len(ys) < 10 {
+		t.Errorf("Echo was drawn at %d places, want it to glide over 10 or more: %v", len(ys), ys)
+	}
+}

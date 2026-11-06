@@ -98,6 +98,10 @@ func (l *ListElement) Label(name string) *ListElement { l.label = name; return l
 // Style is merged into the scroll container: size it with Height, Grow or MaxHeight.
 func (l *ListElement) Style(s Style) *ListElement { l.style = l.style.Merge(s); return l }
 
+// LayoutSpring moves the list to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (l *ListElement) LayoutSpring(s Spring) *ListElement { return l.Style(Style{LayoutSpring: s}) }
+
 // Handle connects h so the list can be scrolled from code.
 func (l *ListElement) Handle(h *ListHandle) *ListElement { l.handle = h; return l }
 

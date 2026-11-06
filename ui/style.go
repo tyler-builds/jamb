@@ -177,7 +177,7 @@ var (
 //	ui.Div().Style(Card)
 type Style struct {
 	// The fields are ordered so that the struct has no padding: the 4-byte fields are
-	// together, and so are the bytes, which keeps Style at 448 bytes, a malloc size
+	// together, and so are the bytes, which keeps Style within 480 bytes, a malloc size
 	// class (see TestElementSizeClasses). The order is not part of the API.
 
 	// Visuals
@@ -281,6 +281,10 @@ type Style struct {
 	// change mid-flight keeps the velocity it had. Colors still ease, over
 	// Transition when it is set. The zero Spring is unset.
 	Spring Spring
+	// LayoutSpring moves the element to a new place in the layout as a
+	// damped spring rather than at once, when the layout moves it among its
+	// siblings (see DivElement.LayoutSpring). The zero Spring is unset.
+	LayoutSpring Spring
 	// ZIndex orders overlapping siblings; a higher value is drawn on top.
 	ZIndex int
 	// ColSpan and RowSpan are the number of grid columns and rows that the item covers; zero means one.
@@ -451,6 +455,9 @@ func (s Style) Merge(o Style) Style {
 	}
 	if o.Spring.Duration != 0 {
 		s.Spring = o.Spring
+	}
+	if o.LayoutSpring.Duration != 0 {
+		s.LayoutSpring = o.LayoutSpring
 	}
 	if sp != nil || o.prov != nil {
 		s.prov = mergeProv(sp, o.prov, s)

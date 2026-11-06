@@ -115,6 +115,9 @@ type DivElement struct {
 	tabIndex     int               // see TabIndex
 	overlayGap   float32
 	fillBase     Color
+	// kidsSpring is the layout spring of the children that set none of their
+	// own (see ChildrenLayoutSpring).
+	kidsSpring Spring
 
 	focusable      bool
 	keepFocus      bool // a press inside leaves focus where it is (see KeepFocus)
@@ -561,6 +564,28 @@ func (d *DivElement) Transition(t time.Duration) *DivElement { d.style.Transitio
 //	ui.Div().Spring(ui.Spring{Duration: 300 * time.Millisecond, Bounce: 0.2}).
 //	    Hover(ui.Style{Scale: 1.04})
 func (d *DivElement) Spring(s Spring) *DivElement { d.style.Spring = s; return d }
+
+// LayoutSpring moves the element to its new place as a damped spring when
+// the layout moves it: a list reordered, a sibling added or removed above it,
+// a parent that grew. The element keeps where it is drawn and springs from
+// there, so a move that comes mid-flight bends the motion rather than
+// restarting it. Its place is taken against its parent's layout box, so an
+// element that moves with its parent does not spring, and a scroll never
+// springs. It snaps instead when it first appears, when the window's size,
+// zoom or text scale changes, and with reduced motion. Hit testing and Find
+// follow where it is drawn. Give the element a key, so that it keeps its
+// identity as it moves. A change of size is not animated.
+//
+//	ui.Div().Key(item.ID).LayoutSpring(ui.Spring{Duration: 350 * time.Millisecond})
+func (d *DivElement) LayoutSpring(s Spring) *DivElement { d.style.LayoutSpring = s; return d }
+
+// ChildrenLayoutSpring gives the element's direct children that set no
+// LayoutSpring of their own the layout spring s (see LayoutSpring): a list
+// whose rows glide to their new places when it is reordered. Their children
+// are not affected. Give each child a key.
+//
+//	list := ui.Div().Column().ChildrenLayoutSpring(ctx.Theme().Motion.ReflowSpring())
+func (d *DivElement) ChildrenLayoutSpring(s Spring) *DivElement { d.kidsSpring = s; return d }
 
 // Offset moves the element by (x, y) logical pixels after layout. Its place in
 // the layout does not change, so siblings stay put; hit testing and Find follow

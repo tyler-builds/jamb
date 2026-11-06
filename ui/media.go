@@ -43,6 +43,10 @@ func (i *IconElement) Color(c Color) *IconElement { i.color = c; return i }
 // Style merges layout fields (margins, alignment...) of s.
 func (i *IconElement) Style(s Style) *IconElement { i.style = i.style.Merge(s); return i }
 
+// LayoutSpring moves the icon to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (i *IconElement) LayoutSpring(s Spring) *IconElement { return i.Style(Style{LayoutSpring: s}) }
+
 // ImageSource is decoded pixel data ready for the GPU. Create it once (for
 // example at package init) and reuse it.
 type ImageSource struct {
@@ -161,3 +165,7 @@ func (i *ImageElement) Opacity(o float32) *ImageElement { i.style.Opacity = o; r
 
 // Style merges layout fields of s.
 func (i *ImageElement) Style(s Style) *ImageElement { i.style = i.style.Merge(s); return i }
+
+// LayoutSpring moves the image to a new place in the layout as the spring s, as
+// DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
+func (i *ImageElement) LayoutSpring(s Spring) *ImageElement { return i.Style(Style{LayoutSpring: s}) }
