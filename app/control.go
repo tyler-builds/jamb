@@ -372,7 +372,7 @@ type ctlReply func(result any, err *ctlError)
 
 // ctlOps are the ops. They are a list and run's switch rather than a map of
 // functions, so that a program that never opens the channel links none of them.
-var ctlOps = []string{"actions", "checkpoint", "click", "commands", "dispatch", "drag", "find", "info", "key", "move", "run", "scroll", "shot", "tree", "type", "wait"}
+var ctlOps = []string{"actions", "checkpoint", "click", "commands", "dispatch", "drag", "find", "info", "key", "move", "run", "scene", "scenes", "scroll", "shot", "tree", "type", "wait"}
 
 func ctlOpList() string {
 	b, _ := json.Marshal(ctlOps)
@@ -394,6 +394,12 @@ func (c *control) run(req ctlRequest, reply ctlReply) {
 		return
 	case "checkpoint":
 		c.opCheckpoint(req, reply)
+		return
+	case "scenes":
+		c.opScenes(reply)
+		return
+	case "scene":
+		c.opScene(req, reply)
 		return
 	}
 	i := req.Window

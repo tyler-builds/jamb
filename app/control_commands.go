@@ -97,3 +97,31 @@ func (c *control) wakeAll() {
 		w.wake()
 	}
 }
+
+// opScenes lists the app's scenes (see scene.go) and the one the first window
+// shows, "" for the app's own root.
+func (c *control) opScenes(reply ctlReply) {
+	if application.scene == nil {
+		reply(map[string]any{"scenes": []string{}, "current": ""}, nil)
+		return
+	}
+	reply(map[string]any{"scenes": sceneNames(), "current": application.scene.current()}, nil)
+}
+
+// opScene opens the scene called name in the first window, from fresh state,
+// or the app's own root again when name is empty.
+func (c *control) opScene(req ctlRequest, reply ctlReply) {
+	s := application.scene
+	if s == nil {
+		reply(nil, ctlErr("not_found", "%v", errNoScenes))
+		return
+	}
+	if err := s.open(req.Name); err != nil {
+		reply(nil, ctlErr("not_found", "%v", err))
+		return
+	}
+	if wins := c.windows(); len(wins) > 0 {
+		wins[0].wake()
+	}
+	reply(map[string]any{"current": s.current()}, nil)
+}

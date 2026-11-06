@@ -190,7 +190,7 @@ func (r *runner) exitedChan() <-chan struct{} {
 // refreshWatchList asks the go tool which source directories the app depends
 // on, skipping the standard library and the read-only module cache.
 func (r *runner) refreshWatchList() error {
-	cmd := exec.Command("go", "list", "-deps", "-f", "{{if not .Standard}}{{.Dir}}{{end}}", ".")
+	cmd := exec.Command("go", "list", "-tags", devTags(os.Getenv("GOFLAGS")), "-deps", "-f", "{{if not .Standard}}{{.Dir}}{{end}}", ".")
 	cmd.Dir = r.dir
 	out, err := cmd.Output()
 	if err != nil {
@@ -246,7 +246,7 @@ func (r *runner) build() (string, bool) {
 	exe := filepath.Join(r.work, name)
 	t0 := time.Now()
 	r.rewrite()
-	cmd := exec.Command("go", "build", "-overlay", r.overlay, "-o", exe, ".")
+	cmd := exec.Command("go", "build", "-tags", devTags(os.Getenv("GOFLAGS")), "-overlay", r.overlay, "-o", exe, ".")
 	cmd.Dir = r.dir
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out

@@ -59,6 +59,8 @@ jobs:
           cache-dependency-path: "**/go.sum"
       - name: go test
         run: for m in $MODULES; do (cd "$m" && go test -count=1 ./...); done
+      - name: scenes (files built with -tags jambdev)
+        run: for m in $MODULES; do (cd "$m" && go vet -tags jambdev ./... && go test -count=1 -tags jambdev -run Scenes ./...); done
 
   race:
     name: Tests with the race detector

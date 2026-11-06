@@ -12,6 +12,7 @@ These environment variables work with any jamb app, with no code changes:
 | `JAMB_A11Y_WARN=1` | Prints accessibility warnings: an interactive element with no name, and an image without `Alt`. Each is reported once. On by default under `jamb dev`. |
 | `JAMB_INSPECT=1` | Opens the visual inspector for the first window at start, if the program links it. Under `jamb dev` the inspector is linked, and Ctrl+Shift+I opens it (see [Visual inspector](#visual-inspector)). |
 | `JAMB_CONTROL=1` | Opens the control channel, which `jamb ctl` and coding agents use to read and drive the running app, if the program links it. `jamb dev` links it and sets this (see [Control channel](#control-channel)). |
+| `JAMB_SCENE=NAME` | Opens the first window on the scene called NAME instead of the app's own root, in a program built with the `jambdev` tag, as `jamb dev` builds (see [Scenes](#scenes)). |
 | `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `type TEXT` types everything after the one space that follows `type`, spaces included. `devicelost` simulates a GPU device loss; see [GPU device loss](architecture.md#gpu-device-loss). `mark` sets a loop point and `repeat N` goes back to the last mark N more times, or loops until the window closes with `repeat 0`; a `repeat` needs a `mark` before it. `a11ydump PATH` writes the accessibility tree as text (see [Accessibility](accessibility.md#accessibility)). |
 | `JAMB_STRESS=rebuild\|paint` | Measures sustained frame cost, allocation and GC, prints the results, then exits. Its frame times come from the performance counter. |
 | `JAMB_FRAMESTATS=PATH` | Records every frame of the first window, from its first frame until it closes, and writes `PATH` with one row per frame (CPU time, the interval between Presents, whether the frame rebuilt, updated or repainted the tree, and whether it came with no idle gap). The summary's present interval covers only the frames with no idle gap, so a pause between frames does not count as an interval. It writes `PATH-input.csv` beside it, with the latency of each input event that caused a frame, from its arrival to the start and the return of `Present`, and prints a summary to stderr. Time to the screen is not measured. |
@@ -183,6 +184,8 @@ top left, as in `JAMB_SCRIPT`.
 | `dispatch` | `action`, an action's name | Runs the action where the focus is, as its key binding does, and says whether something handled it |
 | `commands` | none | The app's commands (see below), with the JSON Schemas of their input and output; it takes no `window` |
 | `run` | `command`, `args` (the input, a JSON value) | Runs the command and returns its `result`; it takes no `window` |
+| `scenes` | none | The app's scenes and the one the first window shows (`current`, empty for the app's own root); see [Scenes](#scenes). It takes no `window` |
+| `scene` | `name`, a scene's name; none goes back to the app's own root | Opens the scene in the first window, from fresh state, and returns it as `current`. A scene opened this way is not kept across `jamb dev`'s restarts; `JAMB_SCENE` is |
 
 A node has an `id`, its `parent`, `role`, `name`, `key`, `value`, `description`,
 `states` (such as `focused`, `disabled` or `offscreen`), `bounds` and the number
@@ -270,6 +273,63 @@ Windows). Beside the socket, `PID.json` describes the app: its executable, its
 working directory and when it started. The app removes both when it ends; `jamb
 dev` removes them when it restarts the app, and the next app to open its channel
 removes those that a crashed app left.
+
+## Scenes
+
+A scene is a named starting state of the app's UI, such as an empty inbox, a
+list of 500 rows or an error, made from synthetic data. Development tools open
+the app straight into one, so neither you nor a coding agent has to click
+through the app to reach it, and nothing touches the user's real data.
+
+Register scenes with `scene.Add` from an `init` function, in a file that starts
+with `//go:build jambdev`. `jamb dev` builds with that tag; `go build` and
+release builds don't, so they compile none of the scenes, however many there
+are.
+
+```go
+//go:build jambdev
+
+package views
+
+import "github.com/tyler-builds/jamb/scene"
+
+func init() {
+	scene.Add("Notes/Empty", func() scene.Root {
+		s := openTempStore()
+		for _, n := range s.Notes.Peek() {
+			s.Delete(n)
+		}
+		return Root(s)
+	})
+}
+```
+
+- A scene's function makes its own state and returns a root, as
+  `app.Window.Root` is. It runs each time the scene opens, so every opening
+  starts fresh. The scene replaces the root of the app's first window; the
+  window's size, bindings, theme and other settings stay the app's own.
+  Commands and actions that the app's `main` bound to its own state still act
+  on that state, not the scene's.
+- Slashes in a name group scenes: `Settings/Accounts/Signed out`.
+- `JAMB_SCENE=Notes/Empty jamb dev` opens the app on the scene, and keeps it
+  open across `jamb dev`'s restarts. Values that `jamb dev` keeps across a
+  restart (see [State across restarts](#state-across-restarts)) are applied over
+  the scene's, as over the app's.
+- `jamb ctl scenes` lists the scenes and the one shown; `jamb ctl scene
+  name=Notes/Empty` opens one in the running app, and `jamb ctl scene` with no
+  name goes back to the app's own root.
+- A test built with the tag opens a scene with `scene.Make` and renders it:
+  `uitest.New(t, root)` (see [Testing your app](testing.md#testing-your-app)).
+  Run such tests with `go test -tags jambdev ./...`; CI runs the tests named
+  `Scenes` with the tag.
+- gopls leaves out files with a build tag it isn't told about. To edit scene
+  files with completion, add `"buildFlags": ["-tags=jambdev"]` to its
+  settings.
+- A program that sets `JAMB_SCENE` without the tag, or without package
+  `devtools` linked, stops with an error that says so.
+
+The notes example has scenes in `examples/notes/views/scenes_dev.go`, and a
+test that opens each one in `scenes_dev_test.go`.
 
 ## Visual inspector
 

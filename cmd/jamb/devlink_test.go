@@ -39,3 +39,17 @@ func TestDevtoolsOverlayLinksTheInspectorIntoTheAppPackage(t *testing.T) {
 		t.Errorf("the app's directory was written to: %d entries", len(entries))
 	}
 }
+
+func TestDevTags(t *testing.T) {
+	for _, tc := range []struct{ goflags, want string }{
+		{"", "jambdev"},
+		{"-mod=mod", "jambdev"},
+		{"-tags=foo,bar -mod=mod", "jambdev,foo,bar"},
+		{"--tags=foo,jambdev", "jambdev,foo"},
+		{"-tags= ", "jambdev"},
+	} {
+		if got := devTags(tc.goflags); got != tc.want {
+			t.Errorf("devTags(%q) = %q, want %q", tc.goflags, got, tc.want)
+		}
+	}
+}
