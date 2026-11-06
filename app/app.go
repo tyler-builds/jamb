@@ -359,6 +359,14 @@ func (a *App) RunE(w Window) error {
 			stop()
 		}
 	}()
+	if open {
+		// JAMB_SCENE opens the first window on a scene (see scene.go). The scene
+		// makes its state here, before jamb dev's kept state is applied over it.
+		var err error
+		if w.Root, application.scene, err = withScene(w.Root); err != nil {
+			return err
+		}
+	}
 	if devhook.Started != nil {
 		devhook.Started() // jamb dev's kept state goes over the startup code's (see devtools/hot)
 	}
@@ -446,6 +454,9 @@ var application struct {
 	frozen      bool
 	controlStop func()
 	closing     *closeOp // a close or quit waiting for answers about unsaved changes (see quit.go)
+	// scene switches the first window between the app's scenes, when the
+	// program has any (see scene.go).
+	scene *sceneSwitch
 }
 
 func withDefaults(w Window) Window {

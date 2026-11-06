@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 )
 
 // devtoolsLinkName is the name of the file that `jamb dev` adds to the app's main
@@ -39,4 +41,30 @@ func devtoolsOverlay(work, dir string) (string, error) {
 		return "", err
 	}
 	return overlay, nil
+}
+
+// devTag is the build tag that jamb dev sets, so that files an app builds only
+// for development, such as its scenes (see package scene), are compiled in.
+const devTag = "jambdev"
+
+// devTags returns the -tags value for jamb dev's builds: devTag and the tags
+// that goflags, the GOFLAGS environment variable, sets, since a -tags flag on
+// the command line replaces the one in GOFLAGS.
+func devTags(goflags string) string {
+	tags := []string{devTag}
+	for _, f := range strings.Fields(goflags) {
+		v, ok := strings.CutPrefix(f, "-tags=")
+		if !ok {
+			v, ok = strings.CutPrefix(f, "--tags=")
+		}
+		if !ok {
+			continue
+		}
+		for _, t := range strings.Split(v, ",") {
+			if t = strings.TrimSpace(t); t != "" && !slices.Contains(tags, t) {
+				tags = append(tags, t)
+			}
+		}
+	}
+	return strings.Join(tags, ",")
 }
