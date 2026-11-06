@@ -43,6 +43,15 @@ go test ./... ./cmd/jamb/... ./examples/demo/... ./examples/notes/... ./examples
 `gofmt -l .` should print nothing. CI runs the same checks on Windows and Linux, the race detector,
 the window tests and builds for macOS.
 
+## Changelog
+
+A change that users would notice adds a file to `changelog/unreleased/`, such as
+`2026-11-07-caret-after-paste.md`, rather than editing [CHANGELOG.md](CHANGELOG.md), so that pull
+requests don't conflict there. The file holds the entry as CHANGELOG.md will show it, under a
+`### Added`, `### Changed`, `### Fixed` or other Keep a Changelog heading. `go run
+./internal/changelog check` checks the files, and a release merges them into CHANGELOG.md; see
+[changelog/README.md](changelog/README.md).
+
 ## Commits
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), for
