@@ -52,8 +52,13 @@ func (rt *Runtime) StyleOf(key string) (DrawnStyle, bool) {
 	if n == nil {
 		return DrawnStyle{}, false
 	}
+	return rt.drawnStyle(n), true
+}
+
+// drawnStyle returns how the latest paint drew n (see StyleOf).
+func (rt *Runtime) drawnStyle(n *node) DrawnStyle {
 	if n.paintGen != rt.paintGen {
-		return DrawnStyle{}, true
+		return DrawnStyle{}
 	}
 	s := &n.style
 	d := DrawnStyle{Painted: true, Bounds: n.abs, Opacity: n.opacity, Scale: n.scale}
@@ -90,5 +95,5 @@ func (rt *Runtime) StyleOf(key string) (DrawnStyle, bool) {
 			d.Opacity *= o
 		}
 	}
-	return d, true
+	return d
 }

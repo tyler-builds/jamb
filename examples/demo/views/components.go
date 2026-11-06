@@ -293,7 +293,8 @@ var placementList = []struct {
 }
 
 // placements has one button per Placement. Each opens a popover beside its
-// button, 10 px away. A click outside it, or Escape, closes it.
+// button, 10 px away, which fades in and out. A click outside it, or Escape,
+// closes it.
 func placements(t *ui.Theme) ui.Element {
 	return ui.Component(func(ctx *ui.Context) ui.Element {
 		open := ui.Local(ctx, "open", -1) // index into placementList, -1 for none
@@ -304,6 +305,8 @@ func placements(t *ui.Theme) ui.Element {
 			if open.Get() == i {
 				anchor.Child(ui.Div().Key("popover").Overlay(p.at).OverlayGap(10).Padding(10).Radius(8).
 					Background(t.Surface).Border(1, t.Border).Shadow(ui.ShadowMd).
+					Enter(ui.Fade().Grow(0.98), ui.Animation{Duration: 120 * time.Millisecond}).
+					Exit(ui.Fade(), ui.Animation{Duration: 80 * time.Millisecond}).
 					OnClickOutside(func() { open.Set(-1) }).
 					Child(ui.Text("Opened " + p.name).FontSize(12).Medium()))
 			}

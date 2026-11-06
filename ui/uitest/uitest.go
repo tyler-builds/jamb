@@ -10,6 +10,10 @@
 //		t.Error("Save is enabled after saving")
 //	}
 //
+// Record records the frames a test runs, and its Check fails the test on
+// motion a person would notice: pops, jumps, cut exits, overshoot and motion
+// that never settles.
+//
 // Every action runs a frame, so its effects are visible at once. Lookups that
 // find nothing fail the test with a message naming what was looked for. A UI
 // has its own clipboard, and never touches the system's. Like the runtime it
@@ -51,6 +55,7 @@ type host interface {
 	AccessNodes(*access.Tree, string) []*access.Node
 	Perform(access.ID, access.Request)
 	Frame(time.Time) *scene.Scene
+	Samples(known func(uint64) bool, visit func(uihost.Sample))
 }
 
 // UI is a root component rendered in a headless runtime for a test. Create one
@@ -63,6 +68,7 @@ type UI struct {
 	w, h     float32
 	scale    float32
 	warnings []string
+	rec      *Recording // set while recording (see Record)
 }
 
 // options are what New's Options set.
@@ -146,7 +152,10 @@ func (u *UI) Now() time.Time { return u.now }
 
 // Frame runs one frame at the current time: changes made to signals since the
 // last frame are rendered, laid out and painted.
-func (u *UI) Frame() { u.rt.Frame(u.now) }
+func (u *UI) Frame() {
+	u.rt.Frame(u.now)
+	u.recordFrame()
+}
 
 // Screenshot runs a frame at the current time and returns it as an image, drawn
 // by jamb's CPU renderer, the one the Linux adapter uses. The image is the size
@@ -158,6 +167,7 @@ func (u *UI) Frame() { u.rt.Frame(u.now) }
 func (u *UI) Screenshot() *image.RGBA {
 	u.tb.Helper()
 	sc := u.host.Frame(u.now)
+	u.recordFrame()
 	w, h := int(u.w*u.scale+0.5), int(u.h*u.scale+0.5)
 	r := soft.New(nil)
 	if err := render.Draw(r, sc, w, h); err != nil {
@@ -223,7 +233,11 @@ func (u *UI) WaitForQueries() {
 
 // Type types text into the focused element, one character at a time, and
 // runs a frame.
-func (u *UI) Type(text string) { u.rt.Type(text) }
+func (u *UI) Type(text string) {
+	u.acted()
+	u.rt.Type(text)
+	u.recordFrame()
+}
 
 // Press presses and releases keys, written as for ui.Bind and
 // case-insensitive: "enter", "tab", "shift+tab", "ctrl+a", or strokes
@@ -232,9 +246,11 @@ func (u *UI) Type(text string) { u.rt.Type(text) }
 // text. A malformed keys string fails the test.
 func (u *UI) Press(keys string) {
 	u.tb.Helper()
+	u.acted()
 	if err := u.host.PressKeys(keys); err != nil {
 		u.tb.Fatalf("uitest: Press(%q): %v", keys, err)
 	}
+	u.recordFrame()
 }
 
 // ---- clipboard ----

@@ -38,7 +38,7 @@ func springSample(t *ui.Theme) ui.Element {
 		return sample(t, "Spring: Move, then Move back", ui.Div().Column().Gap(10).Width(ui.Px(240)).
 			Child(still).
 			Child(bouncy).
-			Child(ui.Button("Move").Secondary().Small().OnClick(func() { right.Set(!right.Peek()) })))
+			Child(ui.Button("Move").Key("motion-move").Secondary().Small().OnClick(func() { right.Set(!right.Peek()) })))
 	})
 }
 
@@ -53,7 +53,7 @@ func keyframeSample(t *ui.Theme) ui.Element {
 		}
 		return sample(t, "Keyframes: Play", ui.Div().Column().Gap(10).Width(ui.Px(240)).
 			Child(tile(t, "Pulse").Play(plays.Get(), frames, ui.Animation{Duration: 800 * time.Millisecond, Easing: ease.OutCubic})).
-			Child(ui.Button("Play").Secondary().Small().OnClick(func() { plays.Set(plays.Peek() + 1) })))
+			Child(ui.Button("Play").Key("motion-play-keyframes").Secondary().Small().OnClick(func() { plays.Set(plays.Peek() + 1) })))
 	})
 }
 
@@ -75,7 +75,7 @@ func timelineSample(t *ui.Theme) ui.Element {
 		})
 		return sample(t, "Timeline: Sequence, Then, Parallel", ui.Div().Column().Gap(10).Width(ui.Px(240)).
 			Child(stage).
-			Child(ui.Button("Play").Secondary().Small().OnClick(func() { runs.Set(runs.Peek() + 1) })))
+			Child(ui.Button("Play").Key("motion-play-timeline").Secondary().Small().OnClick(func() { runs.Set(runs.Peek() + 1) })))
 	})
 }
 
@@ -103,7 +103,7 @@ func staggerSample(t *ui.Theme) ui.Element {
 		}
 		return sample(t, "Stagger: siblings enter one after another", ui.Div().Column().Gap(10).Width(ui.Px(240)).
 			Child(row).
-			Child(ui.Button("Play").Secondary().Small().OnClick(func() { runs.Set(runs.Peek() + 1) })))
+			Child(ui.Button("Play").Key("motion-play-stagger").Secondary().Small().OnClick(func() { runs.Set(runs.Peek() + 1) })))
 	})
 }
 
@@ -122,6 +122,6 @@ func delaySample(t *ui.Theme) ui.Element {
 				Child(tile(t, "Delayed").Enter(ui.Fade(), ui.Animation{Duration: 300 * time.Millisecond,
 					Delay: 600 * time.Millisecond, OnDone: func() { done.Set("Finished: the tile is in place.") }}))).
 			Child(ui.Text(status).FontSize(12).TextColor(t.TextMuted)).
-			Child(ui.Button("Play").Secondary().Small().OnClick(func() { done.Set(""); runs.Set(runs.Peek() + 1) })))
+			Child(ui.Button("Play").Key("motion-play-delay").Secondary().Small().OnClick(func() { done.Set(""); runs.Set(runs.Peek() + 1) })))
 	})
 }

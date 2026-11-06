@@ -222,3 +222,10 @@ that is finite jumps to its last frame (the last stop, every step at 1), and a
 repeating one stops at its first frame, so nothing asks for more frames. Delays
 and stagger are ignored, and an `OnDone` runs at the next frame. Apps should check `ctx.ReducedMotion()`
 before they run their own motion.
+
+## Testing motion
+
+A test can record the frames of a `ui/uitest` UI while it acts and check them
+for motion a person would notice: elements that pop in or out, jump, are cut
+off partway through their exit, overshoot or never settle. See the Motion
+section of [Testing](testing.md#motion).

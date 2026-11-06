@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/ease"
 	"github.com/tyler-builds/jamb/ui"
 	"github.com/tyler-builds/jamb/ui/uitest"
@@ -284,4 +285,45 @@ func TestAnimateTimelineReducedMotion(t *testing.T) {
 			t.Errorf("repeat=%v under reduced motion: progress %v, NeedsFrame %v; want all %v, false", repeat, got, u.Runtime().NeedsFrame(), want)
 		}
 	}
+}
+
+// The built-in popups enter and leave with their motion, with nothing popping
+// or jumping: a Select's list, a TimePicker's list, a DropdownMenu and a
+// tooltip.
+func TestPopupsMotion(t *testing.T) {
+	choice := ui.NewSignal("a")
+	at := ui.NewSignal(time.Time{})
+	u := uitest.New(t, func(ctx *ui.Context) ui.Element {
+		return ui.Div().Padding(20).Gap(12).Children(
+			ui.Select(choice, ui.Option[string]{Value: "a", Label: "Alpha"}, ui.Option[string]{Value: "b", Label: "Beta"}).Key("select").Label("Letter"),
+			ui.TimePicker(at).Key("time").Label("Time"),
+			ui.DropdownMenu(ui.Button("Actions").Key("menu"), func() []ui.MenuItem {
+				return []ui.MenuItem{{Label: "Rename"}, {Label: "Delete"}}
+			}),
+			ui.Button("Help").Key("help").Tooltip("Opens the guide"),
+		)
+	})
+	rec := u.Record()
+	open := func(what string, shown func() bool, act func()) {
+		t.Helper()
+		act()
+		u.Settle()
+		if !shown() {
+			t.Fatalf("the %s did not open", what)
+		}
+		u.Press("escape")
+		u.Settle()
+	}
+	listShown := func() bool { return u.Has("jamb.listbox") }
+	open("select's list", listShown, func() { u.Click("select") })
+	open("time list", listShown, func() { u.ByRole(access.RoleButton, "Show times").Click() })
+	open("menu", func() bool { return u.Has("jamb.menu") }, func() { u.Click("menu") })
+	u.Get("help").Hover()
+	u.Advance(time.Second)
+	if !u.HasRole(access.RoleTooltip, "Opens the guide") {
+		t.Fatal("the tooltip did not show")
+	}
+	u.Get("select").Hover()
+	u.Settle()
+	rec.Check(t)
 }

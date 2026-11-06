@@ -166,6 +166,7 @@ func (e *Element) RightClick() {
 func (e *Element) Hover() {
 	e.u.tb.Helper()
 	x, y := e.center()
+	e.u.acted()
 	e.u.rt.PointerMove(x, y, 0)
 	e.u.Frame()
 }
@@ -176,6 +177,7 @@ func (e *Element) Hover() {
 func (e *Element) Scroll(dx, dy float32) {
 	e.u.tb.Helper()
 	x, y := e.center()
+	e.u.acted()
 	e.u.rt.PointerMove(x, y, 0)
 	e.u.rt.Scroll(x, y, dx, dy, true, 0)
 	e.u.Frame()
@@ -212,6 +214,7 @@ func (e *Element) Perform(a access.Action) {
 		}
 		e.u.tb.Fatalf("uitest: the %s does not support %s; its actions are [%s]", e.desc, a, strings.Join(names, ", "))
 	}
+	e.u.acted()
 	e.u.host.Perform(n.ID, access.Request{Action: a})
 	e.u.Frame()
 }
@@ -223,6 +226,7 @@ func (e *Element) Perform(a access.Action) {
 func (e *Element) press(b input.MouseButton, clicks int) {
 	e.u.tb.Helper()
 	x, y := e.center()
+	e.u.acted()
 	rt := e.u.rt
 	rt.PointerMove(x, y, 0)
 	rt.PointerDown(x, y, b, clicks, 0)

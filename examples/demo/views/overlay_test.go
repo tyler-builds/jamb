@@ -85,3 +85,29 @@ func TestComponentsPopoverClosesOnEscape(t *testing.T) {
 		t.Error("popover still open after Escape")
 	}
 }
+
+// The user menu fades in when the card is clicked and out on Escape, with no
+// pop and nothing jumping.
+func TestUserMenuMotion(t *testing.T) {
+	u := demoUI(t, PageDashboard, "")
+	rec := u.Record()
+	u.Click("user-card")
+	u.Settle()
+	u.Press("escape")
+	u.Settle()
+	rec.Check(t)
+}
+
+// A placement popover of the Components page fades in and out, also when
+// another one replaces it.
+func TestComponentsPopoverMotion(t *testing.T) {
+	u := demoUI(t, PageComponents, "Overlays")
+	rec := u.Record()
+	u.Click("place-BelowStart")
+	u.Settle()
+	u.Click("place-AboveEnd")
+	u.Settle()
+	u.Press("escape")
+	u.Settle()
+	rec.Check(t)
+}
