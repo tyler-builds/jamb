@@ -86,7 +86,9 @@ func resolveCollapsible(ctx *Context, inst CollapsibleStyle) CollapsibleStyle {
 // CollapsibleElement is a section with a header row, which opens and closes the
 // content under it. The header is a button: Space and Enter open and close it, as
 // a click does, and its chevron points right when closed and down when open.
-// The content is not built while the section is closed.
+// The content is not built while the section is closed. The section springs to
+// its new height as it opens and closes (the theme's Motion.Reflow), revealing
+// and covering the content; with reduced motion it snaps.
 //
 // The header's accessible name is the title. The header carries the Expanded
 // state, so assistive technology can open and close it; the content is a group
@@ -105,7 +107,10 @@ type CollapsibleElement struct {
 	renderHeader func(title string, state PartState) Element
 	// group is set by an Accordion, and runs after a change made by the header.
 	group func(open bool)
-	size  sizing // the section's sizes, from the sizing methods (see Sizing in docs/styling.md)
+	// inGroup is set by an Accordion: the section's place springs with its
+	// size, so the sections below it glide as it opens and closes.
+	inGroup bool
+	size    sizing // the section's sizes, from the sizing methods (see Sizing in docs/styling.md)
 }
 
 // Collapsible creates a section titled title, whose content shows while open is
@@ -253,7 +258,12 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 		}).Key(c.headerKey())
 	}
 
-	col := Div().asPart("Collapsible.Section").Column().Style(st.Section).Child(header)
+	// The section's box springs to its new height as it opens and closes (the
+	// theme's Reflow spring), clipping what it holds while it moves, so the
+	// content is revealed and covered by its bottom edge rather than popping.
+	// Alone, its place snaps; in an Accordion it springs too.
+	col := Div().asPart("Collapsible.Section").Column().Style(st.Section).Child(header).
+		springBox(t.Motion.ReflowSpring(), !c.inGroup)
 	if c.key != "" {
 		col.Key(c.key)
 	}
@@ -268,8 +278,11 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 		kept = opened.Peek()
 	}
 	if (on || kept) && c.content != nil {
+		// The content is held: closed, it is drawn on in the section while the
+		// section shrinks, fading out, and opened, it fades in as it grows (see
+		// reflowSpec).
 		col.Child(Div().asPart("Collapsible.Content").Column().Display(on).Role(access.RoleGroup).Label(c.title).LabelledBy(c.headerKey()).
-			Style(st.Content).Child(c.content))
+			Style(st.Content).Child(c.content).heldContent())
 	}
 	return c.size.apply(col)
 }
@@ -328,6 +341,7 @@ func (a *AccordionElement) expand(ctx *Context) Element {
 		col.Key(a.key)
 	}
 	for i, s := range a.sections {
+		s.inGroup = true
 		if a.single {
 			s.group = func(open bool) {
 				if !open {

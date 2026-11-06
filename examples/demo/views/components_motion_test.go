@@ -92,3 +92,44 @@ func TestReorderSampleGlides(t *testing.T) {
 		t.Errorf("Echo was drawn at %d places, want it to glide over 10 or more: %v", len(ys), ys)
 	}
 }
+
+// A card of the expanding card sample grows to show its details, over many
+// frames, and the cards below it glide down with it; closing it, and opening
+// another while one is open, glide too. Nothing pops or jumps.
+func TestExpandCardSampleGrows(t *testing.T) {
+	u := demoUI(t, PageComponents, "Motion")
+	closed := u.Get("motion-card-Build").Bounds().H
+	rec := u.Record()
+	u.ByRole(access.RoleButton, "Show details for Build").Click()
+	var hs, ys []float32
+	for range 40 {
+		u.Advance(16 * time.Millisecond)
+		hs = append(hs, u.Get("motion-card-Build").Bounds().H)
+		ys = append(ys, u.Get("motion-card-Docs").Bounds().Y)
+	}
+	full := hs[len(hs)-1]
+	if full <= closed {
+		t.Fatalf("the open card is %v tall, want more than the closed %v", full, closed)
+	}
+	grew := 0
+	for i := 1; i < len(hs); i++ {
+		if hs[i] < hs[i-1] {
+			t.Fatalf("the card shrank while it opened: %v", hs)
+		}
+		if hs[i] > hs[i-1] {
+			grew++
+		}
+	}
+	if grew < 10 {
+		t.Errorf("the card grew over %d frames (%v), want 10 or more", grew, hs)
+	}
+	if d := (ys[len(ys)-1] - ys[0]) - (full - hs[0]); d > 1 || d < -1 {
+		t.Errorf("the last card moved %v while the first grew %v, want them together", ys[len(ys)-1]-ys[0], full-hs[0])
+	}
+	u.Settle()
+	u.ByRole(access.RoleButton, "Show details for Release").Click()
+	u.Settle()
+	u.ByRole(access.RoleButton, "Hide details for Release").Click()
+	u.Settle()
+	rec.Check(t)
+}

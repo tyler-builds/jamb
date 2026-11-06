@@ -511,7 +511,7 @@ Each row lists options that one side has and the other lacks; options both have 
 | Slider | Vertical, reversed, logarithmic scale, an event on release | `Format` for the value text, labels; `RangeSlider.MinGap` |
 | Toggle, ToggleGroup | Multi-select group; segmented and outline looks | Typed single value with `Validate`, per-option `Disabled`, icon-only |
 | Progress, Spinner | A determinate progress circle; spinner icon and color | `Min`, `Max`, `Format` and `Label` on the bar |
-| Accordion, Collapsible | Bordered, per-item icons, sizes, animated open and close | `KeepMounted`, custom headers, `Disabled`, open state bound to a signal |
+| Accordion, Collapsible | Bordered, per-item icons, sizes | `KeepMounted`, custom headers, `Disabled`, open state bound to a signal |
 | Alert | Banner style, sizes | `Action` slot, `Description` |
 | Avatar | `AvatarGroup` with a limit, icon placeholder, image from a URL | `Tooltip`; can be hidden from screen readers |
 | Badge, Tag | Any color, outline and rounded tags, sizes, icon badges | Five badge variants, `StatusDot`, a spoken noun after the count, `Tag.OnRemove` |
@@ -546,7 +546,7 @@ Each row lists options that one side has and the other lacks; options both have 
 | Sheet / Drawer | Resizable | A default button, initial focus, minimum and maximum sizes |
 | Notification / Toast | Icon and custom content; click and close events; placement per toast; one call for in-app and system | F6 moves focus into toasts; announced by severity; timers pause on hover and focus; system toasts with images, up to five actions and activation arguments |
 | Popover, HoverCard | Controlled open state, an arrow, offset, a right-click trigger, open-change events | An accessible name, 13 placements, hover cards that open on keyboard focus |
-| Sidebar | Nested submenus, item context menus and suffixes, the right side, off-canvas and animated collapse | Selection bound to a signal, arrow-key navigation, badges read by screen readers, disabled items |
+| Sidebar | Nested submenus, item context menus and suffixes, the right side, off-canvas | Selection bound to a signal, arrow-key navigation, badges read by screen readers, disabled items |
 | Resizable / Split | Panels added, removed and reset at run time; hidden and fixed panels; custom handles | Keyboard resizing, collapsible panes, percent sizes, sizes bound to a signal for saving |
 | Scrolling | Scrollbar modes (on scroll, on hover, always), a scroll handle for any area, a horizontal virtual list | `ListOf` with rows of any height that keeps its anchor, chat-style bottom anchoring, `OnAtEnd` |
 | Theme | JSON themes loaded at run time and reloaded from a watched folder; about 135 color tokens plus radius, spacing, shadow, font and motion tokens | A high-contrast theme from the Windows system colors, light and dark that follow Windows live, theme styles per widget |
@@ -578,7 +578,7 @@ Each row lists options that one side has and the other lacks; options both have 
 | Translations | YAML through rust-i18n, also for app strings | Typed `ui.Strings`, chosen from the Windows display language |
 | Actions and keybindings | Typed actions and context predicates; the app supplies any user keymap file | Typed actions and contexts; a built-in JSON keymap file with hot reload |
 | Focus | Focus handles, tab order, a focus trap for any element | Focus handles, tab order, focus-visible and focus-within styles; traps only in `Modal` and `Drawer` |
-| Animation | Transitions, springs, keyframes, sequences, presence, stagger, motion tokens | Transitions, springs, keyframes, timelines, enter and exit animations, delays, stagger, motion tokens; reduced motion honoured |
+| Animation | Transitions, springs, keyframes, sequences, presence, stagger, motion tokens | Transitions, springs, layout springs (an element's place and size), keyframes, timelines, enter and exit animations, delays, stagger, motion tokens; reduced motion honoured |
 | Icons | 101 icons, plus the Lucide set (about 1,800) on request | The Lucide set (1,903 icons, 1.61.0), each linked only when the app names it, and an `SVG` element |
 | Text selection | Across the text elements of a window; touch selection | Within one text element |
 | Undo history | Public `History` and `UndoHistory` types | Inside text fields and the code editor only |

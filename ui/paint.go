@@ -3,6 +3,7 @@ package ui
 import (
 	"image"
 	"math"
+	"slices"
 
 	"github.com/tyler-builds/jamb/internal/layout"
 	"github.com/tyler-builds/jamb/internal/scene"
@@ -16,6 +17,7 @@ func (rt *Runtime) paint(dt float32) {
 	view := scene.Rect{W: rt.viewW, H: rt.viewH}
 	rt.overlays = rt.overlays[:0]
 	rt.paintGen++
+	rt.reflowStart = false
 	// The focused element and its ancestors are painted even when they are off
 	// screen: the caret, the input method and revealCaret need them.
 	for n := rt.byID[rt.focusID]; n != nil; n = n.parent {
@@ -27,6 +29,10 @@ func (rt *Runtime) paint(dt float32) {
 	rt.paintGhosts(dt)
 	rt.paintOverlays(view, dt)
 	rt.paintDrag(view, dt)
+	if len(rt.held) > 0 {
+		// Held content whose box did not draw it has gone (see reflowSpec).
+		rt.held = slices.DeleteFunc(rt.held, func(h heldNode) bool { return h.gen != rt.paintGen })
+	}
 	rt.paintInspect(view)
 	rt.revealTabFocus()
 	rt.revealRowsNow()
@@ -102,17 +108,30 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	}
 	v := rt.visual(n, fg, dt)
 	var lx, ly float32 // where a layout spring draws the element, from its laid-out place
-	if n.flags&flagLayoutSpring != 0 && n.st != nil && n.st.lay != nil {
-		lx, ly = rt.layoutSpring(n, dt)
-		v.offX += lx
-		v.offY += ly
-		if lx != 0 || ly != 0 || n.st.lay.moving {
-			prev := rt.enterReflow(lx, ly, n.st.lay)
-			defer func() { rt.reflowAcc = prev }()
+	w, h := n.lay.W, n.lay.H
+	var box *layoutSpringState // the element's layout spring, which draws its box at the size it has reached
+	var prevAcc reflowMotion
+	var prevBox *layoutSpringState
+	if n.flags&(flagLayoutSpring|flagHeld) != 0 && n.st != nil && n.st.lay != nil {
+		ls := n.st.lay
+		if n.flags&flagHeld != 0 && ls.reveal {
+			opacity *= rt.revealHeld(ls)
+		}
+		if n.flags&flagLayoutSpring != 0 {
+			lx, ly = rt.layoutSpring(n, dt)
+			v.offX += lx
+			v.offY += ly
+			w, h, box = ls.w, ls.h, ls
+			// The children are painted in the element's motion (restored at
+			// the end, with no defer, which nodes without a spring would pay).
+			prevAcc, prevBox = rt.reflowAcc, rt.reflowBox
+			if lx != 0 || ly != 0 || ls.moving {
+				rt.enterReflow(lx, ly, ls)
+			}
+			rt.reflowBox = ls
 		}
 	}
 	x, y := bx+v.offX, by+v.offY
-	w, h := n.lay.W, n.lay.H
 	n.abs = scene.Rect{X: x, Y: y, W: w, H: h}
 	// The hit box is the layout box moved by the element's own offset and its
 	// layout spring, not by its hover, focus or press styles, transitions or
@@ -219,18 +238,21 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 			}
 			sc.AddQuad(q)
 		}
+		// What the element draws inside its box, a canvas, text or an image, is
+		// drawn at its laid-out size: a layout spring moves it, and draws the
+		// box at the size it has reached, but never scales or rewraps it.
 		if visible && n.div != nil && n.div.canvas != nil {
-			rt.paintCanvas(n, x, y, w, h, fg, opacity)
+			rt.paintCanvas(n, x, y, n.lay.W, n.lay.H, fg, opacity)
 		}
 	case kindText:
 		if visible {
-			rt.paintText(n, x, y, w, fg, opacity)
+			rt.paintText(n, x, y, n.lay.W, fg, opacity)
 		}
 	}
 	// A focused editor is painted even when scrolled out of view, so that typing
 	// can scroll its caret back into view (revealCaret).
 	if n.kind == kindEditor && (visible || rt.focusID == n.id) {
-		rt.paintEditor(n, x, y, w, fg, opacity)
+		rt.paintEditor(n, x, y, n.lay.W, fg, opacity)
 	}
 	switch n.kind {
 	case kindIcon:
@@ -244,14 +266,21 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		}
 	case kindImage:
 		if visible {
-			rt.paintImage(n, opacity)
+			rt.paintImage(n, scene.Rect{X: x, Y: y, W: n.lay.W, H: n.lay.H}, opacity)
 		}
 	}
 
-	if len(n.order) == 0 {
+	if len(n.order) == 0 && (box == nil || len(rt.held) == 0) {
+		if box != nil {
+			rt.reflowAcc, rt.reflowBox = prevAcc, prevBox
+		}
 		return
 	}
-	clips := s.OverflowX != OverflowVisible || s.OverflowY != OverflowVisible
+	// A box whose widget clips it while its size moves (see reflowSpec) clips
+	// its children to the size it is drawn at, so they are revealed and covered
+	// by its edge.
+	clips := s.OverflowX != OverflowVisible || s.OverflowY != OverflowVisible ||
+		box != nil && box.clip && box.moving
 	childClip := clip
 	if clips {
 		// The children are clipped to the padding box, inside the border. A
@@ -294,6 +323,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	if n.div != nil && n.div.extent != nil && !rt.inGhost {
 		rt.reportExtent(n)
 	}
+	if box != nil {
+		box.ox, box.oy = x-sx, y-sy
+	}
 	for _, c := range n.order {
 		if c.flags&flagNoDisplay != 0 {
 			continue // nothing of an element hidden by Display is drawn, or hit
@@ -319,6 +351,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		rt.paintNode(c, x-sx, y-sy, childClip, opacity, fg, dt)
 		n.painted = append(n.painted, c)
 	}
+	if box != nil && len(rt.held) > 0 {
+		rt.paintHeld(n, box, x-sx, y-sy, childClip, dt)
+	}
 	if n.st != nil && (s.OverflowX == OverflowScroll || s.OverflowY == OverflowScroll) {
 		rt.paintScrollbars(n, opacity)
 	}
@@ -327,6 +362,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	}
 	if clips {
 		sc.PopClip()
+	}
+	if box != nil {
+		rt.reflowAcc, rt.reflowBox = prevAcc, prevBox
 	}
 }
 
@@ -429,12 +467,12 @@ func (rt *Runtime) paintIcon(n *node, x, y float32, c Color, opacity float32) {
 	})
 }
 
-func (rt *Runtime) paintImage(n *node, opacity float32) {
+// paintImage draws image n into dst, its laid-out box where it is drawn.
+func (rt *Runtime) paintImage(n *node, dst scene.Rect, opacity float32) {
 	img := n.img
 	if img.src == nil {
 		return
 	}
-	dst := n.abs
 	iw, ih := float32(img.src.width), float32(img.src.height)
 	srcR := scene.Rect{W: iw, H: ih}
 	switch img.fit {

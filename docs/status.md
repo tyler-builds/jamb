@@ -162,10 +162,11 @@ The milestone status, and the known limitations and next steps.
   rounded container; a nested one keeps only its own corners, and hit testing
   uses the rectangle (see Borders and rounded clipping). Colors, opacity,
   offset and scale ease with `Transition` or a `Spring`. An element's
-  place in the layout can spring to where a new layout puts it
-  (`LayoutSpring`), but a change of its size is not animated; other layout
-  properties (sizes, padding and so on) animate only through `ui.Animate`,
-  which re-lays out each frame. There is no rotation, and scale is not
+  place and size in the layout can spring to where a new layout puts them
+  (`LayoutSpring`); a size spring draws the element's own box at the size it
+  has reached, while its children keep their final layout. Other layout
+  properties (padding and so on) animate only through `ui.Animate`, which
+  re-lays out each frame. There is no rotation, and scale is not
   hit-tested.
 - **Events.** Bubbling only; there's no capture phase.
 - **Drag and drop.** Files dragged in from outside the app get no drag

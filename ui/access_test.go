@@ -42,6 +42,13 @@ func (r *accessRig) frame() {
 	r.rt.Frame(r.now)
 }
 
+// settle runs frames, 16 ms apart, until the UI is at rest (a second at most).
+func (r *accessRig) settle() {
+	for i := 0; i < 60 && !r.rt.Settled(); i++ {
+		r.frame()
+	}
+}
+
 // tree returns the published snapshot after a frame.
 func (r *accessRig) tree() *access.Tree {
 	r.frame()

@@ -82,10 +82,10 @@ ui.Div().Enter(ui.Grow(0.9), ui.Animation{Duration: 400 * time.Millisecond, Easi
 
 ## Layout springs
 
-`.LayoutSpring(s)` moves an element to a new place in the layout as a spring
-rather than at once: a list reordered, a row added or removed above it, a
-parent that grew. `.ChildrenLayoutSpring(s)` on a parent gives the spring to
-its direct children that set none of their own.
+`.LayoutSpring(s)` moves an element to a new place in the layout, and takes it
+to a new size, as a spring rather than at once: a list reordered, a row added
+or removed above it, a card that grows to show its details. `.ChildrenLayoutSpring(s)`
+on a parent gives the spring to its direct children that set none of their own.
 
 ```go
 list := ui.Div().Column().ChildrenLayoutSpring(ctx.Theme().Motion.ReflowSpring())
@@ -94,15 +94,15 @@ for _, it := range items {
 }
 ```
 
-- The layout is not animated. It puts the element at its new place at once,
-  and paint draws the element where its spring has brought it, adding the
-  difference to its offset as `Offset` is added. Nothing is laid out again
-  while it moves.
-- When the place changes, the element keeps where it is drawn and its
-  velocity and springs from there, with the spring's `Duration` and `Bounce`
-  (see Springs). A move that comes mid-flight bends the motion rather than
-  restarting it. It rests within 0.05 px of its place and then asks for no
-  frames.
+- The layout is not animated. It puts the element at its new place and size
+  at once, and paint draws the element where its spring has brought it, adding
+  the difference to its offset as `Offset` is added, and at the size the spring
+  has reached. Nothing is laid out again while it moves.
+- When the place or the size changes, the element keeps where it is drawn, its
+  size and their velocities, and springs from there, with the spring's
+  `Duration` and `Bounce` (see Springs). A change that comes mid-flight bends
+  the motion rather than restarting it. It rests within 0.05 px of its place
+  and size and then asks for no frames.
 - The place is the element's position in its parent's layout box. A parent
   that moves carries its children, so they do not spring as well; a parent
   with a spring of its own moves them with it. A scroll moves the parent's
@@ -119,8 +119,31 @@ for _, it := range items {
   ghost), and its siblings spring into the gap.
 - Hit testing, `Find`, `DrawnStyle.Bounds` and the accessibility bounds follow
   where the element is drawn, as with `Offset`.
-- A change of size is not animated: the element is drawn at its new size from
-  the frame of the change.
+- A change of size springs the element's own box: its background, border,
+  shadows, corners and focus ring are drawn at the size the spring has reached.
+  What it holds keeps its final layout and moves with the element's drawn
+  origin: text never scales or rewraps, and an `Image`, `Icon` or canvas is
+  drawn at its final size. The children are clipped to the drawn box only when
+  the element clips (`Overflow` hidden or scroll, `ClipContent`, a rounded
+  clip); otherwise they are drawn at their final places, past the box if it is
+  smaller. Hit testing, `Find`, `DrawnStyle.Bounds` and the accessibility
+  bounds use the drawn box.
+- Its siblings take their new places at once, unless they spring too. Under
+  `ChildrenLayoutSpring` they do, so a card that grows and the cards below it
+  move as one:
+
+```go
+cards := ui.Div().Column().Gap(6).ChildrenLayoutSpring(ctx.Theme().Motion.ReflowSpring())
+for _, c := range items {
+	card := ui.Div().Key(c.ID).Column().Padding(10).ClipContent().
+		Child(header(c)).Child(ui.Text(c.Detail))
+	if !open[c.ID] {
+		card.Height(ui.Px(52)) // the details below the header are clipped
+	}
+	cards.Child(card)
+}
+```
+
 - Give each springing element a key. Without one it takes the identity, and
   the place, of whichever sibling is built where it was, so a reorder moves
   nothing; the runtime's warnings (debug builds and `uitest`) name it.
@@ -130,8 +153,17 @@ for _, it := range items {
   that is a `Div` with a layout spring moves with the box the list places it
   in. An overlay is placed by its anchor and does not take one.
 
-The built-in widgets use the theme's `Motion.Reflow` (see Theme motion tokens):
-the toasts of a `Toaster` glide to their places when one leaves.
+The built-in widgets use the theme's `Motion.Reflow` (see Theme motion tokens).
+The toasts of a `Toaster` glide to their places when one leaves. A
+`Collapsible` springs open and closed, and the sections of an `Accordion` move
+with it; a `Sidebar` springs to its new width as it collapses and expands. The
+widget's box clips what it holds while it moves, so its content is revealed and
+covered by the box's edge rather than popping in and out. What the widget
+removes (a closed section's content, a collapsed sidebar's labels) is kept, as
+an `Exit` ghost is, and drawn inside the box while it shrinks, fading out; what
+it adds fades in as the box grows. Once removed it cannot be hit, focused or
+read by assistive technology. Content that the widget is still revealing is
+clipped, and so cannot be clicked where it is not yet drawn.
 
 ## Keyframes (Play)
 
@@ -242,7 +274,7 @@ today's timing:
 | `Enter` | 140 ms; 120 ms | menus, lists, dialogs and drawers; popovers, hover cards and tooltips |
 | `Exit` | 90 ms; 80 ms | the same, as they go |
 | `Spring` | unset | when set, the opacity, offset and scale of those controls move as this spring |
-| `Reflow` | 350 ms, no bounce | the layout spring of the built-in items that move when the layout changes: the toasts of a `Toaster` |
+| `Reflow` | 350 ms, no bounce | the layout spring of the built-in items that move or resize when the layout changes: the toasts of a `Toaster`, a `Collapsible`, the sections of an `Accordion`, a `Sidebar` |
 
 ```go
 t := ui.DarkTheme()
@@ -260,7 +292,9 @@ still turns the motion off.
 `Opacity`, `Offset`, `Scale`, transitions, springs, layout springs, enter and
 exit and keyframes are paint-only, so they cost no layout. An element without a
 layout spring pays one flag check per paint for them; one with a spring keeps a
-little state and asks for frames only while it moves. A timeline costs what `Animate` costs:
+little state, springs its place and size without laying anything out again,
+and asks for frames only while it moves. A widget's removed content, drawn while
+its box shrinks, is painted by that box only until the box comes to rest. A timeline costs what `Animate` costs:
 a render of its function per frame, and a re-layout if what it changes is
 layout. A property that changes the layout (`Width`,
 `Padding`, ...) costs a re-layout of the path to the root on each frame of its
@@ -275,7 +309,9 @@ it waits: no frames are drawn until it ends.
 With Windows' Animation effects turned off (Settings, Accessibility, Visual
 effects), jamb asks for reduced motion (`ctx.ReducedMotion()`). Then `Transition`,
 `Enter` and `Exit` jump to their end, a spring jumps to its target and stops, an
-element with a layout spring takes its new place at once, and smooth scrolling
+element with a layout spring takes its new place and size at once (so a
+`Collapsible`, an `Accordion` and a `Sidebar` open, close, collapse and expand
+at once, and keep nothing drawn after it has gone), and smooth scrolling
 jumps to its target. An `Animate`, `Play` or `AnimateTimeline`
 that is finite jumps to its last frame (the last stop, every step at 1), and a
 repeating one stops at its first frame, so nothing asks for more frames. Delays

@@ -19,6 +19,7 @@ func motionTimingSamples(t *ui.Theme) []ui.Element {
 	return []ui.Element{
 		springSample(t),
 		reorderSample(t),
+		expandCardSample(t),
 		keyframeSample(t),
 		timelineSample(t),
 		loopSample(t),
@@ -85,6 +86,48 @@ func reorderSample(t *ui.Theme) ui.Element {
 		return sample(t, "Layout spring: reorder", ui.Div().Column().Gap(10).Width(ui.Px(240)).
 			Child(list).
 			Child(ui.Button("Shuffle").Key("motion-shuffle").Secondary().Small().OnClick(shuffle)))
+	})
+}
+
+// expandCardSample is a column of cards that grow to show their details. Each card
+// is 52 px tall, clipping what it holds, until its button lets it take the height
+// of its content. ChildrenLayoutSpring gives the cards the theme's Reflow spring,
+// so a card's box springs to its new height, revealing its details with its
+// bottom edge, and the cards below it glide down with it. The details are laid
+// out once, at the card's final size: the text never scales or rewraps.
+func expandCardSample(t *ui.Theme) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		open := ui.Local(ctx, "motion.cardOpen", "")
+		cards := ui.Div().Key("motion-cards").Column().Gap(6).Width(ui.Px(240)).
+			ChildrenLayoutSpring(t.Motion.ReflowSpring())
+		for _, c := range []struct{ name, detail string }{
+			{"Build", "Compiles the app and its examples for each platform, then runs the tests headless."},
+			{"Release", "Tags the version, writes the changelog from its fragments and publishes the notes."},
+			{"Docs", "Checks that every exported name has a comment and that the guides build."},
+		} {
+			on := open.Get() == c.name
+			label, icon := "Show details for "+c.name, icons.ChevronDown
+			if on {
+				label, icon = "Hide details for "+c.name, icons.ChevronUp
+			}
+			card := ui.Div().Key("motion-card-"+c.name).Column().Gap(6).Padding(10).Radius(8).
+				Background(t.Surface).Border(1, t.Border).ClipContent().
+				Child(ui.Div().Row().Align(ui.Center).Height(ui.Px(30)).Shrink(0).
+					Child(ui.Div().Grow(1).Child(ui.Text(c.name).FontSize(13).FontWeight(ui.FontMedium))).
+					Child(ui.IconButton(icon).Label(label).Small().OnClick(func() {
+						if open.Peek() == c.name {
+							open.Set("")
+						} else {
+							open.Set(c.name)
+						}
+					}))).
+				Child(ui.Text(c.detail).FontSize(12).TextColor(t.TextMuted))
+			if !on {
+				card.Height(ui.Px(52)) // the header, with the details below it clipped
+			}
+			cards.Child(card)
+		}
+		return sample(t, "Layout spring: expanding card", cards)
 	})
 }
 

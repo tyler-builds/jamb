@@ -52,7 +52,10 @@ func widgetsSection(t *ui.Theme) ui.Element {
 
 		return section(t, "More widgets",
 			sample(t, "Sidebar, with Collapsed and Toggle",
+				// ChildrenLayoutSpring makes what is beside the sidebar glide as it
+				// collapses and expands, rather than snap to its new place.
 				ui.Div().Row().Height(ui.Px(240)).Border(1, t.Border).Radius(8).ClipContent().
+					ChildrenLayoutSpring(t.Motion.ReflowSpring()).
 					Child(ui.Sidebar(nav,
 						ui.SidebarHeading("Mail"),
 						ui.SidebarItem{Key: "inbox", Label: "Inbox", Icon: icons.Inbox, Badge: 4},
@@ -61,7 +64,7 @@ func widgetsSection(t *ui.Theme) ui.Element {
 						ui.SidebarItem{Key: "files", Label: "Files", Icon: icons.Folder},
 						ui.SidebarItem{Key: "people", Label: "People", Icon: icons.Users, Disabled: true},
 					).Key("demo-sidebar").Label("Sample navigation").Collapsed(collapsed).Toggle()).
-					Child(ui.Div().Padding(12).Child(ui.Textf("Showing %s", nav.Get()).TextColor(t.TextMuted)))),
+					Child(ui.Div().Key("demo-sidebar-page").Padding(12).Child(ui.Textf("Showing %s", nav.Get()).TextColor(t.TextMuted)))),
 			sample(t, "Breadcrumbs, with MaxItems(3)", ui.Div().Gap(10).
 				Child(ui.Breadcrumbs(
 					ui.Crumb{Label: "Home", OnClick: pressed("Home")},
