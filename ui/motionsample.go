@@ -17,10 +17,13 @@ func (h *runtimeHost) Samples(known func(id uint64) bool, visit func(uihost.Samp
 	rt := h.rt()
 	var walk func(n *node, parent uint64, index int, sx, sy float32, exiting, looping bool)
 	walk = func(n *node, parent uint64, index int, sx, sy float32, exiting, looping bool) {
-		if n.flags&flagNoDisplay != 0 {
-			return
+		if n.flags&(flagNoDisplay|flagReplaced) != 0 {
+			return // hidden, or replaced by its match's flight (see Matched)
 		}
 		s := uihost.Sample{ID: n.id, Parent: parent, Key: n.key, Index: index, Exiting: exiting}
+		if n.flags&flagMatched != 0 {
+			s.Matched = n.matchedID()
+		}
 		if n.key == "" && !known(n.id) {
 			s.Label = sampleLabel(n)
 		}

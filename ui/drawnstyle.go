@@ -95,5 +95,10 @@ func (rt *Runtime) drawnStyle(n *node) DrawnStyle {
 			d.Opacity *= o
 		}
 	}
+	if n.flags&flagMatched != 0 && n.kind == kindDiv && n.st != nil && n.st.lay != nil {
+		if m := n.st.lay.match; m != nil && m.flying {
+			d.Background = m.bg // a flight's fill goes from its match's to its own
+		}
+	}
 	return d
 }

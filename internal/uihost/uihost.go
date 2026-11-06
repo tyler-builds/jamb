@@ -16,6 +16,8 @@ type Sample struct {
 	// ID is the element's identity in the runtime, stable across frames as its
 	// state is; Parent is its parent's, 0 for the root.
 	ID, Parent uint64
+	// Matched is the element's shared-element id (ui.DivElement.Matched), or "".
+	Matched string
 	// Key is the element's key, or "". Label names an element without one:
 	// "div", `text "Saved"`, "icon check".
 	Key, Label string

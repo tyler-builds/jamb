@@ -341,6 +341,11 @@ Some motion is not counted:
 - An element that draws nothing of its own (a layout container with no fill,
   border or shadow): the rules look at what it holds. A pop is reported once, on
   the outermost element that came or went with it.
+- An element with a `Matched` id that leaves where another element with the
+  same id is drawn on the next frame (within the jump threshold of its place
+  and size), and that other element: one flies from the other's place (see
+  [Shared-element motion](animation.md#shared-element-motion)), so neither
+  pops. `Sample.Matched` holds the id.
 - An element that moves with its parent: the parent is reported.
 - An element that a repeating animation moves: going back to its start is the
   loop.

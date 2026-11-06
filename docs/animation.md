@@ -165,6 +165,78 @@ it adds fades in as the box grows. Once removed it cannot be hit, focused or
 read by assistive technology. Content that the widget is still revealing is
 clipped, and so cannot be clicked where it is not yet drawn.
 
+## Shared-element motion
+
+`.Matched(id)` gives an element a shared-element id. When a build removes an
+element with the id and adds another one with it, anywhere in the same window,
+the new element starts where the old one was drawn, with its velocity, opacity,
+corner radius and fill, and springs to its own place and size. A thumbnail
+grows into the picture it opens, and shrinks back into its cell when the
+picture closes. Both places are ordinary layout:
+
+```go
+tile := func(i int, w, h float32) *ui.DivElement {
+	id := fmt.Sprintf("photo-%d", i)
+	return ui.Div().Key(id).Matched(id).Size(ui.Px(w), ui.Px(h)).Radius(10).ClipContent().
+		Child(ui.Image(photos[i]).Fit(ui.FitCover).Size(ui.Percent(100), ui.Percent(100)))
+}
+
+stage := ui.Div().Size(ui.Px(320), ui.Px(208))
+if open >= 0 {
+	stage.Child(tile(open, 320, 208)) // the whole stage
+} else {
+	grid := ui.Div().Row().Wrap().Gap(8).
+		Enter(ui.Fade().Grow(0.96), anim).Exit(ui.Fade().Grow(0.96), anim)
+	for i := range photos {
+		grid.Child(tile(i, 156, 100))
+	}
+	stage.Child(grid)
+}
+```
+
+The demo's Motion section has this sample.
+
+- **Scale, not reflow.** The flying element keeps its final layout. Its
+  content is scaled uniformly to cover the moving frame, centered, and clipped
+  to it, so a picture zooms without distortion and nothing is laid out again
+  while it flies. Its own box (fill, border, shadows) is drawn at the frame,
+  with a corner radius and a fill between the old element's and its own; its
+  opacity goes from the old one's to its own the same way. Text inside it is
+  scaled with it. This differs from a layout spring's change of size, which
+  draws only the box at the new size and never scales what it holds.
+- **Above everything.** A flight is drawn after the rest of the window, outside
+  its ancestors' opacity and scale, so an ancestor that fades or scales as it
+  enters or exits (the grid above) never hides it. A flight inside an overlay
+  is drawn after the overlays. It lands, and is drawn in the tree again, once
+  its spring rests and its ancestors' opacity and scale hold still.
+- **Clipping.** It keeps the rectangular clips of where it is going, a scroll
+  viewport's included: a picture that flies into a list is drawn only inside
+  the list. It starts from where the old element was seen, after its
+  ancestors' scale and scroll.
+- **Replaced, not exiting.** The old element does not play its `Exit`, nor does
+  anything in it, and is not drawn inside an exiting ancestor; the new one does
+  not play its `Enter`. Elements whose id has no counterpart in the build play
+  their own `Enter` and `Exit`.
+- **Interruptible.** Matching back mid-flight starts from where the element is
+  drawn, with its velocity. A rebuild that leaves the element's layout alone
+  does not restart its flight; one that moves it bends the flight to the new
+  place.
+- **Spring.** The element's own `LayoutSpring` (or its parent's
+  `ChildrenLayoutSpring`) when it has one, the theme's `Motion.Reflow`
+  otherwise. After it lands, an element with a layout spring moves and resizes
+  as a layout spring does.
+- **Ids are per window.** When two elements drawn at once share an id, the last
+  in tree order is matched, and the runtime warns once (debug builds and
+  `uitest`).
+- Hit testing, `Find`, `DrawnStyle.Bounds` and the accessibility bounds follow
+  the frame, and flights are hit after overlays and before the rest of the
+  window. What the
+  element holds is hit where it is laid out in the frame's unscaled
+  coordinates, as inside any scaled element.
+- `Matched` is on `Div` and `Button`. A text, an icon or an image flies inside
+  a `Div` with the id, as the pictures above do. It is not in `Style`, which
+  would make every element larger, and an overlay does not take one.
+
 ## Keyframes (Play)
 
 `.Play(key, frames, a)` runs an element through keyframes: at each stop's `At`
@@ -293,7 +365,10 @@ still turns the motion off.
 exit and keyframes are paint-only, so they cost no layout. An element without a
 layout spring pays one flag check per paint for them; one with a spring keeps a
 little state, springs its place and size without laying anything out again,
-and asks for frames only while it moves. A widget's removed content, drawn while
+and asks for frames only while it moves. An element without `Matched` pays a
+flag check per paint, and an app with none makes no shared-element state at
+all; a flight springs its frame without laying anything out, is drawn once,
+after the rest of the window, and asks for frames only until it lands. A widget's removed content, drawn while
 its box shrinks, is painted by that box only until the box comes to rest. A timeline costs what `Animate` costs:
 a render of its function per frame, and a re-layout if what it changes is
 layout. A property that changes the layout (`Width`,
@@ -311,7 +386,9 @@ effects), jamb asks for reduced motion (`ctx.ReducedMotion()`). Then `Transition
 `Enter` and `Exit` jump to their end, a spring jumps to its target and stops, an
 element with a layout spring takes its new place and size at once (so a
 `Collapsible`, an `Accordion` and a `Sidebar` open, close, collapse and expand
-at once, and keep nothing drawn after it has gone), and smooth scrolling
+at once, and keep nothing drawn after it has gone), nothing is matched by
+`Matched` (the old element exits and the new one enters by their own `Exit`
+and `Enter`, in place, which reduced motion makes immediate), and smooth scrolling
 jumps to its target. An `Animate`, `Play` or `AnimateTimeline`
 that is finite jumps to its last frame (the last stop, every step at 1), and a
 repeating one stops at its first frame, so nothing asks for more frames. Delays

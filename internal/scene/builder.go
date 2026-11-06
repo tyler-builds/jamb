@@ -61,6 +61,13 @@ func (s *Scene) xf() (Transform, bool) {
 	return Transform{Scale: 1}, false
 }
 
+// Current returns the transform that applies to what is added now: the
+// identity outside any PushTransform.
+func (s *Scene) Current() Transform {
+	t, _ := s.xf()
+	return t
+}
+
 // PushTransform composes t with the current transform for everything added
 // until the matching PopTransform. Transforms are applied on the CPU while
 // building, so renderers only ever see final pixel coordinates.

@@ -578,7 +578,7 @@ Each row lists options that one side has and the other lacks; options both have 
 | Translations | YAML through rust-i18n, also for app strings | Typed `ui.Strings`, chosen from the Windows display language |
 | Actions and keybindings | Typed actions and context predicates; the app supplies any user keymap file | Typed actions and contexts; a built-in JSON keymap file with hot reload |
 | Focus | Focus handles, tab order, a focus trap for any element | Focus handles, tab order, focus-visible and focus-within styles; traps only in `Modal` and `Drawer` |
-| Animation | Transitions, springs, keyframes, sequences, presence, stagger, motion tokens | Transitions, springs, layout springs (an element's place and size), keyframes, timelines, enter and exit animations, delays, stagger, motion tokens; reduced motion honoured |
+| Animation | Transitions, springs, keyframes, sequences, presence, stagger, motion tokens | Transitions, springs, layout springs (an element's place and size), shared-element motion (`Matched`), keyframes, timelines, enter and exit animations, delays, stagger, motion tokens; reduced motion honoured |
 | Icons | 101 icons, plus the Lucide set (about 1,800) on request | The Lucide set (1,903 icons, 1.61.0), each linked only when the app names it, and an `SVG` element |
 | Text selection | Across the text elements of a window; touch selection | Within one text element |
 | Undo history | Public `History` and `UndoHistory` types | Inside text fields and the code editor only |

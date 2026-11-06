@@ -6,8 +6,10 @@ import (
 	"slices"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/ease"
 	"github.com/tyler-builds/jamb/icons"
+	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -20,6 +22,7 @@ func motionTimingSamples(t *ui.Theme) []ui.Element {
 		springSample(t),
 		reorderSample(t),
 		expandCardSample(t),
+		matchedSample(t),
 		keyframeSample(t),
 		timelineSample(t),
 		loopSample(t),
@@ -128,6 +131,75 @@ func expandCardSample(t *ui.Theme) ui.Element {
 			cards.Child(card)
 		}
 		return sample(t, "Layout spring: expanding card", cards)
+	})
+}
+
+// matchedPhotos are the pictures of the shared-element sample: a sky, the
+// ground under it, and a sun, drawn with colored boxes.
+var matchedPhotos = []struct {
+	name             string
+	sky, ground, sun ui.Color
+	sunX             float32 // the sun's center, as a share of the picture's width
+}{
+	{"Dusk", ui.Hex("#f2a07b"), ui.Hex("#3a285c"), ui.Hex("#ffecaa"), 0.3},
+	{"Lake", ui.Hex("#78c8ff"), ui.Hex("#1e5a46"), ui.Hex("#ffffeb"), 0.42},
+	{"Haze", ui.Hex("#c496ff"), ui.Hex("#281e46"), ui.Hex("#ffc8f0"), 0.54},
+	{"Dune", ui.Hex("#ffd678"), ui.Hex("#783c1e"), ui.Hex("#fffadc"), 0.66},
+}
+
+// matchedSample is a grid of four pictures. Clicking one opens it on the whole
+// stage; Back, Escape or a click on it closes it. The tile in the grid and the
+// picture on the stage are two elements with the same Matched id, each laid
+// out where it is: when one replaces the other, it flies from the other's
+// place to its own, scaled to cover its moving frame, so the picture zooms
+// without distortion. The grid fades and shrinks out under it, and back in.
+func matchedSample(t *ui.Theme) ui.Element {
+	return ui.Component(func(ctx *ui.Context) ui.Element {
+		open := ui.Local(ctx, "motion.photo", -1)
+		last := ui.Local(ctx, "motion.photoLast", -1) // the picture last opened, which takes the focus back
+		close := func() { open.Set(-1) }
+		const w, h = 320, 208
+		picture := func(i int, pw, ph float32) *ui.DivElement {
+			p := matchedPhotos[i]
+			id := "motion-photo-" + p.name
+			sun := ph * 0.22
+			return ui.Div().Key(id).Matched(id).Size(ui.Px(pw), ui.Px(ph)).Radius(10).ClipContent().
+				Background(p.ground).Column().Focusable().Role(access.RoleButton).
+				Child(ui.Div().Height(ui.Px(ph * 0.62)).Shrink(0).Background(p.sky)).
+				Child(ui.Div().Absolute().Left(pw*p.sunX-sun/2).Top(ph*0.4-sun/2).
+					Size(ui.Px(sun), ui.Px(sun)).Radius(sun / 2).Background(p.sun)).
+				Child(ui.Div().Absolute().Left(10).Bottom(8).
+					Child(ui.Text(p.name).FontSize(12).FontWeight(ui.FontMedium).TextColor(ui.Hex("#ffffff"))))
+		}
+		stage := ui.Div().Key("motion-stage").Size(ui.Px(w), ui.Px(h))
+		if i := open.Get(); i >= 0 {
+			name := matchedPhotos[i].name
+			stage.Child(picture(i, w, h).Label("Close " + name).AutoFocus().OnClick(close).
+				OnKeyDown(func(e *ui.KeyEvent) {
+					if e.Key == input.KeyEscape {
+						close()
+					}
+				}))
+		} else {
+			const gap = 8
+			grid := ui.Div().Key("motion-grid").Row().Wrap().Gap(gap).Size(ui.Px(w), ui.Px(h)).
+				Enter(ui.Fade().Grow(0.96), ui.Animation{Duration: 200 * time.Millisecond}).
+				Exit(ui.Fade().Grow(0.96), ui.Animation{Duration: 200 * time.Millisecond})
+			for j, p := range matchedPhotos {
+				tile := picture(j, (w-gap)/2, (h-gap)/2).Label("Open " + p.name).OnClick(func() {
+					last.Set(j)
+					open.Set(j)
+				})
+				if j == last.Peek() {
+					tile.AutoFocus()
+				}
+				grid.Child(tile)
+			}
+			stage.Child(grid)
+		}
+		back := ui.Button("Back").Key("motion-photo-back").Secondary().Small().Disabled(open.Get() < 0).OnClick(close)
+		return sample(t, "Shared-element motion: Matched", ui.Div().Column().Gap(10).
+			Child(stage).Child(back))
 	})
 }
 

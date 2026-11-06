@@ -133,3 +133,63 @@ func TestExpandCardSampleGrows(t *testing.T) {
 	u.Settle()
 	rec.Check(t)
 }
+
+// A picture of the shared-element sample opens from its tile: on the frame of
+// the click it is drawn where the tile was, then it grows to the whole stage
+// over many frames. Escape closes it, and it shrinks back into its tile, which
+// takes the focus. The grid fades out and in under it. Nothing pops, jumps or
+// overshoots.
+func TestMatchedSampleZooms(t *testing.T) {
+	u := demoUI(t, PageComponents, "Motion")
+	const key = "motion-photo-Lake"
+	u.Get("motion-photo-back").Perform(access.ActionScrollIntoView) // the sample is below the fold
+	u.Settle()
+	tile := u.Get(key).Bounds()
+	stage := u.Get("motion-stage").Bounds()
+	rec := u.Record()
+	u.ByRole(access.RoleButton, "Open Lake").Click()
+	if b := u.Get(key).Bounds(); abs(b.X-tile.X) > 1 || abs(b.Y-tile.Y) > 1 || abs(b.W-tile.W) > 1 || abs(b.H-tile.H) > 1 {
+		t.Fatalf("on the frame of the click the picture is at %v, want where the tile was, %v", b, tile)
+	}
+	var ws []float32
+	for range 60 {
+		u.Advance(16 * time.Millisecond)
+		if w := u.Get(key).Bounds().W; len(ws) == 0 || w != ws[len(ws)-1] {
+			ws = append(ws, w)
+		}
+	}
+	if len(ws) < 10 {
+		t.Errorf("the picture was drawn at %d widths, want it to grow over 10 or more: %v", len(ws), ws)
+	}
+	u.Settle()
+	if b := u.Get(key).Bounds(); b != stage {
+		t.Errorf("the open picture rests at %v, want the stage, %v", b, stage)
+	}
+	if !u.ByRole(access.RoleButton, "Close Lake").Focused() {
+		t.Errorf("the open picture does not have the focus")
+	}
+	u.Press("escape")
+	u.Settle()
+	if b := u.Get(key).Bounds(); b != tile {
+		t.Errorf("the closed picture rests at %v, want its tile, %v", b, tile)
+	}
+	if !u.ByRole(access.RoleButton, "Open Lake").Focused() {
+		t.Errorf("the tile does not take the focus back")
+	}
+	// Open another and close it with Back, while it still flies.
+	u.ByRole(access.RoleButton, "Open Dune").Click()
+	u.Advance(100 * time.Millisecond)
+	u.Click("motion-photo-back")
+	u.Settle()
+	rec.Check(t)
+	if w := u.Warnings(); len(w) > 0 {
+		t.Errorf("development warnings: %v", w)
+	}
+}
+
+func abs(v float32) float32 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
