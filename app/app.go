@@ -333,7 +333,9 @@ func (a *App) RunE(w Window) error {
 	// A later launch of a single instance app returns here, with its command line
 	// handed over, before any device or font is made.
 	var owned *instanceNames
-	if a.singleInstance {
+	// A headless run is never handed to a running instance, nor takes its
+	// place: it runs on its own, beside the user's app.
+	if a.singleInstance && !headlessOn {
 		var handed bool
 		if owned, handed = a.joinInstance(); handed {
 			return nil

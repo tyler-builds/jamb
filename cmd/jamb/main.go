@@ -40,6 +40,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -125,8 +126,11 @@ func dev(dir string) error {
 	r := &runner{dir: dir, work: work, geometry: filepath.Join(work, "geometry"), overlay: overlay,
 		state: filepath.Join(work, "state.json"), modRoot: moduleRoot(dir)}
 
+	// SIGTERM too, so that a script or an agent that ends jamb dev with kill
+	// does not leave the app running, which a headless app (JAMB_HEADLESS=1)
+	// would do without anyone seeing it.
 	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
 	if err := r.refreshWatchList(); err != nil {
 		return err

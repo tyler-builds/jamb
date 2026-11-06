@@ -25,6 +25,9 @@ import (
 // it, is not reported; a failure that Windows raises for the toast is printed on
 // stderr.
 func Notify(n Notification) error {
+	if headlessOn {
+		return headlessNotify(n)
+	}
 	s, err := notifyReady("app.Notify")
 	if err != nil {
 		return err

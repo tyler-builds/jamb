@@ -125,6 +125,10 @@ func (t *Tray) Show() {
 			fmt.Fprintln(os.Stderr, "jamb: NewTray: more than 65535 tray icons")
 			return
 		}
+		if headlessOn {
+			fmt.Fprintln(os.Stderr, "jamb: headless: the tray icon is not shown")
+			return
+		}
 		n := newTrayIcon(t)
 		if err := n.Show(); err != nil {
 			fmt.Fprintln(os.Stderr, "jamb: tray icon:", err)

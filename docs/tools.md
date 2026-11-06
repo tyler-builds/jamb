@@ -13,6 +13,8 @@ These environment variables work with any jamb app, with no code changes:
 | `JAMB_INSPECT=1` | Opens the visual inspector for the first window at start, if the program links it. Under `jamb dev` the inspector is linked, and Ctrl+Shift+I opens it (see [Visual inspector](#visual-inspector)). |
 | `JAMB_CONTROL=1` | Opens the control channel, which `jamb ctl` and coding agents use to read and drive the running app, if the program links it. `jamb dev` links it and sets this (see [Control channel](#control-channel)). |
 | `JAMB_SCENE=NAME` | Opens the first window on the scene called NAME instead of the app's own root, in a program built with the `jambdev` tag, as `jamb dev` builds (see [Scenes](#scenes)). |
+| `JAMB_HEADLESS=1` | Runs the app with no window on the screen: its windows exist in memory and the CPU renderer draws them, so nothing takes the focus or appears on the desktop (see [Headless runs](#headless-runs)). |
+| `JAMB_HEADLESS_SCALE=S` | The display scale of a headless run's windows, from 0.5 to 4; 1 by default. |
 | `JAMB_SCRIPT="idle; shot a.png; click 600 400; type hi; key enter; idle; shot b.png; exit"` | Drives the app with synthetic input and saves screenshots. This is how the demo was verified. Besides `click`, the steps include `rclick X Y` (the right button, which opens a context menu), `down X Y`, `move X Y` and `up X Y` for drags, and `drop X Y PATH...` for files dropped from the desktop. The `drop` step goes through the same handler as a real drop, but the Windows message handling itself is only exercised by a real drop. `window N` makes the following steps, and the `shot`s, target the Nth window opened (1-based); the first window is the default. `type TEXT` types everything after the one space that follows `type`, spaces included. `devicelost` simulates a GPU device loss; see [GPU device loss](architecture.md#gpu-device-loss). `mark` sets a loop point and `repeat N` goes back to the last mark N more times, or loops until the window closes with `repeat 0`; a `repeat` needs a `mark` before it. `a11ydump PATH` writes the accessibility tree as text (see [Accessibility](accessibility.md#accessibility)). |
 | `JAMB_STRESS=rebuild\|paint` | Measures sustained frame cost, allocation and GC, prints the results, then exits. Its frame times come from the performance counter. |
 | `JAMB_FRAMESTATS=PATH` | Records every frame of the first window, from its first frame until it closes, and writes `PATH` with one row per frame (CPU time, the interval between Presents, whether the frame rebuilt, updated or repainted the tree, and whether it came with no idle gap). The summary's present interval covers only the frames with no idle gap, so a pause between frames does not count as an interval. It writes `PATH-input.csv` beside it, with the latency of each input event that caused a frame, from its arrival to the start and the return of `Present`, and prints a summary to stderr. Time to the screen is not measured. |
@@ -27,7 +29,12 @@ These environment variables work with any jamb app, with no code changes:
 `delete`, `insert`, `space`, the arrows, `home`, `end`, `pageup`, `pagedown`,
 `menu` (the Apps key), `f1` to `f12`, `a` to `z`, `0` to `9`, `=` and `-`, with the modifiers `ctrl`,
 `shift`, `alt` and `super`. An unknown key or modifier stops the script with an
-error when the script is loaded. `idle` waits for `rt.Settled()`, which ignores
+error when the script is loaded. In `move`, `click`, `rclick`, `down`, `up` and
+`scroll`, `#KEY` in place of `X Y` aims at the center of the element with that
+key, where it is when the step runs: `click #save`, `scroll #list 300`. A key
+that no element has stops the program with an error. `tree PATH` writes the
+accessibility tree as JSON, its nodes as the control channel's `tree` op gives
+them, with their keys, roles, names, states and bounds. `idle` waits for `rt.Settled()`, which ignores
 repeating animations, so a screen with a spinner does not hold the script, and
 for every `ui.Query` fetch in flight or waiting to retry (`rt.Fetching()`), so a
 screenshot after it shows the fetched data. `wait N` pauses the script for N
@@ -273,6 +280,46 @@ Windows). Beside the socket, `PID.json` describes the app: its executable, its
 working directory and when it started. The app removes both when it ends; `jamb
 dev` removes them when it restarts the app, and the next app to open its channel
 removes those that a crashed app left.
+
+## Headless runs
+
+`JAMB_HEADLESS=1` runs an app with no window on the screen. Its windows exist
+only in memory, the CPU renderer draws their frames, and nothing takes the
+keyboard focus or appears on the desktop, so you can keep working while an
+agent runs and drives the app. Everything else is the app as it runs in a
+window: `JAMB_SCRIPT`, `JAMB_SCENE`, the control channel, `jamb ctl shot` and
+`jamb dev`'s restarts.
+
+```
+# One scripted run: build, open on a scene, take a screenshot and the tree, quit.
+JAMB_HEADLESS=1 JAMB_SCENE=Notes/Many \
+  JAMB_SCRIPT="idle; shot many.png; click #preview-toggle; idle; tree tree.json; exit" jamb dev
+
+# A live run that jamb ctl drives, rebuilt on each save.
+JAMB_HEADLESS=1 jamb dev &
+jamb ctl scene name=Notes/Empty
+jamb ctl click key=preview-toggle
+jamb ctl shot path=$PWD/after.png
+```
+
+- `jamb dev` stops when the app exits, so a script that ends with `exit` makes
+  it a one-shot run. `jamb dev` also stops the app when it gets SIGTERM, so a
+  headless app never outlives it unseen.
+- A run looks the same on every machine: the platform's settings are the
+  defaults (light mode, 100% text, animations on; `JAMB_DARK`,
+  `JAMB_TEXT_SCALE` and the other overrides above still apply), the scale is
+  `JAMB_HEADLESS_SCALE` (1 by default), and the fonts are the ones the app
+  bundles or the system has.
+- Frames are drawn when something changes, and at 60 per second while
+  something animates, on the real clock.
+- A headless run does not touch the system: the clipboard is the process's
+  own, file dialogs answer as canceled and message boxes with no button, links
+  are printed instead of opened, notifications are printed, and no tray icon,
+  jump list, recent document or AppID is registered. A single-instance app runs
+  on its own, beside the user's running copy.
+- Without `jamb dev`, a program runs headless when it links package `devtools`
+  (`import _ "github.com/tyler-builds/jamb/devtools"`) or needs neither scenes
+  nor the control channel.
 
 ## Scenes
 

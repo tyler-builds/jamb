@@ -26,7 +26,7 @@ type gpuResult struct {
 // Creating it loads the graphics driver, which takes longer than anything
 // else at startup, so it overlaps with creating the first window and parsing
 // fonts. A Direct3D 11 device may be created on any thread.
-func prepareDevice() {
+func osPrepareDevice() {
 	gpuPending = make(chan gpuResult, 1)
 	go func() {
 		dev, err := d3d11.NewDevice()
@@ -34,24 +34,24 @@ func prepareDevice() {
 	}()
 }
 
-func runPlatform(start func() error) error { return windows.Run(start) }
+func osRunPlatform(start func() error) error { return windows.Run(start) }
 
-func openPlatform(opts platform.WindowOptions, h platform.Handler) (platform.Window, error) {
+func osOpenPlatform(opts platform.WindowOptions, h platform.Handler) (platform.Window, error) {
 	return windows.Open(opts, h)
 }
 
-func postUI(fn func()) { windows.Post(fn) }
+func osPostUI(fn func()) { windows.Post(fn) }
 
 // releaseWindowSession does nothing: windows are placed by their geometry here.
-func releaseWindowSession() {}
+func osReleaseWindowSession() {}
 
-func onUIThread() bool { return windows.OnUIThread() }
+func osOnUIThread() bool { return windows.OnUIThread() }
 
-func quitUI() { windows.Quit() }
+func osQuitUI() { windows.Quit() }
 
 // releaseDevice releases the shared device and its objects, as a removal
 // leaves them; see simulateDeviceLoss.
-func releaseDevice() {
+func osReleaseDevice() {
 	if gpu != nil {
 		gpu.ReleaseDevice()
 	}
@@ -59,18 +59,18 @@ func releaseDevice() {
 
 // rebuildDevice recreates the shared device after a loss. Each window then
 // recreates its swap chain; see rebuildGPU.
-func rebuildDevice() error { return gpu.Recover() }
+func osRebuildDevice() error { return gpu.Recover() }
 
 // gpuAdapter names the adapter the shared device runs on, for the recovery
 // message: the hardware GPU, or WARP after a fallback.
-func gpuAdapter() string {
+func osGpuAdapter() string {
 	if gpu == nil {
 		return ""
 	}
 	return gpu.Adapter()
 }
 
-func newRenderer(w platform.Window, width, height int) (render.Renderer, error) {
+func osNewRenderer(w platform.Window, width, height int) (render.Renderer, error) {
 	if gpu == nil {
 		var res gpuResult
 		if gpuPending != nil {
@@ -96,11 +96,11 @@ func newRenderer(w platform.Window, width, height int) (render.Renderer, error) 
 
 // readPlatformSettings reads the operating system's accessibility and text
 // settings (see platform.Settings).
-func readPlatformSettings() platform.Settings { return windows.ReadSettings() }
+func osReadPlatformSettings() platform.Settings { return windows.ReadSettings() }
 
 // clockNow returns the performance clock that frame statistics and input latency
 // use, in nanoseconds (see windows.Clock).
-func clockNow() int64 { return windows.Clock() }
+func osClockNow() int64 { return windows.Clock() }
 
 // processMemory returns the process's private bytes and working set (see
 // windows.ProcessMemory).

@@ -1,15 +1,18 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/png"
 	"os"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/ui"
@@ -91,7 +94,10 @@ import (
 // `window N` step; a shot captures the target too:
 //
 //	window N        target window N from now on (1 is the first window opened)
-//	move X Y        move the pointer to logical (X, Y)
+//	move X Y        move the pointer to logical (X, Y); in move, click, rclick,
+//	                down, up and scroll, #KEY in place of X Y aims at the center
+//	                of the element with that key, and a key no element has
+//	                stops the program with an error
 //	click X Y       press and release the left button at (X, Y)
 //	rclick X Y      press and release the right button at (X, Y), which opens a context menu
 //	down X Y / up X Y
@@ -117,6 +123,8 @@ import (
 //	                allow. A repeat needs a mark before it in the script
 //	shot PATH       save a PNG screenshot of the next frame
 //	a11ydump PATH   write the accessibility tree as text (see ui.Runtime.AccessTree)
+//	tree PATH       write the accessibility tree as JSON, its nodes as the control
+//	                channel's tree op gives them
 //	exit            close the window
 //
 // Example: JAMB_SCRIPT="idle; shot a.png; click 600 400; idle; shot b.png; exit"
@@ -338,6 +346,7 @@ type step struct {
 	n     float32
 	arg   string
 	paths []string
+	key   string // the element the step aims at, for #KEY in place of X Y
 }
 
 type script struct {
@@ -403,16 +412,28 @@ func parseScript(src string) (*script, error) {
 			return float32(v), nil
 		}
 		var err error
-		switch op {
-		case "move", "click", "rclick", "down", "up":
-			if st.x, err = parse(0); err == nil {
+		// #KEY in place of X Y aims the step at the center of the element with
+		// that key, wherever it is when the step runs.
+		at := func() error {
+			if len(nums) > 0 && strings.HasPrefix(nums[0], "#") {
+				if st.key = nums[0][1:]; st.key == "" {
+					return fmt.Errorf("JAMB_SCRIPT step %q: # needs an element's key after it", raw)
+				}
+				nums = slices.Insert(nums[1:], 0, "0", "0")
+			}
+			x, err := parse(0)
+			if err == nil {
+				st.x = x
 				st.y, err = parse(1)
 			}
+			return err
+		}
+		switch op {
+		case "move", "click", "rclick", "down", "up":
+			err = at()
 		case "scroll":
-			if st.x, err = parse(0); err == nil {
-				if st.y, err = parse(1); err == nil {
-					st.n, err = parse(2)
-				}
+			if err = at(); err == nil {
+				st.n, err = parse(2)
 			}
 		case "drop":
 			if st.x, err = parse(0); err == nil {
@@ -424,7 +445,7 @@ func parseScript(src string) (*script, error) {
 			st.paths = nums[min(2, len(nums)):]
 		case "wait":
 			st.n, err = parse(0)
-		case "key", "type", "shot", "a11ydump":
+		case "key", "type", "shot", "a11ydump", "tree":
 			if st.arg == "" {
 				err = fmt.Errorf("JAMB_SCRIPT step %q: missing argument", raw)
 			} else if op == "key" {
@@ -449,7 +470,7 @@ func parseScript(src string) (*script, error) {
 			}
 		case "idle", "exit", "devicelost":
 		default:
-			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, rclick, down, up, scroll, key, type, drop, wait, idle, devicelost, mark, repeat, shot, a11ydump or exit", op)
+			err = fmt.Errorf("JAMB_SCRIPT: unknown step %q; expected window, move, click, rclick, down, up, scroll, key, type, drop, wait, idle, devicelost, mark, repeat, shot, a11ydump, tree or exit", op)
 		}
 		if err != nil {
 			return nil, err
@@ -557,6 +578,14 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 			return false
 		}
 		st := s.steps[s.i]
+		if st.key != "" {
+			r, ok := rt.Find(st.key)
+			if !ok {
+				fmt.Fprintf(os.Stderr, "jamb: JAMB_SCRIPT: no element has the key %q\n", st.key)
+				os.Exit(1)
+			}
+			st.x, st.y = r.X+r.W/2, r.Y+r.H/2
+		}
 		arrived := clockNow() // an input step's event arrives when the step injects it
 		switch st.op {
 		case "move":
@@ -628,6 +657,10 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 			if err := os.WriteFile(st.arg, []byte(rt.AccessTree().Dump()), 0o644); err != nil {
 				fmt.Fprintln(os.Stderr, "jamb: a11ydump failed:", err)
 			}
+		case "tree":
+			if err := writeTreeJSON(st.arg, rt, w.Scale()); err != nil {
+				fmt.Fprintln(os.Stderr, "jamb: tree failed:", err)
+			}
 		case "window":
 			s.target = int(st.n)
 			t := s.current()
@@ -654,4 +687,19 @@ func (s *script) afterDraw(h *host, w platform.Window) bool {
 		}
 	}
 	return false
+}
+
+// writeTreeJSON writes the window's accessibility tree to path as JSON: its
+// nodes depth first, in reading order, as the control channel reports them.
+func writeTreeJSON(path string, rt *ui.Runtime, scale float32) error {
+	nodes := []ctlNode{}
+	rt.AccessTree().Walk(func(n *access.Node) bool {
+		nodes = append(nodes, ctlNodeOf(n, scale))
+		return true
+	})
+	b, err := json.MarshalIndent(map[string]any{"nodes": nodes}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(b, '\n'), 0o644)
 }
