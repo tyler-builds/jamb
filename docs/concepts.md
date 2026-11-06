@@ -66,7 +66,10 @@ ui.Icon(icons.Folder).Size(16).Color(c)          // color defaults to the inheri
                                                  // icons are the Lucide set, icons.<CamelName>; see Icons in drawing.md
 ui.Image(src).Size(ui.Px(34), ui.Px(34)).Radius(17).Fit(ui.FitCover)
                                                  // src := ui.MustImage(data): PNG, JPEG, WebP or GIF; an animated
-                                                 // GIF plays while drawn, and stays on its first frame under reduced motion
+                                                 // GIF plays while drawn, and stays on its first frame under reduced motion;
+                                                 // a still image drawn smaller than its pixels is resampled once to its
+                                                 // device size (a large one off the UI thread), so a 128 px icon stays
+                                                 // sharp at 36 px; while its size changes it waits until the size settles
 ui.Button("Save").Icon(icons.Check).Secondary().Small().OnClick(fn)   // Primary|Secondary|Ghost|Danger; Small|Large
 ui.Button("See all").IconEnd(icons.ArrowRight).Ghost()                // the icon after the label
 ui.IconButton(icons.Bell)

@@ -50,6 +50,10 @@ type nodeState struct {
 
 	// imageStart is when an animated image was first drawn (see imageTexture).
 	imageStart time.Time
+	// fitSize is the device size a still image was last drawn at, and fitSizeAt
+	// when it took that size (see fitImage).
+	fitSize   [2]int
+	fitSizeAt time.Time
 	// canvas is a canvas's drawing (see paintCanvas).
 	canvas *canvasState
 	// sel is the selection of a selectable text (see Selectable).

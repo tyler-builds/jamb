@@ -7,6 +7,7 @@ import (
 	"image/draw"
 	_ "image/jpeg" // register decoders for ImageFromBytes
 	_ "image/png"
+	"sync"
 
 	_ "golang.org/x/image/webp"
 
@@ -52,6 +53,10 @@ type ImageSource struct {
 	// is the GIF's loop count: 0 repeats forever, -1 plays once.
 	frames []imageFrame
 	loops  int
+
+	// fits are copies resampled to the sizes the image is drawn at (see fitImage).
+	fitMu sync.Mutex
+	fits  []fittedTexture
 }
 
 // Animated reports whether the image is an animated GIF.
