@@ -15,7 +15,8 @@ follows CSS Flexbox's automatic minimum size of flex items
 - **Containers keep their children's min-content widths.** A column or a wrapping row
   takes the largest of its children's, and a row takes their sum, with the gaps and the padding.
 - **Opt-outs.** `Truncate()` sets the minimum to zero, so the text stays on one line
-  and shrinks with an ellipsis. `NoWrap()` keeps the full width of the text, since it
+  and shrinks with an ellipsis; so do `TruncateMiddle()` and `TruncateHead()` (see
+  [text.md](text.md#truncation-and-line-limits)). `NoWrap()` keeps the full width of the text, since it
   is one line. Any explicit `MinWidth` replaces the automatic minimum. An item that
   clips its overflow (`ScrollX`, `ScrollY`, `ClipContent`) has no automatic minimum.
 - **A fixed `Width` is the item's floor**, as it was before this rule: the item does

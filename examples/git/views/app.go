@@ -318,7 +318,7 @@ func (a *App) statusBar() ui.Element {
 		return ui.StatusBar().Label("Repository status").
 			Start(ui.Div().Row().Align(ui.Center).Gap(6).
 				Child(ui.Icon(icons.GitBranch).Size(13).Color(t.TextMuted)).Child(ui.Text(head)),
-				ui.Text(info.Root).Truncate()).
+				ui.Text(info.Root).TruncateMiddle()).
 			End(end...)
 	})
 }

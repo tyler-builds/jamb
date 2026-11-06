@@ -43,7 +43,7 @@ func (a *App) diffView(r *store.Repo, target *diffTarget) ui.Element {
 			Child(ui.Div().Width(ui.Px(1)).Height(ui.Px(16)).Background(t.Border)).
 			Child(statusMark(t, target.file.Status)).
 			Child(ui.Div().Row().MinWidth(ui.Px(0)).Grow(1).
-				Child(ui.Text(dir).TextColor(t.TextSubtle).Truncate()).
+				Child(ui.Text(dir).TextColor(t.TextSubtle).TruncateMiddle()).
 				Child(ui.Div().Shrink(0).Child(ui.Text(base).Medium()))).
 			Child(ui.Text(target.commit.Short()).Mono().FontSize(12).TextColor(t.TextSubtle))
 		var body ui.Element

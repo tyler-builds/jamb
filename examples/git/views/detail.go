@@ -156,7 +156,7 @@ func (a *App) files(t *ui.Theme, r *store.Repo, d repo.Details) ui.Element {
 			return ui.Div().Row().Align(ui.Center).Gap(8).Grow(1).MinWidth(ui.Px(0)).
 				Child(statusMark(t, f.Status)).
 				Child(ui.Div().Row().Grow(1).MinWidth(ui.Px(0)).
-					Child(ui.Text(dir).TextColor(t.TextSubtle).Truncate()).
+					Child(ui.Text(dir).TextColor(t.TextSubtle).TruncateMiddle()).
 					Child(ui.Div().Shrink(0).Child(ui.Text(base)))).
 				Child(counts)
 		}).

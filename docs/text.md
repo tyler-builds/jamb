@@ -96,6 +96,37 @@ ui.Text(body).HighlightMatches(query, ui.Highlight{Background: t.AccentSoft, Col
   in color. Fonts with only SVG color glyphs are drawn in one color.
 - Rich text is display-only. `TextArea` stays single-style.
 
+## Truncation and line limits
+
+A text wraps to its box by default. Four calls limit it instead, and the last of them wins:
+
+```go
+ui.Text(title).Truncate()           // one line: "A long title th…"
+ui.Text(path).TruncateMiddle()      // one line: "C:/Users/alex/…/views/app.go"
+ui.Text(path).TruncateHead()        // one line: "…/examples/git/views/app.go"
+ui.Text(body).MaxLines(3)           // wraps, three lines at most, "…" ending the third
+```
+
+- `Truncate`, `TruncateMiddle` and `TruncateHead` keep the text on one line and set its
+  minimum width to zero, so it gives up room in a shrinking row (see [layout.md](layout.md)).
+  `TruncateMiddle` keeps both ends, about half the room each, as AppKit's
+  `NSLineBreakByTruncatingMiddle` does; use it for file paths and names. `TruncateHead`
+  keeps the end. Line breaks in the text show as spaces, and spaces next to the "…" are
+  left out with the middle.
+- `MaxLines(n)` wraps and stops after `n` lines, with "…" ending the last when more would
+  follow, as CSS `line-clamp` does. The text measures at most `n` lines tall. `MaxLines(0)`
+  removes the limit.
+- A text that fits is drawn as it is. One that does not is cut between grapheme clusters
+  (a letter with its accents, a whole emoji), also inside a word too wide for the box, and
+  is cut again to fit whenever its width changes.
+- Only the drawing is cut. Selecting and copying a `Selectable` text, and its accessible
+  name, keep the whole string; a selection that covers hidden characters covers the "…" that
+  stands for them. Show the whole text on hover with a `Tooltip` on the text's parent where
+  it matters.
+- Rich text truncates the same way. The "…" takes the style of the text it follows (or, at
+  the head, the text after it).
+- Text fields scroll their text instead and have no truncation.
+
 ## Selectable text
 
 Text and rich text are not selectable by default, as labels in Windows apps are
