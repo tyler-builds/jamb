@@ -283,6 +283,89 @@ u.Advance(time.Second)
 u.ByRole(access.RoleTooltip, "Add one") // fails if the tooltip is not shown
 ```
 
+## Motion
+
+A test can check that the UI moves well: that nothing pops in or out, jumps,
+is cut short or keeps moving where a person would notice. `u.Record()` starts
+recording the frames the UI runs, and `rec.Check(t)` fails the test on what it
+finds:
+
+```go
+rec := u.Record()
+u.Click("open")       // the popover fades in
+u.Settle()
+u.Press("escape")     // and out
+u.Settle()
+rec.Check(t)
+```
+
+Every frame from the one shown at `Record` is kept until `rec.Stop()` or the
+next `Record`: those of actions, `Frame`, `Advance`, `Settle`, `WaitFor` and
+`Screenshot`. Each holds, for every element drawn, its bounds, opacity, scale
+and the rest of its `ui.DrawnStyle`, and whether the frame followed an input (a
+click, a key, typing, a hover, a wheel turn or an accessibility action). Input
+sent through `u.Runtime()` is not seen as input; call `rec.MarkInput()` before
+it. A UI that is not recording samples nothing, so recording costs nothing
+until a test asks for it.
+
+Elements are followed by their identity in the runtime, the one their state
+keeps: a key, or their place among their siblings. Findings name them by the
+keys of their keyed ancestors and their own, then, for an element with no key,
+its place below the nearest key: `toaster/jamb.toast:1`,
+`settings/div[1]/text "Saved"`.
+
+| Finding | What a person sees |
+|---|---|
+| `uitest.PopIn` | an element appears at full opacity and size, with no transition |
+| `uitest.PopOut` | an element disappears at full opacity and size, with no transition |
+| `uitest.CutExit` | an element is removed partway through its exit fade, while it is still seen |
+| `uitest.Jump` | an element's position or size changes in one frame, while something animates and not following an input |
+| `uitest.Overshoot` | a motion passes where it comes to rest and comes back, with no input during it |
+| `uitest.NeverSettles` | the UI still animates at the end of the recording, long after the last input |
+
+The thresholds:
+
+| Rule | Threshold |
+|---|---|
+| pops | opacity 0.5 or more; 24 × 24 logical pixels or more; no change of opacity, scale or size on the next frame |
+| cut exit | last drawn above opacity 0.05, and its last step to nothing is bigger than the fade's step before it |
+| jump | 12 logical pixels or more in one frame, and more than 3 times the element's change on the frames before and after it (taken as at least 1 px) |
+| overshoot | 2 logical pixels or more past where the motion rests; a motion ends after 3 frames without change |
+| never settles | not settled (see `rt.Settled()`) at the last frame, 1 s or more after the last input |
+
+Some motion is not counted:
+
+- An element moved by a scroll, or brought into view by one or by the layout,
+  as it was in the tree all along. Hiding an element with `Display(false)`
+  and showing it again counts as removing and adding it.
+- An element that draws nothing of its own (a layout container with no fill,
+  border or shadow): the rules look at what it holds. A pop is reported once, on
+  the outermost element that came or went with it.
+- An element that moves with its parent: the parent is reported.
+- An element that a repeating animation moves: going back to its start is the
+  loop.
+- An element seen by no one: clipped away, or at opacity 0.05 or less.
+
+`rec.Findings()` returns what was found without failing, for a test that only
+reports it. `rec.Frames()` has every frame, to look into a finding.
+
+When a finding is intended, or waits for a fix, allow it with the reason, and
+`Check` logs it instead of failing. An `Allow` matches findings of its `Kind`
+on elements whose name contains its `Element` (`""` matches any). A rule with
+no reason, and a rule that matched no finding, fail the test, so stale rules
+come out:
+
+```go
+rec.Check(t,
+	uitest.Allow{Kind: uitest.Overshoot, Element: "bouncy",
+		Reason: "the tile springs with Bounce 0.5 by design"},
+	uitest.Allow{Kind: uitest.PopIn, Element: "panel:",
+		Reason: "a tab shows its panel at once"})
+```
+
+The demo's `examples/demo/views/motion_test.go` records its dialogs, toasts,
+tooltips, pickers and pages this way.
+
 ## The clipboard
 
 The UI has a clipboard of its own, the in-process one a headless runtime

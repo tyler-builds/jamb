@@ -6,6 +6,7 @@ import (
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/access/accesstest"
+	"github.com/tyler-builds/jamb/ui/uitest"
 )
 
 // The motion samples of the Components page show their labels, and the delayed
@@ -31,4 +32,35 @@ func TestMotionSamplesShowAndDelayedEntranceFinishes(t *testing.T) {
 	if len(r.warnings) > 0 {
 		t.Errorf("development warnings: %v", r.warnings)
 	}
+}
+
+// demoUI renders the demo app in a uitest UI on page, with the Components page
+// filtered to the sections that match query, and lets it settle.
+func demoUI(t *testing.T, page Page, query string) *uitest.UI {
+	t.Helper()
+	s := NewStore()
+	s.Page.Set(page)
+	s.SectionQuery.Set(query)
+	u := uitest.New(t, App(s), uitest.Size(1200, 900), uitest.Theme(DemoDarkTheme))
+	u.Settle()
+	return u
+}
+
+// The motion samples move as they should when played: the springs, keyframes,
+// timeline, stagger and delayed entrance neither pop nor jump, and all settle.
+func TestMotionSamplesMoveSmoothly(t *testing.T) {
+	u := demoUI(t, PageComponents, "Motion")
+	rec := u.Record()
+	u.Click("motion-move")
+	u.Settle()
+	u.Click("motion-move")
+	u.Advance(100 * time.Millisecond)
+	u.Click("motion-move") // retargeted mid-flight
+	u.Settle()
+	for _, key := range []string{"motion-play-keyframes", "motion-play-timeline", "motion-play-stagger", "motion-play-delay"} {
+		u.Click(key)
+		u.Settle()
+	}
+	rec.Check(t, uitest.Allow{Kind: uitest.Overshoot, Element: "section:Motion",
+		Reason: "the Bounce 0.5 spring tile passes its target by design; the Bounce 0 one beside it does not"})
 }
