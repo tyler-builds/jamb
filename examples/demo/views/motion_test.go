@@ -76,29 +76,27 @@ func TestPageSwitchMotion(t *testing.T) {
 	rec.Check(t, uitest.Allow{Kind: uitest.PopIn, Reason: why}, uitest.Allow{Kind: uitest.PopOut, Reason: why})
 }
 
-// Tabs switch their panel at once, and a Collapsible, an Accordion and a
-// collapsing Sidebar show and hide what they hold at once: they have no
-// open and close motion yet.
+// Tabs switch their panel at once. A Collapsible and an Accordion spring open
+// and closed, revealing and covering what they hold, and a collapsing Sidebar
+// springs to its new width (the theme's Reflow spring).
 func TestDisclosureMotion(t *testing.T) {
-	const notYet = "Collapsible, Accordion and Sidebar open and close with no motion; " +
-		"docs/comparison-gpui.md lists their animated open and close as a gap"
 	u := demoUI(t, PageComponents, "Navigation and layout")
 	rec := u.Record()
 	u.ByRole(access.RoleTab, "Beta").Click()
 	u.Settle()
-	u.ByRole(access.RoleButton, "Advanced options").Click()
-	u.Settle()
-	u.ByRole(access.RoleButton, "Email alerts").Click()
-	u.Settle()
+	for _, b := range []string{"Advanced options", "Email alerts", "Text alerts", "Advanced options", "Text alerts"} {
+		u.ByRole(access.RoleButton, b).Click()
+		u.Settle()
+	}
 	rec.Check(t,
 		uitest.Allow{Kind: uitest.PopIn, Element: "panel:beta", Reason: "a tab shows its panel at once, by design"},
-		uitest.Allow{Kind: uitest.PopOut, Element: "panel:alpha", Reason: "a tab shows its panel at once, by design"},
-		uitest.Allow{Kind: uitest.PopIn, Element: "nav.advanced", Reason: notYet},
-		uitest.Allow{Kind: uitest.PopOut, Element: "nav.emailSection", Reason: notYet})
+		uitest.Allow{Kind: uitest.PopOut, Element: "panel:alpha", Reason: "a tab shows its panel at once, by design"})
 
 	u = demoUI(t, PageComponents, "More widgets")
 	rec = u.Record()
 	u.ByRole(access.RoleButton, "Collapse navigation").Click()
 	u.Settle()
-	rec.Check(t, uitest.Allow{Kind: uitest.PopOut, Element: "demo-sidebar", Reason: notYet})
+	u.ByRole(access.RoleButton, "Expand navigation").Click()
+	u.Settle()
+	rec.Check(t)
 }

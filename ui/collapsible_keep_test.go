@@ -28,6 +28,7 @@ func TestCollapsibleKeepMountedStateSurvivesClosing(t *testing.T) {
 		t.Fatalf("the content of a section that was never opened is in the tree")
 	}
 	r.clickKey(t, "details/header")
+	r.settle() // the section springs open; its content is clipped until it has
 	r.clickKey(t, "add")
 	r.clickKey(t, "add")
 	if !namedInTree(r, "Count 2") {
@@ -38,6 +39,7 @@ func TestCollapsibleKeepMountedStateSurvivesClosing(t *testing.T) {
 		t.Fatalf("the content of the closed section is in the accessibility tree")
 	}
 	r.clickKey(t, "details/header") // open again
+	r.settle()
 	if !namedInTree(r, "Count 2") {
 		t.Fatalf("the count was lost when the section closed")
 	}
@@ -54,9 +56,11 @@ func TestCollapsibleDefaultDiscardsContentWhenClosed(t *testing.T) {
 	open := NewSignal(false)
 	r := newAccessRig(func(ctx *Context) Element { return keptSection(open, false) })
 	r.clickKey(t, "details/header")
+	r.settle()
 	r.clickKey(t, "add")
 	r.clickKey(t, "details/header") // close
 	r.clickKey(t, "details/header") // open again
+	r.settle()
 	if !namedInTree(r, "Count 0") {
 		t.Fatalf("without KeepMounted the count should start again at 0 on opening")
 	}

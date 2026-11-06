@@ -269,6 +269,7 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 		st := resolveSidebar(ctx, s.styles)
 		cur := s.selected.Get()
 		collapsed := s.collapsed != nil && s.collapsed.Get()
+		reflow := t.Motion.ReflowSpring()
 		strs := ctx.Strings()
 		name := s.name
 		if name == "" {
@@ -316,8 +317,10 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 		drawItem := func(i, pos int) *DivElement {
 			it := s.items[i]
 			on := i == sel
+			// The item springs to its new width as the sidebar collapses and
+			// expands, clipping its label while it moves.
 			row := Div().asPart("Sidebar.Item").Key(scope+"/item:"+it.Key).Style(st.Item).
-				listItem(pos, size).Label(it.Label).AccessSelected(on)
+				listItem(pos, size).Label(it.Label).AccessSelected(on).springBox(reflow, false)
 			if on {
 				row.Style(st.ItemSelected)
 			}
@@ -333,9 +336,14 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 				row.Child(Icon(it.Icon).Size(16))
 			}
 			if !collapsed {
-				row.Child(Text(it.Label).NoWrap()).Child(Spacer())
+				// The label and the count are held: they fade out as the item
+				// narrows, and in as it widens (see reflowSpec).
+				row.Child(Div().heldContent().Child(Text(it.Label).NoWrap())).Child(Spacer())
 				if it.Badge > 0 {
-					row.Badged(Badge(it.Badge))
+					b := Badge(it.Badge)
+					b.attached = true
+					row.access().badge = b
+					row.Child(Div().heldContent().Child(b))
 				}
 			} else if it.Badge > 0 {
 				// The count is not drawn when collapsed, but the name keeps it.
@@ -379,7 +387,8 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 
 		// The items are a list of list items, with the headings among them. The list
 		// scrolls, so the header and the footer stay in place.
-		list := Div().Column().Gap(2).Grow(1).MinHeight(Px(0)).ScrollY().Role(access.RoleList).SelectionContainer()
+		list := Div().Column().Gap(2).Grow(1).MinHeight(Px(0)).ScrollY().Role(access.RoleList).SelectionContainer().
+			springBox(reflow, true)
 		pos := 0
 		for i, it := range s.items {
 			if it.divider {
@@ -393,7 +402,7 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 					// not drawn.
 					h.Style(st.Divider)
 				} else {
-					h.Style(st.Heading).Child(Text(it.Label).NoWrap())
+					h.Style(st.Heading).Child(Div().heldContent().Child(Text(it.Label).NoWrap()))
 				}
 				list.Child(h)
 				continue
@@ -402,8 +411,13 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 			list.Child(drawItem(i, pos))
 		}
 
+		// The pane springs to its new width as the sidebar collapses and
+		// expands (the theme's Reflow spring), clipping what it holds while it
+		// moves. What is beside it takes its new place at once, unless it
+		// springs itself (ChildrenLayoutSpring on the row).
 		pane := Div().asPart("Sidebar.Pane").Key(scope).Column().Role(access.RoleGroup).Label(name).
-			Style(Style{Width: Px(sidebarWidth * textScale(ctx))}).Style(st.Pane).Tooltip(s.tooltip)
+			Style(Style{Width: Px(sidebarWidth * textScale(ctx))}).Style(st.Pane).Tooltip(s.tooltip).
+			springBox(reflow, true)
 		if collapsed {
 			w := Px(sidebarCollapsedWidth)
 			pane.Style(Style{Width: w, MinWidth: w, MaxWidth: w})

@@ -118,6 +118,8 @@ type DivElement struct {
 	// kidsSpring is the layout spring of the children that set none of their
 	// own (see ChildrenLayoutSpring).
 	kidsSpring Spring
+	// reflow is set by a widget whose box springs its size (see reflowSpec).
+	reflow *reflowSpec
 
 	focusable      bool
 	keepFocus      bool // a press inside leaves focus where it is (see KeepFocus)

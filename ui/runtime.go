@@ -42,6 +42,7 @@ const (
 	flagRich                               // rich text with a clickable or hoverable segment
 	flagNoDisplay                          // Display(false): the node and its subtree are not laid out, painted or focusable
 	flagLayoutSpring                       // has a layout spring: paint springs it to its laid-out place (see layoutSpring)
+	flagHeld                               // held content: it fades in and out with the box that holds it (see reflowSpec)
 )
 
 // nodeState is per-element state that survives rebuilds, keyed by element ID.
@@ -363,9 +364,22 @@ type Runtime struct {
 	// just placed its rows with a new row height.
 	reflowSnap   bool
 	reflowSnapIn int
+	// reflowStart reports that the last paint started a layout spring's
+	// motion. It asks for the next frame only once the frame ends, so that a
+	// paint the frame does again, once a UniformList has measured its rows,
+	// can snap what the first one started.
+	reflowStart bool
 	// reflowAcc is the motion of the layout springs of the ancestors of the
 	// node being painted (see layoutSpring).
-	reflowAcc    reflowMotion
+	reflowAcc reflowMotion
+	// reflowBox is the layout spring of the nearest ancestor of the node being
+	// painted that has one, which held content fades in with (see reflowSpec).
+	reflowBox *layoutSpringState
+	// held is the held content that has left the tree, drawn by its box
+	// while the box shrinks (see reflowSpec). noReuse is held content the
+	// build under way hides, whose node is kept rather than rebuilt in place.
+	held         []heldNode
+	noReuse      *node
 	looping      bool                               // a repeating Animate runs: the next frame must come, but it never ends
 	animInsts    []*componentInstance               // Animate instances that were running; re-rendered by the next Frame
 	pausedAnims  map[*componentInstance]struct{}    // running Animate instances the last paint did not draw (see settleAnims)
@@ -998,6 +1012,10 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 	if painted {
 		rt.reflowSnap = false // the frame of the change is drawn
 	}
+	if rt.reflowStart {
+		// The last paint started a layout spring's motion; the next frame steps it.
+		rt.animating, rt.reflowStart = true, false
+	}
 	rt.publishAccess()
 	rt.stats.Nodes = len(rt.byID)
 	rt.stats.Quads, rt.stats.Glyphs = len(rt.scene.Quads), len(rt.scene.Glyphs)
@@ -1352,6 +1370,9 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	// Only an element that was drawn in the last paint has something to fade
 	// out; one that was off screen (culled) simply goes.
 	exits := mayExit && leaving && n.div != nil && n.div.exit != nil && n.paintGen == rt.paintGen && !rt.sys.ReducedMotion
+	// Held content is kept to be drawn by its box while the box shrinks (see
+	// reflowSpec).
+	held := !exits && mayExit && leaving && n.flags&flagHeld != 0 && rt.hold(n)
 	if exits {
 		n.st.leaveAt = rt.now()
 		rt.ghosts = append(rt.ghosts, n)
@@ -1360,7 +1381,7 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 		rt.done(rt.now(), func() func() { return n.div.exit.a.OnDone })
 	}
 	for _, c := range n.children {
-		rt.retireNode(c, !exits)
+		rt.retireNode(c, !exits && !held)
 	}
 }
 
@@ -1404,7 +1425,7 @@ func (rt *Runtime) disposeInstance(inst *componentInstance) {
 func (rt *Runtime) newNode(kind nodeKind, id uint64, parent *node, owner *componentInstance) *node {
 	var n *node
 	if old := rt.byID[id]; old != nil && old.kind == kind && old.rt == rt && old.gen != rt.gen &&
-		old.parent == parent && len(old.oldKids) == 0 {
+		old.parent == parent && len(old.oldKids) == 0 && old != rt.noReuse {
 		// The arrays of the children and of the layout children are kept for this
 		// build's children, cleared of the old pointers.
 		prev, spare, lc, pa := old.children, old.oldKids[:0], old.lay.Children[:0], old.painted[:0]
@@ -1521,7 +1542,21 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		if e == nil {
 			return nil
 		}
+		// Held content (see reflowSpec) that the last paint drew and this build
+		// hides is kept as it was, to be drawn while its box shrinks: its node
+		// is not rebuilt in place.
+		var shown, hidden *node
+		if e.reflow != nil && e.reflow.held {
+			if old := rt.byID[id]; old != nil && old.gen != rt.gen {
+				shown = old
+				if e.noDisplay && old.flags&flagNoDisplay == 0 {
+					hidden = old
+					rt.noReuse = old
+				}
+			}
+		}
 		n := rt.newNode(kindDiv, id, parent, owner)
+		rt.noReuse = nil
 		n.div = e
 		if e.revealRow {
 			rt.revealRows = append(rt.revealRows, n)
@@ -1547,6 +1582,18 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		}
 		if e.noDisplay {
 			n.flags |= flagNoDisplay
+		}
+		if e.reflow != nil {
+			if e.reflow.spring.Duration > 0 {
+				n.flags |= flagLayoutSpring // confirmed by setLayoutSpring
+			}
+			if e.reflow.held {
+				n.flags |= flagHeld
+				rt.setHeld(n, !e.noDisplay, !e.noDisplay && (n.fresh || shown != nil && shown.flags&flagNoDisplay != 0))
+				if hidden != nil {
+					rt.hold(hidden)
+				}
+			}
 		}
 		if e.onGridCols != nil {
 			if rt.gridWatches == nil {

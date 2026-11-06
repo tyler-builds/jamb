@@ -120,6 +120,7 @@ func (rt *Runtime) park(inst *componentInstance) {
 	rt.hoverIDs = slices.DeleteFunc(rt.hoverIDs, func(id uint64) bool { return ids[id] })
 	rt.pressIDs = slices.DeleteFunc(rt.pressIDs, func(id uint64) bool { return ids[id] })
 	rt.ghosts = slices.DeleteFunc(rt.ghosts, func(n *node) bool { return ids[n.id] })
+	rt.held = slices.DeleteFunc(rt.held, func(h heldNode) bool { return ids[h.n.id] })
 	inst.parked = true
 	inst.parent = nil // parentNode stays: adopt finds the instances that render into it by it
 	rt.markAccess()

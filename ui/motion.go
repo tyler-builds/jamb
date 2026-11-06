@@ -323,4 +323,7 @@ func (rt *Runtime) paintGhost(n *node, dt float32) {
 // is appearing again, so the two are not drawn together.
 func (rt *Runtime) dropGhost(id uint64) {
 	rt.ghosts = slices.DeleteFunc(rt.ghosts, func(n *node) bool { return n.id == id })
+	if len(rt.held) > 0 {
+		rt.dropHeld(id)
+	}
 }

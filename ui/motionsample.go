@@ -7,7 +7,8 @@ import (
 )
 
 // Samples calls visit with each element of the tree, parents before their
-// children, then with the elements drawn while their exit plays. Elements
+// children, then with the elements drawn while their exit plays, and the held
+// content drawn while the box that holds it shrinks (see reflowSpec). Elements
 // hidden by Display(false) are left out, with what is inside them. It is for
 // ui/uitest's motion recording, which calls it after each frame it records;
 // nothing else calls it, so a frame costs nothing more for it. An element
@@ -54,6 +55,11 @@ func (h *runtimeHost) Samples(known func(id uint64) bool, visit func(uihost.Samp
 			parent = g.parent.id
 		}
 		walk(g, parent, 0, 0, 0, true, false)
+	}
+	for _, h := range rt.held {
+		if h.gen == rt.paintGen && h.n.parent != nil {
+			walk(h.n, h.n.parent.id, 0, 0, 0, true, false)
+		}
 	}
 }
 
