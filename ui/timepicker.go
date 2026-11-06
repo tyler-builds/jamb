@@ -609,7 +609,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		})
 
 		if open.Get() {
-			root.Child(p.list(st, scale, times, hl.Get(), v, ls, func(i int) { hl.Set(i) }, choose, shut, ret, name, s))
+			root.Child(p.list(t, st, scale, times, hl.Get(), v, ls, func(i int) { hl.Set(i) }, choose, shut, ret, name, s))
 		}
 		return p.size.apply(root)
 	})
@@ -648,7 +648,7 @@ func nextTimeIndex(times []int, m, dir int) int {
 // selected one is the time the field holds. A press in the list hands focus back to the
 // text. reveal is the row (plus one, zero for none) that the keys moved to, and it is
 // scrolled into view once.
-func (p *TimePickerElement) list(st TimePickerStyle, scale float32, times []int, hl int, v time.Time,
+func (p *TimePickerElement) list(t *Theme, st TimePickerStyle, scale float32, times []int, hl int, v time.Time,
 	ls *timeList, hover func(int), choose func(int), shut func(), ret *FocusHandle, name string, s *Strings) Element {
 	loc := currentLocale()
 	if name == "" {
@@ -658,6 +658,8 @@ func (p *TimePickerElement) list(st TimePickerStyle, scale float32, times []int,
 	ls.reveal = 0
 	maxH := float32(timePickerMaxVisible)*timePickerRowHeight*scale + 8
 	panel := Div().asPart("TimePicker.Popup").Key("jamb.listbox").Style(st.Popup).
+		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: t.Motion.enter(140 * time.Millisecond)}).
+		Exit(Fade().Grow(0.98), Animation{Duration: t.Motion.exit(90 * time.Millisecond)}).
 		Overlay(BelowStart).OverlayGap(4).
 		Role(access.RoleList).SelectionContainer().Label(name).
 		MaxHeight(Px(maxH)).ScrollY().
