@@ -213,6 +213,7 @@ type ButtonElement struct {
 	noFocus  bool         // set by Tabs on its scroll buttons, which take no focus, as TabView's do
 	handle   *FocusHandle // see FocusHandle; Modal.Default sets one if there is none
 	size     sizing
+	matched  string // see Matched
 }
 
 // Button creates a button with a text label. The default variant is Primary.
@@ -345,6 +346,11 @@ func (b *ButtonElement) Style(s Style) *ButtonElement {
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
 func (b *ButtonElement) LayoutSpring(s Spring) *ButtonElement { return b.Style(Style{LayoutSpring: s}) }
 
+// Matched gives the button a shared-element id, as DivElement.Matched does:
+// when a build removes a button with the id and adds another, the new one
+// flies from where the old one was.
+func (b *ButtonElement) Matched(id string) *ButtonElement { b.matched = id; return b }
+
 // Styles sets the look of the parts of the button, for this instance only. Set
 // fields win over the theme's Button and Buttons and the defaults of the
 // variant; see ButtonStyle and docs/styling.md. Calling Styles again merges with
@@ -359,6 +365,9 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 	iconSize := buttonIconSize(b.ctlSize)
 	st := resolveButton(ctx, b.variant, b.ctlSize, b.label == "", b.styles)
 	d := Div().asPart("Button.Root").Style(st.Root)
+	if b.matched != "" {
+		d.Matched(b.matched)
+	}
 	busy := b.loading && !b.disabled
 	if b.disabled {
 		d.Style(st.RootDisabled).Cursor(CursorNotAllowed)

@@ -43,6 +43,8 @@ const (
 	flagNoDisplay                          // Display(false): the node and its subtree are not laid out, painted or focusable
 	flagLayoutSpring                       // has a layout spring: paint springs it to its laid-out place (see layoutSpring)
 	flagHeld                               // held content: it fades in and out with the box that holds it (see reflowSpec)
+	flagMatched                            // has a Matched id: it can fly from where an element with the id was (see matchState)
+	flagReplaced                           // left the tree and was replaced by the flight of its match: nothing of it is drawn
 )
 
 // nodeState is per-element state that survives rebuilds, keyed by element ID.
@@ -378,8 +380,14 @@ type Runtime struct {
 	// held is the held content that has left the tree, drawn by its box
 	// while the box shrinks (see reflowSpec). noReuse is held content the
 	// build under way hides, whose node is kept rather than rebuilt in place.
-	held         []heldNode
-	noReuse      *node
+	held    []heldNode
+	noReuse *node
+	// match is the shared-element motion of the window: the elements with a
+	// Matched id that came and went in the builds since the last paint, the
+	// flights that paint draws after the rest of the window, and the last
+	// element drawn with each id (see matchState). It is nil until an element
+	// with a Matched id is built.
+	match        *matchRuntime
 	looping      bool                               // a repeating Animate runs: the next frame must come, but it never ends
 	animInsts    []*componentInstance               // Animate instances that were running; re-rendered by the next Frame
 	pausedAnims  map[*componentInstance]struct{}    // running Animate instances the last paint did not draw (see settleAnims)
@@ -1367,6 +1375,9 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	if leaving && n.div != nil && n.div.modal != nil {
 		rt.modalClosed(n)
 	}
+	if leaving && n.flags&flagMatched != 0 {
+		rt.departMatched(n) // its match, if one comes in this build, flies from where it was
+	}
 	// Only an element that was drawn in the last paint has something to fade
 	// out; one that was off screen (culled) simply goes.
 	exits := mayExit && leaving && n.div != nil && n.div.exit != nil && n.paintGen == rt.paintGen && !rt.sys.ReducedMotion
@@ -1519,6 +1530,9 @@ func (rt *Runtime) buildNode(el Element, parent *node, id uint64, depth int, inh
 		parent != nil && parent.div != nil && parent.div.kidsSpring.Duration > 0 {
 		rt.setLayoutSpring(n, parent)
 	}
+	if n.flags&flagMatched != 0 {
+		rt.setMatched(n)
+	}
 	return n
 }
 
@@ -1586,6 +1600,9 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		if e.reflow != nil {
 			if e.reflow.spring.Duration > 0 {
 				n.flags |= flagLayoutSpring // confirmed by setLayoutSpring
+			}
+			if e.reflow.matched != "" {
+				n.flags |= flagMatched
 			}
 			if e.reflow.held {
 				n.flags |= flagHeld

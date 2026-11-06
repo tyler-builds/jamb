@@ -23,11 +23,19 @@ func (rt *Runtime) paint(dt float32) {
 	for n := rt.byID[rt.focusID]; n != nil; n = n.parent {
 		n.keepGen = rt.paintGen
 	}
+	if mr := rt.match; mr != nil {
+		mr.flights, mr.done = mr.flights[:0], 0
+		if len(mr.in) > 0 || len(mr.out) > 0 {
+			rt.pairMatched()
+		}
+	}
 	if rt.tree.flags&flagNoDisplay == 0 {
 		rt.paintNode(rt.tree, 0, 0, view, 1, rt.theme.Text, dt)
 	}
 	rt.paintGhosts(dt)
+	rt.paintFlights(dt) // above the rest of the window (see Matched)
 	rt.paintOverlays(view, dt)
+	rt.paintFlights(dt) // those inside overlays
 	rt.paintDrag(view, dt)
 	if len(rt.held) > 0 {
 		// Held content whose box did not draw it has gone (see reflowSpec).
@@ -112,12 +120,23 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	var box *layoutSpringState // the element's layout spring, which draws its box at the size it has reached
 	var prevAcc reflowMotion
 	var prevBox *layoutSpringState
-	if n.flags&(flagLayoutSpring|flagHeld) != 0 && n.st != nil && n.st.lay != nil {
+	var fl *matchState // the flight that draws the element, while it flies (see Matched)
+	if n.flags&(flagLayoutSpring|flagHeld|flagMatched) != 0 && n.st != nil && n.st.lay != nil {
 		ls := n.st.lay
 		if n.flags&flagHeld != 0 && ls.reveal {
 			opacity *= rt.revealHeld(ls)
 		}
-		if n.flags&flagLayoutSpring != 0 {
+		if n.flags&flagMatched != 0 {
+			fl = rt.flight(n, ox, oy, v.offX, v.offY, dt)
+		}
+		if fl != nil {
+			// Its box is the flight's frame. Its children are drawn in the
+			// flight's scale, not in the motion of a layout spring.
+			lx, ly = ls.x-n.lay.X, ls.y-n.lay.Y
+			v.offX += lx
+			v.offY += ly
+			w, h = ls.w, ls.h
+		} else if n.flags&flagLayoutSpring != 0 {
 			lx, ly = rt.layoutSpring(n, dt)
 			v.offX += lx
 			v.offY += ly
@@ -146,8 +165,13 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	n.hit = scene.Rect{X: bx + own.OffsetX + lx, Y: by + own.OffsetY + ly, W: w, H: h}
 	n.clip = clip
 	opacity *= v.opacity
-	n.opacity, n.scale = opacity, v.scale
 	bg, border, fg := v.bg, v.border, v.fg
+	if n.flags&flagMatched != 0 {
+		// A flight's opacity, fill and corner radius go from its match's to
+		// its own; how it is drawn is what a match of it flies from.
+		opacity, bg = rt.seeMatched(n, fl, opacity, bg)
+	}
+	n.opacity, n.scale = opacity, v.scale
 	if v.scale != 1 {
 		// Scale about the element's center. Transforms are in device pixels and
 		// compose with the transform of any enclosing element, so the element's
@@ -166,6 +190,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	switch n.kind {
 	case kindDiv, kindEditor:
 		radii := rt.corners(s.radii())
+		if fl != nil {
+			radii = rt.corners(fl.radius)
+		}
 		for _, sh := range s.Shadows {
 			if rt.sys.HighContrast && (sh.Blur != 0 || sh.X != 0 || sh.Y != 0 || sh.Spread <= 0) {
 				// High contrast draws no shadows. A crisp ring, as a focus ring
@@ -238,6 +265,13 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 			}
 			sc.AddQuad(q)
 		}
+		if fl != nil {
+			// From here on, the element's box is its content's, at its final
+			// layout, which the flight scales to cover its frame (see
+			// enterFlight). A flight is a div's.
+			x, y, clip = rt.enterFlight(n, fl, n.abs, clip)
+			w, h = n.lay.W, n.lay.H
+		}
 		// What the element draws inside its box, a canvas, text or an image, is
 		// drawn at its laid-out size: a layout spring moves it, and draws the
 		// box at the size it has reached, but never scales or rewraps it.
@@ -274,13 +308,19 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		if box != nil {
 			rt.reflowAcc, rt.reflowBox = prevAcc, prevBox
 		}
+		if fl != nil {
+			rt.leaveFlight()
+		}
 		return
 	}
 	// A box whose widget clips it while its size moves (see reflowSpec) clips
 	// its children to the size it is drawn at, so they are revealed and covered
 	// by its edge.
-	clips := s.OverflowX != OverflowVisible || s.OverflowY != OverflowVisible ||
-		box != nil && box.clip && box.moving
+	// A flight clips its content to its frame (see enterFlight), which the
+	// content, scaled to cover it, always overflows: the element's own clip
+	// would cut nothing more, and would replace the frame's rounded corners.
+	clips := (s.OverflowX != OverflowVisible || s.OverflowY != OverflowVisible ||
+		box != nil && box.clip && box.moving) && fl == nil
 	childClip := clip
 	if clips {
 		// The children are clipped to the padding box, inside the border. A
@@ -327,16 +367,25 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		box.ox, box.oy = x-sx, y-sy
 	}
 	for _, c := range n.order {
-		if c.flags&flagNoDisplay != 0 {
-			continue // nothing of an element hidden by Display is drawn, or hit
-		}
-		if c.flags&flagOverlay != 0 {
-			// Painted later, on top of everything and unclipped. n.abs and
-			// clip are the anchor's.
-			if anchorVisible(n.abs, clip) {
-				rt.overlays = append(rt.overlays, overlayItem{n: c, anchor: n.abs, opacity: opacity, fg: fg, ghost: rt.inGhost})
+		if c.flags&(flagNoDisplay|flagOverlay|flagReplaced|flagMatched) != 0 {
+			if c.flags&(flagNoDisplay|flagReplaced) != 0 {
+				// Nothing of an element hidden by Display is drawn, or hit, nor
+				// of one whose match flies in its place.
+				continue
 			}
-			continue
+			if c.flags&flagOverlay != 0 {
+				// Painted later, on top of everything and unclipped. n.abs and
+				// clip are the anchor's.
+				if anchorVisible(n.abs, clip) {
+					rt.overlays = append(rt.overlays, overlayItem{n: c, anchor: n.abs, opacity: opacity, fg: fg, ghost: rt.inGhost})
+				}
+				continue
+			}
+			if rt.deferFlight(c, x-sx, y-sy, childClip, opacity, fg) {
+				// It flies: drawn after the rest of the window.
+				n.painted = append(n.painted, c)
+				continue
+			}
 		}
 		// A child whose drawing cannot reach the clip is skipped with its whole
 		// subtree. Never skipped: the focus path, and anything painted inside a
@@ -362,6 +411,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 	}
 	if clips {
 		sc.PopClip()
+	}
+	if fl != nil {
+		rt.leaveFlight()
 	}
 	if box != nil {
 		rt.reflowAcc, rt.reflowBox = prevAcc, prevBox

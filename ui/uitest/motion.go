@@ -141,6 +141,10 @@ type Sample struct {
 	Name string
 	// Key is the element's key, or "".
 	Key string
+	// Matched is the element's shared-element id (see ui.DivElement.Matched),
+	// or "". An element that leaves where another with its id comes, drawn
+	// where it was, has flown there: neither pops.
+	Matched string
 	// Exiting reports an element that was removed and is drawn while its exit
 	// plays.
 	Exiting bool
@@ -233,7 +237,7 @@ func (r *Recording) sample() {
 			return
 		}
 		f.Elements = append(f.Elements, Sample{
-			Name: id.name(), Key: s.Key, Exiting: s.Exiting, Visible: s.Visible, Looping: s.Looping, Blank: s.Blank,
+			Name: id.name(), Key: s.Key, Matched: s.Matched, Exiting: s.Exiting, Visible: s.Visible, Looping: s.Looping, Blank: s.Blank,
 			DrawnStyle: s.Style.(ui.DrawnStyle),
 			id:         s.ID, parent: s.Parent, sx: s.ScrollX, sy: s.ScrollY, ownX: s.OwnScrollX, ownY: s.OwnScrollY,
 		})
@@ -497,6 +501,24 @@ func (a *analysis) pops(k int, elements []Sample, came bool, judge func(s *Sampl
 	}
 }
 
+// flew reports whether s, an element that came or went, has a Matched id
+// that another element drawn at frame k has, drawn where s is: one flies from
+// the other's place (see ui.DivElement.Matched), so neither pops.
+func (a *analysis) flew(s *Sample, k int) bool {
+	if s.Matched == "" || k < 0 || k >= len(a.frames) {
+		return false
+	}
+	for i := range a.frames[k].Elements {
+		o := &a.frames[k].Elements[i]
+		if o.Matched == s.Matched && o.id != s.id && !o.Exiting &&
+			abs(o.Bounds.X-s.Bounds.X) < jumpPx && abs(o.Bounds.Y-s.Bounds.Y) < jumpPx &&
+			abs(o.Bounds.W-s.Bounds.W) < jumpPx && abs(o.Bounds.H-s.Bounds.H) < jumpPx {
+			return true
+		}
+	}
+	return false
+}
+
 // drawn reports whether element id was drawn at frame k.
 func (a *analysis) drawn(k int, id uint64) bool { return a.get(k, id) != nil }
 
@@ -508,7 +530,7 @@ func (a *analysis) births(k int) {
 		if s.Blank || !s.Visible || s.Opacity < popOpacity || area(s) < popMinArea {
 			return popHolder, ""
 		}
-		if a.scrolled(s, k, k-1, k) {
+		if a.scrolled(s, k, k-1, k) || a.flew(s, k-1) {
 			return popDone, ""
 		}
 		if n := a.get(next, s.id); n != nil && changes(s, n) {
@@ -527,7 +549,7 @@ func (a *analysis) deaths(k int) {
 		if s.Blank || !s.Visible || area(s) < popMinArea || s.Opacity <= cutExitOpacity {
 			return popHolder, ""
 		}
-		if !s.Exiting && a.scrolled(s, k-1, k-1, k) {
+		if !s.Exiting && a.scrolled(s, k-1, k-1, k) || a.flew(s, k) {
 			return popDone, ""
 		}
 		if s.Opacity >= popOpacity {

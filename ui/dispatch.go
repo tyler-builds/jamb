@@ -21,6 +21,18 @@ func (rt *Runtime) hitTest(x, y float32) []*node {
 			return rt.hitPath
 		}
 	}
+	// Then the flights, which are drawn above the rest of the window (see
+	// Matched).
+	if mr := rt.match; mr != nil {
+		for i := len(mr.flights) - 1; i >= 0; i-- {
+			if f := &mr.flights[i]; !f.ghost && rt.hit(f.n, x, y) {
+				for p := f.n.parent; p != nil; p = p.parent {
+					rt.hitPath = append(rt.hitPath, p)
+				}
+				return rt.hitPath
+			}
+		}
+	}
 	if rt.tree != nil {
 		rt.hit(rt.tree, x, y)
 	}

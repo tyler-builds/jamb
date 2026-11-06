@@ -306,3 +306,39 @@ func TestMotionFrames(t *testing.T) {
 		t.Errorf("the panel in the last frame is %+v", panel)
 	}
 }
+
+// An element that leaves one place as an element with its Matched id comes to
+// another flies from the first to the second: neither pops. Without the id,
+// the one pops out and the other pops in.
+func TestMotionMatchedIsNotAPop(t *testing.T) {
+	for _, tc := range []struct {
+		name, id string
+		want     string
+	}{
+		{"matched", "card", ""},
+		{"not matched", "", "pop-in wide; pop-out narrow"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wide := ui.NewSignal(false)
+			u := uitest.New(t, func(ctx *ui.Context) ui.Element {
+				root := ui.Div().Size(ui.Px(400), ui.Px(300))
+				c := box("card")
+				if tc.id != "" {
+					c.Matched(tc.id)
+				}
+				if wide.Get() {
+					root.Child(ui.Div().Key("wide").Padding(100).Child(c.Size(ui.Px(200), ui.Px(150))))
+				} else {
+					root.Child(ui.Div().Key("narrow").Child(c))
+				}
+				return root
+			}, uitest.Size(400, 300))
+			rec := u.Record()
+			wide.Set(true)
+			u.Settle()
+			if got := kinds(rec.Findings()); got != tc.want {
+				t.Errorf("findings %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

@@ -37,14 +37,16 @@ type layoutSpringState struct {
 	fw, fh float32
 	// ox and oy are the origin of the element's content at the last paint, in
 	// the window: what held content is placed from (see hold).
-	ox, oy  float32
-	gen     uint32 // the paint that last drew it
-	ready   bool   // x, y, w and h hold a place and a size; false until the element is first drawn
-	moving  bool   // the spring moves: away from its target, or not still
-	warned  bool   // the warning for an element with no key has been given
-	boxOnly bool   // only the size springs, the place snaps (a widget's box; see reflowSpec)
-	clip    bool   // the children are clipped to the drawn box while the size moves (see reflowSpec)
-	quiet   bool   // set by a widget, which keys what needs keys: no warning
+	ox, oy float32
+	gen    uint32 // the paint that last drew it
+	// match is the shared-element motion of an element with a Matched id.
+	match   *matchState
+	ready   bool // x, y, w and h hold a place and a size; false until the element is first drawn
+	moving  bool // the spring moves: away from its target, or not still
+	warned  bool // the warning for an element with no key has been given
+	boxOnly bool // only the size springs, the place snaps (a widget's box; see reflowSpec)
+	clip    bool // the children are clipped to the drawn box while the size moves (see reflowSpec)
+	quiet   bool // set by a widget, which keys what needs keys: no warning
 	// reveal is set on held content (flagHeld) that has just appeared: it
 	// fades in as the box that holds it grows (see revealHeld).
 	reveal bool
@@ -69,6 +71,9 @@ type reflowSpec struct {
 	boxOnly bool
 	clip    bool
 	held    bool
+	// matched is the element's Matched id (see DivElement.Matched). It lives
+	// here, behind a pointer, so that elements without one pay nothing for it.
+	matched string
 }
 
 // heldNode is held content that has left the tree and is drawn by its box
