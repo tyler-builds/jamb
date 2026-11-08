@@ -75,7 +75,7 @@ func (s *swapchain) Present() error {
 	}
 	s.current = nil
 	b.busy = true
-	s.w.present(b)
+	s.w.presentBuffer(b.buf, b.width, b.height)
 	return nil
 }
 

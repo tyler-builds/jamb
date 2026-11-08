@@ -28,6 +28,9 @@ small program that shows it is worth more than anything else. Report security pr
 - Default styles never change font weight for hover, selection or focus; state is shown with fills,
   outlines and indicators.
 - Exported names have doc comments, and docs in `docs/` change with the behavior they describe.
+- The Vulkan shaders (`internal/render/vulkan/shaders`) port the Direct3D 11 renderer's HLSL; change
+  both together. Commit only the GLSL: the `Shaders` workflow compiles the SPIR-V and commits it to
+  your pull request's branch.
 
 ## Checks
 

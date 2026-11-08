@@ -19,7 +19,9 @@ input/             platform-neutral keys, buttons, modifiers, cursors
 internal/          packages apps don't import, so they can change without breaking apps:
   layout/          flexbox-subset layout engine (no drawing, no text)
   scene/           GPU-friendly primitives (Quad/shadow, Glyph, Image, Clip, Transform)
-  render/          Renderer interface; render/d3d11 = Direct3D 11 backend, render/soft = CPU renderer
+  render/          Renderer interface; render/d3d11 = Direct3D 11 backend, render/vulkan = Vulkan
+                   backend (Linux), render/soft = CPU renderer
+  dmabuf/          the types a GPU renderer and the Wayland adapter share to hand frames over as dma-bufs
   platform/        adapter contract; platform/windows (Win32), platform/linux (Wayland, experimental), darwin placeholder
   text/            fonts and fallback, shaping and line breaking (go-text/typesetting),
                    caret/selection geometry, glyph atlas
@@ -67,7 +69,8 @@ app code ──► ui (elements, signals, components)
                │
                ▼
              render.Renderer ◄── internal/render/d3d11 (only package that knows Direct3D)
-                             internal/render/soft (CPU, pure Go: Linux, and screenshots in tests)
+                             internal/render/vulkan (Linux; only package that knows Vulkan)
+                             internal/render/soft (CPU, pure Go: Linux without a GPU, and screenshots in tests)
 platform.Window/Handler ◄── internal/platform/windows (only package that knows Win32)
                              internal/platform/linux (Wayland, experimental)
 ```
@@ -140,6 +143,63 @@ Each concern is replaceable independently:
    (`RegisterOcclusionStatusWindow`). A shown toast wakes the window when
    its time runs out, and a caret wakes it at each blink.
 
+## Vulkan on Linux
+
+The Linux adapter speaks the Wayland protocol in pure Go, without libwayland, so it
+has no `wl_display` pointer to give Vulkan's window-system integration
+(`VK_KHR_wayland_surface`). `internal/render/vulkan` therefore draws each frame into
+an image of its own, exported as a dma-buf, and the adapter hands that dma-buf to
+the compositor over its own connection with `zwp_linux_dmabuf_v1`. The two packages
+share only the types of `internal/dmabuf`.
+
+- **Loading.** `libvulkan.so.1` is loaded at run time with purego, as libxkbcommon
+  is. The device needs Vulkan 1.1 and `VK_KHR_external_memory_fd`,
+  `VK_EXT_external_memory_dma_buf` and `VK_EXT_image_drm_format_modifier`. Software
+  rasterizers (lavapipe) are skipped, since the CPU renderer is as fast.
+- **Choosing the GPU.** A discrete GPU is preferred to an integrated one. When the
+  compositor names the GPU it composites with (`zwp_linux_dmabuf_v1` version 4, with
+  `VK_EXT_physical_device_drm`), that GPU is used when it qualifies, so frames are
+  not copied between GPUs.
+- **Images.** A window's images are B8G8R8A8 (`DRM_FORMAT_ARGB8888`), premultiplied.
+  On the compositor's GPU they are in the GPU's memory, with the format modifier the
+  driver prefers among those the compositor imports. For a compositor on another GPU
+  (a laptop that composites on the integrated GPU while jamb draws on the discrete
+  one), frames are drawn in the GPU's memory and copied into linear images in system
+  memory, which both GPUs reach, as PRIME render offload does. A window keeps two or
+  three images, and a fourth when the compositor holds them all. A new size gets new
+  images.
+- **Probing.** A compositor that cannot import a buffer sent with `create_immed`
+  ends the connection. So before a window's first frame, a small image of each kind
+  (same GPU, then shared, or the other way round when the compositor is on another
+  GPU) is sent with `create`, which the compositor answers with `created` or
+  `failed`, and the first kind it imports is used. When it imports none, the window
+  is drawn on the CPU.
+- **Frames.** One command buffer records texture uploads, the render pass and the
+  hand-off of the image to the compositor (`VK_QUEUE_FAMILY_FOREIGN_EXT`). The frame
+  waits for the GPU before the image is attached, so the compositor never reads an
+  unfinished frame; the wait is the GPU's time for the frame, well under a
+  millisecond for a UI. Before drawing into an image the compositor released, the
+  frame waits (up to 100 ms) until the dma-buf polls writable, which is when the
+  compositor's own reads of it are done, so a frame on screen is never changed.
+  Frames are paced by the compositor's frame callbacks, as on the CPU path.
+- **Shaders.** The GLSL in `internal/render/vulkan/shaders` is a port of the
+  Direct3D 11 renderer's HLSL, and the two must change together. The SPIR-V it
+  compiles to is committed and embedded, so a build needs no shader compiler. The
+  `Shaders` workflow compiles it on every pull request that changes a shader and
+  commits the result to the pull request's branch; `go generate
+  ./internal/render/vulkan` does the same where `glslc` is installed.
+- **Fallback.** When Vulkan, a qualifying GPU or the compositor's dma-buf support is
+  missing, the window is drawn on the CPU, and the reason is printed once.
+  `JAMB_RENDERER=cpu` asks for the CPU renderer.
+
+Not done yet: images with spare room during a live resize (each step of a drag
+makes new images), and explicit synchronization (`linux-drm-syncobj-v1`) in place of
+waiting for the GPU on the CPU. A driver that does not track the compositor's reads
+on the dma-buf (implicit synchronization) leaves the wait above without effect;
+explicit synchronization would cover it. The shared images for a compositor on
+another GPU were checked on one GPU only: GNOME on NVIDIA rejects them, and the
+window then draws in the GPU's memory.
+
 ## GPU device loss
 
 When the GPU device is removed or reset (a driver update or crash, a remote
@@ -148,7 +208,8 @@ needs no code for this, and the ui state of every window is kept.
 
 - A frame detects the loss from `Present`, `ResizeBuffers`, `Map`, resource
   creation, or the device's removal reason, and reports it as
-  `render.ErrDeviceLost`.
+  `render.ErrDeviceLost`. On Linux, Vulkan reports `VK_ERROR_DEVICE_LOST`, or a
+  frame does not finish within 5 seconds.
 - The first window to draw afterwards recreates the shared device (hardware
   first, then WARP, as at startup), its pipelines and states, and then each
   window's swap chain. The windows draw again. One loss causes one rebuild, however

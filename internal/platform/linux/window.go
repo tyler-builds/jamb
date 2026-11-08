@@ -281,9 +281,9 @@ func (w *window) render() {
 	w.frameWanted = w.handler.OnFrame(w)
 }
 
-// present attaches a drawn buffer to the surface and commits it, asking for a
-// frame callback to pace the next frame.
-func (w *window) present(b *shmBuffer) {
+// presentBuffer attaches a drawn buffer of width×height physical pixels to the
+// surface and commits it, asking for a frame callback to pace the next frame.
+func (w *window) presentBuffer(buf *wl.Proxy, width, height int) {
 	if w.destroyed {
 		return
 	}
@@ -297,8 +297,8 @@ func (w *window) present(b *shmBuffer) {
 		}
 		s.Send(8, int32(w.intScale)) // set_buffer_scale
 	}
-	s.Send(1, b.buf, int32(0), int32(0))                           // attach
-	s.Send(9, int32(0), int32(0), int32(b.width), int32(b.height)) // damage_buffer
+	s.Send(1, buf, int32(0), int32(0))                         // attach
+	s.Send(9, int32(0), int32(0), int32(width), int32(height)) // damage_buffer
 	if w.callback == nil {
 		cb := w.d.conn.NewProxy("wl_callback", 1, nil)
 		cb.On = func(op uint16, d *wl.Decoder) {

@@ -3,7 +3,8 @@
 // Package linux is the Linux platform adapter, for Wayland compositors. It is
 // pure Go: it speaks the Wayland protocol itself (see package wl), loads
 // libxkbcommon at run time for keyboard layouts, and presents frames that the
-// CPU renderer (render/soft) draws into shared memory.
+// GPU renderer (render/vulkan) draws into dma-bufs (see DmabufSurface), or that
+// the CPU renderer (render/soft) draws into shared memory.
 //
 // One goroutine, locked to its thread, runs the event loop for every window
 // of the process, as on Windows.
@@ -29,12 +30,13 @@ type display struct {
 	compositor *wl.Proxy
 	shm        *wl.Proxy
 	wmBase     *wl.Proxy
-	decoration *wl.Proxy   // zxdg_decoration_manager_v1, or nil
-	cursor     *wl.Proxy   // wp_cursor_shape_manager_v1, or nil
-	fractional *wl.Proxy   // wp_fractional_scale_manager_v1, or nil
-	viewporter *wl.Proxy   // wp_viewporter, or nil
-	sessions   *wl.Proxy   // xdg_session_manager_v1, or nil
-	session    *winSession // the window session under jamb dev (see session.go), or nil
+	decoration *wl.Proxy    // zxdg_decoration_manager_v1, or nil
+	cursor     *wl.Proxy    // wp_cursor_shape_manager_v1, or nil
+	fractional *wl.Proxy    // wp_fractional_scale_manager_v1, or nil
+	viewporter *wl.Proxy    // wp_viewporter, or nil
+	sessions   *wl.Proxy    // xdg_session_manager_v1, or nil
+	dmabuf     *linuxDmabuf // zwp_linux_dmabuf_v1 version 3 or later, or nil
+	session    *winSession  // the window session under jamb dev (see session.go), or nil
 	seat       *seat
 	clip       *clipboard // nil without wl_data_device_manager
 
@@ -140,6 +142,9 @@ func connect() (*display, error) {
 	d.viewporter = bind("wp_viewporter", 1, 1, nil)
 	d.sessions = bind("xdg_session_manager_v1", 1, 1, nil)
 	d.openSession()
+	if g, ok := globals["zwp_linux_dmabuf_v1"]; ok && g.version >= 3 {
+		d.dmabuf = bindDmabuf(c, d.registry, g.name, g.version)
+	}
 	if d.fractional != nil && d.viewporter == nil {
 		d.fractional = nil // a fractional scale needs a viewport to size the buffer
 	}
@@ -150,7 +155,8 @@ func connect() (*display, error) {
 			d.clip.attach(d.seat)
 		}
 	}
-	// A second roundtrip receives the seat's capabilities and the keymap.
+	// A second roundtrip receives the seat's capabilities and the keymap, and
+	// the dma-buf formats.
 	if err := c.Roundtrip(); err != nil {
 		c.Close()
 		return nil, err
