@@ -34,7 +34,7 @@ other applications were running, so they are a reference, not a guarantee:
 
 ## Using jamb in your app
 
-The module is `github.com/tyler-builds/jamb`, and the latest release is `v0.6.4`. A minimal
+The module is `github.com/tyler-builds/jamb`, and the latest release is `v0.7.0`. A minimal
 `main.go` is a window with a greeting and a button that counts its clicks:
 
 ```go
@@ -69,16 +69,16 @@ In the module that holds it, add jamb and run the app. `go get` on a module path
 that module's checksum, so `go mod tidy` adds the checksums of jamb's own dependencies:
 
 ```
-go get github.com/tyler-builds/jamb@v0.6.4
+go get github.com/tyler-builds/jamb@v0.7.0
 go mod tidy
 go run .
 ```
 
 Start with the [API guide](concepts.md#api-guide). The `jamb` command is its own module, whose latest release
-is `cmd/jamb/v0.4.2`, and it is installed with:
+is `cmd/jamb/v0.4.3`, and it is installed with:
 
 ```
-go install github.com/tyler-builds/jamb/cmd/jamb@v0.4.2
+go install github.com/tyler-builds/jamb/cmd/jamb@v0.4.3
 ```
 
 - `jamb dev ./myapp` rebuilds and restarts the app on each save, keeping its window position (see

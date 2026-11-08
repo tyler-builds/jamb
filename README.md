@@ -67,15 +67,15 @@ func main() {
 In the module that holds it, add jamb and run the app:
 
 ```
-go get github.com/tyler-builds/jamb@v0.6.4
+go get github.com/tyler-builds/jamb@v0.7.0
 go mod tidy    # records the checksums of jamb's own dependencies
 go run .
 ```
 
-The `jamb` command is a separate module, whose latest release is `cmd/jamb/v0.4.2`:
+The `jamb` command is a separate module, whose latest release is `cmd/jamb/v0.4.3`:
 
 ```
-go install github.com/tyler-builds/jamb/cmd/jamb@v0.4.2
+go install github.com/tyler-builds/jamb/cmd/jamb@v0.4.3
 ```
 
 The repository includes six examples. From a clone of the repository, run them with:
