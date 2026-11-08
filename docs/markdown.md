@@ -89,6 +89,7 @@ screen reader says that it is a table, and its size, from the Grid pattern.
 | `Label(s)` | names the view for assistive technology, as a group of that name |
 | `Styles(markdown.Style{...})` | sets the parts of this view (see Parts) |
 | `OnLink(func(url string))` | handles every link, in place of the view's own handling |
+| `OnLinkMenu(func(url string) []ui.MenuItem)` | gives every link a context menu for its destination |
 | `OnTaskToggle(func(index int, checked bool))` | makes the tasks' check boxes operable |
 | `Images(func(src string) (*ui.ImageSource, error))` | sets the image loader |
 | `BaseDir(dir)` | sets the directory of the default image loader |
@@ -124,6 +125,21 @@ Without `OnLink`, following a link:
 `OnLink` replaces the first two: its function gets every link's destination as it is
 written in the text, `#name` anchors and relative paths included, and decides what is
 safe to open. A footnote reference still moves to its note.
+
+`OnLinkMenu` gives every link a context menu, which a right click opens, and Shift+F10
+or the Menu key while the link has focus. Its function gets the link's destination as
+`OnLink` does, and returns the items:
+
+```go
+markdown.View(src).OnLinkMenu(func(url string) []ui.MenuItem {
+	return []ui.MenuItem{
+		{Label: "Open link", OnClick: func() { _ = ctx.OpenURL(url) }},
+		{Label: "Copy link address", OnClick: func() { ctx.SetClipboard(url) }},
+	}
+})
+```
+
+A linked image has the menu too. A footnote reference has none.
 
 ## Images
 

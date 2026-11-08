@@ -55,6 +55,7 @@ type Segment struct {
 	// link is shared by the segments of one link made by LinkSegs, so that
 	// consecutive segments with the same link are one link (see linkEnd).
 	link *linkGroup
+	menu func() []MenuItem // see ContextMenu
 }
 
 // linkGroup is the identity of a link made of several segments (see LinkSegs).
@@ -98,6 +99,17 @@ func (g Segment) OnClick(fn func()) Segment { g.onClick = fn; return g }
 // fields that do not change the shaping apply (Color, Background, Underline,
 // Strikethrough), so hovering never re-lays out the text.
 func (g Segment) Hover(h Highlight) Segment { g.hover = &h; return g }
+
+// ContextMenu opens a menu when the segment is right-clicked, or, for a link,
+// when it has keyboard focus and Shift+F10 or the Menu key is pressed. build
+// runs when the menu opens; an empty result opens nothing. The segment's menu
+// wins over the menus of the elements around it. A link made by LinkSegs needs
+// the menu on only one of its segments: it opens from any of them.
+//
+//	ui.Link("docs", openDocs).ContextMenu(func() []ui.MenuItem {
+//		return []ui.MenuItem{{Label: "Copy link", OnClick: copyDocsURL}}
+//	})
+func (g Segment) ContextMenu(build func() []MenuItem) Segment { g.menu = build; return g }
 
 // Link is a clickable piece of text. It takes the theme's Link color (when
 // no Color is set) and underlines while the pointer is over it. Tab stops on
@@ -200,7 +212,7 @@ func buildRich(t *TextElement) *richText {
 		starts[i] = off
 		off += len(g.text)
 		bounds = append(bounds, off)
-		if g.onClick != nil || g.hover != nil {
+		if g.onClick != nil || g.hover != nil || g.menu != nil {
 			rt.interactive = true
 		}
 	}
@@ -272,7 +284,8 @@ func (n *node) richSpanAt(x, y float32) int {
 }
 
 // segmentAt returns the segment under (x, y) when the deepest node of path is
-// a rich text node with a clickable or hoverable segment there.
+// a rich text node with a clickable or hoverable segment, or one with a context
+// menu, there.
 func (rt *Runtime) segmentAt(path []*node, x, y float32) segRef {
 	if len(path) == 0 || path[0].flags&flagRich == 0 {
 		return segRef{}
@@ -286,10 +299,30 @@ func (rt *Runtime) segmentAt(path []*node, x, y float32) segRef {
 	if owner < 0 {
 		return segRef{}
 	}
-	if seg := &n.rich.segs[owner]; seg.onClick == nil && seg.hover == nil {
+	if seg := &n.rich.segs[owner]; seg.onClick == nil && seg.hover == nil && seg.menu == nil {
 		return segRef{}
 	}
 	return segRef{n.id, owner}
+}
+
+// segMenu returns the context menu of segment i of segs: its own, or that of
+// another segment of the same link (see LinkSegs), or nil.
+func segMenu(segs []Segment, i int) func() []MenuItem {
+	if segs[i].menu != nil || segs[i].link == nil {
+		return segs[i].menu
+	}
+	g := segs[i].link
+	for j := i; j >= 0 && segs[j].link == g; j-- {
+		if segs[j].menu != nil {
+			return segs[j].menu
+		}
+	}
+	for j := i + 1; j < len(segs) && segs[j].link == g; j++ {
+		if segs[j].menu != nil {
+			return segs[j].menu
+		}
+	}
+	return nil
 }
 
 // clickable reports whether r names a segment with an OnClick.

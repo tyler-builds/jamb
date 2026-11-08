@@ -33,7 +33,7 @@ type imageEntry struct {
 
 // image returns the element of an image: the image once it has loaded, else a
 // placeholder with its alternative text, inside a link when link is set.
-func (b *builder) image(n *ast.Image, link func()) ui.Element {
+func (b *builder) image(n *ast.Image, link *linkTo) ui.Element {
 	dest := string(n.Destination)
 	alt := plainText(n, b.doc.src)
 	name := alt
@@ -61,9 +61,13 @@ func (b *builder) image(n *ast.Image, link func()) ui.Element {
 	if link == nil {
 		return el
 	}
-	return ui.Div().Role(access.RoleLink).Label(name).Focusable().Cursor(ui.CursorPointer).AlignSelf(ui.Start).
+	box := ui.Div().Role(access.RoleLink).Label(name).Focusable().Cursor(ui.CursorPointer).AlignSelf(ui.Start).
 		FocusVisible(ui.Style{Shadows: []ui.Shadow{{Spread: 2, Color: b.t.FocusRing}}}).
-		OnClick(link).Child(el)
+		OnClick(link.follow).Child(el)
+	if menu := b.linkMenu(link.url); menu != nil {
+		box.ContextMenu(menu)
+	}
+	return box
 }
 
 // loadImage returns the entry of the image with the source dest, and starts loading it

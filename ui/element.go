@@ -133,6 +133,7 @@ type DivElement struct {
 	noScrollbar    bool // set by Tabs on its strip, which has scroll buttons in place of a bar
 	matchAnchor    bool // set by a Select's list: at least as wide as the field it opens from
 	menuBar        bool // set by MenuBar on the bar
+	menuFallback   bool // a built-in context menu that gives way to one around it (see menuTarget)
 	noInitialFocus bool // set on a Modal's footer and close box, which the initial focus skips
 	// hitThrough is set on the transparent layer of a non-modal dialog: a press on
 	// the layer itself reaches the window behind it (see NonModal).

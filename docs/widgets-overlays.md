@@ -63,6 +63,15 @@ ui.MenuBar(
   choosing an item, or a press outside) returns focus to the element that had it
   before the press, or to the focused element for a keyboard open. A press
   outside closes the whole chain. A press on the trigger toggles a dropdown.
+  While a context menu has focus, the element it returns focus to does not get
+  `OnBlur`; that runs when the menu closes only if focus goes elsewhere, so a
+  field is not checked as left and a selection is kept for the menu's Copy.
+- **Built-in context menus.** Text fields, selectable text and `codeedit` editors
+  have their own Cut, Copy and Paste menus (see [input.md](input.md) and
+  [text.md](text.md)), and a rich text segment or a Markdown link can have one
+  (`Segment.ContextMenu`, `markdown.ViewElement.OnLinkMenu`). The innermost menu
+  under a right click opens, except that selectable text gives way to a menu
+  around it.
 - **Menu bar.** A click opens a top-level menu, and while one is open, the pointer
   over another label opens that one. Left and Right move between the top-level
   menus, also from inside an open menu. Down, Enter or Space open the highlighted

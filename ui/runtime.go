@@ -516,10 +516,14 @@ type Runtime struct {
 	// the focus before the latest press, which a menu opened by the pointer
 	// returns to. menuFn is a submenu's hover change, waiting until menuAt.
 	// altArmed is set while Alt alone is held, so that its release focuses the
-	// menu bar.
+	// menu bar. menuHeld is the element a context menu returns focus to, whose
+	// OnBlur waits while the menu has focus (see holdsBlur); heldBlur is set once
+	// it has skipped one.
 	ctxMenu      *contextMenu
 	menuReturn   *FocusHandle
 	pointerFocus uint64
+	menuHeld     uint64
+	heldBlur     bool
 	menuAt       time.Time
 	menuFn       func()
 	altArmed     bool
@@ -1369,8 +1373,8 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	if leaving && n.flags&flagOutside != 0 {
 		rt.outside = slices.DeleteFunc(rt.outside, func(o *node) bool { return o.id == n.id })
 	}
-	if leaving && rt.ctxMenu != nil && rt.ctxMenu.id == n.id {
-		rt.closeContextMenu(false) // the element it hung from has gone
+	if leaving && rt.ctxMenu != nil && (rt.ctxMenu.id == n.id || rt.ctxMenu.host == n.id) {
+		rt.closeContextMenu(false) // the element it is open on, or hung from, has gone
 	}
 	if leaving && n.div != nil && n.div.modal != nil {
 		rt.modalClosed(n)
@@ -1699,7 +1703,7 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 				n.lay.Children = append(n.lay.Children, &cn.lay)
 			}
 		}
-		if e.contextMenu != nil && rt.ctxMenu != nil && rt.ctxMenu.id == id {
+		if rt.ctxMenu != nil && rt.ctxMenu.host == id {
 			c := contextMenuAt(rt, rt.ctxMenu)
 			cid := childID(id, len(e.children), c)
 			if rt.claimed(cid) {

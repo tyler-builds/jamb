@@ -543,14 +543,20 @@ func (m *menuView) shortcut(it MenuItem) string {
 	return m.ctx.KeysFor(it.Action)
 }
 
-// contextMenu is an open context menu: the element it is open on, the point
-// on that element where it opened (in its local coordinates), and its items.
+// contextMenu is an open context menu: the element it is open on, the element
+// it hangs from, the point on that element where it opened (in its local
+// coordinates), and its items. It hangs from the element it is open on, or,
+// when that is a text or a text field, from the nearest element around it.
 type contextMenu struct {
-	id       uint64
+	id       uint64 // the element it is open on
+	host     uint64 // the element it hangs from (see menuHost)
 	x, y     float32
 	items    []MenuItem
 	keyboard bool   // opened from the keyboard: the first item is highlighted
 	label    string // the name of the element it is open on, for the menu's name
+	// link is the link of rich text that had keyboard focus when the menu opened
+	// (see Runtime.focusLink), which focus returns to.
+	link int
 }
 
 // ContextMenu opens a menu when the element is right-clicked, or when it has
@@ -664,11 +670,29 @@ func (dm *DropdownMenuElement) expand(ctx *Context) Element {
 }
 
 // menuTarget returns the nearest element on path (deepest first) that has a
-// context menu, or nil.
+// context menu, or nil. A built-in menu that gives way (menuFallback) is
+// chosen only when no element around it has a menu.
 func menuTarget(path []*node) *node {
+	var fallback *node
 	for _, n := range path {
-		if n.div != nil && n.div.contextMenu != nil {
+		switch {
+		case n.div == nil || n.div.contextMenu == nil:
+		case !n.div.menuFallback:
 			return n
+		case fallback == nil:
+			fallback = n
+		}
+	}
+	return fallback
+}
+
+// menuHost returns the element a context menu open on n hangs from: n itself
+// when it is an element, else the nearest element around it, since a text or
+// a text field has no children to hold the menu.
+func menuHost(n *node) *node {
+	for h := n; h != nil; h = h.parent {
+		if h.kind == kindDiv && h.div != nil {
+			return h
 		}
 	}
 	return nil
@@ -718,51 +742,187 @@ func (rt *Runtime) menuLater(d time.Duration, fn func()) {
 // menuCancel drops the pending hover change, if any.
 func (rt *Runtime) menuCancel() { rt.menuFn = nil }
 
-// openContextMenu opens n's context menu at (x, y) in n's local coordinates.
-func (rt *Runtime) openContextMenu(n *node, x, y float32, keyboard bool) {
-	items := n.div.contextMenu()
+// openContextMenu opens a context menu on n, with the items build returns, at
+// (x, y) in window coordinates. label names it; empty, it takes n's name.
+func (rt *Runtime) openContextMenu(n *node, build func() []MenuItem, x, y float32, keyboard bool, label string) {
+	host := menuHost(n)
+	if host == nil {
+		return
+	}
+	items := build()
 	if len(items) == 0 {
 		return
 	}
+	if label == "" {
+		label = menuLabel(n, rt.strings)
+	}
+	link := rt.focusLink
 	rt.menuOpened()
-	rt.ctxMenu = &contextMenu{id: n.id, x: x, y: y, items: items, keyboard: keyboard, label: menuLabel(n, rt.strings)}
-	if n.owner != nil {
-		n.owner.invalidate()
+	rt.menuHeld, rt.heldBlur = 0, false
+	if r := rt.menuReturn; r != nil && !r.none {
+		rt.menuHeld = r.id
+	}
+	r := rt.nodeRect(host)
+	rt.ctxMenu = &contextMenu{id: n.id, host: host.id, x: x - r.X, y: y - r.Y, items: items,
+		keyboard: keyboard, label: label, link: link}
+	if host.owner != nil {
+		host.owner.invalidate()
 	}
 }
 
+// openPointerMenu opens the context menu of a right press at (x, y) on path:
+// the menu of a segment of rich text under the press, or of the nearest
+// element that has one.
+func (rt *Runtime) openPointerMenu(path []*node, x, y float32) {
+	if seg := rt.segmentAt(path, x, y); seg.node != 0 {
+		n := path[0]
+		if build := segMenu(n.rich.segs, seg.seg); build != nil {
+			rt.openContextMenu(n, build, x, y, false, linkText(n.rich.segs, seg.seg))
+			return
+		}
+	}
+	if n := menuTarget(path); n != nil {
+		rt.openContextMenu(n, n.div.contextMenu, x, y, false, "")
+	}
+}
+
+// linkText is the text of the link that segment i of segs is part of: the
+// joined text of its segments (see LinkSegs), or the segment's own.
+func linkText(segs []Segment, i int) string {
+	g := segs[i].link
+	if g == nil {
+		return segs[i].text
+	}
+	for i > 0 && segs[i-1].link == g {
+		i--
+	}
+	var b []byte
+	for j := i; j < len(segs) && segs[j].link == g; j++ {
+		b = append(b, segs[j].text...)
+	}
+	return string(b)
+}
+
 // closeContextMenu closes the open context menu, if any, and restores focus
-// when restore is set.
+// when restore is set, to the link that had it when there was one.
 func (rt *Runtime) closeContextMenu(restore bool) {
 	c := rt.ctxMenu
 	if c == nil {
 		return
 	}
 	rt.ctxMenu = nil
-	if n := rt.byID[c.id]; n != nil && n.owner != nil {
+	if n := rt.byID[c.host]; n != nil && n.owner != nil {
 		n.owner.invalidate()
 	}
+	r := rt.menuReturn
 	rt.menuClosed(restore)
+	if restore && c.link != 0 && r != nil && !r.none && rt.focusID == r.id {
+		rt.focusStop(tabPlace{id: r.id, link: c.link})
+	}
+	// Focus did not come back to the element the menu held it for: it has
+	// left, so its OnBlur runs now.
+	held, skipped := rt.menuHeld, rt.heldBlur
+	rt.menuHeld, rt.heldBlur = 0, false
+	if n := rt.byID[held]; skipped && n != nil && rt.focusID != held && n.div != nil && n.div.h.onBlur != nil {
+		n.div.h.onBlur()
+	}
 }
 
-// openFocusedMenu opens the context menu of the nearest element on the focus
-// path that has one, below the focused element. It reports whether it did.
+// holdsBlur reports whether focus moving from old to id skips old's OnBlur:
+// old is the element an open context menu returns focus to, and focus goes
+// into the menu. The element keeps what OnBlur would drop, such as the
+// selection of a selectable text, which the menu's Copy needs, and a field is
+// not checked as left. closeContextMenu runs the OnBlur when focus does not
+// come back.
+func (rt *Runtime) holdsBlur(old, id uint64) bool {
+	if rt.ctxMenu == nil || old == 0 || old != rt.menuHeld || !rt.inContextMenu(id) {
+		return false
+	}
+	rt.heldBlur = true
+	return true
+}
+
+// focusBack reports whether focus coming to id is its return from a context
+// menu that skipped its OnBlur, so that its OnFocus is skipped too.
+func (rt *Runtime) focusBack(id uint64) bool {
+	return rt.heldBlur && id == rt.menuHeld && rt.ctxMenu == nil
+}
+
+// contextMenuKey is the key of the box an open context menu hangs from, among
+// the children of its host (see contextMenuAt).
+const contextMenuKey = "jamb.context-menu"
+
+// inContextMenu reports whether element id is part of the open context menu.
+func (rt *Runtime) inContextMenu(id uint64) bool {
+	for n := rt.byID[id]; n != nil && n.parent != nil; n = n.parent {
+		if n.parent.id == rt.ctxMenu.host && n.div != nil && n.div.key == contextMenuKey {
+			return true
+		}
+	}
+	return false
+}
+
+// openFocusedMenu opens a context menu for the keyboard, below what has focus:
+// the menu of the focused link of a rich text, or else of the nearest element on
+// the focus path that has one. It reports whether it did.
 func (rt *Runtime) openFocusedMenu() bool {
+	if n := rt.byID[rt.focusID]; n != nil && rt.focusedLink() != nil {
+		if build := segMenu(n.rich.segs, rt.focusLink-1); build != nil {
+			x, y := rt.linkBottom(n, rt.focusLink-1)
+			rt.openContextMenu(n, build, x, y, true, linkText(n.rich.segs, rt.focusLink-1))
+			return rt.ctxMenu != nil
+		}
+	}
 	path := rt.focusPath()
 	target := menuTarget(path)
 	if target == nil {
 		return false
 	}
-	f, tr := rt.nodeRect(path[0]), rt.nodeRect(target)
-	rt.openContextMenu(target, f.X-tr.X, f.Y+f.H-tr.Y, true)
-	return true
+	f := rt.nodeRect(path[0])
+	rt.openContextMenu(target, target.div.contextMenu, f.X, f.Y+f.H, true, "")
+	return rt.ctxMenu != nil
+}
+
+// linkBottom returns the bottom left corner of the link that starts at segment
+// i of rich text n, in window coordinates: of its last line when it wraps. It
+// falls back to the bottom left of n before n has been painted.
+func (rt *Runtime) linkBottom(n *node, i int) (x, y float32) {
+	r := rt.nodeRect(n)
+	l := n.rich.lay
+	if l == nil {
+		return r.X, r.Y + r.H
+	}
+	start := 0
+	for _, g := range n.rich.segs[:i] {
+		start += len(g.text)
+	}
+	end := start
+	for _, g := range n.rich.segs[i:linkEnd(n.rich.segs, i)] {
+		end += len(g.text)
+	}
+	rects := l.SelectionRects(start, end, nil)
+	if len(rects) == 0 {
+		return r.X, r.Y + r.H
+	}
+	last := rects[len(rects)-1]
+	li := 0
+	if l.LineHeight > 0 {
+		li = min(max(int(last.Y/l.LineHeight+0.5), 0), len(l.Lines)-1)
+	}
+	x = r.X + n.style.Padding.Left + n.lineOffset(l, li) + last.X
+	y = r.Y + n.style.Padding.Top + last.Y + last.H
+	return x, y
 }
 
 // contextMenuAt is the element a context menu hangs from: an empty box at the
-// point the menu opened at, inside the element that owns the menu. The menu
+// point the menu opened at, inside the element it hangs from. The menu
 // is an overlay of that box, so it is placed at the point.
 func contextMenuAt(rt *Runtime, c *contextMenu) Element {
-	return Div().Absolute().Left(c.x).Top(c.y).Size(Px(0), Px(0)).Child(
+	// A press in the menu goes no further than the menu: not to the element it
+	// hangs from, whose own press handling (a code editor placing its caret) is
+	// for presses on it.
+	return Div().Key(contextMenuKey).Absolute().Left(c.x).Top(c.y).Size(Px(0), Px(0)).
+		OnMouseDown(func(e *MouseEvent) { e.StopPropagation() }).Child(
 		Component(func(ctx *Context) Element {
 			m := &menuView{ctx: ctx, t: ctx.Theme(), items: c.items,
 				path:  Local(ctx, "path", highlightPath(c.items, c.keyboard)),

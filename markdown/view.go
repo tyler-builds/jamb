@@ -51,6 +51,8 @@ type ViewElement struct {
 	baseDir string
 	code    CodeHighlighter
 	size    sizes // see Width
+	// onLinkMenu builds the context menu of a link (see OnLinkMenu).
+	onLinkMenu func(url string) []ui.MenuItem
 }
 
 // View returns a view of the Markdown text src.
@@ -98,6 +100,23 @@ func (v *ViewElement) Styles(st Style) *ViewElement { v.styles = v.styles.merge(
 // images inside links. It replaces the view's own handling (see the package
 // documentation). fn runs on the UI thread; it decides what is safe to open.
 func (v *ViewElement) OnLink(fn func(url string)) *ViewElement { v.onLink = fn; return v }
+
+// OnLinkMenu gives every link a context menu, which a right click opens, or
+// Shift+F10 or the Menu key while the link has focus: fn returns its items for
+// the link's destination as it is written, as OnLink receives it. fn runs when
+// the menu opens; an empty result opens nothing. A linked image has the menu
+// too; a reference to a footnote has none.
+//
+//	view.OnLinkMenu(func(url string) []ui.MenuItem {
+//		return []ui.MenuItem{
+//			{Label: "Open link", OnClick: func() { open(url) }},
+//			{Label: "Copy link address", OnClick: func() { ctx.SetClipboard(url) }},
+//		}
+//	})
+func (v *ViewElement) OnLinkMenu(fn func(url string) []ui.MenuItem) *ViewElement {
+	v.onLinkMenu = fn
+	return v
+}
 
 // OnTaskToggle makes the check boxes of task list items operable: a click, or Space
 // while one has focus, calls fn with the task's index (0 for the first task of the

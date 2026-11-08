@@ -321,13 +321,6 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 			break
 		}
 	}
-	if b == input.ButtonRight && rt.ctxMenu == nil {
-		// A context menu that survived the press was pressed inside: it stays.
-		if n := menuTarget(path); n != nil {
-			e := rt.mouseEvent(n, x, y)
-			rt.openContextMenu(n, e.LocalX, e.LocalY, false)
-		}
-	}
 	if b == input.ButtonLeft {
 		rt.notePress(path, x, y)
 		rt.pressSeg = rt.segmentAt(path, x, y)
@@ -358,6 +351,8 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 			}
 		}
 	}
+	// A context menu that survived the press was pressed inside: it stays.
+	menuOpen := rt.ctxMenu != nil
 	for _, n := range path {
 		if n.div != nil && n.div.h.onMouseDown != nil {
 			e := rt.mouseEvent(n, x, y)
@@ -367,6 +362,13 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 				break
 			}
 		}
+	}
+	if b == input.ButtonRight && !menuOpen && rt.ctxMenu == nil {
+		// The handlers ran first, so that a text field can take focus and move its
+		// caret to the press before its menu is built. Focus returns to where they
+		// left it.
+		rt.pointerFocus = rt.focusID
+		rt.openPointerMenu(path, x, y)
 	}
 	if clicks == 2 && b == input.ButtonLeft {
 		for _, n := range path {
@@ -959,7 +961,8 @@ func (rt *Runtime) setFocus(id uint64) {
 	// focus, so its OnBlur sees it.
 	rt.commitComposition()
 	oldID := rt.focusID
-	if old := rt.byID[oldID]; old != nil && old.div != nil && old.div.h.onBlur != nil && rt.blurring != oldID {
+	held := rt.holdsBlur(oldID, id)
+	if old := rt.byID[oldID]; !held && old != nil && old.div != nil && old.div.h.onBlur != nil && rt.blurring != oldID {
 		// Focus stays on the old element while its OnBlur runs. A focus change
 		// the handler makes then finds blurring set, so it does not call OnBlur
 		// for the same element again.
@@ -975,7 +978,7 @@ func (rt *Runtime) setFocus(id uint64) {
 	rt.focusID, rt.focusLink = id, 0
 	rt.rovingFocused(id)
 	rt.focusInChanged(oldID, id)
-	if n := rt.byID[id]; n != nil && n.div != nil && n.div.h.onFocus != nil {
+	if n := rt.byID[id]; n != nil && n.div != nil && n.div.h.onFocus != nil && !rt.focusBack(id) {
 		n.div.h.onFocus()
 	}
 	for _, x := range [2]uint64{oldID, id} {

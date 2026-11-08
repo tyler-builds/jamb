@@ -48,6 +48,19 @@ ui.Text(body).HighlightMatches(query, ui.Highlight{Background: t.AccentSoft, Col
   Placed one after another in a `Rich` text, they are one Tab stop, one focus ring,
   one link named "the guide" for assistive technology, and they underline together
   under the pointer.
+- `Segment.ContextMenu(build)` gives a segment a context menu, which a right click
+  on it opens, and Shift+F10 or the Menu key while the link has focus. It wins over
+  the menu of an element around the text, so a row with its own menu can hold a link
+  with another:
+
+  ```go
+  ui.Link("Project Beta", openProject).ContextMenu(func() []ui.MenuItem {
+      return []ui.MenuItem{{Label: "Copy link", OnClick: copyProjectURL}}
+  })
+  ```
+
+  A link made with `LinkSegs` needs the menu on only one of its segments; it opens
+  from any of them.
 - `ui.Text(...).Italic()` and segment `Italic()` use the family's italic face.
   A family without an italic face for that weight uses its upright face: there
   is no synthetic slant. Segoe UI and Consolas have italics on Windows; the
@@ -145,6 +158,11 @@ are `text.select-all` and `text.copy` in the `SelectableText` key context. The
 selection is drawn in the text fields' selection colors and cleared when focus
 moves away. A click on a link in selectable rich text still follows the link.
 Selection stays within one text element; it does not run across paragraphs.
+
+A right click opens a menu of Copy and Select all. It focuses the text, keeps a
+selection it lands in, and clears one it lands outside. The menu gives way to the
+menu of an element around the text, so selectable text in a card with a
+`ContextMenu` opens the card's menu.
 
 ## Relative time
 

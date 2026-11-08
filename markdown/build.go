@@ -184,6 +184,16 @@ func (b *builder) follow(url string) func() {
 	}
 }
 
+// linkMenu returns the context menu of a link to url: the view's OnLinkMenu for
+// url, or nil when the view has none or the link leads to a footnote (url is "").
+func (b *builder) linkMenu(url string) func() []ui.MenuItem {
+	menu := b.v.onLinkMenu
+	if menu == nil || url == "" {
+		return nil
+	}
+	return func() []ui.MenuItem { return menu(url) }
+}
+
 // toFootnote returns what following the reference to footnote i does: a move to it.
 func (b *builder) toFootnote(i int) func() {
 	notes := b.notes
