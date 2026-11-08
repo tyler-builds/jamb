@@ -65,6 +65,10 @@ func TestConfigProblems(t *testing.T) {
 		{"icon missing", func(c *config) { c.Icon = "" }, `"icon" is required`},
 		{"icon outside the app", func(c *config) { c.Icon = "../icon.png" }, `"icon" must be a relative path`},
 		{"icon absolute", func(c *config) { c.Icon = filepath.Join(string(filepath.Separator), "icon.png") }, `"icon" must be a relative path`},
+		{"file outside the app", func(c *config) { c.Files = []string{"../helper.exe"} }, `"files": "../helper.exe" must be a relative path`},
+		{"file named like the executable", func(c *config) { c.Files = []string{"bin/JAMB-DEMO.exe"} }, `would land on the name of the executable`},
+		{"file named like the uninstaller", func(c *config) { c.Files = []string{"uninstall.exe"} }, `the installer's uninstaller`},
+		{"two files with one name", func(c *config) { c.Files = []string{"a/helper.exe", "b/helper.exe"} }, `"files": "b/helper.exe" would land on the name of "a/helper.exe"`},
 	}
 	for _, tc := range cases {
 		c := validConfig()
@@ -139,5 +143,36 @@ func TestNotificationProtocol(t *testing.T) {
 	}
 	if !c.NotificationProtocol {
 		t.Error("notificationProtocol is not read from jamb.json")
+	}
+}
+
+func TestExtraFiles(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "bin"), 0o755)
+	os.WriteFile(filepath.Join(dir, "bin", "helper.exe"), []byte("MZ"), 0o644)
+	os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("license"), 0o644)
+	os.WriteFile(filepath.Join(dir, "bin", "LICENSE"), []byte("other"), 0o644)
+	c := validConfig()
+
+	c.Files = []string{"bin/helper.exe"}
+	got, err := c.extraFiles(dir)
+	if err != nil || len(got) != 1 || got[0] != filepath.Join(dir, "bin", "helper.exe") {
+		t.Errorf("extraFiles = %v, %v", got, err)
+	}
+	c.Files = []string{"missing.exe"}
+	if _, err := c.extraFiles(dir); err == nil || !strings.Contains(err.Error(), `"missing.exe"`) {
+		t.Errorf("missing file: err = %v", err)
+	}
+	c.Files = []string{"bin"}
+	if _, err := c.extraFiles(dir); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+		t.Errorf("a folder: err = %v", err)
+	}
+	c.Files = []string{"bin/LICENSE"}
+	if _, err := c.extraFiles(dir); err == nil || !strings.Contains(err.Error(), "would land on LICENSE") {
+		t.Errorf("a file named like a license: err = %v", err)
+	}
+	c.Files = []string{"LICENSE"} // the app's own license file, listed again, is the same file
+	if _, err := c.extraFiles(dir); err != nil {
+		t.Errorf("the license itself: err = %v", err)
 	}
 }

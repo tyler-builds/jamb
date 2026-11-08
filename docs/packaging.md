@@ -13,8 +13,9 @@ Outputs go to `<app>/dist/`, which git ignores. Each run builds its files in a
 temporary folder inside `dist` and moves them there only after every step has
 succeeded, so a failed signature leaves no partly signed set.
 
-- `<name>-<version>-windows-<arch>.zip`: the executable at the root, and any
-  `LICENSE*` and `NOTICE*` files of the app directory beside it. Always built.
+- `<name>-<version>-windows-<arch>.zip`: the executable at the root, with the
+  `files` of `jamb.json` and any `LICENSE*` and `NOTICE*` files of the app directory
+  beside it. Always built.
 - `<name>-<version>-windows-<arch>-setup.exe`: an installer, built with
   `--installer`. See [Installer](#installer).
 - `<name>-<version>-windows-<arch>.msix`: an MSIX package, built with `--msix`.
@@ -24,7 +25,7 @@ succeeded, so a failed signature leaves no partly signed set.
 
 ## jamb.json
 
-Every field is required except `copyright` and `notificationProtocol`. An unknown
+Every field is required except `copyright`, `notificationProtocol` and `files`. An unknown
 field is an error, so a misspelled name stops the build, and every problem is reported
 in one message.
 
@@ -40,6 +41,7 @@ in one message.
 | `copyright` | Optional. Shown as the legal copyright in file properties and the installer. |
 | `notificationProtocol` | Optional, `true` or `false`; the default is `false`. With `true`, the MSIX manifest declares the app's notification protocol, `jamb-` and `identityName` in lower case, as a `windows.protocol` extension. A click on a notification then starts the packaged app after it has closed. The app must use the same `AppID`, which is `identityName`, and `OnNotification`. It has no effect on the zip or the installer. |
 | `icon` | A square PNG, at least 48 px, relative to the app directory. 256 px or larger is recommended, and packaging warns below that. It becomes the executable's icon, the installer's icon and the MSIX logos. |
+| `files` | Optional. More files to ship beside the executable, such as a helper program the app starts, by paths relative to the app directory. Each lands at the root of the zip, the install folder and the MSIX under its base name, so two files cannot share a base name, and none can take the executable's, `uninstall.exe`, `AppxManifest.xml` or `Assets`. With `--sign-command`, the `.exe` and `.dll` files among them are signed too; the app directory's copies are left as they were. |
 
 File associations and extra capabilities are not supported yet. The manifest
 requests only `runFullTrust`.
