@@ -25,8 +25,31 @@ const (
 	stateMaximized  = 1
 	stateFullscreen = 2
 	stateActivated  = 4
+	stateTiledLeft  = 5
+	stateTiledRight = 6
+	stateTiledTop   = 7
+	stateTiledBot   = 8
 	stateSuspended  = 9
 )
+
+// The frame a window whose frame is its own draws (see ClientFrame), in
+// logical pixels.
+const (
+	// shadowMargin is the transparent margin around the window that holds
+	// its shadow.
+	shadowMargin = 24
+	// outsideResize is how far out of the window the pointer resizes it: the
+	// part of the margin that takes input.
+	outsideResize = 10
+	// cornerRadius and cornerRadiusSmall are the radii of CornersRound (and
+	// the default, as GNOME rounds its windows) and CornersRoundSmall.
+	cornerRadius      = 12
+	cornerRadiusSmall = 6
+)
+
+// tiling is the edges a window is snapped against (xdg_toplevel's tiled
+// states).
+type tiling struct{ left, top, right, bottom bool }
 
 type window struct {
 	d       *display
@@ -63,6 +86,10 @@ type window struct {
 	needsDraw   bool // the size or scale changed: draw even without a request
 
 	maximized, fullscreen, activated, suspended bool
+	tiled                                       tiling
+	// sentFrame is the frame of the last commit's geometry and regions (see
+	// applyFrame).
+	sentFrame frameState
 	// serverFrame is set when the compositor draws the window's frame.
 	serverFrame bool
 	// ownTitleBar is set when the window asked for the system's title bar and
@@ -214,6 +241,7 @@ func (w *window) toplevelEvent(op uint16, d *wl.Decoder) {
 		width, height := int(d.Int()), int(d.Int())
 		states := d.Array()
 		maximized, fullscreen, activated, suspended := false, false, false, false
+		var tiled tiling
 		for i := 0; i+4 <= len(states); i += 4 {
 			switch uint32(states[i]) | uint32(states[i+1])<<8 | uint32(states[i+2])<<16 | uint32(states[i+3])<<24 {
 			case stateMaximized:
@@ -222,12 +250,21 @@ func (w *window) toplevelEvent(op uint16, d *wl.Decoder) {
 				fullscreen = true
 			case stateActivated:
 				activated = true
+			case stateTiledLeft:
+				tiled.left = true
+			case stateTiledRight:
+				tiled.right = true
+			case stateTiledTop:
+				tiled.top = true
+			case stateTiledBot:
+				tiled.bottom = true
 			case stateSuspended:
 				suspended = true
 			}
 		}
 		stateChanged := maximized != w.maximized || fullscreen != w.fullscreen
 		w.maximized, w.fullscreen, w.activated, w.suspended = maximized, fullscreen, activated, suspended
+		w.tiled = tiled
 		resized := false
 		if width > 0 && height > 0 && (width != w.logW || height != w.logH) {
 			w.logW, w.logH = max(width, w.opts.MinWidth, 1), max(height, w.opts.MinHeight, 1)
@@ -288,9 +325,12 @@ func (w *window) presentBuffer(buf *wl.Proxy, width, height int) {
 		return
 	}
 	s := w.surface
+	f := w.frame()
+	w.applyFrame(f)
 	if w.viewport != nil && w.scale120 > 0 {
-		s.Send(8, int32(1))                              // set_buffer_scale
-		w.viewport.Send(2, int32(w.logW), int32(w.logH)) // set_destination
+		sw, sh := f.surfaceSize()
+		s.Send(8, int32(1))                      // set_buffer_scale
+		w.viewport.Send(2, int32(sw), int32(sh)) // set_destination
 	} else {
 		if w.viewport != nil {
 			w.viewport.Send(2, int32(-1), int32(-1)) // unset the destination
@@ -390,8 +430,13 @@ func (w *window) Handle() uintptr { return uintptr(w.surface.ID) }
 // Target returns where the CPU renderer draws the window's frames.
 func (w *window) Target() soft.Target { return w.target() }
 
-func (w *window) Size() (int, int) { return w.physical(w.logW), w.physical(w.logH) }
-func (w *window) Scale() float32   { return float32(w.scale()) }
+// Size implements platform.Window: the content's size, which for a window
+// that draws its own frame leaves out the margin around it (see ClientFrame).
+func (w *window) Size() (int, int) {
+	x0, y0, x1, y1, _, _ := w.physicalFrame(w.frame())
+	return x1 - x0, y1 - y0
+}
+func (w *window) Scale() float32 { return float32(w.scale()) }
 
 func (w *window) SetTitle(t string) {
 	if t != w.title && !w.destroyed {

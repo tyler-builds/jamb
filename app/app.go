@@ -97,6 +97,10 @@ type Window struct {
 	// Chrome selects who draws the title bar: the operating system (the
 	// default) or the app; see ChromeCustom.
 	Chrome Chrome
+	// Corners selects how the window's corners are drawn: the system's
+	// default (the zero value), rounded, slightly rounded or square. See
+	// Corners.
+	Corners Corners
 	// X and Y place the window's top-left corner in logical screen pixels.
 	// Both zero centers the first window, and cascades a later one 32 pixels
 	// from the last window opened.
@@ -153,6 +157,28 @@ const (
 	// with ui.DivElement.WindowArea; ui.TitleBarButtons draws the usual
 	// buttons.
 	ChromeCustom
+)
+
+// Corners selects how a window's corners are drawn. The system draws them where
+// it draws the window's frame: Windows 11 and macOS round every window, and on
+// Linux a desktop that draws frames (KDE) rounds them as its theme says. On a
+// desktop that leaves the frame to the app (GNOME), jamb draws the corners, a
+// shadow and a thin outline itself. Corners are square while the window is
+// maximized, fullscreen or snapped against that edge. Windows 10 does not round
+// windows, so there every choice is square.
+type Corners uint8
+
+const (
+	// CornersDefault is the system's choice: rounded on Windows 11, macOS and
+	// GNOME (as GNOME's own windows are).
+	CornersDefault Corners = iota
+	// CornersRound rounds the corners as the system rounds a main window.
+	CornersRound
+	// CornersRoundSmall rounds them less, as Windows 11 rounds menus and
+	// tooltips.
+	CornersRoundSmall
+	// CornersSquare keeps them square.
+	CornersSquare
 )
 
 // App is an application instance. A process has one App: its windows share
@@ -507,6 +533,7 @@ func openWindow(cfg Window, handle *appWindow) (*host, error) {
 		Title: cfg.Title, Width: cfg.Width, Height: cfg.Height,
 		MinWidth: cfg.MinWidth, MinHeight: cfg.MinHeight, Dark: cfg.themeFor(systemSettings(h.dev).Dark).Dark,
 		CustomTitleBar: cfg.Chrome == ChromeCustom,
+		Corners:        platform.Corners(cfg.Corners),
 		NoActivate:     h.dev.noActivate,
 	}
 	if h.primary && h.dev.position != nil {
@@ -723,6 +750,11 @@ func (h *host) OnCreate(w platform.Window) error {
 	r, err := newRenderer(w, width, height)
 	if err != nil {
 		return err
+	}
+	// On a desktop that leaves the window frame to the app (GNOME), the
+	// frame is drawn around each scene: see framedRenderer.
+	if fw, ok := w.(platform.FramedWindow); ok {
+		r = newFramedRenderer(r, fw, func() bool { return h.rt.Theme().Dark })
 	}
 	h.r = r
 	desc := ""

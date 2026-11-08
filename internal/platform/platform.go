@@ -51,11 +51,54 @@ type WindowOptions struct {
 	// TitleBarHandler, and the window keeps its native resize borders, snap
 	// and shadow. See TitleBarHandler.
 	CustomTitleBar bool
+	// Corners selects how the window's corners are drawn (see app.Corners).
+	Corners Corners
 	// NoActivate shows the window without activating it, and the adapter never
 	// asks the system to make it the foreground window: showing, restoring and
 	// Focus leave the active window alone. Only Windows does this. It is for
 	// measurements that must not take the user's focus (see JAMB_NOACTIVATE).
 	NoActivate bool
+}
+
+// Corners selects how a window's corners are drawn; its values are app.Corners'.
+type Corners uint8
+
+// The Corners values, as app.Corners documents them.
+const (
+	CornersDefault Corners = iota
+	CornersRound
+	CornersRoundSmall
+	CornersSquare
+)
+
+// ClientFrame is the frame a window draws around its content, on a desktop
+// that leaves the window frame to the app (GNOME). See FramedWindow.
+type ClientFrame struct {
+	// Left, Top, Right and Bottom are the transparent margin around the
+	// content, in physical pixels, which holds the shadow: a frame is drawn
+	// (Size + margins) large, with the content at (Left, Top). They are zero on
+	// an edge the window is maximized, fullscreen or snapped against.
+	Left, Top, Right, Bottom int
+	// Radii are the content's corner radii in physical pixels: top left, top
+	// right, bottom right, bottom left.
+	Radii [4]float32
+	// Active is set while the window has the keyboard focus: its shadow is
+	// deeper.
+	Active bool
+	// Scale is the window's scale, for sizes given in logical pixels.
+	Scale float32
+}
+
+// Framed reports whether there is a frame to draw.
+func (f ClientFrame) Framed() bool {
+	return f.Left|f.Top|f.Right|f.Bottom != 0 || f.Radii != [4]float32{}
+}
+
+// FramedWindow is a Window that leaves its frame to the app. The host draws
+// each frame (see ClientFrame) around the content, and the window's events,
+// Size and title-bar hit tests are all in content coordinates.
+type FramedWindow interface {
+	ClientFrame() ClientFrame
 }
 
 // Point is a position in logical pixels (see WindowOptions.Origin).

@@ -153,6 +153,7 @@ func (s *seat) pointerEvent(op uint16, d *wl.Decoder) {
 		s.enterSerial = d.Uint()
 		s.pointerOn = s.windowOf(d.Uint())
 		s.x, s.y = d.Fixed(), d.Fixed()
+		s.toContent()
 		if w := s.pointerOn; w != nil {
 			s.applyCursor(w.cursor)
 			s.move(w)
@@ -167,6 +168,7 @@ func (s *seat) pointerEvent(op uint16, d *wl.Decoder) {
 	case 2: // motion(time, x, y)
 		d.Uint()
 		s.x, s.y = d.Fixed(), d.Fixed()
+		s.toContent()
 		if w := s.pointerOn; w != nil {
 			s.move(w)
 		}
@@ -200,6 +202,17 @@ func (s *seat) pointerEvent(op uint16, d *wl.Decoder) {
 		} else {
 			s.v120X += v
 		}
+	}
+}
+
+// toContent makes the pointer's position, which arrives relative to the
+// surface, relative to the window's content: a window that draws its own frame
+// has a margin around it (see ClientFrame). In the margin it is negative or
+// past the content's size, where only the resize border takes input.
+func (s *seat) toContent() {
+	if w := s.pointerOn; w != nil {
+		s.x -= float64(w.sentFrame.l)
+		s.y -= float64(w.sentFrame.t)
 	}
 }
 
@@ -289,7 +302,8 @@ func (s *seat) button(w *window, serial, code uint32, pressed bool) {
 	}
 	if b == input.ButtonRight && w.opts.CustomTitleBar {
 		if th, ok := w.handler.(platform.TitleBarHandler); ok && th.TitleArea(w, x, y) == platform.TitleDrag {
-			w.toplevel.Send(4, s.proxy, serial, int32(s.x), int32(s.y)) // show_window_menu
+			f := w.sentFrame
+			w.toplevel.Send(4, s.proxy, serial, int32(s.x)+int32(f.l), int32(s.y)+int32(f.t)) // show_window_menu
 			return
 		}
 	}
