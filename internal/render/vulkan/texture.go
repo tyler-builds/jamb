@@ -48,6 +48,7 @@ type upload struct {
 // changed, after creating the images of new ones. The copies count once the
 // frame has finished: see commitUploads.
 func (r *Renderer) uploadTextures(now time.Time) error {
+	r.unifyTextures()
 	ups := r.uploads[:0]
 	staged := 0
 	for _, c := range r.commands {
@@ -120,6 +121,68 @@ func (r *Renderer) uploadTextures(now time.Time) error {
 			stageTransfer, stageFragmentShader, queueFamilyIgnored, queueFamilyIgnored)
 	}
 	return nil
+}
+
+// unifyTextures makes each command draw the newest texture of its ID. A glyph
+// atlas that grows is replaced by a bigger texture with the same ID that holds
+// the old pixels in its top-left corner (text.Atlas.grow), so a frame drawn
+// while it grew draws both. They share one GPU texture, made at the newest
+// size: uploading both would free the image an earlier copy in the frame
+// writes to. The older texture's UVs are scaled to the bigger one.
+func (r *Renderer) unifyTextures() {
+	var newest map[uint64]*scene.Texture
+	var first *scene.Texture
+	for _, c := range r.commands {
+		t := c.tex
+		switch {
+		case t == nil || t == first:
+		case first == nil:
+			first = t
+		default:
+			if newest == nil {
+				newest = map[uint64]*scene.Texture{first.ID: first}
+			}
+			if n := newest[t.ID]; n == nil || t.Version > n.Version {
+				newest[t.ID] = t
+			}
+		}
+	}
+	if newest == nil {
+		return // one texture at most
+	}
+	for i := range r.commands {
+		c := &r.commands[i]
+		if c.tex == nil {
+			continue
+		}
+		n := newest[c.tex.ID]
+		if n == c.tex {
+			continue
+		}
+		sx, sy := float32(c.tex.Width)/float32(n.Width), float32(c.tex.Height)/float32(n.Height)
+		lo, hi := int(c.start), int(c.start+c.count)
+		switch c.pipe {
+		case pipeMask:
+			scaleUVs(r.masks[lo:hi], sx, sy)
+		case pipeSubpixel:
+			scaleUVs(r.subs[lo:hi], sx, sy)
+		case pipeImage:
+			for j := lo; j < hi; j++ {
+				scaleUV(&r.images[j].UV, sx, sy)
+			}
+		}
+		c.tex = n
+	}
+}
+
+func scaleUVs(ins []maskInstance, sx, sy float32) {
+	for i := range ins {
+		scaleUV(&ins[i].UV, sx, sy)
+	}
+}
+
+func scaleUV(uv *[4]float32, sx, sy float32) {
+	uv[0], uv[1], uv[2], uv[3] = uv[0]*sx, uv[1]*sy, uv[2]*sx, uv[3]*sy
 }
 
 // commitUploads marks the frame's uploads done, once the frame has finished.
