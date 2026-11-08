@@ -152,7 +152,9 @@ brackets where it changed:
 
 jamb is plain Go, with no cgo. On Windows it uses Win32 for windows and input, and draws with a
 Direct3D 11 renderer that it reaches through COM vtables; text is shaped with HarfBuzz (through
-go-text) and the accessibility tree is exposed through UI Automation. Each frame, components whose
+go-text) and the accessibility tree is exposed through UI Automation. On Linux (experimental) it
+speaks the Wayland protocol itself and draws with Vulkan, loaded at run time, into dma-bufs it hands
+to the compositor; without a usable GPU it draws on the CPU. Each frame, components whose
 signals changed render again, the layout updates what moved, and the renderer submits the scene to
 the GPU; nothing is drawn while nothing changes. [docs/architecture.md](docs/architecture.md) has the
 details.

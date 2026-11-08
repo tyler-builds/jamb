@@ -67,13 +67,15 @@ The milestone status, and the known limitations and next steps.
   compositors is experimental (`internal/platform/linux`): it speaks the Wayland
   protocol in pure Go, loads libxkbcommon with purego for keyboard layouts and
   libfontconfig for the desktop's fonts (the UI, monospace and emoji fonts, and
-  a font for any character the others lack), and draws on the CPU
-  (`internal/render/soft`) into shared memory. It has windows,
+  a font for any character the others lack), and draws with Vulkan
+  (`internal/render/vulkan`) into dma-bufs, or on the CPU
+  (`internal/render/soft`) into shared memory when the GPU or the compositor
+  cannot (see [Vulkan on Linux](architecture.md#vulkan-on-linux)). It has windows,
   server or client-side decorations, fractional scaling, pointer, keyboard with
   compose, the clipboard (text and PNG), the desktop's dark mode, high contrast
   and reduced motion, file dialogs through the portal, OS notifications, and tray icons (StatusNotifierItem,
-  hosted by KDE Plasma and, with the AppIndicator extension, GNOME). It lacks a GPU
-  renderer, input methods (text-input-v3), message boxes, accessibility
+  hosted by KDE Plasma and, with the AppIndicator extension, GNOME). It lacks
+  input methods (text-input-v3), message boxes, accessibility
   (AT-SPI), drag and drop, and X11. On compositors that draw no window frames
   (GNOME), a window that does not draw its own title bar gets jamb's default one
   (see [Default title bar](windows.md#default-title-bar)).

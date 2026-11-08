@@ -1,0 +1,73 @@
+name: Shaders
+
+# Compiles the Vulkan renderer's GLSL shaders to the SPIR-V files it embeds
+# (internal/render/vulkan/shaders/spv), so nobody needs glslc installed. On a pull
+# request that changes a shader, the job compiles them and commits the result to the
+# pull request's branch, then runs CI again on that commit (a push made with the
+# workflow's token starts no workflow by itself). On main, and on a pull request
+# from a fork, which the job cannot push to, it only checks that the committed files
+# are current. glslc's output depends on its version: this job's (Ubuntu 24.04's
+# shaderc) is the reference.
+on:
+  pull_request:
+    paths:
+      - "internal/render/vulkan/shaders/**"
+      - ".github/workflows/shaders.yml"
+  push:
+    branches: [main]
+    paths:
+      - "internal/render/vulkan/shaders/**"
+      - ".github/workflows/shaders.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shaders-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Compile shaders
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # to commit the compiled shaders to the pull request's branch
+      actions: write # to run CI on that commit
+    env:
+      # The pull request's branch can be pushed to only when it is in this repository.
+      CAN_PUSH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The branch itself rather than the merge commit, so a commit can go on it.
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      - name: Install glslc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq glslc
+          glslc --version
+      - name: Compile
+        run: sh internal/render/vulkan/shaders/compile.sh
+      - name: Commit or check the compiled shaders
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          git add -A internal/render/vulkan/shaders/spv
+          if git diff --cached --quiet; then
+            echo "The compiled shaders are current."
+            exit 0
+          fi
+          git diff --cached --stat
+          if [ "$CAN_PUSH" != "true" ]; then
+            echo "::error::The compiled shaders in internal/render/vulkan/shaders/spv are out of date. Run internal/render/vulkan/shaders/compile.sh with glslc from Ubuntu 24.04, or push the change to a branch of this repository, where this workflow commits them."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "build(shaders): compile SPIR-V"
+          git push origin "HEAD:$BRANCH"
+          gh workflow run ci.yml --ref "$BRANCH"

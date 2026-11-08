@@ -11,8 +11,9 @@ import (
 	"github.com/tyler-builds/jamb/internal/render/soft"
 )
 
-// On Linux, windows are Wayland surfaces and frames are drawn on the CPU (see
-// render/soft) into shared memory. There is no GPU device to prepare or lose.
+// On Linux, windows are Wayland surfaces. Frames are drawn with Vulkan into
+// dma-bufs when the GPU and the compositor allow it (see gpu_linux.go), and
+// otherwise on the CPU (see render/soft) into shared memory.
 
 func osRunPlatform(start func() error) error { return linux.Run(start) }
 
@@ -34,27 +35,19 @@ func osQuitUI() { linux.Quit() }
 // desktop matches to the app's .desktop file.
 func setPlatformAppID(id string) { linux.SetAppID(id) }
 
-func osPrepareDevice() {}
-
 // softWindow is a window whose frames the CPU renderer draws.
 type softWindow interface {
 	Target() soft.Target
 }
 
-func osNewRenderer(w platform.Window, width, height int) (render.Renderer, error) {
+// newSoftRenderer returns the CPU renderer of a window.
+func newSoftRenderer(w platform.Window) (render.Renderer, error) {
 	sw, ok := w.(softWindow)
 	if !ok {
 		return nil, errors.New("app: the window has no target for the CPU renderer")
 	}
 	return soft.New(sw.Target()), nil
 }
-
-// The CPU renderer never loses a device.
-func osReleaseDevice() {}
-
-func osRebuildDevice() error { return nil }
-
-func osGpuAdapter() string { return "CPU" }
 
 // readPlatformSettings reads the desktop's settings from the settings portal
 // (see linux.ReadSettings).

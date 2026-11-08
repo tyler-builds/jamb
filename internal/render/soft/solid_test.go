@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/tyler-builds/jamb/internal/render/rendertest"
 	"github.com/tyler-builds/jamb/internal/scene"
 )
 
@@ -18,7 +19,7 @@ func TestSolidSpansMatchShading(t *testing.T) {
 		if err := r.BeginFrame(w, h, black); err != nil {
 			t.Fatal(err)
 		}
-		busyScene(r, w, h)
+		rendertest.BusyScene(r, w, h)
 		borderedScene(r, w, h)
 		if err := r.EndFrame(); err != nil {
 			t.Fatal(err)
