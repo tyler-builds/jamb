@@ -30,28 +30,6 @@ type ListBoxStyle struct {
 	ItemFocusVisible Style // the item that has keyboard focus, while the list has focus
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ListBoxStyle) merge(o ListBoxStyle) ListBoxStyle {
-	return ListBoxStyle{
-		List:             s.List.Merge(o.List),
-		Item:             s.Item.Merge(o.Item),
-		ItemHover:        s.ItemHover.Merge(o.ItemHover),
-		ItemSelected:     s.ItemSelected.Merge(o.ItemSelected),
-		ItemFocusVisible: s.ItemFocusVisible.Merge(o.ItemFocusVisible),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ListBoxStyle) plain() ListBoxStyle {
-	return ListBoxStyle{
-		List:             plainStyle(s.List),
-		Item:             plainStyle(s.Item),
-		ItemHover:        plainStyle(s.ItemHover),
-		ItemSelected:     plainStyle(s.ItemSelected),
-		ItemFocusVisible: plainStyle(s.ItemFocusVisible),
-	}
-}
-
 // listBoxDefaults returns the built-in look of a list box, from the colors of t.
 // Under high contrast the selected item is the Accent color with AccentText on it.
 // No state changes the font weight: a selected item is shown by its fill.
@@ -76,8 +54,10 @@ func listBoxDefaults(t *Theme) ListBoxStyle {
 // overrides are plain (see plainStyle).
 func resolveListBox(ctx *Context, inst ListBoxStyle) ListBoxStyle {
 	t := ctx.Theme()
-	return layered(ctx, listBoxDefaults(t), ListBoxStyle.merge, ListBoxStyle.plain,
-		themeLayer(t.ListBox), instanceLayer(inst))
+	st := listBoxDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.ListBox), instanceLayer(&inst))
+	return st
 }
 
 // ListBoxElement is a list of items that the user selects from, with the keyboard
@@ -239,7 +219,7 @@ func (l *ListBoxElement[T]) OnActivate(fn func(item T)) *ListBoxElement[T] {
 // fields win over the theme's ListBox and the defaults; see ListBoxStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (l *ListBoxElement[T]) Styles(st ListBoxStyle) *ListBoxElement[T] {
-	l.styles = l.styles.merge(st)
+	l.styles.mergeFrom(&st, false)
 	return l
 }
 

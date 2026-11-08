@@ -375,7 +375,8 @@ func LightTheme() *Theme { return newLightTheme() }
 // map. It has the styles that SetThemeStyle stored on t; setting one on the copy
 // does not change t, nor the other way round.
 func (t *Theme) Clone() *Theme {
-	c := *t
+	c := new(Theme)
+	copyLarge(c, t)
 	c.Syntax = maps.Clone(t.Syntax)
-	return &c
+	return c
 }

@@ -144,16 +144,6 @@ type TooltipStyle struct {
 	Text  Style // the text in it
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s TooltipStyle) merge(o TooltipStyle) TooltipStyle {
-	return TooltipStyle{Panel: s.Panel.Merge(o.Panel), Text: s.Text.Merge(o.Text)}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s TooltipStyle) plain() TooltipStyle {
-	return TooltipStyle{Panel: plainStyle(s.Panel), Text: plainStyle(s.Text)}
-}
-
 // tooltipDefaults returns the built-in look of a tooltip, from the colors of t.
 func tooltipDefaults(t *Theme) TooltipStyle {
 	return TooltipStyle{Panel: Style{Padding: XY(8, 4), Radius: 6, Background: t.Surface, BorderWidth: 1,
@@ -164,11 +154,8 @@ func tooltipDefaults(t *Theme) TooltipStyle {
 // theme's Tooltip. Under high contrast the override is plain (see plainStyle).
 func resolveTooltip(t *Theme) TooltipStyle {
 	st := tooltipDefaults(t)
-	o := t.Tooltip
-	if t.HighContrast {
-		o = o.plain()
-	}
-	return st.merge(o)
+	st.mergeFrom(&t.Tooltip, t.HighContrast)
+	return st
 }
 
 // tooltipElement builds the label shown for a tooltip. It fades in and out.

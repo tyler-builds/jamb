@@ -160,47 +160,59 @@ func (s *Style) recordSizing(set sizeSet) {
 	}
 }
 
-// layer is one layer of a widget's part styles, with the name the inspector
-// gives it.
+// layer is one layer of a widget's part styles: the theme's style for a part, or
+// the Styles of an element. It points at the style, which layered only reads.
+// The inspector's name for it comes from instance, not from a string the layer
+// holds, so that a layer holds no pointer but s (see the generated layered).
 type layer[S any] struct {
-	name string
-	s    S
+	s        *S
+	instance bool
+}
+
+// name is the inspector's name for the layer.
+func (l layer[S]) name() string {
+	if l.instance {
+		return inspect.SourceInstance
+	}
+	return inspect.SourceTheme
 }
 
 // themeLayer is the theme's style for a part, as a layer for layered.
-func themeLayer[S any](s S) layer[S] { return layer[S]{inspect.SourceTheme, s} }
+func themeLayer[S any](s *S) layer[S] { return layer[S]{s, false} }
 
 // instanceLayer is the Styles of an element, as a layer for layered.
-func instanceLayer[S any](s S) layer[S] { return layer[S]{inspect.SourceInstance, s} }
+func instanceLayer[S any](s *S) layer[S] { return layer[S]{s, true} }
 
-// layered returns the look of a widget's part styles: base, with each layer
-// merged over it in order, as the widget's merge does. Under high contrast each
-// layer is first passed through plain, which drops what the system colors replace.
-// The inspector names base as the built-in default, and each layer by its name
-// (see StyleLayer).
-func layered[S any](ctx *Context, base S, merge func(S, S) S, plain func(S) S, layers ...layer[S]) S {
-	hc := ctx.Theme().HighContrast
-	st := base
-	// Without an inspector the layers are merged as they always were: a layer is
-	// copied only when it is recorded.
-	rec := ctx.rt.insp != nil
-	if rec {
-		st = recordLayer(st, inspect.SourceDefault)
-	}
+//go:generate go run ../internal/stylegen
+
+// styleParts is a widget's style type, which merges in place (see
+// style_merge_gen.go).
+type styleParts[S any] interface {
+	*S
+	mergeFrom(o *S, plain bool)
+}
+
+// layeredRecorded is a widget style's layered while an inspector is attached: it
+// merges each layer over st in order, and records the name of the layer that set
+// each value. The inspector names st as the built-in default, and each layer by
+// its name (see StyleLayer). Under high contrast each layer is merged as plain,
+// without what the system colors replace. st and the layers are the caller's
+// copies, which it changes.
+func layeredRecorded[S any, P styleParts[S]](st P, layers []layer[S], hc bool) {
+	tagLayer(reflect.ValueOf(st).Elem(), inspect.SourceDefault)
 	for _, l := range layers {
+		// A layer is made plain before its name is recorded, as it is merged,
+		// so that it names only what the layer sets.
 		o := l.s
 		if hc {
-			o = plain(o)
+			pl := new(S)
+			P(pl).mergeFrom(o, true)
+			o = pl
 		}
-		if rec {
-			o = recordLayer(o, l.name)
-		}
-		st = merge(st, o)
+		tagLayer(reflect.ValueOf(o).Elem(), l.name())
+		st.mergeFrom(o, false)
 	}
-	if rec {
-		st = nameStates(st)
-	}
-	return st
+	nameStateFields(reflect.ValueOf(st).Elem())
 }
 
 // appliedStates names the states that a widget applies with a Style of its own
@@ -215,16 +227,10 @@ var appliedStates = map[string]string{
 	"Alternate": "alternate", "Editing": "editing", "Complete": "complete", "Filled": "filled",
 }
 
-// nameStates names the layers of the applied states of a resolved widget style (see
-// appliedStates), so the inspector reports "state: disabled (theme)" for a value that
-// the disabled style of the part set, and not the layer of the part.
-func nameStates[S any](st S) S {
-	nameStateFields(reflect.ValueOf(&st).Elem())
-	return st
-}
-
-// nameStateFields names the applied-state fields of the struct v (settable), and of
-// the structs it holds.
+// nameStateFields names the layers of the applied states of the resolved widget
+// style v, which must be settable, and of the structs it holds (see appliedStates),
+// so the inspector reports "state: disabled (theme)" for a value that the disabled
+// style of the part set, and not the layer of the part.
 func nameStateFields(v reflect.Value) {
 	for i := 0; i < v.NumField(); i++ {
 		f := v.Field(i)

@@ -29,36 +29,6 @@ type OTPInputStyle struct {
 	Dot         Style // the dot of a masked box that holds a character
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s OTPInputStyle) merge(o OTPInputStyle) OTPInputStyle {
-	return OTPInputStyle{
-		Root:        s.Root.Merge(o.Root),
-		Group:       s.Group.Merge(o.Group),
-		Box:         s.Box.Merge(o.Box),
-		BoxFilled:   s.BoxFilled.Merge(o.BoxFilled),
-		BoxFocused:  s.BoxFocused.Merge(o.BoxFocused),
-		BoxDisabled: s.BoxDisabled.Merge(o.BoxDisabled),
-		BoxInvalid:  s.BoxInvalid.Merge(o.BoxInvalid),
-		Text:        s.Text.Merge(o.Text),
-		Dot:         s.Dot.Merge(o.Dot),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s OTPInputStyle) plain() OTPInputStyle {
-	return OTPInputStyle{
-		Root:        plainStyle(s.Root),
-		Group:       plainStyle(s.Group),
-		Box:         plainStyle(s.Box),
-		BoxFilled:   plainStyle(s.BoxFilled),
-		BoxFocused:  plainStyle(s.BoxFocused),
-		BoxDisabled: plainStyle(s.BoxDisabled),
-		BoxInvalid:  plainStyle(s.BoxInvalid),
-		Text:        plainStyle(s.Text),
-		Dot:         plainStyle(s.Dot),
-	}
-}
-
 // otpBoxWidth and otpBoxHeight are the size of a box at the Text size of 100
 // percent, in logical pixels. They scale with the Text size.
 const (
@@ -107,8 +77,10 @@ func otpInputDefaults(t *Theme, scale float32, disabled bool) OTPInputStyle {
 // two overrides are plain (see plainStyle).
 func resolveOTPInput(ctx *Context, scale float32, disabled bool, inst OTPInputStyle) OTPInputStyle {
 	t := ctx.Theme()
-	return layered(ctx, otpInputDefaults(t, scale, disabled), OTPInputStyle.merge, OTPInputStyle.plain,
-		themeLayer(t.OTPInput), instanceLayer(inst))
+	st := otpInputDefaults(t, scale, disabled)
+	st.layered(ctx,
+		themeLayer(&t.OTPInput), instanceLayer(&inst))
+	return st
 }
 
 // OTPInputElement is an input for a one-time code, such as a verification code
@@ -247,7 +219,7 @@ func (o *OTPInputElement) Tooltip(s string) *OTPInputElement { o.tooltip = s; re
 // fields win over the theme's OTPInput and the defaults; see OTPInputStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (o *OTPInputElement) Styles(st OTPInputStyle) *OTPInputElement {
-	o.styles = o.styles.merge(st)
+	o.styles.mergeFrom(&st, false)
 	return o
 }
 

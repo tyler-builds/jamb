@@ -13,24 +13,6 @@ type StatusBarStyle struct {
 	End   Style // the row of items at the end
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s StatusBarStyle) merge(o StatusBarStyle) StatusBarStyle {
-	return StatusBarStyle{
-		Bar:   s.Bar.Merge(o.Bar),
-		Start: s.Start.Merge(o.Start),
-		End:   s.End.Merge(o.End),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s StatusBarStyle) plain() StatusBarStyle {
-	return StatusBarStyle{
-		Bar:   plainStyle(s.Bar),
-		Start: plainStyle(s.Start),
-		End:   plainStyle(s.End),
-	}
-}
-
 // statusBarDefaults returns the built-in look of a status bar, from the colors of
 // t: a compact strip in the panel color with a border along its top, and small
 // muted text. Under high contrast the strip is the window color, its border and
@@ -53,8 +35,10 @@ func statusBarDefaults(t *Theme) StatusBarStyle {
 // overrides are plain (see plainStyle).
 func resolveStatusBar(ctx *Context, inst StatusBarStyle) StatusBarStyle {
 	t := ctx.Theme()
-	return layered(ctx, statusBarDefaults(t), StatusBarStyle.merge, StatusBarStyle.plain,
-		themeLayer(t.StatusBar), instanceLayer(inst))
+	st := statusBarDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.StatusBar), instanceLayer(&inst))
+	return st
 }
 
 // StatusBarElement is the bar along the bottom of a window, which shows the state
@@ -131,7 +115,7 @@ func (s *StatusBarElement) GridSpan(cols, rows int) *StatusBarElement {
 // Set fields win over the theme's StatusBar and the defaults; see StatusBarStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
 func (s *StatusBarElement) Styles(st StatusBarStyle) *StatusBarElement {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

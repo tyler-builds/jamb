@@ -34,34 +34,6 @@ type SliderStyle struct {
 	ValueText         Style // the readout beside the track
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s SliderStyle) merge(o SliderStyle) SliderStyle {
-	return SliderStyle{
-		Track:             s.Track.Merge(o.Track),
-		TrackFocusVisible: s.TrackFocusVisible.Merge(o.TrackFocusVisible),
-		Rail:              s.Rail.Merge(o.Rail),
-		Fill:              s.Fill.Merge(o.Fill),
-		Thumb:             s.Thumb.Merge(o.Thumb),
-		ThumbHover:        s.ThumbHover.Merge(o.ThumbHover),
-		ThumbPressed:      s.ThumbPressed.Merge(o.ThumbPressed),
-		ValueText:         s.ValueText.Merge(o.ValueText),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s SliderStyle) plain() SliderStyle {
-	return SliderStyle{
-		Track:             plainStyle(s.Track),
-		TrackFocusVisible: plainStyle(s.TrackFocusVisible),
-		Rail:              plainStyle(s.Rail),
-		Fill:              plainStyle(s.Fill),
-		Thumb:             plainStyle(s.Thumb),
-		ThumbHover:        plainStyle(s.ThumbHover),
-		ThumbPressed:      plainStyle(s.ThumbPressed),
-		ValueText:         plainStyle(s.ValueText),
-	}
-}
-
 // sliderDefaults returns the built-in look of a slider, from the colors of t.
 // Under high contrast the parts are outlined and filled with the text color, or
 // with Highlight for the fill; a disabled slider is all GrayText, with no dimming.
@@ -101,8 +73,10 @@ func sliderDefaults(t *Theme, disabled bool) SliderStyle {
 // overrides are plain (see plainStyle).
 func resolveSlider(ctx *Context, disabled bool, inst SliderStyle) SliderStyle {
 	t := ctx.Theme()
-	return layered(ctx, sliderDefaults(t, disabled), SliderStyle.merge, SliderStyle.plain,
-		themeLayer(t.Slider), instanceLayer(inst))
+	st := sliderDefaults(t, disabled)
+	st.layered(ctx,
+		themeLayer(&t.Slider), instanceLayer(&inst))
+	return st
 }
 
 // sliderMinWidth is the narrowest a slider is by default, in logical pixels.
@@ -196,7 +170,7 @@ func (s *SliderElement) OnChange(fn func(float64)) *SliderElement { s.onChange =
 // fields win over the theme's Slider and the defaults; see SliderStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (s *SliderElement) Styles(st SliderStyle) *SliderElement {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

@@ -117,8 +117,10 @@ func drawerDefaults(t *Theme, side DrawerSide) DrawerStyle {
 // overrides are plain (see plainStyle).
 func resolveDrawer(ctx *Context, side DrawerSide, inst DrawerStyle) DrawerStyle {
 	t := ctx.Theme()
-	return layered(ctx, drawerDefaults(t, side), DrawerStyle.merge, DrawerStyle.plain,
-		themeLayer(t.Drawer), instanceLayer(inst))
+	st := drawerDefaults(t, side)
+	st.layered(ctx,
+		themeLayer(&t.Drawer), instanceLayer(&inst))
+	return st
 }
 
 // Edge placements put a drawer's panel against a side of its anchor, the

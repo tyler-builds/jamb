@@ -16,16 +16,6 @@ type SkeletonStyle struct {
 	Bone Style // each placeholder shape
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s SkeletonStyle) merge(o SkeletonStyle) SkeletonStyle {
-	return SkeletonStyle{Bone: s.Bone.Merge(o.Bone)}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s SkeletonStyle) plain() SkeletonStyle {
-	return SkeletonStyle{Bone: plainStyle(s.Bone)}
-}
-
 // skeletonBarHeight is the height of a bar at the default Text size, in logical
 // pixels. A bar stands in for a line of text, so it grows with the Text size.
 const skeletonBarHeight = 16
@@ -54,8 +44,10 @@ func skeletonDefaults(t *Theme, scale float32) SkeletonStyle {
 // overrides are plain (see plainStyle).
 func resolveSkeleton(ctx *Context, scale float32, inst SkeletonStyle) SkeletonStyle {
 	t := ctx.Theme()
-	return layered(ctx, skeletonDefaults(t, scale), SkeletonStyle.merge, SkeletonStyle.plain,
-		themeLayer(t.Skeleton), instanceLayer(inst))
+	st := skeletonDefaults(t, scale)
+	st.layered(ctx,
+		themeLayer(&t.Skeleton), instanceLayer(&inst))
+	return st
 }
 
 // skeletonShape is the form of a skeleton.
@@ -129,7 +121,7 @@ func (s *SkeletonElement) GridSpan(cols, rows int) *SkeletonElement {
 // fields win over the theme's Skeleton and the defaults; see SkeletonStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (s *SkeletonElement) Styles(st SkeletonStyle) *SkeletonElement {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

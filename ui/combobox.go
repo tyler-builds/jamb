@@ -66,36 +66,6 @@ type ComboboxStyle struct {
 	Error Style
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ComboboxStyle) merge(o ComboboxStyle) ComboboxStyle {
-	return ComboboxStyle{
-		Field:             s.Field.merge(o.Field),
-		Popup:             s.Popup.Merge(o.Popup),
-		Option:            s.Option.Merge(o.Option),
-		OptionHighlighted: s.OptionHighlighted.Merge(o.OptionHighlighted),
-		OptionDisabled:    s.OptionDisabled.Merge(o.OptionDisabled),
-		Match:             s.Match.Merge(o.Match),
-		Empty:             s.Empty.Merge(o.Empty),
-		Loading:           s.Loading.Merge(o.Loading),
-		Error:             s.Error.Merge(o.Error),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ComboboxStyle) plain() ComboboxStyle {
-	return ComboboxStyle{
-		Field:             s.Field.plain(),
-		Popup:             plainStyle(s.Popup),
-		Option:            plainStyle(s.Option),
-		OptionHighlighted: plainStyle(s.OptionHighlighted),
-		OptionDisabled:    plainStyle(s.OptionDisabled),
-		Match:             plainStyle(s.Match),
-		Empty:             plainStyle(s.Empty),
-		Loading:           plainStyle(s.Loading),
-		Error:             plainStyle(s.Error),
-	}
-}
-
 // comboboxDefaults returns the built-in look of the parts of a combobox, from the
 // colors of t. The highlighted suggestion is the Highlight color under high contrast
 // and a soft accent otherwise, as a select's highlighted option is.
@@ -127,8 +97,10 @@ func comboboxDefaults(t *Theme) ComboboxStyle {
 // the theme's Field.
 func resolveCombobox(ctx *Context, inst ComboboxStyle) ComboboxStyle {
 	t := ctx.Theme()
-	return layered(ctx, comboboxDefaults(t), ComboboxStyle.merge, ComboboxStyle.plain,
-		themeLayer(t.Combobox), instanceLayer(inst))
+	st := comboboxDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Combobox), instanceLayer(&inst))
+	return st
 }
 
 // comboItems are the suggestions of a query, as the last request returned them.
@@ -374,7 +346,7 @@ func (c *ComboboxElement[T]) GridSpan(cols, rows int) *ComboboxElement[T] {
 // fields win over the theme's Combobox and the defaults; see ComboboxStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (c *ComboboxElement[T]) Styles(st ComboboxStyle) *ComboboxElement[T] {
-	c.styles = c.styles.merge(st)
+	c.styles.mergeFrom(&st, false)
 	return c
 }
 

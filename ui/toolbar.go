@@ -17,22 +17,6 @@ type ToolbarStyle struct {
 	Separator Style // the line between groups of controls
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ToolbarStyle) merge(o ToolbarStyle) ToolbarStyle {
-	return ToolbarStyle{
-		Bar:       s.Bar.Merge(o.Bar),
-		Separator: s.Separator.Merge(o.Separator),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ToolbarStyle) plain() ToolbarStyle {
-	return ToolbarStyle{
-		Bar:       plainStyle(s.Bar),
-		Separator: plainStyle(s.Separator),
-	}
-}
-
 // toolbarDefaults returns the built-in look of a toolbar, from the colors of t: a
 // row of controls 2 pixels apart, on the surface color and outlined in the border
 // color, and separators as thin vertical lines in the border color. Under high
@@ -54,8 +38,10 @@ func toolbarDefaults(t *Theme) ToolbarStyle {
 // overrides are plain (see plainStyle).
 func resolveToolbar(ctx *Context, inst ToolbarStyle) ToolbarStyle {
 	t := ctx.Theme()
-	return layered(ctx, toolbarDefaults(t), ToolbarStyle.merge, ToolbarStyle.plain,
-		themeLayer(t.Toolbar), instanceLayer(inst))
+	st := toolbarDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Toolbar), instanceLayer(&inst))
+	return st
 }
 
 // ToolbarElement is a row of controls, such as the formatting buttons above an
@@ -131,7 +117,7 @@ func (b *ToolbarElement) GridSpan(cols, rows int) *ToolbarElement {
 // fields win over the theme's Toolbar and the defaults; see ToolbarStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (b *ToolbarElement) Styles(st ToolbarStyle) *ToolbarElement {
-	b.styles = b.styles.merge(st)
+	b.styles.mergeFrom(&st, false)
 	return b
 }
 

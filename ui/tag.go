@@ -16,16 +16,6 @@ type TagStyle struct {
 	Remove Style // the box around the remove button
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s TagStyle) merge(o TagStyle) TagStyle {
-	return TagStyle{Tag: s.Tag.Merge(o.Tag), Label: s.Label.Merge(o.Label), Remove: s.Remove.Merge(o.Remove)}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s TagStyle) plain() TagStyle {
-	return TagStyle{Tag: plainStyle(s.Tag), Label: plainStyle(s.Label), Remove: plainStyle(s.Remove)}
-}
-
 // tagDefaults returns the built-in look of a tag: a small rounded chip in the
 // surface color, with the text color. Under high contrast the chip is an outlined
 // empty box.
@@ -47,7 +37,10 @@ func tagDefaults(t *Theme) TagStyle {
 // (see plainStyle).
 func resolveTag(ctx *Context, inst TagStyle) TagStyle {
 	t := ctx.Theme()
-	return layered(ctx, tagDefaults(t), TagStyle.merge, TagStyle.plain, themeLayer(t.Tag), instanceLayer(inst))
+	st := tagDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Tag), instanceLayer(&inst))
+	return st
 }
 
 // tagTint returns the look of a tag of color c: a fill of c at about 14% alpha, a
@@ -119,7 +112,7 @@ func (g *TagElement) GridSpan(cols, rows int) *TagElement { g.size.setSpan(cols,
 // win over the theme's Tag and the defaults; see TagStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
 func (g *TagElement) Styles(st TagStyle) *TagElement {
-	g.styles = g.styles.merge(st)
+	g.styles.mergeFrom(&st, false)
 	return g
 }
 
@@ -128,7 +121,8 @@ func (g *TagElement) expand(ctx *Context) Element {
 	if !g.color.IsZero() {
 		// The tint is an instance layer under the Styles, so Styles wins over it. Under
 		// high contrast the instance layer is plain, and the tint is dropped with its colors.
-		inst = tagTint(g.color).merge(g.styles)
+		inst = tagTint(g.color)
+		inst.mergeFrom(&g.styles, false)
 	}
 	st := resolveTag(ctx, inst)
 	strs := ctx.Strings()

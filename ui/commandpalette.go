@@ -64,38 +64,6 @@ type CommandPaletteStyle struct {
 	Empty Style
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s CommandPaletteStyle) merge(o CommandPaletteStyle) CommandPaletteStyle {
-	return CommandPaletteStyle{
-		Panel:           s.Panel.Merge(o.Panel),
-		Input:           s.Input.Merge(o.Input),
-		List:            s.List.Merge(o.List),
-		Item:            s.Item.Merge(o.Item),
-		ItemHighlighted: s.ItemHighlighted.Merge(o.ItemHighlighted),
-		Label:           s.Label.Merge(o.Label),
-		Match:           s.Match.Merge(o.Match),
-		Keys:            s.Keys.Merge(o.Keys),
-		Detail:          s.Detail.Merge(o.Detail),
-		Empty:           s.Empty.Merge(o.Empty),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s CommandPaletteStyle) plain() CommandPaletteStyle {
-	return CommandPaletteStyle{
-		Panel:           plainStyle(s.Panel),
-		Input:           plainStyle(s.Input),
-		List:            plainStyle(s.List),
-		Item:            plainStyle(s.Item),
-		ItemHighlighted: plainStyle(s.ItemHighlighted),
-		Label:           plainStyle(s.Label),
-		Match:           plainStyle(s.Match),
-		Keys:            plainStyle(s.Keys),
-		Detail:          plainStyle(s.Detail),
-		Empty:           plainStyle(s.Empty),
-	}
-}
-
 // commandPaletteDefaults returns the built-in look of a command palette, from the
 // colors of t: the panel of a modal, and the rows of a menu. The highlighted row is
 // the Highlight color under high contrast and a soft accent otherwise, as a menu's
@@ -128,8 +96,10 @@ func commandPaletteDefaults(t *Theme) CommandPaletteStyle {
 // the two overrides are plain (see plainStyle).
 func resolveCommandPalette(ctx *Context, inst CommandPaletteStyle) CommandPaletteStyle {
 	t := ctx.Theme()
-	return layered(ctx, commandPaletteDefaults(t), CommandPaletteStyle.merge, CommandPaletteStyle.plain,
-		themeLayer(t.CommandPalette), instanceLayer(inst))
+	st := commandPaletteDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.CommandPalette), instanceLayer(&inst))
+	return st
 }
 
 // CommandPaletteElement is a floating panel that lists commands to run: a search
@@ -270,7 +240,7 @@ func (p *CommandPaletteElement) ItemsOnly() *CommandPaletteElement {
 // CommandPaletteStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (p *CommandPaletteElement) Styles(st CommandPaletteStyle) *CommandPaletteElement {
-	p.styles = p.styles.merge(st)
+	p.styles.mergeFrom(&st, false)
 	return p
 }
 

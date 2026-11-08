@@ -48,34 +48,6 @@ type NumberInputStyle struct {
 	Message                Style // the row with the icon and the message, while the text is invalid
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s NumberInputStyle) merge(o NumberInputStyle) NumberInputStyle {
-	return NumberInputStyle{
-		FieldStyle:             s.FieldStyle.merge(o.FieldStyle),
-		SpinButtons:            s.SpinButtons.Merge(o.SpinButtons),
-		SpinButton:             s.SpinButton.Merge(o.SpinButton),
-		SpinButtonHover:        s.SpinButtonHover.Merge(o.SpinButtonHover),
-		SpinButtonPressed:      s.SpinButtonPressed.Merge(o.SpinButtonPressed),
-		SpinButtonFocusVisible: s.SpinButtonFocusVisible.Merge(o.SpinButtonFocusVisible),
-		SpinButtonDisabled:     s.SpinButtonDisabled.Merge(o.SpinButtonDisabled),
-		Message:                s.Message.Merge(o.Message),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s NumberInputStyle) plain() NumberInputStyle {
-	return NumberInputStyle{
-		FieldStyle:             s.FieldStyle.plain(),
-		SpinButtons:            plainStyle(s.SpinButtons),
-		SpinButton:             plainStyle(s.SpinButton),
-		SpinButtonHover:        plainStyle(s.SpinButtonHover),
-		SpinButtonPressed:      plainStyle(s.SpinButtonPressed),
-		SpinButtonFocusVisible: plainStyle(s.SpinButtonFocusVisible),
-		SpinButtonDisabled:     plainStyle(s.SpinButtonDisabled),
-		Message:                plainStyle(s.Message),
-	}
-}
-
 // numberInputWidth is the default width of a number input at the Text size of 100
 // percent, in logical pixels. It scales with the Text size.
 const numberInputWidth = 120
@@ -150,8 +122,10 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 // Styles. Under high contrast the overrides are plain (see plainStyle).
 func resolveNumberInput(ctx *Context, placement SpinPlacement, scale float32, disabled, spin bool, size controlSize, inst NumberInputStyle) NumberInputStyle {
 	t := ctx.Theme()
-	return layered(ctx, numberInputDefaults(t, placement, scale, disabled, spin, size), NumberInputStyle.merge, NumberInputStyle.plain,
-		themeLayer(NumberInputStyle{FieldStyle: t.Field}), themeLayer(t.NumberInput), instanceLayer(inst))
+	st := numberInputDefaults(t, placement, scale, disabled, spin, size)
+	st.layered(ctx,
+		themeLayer(&NumberInputStyle{FieldStyle: t.Field}), themeLayer(&t.NumberInput), instanceLayer(&inst))
+	return st
 }
 
 // NumberInputElement is a text field for a number, bound to an int or float64
@@ -326,7 +300,7 @@ func (n *NumberInputElement[T]) GridSpan(cols, rows int) *NumberInputElement[T] 
 // NumberInputStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (n *NumberInputElement[T]) Styles(st NumberInputStyle) *NumberInputElement[T] {
-	n.styles = n.styles.merge(st)
+	n.styles.mergeFrom(&st, false)
 	return n
 }
 

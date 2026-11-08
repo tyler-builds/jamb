@@ -36,30 +36,6 @@ type BreadcrumbsStyle struct {
 	Overflow  Style // the box around the "..." button of the hidden locations
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s BreadcrumbsStyle) merge(o BreadcrumbsStyle) BreadcrumbsStyle {
-	return BreadcrumbsStyle{
-		Bar:       s.Bar.Merge(o.Bar),
-		Item:      s.Item.Merge(o.Item),
-		ItemHover: s.ItemHover.Merge(o.ItemHover),
-		Current:   s.Current.Merge(o.Current),
-		Separator: s.Separator.Merge(o.Separator),
-		Overflow:  s.Overflow.Merge(o.Overflow),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s BreadcrumbsStyle) plain() BreadcrumbsStyle {
-	return BreadcrumbsStyle{
-		Bar:       plainStyle(s.Bar),
-		Item:      plainStyle(s.Item),
-		ItemHover: plainStyle(s.ItemHover),
-		Current:   plainStyle(s.Current),
-		Separator: plainStyle(s.Separator),
-		Overflow:  plainStyle(s.Overflow),
-	}
-}
-
 // breadcrumbsDefaults returns the built-in look of a breadcrumb trail, from the
 // colors of t. The locations that can be chosen are drawn in TextMuted, and the
 // current location in Text.
@@ -81,8 +57,10 @@ func breadcrumbsDefaults(t *Theme) BreadcrumbsStyle {
 // the two overrides are plain (see plainStyle).
 func resolveBreadcrumbs(ctx *Context, inst BreadcrumbsStyle) BreadcrumbsStyle {
 	t := ctx.Theme()
-	return layered(ctx, breadcrumbsDefaults(t), BreadcrumbsStyle.merge, BreadcrumbsStyle.plain,
-		themeLayer(t.Breadcrumbs), instanceLayer(inst))
+	st := breadcrumbsDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Breadcrumbs), instanceLayer(&inst))
+	return st
 }
 
 // crumbSlots returns the locations of a trail of n locations to show, in order,
@@ -154,7 +132,7 @@ func (b *BreadcrumbsElement) MaxItems(n int) *BreadcrumbsElement { b.limit = n; 
 // fields win over the theme's Breadcrumbs and the defaults; see BreadcrumbsStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
 func (b *BreadcrumbsElement) Styles(s BreadcrumbsStyle) *BreadcrumbsElement {
-	b.styles = b.styles.merge(s)
+	b.styles.mergeFrom(&s, false)
 	return b
 }
 

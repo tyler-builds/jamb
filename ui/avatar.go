@@ -18,16 +18,6 @@ type AvatarStyle struct {
 	Initials Style // the initials in the circle
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s AvatarStyle) merge(o AvatarStyle) AvatarStyle {
-	return AvatarStyle{Avatar: s.Avatar.Merge(o.Avatar), Initials: s.Initials.Merge(o.Initials)}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s AvatarStyle) plain() AvatarStyle {
-	return AvatarStyle{Avatar: plainStyle(s.Avatar), Initials: plainStyle(s.Initials)}
-}
-
 // avatarPalette is the fills an avatar takes from its name. Each one keeps
 // avatarInk at 4.5:1 or more, so the initials read in both themes.
 var avatarPalette = [...]Color{
@@ -89,8 +79,10 @@ func avatarDefaults(t *Theme, name string, size float32) AvatarStyle {
 // overrides are plain (see plainStyle).
 func resolveAvatar(ctx *Context, name string, size float32, inst AvatarStyle) AvatarStyle {
 	t := ctx.Theme()
-	return layered(ctx, avatarDefaults(t, name, size), AvatarStyle.merge, AvatarStyle.plain,
-		themeLayer(t.Avatar), instanceLayer(inst))
+	st := avatarDefaults(t, name, size)
+	st.layered(ctx,
+		themeLayer(&t.Avatar), instanceLayer(&inst))
+	return st
 }
 
 // AvatarElement is a circle that stands for a person: the initials of the name in
@@ -138,7 +130,7 @@ func (a *AvatarElement) AccessHidden() *AvatarElement { a.accessHidden = true; r
 // fields win over the theme's Avatar and the defaults; see AvatarStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (a *AvatarElement) Styles(st AvatarStyle) *AvatarElement {
-	a.styles = a.styles.merge(st)
+	a.styles.mergeFrom(&st, false)
 	return a
 }
 

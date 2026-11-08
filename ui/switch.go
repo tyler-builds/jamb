@@ -28,36 +28,6 @@ type SwitchStyle struct {
 	Label             Style // the text beside the track, with ShowLabel
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s SwitchStyle) merge(o SwitchStyle) SwitchStyle {
-	return SwitchStyle{
-		Track:             s.Track.Merge(o.Track),
-		TrackChecked:      s.TrackChecked.Merge(o.TrackChecked),
-		TrackHover:        s.TrackHover.Merge(o.TrackHover),
-		TrackFocusVisible: s.TrackFocusVisible.Merge(o.TrackFocusVisible),
-		TrackDisabled:     s.TrackDisabled.Merge(o.TrackDisabled),
-		Knob:              s.Knob.Merge(o.Knob),
-		KnobChecked:       s.KnobChecked.Merge(o.KnobChecked),
-		KnobDisabled:      s.KnobDisabled.Merge(o.KnobDisabled),
-		Label:             s.Label.Merge(o.Label),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s SwitchStyle) plain() SwitchStyle {
-	return SwitchStyle{
-		Track:             plainStyle(s.Track),
-		TrackChecked:      plainStyle(s.TrackChecked),
-		TrackHover:        plainStyle(s.TrackHover),
-		TrackFocusVisible: plainStyle(s.TrackFocusVisible),
-		TrackDisabled:     plainStyle(s.TrackDisabled),
-		Knob:              plainStyle(s.Knob),
-		KnobChecked:       plainStyle(s.KnobChecked),
-		KnobDisabled:      plainStyle(s.KnobDisabled),
-		Label:             plainStyle(s.Label),
-	}
-}
-
 // switchDefaults returns the built-in look of a switch that is on or off and
 // disabled or not, from the colors of t. Under high contrast the track is an
 // outlined empty track, or a solid Highlight track when on, with the knob in the
@@ -109,8 +79,10 @@ func switchDefaults(t *Theme, on, disabled bool) SwitchStyle {
 // two overrides are plain (see plainStyle).
 func resolveSwitch(ctx *Context, on, disabled bool, inst SwitchStyle) SwitchStyle {
 	t := ctx.Theme()
-	return layered(ctx, switchDefaults(t, on, disabled), SwitchStyle.merge, SwitchStyle.plain,
-		themeLayer(t.Switch), instanceLayer(inst))
+	st := switchDefaults(t, on, disabled)
+	st.layered(ctx,
+		themeLayer(&t.Switch), instanceLayer(&inst))
+	return st
 }
 
 // SwitchElement is an on/off switch bound to a bool signal. It is drawn as a
@@ -191,7 +163,7 @@ func (s *SwitchElement) GridSpan(cols, rows int) *SwitchElement { s.size.setSpan
 // fields win over the theme's Switch and the defaults; see SwitchStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (s *SwitchElement) Styles(st SwitchStyle) *SwitchElement {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

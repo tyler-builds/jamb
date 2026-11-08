@@ -28,26 +28,6 @@ type CardStyle struct {
 	CardFocusVisible Style // a clickable card that has keyboard focus
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s CardStyle) merge(o CardStyle) CardStyle {
-	return CardStyle{
-		Card:             s.Card.Merge(o.Card),
-		CardHover:        s.CardHover.Merge(o.CardHover),
-		CardPressed:      s.CardPressed.Merge(o.CardPressed),
-		CardFocusVisible: s.CardFocusVisible.Merge(o.CardFocusVisible),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s CardStyle) plain() CardStyle {
-	return CardStyle{
-		Card:             plainStyle(s.Card),
-		CardHover:        plainStyle(s.CardHover),
-		CardPressed:      plainStyle(s.CardPressed),
-		CardFocusVisible: plainStyle(s.CardFocusVisible),
-	}
-}
-
 // CardVariants is the look of each card variant, in Theme.Cards.
 type CardVariants struct {
 	// Filled and Outlined are the styles of the variants, and each merges over Card.
@@ -55,11 +35,11 @@ type CardVariants struct {
 }
 
 // of returns the style of variant v.
-func (cv CardVariants) of(v CardVariant) CardStyle {
+func (cv *CardVariants) of(v CardVariant) *CardStyle {
 	if v == CardOutlined {
-		return cv.Outlined
+		return &cv.Outlined
 	}
-	return cv.Filled
+	return &cv.Filled
 }
 
 // cardDefaults returns the built-in look of a card of variant v. Under high
@@ -89,8 +69,10 @@ func cardDefaults(t *Theme, v CardVariant) CardStyle {
 // overrides are plain (see plainStyle).
 func resolveCard(ctx *Context, v CardVariant, inst CardStyle) CardStyle {
 	t := ctx.Theme()
-	return layered(ctx, cardDefaults(t, v), CardStyle.merge, CardStyle.plain,
-		themeLayer(t.Card), themeLayer(t.Cards.of(v)), instanceLayer(inst))
+	st := cardDefaults(t, v)
+	st.layered(ctx,
+		themeLayer(&t.Card), themeLayer(t.Cards.of(v)), instanceLayer(&inst))
+	return st
 }
 
 // CardElement is a surface that holds related content, such as one item of a
@@ -199,7 +181,7 @@ func (c *CardElement) GridSpan(cols, rows int) *CardElement { c.size.setSpan(col
 // fields win over the theme's Card and Cards and the defaults; see CardStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (c *CardElement) Styles(st CardStyle) *CardElement {
-	c.styles = c.styles.merge(st)
+	c.styles.mergeFrom(&st, false)
 	return c
 }
 

@@ -42,34 +42,6 @@ type ButtonStyle struct {
 	Icon             Style // the icon
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ButtonStyle) merge(o ButtonStyle) ButtonStyle {
-	return ButtonStyle{
-		Root:             s.Root.Merge(o.Root),
-		RootHover:        s.RootHover.Merge(o.RootHover),
-		RootPressed:      s.RootPressed.Merge(o.RootPressed),
-		RootDisabled:     s.RootDisabled.Merge(o.RootDisabled),
-		RootLoading:      s.RootLoading.Merge(o.RootLoading),
-		RootFocusVisible: s.RootFocusVisible.Merge(o.RootFocusVisible),
-		Label:            s.Label.Merge(o.Label),
-		Icon:             s.Icon.Merge(o.Icon),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ButtonStyle) plain() ButtonStyle {
-	return ButtonStyle{
-		Root:             plainStyle(s.Root),
-		RootHover:        plainStyle(s.RootHover),
-		RootPressed:      plainStyle(s.RootPressed),
-		RootDisabled:     plainStyle(s.RootDisabled),
-		RootLoading:      plainStyle(s.RootLoading),
-		RootFocusVisible: plainStyle(s.RootFocusVisible),
-		Label:            plainStyle(s.Label),
-		Icon:             plainStyle(s.Icon),
-	}
-}
-
 // ButtonVariants holds the style of each variant of a button, for the theme's
 // Buttons. It merges over Theme.Button, which applies to every variant.
 type ButtonVariants struct {
@@ -84,16 +56,16 @@ type ButtonVariants struct {
 }
 
 // of returns the style of variant v.
-func (bv ButtonVariants) of(v ButtonVariant) ButtonStyle {
+func (bv *ButtonVariants) of(v ButtonVariant) *ButtonStyle {
 	switch v {
 	case ButtonSecondary:
-		return bv.Secondary
+		return &bv.Secondary
 	case ButtonGhost:
-		return bv.Ghost
+		return &bv.Ghost
 	case ButtonDanger:
-		return bv.Danger
+		return &bv.Danger
 	}
-	return bv.Primary
+	return &bv.Primary
 }
 
 // controlSize is the size of a control: the default, Small or Large. The
@@ -189,8 +161,10 @@ func buttonDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly bool) 
 // the instance's Styles. Under high contrast the overrides are plain.
 func resolveButton(ctx *Context, v ButtonVariant, size controlSize, iconOnly bool, inst ButtonStyle) ButtonStyle {
 	t := ctx.Theme()
-	return layered(ctx, buttonDefaults(t, v, size, iconOnly), ButtonStyle.merge, ButtonStyle.plain,
-		themeLayer(t.Button), themeLayer(t.Buttons.of(v)), instanceLayer(inst))
+	st := buttonDefaults(t, v, size, iconOnly)
+	st.layered(ctx,
+		themeLayer(&t.Button), themeLayer(t.Buttons.of(v)), instanceLayer(&inst))
+	return st
 }
 
 // ButtonElement is a themed, clickable button.
@@ -356,7 +330,7 @@ func (b *ButtonElement) Matched(id string) *ButtonElement { b.matched = id; retu
 // variant; see ButtonStyle and docs/styling.md. Calling Styles again merges with
 // the earlier values.
 func (b *ButtonElement) Styles(st ButtonStyle) *ButtonElement {
-	b.styles = b.styles.merge(st)
+	b.styles.mergeFrom(&st, false)
 	return b
 }
 
@@ -507,44 +481,6 @@ type FieldStyle struct {
 	ButtonHover      Style // such a button while the pointer is over it (paint only)
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s FieldStyle) merge(o FieldStyle) FieldStyle {
-	return FieldStyle{
-		Frame:            s.Frame.Merge(o.Frame),
-		FrameHover:       s.FrameHover.Merge(o.FrameHover),
-		FrameFocusWithin: s.FrameFocusWithin.Merge(o.FrameFocusWithin),
-		FrameDisabled:    s.FrameDisabled.Merge(o.FrameDisabled),
-		FrameReadOnly:    s.FrameReadOnly.Merge(o.FrameReadOnly),
-		FrameInvalid:     s.FrameInvalid.Merge(o.FrameInvalid),
-		Text:             s.Text.Merge(o.Text),
-		Placeholder:      s.Placeholder.Merge(o.Placeholder),
-		Selection:        s.Selection.Merge(o.Selection),
-		Leading:          s.Leading.Merge(o.Leading),
-		Trailing:         s.Trailing.Merge(o.Trailing),
-		Button:           s.Button.Merge(o.Button),
-		ButtonHover:      s.ButtonHover.Merge(o.ButtonHover),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s FieldStyle) plain() FieldStyle {
-	return FieldStyle{
-		Frame:            plainStyle(s.Frame),
-		FrameHover:       plainStyle(s.FrameHover),
-		FrameFocusWithin: plainStyle(s.FrameFocusWithin),
-		FrameDisabled:    plainStyle(s.FrameDisabled),
-		FrameReadOnly:    plainStyle(s.FrameReadOnly),
-		FrameInvalid:     plainStyle(s.FrameInvalid),
-		Text:             plainStyle(s.Text),
-		Placeholder:      plainStyle(s.Placeholder),
-		Selection:        plainStyle(s.Selection),
-		Leading:          plainStyle(s.Leading),
-		Trailing:         plainStyle(s.Trailing),
-		Button:           plainStyle(s.Button),
-		ButtonHover:      plainStyle(s.ButtonHover),
-	}
-}
-
 // fieldLayout is the layout a text frame is built for: a multi-line editor, a
 // compact one (Small), or a disabled field.
 type fieldLayout struct {
@@ -626,8 +562,10 @@ func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
 // contrast the two overrides are plain (see plainStyle).
 func resolveField(ctx *Context, lay fieldLayout, inst FieldStyle) FieldStyle {
 	t := ctx.Theme()
-	return layered(ctx, fieldDefaults(t, lay), FieldStyle.merge, FieldStyle.plain,
-		themeLayer(t.Field), instanceLayer(inst))
+	st := fieldDefaults(t, lay)
+	st.layered(ctx,
+		themeLayer(&t.Field), instanceLayer(&inst))
+	return st
 }
 
 // fieldOptions are shared by TextInput, TextArea and NumberInput.
@@ -848,7 +786,7 @@ func (ti *TextInputElement) LayoutSpring(s Spring) *TextInputElement {
 // fields win over the theme's Field and the defaults; see FieldStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (ti *TextInputElement) Styles(s FieldStyle) *TextInputElement {
-	ti.styles = ti.styles.merge(s)
+	ti.styles.mergeFrom(&s, false)
 	return ti
 }
 
@@ -1041,7 +979,7 @@ func (ta *TextAreaElement) Borderless() *TextAreaElement { ta.borderless = true;
 // Styles sets the look of the parts of the editor, for this instance only; see
 // TextInputElement.Styles.
 func (ta *TextAreaElement) Styles(s FieldStyle) *TextAreaElement {
-	ta.styles = ta.styles.merge(s)
+	ta.styles.mergeFrom(&s, false)
 	return ta
 }
 

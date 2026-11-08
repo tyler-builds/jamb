@@ -19,104 +19,37 @@ func HighContrastTheme(c SystemColors, base *Theme) *Theme {
 	if c.isZero() {
 		c = HighContrastBlack()
 	}
-	t := &Theme{
-		Name:          "high contrast",
-		HighContrast:  true,
-		Dark:          (c.Window.R+c.Window.G+c.Window.B)/3 < 0.5,
-		Background:    c.Window,
-		Panel:         c.Window,
-		Surface:       c.Window,
-		SurfaceHover:  c.Window,
-		SurfaceActive: c.Highlight,
-		Border:        c.WindowText,
-		BorderStrong:  c.WindowText,
-		Text:          c.WindowText,
-		TextMuted:     c.WindowText,
-		TextSubtle:    c.WindowText,
-		Accent:        c.Highlight,
-		AccentHover:   c.Highlight,
-		AccentActive:  c.Highlight,
-		AccentText:    c.HighlightText,
-		Link:          c.HotLight,
-		Disabled:      c.GrayText,
-		AccentSoft:    c.Window,
-		Success:       c.WindowText,
-		Warning:       c.WindowText,
-		Danger:        c.WindowText,
-		Scrollbar:     c.WindowText,
-		FocusRing:     c.Highlight,
-		Scrim:         c.Window,
-		Syntax:        highContrastSyntax(c, base.Syntax),
-		Radius:        base.Radius,
-		FontSize:      base.FontSize,
-		Motion:        base.Motion,
-		Tabs:          base.Tabs,
-		Select:        base.Select,
-		Slider:        base.Slider,
-		RangeSlider:   base.RangeSlider,
-		SplitButton:   base.SplitButton,
-		Split:         base.Split,
-		Dock:          base.Dock,
-		Field:         base.Field,
-		NumberInput:   base.NumberInput,
-		Button:        base.Button,
-		Buttons:       base.Buttons,
-		Checkbox:      base.Checkbox,
-		RadioGroup:    base.RadioGroup,
-		Switch:        base.Switch,
-		Toggle:        base.Toggle,
-		ToggleGroup:   base.ToggleGroup,
-		Rating:        base.Rating,
-		Collapsible:   base.Collapsible,
-		Tree:          base.Tree,
-		ListBox:       base.ListBox,
-		DataGrid:      base.DataGrid,
-		Menu:          base.Menu,
-		MenuBar:       base.MenuBar,
-		Modal:         base.Modal,
-		FormField:     base.FormField,
-		Form:          base.Form,
-		ProgressBar:   base.ProgressBar,
-		ProgressRing:  base.ProgressRing,
-		Badge:         base.Badge,
-		Badges:        base.Badges,
-		Toast:         base.Toast,
-		Toasts:        base.Toasts,
-		Alert:         base.Alert,
-		Alerts:        base.Alerts,
-		Tooltip:       base.Tooltip,
-		Avatar:        base.Avatar,
-		Tag:           base.Tag,
-		GroupBox:      base.GroupBox,
-		Card:          base.Card,
-		Cards:         base.Cards,
-		Kbd:           base.Kbd,
-		Skeleton:      base.Skeleton,
-		Sidebar:       base.Sidebar,
-		Breadcrumbs:   base.Breadcrumbs,
-		Pagination:    base.Pagination,
-		Stepper:       base.Stepper,
-		OTPInput:      base.OTPInput,
-
-		Combobox:        base.Combobox,
-		DatePicker:      base.DatePicker,
-		DateRangePicker: base.DateRangePicker,
-		Calendar:        base.Calendar,
-		Carousel:        base.Carousel,
-		TimePicker:      base.TimePicker,
-		ColorPicker:     base.ColorPicker,
-		Drawer:          base.Drawer,
-		AlertDialog:     base.AlertDialog,
-		Popover:         base.Popover,
-		CommandPalette:  base.CommandPalette,
-		DescriptionList: base.DescriptionList,
-		StatusBar:       base.StatusBar,
-		Toolbar:         base.Toolbar,
-		Empty:           base.Empty,
-		HoverCard:       base.HoverCard,
-
-		styles: base.styles, // never changed in place (see SetThemeStyle)
-	}
+	// Everything but the colors comes from base. The copy goes through copyLarge,
+	// since a struct literal of every field is several hundred KB of code under TinyGo.
+	t := new(Theme)
+	copyLarge(t, base)
+	t.Name = "high contrast"
+	t.HighContrast = true
+	t.Dark = (c.Window.R+c.Window.G+c.Window.B)/3 < 0.5
+	t.Background = c.Window
+	t.Panel = c.Window
+	t.Surface = c.Window
+	t.SurfaceHover = c.Window
+	t.SurfaceActive = c.Highlight
+	t.Border = c.WindowText
+	t.BorderStrong = c.WindowText
+	t.Text = c.WindowText
+	t.TextMuted = c.WindowText
+	t.TextSubtle = c.WindowText
+	t.Accent = c.Highlight
+	t.AccentHover = c.Highlight
+	t.AccentActive = c.Highlight
+	t.AccentText = c.HighlightText
+	t.Link = c.HotLight
+	t.Disabled = c.GrayText
+	t.AccentSoft = c.Window
+	t.Success = c.WindowText
+	t.Warning = c.WindowText
+	t.Danger = c.WindowText
+	t.Scrollbar = c.WindowText
+	t.FocusRing = c.Highlight
+	t.Scrim = c.Window
+	t.Syntax = highContrastSyntax(c, base.Syntax)
 	t.CodeEditor = CodeEditorColors{
 		Background:       c.Window,
 		Foreground:       c.WindowText,

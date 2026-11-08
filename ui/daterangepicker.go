@@ -100,16 +100,6 @@ func rangeStyle(d DatePickerStyle, in Style) DateRangePickerStyle {
 	}
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s DateRangePickerStyle) merge(o DateRangePickerStyle) DateRangePickerStyle {
-	return rangeStyle(s.dates().merge(o.dates()), s.DayInRange.Merge(o.DayInRange))
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s DateRangePickerStyle) plain() DateRangePickerStyle {
-	return rangeStyle(s.dates().plain(), plainStyle(s.DayInRange))
-}
-
 // dateRangePickerDefaults returns the built-in look of a date range picker at the Text size scale,
 // from the colors of t: the look of a date picker, and the days between the ends drawn as a band.
 func dateRangePickerDefaults(t *Theme, scale float32, disabled bool) DateRangePickerStyle {
@@ -121,8 +111,10 @@ func dateRangePickerDefaults(t *Theme, scale float32, disabled bool) DateRangePi
 // plain (see plainStyle).
 func resolveDateRangePicker(ctx *Context, scale float32, disabled bool, inst DateRangePickerStyle) DateRangePickerStyle {
 	t := ctx.Theme()
-	return layered(ctx, dateRangePickerDefaults(t, scale, disabled), DateRangePickerStyle.merge, DateRangePickerStyle.plain,
-		themeLayer(t.DateRangePicker), instanceLayer(inst))
+	st := dateRangePickerDefaults(t, scale, disabled)
+	st.layered(ctx,
+		themeLayer(&t.DateRangePicker), instanceLayer(&inst))
+	return st
 }
 
 // DateRangePickerElement is a text field for a range of days, with a calendar that opens below it.
@@ -342,7 +334,7 @@ func (d *DateRangePickerElement) GridSpan(cols, rows int) *DateRangePickerElemen
 // win over the theme's DateRangePicker and the defaults; see DateRangePickerStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (d *DateRangePickerElement) Styles(st DateRangePickerStyle) *DateRangePickerElement {
-	d.styles = d.styles.merge(st)
+	d.styles.mergeFrom(&st, false)
 	return d
 }
 

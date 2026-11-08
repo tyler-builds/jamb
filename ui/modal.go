@@ -86,32 +86,6 @@ type ModalStyle struct {
 	Footer Style // the row of buttons, at the bottom
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ModalStyle) merge(o ModalStyle) ModalStyle {
-	return ModalStyle{
-		Scrim:  s.Scrim.Merge(o.Scrim),
-		Panel:  s.Panel.Merge(o.Panel),
-		Header: s.Header.Merge(o.Header),
-		Title:  s.Title.Merge(o.Title),
-		Close:  s.Close.Merge(o.Close),
-		Body:   s.Body.Merge(o.Body),
-		Footer: s.Footer.Merge(o.Footer),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ModalStyle) plain() ModalStyle {
-	return ModalStyle{
-		Scrim:  plainStyle(s.Scrim),
-		Panel:  plainStyle(s.Panel),
-		Header: plainStyle(s.Header),
-		Title:  plainStyle(s.Title),
-		Close:  plainStyle(s.Close),
-		Body:   plainStyle(s.Body),
-		Footer: plainStyle(s.Footer),
-	}
-}
-
 // modalDefaults returns the built-in look of a modal, from the colors of t.
 func modalDefaults(t *Theme) ModalStyle {
 	return ModalStyle{
@@ -131,15 +105,17 @@ func modalDefaults(t *Theme) ModalStyle {
 // overrides are plain (see plainStyle).
 func resolveModal(ctx *Context, inst ModalStyle) ModalStyle {
 	t := ctx.Theme()
-	return layered(ctx, modalDefaults(t), ModalStyle.merge, ModalStyle.plain,
-		themeLayer(t.Modal), instanceLayer(inst))
+	st := modalDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Modal), instanceLayer(&inst))
+	return st
 }
 
 // Styles sets the look of the parts of the modal, for this instance only. Set
 // fields win over the theme's Modal and the defaults; see ModalStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (m *ModalElement) Styles(st ModalStyle) *ModalElement {
-	m.styles = m.styles.merge(st)
+	m.styles.mergeFrom(&st, false)
 	return m
 }
 

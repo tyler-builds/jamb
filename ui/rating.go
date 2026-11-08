@@ -30,32 +30,6 @@ type RatingStyle struct {
 	StarDisabled     Style // each star when the rating is disabled
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s RatingStyle) merge(o RatingStyle) RatingStyle {
-	return RatingStyle{
-		Root:             s.Root.Merge(o.Root),
-		RootFocusVisible: s.RootFocusVisible.Merge(o.RootFocusVisible),
-		RootDisabled:     s.RootDisabled.Merge(o.RootDisabled),
-		Star:             s.Star.Merge(o.Star),
-		StarChecked:      s.StarChecked.Merge(o.StarChecked),
-		StarHover:        s.StarHover.Merge(o.StarHover),
-		StarDisabled:     s.StarDisabled.Merge(o.StarDisabled),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s RatingStyle) plain() RatingStyle {
-	return RatingStyle{
-		Root:             plainStyle(s.Root),
-		RootFocusVisible: plainStyle(s.RootFocusVisible),
-		RootDisabled:     plainStyle(s.RootDisabled),
-		Star:             plainStyle(s.Star),
-		StarChecked:      plainStyle(s.StarChecked),
-		StarHover:        plainStyle(s.StarHover),
-		StarDisabled:     plainStyle(s.StarDisabled),
-	}
-}
-
 // ratingStarColor is the color of a filled star: Warning, darkened by a tenth in a
 // light theme so that it keeps 3:1 against the light panels.
 func ratingStarColor(t *Theme) Color {
@@ -95,8 +69,10 @@ func ratingDefaults(t *Theme) RatingStyle {
 // overrides are plain (see plainStyle).
 func resolveRating(ctx *Context, inst RatingStyle) RatingStyle {
 	t := ctx.Theme()
-	return layered(ctx, ratingDefaults(t), RatingStyle.merge, RatingStyle.plain,
-		themeLayer(t.Rating), instanceLayer(inst))
+	st := ratingDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Rating), instanceLayer(&inst))
+	return st
 }
 
 // RatingElement is a row of stars that shows and sets a whole number from 0 to its
@@ -194,7 +170,7 @@ func (r *RatingElement) GridSpan(cols, rows int) *RatingElement { r.size.setSpan
 // fields win over the theme's Rating and the defaults; see RatingStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (r *RatingElement) Styles(st RatingStyle) *RatingElement {
-	r.styles = r.styles.merge(st)
+	r.styles.mergeFrom(&st, false)
 	return r
 }
 

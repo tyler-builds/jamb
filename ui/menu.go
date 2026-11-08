@@ -115,36 +115,6 @@ type MenuStyle struct {
 	SubmenuChevron  Style // the arrow of a row that opens a submenu
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s MenuStyle) merge(o MenuStyle) MenuStyle {
-	return MenuStyle{
-		Panel:           s.Panel.Merge(o.Panel),
-		Item:            s.Item.Merge(o.Item),
-		ItemHighlighted: s.ItemHighlighted.Merge(o.ItemHighlighted),
-		ItemDisabled:    s.ItemDisabled.Merge(o.ItemDisabled),
-		Separator:       s.Separator.Merge(o.Separator),
-		SectionLabel:    s.SectionLabel.Merge(o.SectionLabel),
-		Shortcut:        s.Shortcut.Merge(o.Shortcut),
-		Check:           s.Check.Merge(o.Check),
-		SubmenuChevron:  s.SubmenuChevron.Merge(o.SubmenuChevron),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s MenuStyle) plain() MenuStyle {
-	return MenuStyle{
-		Panel:           plainStyle(s.Panel),
-		Item:            plainStyle(s.Item),
-		ItemHighlighted: plainStyle(s.ItemHighlighted),
-		ItemDisabled:    plainStyle(s.ItemDisabled),
-		Separator:       plainStyle(s.Separator),
-		SectionLabel:    plainStyle(s.SectionLabel),
-		Shortcut:        plainStyle(s.Shortcut),
-		Check:           plainStyle(s.Check),
-		SubmenuChevron:  plainStyle(s.SubmenuChevron),
-	}
-}
-
 // menuDefaults returns the built-in look of a menu, from the colors of t. Under
 // high contrast the highlighted row is the Highlight color with HighlightText on
 // it, since the soft tint of the normal theme is the window color there.
@@ -174,8 +144,10 @@ func menuDefaults(t *Theme) MenuStyle {
 // plain (see plainStyle).
 func resolveMenu(ctx *Context, inst MenuStyle) MenuStyle {
 	t := ctx.Theme()
-	return layered(ctx, menuDefaults(t), MenuStyle.merge, MenuStyle.plain,
-		themeLayer(t.Menu), instanceLayer(inst))
+	st := menuDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Menu), instanceLayer(&inst))
+	return st
 }
 
 // TopMenu is one menu of a MenuBar: the label on the bar, and the function that
@@ -598,7 +570,7 @@ func (*DropdownMenuElement) isElement() {}
 // fields win over the theme's Menu and the defaults; see MenuStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (dm *DropdownMenuElement) Styles(st MenuStyle) *DropdownMenuElement {
-	dm.styles = dm.styles.merge(st)
+	dm.styles.mergeFrom(&st, false)
 	return dm
 }
 

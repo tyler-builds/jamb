@@ -40,50 +40,6 @@ type SplitButtonStyle struct {
 	Chevron           Style // the arrow's icon
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s SplitButtonStyle) merge(o SplitButtonStyle) SplitButtonStyle {
-	return SplitButtonStyle{
-		Root:              s.Root.Merge(o.Root),
-		Main:              s.Main.Merge(o.Main),
-		MainHover:         s.MainHover.Merge(o.MainHover),
-		MainPressed:       s.MainPressed.Merge(o.MainPressed),
-		MainDisabled:      s.MainDisabled.Merge(o.MainDisabled),
-		MainLoading:       s.MainLoading.Merge(o.MainLoading),
-		MainFocusVisible:  s.MainFocusVisible.Merge(o.MainFocusVisible),
-		Arrow:             s.Arrow.Merge(o.Arrow),
-		ArrowHover:        s.ArrowHover.Merge(o.ArrowHover),
-		ArrowPressed:      s.ArrowPressed.Merge(o.ArrowPressed),
-		ArrowDisabled:     s.ArrowDisabled.Merge(o.ArrowDisabled),
-		ArrowLoading:      s.ArrowLoading.Merge(o.ArrowLoading),
-		ArrowFocusVisible: s.ArrowFocusVisible.Merge(o.ArrowFocusVisible),
-		Label:             s.Label.Merge(o.Label),
-		Icon:              s.Icon.Merge(o.Icon),
-		Chevron:           s.Chevron.Merge(o.Chevron),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s SplitButtonStyle) plain() SplitButtonStyle {
-	return SplitButtonStyle{
-		Root:              plainStyle(s.Root),
-		Main:              plainStyle(s.Main),
-		MainHover:         plainStyle(s.MainHover),
-		MainPressed:       plainStyle(s.MainPressed),
-		MainDisabled:      plainStyle(s.MainDisabled),
-		MainLoading:       plainStyle(s.MainLoading),
-		MainFocusVisible:  plainStyle(s.MainFocusVisible),
-		Arrow:             plainStyle(s.Arrow),
-		ArrowHover:        plainStyle(s.ArrowHover),
-		ArrowPressed:      plainStyle(s.ArrowPressed),
-		ArrowDisabled:     plainStyle(s.ArrowDisabled),
-		ArrowLoading:      plainStyle(s.ArrowLoading),
-		ArrowFocusVisible: plainStyle(s.ArrowFocusVisible),
-		Label:             plainStyle(s.Label),
-		Icon:              plainStyle(s.Icon),
-		Chevron:           plainStyle(s.Chevron),
-	}
-}
-
 // splitButtonDefaults returns the built-in look of a split button of variant v at
 // size, from the colors of t: a Button of that variant cut in two. The shadow is
 // the row's, so it is not drawn between the segments. A variant with a border keeps
@@ -138,8 +94,10 @@ func splitButtonDefaults(t *Theme, v ButtonVariant, size controlSize) SplitButto
 // Under high contrast the two overrides are plain (see plainStyle).
 func resolveSplitButton(ctx *Context, v ButtonVariant, size controlSize, inst SplitButtonStyle) SplitButtonStyle {
 	t := ctx.Theme()
-	return layered(ctx, splitButtonDefaults(t, v, size), SplitButtonStyle.merge, SplitButtonStyle.plain,
-		themeLayer(t.SplitButton), instanceLayer(inst))
+	st := splitButtonDefaults(t, v, size)
+	st.layered(ctx,
+		themeLayer(&t.SplitButton), instanceLayer(&inst))
+	return st
 }
 
 // SplitButtonElement is a button with a main action and a menu of related ones,
@@ -248,7 +206,7 @@ func (b *SplitButtonElement) GridSpan(cols, rows int) *SplitButtonElement {
 // SplitButtonStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (b *SplitButtonElement) Styles(st SplitButtonStyle) *SplitButtonElement {
-	b.styles = b.styles.merge(st)
+	b.styles.mergeFrom(&st, false)
 	return b
 }
 

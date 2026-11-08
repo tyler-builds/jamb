@@ -26,7 +26,7 @@ func plainStyle(s Style) Style {
 	s.Shadows, s.Opacity = nil, 0
 	// A clear of a color, a border or a shadow would leave the system color, the
 	// border or the focus ring out, so it is dropped with them.
-	s.Clear &^= ClearBackground | ClearTextColor | ClearBorder | ClearShadows
+	s.Clear &^= plainClears
 	return s
 }
 

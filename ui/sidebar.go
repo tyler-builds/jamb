@@ -69,38 +69,6 @@ type SidebarStyle struct {
 	Toggle           Style // the button that collapses and expands the sidebar
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s SidebarStyle) merge(o SidebarStyle) SidebarStyle {
-	return SidebarStyle{
-		Pane:             s.Pane.Merge(o.Pane),
-		Item:             s.Item.Merge(o.Item),
-		ItemHover:        s.ItemHover.Merge(o.ItemHover),
-		ItemSelected:     s.ItemSelected.Merge(o.ItemSelected),
-		ItemDisabled:     s.ItemDisabled.Merge(o.ItemDisabled),
-		ItemFocusVisible: s.ItemFocusVisible.Merge(o.ItemFocusVisible),
-		Indicator:        s.Indicator.Merge(o.Indicator),
-		Heading:          s.Heading.Merge(o.Heading),
-		Divider:          s.Divider.Merge(o.Divider),
-		Toggle:           s.Toggle.Merge(o.Toggle),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s SidebarStyle) plain() SidebarStyle {
-	return SidebarStyle{
-		Pane:             plainStyle(s.Pane),
-		Item:             plainStyle(s.Item),
-		ItemHover:        plainStyle(s.ItemHover),
-		ItemSelected:     plainStyle(s.ItemSelected),
-		ItemDisabled:     plainStyle(s.ItemDisabled),
-		ItemFocusVisible: plainStyle(s.ItemFocusVisible),
-		Indicator:        plainStyle(s.Indicator),
-		Heading:          plainStyle(s.Heading),
-		Divider:          plainStyle(s.Divider),
-		Toggle:           plainStyle(s.Toggle),
-	}
-}
-
 // sidebarDefaults returns the built-in look of a sidebar, from the colors of t.
 // Under high contrast the selected item is the Accent color with AccentText on
 // it, and the borders are in Text.
@@ -138,8 +106,10 @@ func sidebarDefaults(t *Theme) SidebarStyle {
 // overrides are plain (see plainStyle).
 func resolveSidebar(ctx *Context, inst SidebarStyle) SidebarStyle {
 	t := ctx.Theme()
-	return layered(ctx, sidebarDefaults(t), SidebarStyle.merge, SidebarStyle.plain,
-		themeLayer(t.Sidebar), instanceLayer(inst))
+	st := sidebarDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Sidebar), instanceLayer(&inst))
+	return st
 }
 
 // SidebarElement is a vertical navigation pane, as the left pane of WinUI's
@@ -214,7 +184,7 @@ func (s *SidebarElement) OnChange(fn func(key string)) *SidebarElement { s.onCha
 // fields win over the theme's Sidebar and the defaults; see SidebarStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (s *SidebarElement) Styles(st SidebarStyle) *SidebarElement {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

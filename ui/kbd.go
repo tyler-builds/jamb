@@ -17,16 +17,6 @@ type KbdStyle struct {
 	Key Style // one key cap: its shape, fill, border and text
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s KbdStyle) merge(o KbdStyle) KbdStyle {
-	return KbdStyle{Kbd: s.Kbd.Merge(o.Kbd), Key: s.Key.Merge(o.Key)}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s KbdStyle) plain() KbdStyle {
-	return KbdStyle{Kbd: plainStyle(s.Kbd), Key: plainStyle(s.Key)}
-}
-
 // kbdDefaults returns the built-in look of a keyboard shortcut: small caps in the
 // surface color, with a border that is heavier at the bottom, and muted text.
 // Under high contrast the caps are outlined in the text color.
@@ -48,7 +38,10 @@ func kbdDefaults(t *Theme) KbdStyle {
 // overrides are plain (see plainStyle).
 func resolveKbd(ctx *Context, inst KbdStyle) KbdStyle {
 	t := ctx.Theme()
-	return layered(ctx, kbdDefaults(t), KbdStyle.merge, KbdStyle.plain, themeLayer(t.Kbd), instanceLayer(inst))
+	st := kbdDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Kbd), instanceLayer(&inst))
+	return st
 }
 
 // KbdElement shows a keyboard shortcut as key caps, such as Ctrl, Shift and P for
@@ -113,7 +106,7 @@ func (k *KbdElement) GridSpan(cols, rows int) *KbdElement { k.size.setSpan(cols,
 // fields win over the theme's Kbd and the defaults; see KbdStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (k *KbdElement) Styles(st KbdStyle) *KbdElement {
-	k.styles = k.styles.merge(st)
+	k.styles.mergeFrom(&st, false)
 	return k
 }
 

@@ -43,42 +43,6 @@ type RadioGroupStyle struct {
 	LabelDisabled     Style // the text of an option that cannot be chosen
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s RadioGroupStyle) merge(o RadioGroupStyle) RadioGroupStyle {
-	return RadioGroupStyle{
-		Group:             s.Group.Merge(o.Group),
-		Radio:             s.Radio.Merge(o.Radio),
-		RadioFocusVisible: s.RadioFocusVisible.Merge(o.RadioFocusVisible),
-		RadioDisabled:     s.RadioDisabled.Merge(o.RadioDisabled),
-		Ring:              s.Ring.Merge(o.Ring),
-		RingChecked:       s.RingChecked.Merge(o.RingChecked),
-		RingDisabled:      s.RingDisabled.Merge(o.RingDisabled),
-		RingInvalid:       s.RingInvalid.Merge(o.RingInvalid),
-		Dot:               s.Dot.Merge(o.Dot),
-		DotDisabled:       s.DotDisabled.Merge(o.DotDisabled),
-		Label:             s.Label.Merge(o.Label),
-		LabelDisabled:     s.LabelDisabled.Merge(o.LabelDisabled),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s RadioGroupStyle) plain() RadioGroupStyle {
-	return RadioGroupStyle{
-		Group:             plainStyle(s.Group),
-		Radio:             plainStyle(s.Radio),
-		RadioFocusVisible: plainStyle(s.RadioFocusVisible),
-		RadioDisabled:     plainStyle(s.RadioDisabled),
-		Ring:              plainStyle(s.Ring),
-		RingChecked:       plainStyle(s.RingChecked),
-		RingDisabled:      plainStyle(s.RingDisabled),
-		RingInvalid:       plainStyle(s.RingInvalid),
-		Dot:               plainStyle(s.Dot),
-		DotDisabled:       plainStyle(s.DotDisabled),
-		Label:             plainStyle(s.Label),
-		LabelDisabled:     plainStyle(s.LabelDisabled),
-	}
-}
-
 // radioGroupDefaults returns the built-in look of a radio group, from the colors
 // of t. Under high contrast the ring is a solid 2 px line in the text color, or
 // in Highlight when selected, and a disabled option is GrayText and not dimmed.
@@ -110,8 +74,10 @@ func radioGroupDefaults(t *Theme) RadioGroupStyle {
 // two overrides are plain (see plainStyle).
 func resolveRadioGroup(ctx *Context, inst RadioGroupStyle) RadioGroupStyle {
 	t := ctx.Theme()
-	return layered(ctx, radioGroupDefaults(t), RadioGroupStyle.merge, RadioGroupStyle.plain,
-		themeLayer(t.RadioGroup), instanceLayer(inst))
+	st := radioGroupDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.RadioGroup), instanceLayer(&inst))
+	return st
 }
 
 // RadioGroupElement is a set of radio buttons, one per option, bound to a value.
@@ -227,7 +193,7 @@ func (r *RadioGroupElement[T]) GridSpan(cols, rows int) *RadioGroupElement[T] {
 // RadioGroupStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (r *RadioGroupElement[T]) Styles(st RadioGroupStyle) *RadioGroupElement[T] {
-	r.styles = r.styles.merge(st)
+	r.styles.mergeFrom(&st, false)
 	return r
 }
 

@@ -25,34 +25,6 @@ type CollapsibleStyle struct {
 	Content            Style // the area under the header, while the section is open
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s CollapsibleStyle) merge(o CollapsibleStyle) CollapsibleStyle {
-	return CollapsibleStyle{
-		Section:            s.Section.Merge(o.Section),
-		Header:             s.Header.Merge(o.Header),
-		HeaderHover:        s.HeaderHover.Merge(o.HeaderHover),
-		HeaderOpen:         s.HeaderOpen.Merge(o.HeaderOpen),
-		HeaderFocusVisible: s.HeaderFocusVisible.Merge(o.HeaderFocusVisible),
-		HeaderDisabled:     s.HeaderDisabled.Merge(o.HeaderDisabled),
-		Chevron:            s.Chevron.Merge(o.Chevron),
-		Content:            s.Content.Merge(o.Content),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s CollapsibleStyle) plain() CollapsibleStyle {
-	return CollapsibleStyle{
-		Section:            plainStyle(s.Section),
-		Header:             plainStyle(s.Header),
-		HeaderHover:        plainStyle(s.HeaderHover),
-		HeaderOpen:         plainStyle(s.HeaderOpen),
-		HeaderFocusVisible: plainStyle(s.HeaderFocusVisible),
-		HeaderDisabled:     plainStyle(s.HeaderDisabled),
-		Chevron:            plainStyle(s.Chevron),
-		Content:            plainStyle(s.Content),
-	}
-}
-
 // collapsibleDefaults returns the built-in look of a collapsible section, from
 // the colors of t. Under high contrast a disabled header is GrayText, not dimmed.
 func collapsibleDefaults(t *Theme) CollapsibleStyle {
@@ -79,8 +51,10 @@ func collapsibleDefaults(t *Theme) CollapsibleStyle {
 // contrast the two overrides are plain (see plainStyle).
 func resolveCollapsible(ctx *Context, inst CollapsibleStyle) CollapsibleStyle {
 	t := ctx.Theme()
-	return layered(ctx, collapsibleDefaults(t), CollapsibleStyle.merge, CollapsibleStyle.plain,
-		themeLayer(t.Collapsible), instanceLayer(inst))
+	st := collapsibleDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Collapsible), instanceLayer(&inst))
+	return st
 }
 
 // CollapsibleElement is a section with a header row, which opens and closes the
@@ -166,7 +140,7 @@ func (c *CollapsibleElement) GridSpan(cols, rows int) *CollapsibleElement {
 // fields win over the theme's Collapsible and the defaults; see CollapsibleStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
 func (c *CollapsibleElement) Styles(st CollapsibleStyle) *CollapsibleElement {
-	c.styles = c.styles.merge(st)
+	c.styles.mergeFrom(&st, false)
 	return c
 }
 

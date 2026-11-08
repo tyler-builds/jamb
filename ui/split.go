@@ -45,30 +45,6 @@ type SplitStyle struct {
 	Pane                Style // the box of each pane
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s SplitStyle) merge(o SplitStyle) SplitStyle {
-	return SplitStyle{
-		Divider:             s.Divider.Merge(o.Divider),
-		DividerHover:        s.DividerHover.Merge(o.DividerHover),
-		DividerActive:       s.DividerActive.Merge(o.DividerActive),
-		DividerFocusVisible: s.DividerFocusVisible.Merge(o.DividerFocusVisible),
-		Grip:                s.Grip.Merge(o.Grip),
-		Pane:                s.Pane.Merge(o.Pane),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s SplitStyle) plain() SplitStyle {
-	return SplitStyle{
-		Divider:             plainStyle(s.Divider),
-		DividerHover:        plainStyle(s.DividerHover),
-		DividerActive:       plainStyle(s.DividerActive),
-		DividerFocusVisible: plainStyle(s.DividerFocusVisible),
-		Grip:                plainStyle(s.Grip),
-		Pane:                plainStyle(s.Pane),
-	}
-}
-
 // splitDefaults returns the built-in look of a split, from the colors of t. Under
 // high contrast the bar and the grip are the text color, the focus ring is a solid
 // outline, and the hover and drag states add no color, since the bar is already
@@ -104,8 +80,10 @@ func splitDefaults(t *Theme, vertical bool) SplitStyle {
 // plain (see plainStyle).
 func resolveSplit(ctx *Context, vertical bool, inst SplitStyle) SplitStyle {
 	t := ctx.Theme()
-	return layered(ctx, splitDefaults(t, vertical), SplitStyle.merge, SplitStyle.plain,
-		themeLayer(t.Split), instanceLayer(inst))
+	st := splitDefaults(t, vertical)
+	st.layered(ctx,
+		themeLayer(&t.Split), instanceLayer(&inst))
+	return st
 }
 
 // SplitOrientation says how the panes of a split are laid out.
@@ -351,7 +329,7 @@ func (s *SplitElement) GridSpan(cols, rows int) *SplitElement { s.size.setSpan(c
 // win over the theme's Split and the defaults; see SplitStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
 func (s *SplitElement) Styles(st SplitStyle) *SplitElement {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

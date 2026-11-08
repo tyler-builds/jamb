@@ -76,43 +76,27 @@ type TabsStyle struct {
 	MenuButton      Style // the button that opens the menu of all the tabs (see OverflowMenu)
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s TabsStyle) merge(o TabsStyle) TabsStyle {
-	return TabsStyle{
-		Bar:             s.Bar.Merge(o.Bar),
-		List:            s.List.Merge(o.List),
-		Tab:             s.Tab.Merge(o.Tab),
-		TabHover:        s.TabHover.Merge(o.TabHover),
-		TabSelected:     s.TabSelected.Merge(o.TabSelected),
-		TabDisabled:     s.TabDisabled.Merge(o.TabDisabled),
-		TabFocusVisible: s.TabFocusVisible.Merge(o.TabFocusVisible),
-		Indicator:       s.Indicator.Merge(o.Indicator),
-		Panel:           s.Panel.Merge(o.Panel),
-		DropLine:        s.DropLine.Merge(o.DropLine),
-		ScrollButton:    s.ScrollButton.Merge(o.ScrollButton),
-		MenuButton:      s.MenuButton.Merge(o.MenuButton),
+// mergeFrom applies o on top of s in place, part by part (see Style.mergeFrom).
+// Under plain the indicator's height is the system's too, as in plain.
+func (s *TabsStyle) mergeFrom(o *TabsStyle, plain bool) {
+	s.Bar.mergeFrom(&o.Bar, plain)
+	s.List.mergeFrom(&o.List, plain)
+	s.Tab.mergeFrom(&o.Tab, plain)
+	s.TabHover.mergeFrom(&o.TabHover, plain)
+	s.TabSelected.mergeFrom(&o.TabSelected, plain)
+	s.TabDisabled.mergeFrom(&o.TabDisabled, plain)
+	s.TabFocusVisible.mergeFrom(&o.TabFocusVisible, plain)
+	ind := &o.Indicator
+	if plain {
+		cp := *ind // a Style copy is a memory copy, even under TinyGo
+		cp.Height = Auto
+		ind = &cp
 	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle). The indicator's height
-// is the system's too, so a size cannot hide the selection either.
-func (s TabsStyle) plain() TabsStyle {
-	ind := plainStyle(s.Indicator)
-	ind.Height = Auto
-	return TabsStyle{
-		Bar:             plainStyle(s.Bar),
-		List:            plainStyle(s.List),
-		Tab:             plainStyle(s.Tab),
-		TabHover:        plainStyle(s.TabHover),
-		TabSelected:     plainStyle(s.TabSelected),
-		TabDisabled:     plainStyle(s.TabDisabled),
-		TabFocusVisible: plainStyle(s.TabFocusVisible),
-		Indicator:       ind,
-		Panel:           plainStyle(s.Panel),
-		DropLine:        plainStyle(s.DropLine),
-		ScrollButton:    plainStyle(s.ScrollButton),
-		MenuButton:      plainStyle(s.MenuButton),
-	}
+	s.Indicator.mergeFrom(ind, plain)
+	s.Panel.mergeFrom(&o.Panel, plain)
+	s.DropLine.mergeFrom(&o.DropLine, plain)
+	s.ScrollButton.mergeFrom(&o.ScrollButton, plain)
+	s.MenuButton.mergeFrom(&o.MenuButton, plain)
 }
 
 // tabsDefaults returns the built-in look of a tab list of variant v, from the
@@ -162,8 +146,10 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 // overrides are plain (see plainStyle).
 func resolveTabs(ctx *Context, v TabsVariant, inst TabsStyle) TabsStyle {
 	th := ctx.Theme()
-	return layered(ctx, tabsDefaults(th, v), TabsStyle.merge, TabsStyle.plain,
-		themeLayer(th.Tabs), instanceLayer(inst))
+	st := tabsDefaults(th, v)
+	st.layered(ctx,
+		themeLayer(&th.Tabs), instanceLayer(&inst))
+	return st
 }
 
 // TabsElement is a tab list and the panel of the selected tab. The selected tab
@@ -303,7 +289,7 @@ func (t *TabsElement[T]) Variant(v TabsVariant) *TabsElement[T] { t.variant = v;
 //	ui.Tabs(view, tabs...).Styles(ui.TabsStyle{
 //		Indicator: ui.Style{Height: ui.Px(3)},
 //	})
-func (t *TabsElement[T]) Styles(s TabsStyle) *TabsElement[T] { t.styles = t.styles.merge(s); return t }
+func (t *TabsElement[T]) Styles(s TabsStyle) *TabsElement[T] { t.styles.mergeFrom(&s, false); return t }
 
 // The sizing methods give the tab list a width; the panel always fills the width of
 // the Tabs. The segmented tab list is as wide as its tabs by default, and the
