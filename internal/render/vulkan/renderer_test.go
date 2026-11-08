@@ -266,3 +266,40 @@ func BenchmarkBusyFrame1080p(b *testing.B) {
 		}
 	}
 }
+
+// A glyph atlas that grows mid-frame is replaced by a bigger texture with the
+// same ID, holding the old pixels in its top-left corner (text.Atlas.grow), so
+// one frame draws both. Both draw from one GPU texture, as the CPU renderer
+// draws them.
+func TestTextureGrowsMidFrame(t *testing.T) {
+	const w, h = 96, 48
+	r, _ := newTestRenderer(t)
+	small := scene.NewTexture(16, 16, scene.FormatAlpha8)
+	for y := 0; y < 16; y++ {
+		for x := 0; x < 16; x++ {
+			small.Pix[y*16+x] = uint8(x * 16)
+		}
+	}
+	big := scene.NewTexture(32, 32, scene.FormatAlpha8)
+	for y := 0; y < 16; y++ {
+		copy(big.Pix[y*32:y*32+16], small.Pix[y*16:(y+1)*16])
+	}
+	for y := 0; y < 32; y++ {
+		for x := 16; x < 32; x++ {
+			big.Pix[y*32+x] = 200
+		}
+	}
+	big.ID, big.Version = small.ID, small.Version+1
+	white := scene.Color{R: 1, G: 1, B: 1, A: 1}
+	draw := func(r render.Renderer) {
+		r.DrawGlyphs(scene.GlyphRun{Texture: small, Glyphs: []scene.Glyph{{
+			Bounds: scene.Rect{X: 8, Y: 8, W: 16, H: 16}, Src: scene.Rect{W: 16, H: 16}, Color: white}}})
+		r.DrawGlyphs(scene.GlyphRun{Texture: big, Glyphs: []scene.Glyph{{
+			Bounds: scene.Rect{X: 40, Y: 8, W: 16, H: 16}, Src: scene.Rect{X: 16, W: 16, H: 16}, Color: white}}})
+	}
+	gpu := capture(t, r, w, h, draw)
+	cpu := capture(t, soft.New(nil), w, h, draw)
+	if maxDiff, over := compare(gpu, cpu, 2); over > 0 {
+		t.Errorf("the GPU frame differs from the CPU frame: largest difference %d, %d pixels by more than 2", maxDiff, over)
+	}
+}
