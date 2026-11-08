@@ -288,6 +288,9 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 		win32.SetWindowPos(hwnd, x, y, ww, wh, win32.SWP_NOZORDER|win32.SWP_NOACTIVATE)
 	}
 	win32.SetDarkTitleBar(hwnd, opts.Dark)
+	if pref, ok := cornerPreference[opts.Corners]; ok {
+		win32.SetCornerPreference(hwnd, pref)
+	}
 	w.updateSize()
 
 	if err := h.OnCreate(w); err != nil {
@@ -1088,4 +1091,12 @@ func mapKey(vk uintptr) input.Key {
 		return input.KeyMenu
 	}
 	return input.KeyUnknown
+}
+
+// cornerPreference maps a window's Corners to DWM's preference. The default is
+// left to DWM.
+var cornerPreference = map[platform.Corners]int32{
+	platform.CornersRound:      win32.DWMWCP_ROUND,
+	platform.CornersRoundSmall: win32.DWMWCP_ROUNDSMALL,
+	platform.CornersSquare:     win32.DWMWCP_DONOTROUND,
 }

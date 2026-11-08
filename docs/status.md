@@ -73,7 +73,8 @@ The milestone status, and the known limitations and next steps.
   cannot (see [Vulkan on Linux](architecture.md#vulkan-on-linux)). It has windows,
   server or client-side decorations, fractional scaling, pointer, keyboard with
   compose, the clipboard (text and PNG), the desktop's dark mode, high contrast
-  and reduced motion, file dialogs through the portal, OS notifications, and tray icons (StatusNotifierItem,
+  and reduced motion, a window frame with rounded corners and a shadow on GNOME
+  (see [Window corners](windows.md#window-corners)), file dialogs through the portal, OS notifications, and tray icons (StatusNotifierItem,
   hosted by KDE Plasma and, with the AppIndicator extension, GNOME). It lacks
   input methods (text-input-v3), message boxes, accessibility
   (AT-SPI), drag and drop, and X11. On compositors that draw no window frames

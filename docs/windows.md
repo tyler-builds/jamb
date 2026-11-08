@@ -234,6 +234,38 @@ ui.TitleBar().Height(ui.Px(32)).
   is part of the window's content, as a Windows 11 title bar is; a band of its own is
   `Style(ui.Style{Background: t.Panel, BorderEdges: ui.Edges{Bottom: 1}, BorderColor: t.Border})`.
 
+## Window corners
+
+`app.Window.Corners` chooses how a window's corners look: `CornersDefault` (the
+system's choice), `CornersRound`, `CornersRoundSmall` or `CornersSquare`. The
+system draws the corners wherever it draws the window's frame, with its own border
+and shadow, so a radius cannot be chosen freely:
+
+- **Windows 11** rounds every window, with the system title bar or `ChromeCustom`.
+  `Corners` sets DWM's corner preference (`DWMWA_WINDOW_CORNER_PREFERENCE`):
+  rounded (8 px), slightly rounded (4 px, as menus are) or square. Windows 10 does
+  not round windows.
+- **Linux, desktops that draw frames** (KDE) round them as their theme says, and
+  `Corners` has no effect.
+- **Linux, GNOME**, which leaves the frame to the app: jamb draws it around the
+  window's content, as GNOME's own apps do. The surface has a transparent 24 px
+  margin with a shadow, deeper while the window has the focus; the content is
+  clipped to 12 px corners (6 px for `CornersRoundSmall`, none for
+  `CornersSquare`) and has a 1 px outline. The pointer resizes the window from
+  10 px outside it to 6 px inside, and clicks on the rest of the shadow go to what
+  is under it. The window tells GNOME which part of the surface is the window
+  (`xdg_surface.set_window_geometry`), so snapping and placement leave the shadow
+  out. While the window is maximized or fullscreen, and on each edge it is snapped
+  against, there is no margin and the corners there are square. The app sees none
+  of this: its size, events and screenshots are the content's.
+- **macOS** rounds every window. The adapter is not written yet; a custom title bar
+  there will keep a titled window with a full-size content view, as GPUI does,
+  since a borderless window has neither the corners nor the shadow.
+
+A known limit on GNOME: only the innermost rounded clip keeps its corners (see
+`render.Renderer`), so content inside a rounded clip of its own, at a window
+corner, is cut square there instead of at the window's corner.
+
 ## Native dialogs
 
 `ctx.Window()` opens the system's own dialogs, each owned by the window: a file

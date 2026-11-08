@@ -536,6 +536,23 @@ func SetDarkTitleBar(hwnd uintptr, dark bool) {
 	procDwmSetWindowAttribute.Call(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, uintptr(unsafe.Pointer(&v)), 4)
 }
 
+// SetCornerPreference sets how DWM draws a window's corners on Windows 11:
+// one of the DWMWCP_ values. Earlier Windows ignores it.
+func SetCornerPreference(hwnd uintptr, pref int32) {
+	if procDwmSetWindowAttribute.Find() != nil {
+		return
+	}
+	procDwmSetWindowAttribute.Call(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, uintptr(unsafe.Pointer(&pref)), 4)
+}
+
+// DWMWCP_ values: the corner preferences of SetCornerPreference.
+const (
+	DWMWCP_DEFAULT    = 0
+	DWMWCP_DONOTROUND = 1
+	DWMWCP_ROUND      = 2
+	DWMWCP_ROUNDSMALL = 3
+)
+
 // ---- drag and drop of files ----
 
 // DragAcceptFiles lets the window receive WM_DROPFILES.
