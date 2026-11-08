@@ -9,6 +9,13 @@ them in here.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-08
+
+### Fixed
+
+- Linux: the Vulkan renderer no longer crashes when a frame's text fills the glyph atlas, which then
+  grows. Text drawn before and after the growth shares one texture.
+
 ## [0.7.0] - 2026-11-08
 
 The `jamb` command for this version is `cmd/jamb/v0.4.3`, which adds the `files` list of `jamb.json`.
@@ -998,7 +1005,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/tyler-builds/jamb/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/tyler-builds/jamb/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/tyler-builds/jamb/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/tyler-builds/jamb/compare/v0.6.2...v0.6.3
