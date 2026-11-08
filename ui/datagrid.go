@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"cmp"
 	"fmt"
 	"slices"
@@ -1034,6 +1035,24 @@ type dgShared[T any] struct {
 	dup            string         // a key that is used twice, for the warning
 	data           []T            // the rows of the last build, for an edit to find its row
 
+	// A flat grid keeps shadow, a copy of the rows its keys were made for, while
+	// shadowed (see makeKeys), and midKeys for the keys of the rows a change made.
+	// keysFlat says that keys is makeKeys's own, not the keys of a tree; descents is
+	// the number of keys that do not come after the key before them. orderBuf holds
+	// the order, from one slice of rows to the next.
+	shadow   []T
+	shadowed bool
+	midKeys  []string
+	keysFlat bool
+	descents int
+	orderBuf []int
+	// counts is how many rows have each key, kept while the grid still checks for a
+	// repeated key (see countKeys); dups is the number of keys used more than once,
+	// and dupKey the last key that became one of them.
+	counts map[string]int32
+	dups   int
+	dupKey string
+
 	// The tree of the rows, when the grid has Children (see dgTree), with the identity
 	// of the rows it was made from. open is the keys of the open rows the order was made
 	// for, and openSet the same as a set.
@@ -1105,27 +1124,27 @@ type dgShared[T any] struct {
 }
 
 // update makes the keys of the rows when the rows have changed, and the order of
-// them for the sort by when either has changed. A key used twice is noted in dup.
-func (sh *dgShared[T]) update(rows []T, key func(T) string, cols []DataColumn[T], by SortState) {
+// them for the sort by when either has changed. While checkDup is set, a key used
+// twice is noted in dup (see countKeys).
+//
+// The table of positions by key is not made here: posOf makes it on its first
+// lookup, and posNear finds a row near where it was without it. So a change to a
+// long list of rows costs a call of key for each row and an order, not a map.
+func (sh *dgShared[T]) update(rows []T, key func(T) string, cols []DataColumn[T], by SortState, checkDup bool) {
 	n := len(rows)
 	ident := unsafe.Pointer(unsafe.SliceData(rows))
 	if !sh.keyed || sh.ident != ident || sh.n != n {
 		sh.keyed, sh.ident, sh.n = true, ident, n
-		sh.keys = make([]string, n)
-		sh.sortedKeys = true
-		for i := range rows {
-			sh.keys[i] = key(rows[i])
-			if i > 0 && sh.keys[i-1] >= sh.keys[i] {
-				sh.sortedKeys = false
-			}
-		}
+		sh.makeKeys(rows, key, checkDup)
 		sh.ordered = false
+	} else if !checkDup {
+		sh.counts, sh.dups = nil, 0
 	}
 	if sh.ordered && sh.by == by {
 		return
 	}
 	sh.ordered, sh.by = true, by
-	order := make([]int, n)
+	order := slices.Grow(sh.orderBuf[:0], n)[:n]
 	for i := range order {
 		order[i] = i
 	}
@@ -1142,14 +1161,185 @@ func (sh *dgShared[T]) update(rows []T, key func(T) string, cols []DataColumn[T]
 			break
 		}
 	}
-	sh.order = order
+	sh.order, sh.orderBuf = order, order
 	sh.tree = nil
-	sh.pos, sh.dup = nil, ""
-	// Keys in strictly increasing order are unique, so the table of positions can
-	// wait for its first lookup; otherwise it is made now, to find a repeated key.
-	if !sh.sortedKeys {
-		sh.makePos()
+	sh.pos = nil
+}
+
+// dgShadowMax is the largest row, in bytes, whose rows a grid keeps a copy of to
+// find what a change to them changed (see makeKeys). Larger rows are keyed again.
+const dgShadowMax = 128
+
+// makeKeys makes the keys of rows, the rows of a new slice. It keeps a copy of the
+// rows it made them for, and compares the new rows with it, byte for byte, from
+// the start and from the end: the rows that are the same at both ends keep their
+// keys, and key runs only for the rows between. A row whose bytes are the same is
+// the same value, whose key is the same, since keys are stable. So an insert, a
+// removal or a move among 100,000 rows calls key a few times, not 100,000, and
+// changes the count of repeated keys (see countKey) and of keys out of order for
+// those rows alone.
+//
+// Rows larger than dgShadowMax are not copied, and every change keys them all.
+func (sh *dgShared[T]) makeKeys(rows []T, key func(T) string, checkDup bool) {
+	n := len(rows)
+	size := unsafe.Sizeof(*new(T))
+	if !sh.keysFlat || !sh.shadowed {
+		keys := slices.Grow(sh.keys[:0:0], n)[:n]
+		if sh.keysFlat {
+			keys = slices.Grow(sh.keys[:0], n)[:n]
+		}
+		for i := range rows {
+			keys[i] = key(rows[i])
+		}
+		sh.keys, sh.keysFlat = keys, true
+		sh.descents = dgDescents(keys, 1, n-1)
+		sh.sortedKeys = sh.descents == 0
+		sh.counts, sh.dups = nil, 0
+		sh.shadowed = size > 0 && size <= dgShadowMax
+		sh.shadow = nil
+		if sh.shadowed {
+			sh.shadow = append(sh.shadow, rows...)
+		}
+		sh.noteDup(checkDup)
+		return
 	}
+	old := sh.shadow
+	oldN := len(old)
+	head := dgSameHead(old, rows)
+	tail := dgSameTail(old[head:], rows[head:])
+	oldEnd, newEnd := oldN-tail, n-tail
+	sh.descents -= dgDescents(sh.keys, max(1, head), min(oldN-1, oldEnd))
+	counting := checkDup && sh.counts != nil
+	if counting {
+		for _, k := range sh.keys[head:oldEnd] {
+			sh.countKey(k, -1)
+		}
+	}
+	mid := sh.midKeys[:0]
+	for _, r := range rows[head:newEnd] {
+		mid = append(mid, key(r))
+	}
+	sh.keys = slices.Replace(sh.keys, head, oldEnd, mid...)
+	clear(mid)
+	sh.midKeys = mid[:0]
+	sh.shadow = slices.Replace(sh.shadow, head, oldEnd, rows[head:newEnd]...)
+	sh.descents += dgDescents(sh.keys, max(1, head), min(n-1, newEnd))
+	sh.sortedKeys = sh.descents == 0
+	if counting {
+		for _, k := range sh.keys[head:newEnd] {
+			sh.countKey(k, 1)
+		}
+	}
+	sh.noteDup(checkDup)
+}
+
+// noteDup notes in dup a key that the rows use twice, while check is set. Keys in
+// strictly increasing order are unique and are not counted; others are counted
+// once, and makeKeys keeps the counts in step with each change after that. The
+// grid warns once (see build), and counts no more after that.
+func (sh *dgShared[T]) noteDup(check bool) {
+	sh.dup = ""
+	if !check || sh.sortedKeys {
+		sh.counts, sh.dups = nil, 0
+		return
+	}
+	if sh.counts == nil {
+		sh.counts, sh.dups = make(map[string]int32, len(sh.keys)), 0
+		for _, k := range sh.keys {
+			sh.countKey(k, 1)
+		}
+	}
+	if sh.dups == 0 {
+		return
+	}
+	if sh.counts[sh.dupKey] < 2 {
+		for k, c := range sh.counts {
+			if c > 1 {
+				sh.dupKey = k
+				break
+			}
+		}
+	}
+	sh.dup = sh.dupKey
+}
+
+// countKey adds d to the count of the key k.
+func (sh *dgShared[T]) countKey(k string, d int32) {
+	c := sh.counts[k] + d
+	switch {
+	case d > 0 && c == 2:
+		sh.dups++
+		sh.dupKey = k
+	case d < 0 && c == 1:
+		sh.dups--
+	}
+	if c <= 0 {
+		delete(sh.counts, k)
+		return
+	}
+	sh.counts[k] = c
+}
+
+// dgDescents counts the positions i from lo to hi, both included, where keys[i]
+// does not come after keys[i-1]: the keys are in strictly increasing order when
+// there are none.
+func dgDescents(keys []string, lo, hi int) int {
+	d := 0
+	for i := max(lo, 1); i <= hi && i < len(keys); i++ {
+		if keys[i-1] >= keys[i] {
+			d++
+		}
+	}
+	return d
+}
+
+// dgRowBytes returns the memory of rows.
+func dgRowBytes[T any](rows []T) []byte {
+	if len(rows) == 0 {
+		return nil
+	}
+	return unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(rows))), len(rows)*int(unsafe.Sizeof(rows[0])))
+}
+
+// dgSameHead returns the number of rows at the start of a and b that are the same,
+// byte for byte. It compares blocks of memory first, then the rows of the block
+// that differs.
+func dgSameHead[T any](a, b []T) int {
+	m := min(len(a), len(b))
+	size := int(unsafe.Sizeof(*new(T)))
+	ab, bb := dgRowBytes(a[:m]), dgRowBytes(b[:m])
+	const block = 4096
+	i := 0
+	for i+block <= len(ab) && bytes.Equal(ab[i:i+block], bb[i:i+block]) {
+		i += block
+	}
+	h := i / size
+	for h < m && bytes.Equal(ab[h*size:(h+1)*size], bb[h*size:(h+1)*size]) {
+		h++
+	}
+	return h
+}
+
+// dgSameTail returns the number of rows at the end of a and b that are the same,
+// byte for byte.
+func dgSameTail[T any](a, b []T) int {
+	m := min(len(a), len(b))
+	size := int(unsafe.Sizeof(*new(T)))
+	ab, bb := dgRowBytes(a[len(a)-m:]), dgRowBytes(b[len(b)-m:])
+	const block = 4096
+	j := len(ab) // ab[j:] and bb[j:] are the same
+	for j-block >= 0 && bytes.Equal(ab[j-block:j], bb[j-block:j]) {
+		j -= block
+	}
+	t := (len(ab) - j) / size
+	for t < m {
+		lo := len(ab) - (t+1)*size
+		if !bytes.Equal(ab[lo:lo+size], bb[lo:lo+size]) {
+			break
+		}
+		t++
+	}
+	return t
 }
 
 // makePos makes the table of displayed positions by key, and notes in dup a key
@@ -1177,6 +1367,22 @@ func (sh *dgShared[T]) posOf(k string) (int, bool) {
 	}
 	q, ok := sh.pos[k]
 	return q, ok
+}
+
+// posNear is posOf for a row that was at the position hint: it looks at the few
+// positions either side of hint first, which finds the row after rows were added or
+// removed near it, or after it moved a little, without the table of positions.
+func (sh *dgShared[T]) posNear(k string, hint int) (int, bool) {
+	n := len(sh.order)
+	for d := range 5 {
+		if q := hint - d; q >= 0 && q < n && sh.keys[sh.order[q]] == k {
+			return q, true
+		}
+		if q := hint + d; d > 0 && q >= 0 && q < n && sh.keys[sh.order[q]] == k {
+			return q, true
+		}
+	}
+	return sh.posOf(k)
 }
 
 // selection returns the set of the keys in sel, made again only when sel changes.
@@ -1303,7 +1509,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	sortState := by.Get()
 	store := g.openStore(ctx)
-	rows := g.refresh(sh, store, cols, sortState)
+	rows := g.refresh(sh, store, cols, sortState, rt.warn != nil && !sh.warned)
 	n := len(sh.order)
 	sh.data = rows
 	if sh.focus == nil {
@@ -1350,7 +1556,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	p := min(max(cursor.pos, 0), max(n-1, 0))
 	if cursor.key != "" {
-		if q, ok := sh.posOf(cursor.key); ok {
+		if q, ok := sh.posNear(cursor.key, cursor.pos); ok {
 			p = q
 		}
 	}

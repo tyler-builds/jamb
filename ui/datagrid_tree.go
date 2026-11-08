@@ -153,7 +153,8 @@ func (sh *dgShared[T]) ensureTree(rows []T, key func(T) string, children func(T)
 	}
 	sh.treeIdent = ident
 	sh.tree = flattenRows(rows, key, children)
-	sh.keys, sh.keyed = sh.tree.keys, false
+	sh.keys, sh.keyed, sh.keysFlat = sh.tree.keys, false, false
+	sh.counts, sh.dups, sh.shadow, sh.shadowed = nil, 0, nil, false
 	sh.n = len(sh.tree.rows)
 	sh.ordered = false
 }
@@ -240,9 +241,9 @@ func (g *DataGridElement[T]) openStore(ctx *Context) *Signal[[]string] {
 // updateTree), and returns the rows that the order indexes: those given, or for a tree
 // every row of it, flattened. A ScrollToRow or FocusCell on a row that a collapse hides
 // opens the rows above it first, through store, so that the row is shown.
-func (g *DataGridElement[T]) refresh(sh *dgShared[T], store *Signal[[]string], cols []DataColumn[T], by SortState) []T {
+func (g *DataGridElement[T]) refresh(sh *dgShared[T], store *Signal[[]string], cols []DataColumn[T], by SortState, checkDup bool) []T {
 	if store == nil {
-		sh.update(g.rows, g.key, cols, by)
+		sh.update(g.rows, g.key, cols, by, checkDup)
 		return g.rows
 	}
 	sh.ensureTree(g.rows, g.key, g.children)
