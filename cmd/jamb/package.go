@@ -183,6 +183,10 @@ func packageApp(o packageOptions) error {
 	if err != nil {
 		return err
 	}
+	extraSrc, err := cfg.extraFiles(o.dir)
+	if err != nil {
+		return err
+	}
 	icon, err := loadIcon(filepath.Join(o.dir, cfg.Icon))
 	if err != nil {
 		return err
@@ -254,10 +258,26 @@ func packageApp(o packageOptions) error {
 			return err
 		}
 	}
+	// The extra files go into the layout beside the executable, so the MSIX holds them,
+	// and the zip and the installer take them from there. Programs and libraries among
+	// them are signed there, leaving the app's own copies as they were.
+	var extras []string
+	for _, src := range extraSrc {
+		dst := filepath.Join(layout, filepath.Base(src))
+		if err := copyFile(src, dst); err != nil {
+			return err
+		}
+		if ext := strings.ToLower(filepath.Ext(dst)); sign != nil && (ext == ".exe" || ext == ".dll") {
+			if err := sign.sign(dst); err != nil {
+				return err
+			}
+		}
+		extras = append(extras, dst)
+	}
 
 	base := fmt.Sprintf("%s-%s-windows-%s", cfg.Name, cfg.Version, o.arch)
 	zipName := base + ".zip"
-	if err := writeZip(filepath.Join(work, zipName), o.dir, exe); err != nil {
+	if err := writeZip(filepath.Join(work, zipName), o.dir, exe, extras); err != nil {
 		return err
 	}
 	outputs := []string{zipName}
@@ -265,7 +285,7 @@ func packageApp(o packageOptions) error {
 	if makensis != "" {
 		setupName := base + "-setup.exe"
 		setupPath := filepath.Join(work, setupName)
-		if err := buildInstaller(makensis, stage, setupPath, o.dir, exe, cfg, icon, winVersion); err != nil {
+		if err := buildInstaller(makensis, stage, setupPath, o.dir, exe, extras, cfg, icon, winVersion); err != nil {
 			return err
 		}
 		if sign != nil {
@@ -348,14 +368,14 @@ func licenseFiles(dir string) ([]string, error) {
 	return files, nil
 }
 
-// writeZip writes the release zip. It holds the executable and any LICENSE or
-// NOTICE files of the app's directory, all at the root of the archive.
-func writeZip(path, dir, exe string) (err error) {
+// writeZip writes the release zip. It holds the executable, the extra files and any
+// LICENSE or NOTICE files of the app's directory, all at the root of the archive.
+func writeZip(path, dir, exe string, extras []string) (err error) {
 	licenses, err := licenseFiles(dir)
 	if err != nil {
 		return err
 	}
-	files := append([]string{exe}, licenses...)
+	files := append(append([]string{exe}, extras...), licenses...)
 
 	out, err := os.Create(path)
 	if err != nil {
@@ -399,6 +419,31 @@ func addZipFile(zw *zip.Writer, file string) error {
 	}
 	_, err = io.Copy(w, src)
 	return err
+}
+
+// copyFile copies src to dst, keeping its modification time.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o755)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	return os.Chtimes(dst, info.ModTime(), info.ModTime())
 }
 
 // pkgf prints a progress or warning line for jamb package.

@@ -31,6 +31,10 @@ type config struct {
 	Copyright            string `json:"copyright"`
 	Icon                 string `json:"icon"`
 	NotificationProtocol bool   `json:"notificationProtocol"`
+	// Files are more files to ship beside the executable, such as a helper program, by
+	// paths relative to the app's directory. Each lands at the root of the zip, the
+	// install folder and the package, under its base name.
+	Files []string `json:"files"`
 }
 
 var (
@@ -112,7 +116,53 @@ func (c *config) problems() []string {
 	if c.Icon != "" && !filepath.IsLocal(c.Icon) {
 		p = append(p, `"icon" must be a relative path inside the app's directory`)
 	}
+	// Names the packages already use beside the executable.
+	taken := map[string]string{
+		strings.ToLower(c.Name + ".exe"): "the executable",
+		"uninstall.exe":                  "the installer's uninstaller",
+		"appxmanifest.xml":               "the MSIX manifest",
+		"assets":                         "the MSIX logos",
+	}
+	for _, f := range c.Files {
+		if !filepath.IsLocal(f) {
+			p = append(p, fmt.Sprintf(`"files": %q must be a relative path inside the app's directory`, f))
+			continue
+		}
+		base := strings.ToLower(filepath.Base(f))
+		if what, ok := taken[base]; ok {
+			p = append(p, fmt.Sprintf(`"files": %q would land on the name of %s; each file lands beside the executable under its base name`, f, what))
+			continue
+		}
+		taken[base] = fmt.Sprintf("%q", f)
+	}
 	return p
+}
+
+// extraFiles returns the paths of the config's files in dir, checking that each is a
+// file and that none lands on a LICENSE or NOTICE file, which the packages also carry.
+func (c *config) extraFiles(dir string) ([]string, error) {
+	licenses, err := licenseFiles(dir)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, f := range c.Files {
+		path := filepath.Join(dir, f)
+		info, err := os.Stat(path)
+		if err != nil {
+			return nil, fmt.Errorf(`"files": %q: %w`, f, err)
+		}
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf(`"files": %q is not a regular file`, f)
+		}
+		for _, l := range licenses {
+			if strings.EqualFold(filepath.Base(l), filepath.Base(f)) && filepath.Clean(l) != filepath.Clean(path) {
+				return nil, fmt.Errorf(`"files": %q would land on %s, which the packages carry already`, f, filepath.Base(l))
+			}
+		}
+		out = append(out, path)
+	}
+	return out, nil
 }
 
 // windowsVersion maps a semantic version to the four numeric parts that Windows

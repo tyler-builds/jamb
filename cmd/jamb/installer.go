@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/template"
 )
@@ -99,19 +100,19 @@ func findMakensis(path string) (string, error) {
 }
 
 // buildInstaller writes the NSIS script and the icon into dir, and compiles the
-// installer to out with makensis. The installer copies the executable and the
-// LICENSE and NOTICE files of appDir, the same files as the zip.
-func buildInstaller(makensis, dir, out, appDir, exe string, cfg *config, icon image.Image, winVersion string) error {
+// installer to out with makensis. The installer copies the executable, the extra
+// files and the LICENSE and NOTICE files of appDir, the same files as the zip.
+func buildInstaller(makensis, dir, out, appDir, exe string, extras []string, cfg *config, icon image.Image, winVersion string) error {
 	licenses, err := licenseFiles(appDir)
 	if err != nil {
 		return err
 	}
-	files := make([]installerFile, 0, len(licenses))
+	files := make([]installerFile, 0, len(extras)+len(licenses))
 	size, err := fileSize(exe)
 	if err != nil {
 		return err
 	}
-	for _, l := range licenses {
+	for _, l := range append(slices.Clone(extras), licenses...) {
 		files = append(files, installerFile{Path: l, Name: filepath.Base(l)})
 		n, err := fileSize(l)
 		if err != nil {

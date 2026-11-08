@@ -190,7 +190,7 @@ func TestInstallerCompilesWithMakensis(t *testing.T) {
 	out := filepath.Join(dir, "setup.exe")
 	cfg := validConfig()
 	icon := image.NewNRGBA(image.Rect(0, 0, 256, 256))
-	if err := buildInstaller(makensis, stage, out, appDir, exe, &cfg, icon, "0.1.0.0"); err != nil {
+	if err := buildInstaller(makensis, stage, out, appDir, exe, nil, &cfg, icon, "0.1.0.0"); err != nil {
 		t.Fatal(err)
 	}
 	f, err := pe.Open(out)

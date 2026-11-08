@@ -361,3 +361,65 @@ func TestCleanerRunsOnceInReverseOrder(t *testing.T) {
 		t.Errorf("order = %v", order)
 	}
 }
+
+func TestPackageZipHoldsTheExtraFiles(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds an executable")
+	}
+	dir := t.TempDir()
+	makeApp(t, dir, "package main\n\nfunc main() {}\n")
+	cfg := validConfig()
+	cfg.Files = []string{"bin/helper.exe"}
+	data, _ := json.Marshal(cfg)
+	os.WriteFile(filepath.Join(dir, configFile), data, 0o644)
+	os.MkdirAll(filepath.Join(dir, "bin"), 0o755)
+	os.WriteFile(filepath.Join(dir, "bin", "helper.exe"), []byte("helper"), 0o644)
+
+	if err := packageApp(packageOptions{dir: dir, arch: "amd64"}); err != nil {
+		t.Fatal(err)
+	}
+	zr, err := zip.OpenReader(filepath.Join(dir, "dist", "jamb-demo-0.1.0-windows-amd64.zip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	var names []string
+	for _, f := range zr.File {
+		names = append(names, f.Name)
+		if f.Name == "helper.exe" {
+			rc, _ := f.Open()
+			b, _ := io.ReadAll(rc)
+			rc.Close()
+			if string(b) != "helper" {
+				t.Errorf("helper.exe holds %q", b)
+			}
+		}
+	}
+	sort.Strings(names)
+	if strings.Join(names, ",") != "helper.exe,jamb-demo.exe" {
+		t.Errorf("zip holds %v; want the executable and helper.exe at the root", names)
+	}
+}
+
+func TestPackageInstallerHoldsTheExtraFiles(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds an executable and an installer")
+	}
+	makensis, err := findMakensis("")
+	if err != nil {
+		t.Skip(err)
+	}
+	dir := t.TempDir()
+	makeApp(t, dir, "package main\n\nfunc main() {}\n")
+	cfg := validConfig()
+	cfg.Files = []string{"helper.exe"}
+	data, _ := json.Marshal(cfg)
+	os.WriteFile(filepath.Join(dir, configFile), data, 0o644)
+	os.WriteFile(filepath.Join(dir, "helper.exe"), []byte("helper"), 0o644)
+	if err := packageApp(packageOptions{dir: dir, arch: "amd64", installer: true, makensis: makensis}); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(distEntries(t, filepath.Join(dir, "dist")), ","); got != "jamb-demo-0.1.0-windows-amd64-setup.exe,jamb-demo-0.1.0-windows-amd64.zip" {
+		t.Errorf("dist holds %s", got)
+	}
+}
