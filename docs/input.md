@@ -23,6 +23,13 @@ converted underlined more heavily, and the input method's candidate list opens
 next to that clause. It becomes part of the value when the input method confirms
 it. A click, a key the field handles, or focus moving away types it as shown.
 
+A right click opens the field's context menu: Undo, Redo, Cut, Copy, Paste and Select
+all, each run as the field's action, so the menu shows the keys bound to it. A read-only
+field has Copy and Select all only, and a masked field never enables Copy or Cut. The
+right click focuses the field and keeps a selection it lands in, or else moves the caret
+to it, as Windows text boxes do. Shift+F10 and the Menu key open the menu while the field
+has focus. The field's menu wins over the menu of an element around it.
+
 ## Clipboard
 
 App code reads and writes the clipboard's plain text with `ctx.Clipboard()`,

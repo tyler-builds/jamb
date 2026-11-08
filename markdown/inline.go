@@ -22,7 +22,7 @@ type look struct {
 type inlines struct {
 	b     *builder
 	parts []part
-	links []func() // the handlers of the links, by look.link - 1
+	links []linkTo // the links, by look.link - 1
 	cur   look
 	text  strings.Builder // the text of the run in progress, in the look cur
 }
@@ -32,7 +32,7 @@ type part struct {
 	text string
 	look look
 	img  *ast.Image
-	link func() // the link around an image
+	link *linkTo // the link around an image
 }
 
 // collect walks the inline children of n into parts.
@@ -98,20 +98,20 @@ func (in *inlines) node(n ast.Node, lk look) {
 		lk.strike = true
 		in.children(n, lk)
 	case *ast.Link:
-		lk.link = in.link(in.b.follow(string(n.Destination)))
+		lk.link = in.link(in.b.follow(string(n.Destination)), string(n.Destination))
 		in.children(n, lk)
 	case *ast.AutoLink:
 		url := string(n.URL(src))
 		if n.AutoLinkType == ast.AutoLinkEmail && !strings.HasPrefix(strings.ToLower(url), "mailto:") {
 			url = "mailto:" + url
 		}
-		lk.link = in.link(in.b.follow(url))
+		lk.link = in.link(in.b.follow(url), url)
 		in.add(string(n.Label(src)), lk)
 	case *ast.Image:
 		in.flush()
-		var link func()
+		var link *linkTo
 		if lk.link > 0 {
-			link = in.links[lk.link-1]
+			link = &in.links[lk.link-1]
 		}
 		in.parts = append(in.parts, part{img: n, link: link})
 	case *ast.RawHTML:
@@ -126,7 +126,7 @@ func (in *inlines) node(n ast.Node, lk look) {
 			in.add(s, lk)
 		}
 	case *east.FootnoteLink:
-		lk.link = in.link(in.b.toFootnote(n.Index))
+		lk.link = in.link(in.b.toFootnote(n.Index), "")
 		in.add("["+strconv.Itoa(n.Index)+"]", lk)
 	case *east.TaskCheckBox, *east.FootnoteBacklink:
 		// The list item draws the check box (see listItem); the way back from a
@@ -136,9 +136,16 @@ func (in *inlines) node(n ast.Node, lk look) {
 	}
 }
 
-// link records a link's handler and returns its number for a look.
-func (in *inlines) link(fn func()) int {
-	in.links = append(in.links, fn)
+// linkTo is a link of the text: what following it does, and its destination as it
+// is written, which is empty for the reference to a footnote.
+type linkTo struct {
+	follow func()
+	url    string
+}
+
+// link records a link's handler and destination and returns its number for a look.
+func (in *inlines) link(fn func(), url string) int {
+	in.links = append(in.links, linkTo{fn, url})
 	return len(in.links)
 }
 
@@ -164,7 +171,11 @@ func (in *inlines) segments(parts []part) []ui.Segment {
 	linkNum := 0
 	endLink := func() {
 		if len(link) > 0 {
-			segs = append(segs, ui.LinkSegs(in.links[linkNum-1], link...)...)
+			to := in.links[linkNum-1]
+			if menu := in.b.linkMenu(to.url); menu != nil {
+				link[0] = link[0].ContextMenu(menu) // a menu on one segment opens from all of the link
+			}
+			segs = append(segs, ui.LinkSegs(to.follow, link...)...)
 			link = nil
 		}
 	}

@@ -332,7 +332,7 @@ func TestAccessSubmenuExpandsAndCollapses(t *testing.T) {
 				{Label: "Active", OnClick: func() {}}, {Label: "Done", OnClick: func() {}}}}}
 		}).Child(Text("Body"))
 	})
-	r.rt.openContextMenu(r.nodeByKey(t, "target"), 20, 20, false)
+	openMenuAt(r.rt, r.nodeByKey(t, "target"), 20, 20)
 	status := accesstest.Find(t, r.tree(), access.RoleMenuItem, "Status")
 	if !status.States.Has(access.StateExpandable) || status.States.Has(access.StateExpanded) {
 		t.Fatalf("a closed submenu item has states [%s]", status.States)
@@ -361,7 +361,7 @@ func TestAccessRadioMenuItemsAreSelectionItems(t *testing.T) {
 			}
 		}).Child(Text("Body"))
 	})
-	r.rt.openContextMenu(r.nodeByKey(t, "target"), 20, 20, false)
+	openMenuAt(r.rt, r.nodeByKey(t, "target"), 20, 20)
 	tr := r.tree()
 	accesstest.Check(t, accesstest.Find(t, tr, access.RoleMenuItemRadio, "Active"), access.RoleMenuItemRadio, "Active",
 		access.StateSelectable|access.StateSelected)
@@ -539,10 +539,10 @@ func TestAccessContextMenuIsNamedByItsElement(t *testing.T) {
 			Child(Div().Key("card").Role(access.RoleListItem).Label("Project Alpha").Size(Full, Px(40)).ContextMenu(menu)).
 			Child(Div().Key("plain").Size(Full, Px(40)).ContextMenu(menu))
 	})
-	r.rt.openContextMenu(r.nodeByKey(t, "card"), 20, 20, false)
+	openMenuAt(r.rt, r.nodeByKey(t, "card"), 20, 20)
 	accesstest.Find(t, r.tree(), access.RoleMenu, "Project Alpha")
 	r.rt.closeContextMenu(false)
 	r.frame()
-	r.rt.openContextMenu(r.nodeByKey(t, "plain"), 20, 60, false)
+	openMenuAt(r.rt, r.nodeByKey(t, "plain"), 20, 60)
 	accesstest.Find(t, r.tree(), access.RoleMenu, "Actions")
 }

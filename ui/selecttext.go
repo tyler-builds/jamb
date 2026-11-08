@@ -65,6 +65,9 @@ func (rt *Runtime) buildSelectable(n *node) {
 		}
 	})
 	d.h.onMouseDown = func(e *MouseEvent) { rt.selectMouseDown(id, e) }
+	// Copy and Select all, unless an element around the text has a menu of its own.
+	d.contextMenu = func() []MenuItem { return rt.selectableMenu(id) }
+	d.menuFallback = true
 	d.h.onMouseMove = func(e *MouseEvent) { rt.selectMouseMove(id, e) }
 	d.h.onMouseUp = func(*MouseEvent) {
 		if n := rt.byID[id]; n != nil {
@@ -119,9 +122,46 @@ func (n *node) lineOffset(l *text.Layout, li int) float32 {
 	return 0
 }
 
+// selectableMenu is the context menu of a selectable text: Copy, and Select all.
+func (rt *Runtime) selectableMenu(id uint64) []MenuItem {
+	n, s := rt.selectionOf(id)
+	if n == nil {
+		return nil
+	}
+	a, b := s.bounds()
+	return []MenuItem{
+		{Action: textCopy, Disabled: a == b},
+		{Action: textSelectAll, Disabled: n.textEl.text == ""},
+	}
+}
+
+// selectContextPress readies a selectable text for the context menu a right
+// press opens: the text takes focus, so Copy reaches it, and a press outside
+// the selection clears it. A press inside the selection, or on a link, keeps it.
+func (rt *Runtime) selectContextPress(id uint64, n *node, s *textSelection, e *MouseEvent) {
+	if rt.focusID != id {
+		rt.setFocus(id)
+	}
+	if n.rich != nil && rt.segmentAt([]*node{n}, e.X, e.Y).node != 0 {
+		return
+	}
+	if p, a, b := rt.selectHit(n, s, e.X, e.Y), s.anchor, s.caret; a == b || p < min(a, b) || p > max(a, b) {
+		s.anchor, s.caret = p, p
+		rt.needPaint = true
+		rt.requestFrame()
+	}
+}
+
 func (rt *Runtime) selectMouseDown(id uint64, e *MouseEvent) {
 	n, s := rt.selectionOf(id)
-	if n == nil || e.Button != input.ButtonLeft {
+	if n == nil {
+		return
+	}
+	if e.Button == input.ButtonRight {
+		rt.selectContextPress(id, n, s, e)
+		return
+	}
+	if e.Button != input.ButtonLeft {
 		return
 	}
 	if n.rich != nil && rt.clickable(rt.segmentAt([]*node{n}, e.X, e.Y)) {

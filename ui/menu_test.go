@@ -11,6 +11,12 @@ import (
 	"github.com/tyler-builds/jamb/input"
 )
 
+// openMenuAt opens the context menu of element n at (x, y) in n's coordinates.
+func openMenuAt(rt *Runtime, n *node, x, y float32) {
+	r := rt.nodeRect(n)
+	rt.openContextMenu(n, n.div.contextMenu, r.X+x, r.Y+y, false, "")
+}
+
 // key presses k with mods and lets the frame run.
 func (r *overlayRig) key(k input.Key, mods input.Modifiers) {
 	r.rt.KeyDown(k, mods, false)

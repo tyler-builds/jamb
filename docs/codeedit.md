@@ -122,6 +122,11 @@ The punctuation keys name their physical position as the US layout prints it: `c
 slash key, and `ctrl+shift+[` is the key that prints `[` on a US keyboard (Shift makes it `{`,
 and the binding still matches). A keyboard with another layout has its keys in the same places.
 
+A right click opens the editor's context menu: Undo, Redo, Cut, Copy, Paste and Select all, as
+the commands above, with their keys shown. A read-only editor has Copy and Select all only. The
+right click focuses the editor and keeps a selection it lands in, or else moves the caret to it.
+Shift+F10 and the Menu key open the menu while the editor has focus.
+
 Every command is an action, so menus and a command palette can run it. The movement and typing
 actions are hidden from a palette, as the ui's own text field actions are.
 

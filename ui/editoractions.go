@@ -382,6 +382,33 @@ func (rt *Runtime) editorSelectAll(id uint64) {
 	rt.editorTouched(id)
 }
 
+// editorMenu is the context menu of a text field: Undo and Redo, Cut, Copy and
+// Paste, and Select all, each run as the field's action, so the menu shows the
+// keys bound to it. A read-only field has only Copy and Select all, and a
+// masked field never copies.
+func (rt *Runtime) editorMenu(id uint64) []MenuItem {
+	n, es, v := rt.editorOf(id)
+	if n == nil {
+		return nil
+	}
+	sel := es.hasSelection() && !n.editor.password
+	var items []MenuItem
+	if !n.editor.readOnly {
+		items = append(items,
+			MenuItem{Action: undo, Disabled: len(es.undo) == 0},
+			MenuItem{Action: redo, Disabled: len(es.redo) == 0},
+			MenuItem{Kind: MenuKindSeparator},
+			MenuItem{Action: cut, Disabled: !sel})
+	}
+	items = append(items, MenuItem{Action: copyAction, Disabled: !sel})
+	if !n.editor.readOnly {
+		items = append(items, MenuItem{Action: paste})
+	}
+	return append(items,
+		MenuItem{Kind: MenuKindSeparator},
+		MenuItem{Action: selectAll, Disabled: v == ""})
+}
+
 // editorCopy copies the selection, as the field shows it: a field with a format
 // copies the selected part of the text in its format. A masked field keeps its
 // text off the clipboard: it copies nothing, and cuts nothing either.

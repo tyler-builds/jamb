@@ -1071,6 +1071,16 @@ func (ta *TextAreaElement) expand(ctx *Context) Element {
 	return ta.fieldOptions.expand(ctx, st, true, ta.minRows)
 }
 
+// focusFrame focuses a field's text for a press on the field's frame (its
+// padding or icon). A right press leaves focus to the text itself, which takes
+// it before its context menu opens (see editorContextPress): asked for here, the
+// focus would come after the menu's and take the keyboard from it.
+func focusFrame(h *FocusHandle, e *MouseEvent) {
+	if e.Button != input.ButtonRight {
+		h.Focus()
+	}
+}
+
 // expand returns the field's frame with its editor, in the look st. The frame
 // is the Frame part, and the content before and after the text is in the
 // Leading and Trailing parts. A borderless field draws no Frame part.
@@ -1174,7 +1184,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		box = Div().Row().Align(Start).Gap(8)
 	case f.borderless:
 		box = Div().Row().Align(Start).Gap(8).Cursor(CursorText).KeepFocus().
-			OnMouseDown(func(*MouseEvent) { h.Focus() })
+			OnMouseDown(func(e *MouseEvent) { focusFrame(h, e) })
 	case f.disabled:
 		// A disabled field takes no pointer input, so it has no hover state.
 		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).Style(st.FrameDisabled).Cursor(CursorDefault)
@@ -1182,13 +1192,13 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		// A read-only field is not edited, so it has no hover state either.
 		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).Style(st.FrameReadOnly).
 			FocusWithin(st.FrameFocusWithin).KeepFocus().
-			OnMouseDown(func(*MouseEvent) { h.Focus() })
+			OnMouseDown(func(e *MouseEvent) { focusFrame(h, e) })
 	default:
 		// Clicks on the frame (padding, icon) still focus the text. The press itself leaves
 		// focus alone (KeepFocus), so a focused field is not blurred and focused again.
 		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).
 			Hover(st.FrameHover).FocusWithin(st.FrameFocusWithin).KeepFocus().
-			OnMouseDown(func(*MouseEvent) { h.Focus() })
+			OnMouseDown(func(e *MouseEvent) { focusFrame(h, e) })
 	}
 	box.Tooltip(f.tooltip)
 	// A currency field shows the currency's symbol where the region settings put it.

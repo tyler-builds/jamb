@@ -226,6 +226,7 @@ func (e *EditorElement) wire(canvas *ui.DivElement, vs *viewState) {
 	canvas.OnFocus(func() { vs.focused = true; vs.restart = true; vs.touch() })
 	canvas.OnBlur(func() { vs.focused = false; vs.dragging = false; vs.closePopups(); vs.define.stop(); vs.touch() })
 	canvas.OnMouseDown(func(ev *ui.MouseEvent) { vs.mouseDown(ev) })
+	canvas.ContextMenu(func() []ui.MenuItem { return vs.contextMenu(e.readOnly) })
 	canvas.OnMouseMove(func(ev *ui.MouseEvent) { vs.mouseMove(ev) })
 	canvas.OnMouseUp(func(*ui.MouseEvent) { vs.dragging = false })
 	canvas.OnMouseLeave(func() {
@@ -529,6 +530,10 @@ func (vs *viewState) hitAt(x, y float32) (dr displayRow, p int, upstream, ok boo
 // editor has a provider of definitions, Alt adds a caret, Shift extends the primary selection,
 // and a double or triple click selects a word or a row.
 func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
+	if ev.Button == input.ButtonRight {
+		vs.contextPress(ev)
+		return
+	}
 	if ev.Button != input.ButtonLeft {
 		return
 	}
@@ -568,6 +573,55 @@ func (vs *viewState) mouseDown(ev *ui.MouseEvent) {
 		vs.dragging = true
 	}
 	vs.touch()
+}
+
+// contextPress readies the editor for the context menu a right press opens: the editor takes
+// focus, so the menu's commands reach it, and a press in the text outside every selection
+// moves the caret there. A press inside a selection keeps the selections, for Cut and Copy.
+func (vs *viewState) contextPress(ev *ui.MouseEvent) {
+	vs.commitComposition()
+	vs.closePopups()
+	if !vs.canvasFocus.Focused() {
+		vs.canvasFocus.FocusNow()
+	}
+	_, p, up, ok := vs.hitAt(ev.LocalX, ev.LocalY)
+	if !ok || ev.LocalX < vs.geo.textX {
+		return
+	}
+	for _, s := range vs.doc.Selections() {
+		if from, to := s.Range(); from != to && p >= from && p <= to {
+			return
+		}
+	}
+	vs.doc.SetCaret(p)
+	vs.setUpstream(up)
+	vs.restart = true
+	vs.touch()
+}
+
+// contextMenu is the editor's context menu: Undo and Redo, Cut, Copy and Paste, and Select
+// all, each run as the editor's command, so the menu shows the keys bound to it. A read-only
+// editor has only Copy and Select all.
+func (vs *viewState) contextMenu(readOnly bool) []ui.MenuItem {
+	selected := false
+	for _, s := range vs.doc.Selections() {
+		selected = selected || !s.Empty()
+	}
+	var items []ui.MenuItem
+	if !readOnly {
+		items = append(items,
+			ui.MenuItem{Action: CmdUndo, Disabled: !vs.doc.CanUndo()},
+			ui.MenuItem{Action: CmdRedo, Disabled: !vs.doc.CanRedo()},
+			ui.MenuItem{Kind: ui.MenuKindSeparator},
+			ui.MenuItem{Action: CmdCut, Disabled: !selected})
+	}
+	items = append(items, ui.MenuItem{Action: CmdCopy, Disabled: !selected})
+	if !readOnly {
+		items = append(items, ui.MenuItem{Action: CmdPaste})
+	}
+	return append(items,
+		ui.MenuItem{Kind: ui.MenuKindSeparator},
+		ui.MenuItem{Action: CmdSelectAll})
 }
 
 // mouseMove extends the primary selection while the button is held, and otherwise schedules

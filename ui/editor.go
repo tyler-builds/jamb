@@ -263,6 +263,7 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 		})
 	}
 	d.h.onMouseDown = func(ev *MouseEvent) { rt.editorMouseDown(id, ev) }
+	d.contextMenu = func() []MenuItem { return rt.editorMenu(id) }
 	d.h.onMouseMove = func(ev *MouseEvent) { rt.editorMouseMove(id, ev) }
 	d.h.onMouseUp = func(*MouseEvent) {
 		if n := rt.byID[id]; n != nil {
@@ -530,7 +531,14 @@ func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
 	// A click types what is being composed first: the layout it hits shows it.
 	rt.commitComposition()
 	n, es, v := rt.editorOf(id)
-	if n == nil || ev.Button != input.ButtonLeft {
+	if n == nil {
+		return
+	}
+	if ev.Button == input.ButtonRight {
+		rt.editorContextPress(id, n, es, ev)
+		return
+	}
+	if ev.Button != input.ButtonLeft {
 		return
 	}
 	p := rt.editorHit(n, es, ev)
@@ -565,6 +573,22 @@ func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
 	default:
 		es.caret, es.anchor = p, p
 		es.dragging = true
+	}
+	rt.editorTouched(id)
+}
+
+// editorContextPress readies a field for the context menu a right press opens:
+// the field takes focus, so the menu's commands reach it and focus comes back
+// to it, and a press outside the selection moves the caret there, as in other
+// Windows text boxes. A press inside the selection keeps it, for Cut and Copy.
+func (rt *Runtime) editorContextPress(id uint64, n *node, es *editState, ev *MouseEvent) {
+	if rt.focusID != id {
+		rt.setFocus(id)
+	}
+	p := rt.editorHit(n, es, ev)
+	if a, b := es.selection(); !es.hasSelection() || p < a || p > b {
+		es.caret, es.anchor = p, p
+		es.havePrefX = false
 	}
 	rt.editorTouched(id)
 }
