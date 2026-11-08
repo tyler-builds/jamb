@@ -9,6 +9,26 @@ them in here.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-08
+
+The `jamb` command for this version is `cmd/jamb/v0.4.3`, which adds the `files` list of `jamb.json`.
+
+### Added
+
+- Linux: windows are drawn on the GPU with Vulkan, loaded at run time, into dma-bufs handed to the
+  Wayland compositor. A busy 1080p frame takes about 1.2 ms instead of 11 ms on the CPU. Without
+  Vulkan, a qualifying GPU or the compositor's dma-buf support, windows are drawn on the CPU as
+  before, and `JAMB_RENDERER=cpu` asks for that.
+- Linux: on GNOME, which leaves window frames to apps, windows get rounded corners, a shadow that
+  deepens while the window has the focus, and a thin outline, as GNOME's own apps do. The shadow is
+  outside the window: snapping and placement leave it out, and the pointer resizes the window from
+  just outside its edge. Maximized, fullscreen and snapped edges stay square.
+- `app.Window.Corners` chooses rounded, slightly rounded or square window corners. On Windows 11 it
+  sets DWM's corner preference.
+- `jamb package`: a `files` list in `jamb.json` ships more files beside the executable, such as a
+  helper program, in the zip, the installer and the MSIX. Programs and libraries among them are
+  signed with the executable.
+
 ## [0.6.4] - 2026-11-06
 
 The `jamb` command is released with it as `cmd/jamb/v0.4.2`: `jamb dev` builds with the `jambdev` tag,
@@ -978,7 +998,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/tyler-builds/jamb/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/tyler-builds/jamb/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/tyler-builds/jamb/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/tyler-builds/jamb/compare/v0.6.1...v0.6.2
