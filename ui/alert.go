@@ -35,28 +35,6 @@ type AlertStyle struct {
 	Close       Style // the box around the close button
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s AlertStyle) merge(o AlertStyle) AlertStyle {
-	return AlertStyle{
-		Alert:       s.Alert.Merge(o.Alert),
-		Icon:        s.Icon.Merge(o.Icon),
-		Title:       s.Title.Merge(o.Title),
-		Description: s.Description.Merge(o.Description),
-		Close:       s.Close.Merge(o.Close),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s AlertStyle) plain() AlertStyle {
-	return AlertStyle{
-		Alert:       plainStyle(s.Alert),
-		Icon:        plainStyle(s.Icon),
-		Title:       plainStyle(s.Title),
-		Description: plainStyle(s.Description),
-		Close:       plainStyle(s.Close),
-	}
-}
-
 // AlertVariants holds the style of each variant of an alert, for the theme's
 // Alerts. It merges over Theme.Alert, which applies to every variant.
 type AlertVariants struct {
@@ -65,16 +43,16 @@ type AlertVariants struct {
 }
 
 // of returns the style of variant v.
-func (av AlertVariants) of(v AlertVariant) AlertStyle {
+func (av *AlertVariants) of(v AlertVariant) *AlertStyle {
 	switch v {
 	case AlertSuccess:
-		return av.Success
+		return &av.Success
 	case AlertWarning:
-		return av.Warning
+		return &av.Warning
 	case AlertDanger:
-		return av.Danger
+		return &av.Danger
 	}
-	return av.Info
+	return &av.Info
 }
 
 // alertDefaults returns the built-in look of an alert of variant v, from the
@@ -135,8 +113,10 @@ func alertIcon(v AlertVariant) *icons.Icon {
 // Styles. Under high contrast the overrides are plain (see plainStyle).
 func resolveAlert(ctx *Context, v AlertVariant, inst AlertStyle) AlertStyle {
 	t := ctx.Theme()
-	return layered(ctx, alertDefaults(t, v), AlertStyle.merge, AlertStyle.plain,
-		themeLayer(t.Alert), themeLayer(t.Alerts.of(v)), instanceLayer(inst))
+	st := alertDefaults(t, v)
+	st.layered(ctx,
+		themeLayer(&t.Alert), themeLayer(t.Alerts.of(v)), instanceLayer(&inst))
+	return st
 }
 
 // AlertElement is a message box in the flow of the page, such as a note above a
@@ -225,7 +205,7 @@ func (a *AlertElement) GridSpan(cols, rows int) *AlertElement { a.size.setSpan(c
 // fields win over the theme's Alert and Alerts and the defaults; see AlertStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
 func (a *AlertElement) Styles(st AlertStyle) *AlertElement {
-	a.styles = a.styles.merge(st)
+	a.styles.mergeFrom(&st, false)
 	return a
 }
 

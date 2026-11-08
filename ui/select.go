@@ -38,44 +38,6 @@ type SelectStyle struct {
 	OptionDisabled      Style // an option that cannot be chosen
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s SelectStyle) merge(o SelectStyle) SelectStyle {
-	return SelectStyle{
-		Trigger:             s.Trigger.Merge(o.Trigger),
-		TriggerHover:        s.TriggerHover.Merge(o.TriggerHover),
-		TriggerFocusVisible: s.TriggerFocusVisible.Merge(o.TriggerFocusVisible),
-		TriggerDisabled:     s.TriggerDisabled.Merge(o.TriggerDisabled),
-		TriggerInvalid:      s.TriggerInvalid.Merge(o.TriggerInvalid),
-		Value:               s.Value.Merge(o.Value),
-		Placeholder:         s.Placeholder.Merge(o.Placeholder),
-		Chevron:             s.Chevron.Merge(o.Chevron),
-		Popup:               s.Popup.Merge(o.Popup),
-		Option:              s.Option.Merge(o.Option),
-		OptionHighlighted:   s.OptionHighlighted.Merge(o.OptionHighlighted),
-		OptionSelected:      s.OptionSelected.Merge(o.OptionSelected),
-		OptionDisabled:      s.OptionDisabled.Merge(o.OptionDisabled),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s SelectStyle) plain() SelectStyle {
-	return SelectStyle{
-		Trigger:             plainStyle(s.Trigger),
-		TriggerHover:        plainStyle(s.TriggerHover),
-		TriggerFocusVisible: plainStyle(s.TriggerFocusVisible),
-		TriggerDisabled:     plainStyle(s.TriggerDisabled),
-		TriggerInvalid:      plainStyle(s.TriggerInvalid),
-		Value:               plainStyle(s.Value),
-		Placeholder:         plainStyle(s.Placeholder),
-		Chevron:             plainStyle(s.Chevron),
-		Popup:               plainStyle(s.Popup),
-		Option:              plainStyle(s.Option),
-		OptionHighlighted:   plainStyle(s.OptionHighlighted),
-		OptionSelected:      plainStyle(s.OptionSelected),
-		OptionDisabled:      plainStyle(s.OptionDisabled),
-	}
-}
-
 // selectWidth is the default width of a select at the Text size of 100 percent, in
 // logical pixels. It scales with the Text size.
 const selectWidth = 220
@@ -126,8 +88,10 @@ func selectDefaults(t *Theme, width float32, disabled bool, size controlSize) Se
 // overrides are plain (see plainStyle).
 func resolveSelect(ctx *Context, width float32, disabled bool, size controlSize, inst SelectStyle) SelectStyle {
 	t := ctx.Theme()
-	return layered(ctx, selectDefaults(t, width, disabled, size), SelectStyle.merge, SelectStyle.plain,
-		themeLayer(t.Select), instanceLayer(inst))
+	st := selectDefaults(t, width, disabled, size)
+	st.layered(ctx,
+		themeLayer(&t.Select), instanceLayer(&inst))
+	return st
 }
 
 // SelectElement is a drop-down list: a field that shows the chosen option, and
@@ -274,7 +238,7 @@ func (s *SelectElement[T]) GridSpan(cols, rows int) *SelectElement[T] {
 // fields win over the theme's Select and the defaults; see SelectStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (s *SelectElement[T]) Styles(st SelectStyle) *SelectElement[T] {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

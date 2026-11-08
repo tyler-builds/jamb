@@ -55,36 +55,6 @@ type DockStyle struct {
 	Preview         Style // the rectangle that shows where a dragged panel lands
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s DockStyle) merge(o DockStyle) DockStyle {
-	return DockStyle{
-		Group:           s.Group.Merge(o.Group),
-		Strip:           s.Strip.Merge(o.Strip),
-		Tab:             s.Tab.Merge(o.Tab),
-		TabHover:        s.TabHover.Merge(o.TabHover),
-		TabSelected:     s.TabSelected.Merge(o.TabSelected),
-		TabFocusVisible: s.TabFocusVisible.Merge(o.TabFocusVisible),
-		Indicator:       s.Indicator.Merge(o.Indicator),
-		Panel:           s.Panel.Merge(o.Panel),
-		Preview:         s.Preview.Merge(o.Preview),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s DockStyle) plain() DockStyle {
-	return DockStyle{
-		Group:           plainStyle(s.Group),
-		Strip:           plainStyle(s.Strip),
-		Tab:             plainStyle(s.Tab),
-		TabHover:        plainStyle(s.TabHover),
-		TabSelected:     plainStyle(s.TabSelected),
-		TabFocusVisible: plainStyle(s.TabFocusVisible),
-		Indicator:       plainStyle(s.Indicator),
-		Panel:           plainStyle(s.Panel),
-		Preview:         plainStyle(s.Preview),
-	}
-}
-
 // dockDefaults returns the built-in look of a dock, from the colors of th. The tabs are
 // those of an underlined tab list, and the preview is the accent color, so that it shows
 // under high contrast too.
@@ -106,8 +76,10 @@ func dockDefaults(th *Theme) DockStyle {
 // plainStyle).
 func resolveDock(ctx *Context, inst DockStyle) DockStyle {
 	th := ctx.Theme()
-	return layered(ctx, dockDefaults(th), DockStyle.merge, DockStyle.plain,
-		themeLayer(th.Dock), instanceLayer(inst))
+	st := dockDefaults(th)
+	st.layered(ctx,
+		themeLayer(&th.Dock), instanceLayer(&inst))
+	return st
 }
 
 // DockPanel is one panel of a Dock: its title, which names its tab and its tab panel for
@@ -328,7 +300,7 @@ func (d *DockElement) Key(k string) *DockElement { d.key = k; return d }
 // Styles sets the look of the parts of the dock, for this instance only. Set fields win
 // over the theme's Dock and the defaults; see DockStyle and docs/styling.md. Calling
 // Styles again merges with the earlier values.
-func (d *DockElement) Styles(s DockStyle) *DockElement { d.styles = d.styles.merge(s); return d }
+func (d *DockElement) Styles(s DockStyle) *DockElement { d.styles.mergeFrom(&s, false); return d }
 
 // OnChange runs fn with the new layout after the user changes it: a panel moved, a
 // divider moved, a tab selected, a panel floated, docked back or closed, or a floating

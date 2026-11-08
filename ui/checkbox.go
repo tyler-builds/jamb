@@ -54,44 +54,6 @@ type CheckboxStyle struct {
 	LabelDisabled       Style // the text when the box is disabled
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s CheckboxStyle) merge(o CheckboxStyle) CheckboxStyle {
-	return CheckboxStyle{
-		Control:             s.Control.Merge(o.Control),
-		ControlFocusVisible: s.ControlFocusVisible.Merge(o.ControlFocusVisible),
-		ControlDisabled:     s.ControlDisabled.Merge(o.ControlDisabled),
-		Box:                 s.Box.Merge(o.Box),
-		BoxHover:            s.BoxHover.Merge(o.BoxHover),
-		BoxChecked:          s.BoxChecked.Merge(o.BoxChecked),
-		BoxMixed:            s.BoxMixed.Merge(o.BoxMixed),
-		BoxDisabled:         s.BoxDisabled.Merge(o.BoxDisabled),
-		BoxInvalid:          s.BoxInvalid.Merge(o.BoxInvalid),
-		Mark:                s.Mark.Merge(o.Mark),
-		Dash:                s.Dash.Merge(o.Dash),
-		Label:               s.Label.Merge(o.Label),
-		LabelDisabled:       s.LabelDisabled.Merge(o.LabelDisabled),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s CheckboxStyle) plain() CheckboxStyle {
-	return CheckboxStyle{
-		Control:             plainStyle(s.Control),
-		ControlFocusVisible: plainStyle(s.ControlFocusVisible),
-		ControlDisabled:     plainStyle(s.ControlDisabled),
-		Box:                 plainStyle(s.Box),
-		BoxHover:            plainStyle(s.BoxHover),
-		BoxChecked:          plainStyle(s.BoxChecked),
-		BoxMixed:            plainStyle(s.BoxMixed),
-		BoxDisabled:         plainStyle(s.BoxDisabled),
-		BoxInvalid:          plainStyle(s.BoxInvalid),
-		Mark:                plainStyle(s.Mark),
-		Dash:                plainStyle(s.Dash),
-		Label:               plainStyle(s.Label),
-		LabelDisabled:       plainStyle(s.LabelDisabled),
-	}
-}
-
 // checkboxDefaults returns the built-in look of a check box in state s, from the
 // colors of t. Under high contrast the box is outlined in the text color, or in
 // Highlight when on or mixed, and a disabled box is GrayText and not dimmed.
@@ -134,8 +96,10 @@ func checkboxDefaults(t *Theme, s CheckState, disabled bool) CheckboxStyle {
 // contrast the two overrides are plain (see plainStyle).
 func resolveCheckbox(ctx *Context, s CheckState, disabled bool, inst CheckboxStyle) CheckboxStyle {
 	t := ctx.Theme()
-	return layered(ctx, checkboxDefaults(t, s, disabled), CheckboxStyle.merge, CheckboxStyle.plain,
-		themeLayer(t.Checkbox), instanceLayer(inst))
+	st := checkboxDefaults(t, s, disabled)
+	st.layered(ctx,
+		themeLayer(&t.Checkbox), instanceLayer(&inst))
+	return st
 }
 
 // CheckboxElement is a check box with a text label. Space, a click on the box
@@ -262,7 +226,7 @@ func (c *CheckboxElement) GridSpan(cols, rows int) *CheckboxElement {
 // Set fields win over the theme's Checkbox and the defaults; see CheckboxStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
 func (c *CheckboxElement) Styles(st CheckboxStyle) *CheckboxElement {
-	c.styles = c.styles.merge(st)
+	c.styles.mergeFrom(&st, false)
 	return c
 }
 

@@ -46,42 +46,6 @@ type StepperStyle struct {
 	ConnectorComplete Style // the line after a complete step, over Connector
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s StepperStyle) merge(o StepperStyle) StepperStyle {
-	return StepperStyle{
-		Stepper:           s.Stepper.Merge(o.Stepper),
-		Step:              s.Step.Merge(o.Step),
-		StepHover:         s.StepHover.Merge(o.StepHover),
-		StepFocusVisible:  s.StepFocusVisible.Merge(o.StepFocusVisible),
-		StepDisabled:      s.StepDisabled.Merge(o.StepDisabled),
-		Indicator:         s.Indicator.Merge(o.Indicator),
-		IndicatorComplete: s.IndicatorComplete.Merge(o.IndicatorComplete),
-		IndicatorCurrent:  s.IndicatorCurrent.Merge(o.IndicatorCurrent),
-		Title:             s.Title.Merge(o.Title),
-		Description:       s.Description.Merge(o.Description),
-		Connector:         s.Connector.Merge(o.Connector),
-		ConnectorComplete: s.ConnectorComplete.Merge(o.ConnectorComplete),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s StepperStyle) plain() StepperStyle {
-	return StepperStyle{
-		Stepper:           plainStyle(s.Stepper),
-		Step:              plainStyle(s.Step),
-		StepHover:         plainStyle(s.StepHover),
-		StepFocusVisible:  plainStyle(s.StepFocusVisible),
-		StepDisabled:      plainStyle(s.StepDisabled),
-		Indicator:         plainStyle(s.Indicator),
-		IndicatorComplete: plainStyle(s.IndicatorComplete),
-		IndicatorCurrent:  plainStyle(s.IndicatorCurrent),
-		Title:             plainStyle(s.Title),
-		Description:       plainStyle(s.Description),
-		Connector:         plainStyle(s.Connector),
-		ConnectorComplete: plainStyle(s.ConnectorComplete),
-	}
-}
-
 // stepperDefaults returns the built-in look of a stepper, laid out in a column
 // when vertical, from the colors of t. A step not reached yet has an outlined
 // circle in the muted text color, a complete step a circle filled with Accent and
@@ -133,8 +97,10 @@ func stepperDefaults(t *Theme, vertical bool) StepperStyle {
 // overrides are plain (see plainStyle).
 func resolveStepper(ctx *Context, vertical bool, inst StepperStyle) StepperStyle {
 	t := ctx.Theme()
-	return layered(ctx, stepperDefaults(t, vertical), StepperStyle.merge, StepperStyle.plain,
-		themeLayer(t.Stepper), instanceLayer(inst))
+	st := stepperDefaults(t, vertical)
+	st.layered(ctx,
+		themeLayer(&t.Stepper), instanceLayer(&inst))
+	return st
 }
 
 // StepperElement shows the progress through the steps of a process, such as the
@@ -229,7 +195,7 @@ func (s *StepperElement) Tooltip(text string) *StepperElement { s.tooltip = text
 // fields win over the theme's Stepper and the defaults; see StepperStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (s *StepperElement) Styles(st StepperStyle) *StepperElement {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

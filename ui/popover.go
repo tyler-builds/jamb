@@ -59,12 +59,6 @@ type PopoverStyle struct {
 	Panel Style // the floating panel that holds the content
 }
 
-func (s PopoverStyle) merge(o PopoverStyle) PopoverStyle {
-	return PopoverStyle{Panel: s.Panel.Merge(o.Panel)}
-}
-
-func (s PopoverStyle) plain() PopoverStyle { return PopoverStyle{Panel: plainStyle(s.Panel)} }
-
 // popoverDefaults returns the built-in look of a popover, from the colors of t:
 // the surface and border of a menu, with room around the content.
 func popoverDefaults(t *Theme) PopoverStyle {
@@ -74,14 +68,16 @@ func popoverDefaults(t *Theme) PopoverStyle {
 
 func resolvePopover(ctx *Context, inst PopoverStyle) PopoverStyle {
 	t := ctx.Theme()
-	return layered(ctx, popoverDefaults(t), PopoverStyle.merge, PopoverStyle.plain,
-		themeLayer(t.Popover), instanceLayer(inst))
+	st := popoverDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Popover), instanceLayer(&inst))
+	return st
 }
 
 // Styles sets the look of the panel, for this instance only. Set fields win
 // over the theme's Popover and the defaults. Calling Styles again merges.
 func (p *PopoverElement) Styles(st PopoverStyle) *PopoverElement {
-	p.styles = p.styles.merge(st)
+	p.styles.mergeFrom(&st, false)
 	return p
 }
 

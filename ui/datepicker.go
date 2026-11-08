@@ -63,46 +63,6 @@ type DatePickerStyle struct {
 	DayFocusVisible Style
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s DatePickerStyle) merge(o DatePickerStyle) DatePickerStyle {
-	return DatePickerStyle{
-		Field:           s.Field.merge(o.Field),
-		CalendarButton:  s.CalendarButton.Merge(o.CalendarButton),
-		Message:         s.Message.Merge(o.Message),
-		Popup:           s.Popup.Merge(o.Popup),
-		Header:          s.Header.Merge(o.Header),
-		NavButton:       s.NavButton.Merge(o.NavButton),
-		WeekdayLabel:    s.WeekdayLabel.Merge(o.WeekdayLabel),
-		Day:             s.Day.Merge(o.Day),
-		DayHover:        s.DayHover.Merge(o.DayHover),
-		DaySelected:     s.DaySelected.Merge(o.DaySelected),
-		DayToday:        s.DayToday.Merge(o.DayToday),
-		DayDisabled:     s.DayDisabled.Merge(o.DayDisabled),
-		DayOutsideMonth: s.DayOutsideMonth.Merge(o.DayOutsideMonth),
-		DayFocusVisible: s.DayFocusVisible.Merge(o.DayFocusVisible),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s DatePickerStyle) plain() DatePickerStyle {
-	return DatePickerStyle{
-		Field:           s.Field.plain(),
-		CalendarButton:  plainStyle(s.CalendarButton),
-		Message:         plainStyle(s.Message),
-		Popup:           plainStyle(s.Popup),
-		Header:          plainStyle(s.Header),
-		NavButton:       plainStyle(s.NavButton),
-		WeekdayLabel:    plainStyle(s.WeekdayLabel),
-		Day:             plainStyle(s.Day),
-		DayHover:        plainStyle(s.DayHover),
-		DaySelected:     plainStyle(s.DaySelected),
-		DayToday:        plainStyle(s.DayToday),
-		DayDisabled:     plainStyle(s.DayDisabled),
-		DayOutsideMonth: plainStyle(s.DayOutsideMonth),
-		DayFocusVisible: plainStyle(s.DayFocusVisible),
-	}
-}
-
 // calendar returns the parts of the calendar of a date picker as a CalendarStyle, with its
 // Popup as the Root and inRange as the look of the days between the ends of a range.
 func (s DatePickerStyle) calendar(inRange Style) CalendarStyle {
@@ -157,8 +117,10 @@ func datePickerDefaults(t *Theme, scale float32, disabled bool) DatePickerStyle 
 // Under high contrast the overrides are plain (see plainStyle).
 func resolveDatePicker(ctx *Context, scale float32, disabled bool, inst DatePickerStyle) DatePickerStyle {
 	t := ctx.Theme()
-	return layered(ctx, datePickerDefaults(t, scale, disabled), DatePickerStyle.merge, DatePickerStyle.plain,
-		themeLayer(t.DatePicker), instanceLayer(inst))
+	st := datePickerDefaults(t, scale, disabled)
+	st.layered(ctx,
+		themeLayer(&t.DatePicker), instanceLayer(&inst))
+	return st
 }
 
 // DatePickerElement is a text field for a day, with a calendar that opens below it. The
@@ -335,7 +297,7 @@ func (d *DatePickerElement) GridSpan(cols, rows int) *DatePickerElement {
 // win over the theme's DatePicker and the defaults; see DatePickerStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
 func (d *DatePickerElement) Styles(st DatePickerStyle) *DatePickerElement {
-	d.styles = d.styles.merge(st)
+	d.styles.mergeFrom(&st, false)
 	return d
 }
 

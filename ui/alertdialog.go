@@ -43,34 +43,6 @@ type AlertDialogStyle struct {
 	Footer  Style // the row of buttons, at the bottom
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s AlertDialogStyle) merge(o AlertDialogStyle) AlertDialogStyle {
-	return AlertDialogStyle{
-		Scrim:   s.Scrim.Merge(o.Scrim),
-		Panel:   s.Panel.Merge(o.Panel),
-		Header:  s.Header.Merge(o.Header),
-		Icon:    s.Icon.Merge(o.Icon),
-		Title:   s.Title.Merge(o.Title),
-		Message: s.Message.Merge(o.Message),
-		Body:    s.Body.Merge(o.Body),
-		Footer:  s.Footer.Merge(o.Footer),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s AlertDialogStyle) plain() AlertDialogStyle {
-	return AlertDialogStyle{
-		Scrim:   plainStyle(s.Scrim),
-		Panel:   plainStyle(s.Panel),
-		Header:  plainStyle(s.Header),
-		Icon:    plainStyle(s.Icon),
-		Title:   plainStyle(s.Title),
-		Message: plainStyle(s.Message),
-		Body:    plainStyle(s.Body),
-		Footer:  plainStyle(s.Footer),
-	}
-}
-
 // alertDialogDefaults returns the built-in look of an alert dialog of intent i,
 // from the colors of t: a modal's parts, with the icon in the intent's color,
 // moved towards the text color as an Alert's icon is, and the message in the
@@ -105,8 +77,10 @@ func alertDialogDefaults(t *Theme, i AlertDialogIntent) AlertDialogStyle {
 // Under high contrast the two overrides are plain (see plainStyle).
 func resolveAlertDialog(ctx *Context, i AlertDialogIntent, inst AlertDialogStyle) AlertDialogStyle {
 	t := ctx.Theme()
-	return layered(ctx, alertDialogDefaults(t, i), AlertDialogStyle.merge, AlertDialogStyle.plain,
-		themeLayer(t.AlertDialog), instanceLayer(inst))
+	st := alertDialogDefaults(t, i)
+	st.layered(ctx,
+		themeLayer(&t.AlertDialog), instanceLayer(&inst))
+	return st
 }
 
 // AlertDialogElement is a modal dialog that asks the user to respond to a
@@ -207,7 +181,7 @@ func (a *AlertDialogElement) ConfirmLoading(on bool) *AlertDialogElement { a.loa
 // fields win over the theme's AlertDialog and the defaults; see AlertDialogStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
 func (a *AlertDialogElement) Styles(st AlertDialogStyle) *AlertDialogElement {
-	a.styles = a.styles.merge(st)
+	a.styles.mergeFrom(&st, false)
 	return a
 }
 

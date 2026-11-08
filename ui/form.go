@@ -185,28 +185,6 @@ type FormStyle struct {
 	SummaryItemFocusVisible Style // an item with keyboard focus
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s FormStyle) merge(o FormStyle) FormStyle {
-	return FormStyle{
-		Summary:                 s.Summary.Merge(o.Summary),
-		SummaryTitle:            s.SummaryTitle.Merge(o.SummaryTitle),
-		SummaryItem:             s.SummaryItem.Merge(o.SummaryItem),
-		SummaryItemHover:        s.SummaryItemHover.Merge(o.SummaryItemHover),
-		SummaryItemFocusVisible: s.SummaryItemFocusVisible.Merge(o.SummaryItemFocusVisible),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s FormStyle) plain() FormStyle {
-	return FormStyle{
-		Summary:                 plainStyle(s.Summary),
-		SummaryTitle:            plainStyle(s.SummaryTitle),
-		SummaryItem:             plainStyle(s.SummaryItem),
-		SummaryItemHover:        plainStyle(s.SummaryItemHover),
-		SummaryItemFocusVisible: plainStyle(s.SummaryItemFocusVisible),
-	}
-}
-
 // formDefaults returns the built-in look of a form's summary, from the colors of t.
 // The summary's border is two pixels wide and its title has an alert icon, so the
 // error is not carried by color alone.
@@ -232,8 +210,10 @@ func formDefaults(t *Theme) FormStyle {
 // are plain (see plainStyle).
 func resolveForm(ctx *Context, inst FormStyle) FormStyle {
 	t := ctx.Theme()
-	return layered(ctx, formDefaults(t), FormStyle.merge, FormStyle.plain,
-		themeLayer(t.Form), instanceLayer(inst))
+	st := formDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Form), instanceLayer(&inst))
+	return st
 }
 
 // FormSummaryElement is the error summary of a form. It is empty until the form is
@@ -253,7 +233,7 @@ func (*FormSummaryElement) isElement() {}
 // fields win over the theme's Form and the defaults; see FormStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (s *FormSummaryElement) Styles(st FormStyle) *FormSummaryElement {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

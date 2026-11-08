@@ -27,34 +27,6 @@ type ToggleStyle struct {
 	Icon             Style // the icon
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ToggleStyle) merge(o ToggleStyle) ToggleStyle {
-	return ToggleStyle{
-		Root:             s.Root.Merge(o.Root),
-		RootChecked:      s.RootChecked.Merge(o.RootChecked),
-		RootHover:        s.RootHover.Merge(o.RootHover),
-		RootPressed:      s.RootPressed.Merge(o.RootPressed),
-		RootDisabled:     s.RootDisabled.Merge(o.RootDisabled),
-		RootFocusVisible: s.RootFocusVisible.Merge(o.RootFocusVisible),
-		Label:            s.Label.Merge(o.Label),
-		Icon:             s.Icon.Merge(o.Icon),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ToggleStyle) plain() ToggleStyle {
-	return ToggleStyle{
-		Root:             plainStyle(s.Root),
-		RootChecked:      plainStyle(s.RootChecked),
-		RootHover:        plainStyle(s.RootHover),
-		RootPressed:      plainStyle(s.RootPressed),
-		RootDisabled:     plainStyle(s.RootDisabled),
-		RootFocusVisible: plainStyle(s.RootFocusVisible),
-		Label:            plainStyle(s.Label),
-		Icon:             plainStyle(s.Icon),
-	}
-}
-
 // toggleDefaults returns the built-in look of a toggle of variant v (ButtonGhost
 // or ButtonSecondary), on or off, from the colors of t. At rest it is the button
 // of that variant, so a toggle sits well beside buttons. On, it has a soft accent
@@ -93,8 +65,10 @@ func toggleDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly, on, d
 // contrast the two overrides are plain (see plainStyle).
 func resolveToggle(ctx *Context, v ButtonVariant, size controlSize, iconOnly, on, disabled bool, inst ToggleStyle) ToggleStyle {
 	t := ctx.Theme()
-	return layered(ctx, toggleDefaults(t, v, size, iconOnly, on, disabled), ToggleStyle.merge, ToggleStyle.plain,
-		themeLayer(t.Toggle), instanceLayer(inst))
+	st := toggleDefaults(t, v, size, iconOnly, on, disabled)
+	st.layered(ctx,
+		themeLayer(&t.Toggle), instanceLayer(&inst))
+	return st
 }
 
 // ToggleElement is a button that stays pressed while it is on, such as a Bold
@@ -194,7 +168,7 @@ func (b *ToggleElement) GridSpan(cols, rows int) *ToggleElement { b.size.setSpan
 // fields win over the theme's Toggle and the defaults; see ToggleStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (b *ToggleElement) Styles(st ToggleStyle) *ToggleElement {
-	b.styles = b.styles.merge(st)
+	b.styles.mergeFrom(&st, false)
 	return b
 }
 
@@ -266,38 +240,6 @@ type ToggleGroupStyle struct {
 	Icon             Style // the icon of each option
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ToggleGroupStyle) merge(o ToggleGroupStyle) ToggleGroupStyle {
-	return ToggleGroupStyle{
-		Group:            s.Group.Merge(o.Group),
-		GroupInvalid:     s.GroupInvalid.Merge(o.GroupInvalid),
-		Item:             s.Item.Merge(o.Item),
-		ItemSelected:     s.ItemSelected.Merge(o.ItemSelected),
-		ItemHover:        s.ItemHover.Merge(o.ItemHover),
-		ItemPressed:      s.ItemPressed.Merge(o.ItemPressed),
-		ItemFocusVisible: s.ItemFocusVisible.Merge(o.ItemFocusVisible),
-		ItemDisabled:     s.ItemDisabled.Merge(o.ItemDisabled),
-		Label:            s.Label.Merge(o.Label),
-		Icon:             s.Icon.Merge(o.Icon),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ToggleGroupStyle) plain() ToggleGroupStyle {
-	return ToggleGroupStyle{
-		Group:            plainStyle(s.Group),
-		GroupInvalid:     plainStyle(s.GroupInvalid),
-		Item:             plainStyle(s.Item),
-		ItemSelected:     plainStyle(s.ItemSelected),
-		ItemHover:        plainStyle(s.ItemHover),
-		ItemPressed:      plainStyle(s.ItemPressed),
-		ItemFocusVisible: plainStyle(s.ItemFocusVisible),
-		ItemDisabled:     plainStyle(s.ItemDisabled),
-		Label:            plainStyle(s.Label),
-		Icon:             plainStyle(s.Icon),
-	}
-}
-
 // toggleGroupDefaults returns the built-in look of a toggle group, from the colors
 // of t. The row is a Secondary button split into items, at the height of a
 // button of the same size, and the selected item is filled with Accent, as the
@@ -349,8 +291,10 @@ func toggleGroupDefaults(t *Theme, size controlSize, iconOnly bool) ToggleGroupS
 // two overrides are plain (see plainStyle).
 func resolveToggleGroup(ctx *Context, size controlSize, iconOnly bool, inst ToggleGroupStyle) ToggleGroupStyle {
 	t := ctx.Theme()
-	return layered(ctx, toggleGroupDefaults(t, size, iconOnly), ToggleGroupStyle.merge, ToggleGroupStyle.plain,
-		themeLayer(t.ToggleGroup), instanceLayer(inst))
+	st := toggleGroupDefaults(t, size, iconOnly)
+	st.layered(ctx,
+		themeLayer(&t.ToggleGroup), instanceLayer(&inst))
+	return st
 }
 
 // ToggleGroupElement is a row of joined toggles, one per option, of which one is
@@ -481,7 +425,7 @@ func (g *ToggleGroupElement[T]) GridSpan(cols, rows int) *ToggleGroupElement[T] 
 // ToggleGroupStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (g *ToggleGroupElement[T]) Styles(st ToggleGroupStyle) *ToggleGroupElement[T] {
-	g.styles = g.styles.merge(st)
+	g.styles.mergeFrom(&st, false)
 	return g
 }
 

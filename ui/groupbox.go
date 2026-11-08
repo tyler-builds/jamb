@@ -16,28 +16,6 @@ type GroupBoxStyle struct {
 	Content     Style // the area that holds the children
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s GroupBoxStyle) merge(o GroupBoxStyle) GroupBoxStyle {
-	return GroupBoxStyle{
-		GroupBox:    s.GroupBox.Merge(o.GroupBox),
-		Header:      s.Header.Merge(o.Header),
-		Title:       s.Title.Merge(o.Title),
-		Description: s.Description.Merge(o.Description),
-		Content:     s.Content.Merge(o.Content),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s GroupBoxStyle) plain() GroupBoxStyle {
-	return GroupBoxStyle{
-		GroupBox:    plainStyle(s.GroupBox),
-		Header:      plainStyle(s.Header),
-		Title:       plainStyle(s.Title),
-		Description: plainStyle(s.Description),
-		Content:     plainStyle(s.Content),
-	}
-}
-
 // groupBoxDefaults returns the built-in look of a group box: a frame outlined in
 // the border color, or, with fill, a frame filled with a raised surface color and
 // no border. Under high contrast both are the window color outlined in the text
@@ -65,8 +43,10 @@ func groupBoxDefaults(t *Theme, fill bool) GroupBoxStyle {
 // overrides are plain (see plainStyle).
 func resolveGroupBox(ctx *Context, fill bool, inst GroupBoxStyle) GroupBoxStyle {
 	t := ctx.Theme()
-	return layered(ctx, groupBoxDefaults(t, fill), GroupBoxStyle.merge, GroupBoxStyle.plain,
-		themeLayer(t.GroupBox), instanceLayer(inst))
+	st := groupBoxDefaults(t, fill)
+	st.layered(ctx,
+		themeLayer(&t.GroupBox), instanceLayer(&inst))
+	return st
 }
 
 // GroupBoxElement is a titled section that holds related content, such as the
@@ -142,7 +122,7 @@ func (g *GroupBoxElement) GridSpan(cols, rows int) *GroupBoxElement {
 // fields win over the theme's GroupBox and the defaults; see GroupBoxStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (g *GroupBoxElement) Styles(st GroupBoxStyle) *GroupBoxElement {
-	g.styles = g.styles.merge(st)
+	g.styles.mergeFrom(&st, false)
 	return g
 }
 

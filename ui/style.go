@@ -320,8 +320,8 @@ const (
 	ClearGap                             // Gap: no space between children
 )
 
-// cleared returns s without the fields that c names.
-func (s Style) cleared(c ClearSet) Style {
+// applyClears removes the fields that c names from s.
+func (s *Style) applyClears(c ClearSet) {
 	if c&ClearBackground != 0 {
 		s.Background, s.Gradient = Color{}, Gradient{}
 	}
@@ -346,16 +346,33 @@ func (s Style) cleared(c ClearSet) Style {
 	if c&ClearGap != 0 {
 		s.Gap = 0
 	}
-	return s
 }
 
 // Merge returns s with every set field of o applied on top. The fields that o
 // clears (see Style.Clear) are removed first. While an inspector is attached,
 // the layers that set the fields are merged with them (see style_layers.go).
 func (s Style) Merge(o Style) Style {
+	s.mergeFrom(&o, false)
+	return s
+}
+
+// plainClears are the clears that plainStyle drops.
+const plainClears = ClearBackground | ClearTextColor | ClearBorder | ClearShadows
+
+// mergeFrom applies o on top of s in place, as Merge does. With plain it applies
+// plainStyle(o) instead, without making it: o's colors, gradient, shadows and
+// opacity, and its clears of them, are left out. It is never inlined, so that
+// TinyGo keeps one copy of its code, not one in every widget's merge.
+//
+//go:noinline
+func (s *Style) mergeFrom(o *Style, plain bool) {
 	sp := s.prov
-	s = s.cleared(o.Clear)
-	s.Clear |= o.Clear
+	clears := o.Clear
+	if plain {
+		clears &^= plainClears
+	}
+	s.applyClears(clears)
+	s.Clear |= clears
 	if o.Direction != Column {
 		s.Direction = o.Direction
 	}
@@ -415,11 +432,13 @@ func (s Style) Merge(o Style) Style {
 	if o.ZIndex != 0 {
 		s.ZIndex = o.ZIndex
 	}
-	mergeC(&s.Background, o.Background)
-	if !o.Gradient.isZero() {
-		s.Gradient = o.Gradient
+	if !plain {
+		mergeC(&s.Background, o.Background)
+		if !o.Gradient.isZero() {
+			s.Gradient = o.Gradient
+		}
+		mergeC(&s.BorderColor, o.BorderColor)
 	}
-	mergeC(&s.BorderColor, o.BorderColor)
 	if o.BorderWidth != 0 {
 		s.BorderWidth, s.BorderEdges = o.BorderWidth, Edges{}
 	}
@@ -430,17 +449,21 @@ func (s Style) Merge(o Style) Style {
 	if !o.Corners.isZero() {
 		s.Corners = o.Corners
 	}
-	if o.Shadows != nil {
-		s.Shadows = o.Shadows
+	if !plain {
+		if o.Shadows != nil {
+			s.Shadows = o.Shadows
+		}
+		mergeF(&s.Opacity, o.Opacity)
 	}
-	mergeF(&s.Opacity, o.Opacity)
 	mergeF(&s.OffsetX, o.OffsetX)
 	mergeF(&s.OffsetY, o.OffsetY)
 	mergeF(&s.Scale, o.Scale)
 	if o.Cursor != CursorDefault {
 		s.Cursor = o.Cursor
 	}
-	mergeC(&s.TextColor, o.TextColor)
+	if !plain {
+		mergeC(&s.TextColor, o.TextColor)
+	}
 	mergeF(&s.FontSize, o.FontSize)
 	if o.FontWeight != 0 {
 		s.FontWeight = o.FontWeight
@@ -460,9 +483,8 @@ func (s Style) Merge(o Style) Style {
 		s.LayoutSpring = o.LayoutSpring
 	}
 	if sp != nil || o.prov != nil {
-		s.prov = mergeProv(sp, o.prov, s)
+		s.prov = mergeProv(sp, o.prov, *s) // a copy, so that s does not escape
 	}
-	return s
 }
 
 func (e *Edges) side(i int) *float32 {

@@ -26,30 +26,6 @@ type FormFieldStyle struct {
 	Error       Style // the row with the alert icon and the error text
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s FormFieldStyle) merge(o FormFieldStyle) FormFieldStyle {
-	return FormFieldStyle{
-		Root:        s.Root.Merge(o.Root),
-		Label:       s.Label.Merge(o.Label),
-		InlineLabel: s.InlineLabel.Merge(o.InlineLabel),
-		Required:    s.Required.Merge(o.Required),
-		Description: s.Description.Merge(o.Description),
-		Error:       s.Error.Merge(o.Error),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s FormFieldStyle) plain() FormFieldStyle {
-	return FormFieldStyle{
-		Root:        plainStyle(s.Root),
-		Label:       plainStyle(s.Label),
-		InlineLabel: plainStyle(s.InlineLabel),
-		Required:    plainStyle(s.Required),
-		Description: plainStyle(s.Description),
-		Error:       plainStyle(s.Error),
-	}
-}
-
 // messageStyle is the look of a message that says what is wrong with a control: a
 // row with an alert icon and the text, in Danger, or in the text color under high
 // contrast. A number input's message and a field's error take it, so the two look
@@ -94,8 +70,10 @@ func formFieldDefaults(t *Theme) FormFieldStyle {
 // overrides are plain (see plainStyle).
 func resolveFormField(ctx *Context, inst FormFieldStyle) FormFieldStyle {
 	t := ctx.Theme()
-	return layered(ctx, formFieldDefaults(t), FormFieldStyle.merge, FormFieldStyle.plain,
-		themeLayer(t.FormField), instanceLayer(inst))
+	st := formFieldDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.FormField), instanceLayer(&inst))
+	return st
 }
 
 // fieldWire is what a Field gives the control it wraps. The control applies it in
@@ -217,7 +195,7 @@ func (f *FieldElement) Grow(g float32) *FieldElement { f.size.setGrow(g); return
 // win over the theme's FormField and the defaults; see FormFieldStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (f *FieldElement) Styles(st FormFieldStyle) *FieldElement {
-	f.styles = f.styles.merge(st)
+	f.styles.mergeFrom(&st, false)
 	return f
 }
 

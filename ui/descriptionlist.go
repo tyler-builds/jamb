@@ -18,26 +18,6 @@ type DescriptionListStyle struct {
 	Value           Style // the value of the term
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s DescriptionListStyle) merge(o DescriptionListStyle) DescriptionListStyle {
-	return DescriptionListStyle{
-		DescriptionList: s.DescriptionList.Merge(o.DescriptionList),
-		Item:            s.Item.Merge(o.Item),
-		Term:            s.Term.Merge(o.Term),
-		Value:           s.Value.Merge(o.Value),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s DescriptionListStyle) plain() DescriptionListStyle {
-	return DescriptionListStyle{
-		DescriptionList: plainStyle(s.DescriptionList),
-		Item:            plainStyle(s.Item),
-		Term:            plainStyle(s.Term),
-		Value:           plainStyle(s.Value),
-	}
-}
-
 // descriptionListDefaults returns the built-in look of a description list: the
 // term in muted text, in a column of its own beside the value, or above the value
 // when vertical. The column is termW wide, the width of the widest term, and at
@@ -72,8 +52,10 @@ func descriptionListDefaults(t *Theme, vertical, bordered bool, termW float32) D
 // high contrast the two overrides are plain (see plainStyle).
 func resolveDescriptionList(ctx *Context, vertical, bordered bool, termW float32, inst DescriptionListStyle) DescriptionListStyle {
 	t := ctx.Theme()
-	return layered(ctx, descriptionListDefaults(t, vertical, bordered, termW), DescriptionListStyle.merge,
-		DescriptionListStyle.plain, themeLayer(t.DescriptionList), instanceLayer(inst))
+	st := descriptionListDefaults(t, vertical, bordered, termW)
+	st.layered(ctx,
+		themeLayer(&t.DescriptionList), instanceLayer(&inst))
+	return st
 }
 
 // termWidth is the width of the widest of terms, set in the font of the Term part
@@ -189,7 +171,7 @@ func (l *DescriptionListElement) GridSpan(cols, rows int) *DescriptionListElemen
 // DescriptionListStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (l *DescriptionListElement) Styles(st DescriptionListStyle) *DescriptionListElement {
-	l.styles = l.styles.merge(st)
+	l.styles.mergeFrom(&st, false)
 	return l
 }
 

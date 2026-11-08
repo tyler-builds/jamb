@@ -31,26 +31,6 @@ type MenuBarStyle struct {
 	BarItemOpen         Style // the label of the open menu
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s MenuBarStyle) merge(o MenuBarStyle) MenuBarStyle {
-	return MenuBarStyle{
-		BarItem:             s.BarItem.Merge(o.BarItem),
-		BarItemHover:        s.BarItemHover.Merge(o.BarItemHover),
-		BarItemFocusVisible: s.BarItemFocusVisible.Merge(o.BarItemFocusVisible),
-		BarItemOpen:         s.BarItemOpen.Merge(o.BarItemOpen),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s MenuBarStyle) plain() MenuBarStyle {
-	return MenuBarStyle{
-		BarItem:             plainStyle(s.BarItem),
-		BarItemHover:        plainStyle(s.BarItemHover),
-		BarItemFocusVisible: plainStyle(s.BarItemFocusVisible),
-		BarItemOpen:         plainStyle(s.BarItemOpen),
-	}
-}
-
 // menuBarDefaults returns the built-in look of a menu bar, from the colors of t.
 func menuBarDefaults(t *Theme) MenuBarStyle {
 	return MenuBarStyle{
@@ -67,8 +47,10 @@ func menuBarDefaults(t *Theme) MenuBarStyle {
 // overrides are plain (see plainStyle).
 func resolveMenuBar(ctx *Context, inst MenuBarStyle) MenuBarStyle {
 	t := ctx.Theme()
-	return layered(ctx, menuBarDefaults(t), MenuBarStyle.merge, MenuBarStyle.plain,
-		themeLayer(t.MenuBar), instanceLayer(inst))
+	st := menuBarDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.MenuBar), instanceLayer(&inst))
+	return st
 }
 
 // MenuBarElement is a row of top-level menus. See MenuBar.
@@ -90,7 +72,7 @@ func (*MenuBarElement) isElement() {}
 // fields win over the theme's MenuBar and the defaults; see MenuBarStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (mb *MenuBarElement) Styles(st MenuBarStyle) *MenuBarElement {
-	mb.styles = mb.styles.merge(st)
+	mb.styles.mergeFrom(&st, false)
 	return mb
 }
 

@@ -28,34 +28,6 @@ type RangeSliderStyle struct {
 	ValueText         Style // the readout beside the track
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s RangeSliderStyle) merge(o RangeSliderStyle) RangeSliderStyle {
-	return RangeSliderStyle{
-		Track:             s.Track.Merge(o.Track),
-		Rail:              s.Rail.Merge(o.Rail),
-		Fill:              s.Fill.Merge(o.Fill),
-		Thumb:             s.Thumb.Merge(o.Thumb),
-		ThumbHover:        s.ThumbHover.Merge(o.ThumbHover),
-		ThumbPressed:      s.ThumbPressed.Merge(o.ThumbPressed),
-		ThumbFocusVisible: s.ThumbFocusVisible.Merge(o.ThumbFocusVisible),
-		ValueText:         s.ValueText.Merge(o.ValueText),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s RangeSliderStyle) plain() RangeSliderStyle {
-	return RangeSliderStyle{
-		Track:             plainStyle(s.Track),
-		Rail:              plainStyle(s.Rail),
-		Fill:              plainStyle(s.Fill),
-		Thumb:             plainStyle(s.Thumb),
-		ThumbHover:        plainStyle(s.ThumbHover),
-		ThumbPressed:      plainStyle(s.ThumbPressed),
-		ThumbFocusVisible: plainStyle(s.ThumbFocusVisible),
-		ValueText:         plainStyle(s.ValueText),
-	}
-}
-
 // rangeSliderDefaults returns the built-in look of a range slider, from the colors
 // of t: the parts of a Slider, with the focus ring on the thumb that has focus.
 func rangeSliderDefaults(t *Theme, disabled bool) RangeSliderStyle {
@@ -77,8 +49,10 @@ func rangeSliderDefaults(t *Theme, disabled bool) RangeSliderStyle {
 // two overrides are plain (see plainStyle).
 func resolveRangeSlider(ctx *Context, disabled bool, inst RangeSliderStyle) RangeSliderStyle {
 	t := ctx.Theme()
-	return layered(ctx, rangeSliderDefaults(t, disabled), RangeSliderStyle.merge, RangeSliderStyle.plain,
-		themeLayer(t.RangeSlider), instanceLayer(inst))
+	st := rangeSliderDefaults(t, disabled)
+	st.layered(ctx,
+		themeLayer(&t.RangeSlider), instanceLayer(&inst))
+	return st
 }
 
 // RangeSliderElement sets a range, a low and a high value, with two thumbs on one
@@ -191,7 +165,7 @@ func (s *RangeSliderElement) OnChange(fn func(low, high float64)) *RangeSliderEl
 // RangeSliderStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (s *RangeSliderElement) Styles(st RangeSliderStyle) *RangeSliderElement {
-	s.styles = s.styles.merge(st)
+	s.styles.mergeFrom(&st, false)
 	return s
 }
 

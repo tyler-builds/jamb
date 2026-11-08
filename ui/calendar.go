@@ -329,44 +329,6 @@ type CalendarStyle struct {
 	DayFocusVisible Style
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s CalendarStyle) merge(o CalendarStyle) CalendarStyle {
-	return CalendarStyle{
-		Root:            s.Root.Merge(o.Root),
-		RootDisabled:    s.RootDisabled.Merge(o.RootDisabled),
-		Header:          s.Header.Merge(o.Header),
-		NavButton:       s.NavButton.Merge(o.NavButton),
-		WeekdayLabel:    s.WeekdayLabel.Merge(o.WeekdayLabel),
-		Day:             s.Day.Merge(o.Day),
-		DayHover:        s.DayHover.Merge(o.DayHover),
-		DaySelected:     s.DaySelected.Merge(o.DaySelected),
-		DayInRange:      s.DayInRange.Merge(o.DayInRange),
-		DayToday:        s.DayToday.Merge(o.DayToday),
-		DayDisabled:     s.DayDisabled.Merge(o.DayDisabled),
-		DayOutsideMonth: s.DayOutsideMonth.Merge(o.DayOutsideMonth),
-		DayFocusVisible: s.DayFocusVisible.Merge(o.DayFocusVisible),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s CalendarStyle) plain() CalendarStyle {
-	return CalendarStyle{
-		Root:            plainStyle(s.Root),
-		RootDisabled:    plainStyle(s.RootDisabled),
-		Header:          plainStyle(s.Header),
-		NavButton:       plainStyle(s.NavButton),
-		WeekdayLabel:    plainStyle(s.WeekdayLabel),
-		Day:             plainStyle(s.Day),
-		DayHover:        plainStyle(s.DayHover),
-		DaySelected:     plainStyle(s.DaySelected),
-		DayInRange:      plainStyle(s.DayInRange),
-		DayToday:        plainStyle(s.DayToday),
-		DayDisabled:     plainStyle(s.DayDisabled),
-		DayOutsideMonth: plainStyle(s.DayOutsideMonth),
-		DayFocusVisible: plainStyle(s.DayFocusVisible),
-	}
-}
-
 // calendarDefaults returns the built-in look of a calendar at the Text size scale, from the colors
 // of t. The days, the header and the weekday names are also those of the pickers' calendars (see
 // datePickerDefaults), and the band between the ends of a range is that of a DateRangePicker.
@@ -412,8 +374,10 @@ func calendarDefaults(t *Theme, scale float32) CalendarStyle {
 // and then the instance's Styles. Under high contrast the overrides are plain (see plainStyle).
 func resolveCalendar(ctx *Context, scale float32, inst CalendarStyle) CalendarStyle {
 	t := ctx.Theme()
-	return layered(ctx, calendarDefaults(t, scale), CalendarStyle.merge, CalendarStyle.plain,
-		themeLayer(t.Calendar), instanceLayer(inst))
+	st := calendarDefaults(t, scale)
+	st.layered(ctx,
+		themeLayer(&t.Calendar), instanceLayer(&inst))
+	return st
 }
 
 // dayAllowed reports whether day can be chosen: it is not before earliest or after latest (a zero
@@ -598,7 +562,7 @@ func (c *CalendarElement) GridSpan(cols, rows int) *CalendarElement {
 // over the theme's Calendar and the defaults; see CalendarStyle and docs/styling.md. Calling
 // Styles again merges with the earlier values.
 func (c *CalendarElement) Styles(st CalendarStyle) *CalendarElement {
-	c.styles = c.styles.merge(st)
+	c.styles.mergeFrom(&st, false)
 	return c
 }
 
@@ -783,7 +747,7 @@ func (c *CalendarRangeElement) GridSpan(cols, rows int) *CalendarRangeElement {
 // the theme's Calendar and the defaults; see CalendarStyle and docs/styling.md. Calling Styles
 // again merges with the earlier values.
 func (c *CalendarRangeElement) Styles(st CalendarStyle) *CalendarRangeElement {
-	c.styles = c.styles.merge(st)
+	c.styles.mergeFrom(&st, false)
 	return c
 }
 

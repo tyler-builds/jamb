@@ -44,44 +44,6 @@ type CarouselStyle struct {
 	DotDisabled     Style // each dot when the carousel is disabled
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s CarouselStyle) merge(o CarouselStyle) CarouselStyle {
-	return CarouselStyle{
-		Root:            s.Root.Merge(o.Root),
-		RootDisabled:    s.RootDisabled.Merge(o.RootDisabled),
-		Viewport:        s.Viewport.Merge(o.Viewport),
-		Slide:           s.Slide.Merge(o.Slide),
-		Controls:        s.Controls.Merge(o.Controls),
-		NavButton:       s.NavButton.Merge(o.NavButton),
-		PlayPause:       s.PlayPause.Merge(o.PlayPause),
-		Dots:            s.Dots.Merge(o.Dots),
-		Dot:             s.Dot.Merge(o.Dot),
-		DotCurrent:      s.DotCurrent.Merge(o.DotCurrent),
-		DotHover:        s.DotHover.Merge(o.DotHover),
-		DotFocusVisible: s.DotFocusVisible.Merge(o.DotFocusVisible),
-		DotDisabled:     s.DotDisabled.Merge(o.DotDisabled),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s CarouselStyle) plain() CarouselStyle {
-	return CarouselStyle{
-		Root:            plainStyle(s.Root),
-		RootDisabled:    plainStyle(s.RootDisabled),
-		Viewport:        plainStyle(s.Viewport),
-		Slide:           plainStyle(s.Slide),
-		Controls:        plainStyle(s.Controls),
-		NavButton:       plainStyle(s.NavButton),
-		PlayPause:       plainStyle(s.PlayPause),
-		Dots:            plainStyle(s.Dots),
-		Dot:             plainStyle(s.Dot),
-		DotCurrent:      plainStyle(s.DotCurrent),
-		DotHover:        plainStyle(s.DotHover),
-		DotFocusVisible: plainStyle(s.DotFocusVisible),
-		DotDisabled:     plainStyle(s.DotDisabled),
-	}
-}
-
 // carouselDefaults returns the built-in look of a carousel, from the colors of t. A dot
 // is a 10 px circle in TextSubtle, 14 px from the next, so that the dots keep the spacing
 // of a 24 px target; the current one is a pill in the accent color. Under high contrast
@@ -119,8 +81,10 @@ func carouselDefaults(t *Theme) CarouselStyle {
 // (see plainStyle).
 func resolveCarousel(ctx *Context, inst CarouselStyle) CarouselStyle {
 	t := ctx.Theme()
-	return layered(ctx, carouselDefaults(t), CarouselStyle.merge, CarouselStyle.plain,
-		themeLayer(t.Carousel), instanceLayer(inst))
+	st := carouselDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Carousel), instanceLayer(&inst))
+	return st
 }
 
 // CarouselElement shows slides one at a time, bound to the index of the slide shown, from
@@ -238,7 +202,7 @@ func (c *CarouselElement) GridSpan(cols, rows int) *CarouselElement {
 // win over the theme's Carousel and the defaults; see CarouselStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
 func (c *CarouselElement) Styles(st CarouselStyle) *CarouselElement {
-	c.styles = c.styles.merge(st)
+	c.styles.mergeFrom(&st, false)
 	return c
 }
 

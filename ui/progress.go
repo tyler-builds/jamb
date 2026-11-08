@@ -36,20 +36,6 @@ type ProgressBarStyle struct {
 	Label Style // the readout beside the bar, a percentage by default
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ProgressBarStyle) merge(o ProgressBarStyle) ProgressBarStyle {
-	return ProgressBarStyle{
-		Track: s.Track.Merge(o.Track),
-		Fill:  s.Fill.Merge(o.Fill),
-		Label: s.Label.Merge(o.Label),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ProgressBarStyle) plain() ProgressBarStyle {
-	return ProgressBarStyle{Track: plainStyle(s.Track), Fill: plainStyle(s.Fill), Label: plainStyle(s.Label)}
-}
-
 // progressBarDefaults returns the built-in look of a progress bar from the colors
 // of t. The fill is color when the app gave one (see ProgressBarElement.Color),
 // else the accent. Under high contrast the groove is an outlined empty box and
@@ -77,8 +63,10 @@ func progressBarDefaults(t *Theme, color Color) ProgressBarStyle {
 // two overrides are plain (see plainStyle).
 func resolveProgressBar(ctx *Context, color Color, inst ProgressBarStyle) ProgressBarStyle {
 	t := ctx.Theme()
-	return layered(ctx, progressBarDefaults(t, color), ProgressBarStyle.merge, ProgressBarStyle.plain,
-		themeLayer(t.ProgressBar), instanceLayer(inst))
+	st := progressBarDefaults(t, color)
+	st.layered(ctx,
+		themeLayer(&t.ProgressBar), instanceLayer(&inst))
+	return st
 }
 
 // ProgressRingStyle is the look of a progress ring. A part's style merges over
@@ -92,23 +80,15 @@ type ProgressRingStyle struct {
 	Dot  Style // each dot of the ring
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ProgressRingStyle) merge(o ProgressRingStyle) ProgressRingStyle {
-	return ProgressRingStyle{Ring: s.Ring.Merge(o.Ring), Dot: s.Dot.Merge(o.Dot)}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ProgressRingStyle) plain() ProgressRingStyle {
-	return ProgressRingStyle{Ring: plainStyle(s.Ring), Dot: plainStyle(s.Dot)}
-}
-
 // resolveProgressRing returns the look of a progress ring: the theme's
 // ProgressRing, then the instance's Styles, over the built-in ring, which takes
 // no colors of its own. Under high contrast the two overrides are plain.
 func resolveProgressRing(ctx *Context, inst ProgressRingStyle) ProgressRingStyle {
 	t := ctx.Theme()
-	return layered(ctx, ProgressRingStyle{Ring: Style{NoShrink: true}}, ProgressRingStyle.merge, ProgressRingStyle.plain,
-		themeLayer(t.ProgressRing), instanceLayer(inst))
+	st := ProgressRingStyle{Ring: Style{NoShrink: true}}
+	st.layered(ctx,
+		themeLayer(&t.ProgressRing), instanceLayer(&inst))
+	return st
 }
 
 // ProgressBarElement shows how far an operation has got, as a bar. A
@@ -209,7 +189,7 @@ func (p *ProgressBarElement) HideValue() *ProgressBarElement {
 // fields win over the theme's ProgressBar and the defaults; see ProgressBarStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
 func (p *ProgressBarElement) Styles(st ProgressBarStyle) *ProgressBarElement {
-	p.styles = p.styles.merge(st)
+	p.styles.mergeFrom(&st, false)
 	return p
 }
 
@@ -349,7 +329,7 @@ func (r *ProgressRingElement) Label(name string) *ProgressRingElement { r.name =
 // ProgressRingStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (r *ProgressRingElement) Styles(st ProgressRingStyle) *ProgressRingElement {
-	r.styles = r.styles.merge(st)
+	r.styles.mergeFrom(&st, false)
 	return r
 }
 

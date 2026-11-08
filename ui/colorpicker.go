@@ -50,42 +50,6 @@ type ColorPickerStyle struct {
 	PresetFocusVisible  Style       // a preset swatch while it has keyboard focus
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ColorPickerStyle) merge(o ColorPickerStyle) ColorPickerStyle {
-	return ColorPickerStyle{
-		Trigger:             s.Trigger.Merge(o.Trigger),
-		TriggerHover:        s.TriggerHover.Merge(o.TriggerHover),
-		TriggerFocusVisible: s.TriggerFocusVisible.Merge(o.TriggerFocusVisible),
-		TriggerDisabled:     s.TriggerDisabled.Merge(o.TriggerDisabled),
-		Swatch:              s.Swatch.Merge(o.Swatch),
-		Popup:               s.Popup.Merge(o.Popup),
-		Area:                s.Area.Merge(o.Area),
-		AreaFocusVisible:    s.AreaFocusVisible.Merge(o.AreaFocusVisible),
-		Thumb:               s.Thumb.Merge(o.Thumb),
-		Slider:              s.Slider.merge(o.Slider),
-		Preset:              s.Preset.Merge(o.Preset),
-		PresetFocusVisible:  s.PresetFocusVisible.Merge(o.PresetFocusVisible),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ColorPickerStyle) plain() ColorPickerStyle {
-	return ColorPickerStyle{
-		Trigger:             plainStyle(s.Trigger),
-		TriggerHover:        plainStyle(s.TriggerHover),
-		TriggerFocusVisible: plainStyle(s.TriggerFocusVisible),
-		TriggerDisabled:     plainStyle(s.TriggerDisabled),
-		Swatch:              plainStyle(s.Swatch),
-		Popup:               plainStyle(s.Popup),
-		Area:                plainStyle(s.Area),
-		AreaFocusVisible:    plainStyle(s.AreaFocusVisible),
-		Thumb:               plainStyle(s.Thumb),
-		Slider:              s.Slider.plain(),
-		Preset:              plainStyle(s.Preset),
-		PresetFocusVisible:  plainStyle(s.PresetFocusVisible),
-	}
-}
-
 // colorPickerDefaults returns the built-in look of a color picker, from the colors of
 // t. Its sizes are not in it: colorPickerSizes gives them, under the theme.
 func colorPickerDefaults(t *Theme) ColorPickerStyle {
@@ -141,8 +105,10 @@ func colorPickerSizes(s controlSize, scale float32) ColorPickerStyle {
 // overrides are plain (see plainStyle).
 func resolveColorPicker(ctx *Context, inst ColorPickerStyle) ColorPickerStyle {
 	t := ctx.Theme()
-	return layered(ctx, colorPickerDefaults(t), ColorPickerStyle.merge, ColorPickerStyle.plain,
-		themeLayer(t.ColorPicker), instanceLayer(inst))
+	st := colorPickerDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.ColorPicker), instanceLayer(&inst))
+	return st
 }
 
 // ColorPickerElement is a button that shows a color and opens a panel to change it. The
@@ -271,7 +237,7 @@ func (c *ColorPickerElement) GridSpan(cols, rows int) *ColorPickerElement {
 // fields win over the theme's ColorPicker and the defaults; see ColorPickerStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (c *ColorPickerElement) Styles(st ColorPickerStyle) *ColorPickerElement {
-	c.styles = c.styles.merge(st)
+	c.styles.mergeFrom(&st, false)
 	return c
 }
 
@@ -393,7 +359,9 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 		rt, t := ctx.rt, ctx.Theme()
 		s := ctx.Strings()
 		scale := textScale(ctx)
-		st := colorPickerSizes(c.ctlSize, scale).merge(resolveColorPicker(ctx, c.styles))
+		st := colorPickerSizes(c.ctlSize, scale)
+		resolved := resolveColorPicker(ctx, c.styles)
+		st.mergeFrom(&resolved, false)
 		sl := resolveSlider(ctx, false, st.Slider)
 		cur := c.value.Get()
 		// hs is the color in hue, saturation and value, kept between changes so that the hue
@@ -682,7 +650,7 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 						next := hs.Peek()
 						apply(colorOf(next), next)
 					}).
-					Styles(ops.merge(st.Slider))
+					Styles(mergedSlider(ops, &st.Slider))
 				panel.Child(opacity)
 			}
 
@@ -715,4 +683,10 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 		}
 		return root
 	})
+}
+
+// mergedSlider returns base with o merged over it.
+func mergedSlider(base SliderStyle, o *SliderStyle) SliderStyle {
+	base.mergeFrom(o, false)
+	return base
 }

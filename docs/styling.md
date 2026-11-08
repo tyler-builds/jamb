@@ -491,17 +491,22 @@ A new widget that has parts follows the same pattern as `Tabs`, `Select`, `Slide
 `NumberInput`. In `ui`:
 
 1. **Name the parts.** Write `<Widget>Style` as a struct of `Style` fields, one per part,
-   and one more per state (the naming rules are below). Add a `merge` method that merges
-   each field and a `plain` method that applies `plainStyle` to each field.
+   and one more per state (the naming rules are below). Run `go generate ./ui`:
+   `internal/stylegen` writes the type's `mergeFrom` and `layered` methods into
+   `style_merge_gen.go`. They merge in place, through pointers, because TinyGo turns every
+   copy of a large struct into code for each of its fields. A type whose merge needs more
+   than a merge of each field writes its own `mergeFrom`, as `TabsStyle` does, and stylegen
+   writes only its `layered`.
 2. **Write the defaults.** A `<widget>Defaults(t *Theme, ...)` function returns the built-in
    look from the theme's tokens. It reads the state it needs (disabled, variant, width).
    Under high contrast it uses the system colors, and it keeps the focus ring.
 3. **Resolve the layers.** A `resolve<Widget>` function starts from the defaults, then
-   merges `t.<Widget>` and the instance's styles, in that order. Under high contrast, both
-   overrides pass through `plain()` first.
-4. **Add the fields.** Add the `<Widget>Style` field to `Theme`, and copy it in
-   `HighContrastTheme` from the base theme. Add a `Styles` method to the widget that merges
-   into an unexported field.
+   merges `t.<Widget>` and the instance's styles, in that order, with
+   `st.layered(ctx, themeLayer(&t.<Widget>), instanceLayer(&inst))`. Under high contrast,
+   `layered` merges both overrides as plain (see `plainStyle`).
+4. **Add the fields.** Add the `<Widget>Style` field to `Theme`; `HighContrastTheme` copies
+   it from the base theme with the rest. Add a `Styles` method to the widget that merges
+   into an unexported field with `mergeFrom`.
 5. **Name the elements.** Call `asPart("<Widget>.<Part>")` on the element that draws each
    part. The name is how the drift test finds the part. A state with no element of its own
    is drawn by the element of the part it belongs to.

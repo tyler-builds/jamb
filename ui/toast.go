@@ -57,30 +57,6 @@ type ToastStyle struct {
 	Close     Style // the wrapper of the dismiss button
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s ToastStyle) merge(o ToastStyle) ToastStyle {
-	return ToastStyle{
-		Container: s.Container.Merge(o.Container),
-		Icon:      s.Icon.Merge(o.Icon),
-		Title:     s.Title.Merge(o.Title),
-		Text:      s.Text.Merge(o.Text),
-		Action:    s.Action.Merge(o.Action),
-		Close:     s.Close.Merge(o.Close),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s ToastStyle) plain() ToastStyle {
-	return ToastStyle{
-		Container: plainStyle(s.Container),
-		Icon:      plainStyle(s.Icon),
-		Title:     plainStyle(s.Title),
-		Text:      plainStyle(s.Text),
-		Action:    plainStyle(s.Action),
-		Close:     plainStyle(s.Close),
-	}
-}
-
 // ToastVariants holds the style of each kind of toast, for the theme's Toasts.
 // It merges over Theme.Toast, which applies to every kind.
 type ToastVariants struct {
@@ -89,16 +65,16 @@ type ToastVariants struct {
 }
 
 // of returns the style of variant v.
-func (tv ToastVariants) of(v ToastVariant) ToastStyle {
+func (tv *ToastVariants) of(v ToastVariant) *ToastStyle {
 	switch v {
 	case ToastSuccess:
-		return tv.Success
+		return &tv.Success
 	case ToastWarning:
-		return tv.Warning
+		return &tv.Warning
 	case ToastError:
-		return tv.Error
+		return &tv.Error
 	}
-	return tv.Info
+	return &tv.Info
 }
 
 // toastDefaults returns the built-in look of a toast of variant v, from the
@@ -129,8 +105,10 @@ func toastDefaults(t *Theme, v ToastVariant, titled bool) ToastStyle {
 // Styles. Under high contrast the overrides are plain (see plainStyle).
 func resolveToast(ctx *Context, v ToastVariant, titled bool, inst ToastStyle) ToastStyle {
 	t := ctx.Theme()
-	return layered(ctx, toastDefaults(t, v, titled), ToastStyle.merge, ToastStyle.plain,
-		themeLayer(t.Toast), themeLayer(t.Toasts.of(v)), instanceLayer(inst))
+	st := toastDefaults(t, v, titled)
+	st.layered(ctx,
+		themeLayer(&t.Toast), themeLayer(t.Toasts.of(v)), instanceLayer(&inst))
+	return st
 }
 
 // ToastPlacement is where a Toaster shows its stack of toasts.
@@ -242,7 +220,7 @@ func (t *Toast) Dismiss() { t.rt.closeToast(t.e) }
 // theme's Toast and Toasts and the defaults of its kind; see ToastStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (t *Toast) Styles(st ToastStyle) *Toast {
-	t.e.styles = t.e.styles.merge(st)
+	t.e.styles.mergeFrom(&st, false)
 	return t
 }
 

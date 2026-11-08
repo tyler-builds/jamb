@@ -53,41 +53,6 @@ type TreeStyle struct {
 	Indent           float32 // the indent of each level below the top, in logical pixels
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s TreeStyle) merge(o TreeStyle) TreeStyle {
-	indent := s.Indent
-	if o.Indent != 0 {
-		indent = o.Indent
-	}
-	return TreeStyle{
-		Row:              s.Row.Merge(o.Row),
-		RowHover:         s.RowHover.Merge(o.RowHover),
-		RowSelected:      s.RowSelected.Merge(o.RowSelected),
-		Chevron:          s.Chevron.Merge(o.Chevron),
-		Icon:             s.Icon.Merge(o.Icon),
-		Label:            s.Label.Merge(o.Label),
-		Description:      s.Description.Merge(o.Description),
-		TreeFocusVisible: s.TreeFocusVisible.Merge(o.TreeFocusVisible),
-		Indent:           indent,
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle). The indent is a
-// size, so it is kept.
-func (s TreeStyle) plain() TreeStyle {
-	return TreeStyle{
-		Row:              plainStyle(s.Row),
-		RowHover:         plainStyle(s.RowHover),
-		RowSelected:      plainStyle(s.RowSelected),
-		Chevron:          plainStyle(s.Chevron),
-		Icon:             plainStyle(s.Icon),
-		Label:            plainStyle(s.Label),
-		Description:      plainStyle(s.Description),
-		TreeFocusVisible: plainStyle(s.TreeFocusVisible),
-		Indent:           s.Indent,
-	}
-}
-
 // treeDefaults returns the built-in look of a tree, from the colors of t. Under
 // high contrast the selected row is the Highlight color with HighlightText on it.
 func treeDefaults(t *Theme) TreeStyle {
@@ -115,8 +80,10 @@ func treeDefaults(t *Theme) TreeStyle {
 // are plain (see plainStyle).
 func resolveTree(ctx *Context, inst TreeStyle) TreeStyle {
 	t := ctx.Theme()
-	return layered(ctx, treeDefaults(t), TreeStyle.merge, TreeStyle.plain,
-		themeLayer(t.Tree), instanceLayer(inst))
+	st := treeDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Tree), instanceLayer(&inst))
+	return st
 }
 
 // TreeElement is a hierarchy of nodes that open and close, shown as a list of the
@@ -227,7 +194,7 @@ func (tv *TreeElement) LayoutSpring(s Spring) *TreeElement { return tv.Style(Sty
 // Styles sets the look of the parts of the tree, for this instance only. Set
 // fields win over the theme's Tree and the defaults; see TreeStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (tv *TreeElement) Styles(st TreeStyle) *TreeElement { tv.styles = tv.styles.merge(st); return tv }
+func (tv *TreeElement) Styles(st TreeStyle) *TreeElement { tv.styles.mergeFrom(&st, false); return tv }
 
 // OnChange runs fn with the key of the node after the selection changes, by a
 // click, the keys or a typed letter. The signal is set first.

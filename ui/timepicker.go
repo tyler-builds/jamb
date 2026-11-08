@@ -52,32 +52,6 @@ type TimePickerStyle struct {
 	OptionSelected Style
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s TimePickerStyle) merge(o TimePickerStyle) TimePickerStyle {
-	return TimePickerStyle{
-		Field:             s.Field.merge(o.Field),
-		Button:            s.Button.Merge(o.Button),
-		Message:           s.Message.Merge(o.Message),
-		Popup:             s.Popup.Merge(o.Popup),
-		Option:            s.Option.Merge(o.Option),
-		OptionHighlighted: s.OptionHighlighted.Merge(o.OptionHighlighted),
-		OptionSelected:    s.OptionSelected.Merge(o.OptionSelected),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s TimePickerStyle) plain() TimePickerStyle {
-	return TimePickerStyle{
-		Field:             s.Field.plain(),
-		Button:            plainStyle(s.Button),
-		Message:           plainStyle(s.Message),
-		Popup:             plainStyle(s.Popup),
-		Option:            plainStyle(s.Option),
-		OptionHighlighted: plainStyle(s.OptionHighlighted),
-		OptionSelected:    plainStyle(s.OptionSelected),
-	}
-}
-
 // timePickerDefaults returns the built-in look of a time picker at the Text size scale,
 // from the colors of t.
 func timePickerDefaults(t *Theme, scale float32) TimePickerStyle {
@@ -105,8 +79,10 @@ func timePickerDefaults(t *Theme, scale float32) TimePickerStyle {
 // plain (see plainStyle).
 func resolveTimePicker(ctx *Context, scale float32, inst TimePickerStyle) TimePickerStyle {
 	t := ctx.Theme()
-	return layered(ctx, timePickerDefaults(t, scale), TimePickerStyle.merge, TimePickerStyle.plain,
-		themeLayer(t.TimePicker), instanceLayer(inst))
+	st := timePickerDefaults(t, scale)
+	st.layered(ctx,
+		themeLayer(&t.TimePicker), instanceLayer(&inst))
+	return st
 }
 
 // timeList is the state of the open list that the render keeps: the row the keys have
@@ -281,7 +257,7 @@ func (p *TimePickerElement) GridSpan(cols, rows int) *TimePickerElement {
 // win over the theme's TimePicker and the defaults; see TimePickerStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
 func (p *TimePickerElement) Styles(st TimePickerStyle) *TimePickerElement {
-	p.styles = p.styles.merge(st)
+	p.styles.mergeFrom(&st, false)
 	return p
 }
 

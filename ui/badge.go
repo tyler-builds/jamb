@@ -44,16 +44,6 @@ type BadgeStyle struct {
 	Dot   Style // the dot, before the text or alone
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s BadgeStyle) merge(o BadgeStyle) BadgeStyle {
-	return BadgeStyle{Badge: s.Badge.Merge(o.Badge), Label: s.Label.Merge(o.Label), Dot: s.Dot.Merge(o.Dot)}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s BadgeStyle) plain() BadgeStyle {
-	return BadgeStyle{Badge: plainStyle(s.Badge), Label: plainStyle(s.Label), Dot: plainStyle(s.Dot)}
-}
-
 // BadgeVariants holds the style of each variant of a badge, for the theme's
 // Badges. It merges over Theme.Badge, which applies to every variant.
 type BadgeVariants struct {
@@ -62,18 +52,18 @@ type BadgeVariants struct {
 }
 
 // of returns the style of variant v.
-func (bv BadgeVariants) of(v BadgeVariant) BadgeStyle {
+func (bv *BadgeVariants) of(v BadgeVariant) *BadgeStyle {
 	switch v {
 	case BadgeAccent:
-		return bv.Accent
+		return &bv.Accent
 	case BadgeSuccess:
-		return bv.Success
+		return &bv.Success
 	case BadgeWarning:
-		return bv.Warning
+		return &bv.Warning
 	case BadgeDanger:
-		return bv.Danger
+		return &bv.Danger
 	}
-	return bv.Neutral
+	return &bv.Neutral
 }
 
 // badgeDefaults returns the built-in look of a badge of variant v: a pill, or,
@@ -103,8 +93,10 @@ func badgeDefaults(t *Theme, v BadgeVariant, dot bool) BadgeStyle {
 // Styles. Under high contrast the overrides are plain (see plainStyle).
 func resolveBadge(ctx *Context, v BadgeVariant, dot bool, inst BadgeStyle) BadgeStyle {
 	t := ctx.Theme()
-	return layered(ctx, badgeDefaults(t, v, dot), BadgeStyle.merge, BadgeStyle.plain,
-		themeLayer(t.Badge), themeLayer(t.Badges.of(v)), instanceLayer(inst))
+	st := badgeDefaults(t, v, dot)
+	st.layered(ctx,
+		themeLayer(&t.Badge), themeLayer(t.Badges.of(v)), instanceLayer(&inst))
+	return st
 }
 
 // BadgeElement is a small label: a count, a word such as "New", or a dot. A
@@ -188,7 +180,7 @@ func (b *BadgeElement) GridSpan(cols, rows int) *BadgeElement { b.size.setSpan(c
 // fields win over the theme's Badge and Badges and the defaults; see BadgeStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
 func (b *BadgeElement) Styles(st BadgeStyle) *BadgeElement {
-	b.styles = b.styles.merge(st)
+	b.styles.mergeFrom(&st, false)
 	return b
 }
 

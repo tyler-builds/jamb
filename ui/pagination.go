@@ -23,30 +23,6 @@ type PaginationStyle struct {
 	Ellipsis    Style // the "..." where pages are skipped
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s PaginationStyle) merge(o PaginationStyle) PaginationStyle {
-	return PaginationStyle{
-		Bar:         s.Bar.Merge(o.Bar),
-		Page:        s.Page.Merge(o.Page),
-		PageHover:   s.PageHover.Merge(o.PageHover),
-		PageCurrent: s.PageCurrent.Merge(o.PageCurrent),
-		Nav:         s.Nav.Merge(o.Nav),
-		Ellipsis:    s.Ellipsis.Merge(o.Ellipsis),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s PaginationStyle) plain() PaginationStyle {
-	return PaginationStyle{
-		Bar:         plainStyle(s.Bar),
-		Page:        plainStyle(s.Page),
-		PageHover:   plainStyle(s.PageHover),
-		PageCurrent: plainStyle(s.PageCurrent),
-		Nav:         plainStyle(s.Nav),
-		Ellipsis:    plainStyle(s.Ellipsis),
-	}
-}
-
 // paginationDefaults returns the built-in look of a pagination control, from the
 // colors of t. The current page is filled with Accent, as a selected segment is.
 func paginationDefaults(t *Theme) PaginationStyle {
@@ -77,8 +53,10 @@ func paginationDisabled(t *Theme) Style {
 // the two overrides are plain (see plainStyle).
 func resolvePagination(ctx *Context, inst PaginationStyle) PaginationStyle {
 	t := ctx.Theme()
-	return layered(ctx, paginationDefaults(t), PaginationStyle.merge, PaginationStyle.plain,
-		themeLayer(t.Pagination), instanceLayer(inst))
+	st := paginationDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Pagination), instanceLayer(&inst))
+	return st
 }
 
 // pageSlots returns the pages to show of a control over pages pages, in order, with
@@ -183,7 +161,7 @@ func (p *PaginationElement) Compact() *PaginationElement { p.compact = true; ret
 // fields win over the theme's Pagination and the defaults; see PaginationStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (p *PaginationElement) Styles(s PaginationStyle) *PaginationElement {
-	p.styles = p.styles.merge(s)
+	p.styles.mergeFrom(&s, false)
 	return p
 }
 

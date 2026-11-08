@@ -261,68 +261,6 @@ type DataGridStyle struct {
 	TreeChevron Style
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s DataGridStyle) merge(o DataGridStyle) DataGridStyle {
-	return DataGridStyle{
-		Grid:             s.Grid.Merge(o.Grid),
-		GridFocusVisible: s.GridFocusVisible.Merge(o.GridFocusVisible),
-		Header:           s.Header.Merge(o.Header),
-		HeaderCell:       s.HeaderCell.Merge(o.HeaderCell),
-		HeaderCellHover:  s.HeaderCellHover.Merge(o.HeaderCellHover),
-		HeaderCellSorted: s.HeaderCellSorted.Merge(o.HeaderCellSorted),
-		SortIndicator:    s.SortIndicator.Merge(o.SortIndicator),
-		ResizeHandle:     s.ResizeHandle.Merge(o.ResizeHandle),
-		Row:              s.Row.Merge(o.Row),
-		RowHover:         s.RowHover.Merge(o.RowHover),
-		RowSelected:      s.RowSelected.Merge(o.RowSelected),
-		RowAlternate:     s.RowAlternate.Merge(o.RowAlternate),
-		Cell:             s.Cell.Merge(o.Cell),
-		CellFocused:      s.CellFocused.Merge(o.CellFocused),
-		Empty:            s.Empty.Merge(o.Empty),
-		CellEditing:      s.CellEditing.Merge(o.CellEditing),
-		Editor:           s.Editor.merge(o.Editor),
-		EditorMessage:    s.EditorMessage.Merge(o.EditorMessage),
-		DropIndicator:    s.DropIndicator.Merge(o.DropIndicator),
-		CellPinned:       s.CellPinned.Merge(o.CellPinned),
-		PinnedEdge:       s.PinnedEdge.Merge(o.PinnedEdge),
-		HeaderGroup:      s.HeaderGroup.Merge(o.HeaderGroup),
-		CellSelected:     s.CellSelected.Merge(o.CellSelected),
-		TreeIndent:       s.TreeIndent.Merge(o.TreeIndent),
-		TreeChevron:      s.TreeChevron.Merge(o.TreeChevron),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s DataGridStyle) plain() DataGridStyle {
-	return DataGridStyle{
-		Grid:             plainStyle(s.Grid),
-		GridFocusVisible: plainStyle(s.GridFocusVisible),
-		Header:           plainStyle(s.Header),
-		HeaderCell:       plainStyle(s.HeaderCell),
-		HeaderCellHover:  plainStyle(s.HeaderCellHover),
-		HeaderCellSorted: plainStyle(s.HeaderCellSorted),
-		SortIndicator:    plainStyle(s.SortIndicator),
-		ResizeHandle:     plainStyle(s.ResizeHandle),
-		Row:              plainStyle(s.Row),
-		RowHover:         plainStyle(s.RowHover),
-		RowSelected:      plainStyle(s.RowSelected),
-		RowAlternate:     plainStyle(s.RowAlternate),
-		Cell:             plainStyle(s.Cell),
-		CellFocused:      plainStyle(s.CellFocused),
-		Empty:            plainStyle(s.Empty),
-		CellEditing:      plainStyle(s.CellEditing),
-		Editor:           s.Editor.plain(),
-		EditorMessage:    plainStyle(s.EditorMessage),
-		DropIndicator:    plainStyle(s.DropIndicator),
-		CellPinned:       plainStyle(s.CellPinned),
-		PinnedEdge:       plainStyle(s.PinnedEdge),
-		HeaderGroup:      plainStyle(s.HeaderGroup),
-		CellSelected:     plainStyle(s.CellSelected),
-		TreeIndent:       plainStyle(s.TreeIndent),
-		TreeChevron:      plainStyle(s.TreeChevron),
-	}
-}
-
 // dataGridGutter is the width kept clear at the right of a DataGrid's body for its
 // vertical scrollbar, in logical pixels.
 const dataGridGutter = 12
@@ -392,8 +330,10 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 // overrides are plain (see plainStyle).
 func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst DataGridStyle) DataGridStyle {
 	t := ctx.Theme()
-	return layered(ctx, dataGridDefaults(t, d, textFactor), DataGridStyle.merge, DataGridStyle.plain,
-		themeLayer(t.DataGrid), instanceLayer(inst))
+	st := dataGridDefaults(t, d, textFactor)
+	st.layered(ctx,
+		themeLayer(&t.DataGrid), instanceLayer(&inst))
+	return st
 }
 
 // DataGridElement is a table of rows and columns, for business data. Only the rows
@@ -813,7 +753,7 @@ func (g *DataGridElement[T]) Empty(el Element) *DataGridElement[T] { g.empty = e
 // fields win over the theme's DataGrid and the defaults; see DataGridStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (g *DataGridElement[T]) Styles(st DataGridStyle) *DataGridElement[T] {
-	g.styles = g.styles.merge(st)
+	g.styles.mergeFrom(&st, false)
 	return g
 }
 

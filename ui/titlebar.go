@@ -10,22 +10,6 @@ type TitleBarStyle struct {
 	Center Style // the box of the centered element
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s TitleBarStyle) merge(o TitleBarStyle) TitleBarStyle {
-	return TitleBarStyle{
-		Bar:    s.Bar.Merge(o.Bar),
-		Center: s.Center.Merge(o.Center),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s TitleBarStyle) plain() TitleBarStyle {
-	return TitleBarStyle{
-		Bar:    plainStyle(s.Bar),
-		Center: plainStyle(s.Center),
-	}
-}
-
 // titleBarHeight is the height of a title bar at 100 percent text size.
 const titleBarHeight = 40
 
@@ -58,8 +42,10 @@ func titleBarDefaults(t *Theme, scale float32) TitleBarStyle {
 // resolveTitleBar returns the look of a title bar: the defaults, merged with the
 // instance's Styles. Under high contrast the overrides are plain (see plainStyle).
 func resolveTitleBar(ctx *Context, inst TitleBarStyle) TitleBarStyle {
-	return layered(ctx, titleBarDefaults(ctx.Theme(), textScale(ctx)), TitleBarStyle.merge, TitleBarStyle.plain,
-		instanceLayer(inst))
+	st := titleBarDefaults(ctx.Theme(), textScale(ctx))
+	st.layered(ctx,
+		instanceLayer(&inst))
+	return st
 }
 
 // TitleBarElement is a window's own title bar, for a window with the app's
@@ -149,7 +135,7 @@ func (t *TitleBarElement) Style(s Style) *TitleBarElement {
 // win over the defaults; see TitleBarStyle and docs/styling.md. Calling Styles
 // again merges with the earlier values.
 func (t *TitleBarElement) Styles(st TitleBarStyle) *TitleBarElement {
-	t.styles = t.styles.merge(st)
+	t.styles.mergeFrom(&st, false)
 	return t
 }
 

@@ -19,28 +19,6 @@ type EmptyStyle struct {
 	Action      Style // the box around the action
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s EmptyStyle) merge(o EmptyStyle) EmptyStyle {
-	return EmptyStyle{
-		Empty:       s.Empty.Merge(o.Empty),
-		Icon:        s.Icon.Merge(o.Icon),
-		Title:       s.Title.Merge(o.Title),
-		Description: s.Description.Merge(o.Description),
-		Action:      s.Action.Merge(o.Action),
-	}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s EmptyStyle) plain() EmptyStyle {
-	return EmptyStyle{
-		Empty:       plainStyle(s.Empty),
-		Icon:        plainStyle(s.Icon),
-		Title:       plainStyle(s.Title),
-		Description: plainStyle(s.Description),
-		Action:      plainStyle(s.Action),
-	}
-}
-
 // emptyDefaults returns the built-in look of an empty state, from the colors of
 // t: the parts centered in a column, the icon and the description muted, and the
 // title semibold in the text color. Under high contrast the icon and the
@@ -64,8 +42,10 @@ func emptyDefaults(t *Theme) EmptyStyle {
 // overrides are plain (see plainStyle).
 func resolveEmpty(ctx *Context, inst EmptyStyle) EmptyStyle {
 	t := ctx.Theme()
-	return layered(ctx, emptyDefaults(t), EmptyStyle.merge, EmptyStyle.plain,
-		themeLayer(t.Empty), instanceLayer(inst))
+	st := emptyDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.Empty), instanceLayer(&inst))
+	return st
 }
 
 // EmptyElement is what a list, a table or a page shows when it has nothing to
@@ -123,7 +103,7 @@ func (e *EmptyElement) GridSpan(cols, rows int) *EmptyElement { e.size.setSpan(c
 // Set fields win over the theme's Empty and the defaults; see EmptyStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (e *EmptyElement) Styles(st EmptyStyle) *EmptyElement {
-	e.styles = e.styles.merge(st)
+	e.styles.mergeFrom(&st, false)
 	return e
 }
 

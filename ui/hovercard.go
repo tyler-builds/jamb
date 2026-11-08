@@ -23,14 +23,6 @@ type HoverCardStyle struct {
 	Panel Style // the floating panel that holds the content
 }
 
-// merge returns s with the set fields of o applied on top.
-func (s HoverCardStyle) merge(o HoverCardStyle) HoverCardStyle {
-	return HoverCardStyle{Panel: s.Panel.Merge(o.Panel)}
-}
-
-// plain returns s as high contrast allows it (see plainStyle).
-func (s HoverCardStyle) plain() HoverCardStyle { return HoverCardStyle{Panel: plainStyle(s.Panel)} }
-
 // hoverCardDefaults returns the built-in look of a hover card: the panel of a
 // popover (see popoverDefaults), so the two floating panels match.
 func hoverCardDefaults(t *Theme) HoverCardStyle {
@@ -42,8 +34,10 @@ func hoverCardDefaults(t *Theme) HoverCardStyle {
 // overrides are plain (see plainStyle).
 func resolveHoverCard(ctx *Context, inst HoverCardStyle) HoverCardStyle {
 	t := ctx.Theme()
-	return layered(ctx, hoverCardDefaults(t), HoverCardStyle.merge, HoverCardStyle.plain,
-		themeLayer(t.HoverCard), instanceLayer(inst))
+	st := hoverCardDefaults(t)
+	st.layered(ctx,
+		themeLayer(&t.HoverCard), instanceLayer(&inst))
+	return st
 }
 
 // HoverCardElement is a trigger that shows a floating card of rich content, such
@@ -106,7 +100,7 @@ func (h *HoverCardElement) CloseDelay(d time.Duration) *HoverCardElement {
 // Styles sets the look of the card, for this instance only. Set fields win over
 // the theme's HoverCard and the defaults. Calling Styles again merges.
 func (h *HoverCardElement) Styles(st HoverCardStyle) *HoverCardElement {
-	h.styles = h.styles.merge(st)
+	h.styles.mergeFrom(&st, false)
 	return h
 }
 
