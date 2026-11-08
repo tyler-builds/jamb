@@ -1017,6 +1017,147 @@ type dgRowCtx[T any] struct {
 	activate             func(q int)
 	ops                  dgOps
 	store                *Signal[[]string] // the open rows of a tree, or nil (see Expanded)
+	memoOK               bool              // the rows can be kept from one build to the next (see rowFor)
+}
+
+// dgLive is the closures of the grid's last build, which the handlers of its rows
+// call. A row kept from an earlier build (see rowFor) then acts on the grid as it is
+// now, not as it was when the row was built.
+type dgLive struct {
+	click     func(q, cl int, mods input.Modifiers)
+	colAt     func(q int, x float32) int
+	activate  func(q int)
+	ops       dgOps
+	cursorCol int
+	setOpen   func(key string, v bool)
+}
+
+// dgRowLook is what every row of a grid is built from, beyond the row itself: when
+// it changes, no row is kept (see rowFor and same).
+type dgRowLook struct {
+	theme        *Theme
+	highContrast bool
+	st           DataGridStyle
+	cols         []dgColLook
+	xs           []float32
+	built        []bool
+	startN, endN int
+	striped      bool
+	mode         SelectionMode
+	tree         bool
+}
+
+// dgColLook is what a row's cell is built from, of its column.
+type dgColLook struct {
+	key       string
+	grow      float32
+	align     Alignment
+	pin       ColumnPin
+	cellStyle Style
+	text      bool
+}
+
+// same reports whether the rows built from l and o are built the same.
+func (l *dgRowLook) same(o *dgRowLook) bool {
+	if l.theme != o.theme || l.highContrast != o.highContrast || l.startN != o.startN || l.endN != o.endN ||
+		l.striped != o.striped || l.mode != o.mode || l.tree != o.tree ||
+		!slices.Equal(l.xs, o.xs) || !slices.Equal(l.built, o.built) || len(l.cols) != len(o.cols) ||
+		!sameDataGridStyle(&l.st, &o.st) {
+		return false
+	}
+	for c := range l.cols {
+		a, b := &l.cols[c], &o.cols[c]
+		if a.key != b.key || a.grow != b.grow || a.align != b.align || a.pin != b.pin || a.text != b.text ||
+			!sameStyle(&a.cellStyle, &b.cellStyle) {
+			return false
+		}
+	}
+	return true
+}
+
+// sameDataGridStyle reports whether a and b have the same styles for every part but
+// Editor, the style of an editing cell's editor; a row being edited is never kept.
+func sameDataGridStyle(a, b *DataGridStyle) bool {
+	bs := b.styles()
+	for i, pa := range a.styles() {
+		if !sameStyle(pa, bs[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// styles returns the styles of the parts of s, all but Editor.
+func (s *DataGridStyle) styles() [24]*Style {
+	return [24]*Style{&s.Grid, &s.GridFocusVisible, &s.Header, &s.HeaderCell, &s.HeaderCellHover,
+		&s.HeaderCellSorted, &s.SortIndicator, &s.ResizeHandle, &s.Row, &s.RowHover, &s.RowSelected,
+		&s.RowAlternate, &s.Cell, &s.CellFocused, &s.Empty, &s.CellEditing, &s.EditorMessage,
+		&s.DropIndicator, &s.CellPinned, &s.PinnedEdge, &s.HeaderGroup, &s.CellSelected, &s.TreeIndent,
+		&s.TreeChevron}
+}
+
+// sameStyle reports whether a and b are the same style. The slices are compared by
+// their elements; the other fields, which are numbers, strings, colors and other
+// plain values (TestSameStyleCoversStyle checks that they are), by their memory. Two
+// styles that differ only in memory that holds no value, such as padding, or in
+// strings with equal text held in different memory, are taken as different, which
+// costs a row that is built again, never a wrong one.
+func sameStyle(a, b *Style) bool {
+	if !slices.Equal(a.GridColumns, b.GridColumns) || !slices.Equal(a.GridRows, b.GridRows) ||
+		!slices.Equal(a.Shadows, b.Shadows) {
+		return false
+	}
+	x, y := *a, *b
+	x.GridColumns, x.GridRows, x.Shadows = nil, nil, nil
+	y.GridColumns, y.GridRows, y.Shadows = nil, nil, nil
+	size := unsafe.Sizeof(x)
+	return bytes.Equal(unsafe.Slice((*byte)(unsafe.Pointer(&x)), size), unsafe.Slice((*byte)(unsafe.Pointer(&y)), size))
+}
+
+// dgRowSig is what a row was built from, beyond dgRowLook and the text of its cells:
+// a row whose signature and texts are the same is built the same, but for its
+// position, which place sets.
+type dgRowSig struct {
+	gen        int  // dgShared.lookGen when the row was built
+	selected   bool // the row is selected
+	cursor     int  // the column of the cursor in the row, or -1
+	focused    bool // the cursor's cell is drawn focused
+	odd        bool // the row is an odd one of a striped grid
+	level      int  // the level of a tree row
+	kids, open bool // a tree row has children, and is open
+}
+
+// dgRowMemo is a built row of a grid: its element, what it was built from, and the
+// elements whose position place updates when the row is kept at another position.
+// q is the row's position at its last build or placing, which its handlers act on.
+type dgRowMemo struct {
+	el        *ComponentElement
+	inst      *componentInstance // the instance the element was built by
+	row       *DivElement
+	cells     []*DivElement
+	sig       dgRowSig
+	texts     []string
+	seen      int // dgShared.builds at the row's last build or keeping
+	q         int
+	pos, size int // the position of the row in its set, for assistive technology
+}
+
+// live reports whether the row's element is still built by its instance, so that
+// returning it again keeps the row's nodes.
+func (m *dgRowMemo) live() bool {
+	return m.el != nil && m.inst != nil && !m.inst.disposed && m.inst.el == m.el && m.inst.root != nil && m.inst.root.div == m.row
+}
+
+// place moves a kept row to position q, the pos-th of size in its set.
+func (m *dgRowMemo) place(q, pos, size int) {
+	m.q = q
+	if a := m.row.acc; a != nil {
+		a.gridRow, a.setPos, a.setSize = q+1, pos, size
+	}
+	for _, c := range m.cells {
+		c.acc.gridRow = q + 1
+	}
+	m.pos, m.size = pos, size
 }
 
 // dgShared is the state of a grid that lives with it: the order of its rows, the
@@ -1040,7 +1181,16 @@ type dgShared[T any] struct {
 	// keysFlat says that keys is makeKeys's own, not the keys of a tree; descents is
 	// the number of keys that do not come after the key before them. orderBuf holds
 	// the order, from one slice of rows to the next.
-	shadow   []T
+	shadow []T
+	// live is the closures of the last build (see dgLive). rowMemo is the built rows by
+	// key (see rowFor); look is what they were built from, and lookGen counts its
+	// changes. texts is a buffer for the text of a row's cells.
+	live     dgLive
+	rowMemo  map[string]*dgRowMemo
+	look     dgRowLook
+	lookGen  int
+	builds   int // the builds of the grid
+	texts    []string
 	shadowed bool
 	midKeys  []string
 	keysFlat bool
@@ -2450,6 +2600,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	rc := dgRowCtx[T]{t: t, ctx: ctx, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed, startN: startN, endN: endN,
 		built: built, cells: cellsOn, click: click, colAt: colAt, activate: activate, ops: ops, store: store}
+	sh.live = dgLive{click: click, colAt: colAt, activate: activate, ops: ops, cursorCol: col,
+		setOpen: func(key string, v bool) { g.setOpen(store, sh, key, v) }}
+	rc.memoOK = g.prepareRowMemo(rc)
 	// A row within a viewport of rows of the end asks for more rows when it is built.
 	near := n - max(int(sh.viewH/rowH), 1)
 	list := UniformList(n, func(q int) Element {
@@ -2460,10 +2613,11 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if q >= near {
 			askMore()
 		}
-		return g.row(rc, q)
+		return g.rowFor(rc, q)
 	}).Key(g.keyStr).Handle(handle)
-	// A tree row's position is among its siblings, which the rows report themselves.
-	list.ownPos = store != nil
+	// The rows report their positions themselves: a tree row's is among its siblings,
+	// and a kept row's is updated by place.
+	list.ownPos = true
 	if g.loadingMore && n > 0 {
 		// The row of LoadingMore follows the rows. Its ring names it, and its text is
 		// for sighted users.
@@ -2686,10 +2840,102 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 // row builds the row at displayed position q: a list item whose cells are the
 // cells of the columns. A selected row is drawn in RowSelected: its fill (the Highlight
 // color under high contrast) is the selection, and its text keeps its weight.
-func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
+// prepareRowMemo makes ready the rows kept from one build to the next (see rowFor),
+// and reports whether rows can be kept at all. A grid whose cells hold content of
+// the app's own, an editor or controls, or that selects cells, builds every row
+// each time: the closures its cells capture cannot be compared. When what every row
+// is built from has changed, no row is kept. Rows whose instances are gone are
+// forgotten.
+func (g *DataGridElement[T]) prepareRowMemo(rc dgRowCtx[T]) bool {
+	sh := rc.sh
+	sh.builds++
+	for k, m := range sh.rowMemo {
+		if m.el != nil && !m.live() || m.el == nil && m.seen < sh.builds-1 {
+			delete(sh.rowMemo, k)
+		}
+	}
+	if g.cellOn {
+		return false
+	}
+	look := dgRowLook{theme: rc.t, highContrast: rc.t.HighContrast, st: rc.st, xs: rc.xs, built: rc.built,
+		startN: rc.startN, endN: rc.endN, striped: g.striped, mode: g.mode, tree: sh.tree != nil}
+	look.cols = make([]dgColLook, len(rc.cols))
+	for c, cl := range rc.cols {
+		if cl.Cell != nil || cl.Edit != nil || cl.Editor != nil || cl.Interactive {
+			return false
+		}
+		look.cols[c] = dgColLook{key: cl.key(), grow: cl.Grow, align: cl.Align, pin: cl.Pin,
+			cellStyle: cl.CellStyle, text: cl.Text != nil}
+	}
+	if !look.same(&sh.look) {
+		sh.look = look
+		sh.lookGen++
+	}
+	return true
+}
+
+// rowFor returns the element of the row at position q. A row that would be built
+// the same as at the last build, from the same row of text in the same state, is
+// kept: its element is returned again, so that its instance keeps its nodes, and
+// only its position is updated (see dgRowMemo.place). So a grid that renders again,
+// for a new slice of rows, a click or a move of the cursor, builds only the rows
+// that changed.
+//
+// A row's handlers act on the position the row was last built or placed at, through
+// the closures of the last build (see dgLive), so a kept row acts as a new one would.
+func (g *DataGridElement[T]) rowFor(rc dgRowCtx[T], q int) Element {
+	sh := rc.sh
+	i := sh.order[q]
+	k := sh.keys[i]
+	sig := dgRowSig{gen: sh.lookGen, selected: rc.selected[k], cursor: -1, odd: g.striped && q%2 == 1}
+	if !rc.onHeader && q == rc.cursorPos {
+		sig.cursor, sig.focused = rc.cursorCol, rc.hasFocus
+	}
+	pos, size := q+1, sh.n
+	if t := sh.tree; t != nil {
+		pos, size = t.pos[i], t.size[i]
+		sig.level, sig.kids, sig.open = t.level[i], len(t.kids[i]) > 0, sh.openSet[k]
+	}
+	texts := sh.texts[:0]
+	for _, cl := range rc.cols {
+		s := ""
+		if cl.Text != nil {
+			s = cl.Text(rc.rows[i])
+		}
+		texts = append(texts, s)
+	}
+	sh.texts = texts
+	old := sh.rowMemo[k]
+	if rc.memoOK && rc.ed.key != k && old != nil && old.sig == sig && slices.Equal(old.texts, texts) && old.live() {
+		old.place(q, pos, size)
+		old.seen = sh.builds
+		return old.el
+	}
+	m := &dgRowMemo{sig: sig, q: q, pos: pos, size: size, seen: sh.builds}
+	m.texts = texts // read by row; cloned below when the row is recorded
+	r := g.row(rc, q, m)
+	if !rc.memoOK {
+		return r
+	}
+	m.texts, m.row = slices.Clone(texts), r
+	if sh.rowMemo == nil {
+		sh.rowMemo = map[string]*dgRowMemo{}
+	}
+	sh.rowMemo[k] = m
+	m.el = Component(func(ctx *Context) Element {
+		m.inst = ctx.inst
+		return r
+	}).Key(k)
+	return m.el
+}
+
+func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElement {
 	st, sh, rows, cols, xs, selected := rc.st, rc.sh, rc.rows, rc.cols, rc.xs, rc.selected
 	cursorPos, cursorCol, onHeader, hasFocus := rc.cursorPos, rc.cursorCol, rc.onHeader, rc.hasFocus
-	click, colAt, activate, ed, ops := rc.click, rc.colAt, rc.activate, rc.ed, rc.ops
+	ed := rc.ed
+	// The handlers act on the row where it is now (m.q), through the closures of the
+	// grid's last build (sh.live), since the row may be kept for later builds.
+	live := &sh.live
 	i := sh.order[q]
 	k := sh.keys[i]
 	v := rows[i]
@@ -2714,9 +2960,9 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 	} else {
 		r.listItem(tree.pos[i], tree.size[i]).AccessLevel(tree.level[i])
 		if len(tree.kids[i]) > 0 {
-			key, store := k, rc.store
+			key := k
 			r.AccessExpanded(sh.openSet[k])
-			r.access().setExpanded = func(v bool) { g.setOpen(store, sh, key, v) }
+			r.access().setExpanded = func(v bool) { live.setOpen(key, v) }
 		}
 	}
 	r.access().gridRow = q + 1
@@ -2726,7 +2972,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 	r.OnMouseDown(func(e *MouseEvent) {
 		if e.Button == input.ButtonLeft {
 			sh.pressed, sh.ctl = true, false
-			click(q, colAt(q, e.X), e.Mods)
+			live.click(m.q, live.colAt(m.q, e.X), e.Mods)
 		}
 	})
 	r.OnClick(func() {
@@ -2735,11 +2981,11 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 			return
 		}
 		// A click from an assistive technology selects the row, in the column it had.
-		click(q, cursorCol, 0)
+		live.click(m.q, live.cursorCol, 0)
 	})
 	r.OnDoubleClick(func() {
 		if !sh.ctl {
-			activate(q)
+			live.activate(m.q)
 		}
 	})
 	if g.mode != SelectionNone {
@@ -2748,7 +2994,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 			if ctrl {
 				mods = input.ModCtrl
 			}
-			click(q, cursorCol, mods)
+			live.click(m.q, live.cursorCol, mods)
 		}
 	}
 	var names []string
@@ -2764,7 +3010,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 	for c, cl := range cols {
 		s := ""
 		if cl.Text != nil {
-			s = cl.Text(v)
+			s = m.texts[c]
 			names = append(names, s)
 		}
 		if rc.built != nil && !rc.built[c] {
@@ -2780,6 +3026,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		}
 		cell.Style(cs)
 		cell.Role(access.RoleDataItem).Label(s).AccessCell(q+1, c+1)
+		m.cells = append(m.cells, cell)
 		if cl.Pin != PinNone {
 			cell.Style(st.CellPinned)
 			pinCell(cell, st, cl.Pin, c == rc.startN-1 || c == len(cols)-rc.endN)
@@ -2797,7 +3044,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 				if ctrl {
 					mods = input.ModCtrl
 				}
-				click(q, ci, mods)
+				live.click(m.q, ci, mods)
 			}
 			cell.OnClick(func() {
 				if sh.pressed {
@@ -2805,7 +3052,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 					return
 				}
 				// A click from an assistive technology selects the cell.
-				click(q, ci, 0)
+				live.click(m.q, ci, 0)
 			})
 		}
 		a := cell.access()
@@ -2831,7 +3078,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 				if open {
 					glyph = icons.ChevronDown
 				}
-				key, store := k, rc.store
+				key := k
 				chev.Child(Icon(glyph).Size(12)).Cursor(CursorPointer).
 					OnMouseDown(func(e *MouseEvent) {
 						if e.Button == input.ButtonLeft {
@@ -2839,7 +3086,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 							e.StopPropagation()
 						}
 					}).
-					OnClick(func() { g.setOpen(store, sh, key, !open) })
+					OnClick(func() { live.setOpen(key, !sh.openSet[key]) })
 			}
 			cell.Child(chev)
 		}
@@ -2852,7 +3099,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 				// cursor to the cell and leaves the row alone.
 				if e.Button == input.ButtonLeft && !sh.focus.Focused() {
 					sh.pressed, sh.ctl = true, true
-					ops.pick(q, ci)
+					live.ops.pick(m.q, ci)
 					e.StopPropagation()
 				}
 			})
@@ -2869,7 +3116,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 			ci := c
 			cell.OnDoubleClick(func() {
 				if sh.focus.Focused() {
-					ops.edit(q, ci)
+					live.ops.edit(m.q, ci)
 				}
 			})
 		}
@@ -2877,7 +3124,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int) Element {
 		case editing && cl.Editor != nil:
 			cell.Style(st.CellEditing)
 			cell.Child(cl.Editor(v, sh.draft.Get(), func(x string) { sh.draft.Set(x) },
-				func() { ops.save(sh.draft.Peek()) }, ops.cancel))
+				func() { live.ops.save(sh.draft.Peek()) }, live.ops.cancel))
 		case editing:
 			cell.Style(st.CellEditing)
 			cell.Child(g.editor(rc, cl))
