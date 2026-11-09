@@ -127,7 +127,9 @@ the value it had before. The app declares nothing for this.
   starts it again without that state, and says so.
 - None of this is in a release build: the rewrite happens only in `jamb dev`,
   and the code that keeps the values (package `devtools/hot`) is linked only
-  with package `devtools`.
+  with package `devtools`, and never into a web build. An app that links
+  `devtools` itself, for the inspector, keeps nothing and does no work for it
+  unless `jamb dev` started it.
 
 ## Control channel
 

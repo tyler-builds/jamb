@@ -1,7 +1,7 @@
 // Package devtools links the development tools into an application: the visual
 // inspector, the control channel, the state that survives jamb dev's restarts
-// (package devtools/hot), and the scenes of package scene (see docs/tools.md,
-// "Scenes"). The inspector shows the element tree, styles,
+// (package devtools/hot; not in a web build, see hot.go), and the scenes of
+// package scene (see docs/tools.md, "Scenes"). The inspector shows the element tree, styles,
 // layout, accessibility and frame timings of a window, and Ctrl+Shift+I opens it
 // (see docs/tools.md, "Visual inspector"). The control channel lets `jamb ctl` and
 // coding agents read and drive the running app when JAMB_CONTROL=1 (see
@@ -19,7 +19,6 @@ package devtools
 
 import (
 	"github.com/tyler-builds/jamb/app"
-	_ "github.com/tyler-builds/jamb/devtools/hot" // state across jamb dev's restarts
 	"github.com/tyler-builds/jamb/scene"
 )
 

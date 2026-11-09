@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/internal/devhook"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -34,6 +35,7 @@ func restart(t *testing.T) {
 func fresh() {
 	state.Lock()
 	defer state.Unlock()
+	keep() // as in a process that jamb dev started
 	state.counts = map[string]int{}
 	state.tracked = nil
 	state.runtimes, state.views = nil, nil
@@ -368,5 +370,38 @@ func TestListScrollKept(t *testing.T) {
 	}
 	if after := topRow(rt2); after != before {
 		t.Errorf("the top row is %s after the restart; it was %s", after, before)
+	}
+}
+
+// A program that jamb dev did not start keeps nothing: the hooks are unset, so
+// ui.Local encodes no value, and a signal that jamb dev's rewrite passes to
+// Signal is not tracked.
+func TestNothingKeptOutsideJambDev(t *testing.T) {
+	fresh()
+	t.Cleanup(fresh)
+	// The state of a process whose init found neither JAMB_DEV_CHANGED_AT nor
+	// JAMB_STATE_FILE.
+	keeping = false
+	devhook.Local, devhook.Checkpoint, devhook.Started, devhook.Runtime = nil, nil, nil, nil
+
+	s := ui.NewSignal(1)
+	if got := Signal(s, "main:main/n"); got != s {
+		t.Error("Signal returned another signal")
+	}
+	rows := make([]string, 1000)
+	root := func(ctx *ui.Context) ui.Element {
+		ui.Local(ctx, "rows", rows)
+		return ui.Div()
+	}
+	rt := ui.NewRuntime(root, nil, nil)
+	rt.SetViewport(300, 300, 1)
+	rt.Frame(time.Now())
+	state.Lock()
+	defer state.Unlock()
+	if n := len(state.tracked); n != 0 {
+		t.Errorf("%d values are tracked in a program jamb dev did not start, want none", n)
+	}
+	if n := len(state.runtimes); n != 0 {
+		t.Errorf("%d runtimes are tracked, want none", n)
 	}
 }

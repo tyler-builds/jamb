@@ -573,7 +573,7 @@ func (h *host) ctlWin() *ctlWin {
 // the windows save as they close.
 func (c *control) opCheckpoint(req ctlRequest, reply ctlReply) {
 	if devhook.Checkpoint == nil {
-		reply(nil, ctlErr("failed", "the program keeps no state across restarts: it does not link package devtools/hot"))
+		reply(nil, ctlErr("failed", "the program keeps no state across restarts: jamb dev did not start it, or it does not link package devtools/hot"))
 		return
 	}
 	if req.Path == "" || !filepath.IsAbs(req.Path) {
