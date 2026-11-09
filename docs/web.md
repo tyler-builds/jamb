@@ -1,7 +1,7 @@
 # Web
 
-A jamb app can run in a web page. This is experimental: the page draws on the CPU, and text
-input methods, the system clipboard, file dialogs and message boxes are not there yet.
+A jamb app can run in a web page. This is experimental: the page draws on the CPU, and file
+dialogs and message boxes are not there yet.
 
 ## Building an app for the web
 
@@ -31,7 +31,15 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   buttons. `Window.OpenURL` opens a new tab.
 - **Input.** The mouse and touchpad (clicks, double clicks, the wheel), the keyboard (keys by
   their position, and the text they type), and touch: a tap is a click and a drag scrolls.
-  The browser keeps its own shortcuts, such as reloading the page or closing the tab.
+  The browser keeps its own shortcuts, such as reloading the page or closing the tab. On a
+  Mac, iPhone or iPad, Command is Ctrl, so Command+C copies.
+- **Text input.** While a text field has focus, a hidden textarea of the page has it too, at
+  the field's caret: a phone shows its keyboard, and input methods (IME) compose in the field
+  and put their window by the caret.
+- **Clipboard.** Copying writes the system's clipboard, and pasting into a text field with
+  Ctrl+V (or the browser's paste) reads it. A paste chosen in the app's own context menu, and
+  Ctrl+V outside a text field, paste the text last copied in the app: a page reads the
+  system's clipboard only in the browser's paste event.
 - **Settings.** The page follows the system's dark mode, reduced motion and forced colors.
 - **Fonts.** The embedded Go fonts and the fonts the app registers with `App.Font`; a page
   reads no font files.
@@ -42,5 +50,5 @@ the page, or in a `<canvas id="jamb">` when the page has one.
 
 ## Not there yet
 
-Input methods (IME), the system clipboard (copy and paste work within the app), file dialogs,
-message boxes, second windows, pinch zoom, and drawing on the GPU.
+File dialogs, message boxes, second windows, pinch zoom, images on the clipboard, and drawing
+on the GPU.
