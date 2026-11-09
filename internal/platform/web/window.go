@@ -38,6 +38,7 @@ type window struct {
 	rafAsked    atomic.Bool // a requestAnimationFrame callback is pending
 	rafFired    atomic.Bool // it ran: the display is ready for a frame
 	rafFunc     js.Func
+	rafTime     float64 // the time of the display frame, from requestAnimationFrame, in milliseconds
 	wakeAt      time.Time
 	wakeTmr     *timer
 
@@ -86,7 +87,10 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 	w.canvas.Set("tabIndex", 0)
 	w.SetTitle(opts.Title)
 	w.measure()
-	w.rafFunc = js.FuncOf(func(js.Value, []js.Value) any {
+	w.rafFunc = js.FuncOf(func(_ js.Value, args []js.Value) any {
+		if len(args) > 0 {
+			w.rafTime = args[0].Float()
+		}
 		w.rafAsked.Store(false)
 		w.rafFired.Store(true)
 		signal()
@@ -139,7 +143,11 @@ func (w *window) frame() {
 	}
 	if w.rafFired.Swap(false) {
 		w.wakePending.Store(false)
+		w.touchFrame(w.rafTime)
 		w.frameWanted = w.handler.OnFrame(w)
+		if w.in.flinging {
+			w.wakePending.Store(true) // the momentum scrolls in the next frame too
+		}
 		if !w.wakePending.Load() && !w.frameWanted {
 			return
 		}
