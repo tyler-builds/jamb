@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>jamb</title>
+<!-- The font every text can be drawn with, which the app waits for before its
+     first frame: fetched while the app downloads (see internal/text/fonts_js.go). -->
+<link rel="preload" href="fonts/Go-Regular.ttf" as="fetch" crossorigin>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #fff; color: #555; }
   @media (prefers-color-scheme: dark) { html, body { background: #18181b; color: #a1a1aa; } }

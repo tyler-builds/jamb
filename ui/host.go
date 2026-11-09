@@ -77,6 +77,9 @@ func (h *runtimeHost) OnZoom(fn func(float32)) { h.rt().hostOnZoom(fn) }
 func (h *runtimeHost) Invalidate()    { h.rt().hostInvalidate() }
 func (h *runtimeHost) InvalidateAll() { h.rt().hostInvalidateAll() }
 
+// FontsChanged lays out every element again, after a font arrived.
+func (h *runtimeHost) FontsChanged() { h.rt().hostFontsChanged() }
+
 // PointerLeave reports that the pointer left the window.
 func (h *runtimeHost) PointerLeave() { h.rt().hostPointerLeave() }
 

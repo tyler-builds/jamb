@@ -586,8 +586,27 @@ func loadText(fonts []appFont, size float32) textResult {
 			return textResult{err: fmt.Errorf("app.Font(%q, %d): %w", f.family, f.weight, err)}
 		}
 	}
+	// A web page fetches its fonts: it waits for the one all text can be drawn
+	// with, and each face fetched later lays the text out again (see
+	// text.System.WaitForFonts).
+	ts.OnFontLoaded(func() { osPostUI(func() { fontsArrived(ts) }) })
+	if err := ts.WaitForFonts(); err != nil {
+		return textResult{err: fmt.Errorf("app: loading the fonts: %w", err)}
+	}
 	ts.Warm(size)
 	return textResult{ts: ts}
+}
+
+// fontsArrived lays out every window's text again with the fonts that have
+// arrived. UI thread only.
+func fontsArrived(ts *text.System) {
+	ts.FontsChanged()
+	for _, h := range application.windows {
+		if h.rh != nil {
+			h.rh.FontsChanged()
+			h.win.Wake()
+		}
+	}
 }
 
 // textResult is what the goroutine started by RunE sends: the text system, or
@@ -1263,6 +1282,7 @@ type runtimeHost interface {
 	OnZoom(fn func(float32))
 	Invalidate()
 	InvalidateAll()
+	FontsChanged()
 	PointerLeave()
 	WindowFocus(focused bool)
 	Cursor() input.Cursor

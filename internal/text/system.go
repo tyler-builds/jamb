@@ -141,6 +141,31 @@ func (sys *System) Subpixel() bool { return sys.sub != nil }
 // Registry exposes the font registry, e.g. to register application fonts.
 func (sys *System) Registry() *Registry { return sys.reg }
 
+// WaitForFonts waits until the system can lay out text. A web page fetches its
+// fonts (see fonts_js.go), and this fetches Go Regular, which every text can
+// be drawn with; the other faces are fetched when text asks for them. Other
+// builds have their fonts at once.
+func (sys *System) WaitForFonts() error { return waitPlatformFonts(sys.reg) }
+
+// OnFontLoaded sets fn to be called when a face that was on its way arrives, on
+// the goroutine that fetched it: until then, text that asked for the face was
+// laid out with the nearest face there was. fn should have the UI thread call
+// FontsChanged and lay the text out again. Set it before WaitForFonts.
+func (sys *System) OnFontLoaded(fn func()) { sys.reg.loaded = fn }
+
+// FontsChanged forgets which face each text was drawn with, and the layouts
+// made with them, so that text laid out again uses the faces that have
+// arrived. UI thread only.
+func (sys *System) FontsChanged() {
+	for _, f := range sys.reg.families {
+		clear(f.resolved)
+	}
+	clear(sys.reg.byRune)
+	clear(sys.layouts)
+	clear(sys.paras)
+	clear(sys.ellipses)
+}
+
 // Atlas returns the mask atlas texture.
 func (sys *System) Atlas() *scene.Texture { return sys.atlas.Texture }
 

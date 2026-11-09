@@ -30,6 +30,9 @@ tinygo . ./internal/webcheck cards-tinygo.wasm
 sh "$root/scripts/web/tinygo.sh" wasm_exec "$out/tinygo_wasm_exec.js"
 (cd "$root" && GOOS=js GOARCH=wasm go build -o "$out/cards-go.wasm" ./internal/webcheck)
 go_exec=$(go env GOROOT)/lib/wasm/wasm_exec.js
+# The fonts the builds fetch, which run.js reads for them.
+(cd "$root" && go run scripts/web/fonts.go "$out/fonts")
+export JAMB_FONT_DIR="$out/fonts"
 
 echo "== demo pages (TinyGo)"
 timeout 300 node "$root/scripts/web/run.js" "$out/tinygo_wasm_exec.js" "$out/demo.wasm"

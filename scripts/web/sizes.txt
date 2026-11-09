@@ -3,6 +3,9 @@
 # over its line here. Update a line when a change makes a build smaller, or when a
 # larger build is intended (say why in the PR). Before the web platform adapter,
 # hello's line was 873783: with no platform, app.Run returned before opening its
-# window, and TinyGo left out all of the UI.
-hello 1573956
-demo 2764650
+# window, and TinyGo left out all of the UI. The fonts are not in these sizes: a
+# page fetches them (internal/text/fonts_js.go), Go Regular, 56 KB in Brotli,
+# before its first frame and the other faces when text uses them; compiled in,
+# the nine Go fonts were 315 KB of each build.
+hello 1259200
+demo 2435616

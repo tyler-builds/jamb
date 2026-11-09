@@ -807,6 +807,17 @@ func (rt *Runtime) hostInvalidate() {
 	rt.requestFrame()
 }
 
+// hostFontsChanged lays out every element again, after a font arrived that
+// text was drawn without (see text.System.OnFontLoaded): text measures
+// differently in it.
+func (rt *Runtime) hostFontsChanged() {
+	for _, n := range rt.byID {
+		n.lay.Invalidate()
+	}
+	rt.needLayout, rt.needPaint = true, true
+	rt.requestFrame()
+}
+
 // hostInvalidateAll re-renders every component on the next frame. Used for
 // benchmarking the worst case; applications should rely on signals instead.
 func (rt *Runtime) hostInvalidateAll() {

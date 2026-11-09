@@ -10,6 +10,7 @@ package text
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"runtime"
 	"slices"
@@ -18,7 +19,6 @@ import (
 	"weak"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 
@@ -137,7 +137,11 @@ func fontOf(face *tsfont.Face) *Font {
 	return nil
 }
 
-// lazyFont loads a font at most once.
+// errFontPending is the error of a font that is still on its way (see
+// fonts_js.go): it is not kept, so the font loads once it has arrived.
+var errFontPending = errors.New("text: the font is still loading")
+
+// lazyFont loads a font at most once, after it has arrived (errFontPending).
 type lazyFont struct {
 	load func() (*Font, error)
 	font *Font
@@ -149,8 +153,11 @@ type lazyFont struct {
 
 func (l *lazyFont) get() (*Font, error) {
 	if !l.done {
-		l.done = true
-		l.font, l.err = l.load()
+		font, err := l.load()
+		if err == errFontPending {
+			return nil, err
+		}
+		l.done, l.font, l.err = true, font, err
 	}
 	return l.font, l.err
 }
@@ -176,8 +183,11 @@ type Registry struct {
 	// appFallbacks is the number of fallbacks at the front of fallbacks that
 	// the app added with AddFallback.
 	appFallbacks int
-	// last is the fallback of last resort, the embedded Go Regular.
+	// last is the fallback of last resort, Go Regular (see lastResort).
 	last *lazyFont
+	// loaded is called, on the goroutine that fetched it, when a font that
+	// was on its way arrives (see System.OnFontLoaded).
+	loaded func()
 
 	// Per-character fallback from the platform (fontconfig on Linux): the
 	// font found for each character (nil when there is none) and the fonts
@@ -350,7 +360,8 @@ func NewRegistry() *Registry {
 	for _, spec := range systemFallbackFonts() {
 		r.fallbacks = append(r.fallbacks, fallback{font: r.fileFont(fontFile{path: spec.path}), covers: spec.covers})
 	}
-	r.last = &lazyFont{load: func() (*Font, error) { return ParseFont("Go Regular", goregular.TTF) }}
+	addPlatformFonts(r)
+	r.last = lastResort(r)
 	return r
 }
 
@@ -510,7 +521,12 @@ func (r *Registry) pick(familyName string, f *family, k faceKey) *Font {
 	if familyName != FamilySans {
 		return r.Font(FamilySans, k.w, false)
 	}
-	font, _ := ParseFont("Go Regular", goregular.TTF)
+	font, err := r.last.get()
+	if err != nil {
+		// A page waits for Go Regular before it lays out any text (see
+		// System.WaitForFonts), so this is a misuse, not a missing font.
+		panic(fmt.Sprintf("text: no font to draw with: %v", err))
+	}
 	return font
 }
 
