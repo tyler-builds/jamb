@@ -273,14 +273,14 @@ func dataGridRowHeight(d DataGridDensity) float32 {
 	return 36
 }
 
-// dataGridDefaults returns the built-in look of a DataGrid, from the colors of t.
+// dataGridDefaults sets st to the built-in look of a DataGrid, from the colors of t.
 // Under high contrast the selected row is the Highlight color with HighlightText
 // on it, and the focus ring is kept.
-func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridStyle {
+func dataGridDefaults(st *DataGridStyle, t *Theme, d DataGridDensity, textFactor float32) {
 	h := dataGridRowHeight(d) * textFactor
 	line := Edges{Bottom: 1}
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	st := DataGridStyle{
+	*st = DataGridStyle{
 		Grid:             Style{Grow: 1, Background: t.Surface, BorderWidth: 1, BorderColor: t.Border, TextColor: t.Text},
 		GridFocusVisible: Style{Shadows: []Shadow{ring}},
 		Header: Style{Direction: Row, Align: Center, MinHeight: Px(h), Background: t.Panel,
@@ -322,18 +322,16 @@ func dataGridDefaults(t *Theme, d DataGridDensity, textFactor float32) DataGridS
 		st.CellSelected = Style{Background: t.Accent, TextColor: t.AccentText}
 		st.EditorMessage.BorderColor, st.EditorMessage.TextColor = t.Text, t.Text
 	}
-	return st
 }
 
-// resolveDataGrid returns the look of a DataGrid: the defaults, merged with the
+// resolveDataGrid sets st to the look of a DataGrid: the defaults, merged with the
 // theme's DataGrid and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst DataGridStyle) DataGridStyle {
+func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst, st *DataGridStyle) {
 	t := ctx.Theme()
-	st := dataGridDefaults(t, d, textFactor)
+	dataGridDefaults(st, t, d, textFactor)
 	st.layered(ctx,
-		themeLayer(&t.DataGrid), instanceLayer(&inst))
-	return st
+		themeLayer(&t.DataGrid), instanceLayer(inst))
 }
 
 // DataGridElement is a table of rows and columns, for business data. Only the rows
@@ -621,12 +619,17 @@ func (g *DataGridElement[T]) Key(k string) *DataGridElement[T] { g.keyStr = k; r
 func (g *DataGridElement[T]) Label(name string) *DataGridElement[T] { g.name = name; return g }
 
 // Style is merged into the grid's outer box: size it with Height, Grow or MaxHeight.
-func (g *DataGridElement[T]) Style(s Style) *DataGridElement[T] { g.style = g.style.Merge(s); return g }
+func (g *DataGridElement[T]) Style(s Style) *DataGridElement[T] { return g.styleOf(&s) }
+
+func (g *DataGridElement[T]) styleOf(s *Style) *DataGridElement[T] {
+	g.style.mergeFrom(s, false)
+	return g
+}
 
 // LayoutSpring moves the grid to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
 func (g *DataGridElement[T]) LayoutSpring(s Spring) *DataGridElement[T] {
-	return g.Style(Style{LayoutSpring: s})
+	return g.styleOf(&Style{LayoutSpring: s})
 }
 
 // Density sets the height of the rows: DataGridComfortable (the default) or DataGridCompact.
@@ -752,8 +755,10 @@ func (g *DataGridElement[T]) Empty(el Element) *DataGridElement[T] { g.empty = e
 // Styles sets the look of the parts of the grid, for this instance only. Set
 // fields win over the theme's DataGrid and the defaults; see DataGridStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (g *DataGridElement[T]) Styles(st DataGridStyle) *DataGridElement[T] {
-	g.styles.mergeFrom(&st, false)
+func (g *DataGridElement[T]) Styles(st DataGridStyle) *DataGridElement[T] { return g.stylesOf(&st) }
+
+func (g *DataGridElement[T]) stylesOf(st *DataGridStyle) *DataGridElement[T] {
+	g.styles.mergeFrom(st, false)
 	return g
 }
 
@@ -939,7 +944,7 @@ type dgOps struct {
 type dgRowCtx[T any] struct {
 	t                    *Theme
 	ctx                  *Context // the grid's render, for the layers of the editor's style (see StyleLayer)
-	st                   DataGridStyle
+	st                   *DataGridStyle
 	sh                   *dgShared[T]
 	rows                 []T
 	cols                 []DataColumn[T]
@@ -1527,7 +1532,7 @@ func textWidth(rt *Runtime, s string) float32 {
 // autoFitWidth is the width that fits column i to its header and to the Text of
 // the rows built by the last frame. A Cell slot is not measured. In a tree, the first
 // column also fits the indent of each row and its chevron (see DataGridStyle).
-func autoFitWidth[T any](rt *Runtime, st DataGridStyle, sh *dgShared[T], rows []T, cols []DataColumn[T], i int) float32 {
+func autoFitWidth[T any](rt *Runtime, st *DataGridStyle, sh *dgShared[T], rows []T, cols []DataColumn[T], i int) float32 {
 	cl := cols[i]
 	w := textWidth(rt, cl.Header) + 40 // the padding, the sort arrow and the edge
 	for q := sh.builtLo; q < sh.builtHi && q < sh.n; q++ {
@@ -1551,7 +1556,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	rt := ctx.rt
 	strs := ctx.Strings()
 	inst := ctx.inst // the grid's own component: a width change rebuilds it
-	st := resolveDataGrid(ctx, g.density, rt.textFactor, g.styles)
+	var st DataGridStyle
+	resolveDataGrid(ctx, g.density, rt.textFactor, &g.styles, &st)
 	sh := Local(ctx, "grid", &dgShared[T]{}).Peek()
 	cur := Local(ctx, "cursor", dgCursor{})
 	anchor := Local(ctx, "anchor", "")
@@ -2537,12 +2543,12 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		return g.rowMenu(rows[sh.order[p]], cols[c].key())
 	}
-	rc := dgRowCtx[T]{t: t, ctx: ctx, st: st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
+	rc := dgRowCtx[T]{t: t, ctx: ctx, st: &st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed, startN: startN, endN: endN,
 		built: built, cells: cellsOn, click: click, colAt: colAt, activate: activate, ops: ops, store: store}
 	sh.live = dgLive{click: click, colAt: colAt, activate: activate, ops: ops, cursorCol: col,
 		setOpen: func(key string, v bool) { g.setOpen(store, sh, key, v) }}
-	rc.memoOK = g.prepareRowMemo(rc)
+	rc.memoOK = g.prepareRowMemo(&rc)
 	// A row within a viewport of rows of the end asks for more rows when it is built.
 	near := n - max(int(sh.viewH/rowH), 1)
 	list := UniformList(n, func(q int) Element {
@@ -2553,7 +2559,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if q >= near {
 			askMore()
 		}
-		return g.rowFor(rc, q)
+		return g.rowFor(&rc, q)
 	}).Key(g.keyStr).Handle(handle)
 	// The rows report their positions themselves: a tree row's is among its siblings,
 	// and a kept row's is updated by place.
@@ -2561,7 +2567,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	if g.loadingMore && n > 0 {
 		// The row of LoadingMore follows the rows. Its ring names it, and its text is
 		// for sighted users.
-		list.tail = Div().Style(st.Row).Style(Style{Gap: 8, Padding: Edges{Left: 8}}).
+		list.tail = Div().styleOf(&st.Row).styleOf(&Style{Gap: 8, Padding: Edges{Left: 8}}).
 			Child(ProgressRing().Size(RingSmall).Label(strs.LoadingMore)).
 			Child(Div().AccessHidden().Child(Text(strs.LoadingMore).Truncate()))
 		if !sh.loadingMore {
@@ -2577,8 +2583,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	list.decorate = func(el *DivElement) {
 		focus := Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}.Merge(st.GridFocusVisible)
 		el.asPart("DataGrid.Grid").Role(access.RoleDataGrid).ScrollX().
-			Style(st.Grid).Style(Style{Padding: Edges{Top: headerH, Right: dataGridGutter}}).
-			FocusHandle(sh.focus).FocusVisible(focus).
+			styleOf(&st.Grid).styleOf(&Style{Padding: Edges{Top: headerH, Right: dataGridGutter}}).
+			FocusHandle(sh.focus).focusVisibleOf(&focus).
 			OnKeyDown(func(e *KeyEvent) {
 				if keys(e) {
 					e.StopPropagation()
@@ -2752,12 +2758,12 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		endN:   endN,
 		runs:   runs,
 	}
-	list.header = g.headerRow(st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
-		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, st, sh, rows, cols, i) }, ho, strs)
+	list.header = g.headerRow(&st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
+		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, &st, sh, rows, cols, i) }, ho, strs)
 
 	// The column may shrink below its rows, so that the list windows them to the space
 	// instead of building them all (see Tree).
-	root := g.size.apply(Div().Column().MinHeight(Px(0)).Style(g.style)).Child(list)
+	root := g.size.apply(Div().Column().MinHeight(Px(0)).styleOf(&g.style)).Child(list)
 	if g.rowMenu != nil || g.headerMenu != nil {
 		// The menu hangs from the grid's outer box, which does not scroll, so that it
 		// opens at the pointer however far the rows are scrolled.
@@ -2768,7 +2774,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if msg == nil {
 			msg = Text(strs.NoRows)
 		}
-		root.Child(Div().asPart("DataGrid.Empty").Absolute().Top(headerH).Left(0).Right(0).Style(st.Empty).Child(msg))
+		root.Child(Div().asPart("DataGrid.Empty").Absolute().Top(headerH).Left(0).Right(0).styleOf(&st.Empty).Child(msg))
 	}
 	if g.loading {
 		root.Child(Div().Absolute().Top(0).Right(0).Bottom(0).Left(0).Column().Align(Center).Justify(Center).
@@ -2786,7 +2792,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 // each time: the closures its cells capture cannot be compared. When what every row
 // is built from has changed, no row is kept. Rows whose instances are gone are
 // forgotten.
-func (g *DataGridElement[T]) prepareRowMemo(rc dgRowCtx[T]) bool {
+func (g *DataGridElement[T]) prepareRowMemo(rc *dgRowCtx[T]) bool {
 	sh := rc.sh
 	sh.builds++
 	for k, m := range sh.rowMemo {
@@ -2797,8 +2803,9 @@ func (g *DataGridElement[T]) prepareRowMemo(rc dgRowCtx[T]) bool {
 	if g.cellOn {
 		return false
 	}
-	look := dgRowLook{theme: rc.t, highContrast: rc.t.HighContrast, st: rc.st, xs: rc.xs, built: rc.built,
+	look := dgRowLook{theme: rc.t, highContrast: rc.t.HighContrast, xs: rc.xs, built: rc.built,
 		startN: rc.startN, endN: rc.endN, striped: g.striped, mode: g.mode, tree: sh.tree != nil}
+	copyLarge(&look.st, rc.st)
 	look.cols = make([]dgColLook, len(rc.cols))
 	for c, cl := range rc.cols {
 		if cl.Cell != nil || cl.Edit != nil || cl.Editor != nil || cl.Interactive {
@@ -2808,7 +2815,7 @@ func (g *DataGridElement[T]) prepareRowMemo(rc dgRowCtx[T]) bool {
 			cellStyle: cl.CellStyle, text: cl.Text != nil}
 	}
 	if !look.same(&sh.look) {
-		sh.look = look
+		copyLarge(&sh.look, &look)
 		sh.lookGen++
 	}
 	return true
@@ -2823,7 +2830,7 @@ func (g *DataGridElement[T]) prepareRowMemo(rc dgRowCtx[T]) bool {
 //
 // A row's handlers act on the position the row was last built or placed at, through
 // the closures of the last build (see dgLive), so a kept row acts as a new one would.
-func (g *DataGridElement[T]) rowFor(rc dgRowCtx[T], q int) Element {
+func (g *DataGridElement[T]) rowFor(rc *dgRowCtx[T], q int) Element {
 	sh := rc.sh
 	i := sh.order[q]
 	k := sh.keys[i]
@@ -2869,7 +2876,7 @@ func (g *DataGridElement[T]) rowFor(rc dgRowCtx[T], q int) Element {
 	return m.el
 }
 
-func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElement {
+func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivElement {
 	st, sh, rows, cols, xs, selected := rc.st, rc.sh, rc.rows, rc.cols, rc.xs, rc.selected
 	cursorPos, cursorCol, onHeader, hasFocus := rc.cursorPos, rc.cursorCol, rc.onHeader, rc.hasFocus
 	ed := rc.ed
@@ -2880,14 +2887,14 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElemen
 	k := sh.keys[i]
 	v := rows[i]
 	on := selected[k]
-	r := Div().asPart("DataGrid.Row").Key(k).Style(st.Row)
+	r := Div().asPart("DataGrid.Row").Key(k).styleOf(&st.Row)
 	if g.striped && q%2 == 1 {
-		r.Style(st.RowAlternate)
+		r.styleOf(&st.RowAlternate)
 	}
 	if on {
-		r.Style(st.RowSelected)
+		r.styleOf(&st.RowSelected)
 	} else {
-		r.Hover(st.RowHover)
+		r.hoverOf(&st.RowHover)
 	}
 	// A row reports its place in the grid, for the hit test, and its place in the set for
 	// assistive technology: among the shown rows, or among its siblings in a tree. In a
@@ -2943,7 +2950,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElemen
 	var skip float32
 	spacer := func() {
 		if skip > 0 {
-			r.Child(Div().AccessHidden().Style(Style{Basis: Px(skip), NoShrink: true}))
+			r.Child(Div().AccessHidden().styleOf(&Style{Basis: Px(skip), NoShrink: true}))
 			skip = 0
 		}
 	}
@@ -2958,17 +2965,17 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElemen
 			continue
 		}
 		spacer()
-		cell := Div().asPart("DataGrid.Cell").Style(st.Cell).
-			Style(Style{Basis: Px(xs[c+1] - xs[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
+		cell := Div().asPart("DataGrid.Cell").styleOf(&st.Cell).
+			styleOf(&Style{Basis: Px(xs[c+1] - xs[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
 		cs := cl.CellStyle
 		if rc.t.HighContrast {
 			cs = plainStyle(cs)
 		}
-		cell.Style(cs)
+		cell.styleOf(&cs)
 		cell.Role(access.RoleDataItem).Label(s).AccessCell(q+1, c+1)
 		m.cells = append(m.cells, cell)
 		if cl.Pin != PinNone {
-			cell.Style(st.CellPinned)
+			cell.styleOf(&st.CellPinned)
 			pinCell(cell, st, cl.Pin, c == rc.startN-1 || c == len(cols)-rc.endN)
 		}
 		if g.cellOn && g.cellMode != SelectionNone {
@@ -2976,7 +2983,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElemen
 			// a selected cell is drawn in CellSelected: its fill is the selection.
 			ci, picked := c, rc.cells[CellKey{Row: k, Column: cl.key()}]
 			if picked {
-				cell.Style(st.CellSelected)
+				cell.styleOf(&st.CellSelected)
 			}
 			cell.AccessSelected(picked)
 			cell.access().selectWith = func(ctrl bool) {
@@ -2999,7 +3006,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElemen
 		if !onHeader && q == cursorPos && c == cursorCol {
 			a.highlighted = true
 			if hasFocus {
-				cell.Style(st.CellFocused)
+				cell.styleOf(&st.CellFocused)
 			}
 		}
 		editing := ed.key == k && ed.col == c
@@ -3009,9 +3016,9 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElemen
 			// the text of every row lines up. The chevron is a click target of its own: a
 			// press on it does not select the row.
 			for range tree.level[i] - 1 {
-				cell.Child(Div().AccessHidden().asPart("DataGrid.TreeIndent").Style(st.TreeIndent))
+				cell.Child(Div().AccessHidden().asPart("DataGrid.TreeIndent").styleOf(&st.TreeIndent))
 			}
-			chev := Div().AccessHidden().asPart("DataGrid.TreeChevron").Style(st.TreeChevron)
+			chev := Div().AccessHidden().asPart("DataGrid.TreeChevron").styleOf(&st.TreeChevron)
 			if len(tree.kids[i]) > 0 {
 				glyph := icons.ChevronRight
 				open := sh.openSet[k]
@@ -3062,11 +3069,11 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElemen
 		}
 		switch {
 		case editing && cl.Editor != nil:
-			cell.Style(st.CellEditing)
+			cell.styleOf(&st.CellEditing)
 			cell.Child(cl.Editor(v, sh.draft.Get(), func(x string) { sh.draft.Set(x) },
 				func() { live.ops.save(sh.draft.Peek()) }, live.ops.cancel))
 		case editing:
-			cell.Style(st.CellEditing)
+			cell.styleOf(&st.CellEditing)
 			cell.Child(g.editor(rc, cl))
 		case cl.Cell != nil && cl.Interactive:
 			cell.Child(cl.Cell(v))
@@ -3086,7 +3093,7 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElemen
 		if editing && ed.err != "" {
 			// The message of a failed save hangs under the editing cell as an overlay: it is
 			// not clipped by the cell or the grid, and it flips above at the bottom edge.
-			cell.Child(Div().asPart("DataGrid.EditorMessage").Style(st.EditorMessage).
+			cell.Child(Div().asPart("DataGrid.EditorMessage").styleOf(&st.EditorMessage).
 				Overlay(BelowStart).OverlayGap(4).
 				Child(Div().Row().Align(Center).Gap(6).
 					Child(Icon(icons.Alert).Size(14).Color(st.EditorMessage.TextColor)).
@@ -3104,15 +3111,16 @@ func (g *DataGridElement[T]) row(rc dgRowCtx[T], q int, m *dgRowMemo) *DivElemen
 // editor returns the content of an editing cell: its text editor. The editor takes
 // the grid's keys as described in DataGrid, and its frame is invalid while the last
 // save failed. The message of that save is drawn by row, under the cell.
-func (g *DataGridElement[T]) editor(rc dgRowCtx[T], cl DataColumn[T]) Element {
-	fe := resolveField(rc.ctx, fieldLayout{size: sizeSmall}, rc.st.Editor)
+func (g *DataGridElement[T]) editor(rc *dgRowCtx[T], cl DataColumn[T]) Element {
+	var fe FieldStyle
+	resolveField(rc.ctx, fieldLayout{size: sizeSmall}, &rc.st.Editor, &fe)
 	if rc.ed.err != "" {
 		// The editor has focus while it is invalid, so the invalid frame also takes the
 		// place of the focus frame: the Accent border would hide the danger color.
-		fe.Frame = fe.Frame.Merge(fe.FrameInvalid)
-		fe.FrameFocusWithin = fe.FrameInvalid
+		fe.Frame.mergeFrom(&fe.FrameInvalid, false)
+		copyLarge(&fe.FrameFocusWithin, &fe.FrameInvalid)
 	}
-	ti := TextInput(rc.sh.draft).FocusHandle(rc.sh.editFocus).Label(cl.Header).Styles(fe).
+	ti := TextInput(rc.sh.draft).FocusHandle(rc.sh.editFocus).Label(cl.Header).stylesOf(&fe).
 		OnSubmit(func(text string) { rc.ops.save(text) })
 	ti.widget = "DataGrid.Editor"
 	ti.onCancel = rc.ops.cancel
@@ -3120,13 +3128,13 @@ func (g *DataGridElement[T]) editor(rc dgRowCtx[T], cl DataColumn[T]) Element {
 	// The message is the editor's description: the cell's own name hides the children
 	// of the cell, so a message in the cell is not exposed by itself.
 	ti.description = rc.ed.err
-	return ti.Style(Style{Grow: 1})
+	return ti.styleOf(&Style{Grow: 1})
 }
 
 // pinCell makes d, a cell of a pinned column in the body or the header, opaque in
 // the state of its row and drawn over the cells that scroll under it. The cell at
 // the inner edge of its region, edge, has the PinnedEdge border on that side.
-func pinCell(d *DivElement, st DataGridStyle, pin ColumnPin, edge bool) {
+func pinCell(d *DivElement, st *DataGridStyle, pin ColumnPin, edge bool) {
 	d.ZIndex(1)
 	d.fillFromParent, d.fillBase = true, st.Grid.Background
 	if edge {
@@ -3134,7 +3142,7 @@ func pinCell(d *DivElement, st DataGridStyle, pin ColumnPin, edge bool) {
 		if pin == PinEnd {
 			side = Edges{Left: 1}
 		}
-		d.Style(Style{BorderEdges: side}).Style(st.PinnedEdge)
+		d.styleOf(&Style{BorderEdges: side}).styleOf(&st.PinnedEdge)
 	}
 }
 
@@ -3196,12 +3204,12 @@ func dgControls(n *node, out []*node) []*node {
 
 // headerRow returns the header: a row of header cells, one for each column. The
 // list keeps it at the top of its viewport, and it scrolls with the columns.
-func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows []T, cols []DataColumn[T], cw []float32,
+func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows []T, cols []DataColumn[T], cw []float32,
 	width float32, sorted SortState, sortCol, col int, onHeader, hasFocus, highContrast bool,
 	sortBy func(i int), setWidth func(i int, v float32) bool, fit func(i int) float32, ho dgHeadOps[T],
 	strs *Strings) *DivElement {
 	changed, widthOf := ho.changed, ho.widthOf
-	h := Div().asPart("DataGrid.Header").Style(st.Header).Width(Px(width))
+	h := Div().asPart("DataGrid.Header").styleOf(&st.Header).Width(Px(width))
 	for c, cl := range cols {
 		sortable := cl.Compare != nil
 		isSorted := c == sortCol
@@ -3214,8 +3222,8 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 			}
 			name += ", " + status
 		}
-		hc := Div().asPart("DataGrid.HeaderCell").Style(st.HeaderCell).
-			Style(Style{Basis: Px(cw[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
+		hc := Div().asPart("DataGrid.HeaderCell").styleOf(&st.HeaderCell).
+			styleOf(&Style{Basis: Px(cw[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
 		hc.Role(access.RoleHeaderItem).Label(name)
 		if cl.Group != "" {
 			hc.Description(cl.Group)
@@ -3228,14 +3236,14 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 		if onHeader && c == col {
 			a.highlighted = true
 			if hasFocus {
-				hc.Style(st.CellFocused)
+				hc.styleOf(&st.CellFocused)
 			}
 		}
 		if sortable {
-			hc.Hover(st.HeaderCellHover).Cursor(CursorPointer)
+			hc.hoverOf(&st.HeaderCellHover).Cursor(CursorPointer)
 		}
 		if isSorted {
-			hc.Style(st.HeaderCellSorted)
+			hc.styleOf(&st.HeaderCellSorted)
 		}
 		if cl.RenderHeader != nil {
 			hc.Child(Div().AccessHidden().Child(cl.RenderHeader(cl.Header, PartState{Selected: isSorted, HighContrast: highContrast})))
@@ -3247,7 +3255,7 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 			if sorted.Desc {
 				glyph = icons.ChevronDown
 			}
-			hc.Child(Div().asPart("DataGrid.SortIndicator").Style(st.SortIndicator).Child(Icon(glyph).Size(12)))
+			hc.Child(Div().asPart("DataGrid.SortIndicator").styleOf(&st.SortIndicator).Child(Icon(glyph).Size(12)))
 		}
 		if sortable {
 			ci := c
@@ -3266,7 +3274,7 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 		// side. The line that shows the side changes no weight.
 		key := cl.key()
 		if m := ho.mark; m.key == key {
-			line := Div().asPart("DataGrid.DropIndicator").Absolute().Top(0).Bottom(0).Style(st.DropIndicator)
+			line := Div().asPart("DataGrid.DropIndicator").Absolute().Top(0).Bottom(0).styleOf(&st.DropIndicator)
 			if m.after {
 				line.Right(-1)
 			} else {
@@ -3289,14 +3297,14 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 				source = Style{}
 			}
 			label := cl.Header
-			hc.Dragging(source).OnDrag(Drag(dgColDrag{grid: sh, key: key}).Preview(func() Element {
-				return Div().Padding(6).Style(st.HeaderCell).Background(st.Header.Background).Border(1, st.Header.BorderColor).
+			hc.draggingOf(&source).OnDrag(Drag(dgColDrag{grid: sh, key: key}).Preview(func() Element {
+				return Div().Padding(6).styleOf(&st.HeaderCell).Background(st.Header.Background).Border(1, st.Header.BorderColor).
 					Child(Text(label))
 			}).End(func(DragEnd) { ho.setMark(dgColMark{}) }))
 		}
 		if cl.Resizable {
 			ci, key, cl := c, cl.key(), cl
-			hc.Child(Div().asPart("DataGrid.ResizeHandle").Style(st.ResizeHandle).Absolute().Top(0).Bottom(0).Right(0).
+			hc.Child(Div().asPart("DataGrid.ResizeHandle").styleOf(&st.ResizeHandle).Absolute().Top(0).Bottom(0).Right(0).
 				CapturePointer().
 				OnMouseDown(func(e *MouseEvent) {
 					if e.Button == input.ButtonLeft {
@@ -3335,16 +3343,16 @@ func (g *DataGridElement[T]) headerRow(st DataGridStyle, sh *dgShared[T], rows [
 	// The row of the groups is above the header cells. Its pieces are as wide as their
 	// columns: each takes their widths and their shares of the spare width. It is
 	// for sighted users: each header cell is described by its group.
-	gr := Div().Style(st.Header).AccessHidden()
+	gr := Div().styleOf(&st.Header).AccessHidden()
 	for _, run := range ho.runs {
 		var basis, grow float32
 		for c := run.from; c < run.to; c++ {
 			basis += cw[c]
 			grow += cols[c].Grow
 		}
-		piece := Div().Style(Style{Basis: Px(basis), Grow: grow, NoShrink: true, AlignSelf: Stretch})
+		piece := Div().styleOf(&Style{Basis: Px(basis), Grow: grow, NoShrink: true, AlignSelf: Stretch})
 		if run.group != "" {
-			piece.asPart("DataGrid.HeaderGroup").Style(st.HeaderGroup).Child(Text(run.group).Truncate())
+			piece.asPart("DataGrid.HeaderGroup").styleOf(&st.HeaderGroup).Child(Text(run.group).Truncate())
 		}
 		if run.pin != PinNone {
 			pinCell(piece, st, run.pin, run.to-1 == ho.startN-1 || run.from == len(cols)-ho.endN)

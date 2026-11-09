@@ -17,12 +17,12 @@ type ToolbarStyle struct {
 	Separator Style // the line between groups of controls
 }
 
-// toolbarDefaults returns the built-in look of a toolbar, from the colors of t: a
+// toolbarDefaults sets d to the built-in look of a toolbar, from the colors of t: a
 // row of controls 2 pixels apart, on the surface color and outlined in the border
 // color, and separators as thin vertical lines in the border color. Under high
 // contrast the outline and the separators are the text color.
-func toolbarDefaults(t *Theme) ToolbarStyle {
-	d := ToolbarStyle{
+func toolbarDefaults(d *ToolbarStyle, t *Theme) {
+	*d = ToolbarStyle{
 		Bar: Style{Direction: Row, Align: Center, Gap: 2, Padding: All(4), Radius: t.Radius,
 			Background: t.Surface, BorderWidth: 1, BorderColor: t.Border},
 		Separator: Style{Width: Px(1), Height: Px(20), NoShrink: true, Margin: XY(4, 0), Background: t.Border},
@@ -30,18 +30,16 @@ func toolbarDefaults(t *Theme) ToolbarStyle {
 	if t.HighContrast {
 		d.Bar.BorderColor, d.Separator.Background = t.Text, t.Text
 	}
-	return d
 }
 
-// resolveToolbar returns the look of a toolbar: the defaults, merged with the
+// resolveToolbar sets st to the look of a toolbar: the defaults, merged with the
 // theme's Toolbar and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveToolbar(ctx *Context, inst ToolbarStyle) ToolbarStyle {
+func resolveToolbar(ctx *Context, inst, st *ToolbarStyle) {
 	t := ctx.Theme()
-	st := toolbarDefaults(t)
+	toolbarDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Toolbar), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Toolbar), instanceLayer(inst))
 }
 
 // ToolbarElement is a row of controls, such as the formatting buttons above an
@@ -116,18 +114,23 @@ func (b *ToolbarElement) GridSpan(cols, rows int) *ToolbarElement {
 // Styles sets the look of the parts of the toolbar, for this instance only. Set
 // fields win over the theme's Toolbar and the defaults; see ToolbarStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (b *ToolbarElement) Styles(st ToolbarStyle) *ToolbarElement {
-	b.styles.mergeFrom(&st, false)
+func (b *ToolbarElement) Styles(st ToolbarStyle) *ToolbarElement { return b.stylesOf(&st) }
+
+func (b *ToolbarElement) stylesOf(st *ToolbarStyle) *ToolbarElement {
+	b.styles.mergeFrom(st, false)
 	return b
 }
 
 func (b *ToolbarElement) expand(ctx *Context) Element {
-	label, children, styles, size := b.label, b.children, b.styles, b.size
+	label, children, size := b.label, b.children, b.size
+	styles := new(ToolbarStyle)
+	copyLarge(styles, &b.styles)
 	return Component(func(ctx *Context) Element {
 		rt := ctx.rt
 		group := Local(ctx, "group", &rovingGroup{}).Peek()
-		st := resolveToolbar(ctx, styles)
-		bar := Div().asPart("Toolbar.Bar").Style(st.Bar).Role(access.RoleToolBar).Label(label).
+		var st ToolbarStyle
+		resolveToolbar(ctx, styles, &st)
+		bar := Div().asPart("Toolbar.Bar").styleOf(&st.Bar).Role(access.RoleToolBar).Label(label).
 			OnKeyDown(func(e *KeyEvent) {
 				if e.Mods == 0 && rt.rovingKey(group, e.Key) {
 					e.StopPropagation()
@@ -136,7 +139,7 @@ func (b *ToolbarElement) expand(ctx *Context) Element {
 		bar.roving = group
 		for _, c := range children {
 			if _, ok := c.(toolbarSeparator); ok {
-				bar.Child(Div().asPart("Toolbar.Separator").Style(st.Separator).Role(access.RoleSeparator))
+				bar.Child(Div().asPart("Toolbar.Separator").styleOf(&st.Separator).Role(access.RoleSeparator))
 				continue
 			}
 			bar.Child(c)
@@ -155,8 +158,9 @@ func (toolbarSeparator) isElement() {}
 
 // expand draws the separator with the theme's look, for one outside a toolbar.
 func (toolbarSeparator) expand(ctx *Context) Element {
-	st := resolveToolbar(ctx, ToolbarStyle{})
-	return Div().asPart("Toolbar.Separator").Style(st.Separator).Role(access.RoleSeparator)
+	var st ToolbarStyle
+	resolveToolbar(ctx, &ToolbarStyle{}, &st)
+	return Div().asPart("Toolbar.Separator").styleOf(&st.Separator).Role(access.RoleSeparator)
 }
 
 // rovingGroup is the state of a group of controls that is one Tab stop, such as

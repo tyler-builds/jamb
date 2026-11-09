@@ -50,11 +50,11 @@ type ColorPickerStyle struct {
 	PresetFocusVisible  Style       // a preset swatch while it has keyboard focus
 }
 
-// colorPickerDefaults returns the built-in look of a color picker, from the colors of
+// colorPickerDefaults sets d to the built-in look of a color picker, from the colors of
 // t. Its sizes are not in it: colorPickerSizes gives them, under the theme.
-func colorPickerDefaults(t *Theme) ColorPickerStyle {
+func colorPickerDefaults(d *ColorPickerStyle, t *Theme) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := ColorPickerStyle{
+	*d = ColorPickerStyle{
 		Trigger: Style{Direction: Row, Align: Center, Gap: 8, Radius: t.Radius, Background: t.Surface,
 			BorderWidth: 1, BorderColor: t.BorderStrong, TextColor: t.Text, Cursor: CursorPointer,
 			Transition: t.Motion.hover(), Spring: t.Motion.Spring},
@@ -81,17 +81,16 @@ func colorPickerDefaults(t *Theme) ColorPickerStyle {
 	} else {
 		d.TriggerDisabled = Style{Opacity: 0.5}
 	}
-	return d
 }
 
 // colorPickerSizes returns the sizes of the parts at the control size s and the Text
 // size scale. They are the lowest layer, under the defaults, the theme and the
 // instance, as the sizes of a text field's frame are.
-func colorPickerSizes(s controlSize, scale float32) ColorPickerStyle {
+func colorPickerSizes(st *ColorPickerStyle, s controlSize, scale float32) {
 	h, px, fs := s.field()
 	swatch := Px(colorPickerSwatch * scale)
 	preset := Px(colorPickerPreset * scale)
-	return ColorPickerStyle{
+	*st = ColorPickerStyle{
 		Trigger: Style{MinHeight: Px(h), Padding: XY(px, 0), FontSize: fs},
 		Swatch:  Style{Width: swatch, Height: swatch},
 		Popup:   Style{Width: Px(colorPickerPanelWidth * scale)},
@@ -100,15 +99,14 @@ func colorPickerSizes(s controlSize, scale float32) ColorPickerStyle {
 	}
 }
 
-// resolveColorPicker returns the look of a color picker: the defaults, merged with the
+// resolveColorPicker sets st to the look of a color picker: the defaults, merged with the
 // theme's ColorPicker and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveColorPicker(ctx *Context, inst ColorPickerStyle) ColorPickerStyle {
+func resolveColorPicker(ctx *Context, inst, st *ColorPickerStyle) {
 	t := ctx.Theme()
-	st := colorPickerDefaults(t)
+	colorPickerDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.ColorPicker), instanceLayer(&inst))
-	return st
+		themeLayer(&t.ColorPicker), instanceLayer(inst))
 }
 
 // ColorPickerElement is a button that shows a color and opens a panel to change it. The
@@ -236,8 +234,10 @@ func (c *ColorPickerElement) GridSpan(cols, rows int) *ColorPickerElement {
 // Styles sets the look of the parts of the color picker, for this instance only. Set
 // fields win over the theme's ColorPicker and the defaults; see ColorPickerStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (c *ColorPickerElement) Styles(st ColorPickerStyle) *ColorPickerElement {
-	c.styles.mergeFrom(&st, false)
+func (c *ColorPickerElement) Styles(st ColorPickerStyle) *ColorPickerElement { return c.stylesOf(&st) }
+
+func (c *ColorPickerElement) stylesOf(st *ColorPickerStyle) *ColorPickerElement {
+	c.styles.mergeFrom(st, false)
 	return c
 }
 
@@ -359,10 +359,13 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 		rt, t := ctx.rt, ctx.Theme()
 		s := ctx.Strings()
 		scale := textScale(ctx)
-		st := colorPickerSizes(c.ctlSize, scale)
-		resolved := resolveColorPicker(ctx, c.styles)
+		var st ColorPickerStyle
+		colorPickerSizes(&st, c.ctlSize, scale)
+		var resolved ColorPickerStyle
+		resolveColorPicker(ctx, &c.styles, &resolved)
 		st.mergeFrom(&resolved, false)
-		sl := resolveSlider(ctx, false, st.Slider)
+		var sl SliderStyle
+		resolveSlider(ctx, false, &st.Slider, &sl)
 		cur := c.value.Get()
 		// hs is the color in hue, saturation and value, kept between changes so that the hue
 		// holds while the saturation or the value is 0. seen is the color the state was made
@@ -460,8 +463,8 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 			name = s.Color
 		}
 		hex := formatHex(cur, c.alpha)
-		trig := Div().asPart("ColorPicker.Trigger").Style(st.Trigger).Tooltip(c.tooltip).
-			Child(Div().asPart("ColorPicker.Swatch").Style(st.Swatch).Background(cur)).
+		trig := Div().asPart("ColorPicker.Trigger").styleOf(&st.Trigger).Tooltip(c.tooltip).
+			Child(Div().asPart("ColorPicker.Swatch").styleOf(&st.Swatch).Background(cur)).
 			Child(Text(hex).NoWrap())
 		// The hex text is the trigger's description; a tooltip says more after it.
 		trig.Role(access.RoleButton).Label(name).Description(describe(hex, c.tooltip)).AccessExpanded(open.Get())
@@ -472,12 +475,12 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 			// A disabled trigger takes no focus and no clicks, and a panel that was open
 			// closes.
 			trig.access().disabled = true
-			trig.Style(st.TriggerDisabled).Cursor(CursorNotAllowed)
+			trig.styleOf(&st.TriggerDisabled).Cursor(CursorNotAllowed)
 			if open.Peek() {
 				open.Set(false)
 			}
 		} else {
-			trig.Hover(st.TriggerHover).Focusable().FocusVisible(st.TriggerFocusVisible).OnClick(toggle)
+			trig.hoverOf(&st.TriggerHover).Focusable().focusVisibleOf(&st.TriggerFocusVisible).OnClick(toggle)
 			if c.focusHandle != nil {
 				trig.FocusHandle(c.focusHandle)
 			}
@@ -491,7 +494,7 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 		c.size.apply(root)
 
 		if open.Get() && !c.disabled {
-			panel := Div().asPart("ColorPicker.Popup").Style(st.Popup).Column().
+			panel := Div().asPart("ColorPicker.Popup").styleOf(&st.Popup).Column().
 				Overlay(BelowStart).OverlayGap(6).
 				Role(access.RoleDialog).Label(name).
 				// The panel takes focus when it opens, and hands it to its first control; a click
@@ -512,8 +515,8 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 			// gradients are drawn solid, so the area shows the hue alone, and the thumb marks
 			// the saturation and the value.
 			th := float32(colorPickerThumb) * scale
-			area := Div().asPart("ColorPicker.Area").Style(st.Area).Cursor(CursorPointer).
-				Focusable().FocusVisible(st.AreaFocusVisible).Key(c.partKey("area")).
+			area := Div().asPart("ColorPicker.Area").styleOf(&st.Area).Cursor(CursorPointer).
+				Focusable().focusVisibleOf(&st.AreaFocusVisible).Key(c.partKey("area")).
 				OnMouseDown(func(e *MouseEvent) {
 					if e.Button == input.ButtonLeft {
 						areaDrag.Set(true)
@@ -562,7 +565,7 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 			// The thumb sits where the saturation and the value put it: the spacers above and
 			// below share the room the thumb does not take, as the Slider's do.
 			fx, fy := float32(now.s), float32(1-now.v)
-			thumb := Div().asPart("ColorPicker.Thumb").Style(st.Thumb).Background(cur).
+			thumb := Div().asPart("ColorPicker.Thumb").styleOf(&st.Thumb).Background(cur).
 				Size(Px(th), Px(th)).Radius(th / 2).Shrink(0)
 			area.Child(Div().Absolute().Inset(0).Column().
 				Child(Div().Grow(fy)).
@@ -577,23 +580,23 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 			// segments, one for each sixth of the hue circle. Its keys are the Slider's, with
 			// the arrows by 1 degree and Page Up and Page Down by 10.
 			f := float32(now.h / 360)
-			rail := Div().asPart("Slider.Rail").Row().Style(sl.Rail).Grow(1)
+			rail := Div().asPart("Slider.Rail").Row().styleOf(&sl.Rail).Grow(1)
 			for i := range 6 {
 				from := pickerHSV{float64(i) * 60, 1, 1}.color(1)
 				to := pickerHSV{float64(i+1) * 60, 1, 1}.color(1)
 				rail.Child(Div().Height(Full).Grow(1).BackgroundGradient(LinearGradient(90, from, to)))
 			}
-			hueThumb := Div().asPart("Slider.Thumb").Style(sl.Thumb).Size(Px(sliderThumb), Px(sliderThumb)).Shrink(0)
+			hueThumb := Div().asPart("Slider.Thumb").styleOf(&sl.Thumb).Size(Px(sliderThumb), Px(sliderThumb)).Shrink(0)
 			if hueDrag.Get() {
-				hueThumb.Style(sl.ThumbPressed)
+				hueThumb.styleOf(&sl.ThumbPressed)
 			} else {
-				hueThumb.Hover(sl.ThumbHover)
+				hueThumb.hoverOf(&sl.ThumbHover)
 			}
-			hueTrack := Div().asPart("Slider.Track").Height(Px(22)).Grow(1).Shrink(1).Style(sl.Track).
+			hueTrack := Div().asPart("Slider.Track").Height(Px(22)).Grow(1).Shrink(1).styleOf(&sl.Track).
 				Child(Div().Row().Height(Px(22)).Align(Center).PaddingX(sliderThumb / 2).Child(rail)).
 				Child(Div().Absolute().Inset(0).Row().Align(Center).
 					Child(Div().Grow(f)).Child(hueThumb).Child(Div().Grow(1 - f))).
-				Key(c.partKey("hue")).Cursor(CursorPointer).Focusable().FocusVisible(sl.TrackFocusVisible).
+				Key(c.partKey("hue")).Cursor(CursorPointer).Focusable().focusVisibleOf(&sl.TrackFocusVisible).
 				OnMouseDown(func(e *MouseEvent) {
 					if e.Button == input.ButtonLeft {
 						hueDrag.Set(true)
@@ -631,9 +634,9 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 			ha := hueTrack.access()
 			ha.rng = &access.Range{Value: now.h, Min: 0, Max: 360, SmallChange: 1, LargeChange: 10}
 			ha.setRange = setHue
-			hueRow := Div().Row().Align(Center).Gap(12).Width(Full).Style(Style{MinWidth: Px(sliderMinWidth)}).
+			hueRow := Div().Row().Align(Center).Gap(12).Width(Full).styleOf(&Style{MinWidth: Px(sliderMinWidth)}).
 				Child(hueTrack).
-				Child(Div().asPart("Slider.ValueText").AccessHidden().MinWidth(Px(44)).Align(End).Style(sl.ValueText).
+				Child(Div().asPart("Slider.ValueText").AccessHidden().MinWidth(Px(44)).Align(End).styleOf(&sl.ValueText).
 					Child(Text(fmt.Sprintf("%.0f", now.h))))
 			panel.Child(hueRow)
 
@@ -650,7 +653,7 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 						next := hs.Peek()
 						apply(colorOf(next), next)
 					}).
-					Styles(mergedSlider(ops, &st.Slider))
+					stylesOf(mergedSlider(&ops, &st.Slider))
 				panel.Child(opacity)
 			}
 
@@ -670,8 +673,8 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 			if len(c.swatches) > 0 {
 				presets := Div().Row().Wrap().Gap(6)
 				for i, p := range c.swatches {
-					preset := Div().asPart("ColorPicker.Preset").Style(st.Preset).Background(p).
-						Focusable().FocusVisible(st.PresetFocusVisible).Cursor(CursorPointer).
+					preset := Div().asPart("ColorPicker.Preset").styleOf(&st.Preset).Background(p).
+						Focusable().focusVisibleOf(&st.PresetFocusVisible).Cursor(CursorPointer).
 						Key(c.partKey(fmt.Sprintf("preset:%d", i))).
 						OnClick(func() { apply(p, rgbToPicker(p)) })
 					preset.Role(access.RoleButton).Label(formatHex(p, c.alpha))
@@ -685,8 +688,8 @@ func (c *ColorPickerElement) expand(ctx *Context) Element {
 	})
 }
 
-// mergedSlider returns base with o merged over it.
-func mergedSlider(base SliderStyle, o *SliderStyle) SliderStyle {
+// mergedSlider merges o over base, and returns base.
+func mergedSlider(base *SliderStyle, o *SliderStyle) *SliderStyle {
 	base.mergeFrom(o, false)
 	return base
 }

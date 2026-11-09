@@ -28,11 +28,12 @@ type RangeSliderStyle struct {
 	ValueText         Style // the readout beside the track
 }
 
-// rangeSliderDefaults returns the built-in look of a range slider, from the colors
+// rangeSliderDefaults sets d to the built-in look of a range slider, from the colors
 // of t: the parts of a Slider, with the focus ring on the thumb that has focus.
-func rangeSliderDefaults(t *Theme, disabled bool) RangeSliderStyle {
-	sd := sliderDefaults(t, disabled)
-	return RangeSliderStyle{
+func rangeSliderDefaults(d *RangeSliderStyle, t *Theme, disabled bool) {
+	var sd SliderStyle
+	sliderDefaults(&sd, t, disabled)
+	*d = RangeSliderStyle{
 		Track:             sd.Track,
 		Rail:              sd.Rail,
 		Fill:              sd.Fill,
@@ -44,15 +45,14 @@ func rangeSliderDefaults(t *Theme, disabled bool) RangeSliderStyle {
 	}
 }
 
-// resolveRangeSlider returns the look of a range slider: the defaults, merged with
+// resolveRangeSlider sets st to the look of a range slider: the defaults, merged with
 // the theme's RangeSlider and then the instance's Styles. Under high contrast the
 // two overrides are plain (see plainStyle).
-func resolveRangeSlider(ctx *Context, disabled bool, inst RangeSliderStyle) RangeSliderStyle {
+func resolveRangeSlider(ctx *Context, disabled bool, inst, st *RangeSliderStyle) {
 	t := ctx.Theme()
-	st := rangeSliderDefaults(t, disabled)
+	rangeSliderDefaults(st, t, disabled)
 	st.layered(ctx,
-		themeLayer(&t.RangeSlider), instanceLayer(&inst))
-	return st
+		themeLayer(&t.RangeSlider), instanceLayer(inst))
 }
 
 // RangeSliderElement sets a range, a low and a high value, with two thumbs on one
@@ -164,8 +164,10 @@ func (s *RangeSliderElement) OnChange(fn func(low, high float64)) *RangeSliderEl
 // Set fields win over the theme's RangeSlider and the defaults; see
 // RangeSliderStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
-func (s *RangeSliderElement) Styles(st RangeSliderStyle) *RangeSliderElement {
-	s.styles.mergeFrom(&st, false)
+func (s *RangeSliderElement) Styles(st RangeSliderStyle) *RangeSliderElement { return s.stylesOf(&st) }
+
+func (s *RangeSliderElement) stylesOf(st *RangeSliderStyle) *RangeSliderElement {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
@@ -202,7 +204,8 @@ func (s *RangeSliderElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		strs := ctx.Strings()
-		st := resolveRangeSlider(ctx, s.disabled, s.styles)
+		var st RangeSliderStyle
+		resolveRangeSlider(ctx, s.disabled, &s.styles, &st)
 		ax := s.axis()
 		low, high := s.low.Get(), s.high.Get()
 		drag := Local(ctx, "drag", -1) // the thumb that is dragged, or -1
@@ -243,9 +246,9 @@ func (s *RangeSliderElement) expand(ctx *Context) Element {
 		// The rail is padded by half a thumb, as a Slider's is, and the fill runs
 		// from the center of the low thumb to the center of the high one: a thumb
 		// wide plus its share of the room the thumbs leave.
-		fill := Div().asPart("RangeSlider.Fill").Height(Full).Style(st.Fill).
+		fill := Div().asPart("RangeSlider.Fill").Height(Full).styleOf(&st.Fill).
 			Width(Px(sliderThumb)).Grow(fh - fl)
-		rail := Div().asPart("RangeSlider.Rail").Row().Style(st.Rail).Grow(1).
+		rail := Div().asPart("RangeSlider.Rail").Row().styleOf(&st.Rail).Grow(1).
 			Child(Div().Height(Full).Grow(fl)).
 			Child(fill).
 			Child(Div().Height(Full).Grow(1 - fh))
@@ -253,11 +256,11 @@ func (s *RangeSliderElement) expand(ctx *Context) Element {
 		values := [2]float64{low, high}
 		names := [2]string{strs.Minimum, strs.Maximum}
 		for i := range 2 {
-			thumb := Div().asPart("RangeSlider.Thumb").Style(st.Thumb).Size(Px(sliderThumb), Px(sliderThumb)).Shrink(0)
+			thumb := Div().asPart("RangeSlider.Thumb").styleOf(&st.Thumb).Size(Px(sliderThumb), Px(sliderThumb)).Shrink(0)
 			if drag.Get() == i {
-				thumb.Style(st.ThumbPressed)
+				thumb.styleOf(&st.ThumbPressed)
 			} else if !s.disabled {
-				thumb.Hover(st.ThumbHover)
+				thumb.hoverOf(&st.ThumbHover)
 			}
 			from, to := bounds(i)
 			thumb.Role(access.RoleSlider).Label(names[i])
@@ -269,7 +272,7 @@ func (s *RangeSliderElement) expand(ctx *Context) Element {
 				a.disabled = true
 			} else {
 				v := values[i]
-				thumb.FocusHandle(handles[i]).FocusVisible(st.ThumbFocusVisible).
+				thumb.FocusHandle(handles[i]).focusVisibleOf(&st.ThumbFocusVisible).
 					OnKeyDown(func(e *KeyEvent) {
 						if e.Mods != 0 {
 							return
@@ -301,15 +304,15 @@ func (s *RangeSliderElement) expand(ctx *Context) Element {
 				thumbs.Child(Div().Grow(fh - fl)).Child(thumb).Child(Div().Grow(1 - fh))
 			}
 		}
-		track := Div().asPart("RangeSlider.Track").Height(Px(22)).Grow(1).Shrink(1).Style(st.Track).
+		track := Div().asPart("RangeSlider.Track").Height(Px(22)).Grow(1).Shrink(1).styleOf(&st.Track).
 			Child(Div().Row().Height(Px(22)).Align(Center).PaddingX(sliderThumb / 2).Child(rail)).
 			Child(thumbs)
 
 		readout := fmtValue(ax, low) + " – " + fmtValue(ax, high)
-		value := Div().asPart("RangeSlider.ValueText").AccessHidden().MinWidth(Px(44)).Align(End).Style(st.ValueText).
+		value := Div().asPart("RangeSlider.ValueText").AccessHidden().MinWidth(Px(44)).Align(End).styleOf(&st.ValueText).
 			Child(Text(readout).NoWrap())
 		// The group holds the two thumbs, and names them for assistive technology.
-		root := Div().Row().Align(Center).Gap(12).Width(Full).Style(Style{MinWidth: Px(sliderMinWidth)}).
+		root := Div().Row().Align(Center).Gap(12).Width(Full).styleOf(&Style{MinWidth: Px(sliderMinWidth)}).
 			Role(access.RoleGroup).Tooltip(s.tooltip).
 			Child(track).
 			Child(value)

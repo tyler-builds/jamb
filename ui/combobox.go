@@ -66,11 +66,11 @@ type ComboboxStyle struct {
 	Error Style
 }
 
-// comboboxDefaults returns the built-in look of the parts of a combobox, from the
+// comboboxDefaults sets d to the built-in look of the parts of a combobox, from the
 // colors of t. The highlighted suggestion is the Highlight color under high contrast
 // and a soft accent otherwise, as a select's highlighted option is.
-func comboboxDefaults(t *Theme) ComboboxStyle {
-	d := ComboboxStyle{
+func comboboxDefaults(d *ComboboxStyle, t *Theme) {
+	*d = ComboboxStyle{
 		Popup: Style{Padding: All(4), Background: t.Surface, BorderWidth: 1,
 			BorderColor: t.Border, Radius: t.Radius, Shadows: []Shadow{ShadowMd}},
 		Option: Style{Direction: Row, Align: Center, Gap: 8, MinHeight: Px(28), Padding: XY(8, 0),
@@ -88,19 +88,17 @@ func comboboxDefaults(t *Theme) ComboboxStyle {
 	} else {
 		d.OptionHighlighted = Style{Background: t.AccentSoft}
 	}
-	return d
 }
 
-// resolveCombobox returns the parts of a combobox: the defaults, merged with the
+// resolveCombobox sets st to the parts of a combobox: the defaults, merged with the
 // theme's Combobox and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle). The Field is resolved by the editor, over
 // the theme's Field.
-func resolveCombobox(ctx *Context, inst ComboboxStyle) ComboboxStyle {
+func resolveCombobox(ctx *Context, inst, st *ComboboxStyle) {
 	t := ctx.Theme()
-	st := comboboxDefaults(t)
+	comboboxDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Combobox), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Combobox), instanceLayer(inst))
 }
 
 // comboItems are the suggestions of a query, as the last request returned them.
@@ -198,9 +196,10 @@ func Combobox[T comparable](text *Signal[string], suggest func(query string) []O
 func (c *ComboboxElement[T]) formCheck() error { return firstError(c.text.Get(), c.rules) }
 
 func (c *ComboboxElement[T]) formWire(w fieldWire) Element {
-	cc := *c
+	cc := new(ComboboxElement[T])
+	copyLarge(cc, c)
 	cc.wire = w
-	return &cc
+	return cc
 }
 
 func (*ComboboxElement[T]) isElement()           {}
@@ -345,8 +344,10 @@ func (c *ComboboxElement[T]) GridSpan(cols, rows int) *ComboboxElement[T] {
 // Styles sets the look of the parts of the combobox, for this instance only. Set
 // fields win over the theme's Combobox and the defaults; see ComboboxStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (c *ComboboxElement[T]) Styles(st ComboboxStyle) *ComboboxElement[T] {
-	c.styles.mergeFrom(&st, false)
+func (c *ComboboxElement[T]) Styles(st ComboboxStyle) *ComboboxElement[T] { return c.stylesOf(&st) }
+
+func (c *ComboboxElement[T]) stylesOf(st *ComboboxStyle) *ComboboxElement[T] {
+	c.styles.mergeFrom(st, false)
 	return c
 }
 
@@ -361,9 +362,11 @@ func countText(n int, s *Strings) string {
 func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
-		st := resolveCombobox(ctx, c.styles)
+		var st ComboboxStyle
+		resolveCombobox(ctx, &c.styles, &st)
 		lay := fieldLayout{width: Full, disabled: c.disabled, size: c.ctlSize}
-		fst := resolveField(ctx, lay, st.Field)
+		var fst FieldStyle
+		resolveField(ctx, lay, &st.Field, &fst)
 		w := c.wire
 
 		text := c.text.Get()
@@ -638,8 +641,8 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 		if c.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)
-			frame := Div().asPart("Combobox.Frame").Style(fst.Frame).Style(fst.FrameDisabled).
-				Child(Div().asPart("Combobox.Text").Style(fst.Text).Grow(1).Child(Text(text).NoWrap()))
+			frame := Div().asPart("Combobox.Frame").styleOf(&fst.Frame).styleOf(&fst.FrameDisabled).
+				Child(Div().asPart("Combobox.Text").styleOf(&fst.Text).Grow(1).Child(Text(text).NoWrap()))
 			root.Child(frame)
 			return c.size.apply(root)
 		}
@@ -651,9 +654,9 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 				restrict()
 			}}
 		fo.size.setWidth(Full)
-		root.Child(fo.expand(ctx, fst, false, 0))
+		root.Child(fo.expand(ctx, &fst, false, 0))
 		// The message the field last said: the same look as a field's error.
-		root.Child(Div().Display(notice.Get() != "").Row().Align(Center).Gap(6).Style(st.Error).
+		root.Child(Div().Display(notice.Get() != "").Row().Align(Center).Gap(6).styleOf(&st.Error).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Error))).
 			Child(Text(notice.Get()).NoWrap()))
 
@@ -723,7 +726,7 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 			reveal := s.revealIdx
 			s.revealIdx = 0
 			maxH := float32(c.maxVisible)*comboboxRowHeight*textScale(ctx) + 8
-			root.Child(c.popup(t, st, vis, query, hl.Get(), reveal, loading.Get(), items.Get().failed,
+			root.Child(c.popup(t, &st, vis, query, hl.Get(), reveal, loading.Get(), items.Get().failed,
 				c.errorText, maxH, s.picked, pick, shut, func(i int) { hl.Set(i) }, ret, strs))
 		}
 		return c.size.apply(root)
@@ -737,14 +740,14 @@ func (c *ComboboxElement[T]) expand(ctx *Context) Element {
 // focus back to the text. reveal is the row (plus one, zero for none) that the keys moved
 // to, and it is scrolled into view. A failed request shows the error row instead of the
 // empty slot.
-func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], query string, hl, reveal int,
+func (c *ComboboxElement[T]) popup(t *Theme, st *ComboboxStyle, vis []Option[T], query string, hl, reveal int,
 	loading, failed bool, errorText string, maxH float32, picked *Option[T], pick func(Option[T]), shut func(),
 	highlight func(int), ret *FocusHandle, strs *Strings) Element {
 	name := c.name
 	if name == "" {
 		name = strs.Suggestions
 	}
-	panel := Div().asPart("Combobox.Popup").Key("jamb.listbox").Column().Style(st.Popup).
+	panel := Div().asPart("Combobox.Popup").Key("jamb.listbox").Column().styleOf(&st.Popup).
 		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: t.Motion.enter(140 * time.Millisecond)}).
 		Exit(Fade().Grow(0.98), Animation{Duration: t.Motion.exit(90 * time.Millisecond)}).
 		Overlay(BelowStart).OverlayGap(4).
@@ -756,7 +759,7 @@ func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], 
 		OnMouseDown(func(*MouseEvent) { ret.Focus() })
 	panel.matchAnchor = true // at least as wide as the field, whatever its width
 	if loading {
-		panel.Child(Div().asPart("Combobox.Loading").Style(st.Loading).
+		panel.Child(Div().asPart("Combobox.Loading").styleOf(&st.Loading).
 			Child(ProgressRing().Size(RingSmall).Label(strs.LoadingSuggestions)))
 	}
 	switch {
@@ -764,7 +767,7 @@ func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], 
 		if errorText == "" {
 			errorText = strs.CouldNotLoadSuggestions
 		}
-		panel.Child(Div().asPart("Combobox.Error").Style(st.Error).
+		panel.Child(Div().asPart("Combobox.Error").styleOf(&st.Error).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Error))).
 			Child(Text(errorText).NoWrap()))
 	case len(vis) == 0 && !loading:
@@ -772,7 +775,7 @@ func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], 
 		if empty == "" {
 			empty = strs.NoResults
 		}
-		panel.Child(Div().asPart("Combobox.Empty").Style(st.Empty).Child(Text(empty).NoWrap()))
+		panel.Child(Div().asPart("Combobox.Empty").styleOf(&st.Empty).Child(Text(empty).NoWrap()))
 	}
 	hlStyle := Highlight{Color: st.Match.TextColor, Background: st.Match.Background, Underline: t.HighContrast}
 	for i, o := range vis {
@@ -792,7 +795,7 @@ func (c *ComboboxElement[T]) popup(t *Theme, st ComboboxStyle, vis []Option[T], 
 			if on {
 				mark.Child(Icon(icons.Check).Size(14))
 			}
-			row := Div().asPart("Combobox.Option").Style(style).
+			row := Div().asPart("Combobox.Option").styleOf(&style).
 				Role(access.RoleListItem).AccessSelected(on).Label(o.Label).Child(mark)
 			row.revealRow = reveals
 			reveals = false // a render slot's later renders do not scroll again

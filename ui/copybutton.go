@@ -111,16 +111,21 @@ func (c *CopyButtonElement) Width(l Length) *CopyButtonElement { c.button.Width(
 func (c *CopyButtonElement) Height(l Length) *CopyButtonElement { c.button.Height(l); return c }
 
 // Style sets the look of the button's Root part, for this instance only (see Button.Style).
-func (c *CopyButtonElement) Style(s Style) *CopyButtonElement { c.button.Style(s); return c }
+func (c *CopyButtonElement) Style(s Style) *CopyButtonElement { return c.styleOf(&s) }
+
+func (c *CopyButtonElement) styleOf(s *Style) *CopyButtonElement { c.button.styleOf(s); return c }
 
 // LayoutSpring moves the copy button to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
 func (c *CopyButtonElement) LayoutSpring(s Spring) *CopyButtonElement {
-	return c.Style(Style{LayoutSpring: s})
+	return c.styleOf(&Style{LayoutSpring: s})
 }
 
 // Styles sets the look of the parts of the button, for this instance only (see Button.Styles).
-func (c *CopyButtonElement) Styles(st ButtonStyle) *CopyButtonElement { c.button.Styles(st); return c }
+func (c *CopyButtonElement) Styles(st ButtonStyle) *CopyButtonElement {
+	c.button.stylesOf(&st)
+	return c
+}
 
 func (c *CopyButtonElement) expand(*Context) Element {
 	return Component(func(ctx *Context) Element {
@@ -135,7 +140,8 @@ func (c *CopyButtonElement) expand(*Context) Element {
 		if confirm == "" {
 			confirm = strs.Copied
 		}
-		b := c.button // a copy: the render's state goes on the copy, not on the element
+		b := new(ButtonElement) // a copy: the render's state goes on the copy, not on the element
+		copyLarge(b, &c.button)
 		if c.label != "" {
 			b.label = c.label
 			if done.Get() {

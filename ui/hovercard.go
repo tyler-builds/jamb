@@ -23,21 +23,23 @@ type HoverCardStyle struct {
 	Panel Style // the floating panel that holds the content
 }
 
-// hoverCardDefaults returns the built-in look of a hover card: the panel of a
+// hoverCardDefaults sets d to the built-in look of a hover card: the panel of a
 // popover (see popoverDefaults), so the two floating panels match.
-func hoverCardDefaults(t *Theme) HoverCardStyle {
-	return HoverCardStyle{Panel: popoverDefaults(t).Panel}
+func hoverCardDefaults(d *HoverCardStyle, t *Theme) {
+	var p PopoverStyle
+	popoverDefaults(&p, t)
+	*d = HoverCardStyle{}
+	copyLarge(&d.Panel, &p.Panel)
 }
 
-// resolveHoverCard returns the look of a hover card: the defaults, merged with the
+// resolveHoverCard sets st to the look of a hover card: the defaults, merged with the
 // theme's HoverCard and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveHoverCard(ctx *Context, inst HoverCardStyle) HoverCardStyle {
+func resolveHoverCard(ctx *Context, inst, st *HoverCardStyle) {
 	t := ctx.Theme()
-	st := hoverCardDefaults(t)
+	hoverCardDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.HoverCard), instanceLayer(&inst))
-	return st
+		themeLayer(&t.HoverCard), instanceLayer(inst))
 }
 
 // HoverCardElement is a trigger that shows a floating card of rich content, such
@@ -99,8 +101,10 @@ func (h *HoverCardElement) CloseDelay(d time.Duration) *HoverCardElement {
 
 // Styles sets the look of the card, for this instance only. Set fields win over
 // the theme's HoverCard and the defaults. Calling Styles again merges.
-func (h *HoverCardElement) Styles(st HoverCardStyle) *HoverCardElement {
-	h.styles.mergeFrom(&st, false)
+func (h *HoverCardElement) Styles(st HoverCardStyle) *HoverCardElement { return h.stylesOf(&st) }
+
+func (h *HoverCardElement) stylesOf(st *HoverCardStyle) *HoverCardElement {
+	h.styles.mergeFrom(st, false)
 	return h
 }
 
@@ -121,7 +125,9 @@ func (s *hoverCardState) stop() {
 }
 
 func (h *HoverCardElement) expand(ctx *Context) Element {
-	trigger, content, placement, styles := h.trigger, h.content, h.placement, h.styles
+	trigger, content, placement := h.trigger, h.content, h.placement
+	styles := new(HoverCardStyle)
+	copyLarge(styles, &h.styles)
 	openDelay, closeDelay := h.openDelay, h.closeDelay
 	return Component(func(ctx *Context) Element {
 		rt := ctx.rt
@@ -174,8 +180,9 @@ func (h *HoverCardElement) expand(ctx *Context) Element {
 		}
 		d.access().details = key
 		if open.Get() {
-			s := resolveHoverCard(ctx, styles)
-			d.Child(Div().asPart("HoverCard.Panel").Key(key).Overlay(placement).OverlayGap(6).Style(s.Panel).
+			var s HoverCardStyle
+			resolveHoverCard(ctx, styles, &s)
+			d.Child(Div().asPart("HoverCard.Panel").Key(key).Overlay(placement).OverlayGap(6).styleOf(&s.Panel).
 				Role(access.RoleTooltip).
 				// Escape and a click outside close the card; it never takes focus.
 				OnClickOutside(closeNow).

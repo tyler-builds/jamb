@@ -55,11 +55,11 @@ type DockStyle struct {
 	Preview         Style // the rectangle that shows where a dragged panel lands
 }
 
-// dockDefaults returns the built-in look of a dock, from the colors of th. The tabs are
+// dockDefaults sets d to the built-in look of a dock, from the colors of th. The tabs are
 // those of an underlined tab list, and the preview is the accent color, so that it shows
 // under high contrast too.
-func dockDefaults(th *Theme) DockStyle {
-	return DockStyle{
+func dockDefaults(d *DockStyle, th *Theme) {
+	*d = DockStyle{
 		Strip: Style{Direction: Row, Gap: 4, BorderEdges: Edges{Bottom: 1}, BorderColor: th.Border},
 		Tab: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(32), Padding: XY(12, 0),
 			NoShrink: true, Radius: th.Radius / 2, TextColor: th.TextMuted},
@@ -71,15 +71,14 @@ func dockDefaults(th *Theme) DockStyle {
 	}
 }
 
-// resolveDock returns the look of a dock: the defaults, merged with the theme's Dock and
+// resolveDock sets st to the look of a dock: the defaults, merged with the theme's Dock and
 // then the instance's Styles. Under high contrast the two overrides are plain (see
 // plainStyle).
-func resolveDock(ctx *Context, inst DockStyle) DockStyle {
+func resolveDock(ctx *Context, inst, st *DockStyle) {
 	th := ctx.Theme()
-	st := dockDefaults(th)
+	dockDefaults(st, th)
 	st.layered(ctx,
-		themeLayer(&th.Dock), instanceLayer(&inst))
-	return st
+		themeLayer(&th.Dock), instanceLayer(inst))
 }
 
 // DockPanel is one panel of a Dock: its title, which names its tab and its tab panel for
@@ -539,8 +538,8 @@ func dockKeySide(k input.Key) (DockZone, bool) {
 
 // dockPreview returns the preview of a zone, drawn over its group. It is a child of the
 // group, so the group stays in the hit path, and it is not a drop target.
-func dockPreview(st DockStyle, zone DockZone) *DivElement {
-	p := Div().asPart("Dock.Preview").Absolute().Style(st.Preview)
+func dockPreview(st *DockStyle, zone DockZone) *DivElement {
+	p := Div().asPart("Dock.Preview").Absolute().styleOf(&st.Preview)
 	switch zone {
 	case DockLeft:
 		p.Left(0).Top(0).Bottom(0).Width(Percent(50))
@@ -613,11 +612,11 @@ func (d *DockElement) expand(ctx *Context) Element {
 		}
 		v := &dockView{
 			ctx: ctx, d: d, layout: d.layout, th: ctx.Theme(), strs: ctx.Strings(), scope: d.scope(), key: "main",
-			st:      resolveDock(ctx, d.styles),
 			handles: Local(ctx, "handles", map[string]*FocusHandle{}).Peek(),
 			hover:   Local(ctx, "hover", dockHover{}),
 			windows: Local(ctx, "windows", map[string]Window{}).Peek(),
 		}
+		resolveDock(ctx, &d.styles, &v.st)
 		v.hov = v.hover.Get()
 		v.lay = v.norm(d.layout.Get())
 		d.shared.shown[v.key] = dockShown{rt: ctx.rt, win: ctx.Window()}
@@ -722,8 +721,8 @@ func (v *dockView) resize(path []int, sigs []*Signal[Length]) {
 func (v *dockView) group(g DockNode) Element {
 	anchor := g.Panels[0]
 	gv := Div().asPart("Dock.Group").Key(v.scope + "/group:" + anchor).Column().Grow(1).
-		MinWidth(Px(0)).MinHeight(Px(0)).Style(v.st.Group)
-	strip := Div().asPart("Dock.Strip").Row().Role(access.RoleTabList).Label(v.strs.PanelGroup).Style(v.st.Strip)
+		MinWidth(Px(0)).MinHeight(Px(0)).styleOf(&v.st.Group)
+	strip := Div().asPart("Dock.Strip").Row().Role(access.RoleTabList).Label(v.strs.PanelGroup).styleOf(&v.st.Strip)
 	body := Div().Column().Grow(1).MinHeight(Px(0))
 	for _, id := range g.Panels {
 		strip.Child(v.tab(g, id))
@@ -731,7 +730,7 @@ func (v *dockView) group(g DockNode) Element {
 	}
 	gv.Child(strip).Child(body)
 	if v.hov.group == anchor {
-		gv.Child(dockPreview(v.st, v.hov.zone))
+		gv.Child(dockPreview(&v.st, v.hov.zone))
 	}
 	gv.OnKeyDown(func(e *KeyEvent) {
 		if e.Key != input.KeyTab || e.Repeat || (e.Mods != input.ModCtrl && e.Mods != input.ModCtrl|input.ModShift) {
@@ -777,7 +776,7 @@ func (v *dockView) band(side DockZone) *DivElement {
 		b = Div().Absolute().Bottom(0).Left(0).Right(0).Height(Px(dockEdgeBand))
 	}
 	if v.hov.edge && v.hov.zone == side {
-		b.asPart("Dock.Preview").Style(v.st.Preview)
+		b.asPart("Dock.Preview").styleOf(&v.st.Preview)
 	}
 	return b.OnDrop(Drop(func(p dockDrag, e *DropEvent) {
 		v.setHover(dockHover{})
@@ -804,10 +803,10 @@ func (v *dockView) tab(g DockNode, id string) *DivElement {
 	if v.th.HighContrast {
 		source = Style{}
 	}
-	tab := Div().asPart("Dock.Tab").Key(v.tabKey(id)).Style(style).
+	tab := Div().asPart("Dock.Tab").Key(v.tabKey(id)).styleOf(&style).
 		Role(access.RoleTab).Label(title).AccessSelected(on).Cursor(CursorPointer).
-		Focusable().FocusVisible(v.st.TabFocusVisible).FocusHandle(v.handle(id)).
-		Dragging(source).
+		Focusable().focusVisibleOf(&v.st.TabFocusVisible).FocusHandle(v.handle(id)).
+		draggingOf(&source).
 		OnDrag(Drag(dockDrag{scope: v.d.scope(), panel: id}).Preview(func() Element {
 			return Div().Padding(6).Background(v.th.Surface).Border(1, v.th.Border).Child(Text(title))
 		}).End(func(e DragEnd) {
@@ -820,13 +819,13 @@ func (v *dockView) tab(g DockNode, id string) *DivElement {
 		OnKeyDown(v.tabKeys(g, id)).
 		ContextMenu(v.menu(g, id))
 	if !on {
-		tab.Hover(v.st.TabHover).TabStop(false)
+		tab.hoverOf(&v.st.TabHover).TabStop(false)
 	}
 	if p.Icon != nil {
 		tab.Child(Icon(p.Icon).Size(16))
 	}
 	tab.Child(Text(title).NoWrap())
-	ind := Div().asPart("Dock.Indicator").Absolute().Left(0).Right(0).Bottom(0).Style(v.st.Indicator)
+	ind := Div().asPart("Dock.Indicator").Absolute().Left(0).Right(0).Bottom(0).styleOf(&v.st.Indicator)
 	if !on {
 		ind.Background(Transparent)
 	}
@@ -877,7 +876,7 @@ func (v *dockView) tabKeys(g DockNode, id string) func(*KeyEvent) {
 func (v *dockView) panel(g DockNode, id string) Element {
 	p := v.d.panels[id]
 	return Div().asPart("Dock.Panel").Key(v.scope + "/panel:" + id).Column().Grow(1).MinHeight(Px(0)).
-		Role(access.RoleTabPanel).Label(p.Title).Display(g.Active == id).Style(v.st.Panel).
+		Role(access.RoleTabPanel).Label(p.Title).Display(g.Active == id).styleOf(&v.st.Panel).
 		LabelledBy(v.tabKey(id)).Child(v.d.content(id))
 }
 
@@ -1042,10 +1041,11 @@ func (d *DockElement) floatRoot(layout *Signal[DockLayout], id string, owner *Co
 		ctx.rt.follow(owner.rt, owner.inst)
 		v := &dockView{
 			ctx: ctx, d: d, layout: layout, th: ctx.Theme(), strs: ctx.Strings(), scope: d.scope() + "/float:" + id,
-			key: "float:" + id, st: resolveDock(ctx, d.styles), float: true,
+			key: "float:" + id, float: true,
 			handles: Local(ctx, "handles", map[string]*FocusHandle{}).Peek(),
 			hover:   Local(ctx, "hover", dockHover{}),
 		}
+		resolveDock(ctx, &d.styles, &v.st)
 		d.shared.shown[v.key] = dockShown{rt: ctx.rt, win: ctx.Window()}
 		v.hov = v.hover.Get()
 		v.lay = v.norm(layout.Get())

@@ -63,32 +63,32 @@ type DatePickerStyle struct {
 	DayFocusVisible Style
 }
 
-// calendar returns the parts of the calendar of a date picker as a CalendarStyle, with its
-// Popup as the Root and inRange as the look of the days between the ends of a range.
-func (s DatePickerStyle) calendar(inRange Style) CalendarStyle {
-	return CalendarStyle{
-		Root:            s.Popup,
-		Header:          s.Header,
-		NavButton:       s.NavButton,
-		WeekdayLabel:    s.WeekdayLabel,
-		Day:             s.Day,
-		DayHover:        s.DayHover,
-		DaySelected:     s.DaySelected,
-		DayInRange:      inRange,
-		DayToday:        s.DayToday,
-		DayDisabled:     s.DayDisabled,
-		DayOutsideMonth: s.DayOutsideMonth,
-		DayFocusVisible: s.DayFocusVisible,
-	}
+// calendar sets c to the parts of the calendar of a date picker, with its Popup as the
+// Root and inRange as the look of the days between the ends of a range.
+func (s *DatePickerStyle) calendar(c *CalendarStyle, inRange *Style) {
+	*c = CalendarStyle{}
+	copyLarge(&c.Root, &s.Popup)
+	copyLarge(&c.Header, &s.Header)
+	copyLarge(&c.NavButton, &s.NavButton)
+	copyLarge(&c.WeekdayLabel, &s.WeekdayLabel)
+	copyLarge(&c.Day, &s.Day)
+	copyLarge(&c.DayHover, &s.DayHover)
+	copyLarge(&c.DaySelected, &s.DaySelected)
+	copyLarge(&c.DayInRange, inRange)
+	copyLarge(&c.DayToday, &s.DayToday)
+	copyLarge(&c.DayDisabled, &s.DayDisabled)
+	copyLarge(&c.DayOutsideMonth, &s.DayOutsideMonth)
+	copyLarge(&c.DayFocusVisible, &s.DayFocusVisible)
 }
 
-// datePickerDefaults returns the built-in look of a date picker at the Text size scale,
+// datePickerDefaults sets d to the built-in look of a date picker at the Text size scale,
 // from the colors of t. The calendar's days and header are those of a Calendar (see
 // calendarDefaults), in a popup panel with a shadow. The text frame's defaults come from
 // resolveField.
-func datePickerDefaults(t *Theme, scale float32, disabled bool) DatePickerStyle {
-	c := calendarDefaults(t, scale)
-	d := DatePickerStyle{
+func datePickerDefaults(d *DatePickerStyle, t *Theme, scale float32, disabled bool) {
+	var c CalendarStyle
+	calendarDefaults(&c, t, scale)
+	*d = DatePickerStyle{
 		CalendarButton: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(24 * scale),
 			Height: Px(24 * scale), NoShrink: true, Radius: 4, TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		Message: messageStyle(t),
@@ -108,19 +108,17 @@ func datePickerDefaults(t *Theme, scale float32, disabled bool) DatePickerStyle 
 	if disabled {
 		d.CalendarButton.TextColor = t.Disabled
 	}
-	return d
 }
 
-// resolveDatePicker returns the look of a date picker: the defaults, merged with the
+// resolveDatePicker sets st to the look of a date picker: the defaults, merged with the
 // theme's DatePicker and then the instance's Styles. The text frame is kept as the
 // overrides give it; the element resolves it over the theme's Field (see resolveField).
 // Under high contrast the overrides are plain (see plainStyle).
-func resolveDatePicker(ctx *Context, scale float32, disabled bool, inst DatePickerStyle) DatePickerStyle {
+func resolveDatePicker(ctx *Context, scale float32, disabled bool, inst, st *DatePickerStyle) {
 	t := ctx.Theme()
-	st := datePickerDefaults(t, scale, disabled)
+	datePickerDefaults(st, t, scale, disabled)
 	st.layered(ctx,
-		themeLayer(&t.DatePicker), instanceLayer(&inst))
-	return st
+		themeLayer(&t.DatePicker), instanceLayer(inst))
 }
 
 // DatePickerElement is a text field for a day, with a calendar that opens below it. The
@@ -200,9 +198,10 @@ func (d *DatePickerElement) Validate(rules ...Validator[time.Time]) *DatePickerE
 func (d *DatePickerElement) formCheck() error { return firstError(d.value.Get(), d.rules) }
 
 func (d *DatePickerElement) formWire(w fieldWire) Element {
-	c := *d
+	c := new(DatePickerElement)
+	copyLarge(c, d)
 	c.wire = w
-	return &c
+	return c
 }
 
 func (*DatePickerElement) isElement()           {}
@@ -296,8 +295,10 @@ func (d *DatePickerElement) GridSpan(cols, rows int) *DatePickerElement {
 // Styles sets the look of the parts of the date picker, for this instance only. Set fields
 // win over the theme's DatePicker and the defaults; see DatePickerStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
-func (d *DatePickerElement) Styles(st DatePickerStyle) *DatePickerElement {
-	d.styles.mergeFrom(&st, false)
+func (d *DatePickerElement) Styles(st DatePickerStyle) *DatePickerElement { return d.stylesOf(&st) }
+
+func (d *DatePickerElement) stylesOf(st *DatePickerStyle) *DatePickerElement {
+	d.styles.mergeFrom(st, false)
 	return d
 }
 
@@ -328,7 +329,8 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
-		st := resolveDatePicker(ctx, scale, d.disabled, d.styles)
+		var st DatePickerStyle
+		resolveDatePicker(ctx, scale, d.disabled, &d.styles, &st)
 		v := d.value.Get()
 		// The field keeps its own text while the user types. draft is that text, and seen is
 		// the value it was last made from, so that a value set from outside replaces the text.
@@ -503,19 +505,20 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 		}
 		a.invalid, a.required = isInvalid || w.invalid, w.required
 
-		fst := resolveField(ctx, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, st.Field)
+		var fst FieldStyle
+		resolveField(ctx, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, &st.Field, &fst)
 		if d.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)
-			frame := Div().asPart("DatePicker.Frame").Style(fst.Frame).Style(fst.FrameDisabled).
-				Child(Div().asPart("DatePicker.Text").Style(fst.Text).Grow(1).Child(Text(draft.Get()).NoWrap()))
+			frame := Div().asPart("DatePicker.Frame").styleOf(&fst.Frame).styleOf(&fst.FrameDisabled).
+				Child(Div().asPart("DatePicker.Text").styleOf(&fst.Text).Grow(1).Child(Text(draft.Get()).NoWrap()))
 			root.Child(frame)
 			return d.size.apply(root)
 		}
 
 		// The calendar button is the trailing element of the frame. It is not a Tab stop: the
 		// keys Alt+Down and F4 open the calendar from the field.
-		button := Div().asPart("DatePicker.CalendarButton").Style(st.CalendarButton).
+		button := Div().asPart("DatePicker.CalendarButton").styleOf(&st.CalendarButton).
 			Role(access.RoleButton).Label(s.ChooseDate).Cursor(CursorPointer).
 			OnClick(openCal).Child(Icon(icons.Calendar).Size(16 * scale))
 
@@ -532,10 +535,10 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, trailing: button}
 		fo.wire.invalid = isInvalid || w.invalid
 		fo.size.setWidth(Full)
-		root.Child(fo.expand(ctx, fst, false, 0))
+		root.Child(fo.expand(ctx, &fst, false, 0))
 		// The message is always in the tree, so that the field keeps its place among its
 		// siblings, and it is shown while the text is not a date that can be chosen.
-		root.Child(Div().asPart("DatePicker.Message").Style(st.Message).Display(isInvalid).
+		root.Child(Div().asPart("DatePicker.Message").styleOf(&st.Message).Display(isInvalid).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
 			Child(Text(shown).Key(errKey)))
 
@@ -552,7 +555,9 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 
 		if open.Get() {
 			enabled := func(day time.Time) bool { return d.enabled(day, s) }
-			root.Child(calendarPanel(calendarView{st: st.calendar(Style{}), widget: "DatePicker", loc: loc, scale: scale,
+			cal := new(CalendarStyle)
+			st.calendar(cal, &Style{})
+			root.Child(calendarPanel(&calendarView{st: cal, widget: "DatePicker", loc: loc, scale: scale,
 				value: v, focus: focus.Get(), ring: true, today: dayOf(rt.now()), name: name, fallback: s.DateField, move: moveTo, pick: pick,
 				keys: keys, shut: shut, enabled: enabled, firstSet: d.firstSet, firstDay: d.firstDay, motion: ctx.Theme().Motion}, s))
 		}

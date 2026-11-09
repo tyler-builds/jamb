@@ -63,22 +63,22 @@ const spinInlineWidth = 24
 // meets the border, as the Windows 11 NumberBox draws its buttons.
 const spinGap = 2
 
-// numberInputDefaults returns the built-in look of a number input of the given
+// numberInputDefaults sets d to the built-in look of a number input of the given
 // width, with spin buttons of placement when spin is set, from the colors of t. A
 // disabled field has the disabled frame (see fieldDefaults).
-func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disabled, spin bool, size controlSize) NumberInputStyle {
+func numberInputDefaults(d *NumberInputStyle, t *Theme, placement SpinPlacement, scale float32, disabled, spin bool, size controlSize) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	// h is the frame's height at the Text size of 100 percent, as for the other
 	// controls of that size.
 	h, _, _ := size.field()
-	d := NumberInputStyle{
-		FieldStyle:             fieldDefaults(t, fieldLayout{disabled: disabled, size: size}),
+	*d = NumberInputStyle{
 		SpinButton:             Style{NoShrink: true, TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring},
 		SpinButtonHover:        Style{Background: t.SurfaceHover, TextColor: t.Text},
 		SpinButtonPressed:      Style{Background: t.SurfaceActive},
 		SpinButtonFocusVisible: Style{Shadows: []Shadow{ring}},
 		Message:                messageStyle(t),
 	}
+	fieldDefaults(&d.FieldStyle, t, fieldLayout{disabled: disabled, size: size})
 	d.Frame.Width = Full // the frame fills the field, whose width is its outer box's (see expand)
 	if t.HighContrast {
 		// Disabled controls are GrayText.
@@ -114,18 +114,18 @@ func numberInputDefaults(t *Theme, placement SpinPlacement, scale float32, disab
 		// As in the stacked column, the focus is an inner outline, inside the border.
 		d.SpinButtonFocusVisible = Style{BorderWidth: 2, BorderColor: t.FocusRing}
 	}
-	return d
 }
 
-// resolveNumberInput returns the look of a number input: the defaults, merged
+// resolveNumberInput sets st to the look of a number input: the defaults, merged
 // with the theme's Field, then the theme's NumberInput, then the instance's
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveNumberInput(ctx *Context, placement SpinPlacement, scale float32, disabled, spin bool, size controlSize, inst NumberInputStyle) NumberInputStyle {
+func resolveNumberInput(ctx *Context, placement SpinPlacement, scale float32, disabled, spin bool, size controlSize, inst, st *NumberInputStyle) {
 	t := ctx.Theme()
-	st := numberInputDefaults(t, placement, scale, disabled, spin, size)
+	numberInputDefaults(st, t, placement, scale, disabled, spin, size)
+	field := new(NumberInputStyle) // the theme's Field, as a layer of the number input's parts
+	copyLarge(&field.FieldStyle, &t.Field)
 	st.layered(ctx,
-		themeLayer(&NumberInputStyle{FieldStyle: t.Field}), themeLayer(&t.NumberInput), instanceLayer(&inst))
-	return st
+		themeLayer(field), themeLayer(&t.NumberInput), instanceLayer(inst))
 }
 
 // NumberInputElement is a text field for a number, bound to an int or float64
@@ -213,9 +213,10 @@ func (n *NumberInputElement[T]) Validate(rules ...Validator[T]) *NumberInputElem
 func (n *NumberInputElement[T]) formCheck() error { return firstError(n.value.Get(), n.rules) }
 
 func (n *NumberInputElement[T]) formWire(w fieldWire) Element {
-	c := *n
+	c := new(NumberInputElement[T])
+	copyLarge(c, n)
 	c.wire = w
-	return &c
+	return c
 }
 
 // NumberInput creates a number input that reads and writes value, from lo to hi
@@ -300,7 +301,11 @@ func (n *NumberInputElement[T]) GridSpan(cols, rows int) *NumberInputElement[T] 
 // NumberInputStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (n *NumberInputElement[T]) Styles(st NumberInputStyle) *NumberInputElement[T] {
-	n.styles.mergeFrom(&st, false)
+	return n.stylesOf(&st)
+}
+
+func (n *NumberInputElement[T]) stylesOf(st *NumberInputStyle) *NumberInputElement[T] {
+	n.styles.mergeFrom(st, false)
 	return n
 }
 
@@ -309,7 +314,8 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 		t := ctx.Theme()
 		s := ctx.Strings()
 		scale := float32(ctx.TextScale()) / 100
-		st := resolveNumberInput(ctx, n.placement, scale, n.disabled, n.spin && !n.disabled, n.ctlSize, n.styles)
+		var st NumberInputStyle
+		resolveNumberInput(ctx, n.placement, scale, n.disabled, n.spin && !n.disabled, n.ctlSize, &n.styles, &st)
 		v := n.value.Get()
 		// The field keeps its own text while the user types. draft is that text,
 		// and seen is the value it was last made from, so that a value set from
@@ -380,7 +386,7 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 		}
 		// The field is its column: the frame and the message row, at the field's width. Its default
 		// width is numberInputWidth at the Text size, and the sizing methods replace it.
-		root := Div().Column().Gap(6).Role(access.RoleSpinner).Style(Style{Width: Px(numberInputWidth * scale)})
+		root := Div().Column().Gap(6).Role(access.RoleSpinner).styleOf(&Style{Width: Px(numberInputWidth * scale)})
 		if n.tooltip != "" && w.description == "" {
 			root.Description(n.tooltip) // the spin box is the node assistive technology reads
 		}
@@ -402,8 +408,8 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 			a.disabled = true
 			// The disabled number is drawn as text in a frame, with the disabled frame
 			// and text parts. Under high contrast both are GrayText, with no dimming.
-			frame := Div().asPart("NumberInput.Frame").Style(st.Frame).Style(st.FrameDisabled)
-			content := Div().asPart("NumberInput.Text").Style(st.Text).Row().Grow(1).Justify(n.align).Child(Text(draft.Get()))
+			frame := Div().asPart("NumberInput.Frame").styleOf(&st.Frame).styleOf(&st.FrameDisabled)
+			content := Div().asPart("NumberInput.Text").styleOf(&st.Text).Row().Grow(1).Justify(n.align).Child(Text(draft.Get()))
 			root.Child(row.Child(frame.Child(content)))
 			return n.size.apply(root)
 		}
@@ -426,16 +432,16 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 		// Stacked buttons are the frame's trailing element, inside its right edge. Inline
 		// buttons are laid over the frame's edges, after the text (see spinButtons).
 		if n.spin && n.placement == SpinStacked {
-			fo.trailing = n.stackedSpin(st, frame, v, step, scale, s)
+			fo.trailing = n.stackedSpin(&st, frame, v, step, scale, s)
 		} else if n.spin {
-			fo.overlays = n.inlineSpin(st, frame, v, step, scale, s)
+			fo.overlays = n.inlineSpin(&st, frame, v, step, scale, s)
 		}
-		row.Child(fo.expand(ctx, st.FieldStyle, false, 0))
+		row.Child(fo.expand(ctx, &st.FieldStyle, false, 0))
 		root.Child(row)
 		// The message is always in the tree, after the row, and shown while the text is
 		// invalid, so that the field keeps its place among its siblings.
 		msg := s.NumberRange(n.format(n.lo), n.format(n.hi))
-		root.Child(Div().asPart("NumberInput.Message").Style(st.Message).Display(isInvalid).
+		root.Child(Div().asPart("NumberInput.Message").styleOf(&st.Message).Display(isInvalid).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
 			Child(Text(msg).Key(errKey)))
 		return n.size.apply(root)
@@ -447,7 +453,7 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 // for assistive technology, is in the Tab order while enabled, and steps the value
 // by one step when it is clicked. A button is disabled at the end of the range it
 // would step past.
-func (n *NumberInputElement[T]) stackedSpin(st NumberInputStyle, frame Style, v T, step func(int), scale float32, s *Strings) *DivElement {
+func (n *NumberInputElement[T]) stackedSpin(st *NumberInputStyle, frame Style, v T, step func(int), scale float32, s *Strings) *DivElement {
 	gap := spinGap * scale
 	down := n.spinButton(st, frame, -1, s.Decrease, icons.ChevronDown, 12*scale, gap, v <= n.lo, step)
 	up := n.spinButton(st, frame, 1, s.Increase, icons.ChevronUp, 12*scale, gap, v >= n.hi, step)
@@ -458,14 +464,14 @@ func (n *NumberInputElement[T]) stackedSpin(st NumberInputStyle, frame Style, v 
 	if col.Height.Unit == layout.UnitPx && frame.MinHeight.Unit == layout.UnitPx && col.Height.Value == frame.MinHeight.Value {
 		col.Height = Px(frame.MinHeight.Value - 2*frame.BorderWidth)
 	}
-	return Div().asPart("NumberInput.SpinButtons").Style(col).Child(up).Child(down)
+	return Div().asPart("NumberInput.SpinButtons").styleOf(&col).Child(up).Child(down)
 }
 
 // inlineSpin returns the inline spin buttons: the decrease button at the frame's left
 // edge and the increase button at its right, each laid over the edge, inside the
 // border. They come after the text in the tree, so the Tab order is the text, then
 // the decrease and the increase button.
-func (n *NumberInputElement[T]) inlineSpin(st NumberInputStyle, frame Style, v T, step func(int), scale float32, s *Strings) []Element {
+func (n *NumberInputElement[T]) inlineSpin(st *NumberInputStyle, frame Style, v T, step func(int), scale float32, s *Strings) []Element {
 	gap := spinGap * scale
 	down := n.spinButton(st, frame, -1, s.Decrease, icons.Minus, 14*scale, gap, v <= n.lo, step)
 	up := n.spinButton(st, frame, 1, s.Increase, icons.Plus, 14*scale, gap, v >= n.hi, step)
@@ -477,13 +483,13 @@ func (n *NumberInputElement[T]) inlineSpin(st NumberInputStyle, frame Style, v T
 // by gap from the frame's border on every side that meets it (see spinGap), so the
 // fill never touches the border. Its corners are concentric with the frame's inner
 // corners (see spinFillCorners). The button is the hit target, so the gap is not.
-func (n *NumberInputElement[T]) spinButton(st NumberInputStyle, frame Style, dir int, label string, ic *icons.Icon,
+func (n *NumberInputElement[T]) spinButton(st *NumberInputStyle, frame Style, dir int, label string, ic *icons.Icon,
 	iconSize, gap float32, disabled bool, step func(int)) *DivElement {
 	inline := n.placement != SpinStacked
 	b := Div().asPart("NumberInput.SpinButton").Row().Align(Center).Justify(Center).
-		Style(st.SpinButton).Child(Icon(ic).Size(iconSize)).
+		styleOf(&st.SpinButton).Child(Icon(ic).Size(iconSize)).
 		Role(access.RoleButton).Label(label).
-		Style(Style{Corners: spinFillCorners(frame, inline, dir, gap)})
+		styleOf(&Style{Corners: spinFillCorners(frame, inline, dir, gap)})
 	if inline {
 		b.Absolute().Top(gap).Bottom(gap)
 		if dir < 0 {
@@ -494,11 +500,11 @@ func (n *NumberInputElement[T]) spinButton(st NumberInputStyle, frame Style, dir
 	}
 	if disabled {
 		b.access().disabled = true
-		b.Style(st.SpinButtonDisabled).Cursor(CursorNotAllowed)
+		b.styleOf(&st.SpinButtonDisabled).Cursor(CursorNotAllowed)
 		return b
 	}
-	b.Focusable().Hover(st.SpinButtonHover).Pressed(st.SpinButtonPressed).
-		FocusVisible(st.SpinButtonFocusVisible).
+	b.Focusable().hoverOf(&st.SpinButtonHover).pressedOf(&st.SpinButtonPressed).
+		focusVisibleOf(&st.SpinButtonFocusVisible).
 		OnClick(func() { step(dir) })
 	return b
 }

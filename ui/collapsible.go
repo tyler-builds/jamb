@@ -25,11 +25,11 @@ type CollapsibleStyle struct {
 	Content            Style // the area under the header, while the section is open
 }
 
-// collapsibleDefaults returns the built-in look of a collapsible section, from
+// collapsibleDefaults sets d to the built-in look of a collapsible section, from
 // the colors of t. Under high contrast a disabled header is GrayText, not dimmed.
-func collapsibleDefaults(t *Theme) CollapsibleStyle {
+func collapsibleDefaults(d *CollapsibleStyle, t *Theme) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := CollapsibleStyle{
+	*d = CollapsibleStyle{
 		Section: Style{Direction: Column, BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius},
 		Header: Style{Direction: Row, Align: Center, Gap: 8, MinHeight: Px(40), Padding: XY(12, 0),
 			NoShrink: true, TextColor: t.Text, FontWeight: FontMedium},
@@ -43,18 +43,16 @@ func collapsibleDefaults(t *Theme) CollapsibleStyle {
 	} else {
 		d.HeaderDisabled = Style{Opacity: 0.5}
 	}
-	return d
 }
 
-// resolveCollapsible returns the look of a collapsible section: the defaults,
+// resolveCollapsible sets st to the look of a collapsible section: the defaults,
 // merged with the theme's Collapsible and then the instance's Styles. Under high
 // contrast the two overrides are plain (see plainStyle).
-func resolveCollapsible(ctx *Context, inst CollapsibleStyle) CollapsibleStyle {
+func resolveCollapsible(ctx *Context, inst, st *CollapsibleStyle) {
 	t := ctx.Theme()
-	st := collapsibleDefaults(t)
+	collapsibleDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Collapsible), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Collapsible), instanceLayer(inst))
 }
 
 // CollapsibleElement is a section with a header row, which opens and closes the
@@ -139,8 +137,10 @@ func (c *CollapsibleElement) GridSpan(cols, rows int) *CollapsibleElement {
 // Styles sets the look of the parts of the section, for this instance only. Set
 // fields win over the theme's Collapsible and the defaults; see CollapsibleStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
-func (c *CollapsibleElement) Styles(st CollapsibleStyle) *CollapsibleElement {
-	c.styles.mergeFrom(&st, false)
+func (c *CollapsibleElement) Styles(st CollapsibleStyle) *CollapsibleElement { return c.stylesOf(&st) }
+
+func (c *CollapsibleElement) stylesOf(st *CollapsibleStyle) *CollapsibleElement {
+	c.styles.mergeFrom(st, false)
 	return c
 }
 
@@ -181,7 +181,8 @@ func (c *CollapsibleElement) set(open bool) {
 func (c *CollapsibleElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	on := c.open.Get()
-	st := resolveCollapsible(ctx, c.styles)
+	var st CollapsibleStyle
+	resolveCollapsible(ctx, &c.styles, &st)
 	chevron := icons.ChevronRight
 	if on {
 		chevron = icons.ChevronDown
@@ -198,12 +199,12 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 	// draw returns the header in the state ps describes. The chevron is always
 	// drawn; the title is the slot's content when RenderHeader is set.
 	draw := func(ps PartState) *DivElement {
-		header := Div().asPart("Collapsible.Header").Key(c.headerKey()).Style(st.Header).
-			Style(Style{Corners: corners}).
+		header := Div().asPart("Collapsible.Header").Key(c.headerKey()).styleOf(&st.Header).
+			styleOf(&Style{Corners: corners}).
 			Role(access.RoleButton).Label(c.title).AccessExpanded(on).
-			Child(Div().asPart("Collapsible.Chevron").Style(st.Chevron).Child(Icon(chevron).Size(14)))
+			Child(Div().asPart("Collapsible.Chevron").styleOf(&st.Chevron).Child(Icon(chevron).Size(14)))
 		if on {
-			header.Style(st.HeaderOpen)
+			header.styleOf(&st.HeaderOpen)
 		}
 		if c.renderHeader != nil {
 			header.Child(Div().AccessHidden().Child(c.renderHeader(c.title, ps)))
@@ -212,10 +213,10 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 		}
 		if c.disabled {
 			header.access().disabled = true
-			header.Style(st.HeaderDisabled).Cursor(CursorNotAllowed)
+			header.styleOf(&st.HeaderDisabled).Cursor(CursorNotAllowed)
 		} else {
-			header.Cursor(CursorPointer).Hover(st.HeaderHover).
-				Focusable().FocusVisible(st.HeaderFocusVisible).
+			header.Cursor(CursorPointer).hoverOf(&st.HeaderHover).
+				Focusable().focusVisibleOf(&st.HeaderFocusVisible).
 				OnClick(func() { c.set(!on) })
 		}
 		return header
@@ -236,7 +237,7 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 	// theme's Reflow spring), clipping what it holds while it moves, so the
 	// content is revealed and covered by its bottom edge rather than popping.
 	// Alone, its place snaps; in an Accordion it springs too.
-	col := Div().asPart("Collapsible.Section").Column().Style(st.Section).Child(header).
+	col := Div().asPart("Collapsible.Section").Column().styleOf(&st.Section).Child(header).
 		springBox(t.Motion.ReflowSpring(), !c.inGroup)
 	if c.key != "" {
 		col.Key(c.key)
@@ -256,7 +257,7 @@ func (c *CollapsibleElement) expand(ctx *Context) Element {
 		// section shrinks, fading out, and opened, it fades in as it grows (see
 		// reflowSpec).
 		col.Child(Div().asPart("Collapsible.Content").Column().Display(on).Role(access.RoleGroup).Label(c.title).LabelledBy(c.headerKey()).
-			Style(st.Content).Child(c.content).heldContent())
+			styleOf(&st.Content).Child(c.content).heldContent())
 	}
 	return c.size.apply(col)
 }

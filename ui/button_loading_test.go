@@ -97,7 +97,7 @@ func TestButtonLoadingRingUnderHighContrast(t *testing.T) {
 	r := newThemedRig(th, func(ctx *Context) Element {
 		return Div().Column().Child(Button("Save").Primary().Loading(true))
 	})
-	want := buttonDefaults(th, ButtonPrimary, sizeDefault, false).Root.TextColor
+	want := look(func(st *ButtonStyle) { buttonDefaults(st, th, ButtonPrimary, sizeDefault, false) }).Root.TextColor
 	dots := partNodes(r.rt, "ProgressRing.Dot")
 	if len(dots) == 0 {
 		t.Fatal("the loading button draws no dots")

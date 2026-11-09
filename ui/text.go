@@ -246,8 +246,10 @@ func (t *TextElement) MinWidth(l Length) *TextElement { t.style.MinWidth = l; re
 func (t *TextElement) MaxWidth(l Length) *TextElement { t.style.MaxWidth = l; return t }
 
 // Style merges layout and text fields of s.
-func (t *TextElement) Style(s Style) *TextElement { t.style = t.style.Merge(s); return t }
+func (t *TextElement) Style(s Style) *TextElement { return t.styleOf(&s) }
+
+func (t *TextElement) styleOf(s *Style) *TextElement { t.style.mergeFrom(s, false); return t }
 
 // LayoutSpring moves the text to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
-func (t *TextElement) LayoutSpring(s Spring) *TextElement { return t.Style(Style{LayoutSpring: s}) }
+func (t *TextElement) LayoutSpring(s Spring) *TextElement { return t.styleOf(&Style{LayoutSpring: s}) }

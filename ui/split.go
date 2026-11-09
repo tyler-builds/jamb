@@ -45,11 +45,11 @@ type SplitStyle struct {
 	Pane                Style // the box of each pane
 }
 
-// splitDefaults returns the built-in look of a split, from the colors of t. Under
+// splitDefaults sets d to the built-in look of a split, from the colors of t. Under
 // high contrast the bar and the grip are the text color, the focus ring is a solid
 // outline, and the hover and drag states add no color, since the bar is already
 // visible.
-func splitDefaults(t *Theme, vertical bool) SplitStyle {
+func splitDefaults(d *SplitStyle, t *Theme, vertical bool) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	bar, grip := t.Border, t.TextMuted
 	if t.HighContrast {
@@ -61,7 +61,7 @@ func splitDefaults(t *Theme, vertical bool) SplitStyle {
 	if vertical {
 		thick, mark = Style{Height: Px(1), Width: Full}, Style{Width: Px(24), Height: Px(4)}
 	}
-	d := SplitStyle{
+	*d = SplitStyle{
 		Divider:             thick.Merge(Style{Background: bar}),
 		DividerHover:        Style{Background: t.Accent},
 		DividerActive:       Style{Background: t.AccentActive},
@@ -72,18 +72,16 @@ func splitDefaults(t *Theme, vertical bool) SplitStyle {
 	if t.HighContrast {
 		d.DividerHover, d.DividerActive = Style{}, Style{}
 	}
-	return d
 }
 
-// resolveSplit returns the look of a split: the defaults, merged with the theme's
+// resolveSplit sets st to the look of a split: the defaults, merged with the theme's
 // Split and then the instance's Styles. Under high contrast the two overrides are
 // plain (see plainStyle).
-func resolveSplit(ctx *Context, vertical bool, inst SplitStyle) SplitStyle {
+func resolveSplit(ctx *Context, vertical bool, inst, st *SplitStyle) {
 	t := ctx.Theme()
-	st := splitDefaults(t, vertical)
+	splitDefaults(st, t, vertical)
 	st.layered(ctx,
-		themeLayer(&t.Split), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Split), instanceLayer(inst))
 }
 
 // SplitOrientation says how the panes of a split are laid out.
@@ -328,8 +326,10 @@ func (s *SplitElement) GridSpan(cols, rows int) *SplitElement { s.size.setSpan(c
 // Styles sets the look of the parts of the split, for this instance only. Set fields
 // win over the theme's Split and the defaults; see SplitStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
-func (s *SplitElement) Styles(st SplitStyle) *SplitElement {
-	s.styles.mergeFrom(&st, false)
+func (s *SplitElement) Styles(st SplitStyle) *SplitElement { return s.stylesOf(&st) }
+
+func (s *SplitElement) stylesOf(st *SplitStyle) *SplitElement {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
@@ -533,7 +533,7 @@ type splitRender struct {
 // dividerLine returns the thickness of the bar of st, in logical pixels: the
 // Divider part's Width, or its Height in a vertical split, when it is in pixels,
 // and 1 otherwise.
-func dividerLine(st SplitStyle, vert bool) float64 {
+func dividerLine(st *SplitStyle, vert bool) float64 {
 	l := st.Divider.Width
 	if vert {
 		l = st.Divider.Height
@@ -749,20 +749,20 @@ func (r *splitRender) sizePane(d *DivElement, m splitModel, i int) {
 // and is the window splitter, focusable, with its value and steps. Its hit area is a child wider than
 // the handle, which lies over the panes' edges, drawn and hit above them, and holds the grip; the
 // pointer's presses there reach the handle.
-func (r *splitRender) handle(st SplitStyle, d int) Element {
+func (r *splitRender) handle(st *SplitStyle, d int) Element {
 	return Component(func(ctx *Context) Element {
 		m := r.model(r.length.Get())
 		dr := r.drag.Get()
 		dragged := dr.on && dr.d == d
-		bar := Div().asPart("Split.Divider").Style(st.Divider)
+		bar := Div().asPart("Split.Divider").styleOf(&st.Divider)
 		switch {
 		case dragged:
-			bar.Style(st.DividerActive)
+			bar.styleOf(&st.DividerActive)
 		case ctx.hovered():
-			bar.Style(st.DividerHover)
+			bar.styleOf(&st.DividerHover)
 		}
 		if ctx.KeyboardFocus() {
-			bar.Style(st.DividerFocusVisible)
+			bar.styleOf(&st.DividerFocusVisible)
 		}
 		line := float32(r.line)
 		hit := Div().asPart("Split.Handle").Shrink(0).Center().ZIndex(1)
@@ -777,7 +777,7 @@ func (r *splitRender) handle(st SplitStyle, d int) Element {
 		}
 		hit.Child(bar).Child(area)
 		if r.s.grip == SplitGripShown || r.s.grip == SplitGripOnHover && (ctx.hovered() || dragged || ctx.KeyboardFocus()) {
-			area.Child(Div().asPart("Split.Grip").Style(st.Grip))
+			area.Child(Div().asPart("Split.Grip").styleOf(&st.Grip))
 		}
 		hit.Role(access.RoleSeparator).Label(r.dividerName(ctx, d)).Focusable()
 		value, lo, hi, small, large := m.rangeOf(d)
@@ -935,7 +935,8 @@ func (rt *Runtime) splitsResized() bool {
 func (s *SplitElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		vert := s.vertical()
-		st := resolveSplit(ctx, vert, s.styles)
+		var st SplitStyle
+		resolveSplit(ctx, vert, &s.styles, &st)
 		key := s.key
 		if key == "" {
 			key = fmt.Sprintf("split:%x", ctx.id)
@@ -947,7 +948,7 @@ func (s *SplitElement) expand(ctx *Context) Element {
 			length: Local(ctx, "length", 0.0),
 			memo:   Local(ctx, "memo", map[string]paneMemo(nil)),
 			drag:   Local(ctx, "drag", splitDrag{}),
-			line:   dividerLine(st, vert),
+			line:   dividerLine(&st, vert),
 		}
 		// The split's box is its instance's root, and its length is the last layout's. The
 		// layout comes after the render, so a split that has not been laid out yet renders
@@ -968,7 +969,7 @@ func (s *SplitElement) expand(ctx *Context) Element {
 			root.Row()
 		}
 		for i, p := range s.panes {
-			pane := Div().Key(key + "/pane:" + p.identity(i)).asPart("Split.Pane").Column().Style(st.Pane)
+			pane := Div().Key(key + "/pane:" + p.identity(i)).asPart("Split.Pane").Column().styleOf(&st.Pane)
 			r.sizePane(pane, m, i)
 			pane.Child(p.content)
 			if p.name != "" {
@@ -976,7 +977,7 @@ func (s *SplitElement) expand(ctx *Context) Element {
 			}
 			root.Child(pane)
 			if i < len(s.panes)-1 {
-				root.Child(r.handle(st, i))
+				root.Child(r.handle(&st, i))
 			}
 		}
 		return s.size.apply(root)

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -186,16 +187,29 @@ func (d *DivElement) Children(es ...Element) *DivElement {
 }
 
 // Style merges s into the element's style (set fields win).
-func (d *DivElement) Style(s Style) *DivElement { d.style = d.style.Merge(s); return d }
+func (d *DivElement) Style(s Style) *DivElement { return d.styleOf(&s) }
+
+// styleOf is Style for a style that the caller keeps: it merges *s, and does
+// not hold s. Each method here that takes a Style has such a twin, which the
+// widgets call with the parts of their looks. A Style is 109 values, and
+// TinyGo passes a struct by value as one WebAssembly parameter per field, so a
+// call that passes one by value is a kilobyte of code where it stands.
+func (d *DivElement) styleOf(s *Style) *DivElement { d.style.mergeFrom(s, false); return d }
 
 // Hover merges s on top while the pointer is over the element.
-func (d *DivElement) Hover(s Style) *DivElement { d.hover = mergeInto(d.hover, s); return d }
+func (d *DivElement) Hover(s Style) *DivElement { return d.hoverOf(&s) }
+
+func (d *DivElement) hoverOf(s *Style) *DivElement { d.hover = mergeInto(d.hover, s); return d }
 
 // Pressed merges s on top while the element is being pressed.
-func (d *DivElement) Pressed(s Style) *DivElement { d.pressed = mergeInto(d.pressed, s); return d }
+func (d *DivElement) Pressed(s Style) *DivElement { return d.pressedOf(&s) }
+
+func (d *DivElement) pressedOf(s *Style) *DivElement { d.pressed = mergeInto(d.pressed, s); return d }
 
 // Focused merges s on top while the element has keyboard focus. It implies Focusable.
-func (d *DivElement) Focused(s Style) *DivElement {
+func (d *DivElement) Focused(s Style) *DivElement { return d.focusedOf(&s) }
+
+func (d *DivElement) focusedOf(s *Style) *DivElement {
 	d.focused = mergeInto(d.focused, s)
 	d.focusable = true
 	return d
@@ -205,7 +219,9 @@ func (d *DivElement) Focused(s Style) *DivElement {
 // keyboard-driven: it arrived by Tab or a key press and no click has happened
 // since. It is the focus ring to use for controls; Focused applies even after
 // a click. It implies Focusable.
-func (d *DivElement) FocusVisible(s Style) *DivElement {
+func (d *DivElement) FocusVisible(s Style) *DivElement { return d.focusVisibleOf(&s) }
+
+func (d *DivElement) focusVisibleOf(s *Style) *DivElement {
 	d.focusVisible = mergeInto(d.focusVisible, s)
 	d.focusable = true
 	return d
@@ -221,17 +237,32 @@ func (d *DivElement) defaultFocusRing() bool {
 // FocusWithin merges s on top while the element or any descendant has
 // keyboard focus — for example to highlight a field's frame while the text
 // inside it is being edited.
-func (d *DivElement) FocusWithin(s Style) *DivElement {
+func (d *DivElement) FocusWithin(s Style) *DivElement { return d.focusWithinOf(&s) }
+
+func (d *DivElement) focusWithinOf(s *Style) *DivElement {
 	d.focusWithin = mergeInto(d.focusWithin, s)
 	return d
 }
 
-func mergeInto(dst *Style, s Style) *Style {
+// ringStyle returns the style of a control's focus ring: the control's own shadows
+// with the ring after them, and *over, the look's own focus style, merged on top.
+func ringStyle(shadows []Shadow, ring Shadow, over *Style) *Style {
+	s := &Style{Shadows: append(slices.Clone(shadows), ring)}
+	s.mergeFrom(over, false)
+	return s
+}
+
+// mergeInto returns a new style: dst with *s merged on top, or a copy of *s
+// when there is no dst. It holds neither.
+func mergeInto(dst, s *Style) *Style {
+	m := new(Style)
 	if dst == nil {
-		return &s
+		copyLarge(m, s)
+		return m
 	}
-	m := dst.Merge(s)
-	return &m
+	copyLarge(m, dst)
+	m.mergeFrom(s, false)
+	return m
 }
 
 // When applies fn only if cond is true; handy for conditional styling:

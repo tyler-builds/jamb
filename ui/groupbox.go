@@ -16,12 +16,12 @@ type GroupBoxStyle struct {
 	Content     Style // the area that holds the children
 }
 
-// groupBoxDefaults returns the built-in look of a group box: a frame outlined in
+// groupBoxDefaults sets d to the built-in look of a group box: a frame outlined in
 // the border color, or, with fill, a frame filled with a raised surface color and
 // no border. Under high contrast both are the window color outlined in the text
 // color.
-func groupBoxDefaults(t *Theme, fill bool) GroupBoxStyle {
-	d := GroupBoxStyle{
+func groupBoxDefaults(d *GroupBoxStyle, t *Theme, fill bool) {
+	*d = GroupBoxStyle{
 		GroupBox:    Style{Direction: Column, Radius: t.Radius, BorderWidth: 1, BorderColor: t.Border},
 		Header:      Style{Direction: Column, Gap: 2, Padding: Edges{Top: 12, Right: 14, Left: 14}},
 		Title:       Style{FontWeight: FontSemibold, TextColor: t.Text},
@@ -35,18 +35,16 @@ func groupBoxDefaults(t *Theme, fill bool) GroupBoxStyle {
 		d.GroupBox.Background, d.GroupBox.BorderWidth, d.GroupBox.BorderColor = t.Surface, 1, t.Text
 		d.Description.TextColor = t.Text
 	}
-	return d
 }
 
-// resolveGroupBox returns the look of a group box: the defaults, merged with the
+// resolveGroupBox sets st to the look of a group box: the defaults, merged with the
 // theme's GroupBox and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveGroupBox(ctx *Context, fill bool, inst GroupBoxStyle) GroupBoxStyle {
+func resolveGroupBox(ctx *Context, fill bool, inst, st *GroupBoxStyle) {
 	t := ctx.Theme()
-	st := groupBoxDefaults(t, fill)
+	groupBoxDefaults(st, t, fill)
 	st.layered(ctx,
-		themeLayer(&t.GroupBox), instanceLayer(&inst))
-	return st
+		themeLayer(&t.GroupBox), instanceLayer(inst))
 }
 
 // GroupBoxElement is a titled section that holds related content, such as the
@@ -121,28 +119,31 @@ func (g *GroupBoxElement) GridSpan(cols, rows int) *GroupBoxElement {
 // Styles sets the look of the parts of the group box, for this instance only. Set
 // fields win over the theme's GroupBox and the defaults; see GroupBoxStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (g *GroupBoxElement) Styles(st GroupBoxStyle) *GroupBoxElement {
-	g.styles.mergeFrom(&st, false)
+func (g *GroupBoxElement) Styles(st GroupBoxStyle) *GroupBoxElement { return g.stylesOf(&st) }
+
+func (g *GroupBoxElement) stylesOf(st *GroupBoxStyle) *GroupBoxElement {
+	g.styles.mergeFrom(st, false)
 	return g
 }
 
 func (g *GroupBoxElement) expand(ctx *Context) Element {
-	st := resolveGroupBox(ctx, g.fill, g.styles)
+	var st GroupBoxStyle
+	resolveGroupBox(ctx, g.fill, &g.styles, &st)
 	// The box is a group named by its title, and described by its description.
-	box := Div().asPart("GroupBox.GroupBox").Style(st.GroupBox).Role(access.RoleGroup).Label(g.title).Tooltip(g.tooltip)
+	box := Div().asPart("GroupBox.GroupBox").styleOf(&st.GroupBox).Role(access.RoleGroup).Label(g.title).Tooltip(g.tooltip)
 	if g.desc != "" {
 		box.Description(g.desc)
 	}
 	if g.title != "" || g.desc != "" {
-		header := Div().asPart("GroupBox.Header").Style(st.Header)
+		header := Div().asPart("GroupBox.Header").styleOf(&st.Header)
 		if g.title != "" {
-			header.Child(Div().asPart("GroupBox.Title").Style(st.Title).Child(Text(g.title)))
+			header.Child(Div().asPart("GroupBox.Title").styleOf(&st.Title).Child(Text(g.title)))
 		}
 		if g.desc != "" {
-			header.Child(Div().asPart("GroupBox.Description").Style(st.Description).Child(Text(g.desc)))
+			header.Child(Div().asPart("GroupBox.Description").styleOf(&st.Description).Child(Text(g.desc)))
 		}
 		box.Child(header)
 	}
-	box.Child(Div().asPart("GroupBox.Content").Style(st.Content).Children(g.children...))
+	box.Child(Div().asPart("GroupBox.Content").styleOf(&st.Content).Children(g.children...))
 	return g.size.apply(box)
 }

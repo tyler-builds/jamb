@@ -13,12 +13,12 @@ type StatusBarStyle struct {
 	End   Style // the row of items at the end
 }
 
-// statusBarDefaults returns the built-in look of a status bar, from the colors of
+// statusBarDefaults sets d to the built-in look of a status bar, from the colors of
 // t: a compact strip in the panel color with a border along its top, and small
 // muted text. Under high contrast the strip is the window color, its border and
 // its text the text color.
-func statusBarDefaults(t *Theme) StatusBarStyle {
-	d := StatusBarStyle{
+func statusBarDefaults(d *StatusBarStyle, t *Theme) {
+	*d = StatusBarStyle{
 		Bar: Style{Direction: Row, Align: Center, Gap: 16, Padding: XY(10, 3), MinHeight: Px(24), NoShrink: true,
 			Background: t.Panel, BorderEdges: Edges{Top: 1}, BorderColor: t.Border, FontSize: 12, TextColor: t.TextMuted},
 		Start: Style{Direction: Row, Align: Center, Gap: 12, Grow: 1, MinWidth: Px(0)},
@@ -27,18 +27,16 @@ func statusBarDefaults(t *Theme) StatusBarStyle {
 	if t.HighContrast {
 		d.Bar.Background, d.Bar.BorderColor, d.Bar.TextColor = t.Surface, t.Text, t.Text
 	}
-	return d
 }
 
-// resolveStatusBar returns the look of a status bar: the defaults, merged with the
+// resolveStatusBar sets st to the look of a status bar: the defaults, merged with the
 // theme's StatusBar and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveStatusBar(ctx *Context, inst StatusBarStyle) StatusBarStyle {
+func resolveStatusBar(ctx *Context, inst, st *StatusBarStyle) {
 	t := ctx.Theme()
-	st := statusBarDefaults(t)
+	statusBarDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.StatusBar), instanceLayer(&inst))
-	return st
+		themeLayer(&t.StatusBar), instanceLayer(inst))
 }
 
 // StatusBarElement is the bar along the bottom of a window, which shows the state
@@ -114,15 +112,18 @@ func (s *StatusBarElement) GridSpan(cols, rows int) *StatusBarElement {
 // Styles sets the look of the parts of the status bar, for this instance only.
 // Set fields win over the theme's StatusBar and the defaults; see StatusBarStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
-func (s *StatusBarElement) Styles(st StatusBarStyle) *StatusBarElement {
-	s.styles.mergeFrom(&st, false)
+func (s *StatusBarElement) Styles(st StatusBarStyle) *StatusBarElement { return s.stylesOf(&st) }
+
+func (s *StatusBarElement) stylesOf(st *StatusBarStyle) *StatusBarElement {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
 func (s *StatusBarElement) expand(ctx *Context) Element {
-	st := resolveStatusBar(ctx, s.styles)
-	bar := Div().asPart("StatusBar.Bar").Style(st.Bar).Role(access.RoleStatusBar).Label(s.label).
-		Child(Div().asPart("StatusBar.Start").Style(st.Start).Children(s.start...)).
-		Child(Div().asPart("StatusBar.End").Style(st.End).Children(s.end...))
+	var st StatusBarStyle
+	resolveStatusBar(ctx, &s.styles, &st)
+	bar := Div().asPart("StatusBar.Bar").styleOf(&st.Bar).Role(access.RoleStatusBar).Label(s.label).
+		Child(Div().asPart("StatusBar.Start").styleOf(&st.Start).Children(s.start...)).
+		Child(Div().asPart("StatusBar.End").styleOf(&st.End).Children(s.end...))
 	return s.size.apply(bar)
 }

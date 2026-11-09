@@ -709,7 +709,7 @@ func TestPartStylePrecedence(t *testing.T) {
 				return partTabs(NewSignal("a"), TabsUnderline, st)
 			},
 			setTheme: func(th *Theme, c Color) { th.Tabs.Tab.Background = c }},
-		{name: "Select", part: "Select.Trigger", def: selectDefaults(DarkTheme(), 220, false, sizeDefault).Trigger.Background,
+		{name: "Select", part: "Select.Trigger", def: look(func(st *SelectStyle) { selectDefaults(st, DarkTheme(), 220, false, sizeDefault) }).Trigger.Background,
 			build: func(th *Theme, inst bool) Element {
 				var st SelectStyle
 				if inst {

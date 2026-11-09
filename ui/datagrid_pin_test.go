@@ -146,7 +146,8 @@ func TestDataGridRevealStopsAtThePinnedColumns(t *testing.T) {
 func TestDataGridPinnedCellsShowTheRowState(t *testing.T) {
 	r := dgPinRig(NewSignal([]string{"i2"}))
 	dgScrollX(r, dgBody(t, r), 150)
-	st := resolveDataGrid(&Context{rt: r.rt}, DataGridComfortable, 1, DataGridStyle{})
+	var st DataGridStyle
+	resolveDataGrid(&Context{rt: r.rt}, DataGridComfortable, 1, &DataGridStyle{}, &st)
 	for _, q := range []int{1, 2} { // striped, selected
 		cell := dgCell(r, q, 0)
 		row := cell.parent

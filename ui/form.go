@@ -185,16 +185,16 @@ type FormStyle struct {
 	SummaryItemFocusVisible Style // an item with keyboard focus
 }
 
-// formDefaults returns the built-in look of a form's summary, from the colors of t.
+// formDefaults sets d to the built-in look of a form's summary, from the colors of t.
 // The summary's border is two pixels wide and its title has an alert icon, so the
 // error is not carried by color alone.
-func formDefaults(t *Theme) FormStyle {
+func formDefaults(d *FormStyle, t *Theme) {
 	border := t.Danger
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	if t.HighContrast {
 		border = t.Text
 	}
-	return FormStyle{
+	*d = FormStyle{
 		Summary: Style{Direction: Column, Gap: 6, Padding: All(12), Radius: t.Radius, Background: t.Surface,
 			BorderWidth: 2, BorderColor: border},
 		SummaryTitle: Style{Direction: Row, Align: Center, Gap: 6, FontSize: 14, FontWeight: FontSemibold, TextColor: t.Text},
@@ -205,15 +205,14 @@ func formDefaults(t *Theme) FormStyle {
 	}
 }
 
-// resolveForm returns the look of a form's summary: the defaults, merged with the
+// resolveForm sets st to the look of a form's summary: the defaults, merged with the
 // theme's Form and then the instance's Styles. Under high contrast the two overrides
 // are plain (see plainStyle).
-func resolveForm(ctx *Context, inst FormStyle) FormStyle {
+func resolveForm(ctx *Context, inst, st *FormStyle) {
 	t := ctx.Theme()
-	st := formDefaults(t)
+	formDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Form), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Form), instanceLayer(inst))
 }
 
 // FormSummaryElement is the error summary of a form. It is empty until the form is
@@ -232,8 +231,10 @@ func (*FormSummaryElement) isElement() {}
 // Styles sets the look of the parts of the summary, for this instance only. Set
 // fields win over the theme's Form and the defaults; see FormStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (s *FormSummaryElement) Styles(st FormStyle) *FormSummaryElement {
-	s.styles.mergeFrom(&st, false)
+func (s *FormSummaryElement) Styles(st FormStyle) *FormSummaryElement { return s.stylesOf(&st) }
+
+func (s *FormSummaryElement) stylesOf(st *FormStyle) *FormSummaryElement {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
@@ -247,7 +248,8 @@ func (s *FormSummaryElement) expand(ctx *Context) Element {
 			return nil
 		}
 		t := ctx.Theme()
-		st := resolveForm(ctx, s.styles)
+		var st FormStyle
+		resolveForm(ctx, &s.styles, &st)
 		key := fmt.Sprintf("form-%d/summary-title", f.id)
 		var items []Element
 		count := 0
@@ -257,8 +259,8 @@ func (s *FormSummaryElement) expand(ctx *Context) Element {
 				continue
 			}
 			count++
-			items = append(items, Div().asPart("Form.SummaryItem").Style(st.SummaryItem).
-				Hover(st.SummaryItemHover).FocusVisible(st.SummaryItemFocusVisible).
+			items = append(items, Div().asPart("Form.SummaryItem").styleOf(&st.SummaryItem).
+				hoverOf(&st.SummaryItemHover).focusVisibleOf(&st.SummaryItemFocusVisible).
 				Role(access.RoleLink).Focusable().Key(fmt.Sprintf("form-%d/item:%s", f.id, e.key)).
 				OnClick(func() {
 					if e.focus != nil {
@@ -268,7 +270,7 @@ func (s *FormSummaryElement) expand(ctx *Context) Element {
 				Child(Text(summaryText(e.label, msg))))
 		}
 		if msg := f.formErr.Get(); msg != "" {
-			items = append(items, Div().asPart("Form.SummaryItem").Style(st.SummaryItem).Child(Text(msg)))
+			items = append(items, Div().asPart("Form.SummaryItem").styleOf(&st.SummaryItem).Child(Text(msg)))
 		}
 		if len(items) == 0 {
 			return nil
@@ -277,10 +279,10 @@ func (s *FormSummaryElement) expand(ctx *Context) Element {
 		if count > 0 {
 			title = strs.FieldsNeedAttention(count)
 		}
-		head := Div().asPart("Form.SummaryTitle").Style(st.SummaryTitle).
+		head := Div().asPart("Form.SummaryTitle").styleOf(&st.SummaryTitle).
 			Child(Icon(icons.Alert).Size(16).Color(messageIconColor(t, st.Summary))).
 			Child(Text(title).Key(key))
-		return Div().asPart("Form.Summary").Style(st.Summary).Column().Gap(6).
+		return Div().asPart("Form.Summary").styleOf(&st.Summary).Column().Gap(6).
 			Role(access.RoleGroup).Label(title).LabelledBy(key).
 			Child(head).Children(items...)
 	})

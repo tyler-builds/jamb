@@ -36,11 +36,11 @@ type BreadcrumbsStyle struct {
 	Overflow  Style // the box around the "..." button of the hidden locations
 }
 
-// breadcrumbsDefaults returns the built-in look of a breadcrumb trail, from the
+// breadcrumbsDefaults sets d to the built-in look of a breadcrumb trail, from the
 // colors of t. The locations that can be chosen are drawn in TextMuted, and the
 // current location in Text.
-func breadcrumbsDefaults(t *Theme) BreadcrumbsStyle {
-	return BreadcrumbsStyle{
+func breadcrumbsDefaults(d *BreadcrumbsStyle, t *Theme) {
+	*d = BreadcrumbsStyle{
 		Bar: Style{Direction: Row, Align: Center, Gap: 2, fitWidth: true},
 		Item: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(28), Padding: XY(6, 0),
 			Radius: t.Radius / 2, NoShrink: true, TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring},
@@ -52,15 +52,14 @@ func breadcrumbsDefaults(t *Theme) BreadcrumbsStyle {
 	}
 }
 
-// resolveBreadcrumbs returns the look of a breadcrumb trail: the defaults, merged
+// resolveBreadcrumbs sets st to the look of a breadcrumb trail: the defaults, merged
 // with the theme's Breadcrumbs and then the instance's Styles. Under high contrast
 // the two overrides are plain (see plainStyle).
-func resolveBreadcrumbs(ctx *Context, inst BreadcrumbsStyle) BreadcrumbsStyle {
+func resolveBreadcrumbs(ctx *Context, inst, st *BreadcrumbsStyle) {
 	t := ctx.Theme()
-	st := breadcrumbsDefaults(t)
+	breadcrumbsDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Breadcrumbs), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Breadcrumbs), instanceLayer(inst))
 }
 
 // crumbSlots returns the locations of a trail of n locations to show, in order,
@@ -163,48 +162,49 @@ func (b *BreadcrumbsElement) keyOf(s string) string {
 
 func (b *BreadcrumbsElement) expand(ctx *Context) Element {
 	th := ctx.Theme()
-	st := resolveBreadcrumbs(ctx, b.styles)
+	var st BreadcrumbsStyle
+	resolveBreadcrumbs(ctx, &b.styles, &st)
 	strs := ctx.Strings()
 	name := b.name
 	if name == "" {
 		name = strs.Breadcrumb
 	}
-	bar := b.size.apply(Div().asPart("Breadcrumbs.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().Style(st.Bar).
+	bar := b.size.apply(Div().asPart("Breadcrumbs.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().styleOf(&st.Bar).
 		Tooltip(b.tooltip))
 	slots := crumbSlots(len(b.items), b.limit)
 	for k, s := range slots {
 		if k > 0 {
-			bar.Child(Div().asPart("Breadcrumbs.Separator").AccessHidden().Style(st.Separator).
+			bar.Child(Div().asPart("Breadcrumbs.Separator").AccessHidden().styleOf(&st.Separator).
 				Child(Icon(icons.ChevronRight).Size(14)))
 		}
 		if s < 0 {
 			// The hidden locations lie between the first location and the next slot.
-			bar.Child(b.overflow(strs, st, b.items[slots[k-1]+1:slots[k+1]]))
+			bar.Child(b.overflow(strs, &st, b.items[slots[k-1]+1:slots[k+1]]))
 			continue
 		}
-		bar.Child(b.crumb(th, st, s))
+		bar.Child(b.crumb(th, &st, s))
 	}
 	return bar
 }
 
 // crumb returns the location at index i: the current one, a link, or plain text.
-func (b *BreadcrumbsElement) crumb(th *Theme, st BreadcrumbsStyle, i int) *DivElement {
+func (b *BreadcrumbsElement) crumb(th *Theme, st *BreadcrumbsStyle, i int) *DivElement {
 	c := b.items[i]
 	key := b.keyOf(fmt.Sprintf("crumb:%d", i))
 	if i == len(b.items)-1 {
 		d := Div().asPart("Breadcrumbs.Current").Key(key).Role(access.RoleStaticText).Label(c.Label).
-			AccessSelected(true).Style(st.Current)
+			AccessSelected(true).styleOf(&st.Current)
 		return crumbContent(d, c)
 	}
-	d := Div().asPart("Breadcrumbs.Item").Key(key).Style(st.Item)
+	d := Div().asPart("Breadcrumbs.Item").Key(key).styleOf(&st.Item)
 	if c.OnClick == nil {
 		d.Role(access.RoleStaticText).Label(c.Label)
 		return crumbContent(d, c)
 	}
 	// The ring is added to the shadows of the item, as a button adds its own.
 	ring := Shadow{Spread: 2, Color: th.FocusRing}
-	d.Role(access.RoleLink).Label(c.Label).Hover(st.ItemHover).Focusable().
-		FocusVisible(Style{Shadows: []Shadow{ring}}).OnClick(c.OnClick)
+	d.Role(access.RoleLink).Label(c.Label).hoverOf(&st.ItemHover).Focusable().
+		focusVisibleOf(&Style{Shadows: []Shadow{ring}}).OnClick(c.OnClick)
 	return crumbContent(d, c)
 }
 
@@ -218,12 +218,12 @@ func crumbContent(d *DivElement, c Crumb) *DivElement {
 
 // overflow returns the "..." button that opens a menu of the hidden locations. A
 // hidden location without an OnClick is listed as disabled.
-func (b *BreadcrumbsElement) overflow(strs *Strings, st BreadcrumbsStyle, hidden []Crumb) *DivElement {
+func (b *BreadcrumbsElement) overflow(strs *Strings, st *BreadcrumbsStyle, hidden []Crumb) *DivElement {
 	items := make([]MenuItem, len(hidden))
 	for i, c := range hidden {
 		items[i] = MenuItem{Label: c.Label, Icon: c.Icon, OnClick: c.OnClick, Disabled: c.OnClick == nil}
 	}
 	menu := DropdownMenu(Button("...").Ghost().Small().Label(strs.ShowHiddenLocations),
 		func() []MenuItem { return items })
-	return Div().asPart("Breadcrumbs.Overflow").Style(st.Overflow).Child(menu.Key(b.keyOf("overflow")))
+	return Div().asPart("Breadcrumbs.Overflow").styleOf(&st.Overflow).Child(menu.Key(b.keyOf("overflow")))
 }

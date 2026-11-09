@@ -30,12 +30,12 @@ type ListBoxStyle struct {
 	ItemFocusVisible Style // the item that has keyboard focus, while the list has focus
 }
 
-// listBoxDefaults returns the built-in look of a list box, from the colors of t.
+// listBoxDefaults sets d to the built-in look of a list box, from the colors of t.
 // Under high contrast the selected item is the Accent color with AccentText on it.
 // No state changes the font weight: a selected item is shown by its fill.
-func listBoxDefaults(t *Theme) ListBoxStyle {
+func listBoxDefaults(d *ListBoxStyle, t *Theme) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := ListBoxStyle{
+	*d = ListBoxStyle{
 		List: Style{Grow: 1, Padding: All(2)},
 		Item: Style{Direction: Row, Align: Center, Gap: 8, MinHeight: Px(32), NoShrink: true,
 			Radius: 6, Padding: XY(10, 4), TextColor: t.Text},
@@ -46,18 +46,16 @@ func listBoxDefaults(t *Theme) ListBoxStyle {
 	if t.HighContrast {
 		d.ItemSelected = Style{Background: t.Accent, TextColor: t.AccentText}
 	}
-	return d
 }
 
-// resolveListBox returns the look of a list box: the defaults, merged with the
+// resolveListBox sets st to the look of a list box: the defaults, merged with the
 // theme's ListBox and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveListBox(ctx *Context, inst ListBoxStyle) ListBoxStyle {
+func resolveListBox(ctx *Context, inst, st *ListBoxStyle) {
 	t := ctx.Theme()
-	st := listBoxDefaults(t)
+	listBoxDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.ListBox), instanceLayer(&inst))
-	return st
+		themeLayer(&t.ListBox), instanceLayer(inst))
 }
 
 // ListBoxElement is a list of items that the user selects from, with the keyboard
@@ -218,19 +216,26 @@ func (l *ListBoxElement[T]) OnActivate(fn func(item T)) *ListBoxElement[T] {
 // Styles sets the look of the parts of the list box, for this instance only. Set
 // fields win over the theme's ListBox and the defaults; see ListBoxStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (l *ListBoxElement[T]) Styles(st ListBoxStyle) *ListBoxElement[T] {
-	l.styles.mergeFrom(&st, false)
+func (l *ListBoxElement[T]) Styles(st ListBoxStyle) *ListBoxElement[T] { return l.stylesOf(&st) }
+
+func (l *ListBoxElement[T]) stylesOf(st *ListBoxStyle) *ListBoxElement[T] {
+	l.styles.mergeFrom(st, false)
 	return l
 }
 
 // Style is merged into the outer box of the list box: size it with Height, Grow or
 // MaxHeight. The list fills that box.
-func (l *ListBoxElement[T]) Style(s Style) *ListBoxElement[T] { l.style = l.style.Merge(s); return l }
+func (l *ListBoxElement[T]) Style(s Style) *ListBoxElement[T] { return l.styleOf(&s) }
+
+func (l *ListBoxElement[T]) styleOf(s *Style) *ListBoxElement[T] {
+	l.style.mergeFrom(s, false)
+	return l
+}
 
 // LayoutSpring moves the list box to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
 func (l *ListBoxElement[T]) LayoutSpring(s Spring) *ListBoxElement[T] {
-	return l.Style(Style{LayoutSpring: s})
+	return l.styleOf(&Style{LayoutSpring: s})
 }
 
 // The sizing methods give the list box's outer box a size, over its Style. See Sizing
@@ -272,7 +277,8 @@ func toggleKey(keys []string, k string) []string {
 func (l *ListBoxElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		rt := ctx.rt
-		st := resolveListBox(ctx, l.styles)
+		var st ListBoxStyle
+		resolveListBox(ctx, &l.styles, &st)
 		items := l.items
 		n := len(items)
 		if l.selected == nil {
@@ -466,15 +472,15 @@ func (l *ListBoxElement[T]) expand(ctx *Context) Element {
 		// drawRow returns item i, which is the item with key k.
 		drawRow := func(i int, it T) Element {
 			k := l.itemKey(it)
-			r := Div().asPart("ListBox.Item").Key(k).Style(st.Item).Role(access.RoleListItem).Cursor(CursorPointer)
+			r := Div().asPart("ListBox.Item").Key(k).styleOf(&st.Item).Role(access.RoleListItem).Cursor(CursorPointer)
 			if slices.Contains(l.selected.Get(), k) {
-				r.Style(st.ItemSelected)
+				r.styleOf(&st.ItemSelected)
 			} else {
-				r.Hover(st.ItemHover)
+				r.hoverOf(&st.ItemHover)
 			}
 			isFocus := focus.Get() == k
 			if isFocus && focused.Get() {
-				r.Style(st.ItemFocusVisible)
+				r.styleOf(&st.ItemFocusVisible)
 			}
 			if l.mode != SelectionNone {
 				r.AccessSelected(slices.Contains(l.selected.Get(), k))
@@ -525,7 +531,7 @@ func (l *ListBoxElement[T]) expand(ctx *Context) Element {
 			return r
 		}
 
-		list := ListOf(items, l.itemKey, drawRow).Handle(handle).Style(st.List)
+		list := ListOf(items, l.itemKey, drawRow).Handle(handle).styleOf(&st.List)
 		if l.key != "" {
 			list.Key(l.key)
 		}
@@ -560,6 +566,6 @@ func (l *ListBoxElement[T]) expand(ctx *Context) Element {
 		}
 		// The list sits in a column that takes the list box's style and size, so that the
 		// list fills the space the style gives it and windows its rows to that space (see Tree).
-		return l.size.apply(Div().Column().MinHeight(Px(0)).Style(l.style)).Child(list)
+		return l.size.apply(Div().Column().MinHeight(Px(0)).styleOf(&l.style)).Child(list)
 	})
 }

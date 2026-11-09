@@ -46,16 +46,16 @@ type StepperStyle struct {
 	ConnectorComplete Style // the line after a complete step, over Connector
 }
 
-// stepperDefaults returns the built-in look of a stepper, laid out in a column
+// stepperDefaults sets d to the built-in look of a stepper, laid out in a column
 // when vertical, from the colors of t. A step not reached yet has an outlined
 // circle in the muted text color, a complete step a circle filled with Accent and
 // a check mark, and the current step an Accent outline on AccentSoft. Under high
 // contrast the circles are outlined in the text color, a complete one is filled
 // with Highlight, and the current one has a thicker Highlight outline, so the
 // states differ by shape as well as by color.
-func stepperDefaults(t *Theme, vertical bool) StepperStyle {
+func stepperDefaults(d *StepperStyle, t *Theme, vertical bool) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := StepperStyle{
+	*d = StepperStyle{
 		Stepper: Style{Direction: Row, Align: Center, Gap: 8},
 		// A horizontal step can shrink, down to its indicator, so the stepper fits its
 		// width; its title and description then end with an ellipsis.
@@ -89,18 +89,16 @@ func stepperDefaults(t *Theme, vertical bool) StepperStyle {
 	} else {
 		d.StepDisabled = Style{Opacity: 0.5}
 	}
-	return d
 }
 
-// resolveStepper returns the look of a stepper: the defaults, merged with the
+// resolveStepper sets st to the look of a stepper: the defaults, merged with the
 // theme's Stepper and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveStepper(ctx *Context, vertical bool, inst StepperStyle) StepperStyle {
+func resolveStepper(ctx *Context, vertical bool, inst, st *StepperStyle) {
 	t := ctx.Theme()
-	st := stepperDefaults(t, vertical)
+	stepperDefaults(st, t, vertical)
 	st.layered(ctx,
-		themeLayer(&t.Stepper), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Stepper), instanceLayer(inst))
 }
 
 // StepperElement shows the progress through the steps of a process, such as the
@@ -194,8 +192,10 @@ func (s *StepperElement) Tooltip(text string) *StepperElement { s.tooltip = text
 // Styles sets the look of the parts of the stepper, for this instance only. Set
 // fields win over the theme's Stepper and the defaults; see StepperStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (s *StepperElement) Styles(st StepperStyle) *StepperElement {
-	s.styles.mergeFrom(&st, false)
+func (s *StepperElement) Styles(st StepperStyle) *StepperElement { return s.stylesOf(&st) }
+
+func (s *StepperElement) stylesOf(st *StepperStyle) *StepperElement {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
@@ -232,7 +232,8 @@ func (s *StepperElement) scope() string {
 
 func (s *StepperElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
-		st := resolveStepper(ctx, s.vertical, s.styles)
+		var st StepperStyle
+		resolveStepper(ctx, s.vertical, &s.styles, &st)
 		strs := ctx.Strings()
 		n := len(s.steps)
 		cur := min(max(s.current.Get(), 0), n)
@@ -258,10 +259,10 @@ func (s *StepperElement) expand(ctx *Context) Element {
 		}
 
 		list := s.size.apply(Div().asPart("Stepper.Stepper").Role(access.RoleList).Label(name).
-			SelectionContainer().Style(st.Stepper).Tooltip(s.tooltip))
+			SelectionContainer().styleOf(&st.Stepper).Tooltip(s.tooltip))
 		for i := range s.steps {
 			last := i == n-1
-			item := s.step(strs, st, i, cur, last)
+			item := s.step(strs, &st, i, cur, last)
 			if s.onSelect != nil {
 				item.AccessSelected(i == cur)
 			} else if i == cur {
@@ -269,7 +270,7 @@ func (s *StepperElement) expand(ctx *Context) Element {
 			}
 			if s.onSelect != nil && s.disabled {
 				item.access().disabled = true
-				item.Style(st.StepDisabled).Cursor(CursorNotAllowed)
+				item.styleOf(&st.StepDisabled).Cursor(CursorNotAllowed)
 			}
 			if choosable {
 				if i != stop {
@@ -279,8 +280,8 @@ func (s *StepperElement) expand(ctx *Context) Element {
 				if s.vertical {
 					back, next = input.KeyUp, input.KeyDown
 				}
-				item.Hover(st.StepHover).Cursor(CursorPointer).Focusable().FocusHandle(handleOf(i)).
-					FocusVisible(st.StepFocusVisible).
+				item.hoverOf(&st.StepHover).Cursor(CursorPointer).Focusable().FocusHandle(handleOf(i)).
+					focusVisibleOf(&st.StepFocusVisible).
 					OnClick(func() { s.onSelect(i) }).
 					OnKeyDown(func(e *KeyEvent) {
 						if e.Mods != 0 || e.Repeat {
@@ -305,7 +306,7 @@ func (s *StepperElement) expand(ctx *Context) Element {
 			}
 			list.Child(item)
 			if !last && !s.vertical {
-				list.Child(s.connector(st, i < cur))
+				list.Child(s.connector(&st, i < cur))
 			}
 		}
 		return list
@@ -315,18 +316,18 @@ func (s *StepperElement) expand(ctx *Context) Element {
 // step returns the item of the step at index i, with cur as the current step. In a
 // vertical stepper the line to the next step is drawn under the indicator, inside
 // the item, unless the step is the last.
-func (s *StepperElement) step(strs *Strings, st StepperStyle, i, cur int, last bool) *DivElement {
+func (s *StepperElement) step(strs *Strings, st *StepperStyle, i, cur int, last bool) *DivElement {
 	step := s.steps[i]
 	n := len(s.steps)
 	var label string
-	ind := Div().asPart("Stepper.Indicator").Style(st.Indicator)
+	ind := Div().asPart("Stepper.Indicator").styleOf(&st.Indicator)
 	switch {
 	case i < cur:
 		label = strs.StepCompleted(i+1, n, step.Title)
-		ind.Style(st.IndicatorComplete).Child(Icon(icons.Check).Size(14))
+		ind.styleOf(&st.IndicatorComplete).Child(Icon(icons.Check).Size(14))
 	case i == cur:
 		label = strs.StepCurrent(i+1, n, step.Title)
-		ind.Style(st.IndicatorCurrent)
+		ind.styleOf(&st.IndicatorCurrent)
 	default:
 		label = strs.StepUpcoming(i+1, n, step.Title)
 	}
@@ -346,11 +347,11 @@ func (s *StepperElement) step(strs *Strings, st StepperStyle, i, cur int, last b
 		return Text(str).Truncate()
 	}
 	texts := Div().Column().Gap(2).MinWidth(Px(0)).
-		Child(Div().asPart("Stepper.Title").Style(st.Title).Child(text(step.Title)))
+		Child(Div().asPart("Stepper.Title").styleOf(&st.Title).Child(text(step.Title)))
 	if step.Description != "" {
-		texts.Child(Div().asPart("Stepper.Description").Style(st.Description).Child(text(step.Description)))
+		texts.Child(Div().asPart("Stepper.Description").styleOf(&st.Description).Child(text(step.Description)))
 	}
-	item := Div().asPart("Stepper.Step").Key(s.scope() + fmt.Sprintf("/step:%d", i)).Style(st.Step).
+	item := Div().asPart("Stepper.Step").Key(s.scope() + fmt.Sprintf("/step:%d", i)).styleOf(&st.Step).
 		Role(access.RoleListItem).Label(label)
 	if s.compact && !s.vertical && i != min(cur, n-1) {
 		// Only the indicator, which does not shrink, so the step keeps its size.
@@ -371,10 +372,10 @@ func (s *StepperElement) step(strs *Strings, st StepperStyle, i, cur int, last b
 
 // connector returns the line after a step, drawn as complete after a complete step.
 // It is decorative and hidden from assistive technology.
-func (s *StepperElement) connector(st StepperStyle, complete bool) *DivElement {
-	d := Div().asPart("Stepper.Connector").AccessHidden().Style(st.Connector)
+func (s *StepperElement) connector(st *StepperStyle, complete bool) *DivElement {
+	d := Div().asPart("Stepper.Connector").AccessHidden().styleOf(&st.Connector)
 	if complete {
-		d.Style(st.ConnectorComplete)
+		d.styleOf(&st.ConnectorComplete)
 	}
 	return d
 }

@@ -39,15 +39,15 @@ func ratingStarColor(t *Theme) Color {
 	return t.Warning.Darken(0.1)
 }
 
-// ratingDefaults returns the built-in look of a rating, from the colors of t. An
+// ratingDefaults sets d to the built-in look of a rating, from the colors of t. An
 // empty star is an outline in TextSubtle and a filled star is Warning (see
 // ratingStarColor), so the value is shown by the shape of the stars as well as
 // their color. Under high contrast a
 // filled star is Highlight and an empty one the text color, and a disabled rating
 // is GrayText and not dimmed.
-func ratingDefaults(t *Theme) RatingStyle {
+func ratingDefaults(d *RatingStyle, t *Theme) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := RatingStyle{
+	*d = RatingStyle{
 		Root:             Style{Direction: Row, Align: Center, Gap: 2, Radius: 4, NoShrink: true, fitWidth: true},
 		RootFocusVisible: Style{Shadows: []Shadow{ring}},
 		RootDisabled:     Style{Opacity: 0.5},
@@ -61,18 +61,16 @@ func ratingDefaults(t *Theme) RatingStyle {
 		d.StarChecked, d.StarHover = Style{TextColor: t.Accent}, Style{TextColor: t.Accent}
 		d.StarDisabled = Style{TextColor: t.Disabled}
 	}
-	return d
 }
 
-// resolveRating returns the look of a rating: the defaults, merged with the
+// resolveRating sets st to the look of a rating: the defaults, merged with the
 // theme's Rating and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveRating(ctx *Context, inst RatingStyle) RatingStyle {
+func resolveRating(ctx *Context, inst, st *RatingStyle) {
 	t := ctx.Theme()
-	st := ratingDefaults(t)
+	ratingDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Rating), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Rating), instanceLayer(inst))
 }
 
 // RatingElement is a row of stars that shows and sets a whole number from 0 to its
@@ -137,9 +135,10 @@ func (r *RatingElement) Validate(rules ...Validator[int]) *RatingElement {
 func (r *RatingElement) formCheck() error { return firstError(r.value.Get(), r.rules) }
 
 func (r *RatingElement) formWire(w fieldWire) Element {
-	c := *r
+	c := new(RatingElement)
+	copyLarge(c, r)
 	c.wire = w
-	return &c
+	return c
 }
 
 // FocusHandle lets code focus the rating (see NewFocusHandle). A Field that wraps
@@ -169,8 +168,10 @@ func (r *RatingElement) GridSpan(cols, rows int) *RatingElement { r.size.setSpan
 // Styles sets the look of the parts of the rating, for this instance only. Set
 // fields win over the theme's Rating and the defaults; see RatingStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (r *RatingElement) Styles(st RatingStyle) *RatingElement {
-	r.styles.mergeFrom(&st, false)
+func (r *RatingElement) Styles(st RatingStyle) *RatingElement { return r.stylesOf(&st) }
+
+func (r *RatingElement) stylesOf(st *RatingStyle) *RatingElement {
+	r.styles.mergeFrom(st, false)
 	return r
 }
 
@@ -185,7 +186,8 @@ func (r *RatingElement) starAt(e *MouseEvent) int {
 
 func (r *RatingElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
-		st := resolveRating(ctx, r.styles)
+		var st RatingStyle
+		resolveRating(ctx, &r.styles, &st)
 		v := min(max(r.value.Get(), 0), r.max)
 		// hover is the star under the pointer, or 0 when the pointer is not over the
 		// row. After a click it is the clicked star negated: the preview is off until
@@ -209,23 +211,23 @@ func (r *RatingElement) expand(ctx *Context) Element {
 			}
 		}
 
-		row := Div().asPart("Rating.Root").Style(st.Root)
+		row := Div().asPart("Rating.Root").styleOf(&st.Root)
 		for i := 1; i <= r.max; i++ {
 			// A filled star is drawn as a filled shape, so the value is not carried by
 			// color alone.
 			filled := i <= v
-			star := Div().asPart("Rating.Star").Style(st.Star)
+			star := Div().asPart("Rating.Star").styleOf(&st.Star)
 			if preview > 0 {
 				filled = i <= preview
 			}
 			if i <= v {
-				star.Style(st.StarChecked)
+				star.styleOf(&st.StarChecked)
 			}
 			if i <= preview {
-				star.Style(st.StarHover)
+				star.styleOf(&st.StarHover)
 			}
 			if r.disabled {
-				star.Style(st.StarDisabled)
+				star.styleOf(&st.StarDisabled)
 			}
 			ic := icons.Star
 			if filled {
@@ -252,7 +254,7 @@ func (r *RatingElement) expand(ctx *Context) Element {
 		a.value = ctx.Strings().RatingValue(v, r.max)
 		if r.disabled {
 			a.disabled = true
-			row.Style(st.RootDisabled).Cursor(CursorNotAllowed)
+			row.styleOf(&st.RootDisabled).Cursor(CursorNotAllowed)
 			return r.size.apply(row)
 		}
 		if r.readOnly {
@@ -270,7 +272,7 @@ func (r *RatingElement) expand(ctx *Context) Element {
 		if w.onBlur != nil {
 			row.OnBlur(w.onBlur)
 		}
-		return r.size.apply(row.Cursor(CursorPointer).Focusable().FocusVisible(st.RootFocusVisible).
+		return r.size.apply(row.Cursor(CursorPointer).Focusable().focusVisibleOf(&st.RootFocusVisible).
 			OnMouseMove(func(e *MouseEvent) {
 				if n := r.starAt(e); n != hover.Peek() && -n != hover.Peek() {
 					hover.Set(n)

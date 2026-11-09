@@ -52,10 +52,10 @@ type TimePickerStyle struct {
 	OptionSelected Style
 }
 
-// timePickerDefaults returns the built-in look of a time picker at the Text size scale,
+// timePickerDefaults sets d to the built-in look of a time picker at the Text size scale,
 // from the colors of t.
-func timePickerDefaults(t *Theme, scale float32) TimePickerStyle {
-	d := TimePickerStyle{
+func timePickerDefaults(d *TimePickerStyle, t *Theme, scale float32) {
+	*d = TimePickerStyle{
 		Button: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(24 * scale), Height: Px(24 * scale),
 			NoShrink: true, Radius: 4, TextColor: t.TextMuted},
 		Message: messageStyle(t),
@@ -71,18 +71,16 @@ func timePickerDefaults(t *Theme, scale float32) TimePickerStyle {
 	} else {
 		d.OptionHighlighted = Style{Background: t.AccentSoft}
 	}
-	return d
 }
 
-// resolveTimePicker returns the look of a time picker: the defaults, merged with the
+// resolveTimePicker sets st to the look of a time picker: the defaults, merged with the
 // theme's TimePicker and then the instance's Styles. Under high contrast the overrides are
 // plain (see plainStyle).
-func resolveTimePicker(ctx *Context, scale float32, inst TimePickerStyle) TimePickerStyle {
+func resolveTimePicker(ctx *Context, scale float32, inst, st *TimePickerStyle) {
 	t := ctx.Theme()
-	st := timePickerDefaults(t, scale)
+	timePickerDefaults(st, t, scale)
 	st.layered(ctx,
-		themeLayer(&t.TimePicker), instanceLayer(&inst))
-	return st
+		themeLayer(&t.TimePicker), instanceLayer(inst))
 }
 
 // timeList is the state of the open list that the render keeps: the row the keys have
@@ -183,9 +181,10 @@ func (p *TimePickerElement) Validate(rules ...Validator[time.Time]) *TimePickerE
 func (p *TimePickerElement) formCheck() error { return firstError(p.value.Get(), p.rules) }
 
 func (p *TimePickerElement) formWire(w fieldWire) Element {
-	c := *p
+	c := new(TimePickerElement)
+	copyLarge(c, p)
 	c.wire = w
-	return &c
+	return c
 }
 
 func (*TimePickerElement) isElement()           {}
@@ -256,8 +255,10 @@ func (p *TimePickerElement) GridSpan(cols, rows int) *TimePickerElement {
 // Styles sets the look of the parts of the time picker, for this instance only. Set fields
 // win over the theme's TimePicker and the defaults; see TimePickerStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
-func (p *TimePickerElement) Styles(st TimePickerStyle) *TimePickerElement {
-	p.styles.mergeFrom(&st, false)
+func (p *TimePickerElement) Styles(st TimePickerStyle) *TimePickerElement { return p.stylesOf(&st) }
+
+func (p *TimePickerElement) stylesOf(st *TimePickerStyle) *TimePickerElement {
+	p.styles.mergeFrom(st, false)
 	return p
 }
 
@@ -301,7 +302,8 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
-		st := resolveTimePicker(ctx, scale, p.styles)
+		var st TimePickerStyle
+		resolveTimePicker(ctx, scale, &p.styles, &st)
 		v := p.value.Get()
 		draft := Local(ctx, "draft", formatTimeText(v, loc))
 		seen := Local(ctx, "seen", v)
@@ -519,19 +521,20 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		}
 		a.invalid, a.required = isInvalid || w.invalid, w.required
 
-		fst := resolveField(ctx, fieldLayout{width: Full, disabled: p.disabled, size: p.ctlSize}, st.Field)
+		var fst FieldStyle
+		resolveField(ctx, fieldLayout{width: Full, disabled: p.disabled, size: p.ctlSize}, &st.Field, &fst)
 		if p.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)
-			frame := Div().asPart("TimePicker.Frame").Style(fst.Frame).Style(fst.FrameDisabled).
-				Child(Div().asPart("TimePicker.Text").Style(fst.Text).Grow(1).Child(Text(draft.Get()).NoWrap()))
+			frame := Div().asPart("TimePicker.Frame").styleOf(&fst.Frame).styleOf(&fst.FrameDisabled).
+				Child(Div().asPart("TimePicker.Text").styleOf(&fst.Text).Grow(1).Child(Text(draft.Get()).NoWrap()))
 			root.Child(frame)
 			return p.size.apply(root)
 		}
 
 		// The button is the trailing element of the frame, and it is not a Tab stop: Alt+Down
 		// and F4 open the list from the field.
-		button := Div().asPart("TimePicker.Button").Style(st.Button).Role(access.RoleButton).
+		button := Div().asPart("TimePicker.Button").styleOf(&st.Button).Role(access.RoleButton).
 			Label(s.ShowTimes).Cursor(CursorPointer).
 			OnClick(func() {
 				if open.Peek() {
@@ -565,8 +568,8 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 			onStep: step, trailing: button}
 		fo.wire.invalid = isInvalid || w.invalid
 		fo.size.setWidth(Full)
-		root.Child(fo.expand(ctx, fst, false, 0))
-		root.Child(Div().asPart("TimePicker.Message").Style(st.Message).Display(isInvalid).
+		root.Child(fo.expand(ctx, &fst, false, 0))
+		root.Child(Div().asPart("TimePicker.Message").styleOf(&st.Message).Display(isInvalid).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
 			Child(Text(shown).Key(errKey)))
 
@@ -585,7 +588,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 		})
 
 		if open.Get() {
-			root.Child(p.list(t, st, scale, times, hl.Get(), v, ls, func(i int) { hl.Set(i) }, choose, shut, ret, name, s))
+			root.Child(p.list(t, &st, scale, times, hl.Get(), v, ls, func(i int) { hl.Set(i) }, choose, shut, ret, name, s))
 		}
 		return p.size.apply(root)
 	})
@@ -624,7 +627,7 @@ func nextTimeIndex(times []int, m, dir int) int {
 // selected one is the time the field holds. A press in the list hands focus back to the
 // text. reveal is the row (plus one, zero for none) that the keys moved to, and it is
 // scrolled into view once.
-func (p *TimePickerElement) list(t *Theme, st TimePickerStyle, scale float32, times []int, hl int, v time.Time,
+func (p *TimePickerElement) list(t *Theme, st *TimePickerStyle, scale float32, times []int, hl int, v time.Time,
 	ls *timeList, hover func(int), choose func(int), shut func(), ret *FocusHandle, name string, s *Strings) Element {
 	loc := currentLocale()
 	if name == "" {
@@ -633,7 +636,7 @@ func (p *TimePickerElement) list(t *Theme, st TimePickerStyle, scale float32, ti
 	reveal := ls.reveal
 	ls.reveal = 0
 	maxH := float32(timePickerMaxVisible)*timePickerRowHeight*scale + 8
-	panel := Div().asPart("TimePicker.Popup").Key("jamb.listbox").Style(st.Popup).
+	panel := Div().asPart("TimePicker.Popup").Key("jamb.listbox").styleOf(&st.Popup).
 		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: t.Motion.enter(140 * time.Millisecond)}).
 		Exit(Fade().Grow(0.98), Animation{Duration: t.Motion.exit(90 * time.Millisecond)}).
 		Overlay(BelowStart).OverlayGap(4).
@@ -669,7 +672,7 @@ func (p *TimePickerElement) list(t *Theme, st TimePickerStyle, scale float32, ti
 			mark.Child(Icon(icons.Check).Size(14))
 		}
 		label := formatClock(clockAt(m), loc)
-		row := Div().asPart("TimePicker.Option").Style(style).
+		row := Div().asPart("TimePicker.Option").styleOf(&style).
 			Role(access.RoleListItem).AccessSelected(on).Label(label).Child(mark).
 			Child(Text(label).NoWrap())
 		row.revealRow = reveal == i+1

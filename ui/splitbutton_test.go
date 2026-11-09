@@ -130,14 +130,15 @@ func TestSplitButtonDisabled(t *testing.T) {
 // segment rounds only its outer corners.
 func TestSplitButtonSegments(t *testing.T) {
 	th := DarkTheme()
-	st := splitButtonDefaults(th, ButtonSecondary, sizeDefault)
+	var st SplitButtonStyle
+	splitButtonDefaults(&st, th, ButtonSecondary, sizeDefault)
 	if st.Arrow.BorderEdges != (Edges{Top: 1, Right: 1, Bottom: 1}) {
 		t.Errorf("a Secondary arrow has the borders %v, want no left one", st.Arrow.BorderEdges)
 	}
 	if st.Main.Corners.TopRight != 0 || st.Main.Corners.TopLeft == 0 || st.Arrow.Corners.TopLeft != 0 || st.Arrow.Corners.TopRight == 0 {
 		t.Errorf("the corners are %+v and %+v, want only the outer ones rounded", st.Main.Corners, st.Arrow.Corners)
 	}
-	st = splitButtonDefaults(th, ButtonPrimary, sizeDefault)
+	splitButtonDefaults(&st, th, ButtonPrimary, sizeDefault)
 	if st.Arrow.BorderEdges != (Edges{Left: 1}) {
 		t.Errorf("a Primary arrow has the borders %v, want the line on its left", st.Arrow.BorderEdges)
 	}

@@ -453,8 +453,12 @@ func TestCalendarUnderHighContrast(t *testing.T) {
 // look the same by default.
 func TestCalendarDefaultsMatchThePickers(t *testing.T) {
 	for _, th := range []*Theme{DarkTheme(), LightTheme(), HighContrastTheme(HighContrastBlack(), DarkTheme())} {
-		c := calendarDefaults(th, 1)
-		d := datePickerDefaults(th, 1, false).calendar(dateRangePickerDefaults(th, 1, false).DayInRange)
+		var c CalendarStyle
+		calendarDefaults(&c, th, 1)
+		picker := look(func(st *DatePickerStyle) { datePickerDefaults(st, th, 1, false) })
+		inRange := look(func(st *DateRangePickerStyle) { dateRangePickerDefaults(st, th, 1, false) }).DayInRange
+		var d CalendarStyle
+		picker.calendar(&d, &inRange)
 		d.Root, d.RootDisabled = c.Root, c.RootDisabled
 		if !reflect.DeepEqual(c, d) {
 			t.Errorf("the calendar's defaults differ from the date picker's: %+v vs %+v", c, d)

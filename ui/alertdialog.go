@@ -43,12 +43,13 @@ type AlertDialogStyle struct {
 	Footer  Style // the row of buttons, at the bottom
 }
 
-// alertDialogDefaults returns the built-in look of an alert dialog of intent i,
+// alertDialogDefaults sets d to the built-in look of an alert dialog of intent i,
 // from the colors of t: a modal's parts, with the icon in the intent's color,
 // moved towards the text color as an Alert's icon is, and the message in the
 // muted text color. Under high contrast both are the text color.
-func alertDialogDefaults(t *Theme, i AlertDialogIntent) AlertDialogStyle {
-	m := modalDefaults(t)
+func alertDialogDefaults(d *AlertDialogStyle, t *Theme, i AlertDialogIntent) {
+	var m ModalStyle
+	modalDefaults(&m, t)
 	tone := t.Accent
 	switch i {
 	case AlertDialogWarning:
@@ -60,7 +61,7 @@ func alertDialogDefaults(t *Theme, i AlertDialogIntent) AlertDialogStyle {
 	if t.HighContrast {
 		ink, muted = t.Text, t.Text
 	}
-	return AlertDialogStyle{
+	*d = AlertDialogStyle{
 		Scrim:   m.Scrim,
 		Panel:   m.Panel,
 		Header:  Style{Direction: Row, Align: Center, Gap: 10},
@@ -72,15 +73,14 @@ func alertDialogDefaults(t *Theme, i AlertDialogIntent) AlertDialogStyle {
 	}
 }
 
-// resolveAlertDialog returns the look of an alert dialog of intent i: the
+// resolveAlertDialog sets st to the look of an alert dialog of intent i: the
 // defaults, merged with the theme's AlertDialog and then the instance's Styles.
 // Under high contrast the two overrides are plain (see plainStyle).
-func resolveAlertDialog(ctx *Context, i AlertDialogIntent, inst AlertDialogStyle) AlertDialogStyle {
+func resolveAlertDialog(ctx *Context, i AlertDialogIntent, inst, st *AlertDialogStyle) {
 	t := ctx.Theme()
-	st := alertDialogDefaults(t, i)
+	alertDialogDefaults(st, t, i)
 	st.layered(ctx,
-		themeLayer(&t.AlertDialog), instanceLayer(&inst))
-	return st
+		themeLayer(&t.AlertDialog), instanceLayer(inst))
 }
 
 // AlertDialogElement is a modal dialog that asks the user to respond to a
@@ -180,8 +180,10 @@ func (a *AlertDialogElement) ConfirmLoading(on bool) *AlertDialogElement { a.loa
 // Styles sets the look of the parts of the dialog, for this instance only. Set
 // fields win over the theme's AlertDialog and the defaults; see AlertDialogStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
-func (a *AlertDialogElement) Styles(st AlertDialogStyle) *AlertDialogElement {
-	a.styles.mergeFrom(&st, false)
+func (a *AlertDialogElement) Styles(st AlertDialogStyle) *AlertDialogElement { return a.stylesOf(&st) }
+
+func (a *AlertDialogElement) stylesOf(st *AlertDialogStyle) *AlertDialogElement {
+	a.styles.mergeFrom(st, false)
 	return a
 }
 
@@ -205,7 +207,8 @@ func alertDialogIcon(i AlertDialogIntent) *icons.Icon {
 
 func (a *AlertDialogElement) expand(ctx *Context) Element {
 	strs := ctx.Strings()
-	st := resolveAlertDialog(ctx, a.intent, a.styles)
+	var st AlertDialogStyle
+	resolveAlertDialog(ctx, a.intent, &a.styles, &st)
 	destructive := a.intent == AlertDialogDestructive
 
 	label := a.confirmLabel
@@ -247,11 +250,11 @@ func (a *AlertDialogElement) expand(ctx *Context) Element {
 	if a.iconSet {
 		ic = a.icon
 	}
-	header := Div().asPart("AlertDialog.Header").Style(st.Header).Shrink(0)
+	header := Div().asPart("AlertDialog.Header").styleOf(&st.Header).Shrink(0)
 	if ic != nil {
-		header.Child(Div().asPart("AlertDialog.Icon").Style(st.Icon).Child(Icon(ic).Size(20)))
+		header.Child(Div().asPart("AlertDialog.Icon").styleOf(&st.Icon).Child(Icon(ic).Size(20)))
 	}
-	header.Child(Div().asPart("AlertDialog.Title").Style(st.Title).Child(Text(a.title)))
+	header.Child(Div().asPart("AlertDialog.Title").styleOf(&st.Title).Child(Text(a.title)))
 
 	// The message is the panel's description, linked by its key.
 	msgKey := "jamb.alertdialog/message"
@@ -261,7 +264,7 @@ func (a *AlertDialogElement) expand(ctx *Context) Element {
 	body := Div().Column().Gap(st.Body.Gap)
 	describedBy := ""
 	if a.message != "" {
-		body.Child(Div().asPart("AlertDialog.Message").Style(st.Message).Child(Text(a.message).Key(msgKey)))
+		body.Child(Div().asPart("AlertDialog.Message").styleOf(&st.Message).Child(Text(a.message).Key(msgKey)))
 		describedBy = msgKey
 	}
 	if a.body != nil {

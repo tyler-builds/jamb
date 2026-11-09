@@ -16,11 +16,11 @@ type TagStyle struct {
 	Remove Style // the box around the remove button
 }
 
-// tagDefaults returns the built-in look of a tag: a small rounded chip in the
+// tagDefaults sets d to the built-in look of a tag: a small rounded chip in the
 // surface color, with the text color. Under high contrast the chip is an outlined
 // empty box.
-func tagDefaults(t *Theme) TagStyle {
-	d := TagStyle{
+func tagDefaults(d *TagStyle, t *Theme) {
+	*d = TagStyle{
 		Tag: Style{Direction: Row, Align: Center, Gap: 6, NoShrink: true, Radius: 6, Padding: XY(8, 3),
 			Background: t.SurfaceActive, fitWidth: true},
 		Label:  Style{FontSize: 13, FontWeight: FontMedium, TextColor: t.Text},
@@ -29,25 +29,23 @@ func tagDefaults(t *Theme) TagStyle {
 	if t.HighContrast {
 		d.Tag.Background, d.Tag.BorderWidth, d.Tag.BorderColor = t.Surface, 1, t.Text
 	}
-	return d
 }
 
-// resolveTag returns the look of a tag: the defaults, merged with the theme's Tag
+// resolveTag sets st to the look of a tag: the defaults, merged with the theme's Tag
 // and then the instance's Styles. Under high contrast the two overrides are plain
 // (see plainStyle).
-func resolveTag(ctx *Context, inst TagStyle) TagStyle {
+func resolveTag(ctx *Context, inst, st *TagStyle) {
 	t := ctx.Theme()
-	st := tagDefaults(t)
+	tagDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Tag), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Tag), instanceLayer(inst))
 }
 
 // tagTint returns the look of a tag of color c: a fill of c at about 14% alpha, a
 // border of c at about 32%, and the icon in c (see Tag.Color). The text keeps the
 // theme's text color.
-func tagTint(c Color) TagStyle {
-	return TagStyle{Tag: Style{Background: c.Alpha(0.14), BorderWidth: 1, BorderColor: c.Alpha(0.32)}}
+func tagTint(st *TagStyle, c Color) {
+	*st = TagStyle{Tag: Style{Background: c.Alpha(0.14), BorderWidth: 1, BorderColor: c.Alpha(0.32)}}
 }
 
 // TagElement is a small rounded chip with a text, for a label or a filter. A tag
@@ -111,23 +109,27 @@ func (g *TagElement) GridSpan(cols, rows int) *TagElement { g.size.setSpan(cols,
 // Styles sets the look of the parts of the tag, for this instance only. Set fields
 // win over the theme's Tag and the defaults; see TagStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
-func (g *TagElement) Styles(st TagStyle) *TagElement {
-	g.styles.mergeFrom(&st, false)
+func (g *TagElement) Styles(st TagStyle) *TagElement { return g.stylesOf(&st) }
+
+func (g *TagElement) stylesOf(st *TagStyle) *TagElement {
+	g.styles.mergeFrom(st, false)
 	return g
 }
 
 func (g *TagElement) expand(ctx *Context) Element {
-	inst := g.styles
+	inst := &g.styles
 	if !g.color.IsZero() {
 		// The tint is an instance layer under the Styles, so Styles wins over it. Under
 		// high contrast the instance layer is plain, and the tint is dropped with its colors.
-		inst = tagTint(g.color)
+		inst = new(TagStyle)
+		tagTint(inst, g.color)
 		inst.mergeFrom(&g.styles, false)
 	}
-	st := resolveTag(ctx, inst)
+	var st TagStyle
+	resolveTag(ctx, inst, &st)
 	strs := ctx.Strings()
 	// The tag is a group named by its text, so it is read as one thing.
-	tag := Div().asPart("Tag.Tag").Style(st.Tag).Role(access.RoleGroup).Label(g.text).Tooltip(g.tooltip)
+	tag := Div().asPart("Tag.Tag").styleOf(&st.Tag).Role(access.RoleGroup).Label(g.text).Tooltip(g.tooltip)
 	if g.icon != nil {
 		icon := Icon(g.icon).Size(14)
 		if !g.color.IsZero() && !ctx.Theme().HighContrast {
@@ -135,9 +137,9 @@ func (g *TagElement) expand(ctx *Context) Element {
 		}
 		tag.Child(icon)
 	}
-	tag.Child(Div().asPart("Tag.Label").Style(st.Label).Child(Text(g.text).Truncate()))
+	tag.Child(Div().asPart("Tag.Label").styleOf(&st.Label).Child(Text(g.text).Truncate()))
 	if g.onRemove != nil {
-		tag.Child(Div().asPart("Tag.Remove").Style(st.Remove).Child(
+		tag.Child(Div().asPart("Tag.Remove").styleOf(&st.Remove).Child(
 			IconButton(icons.X).Label(strs.Remove(g.text)).Small().Ghost().OnClick(g.onRemove)))
 	}
 	return g.size.apply(tag)

@@ -17,11 +17,11 @@ type KbdStyle struct {
 	Key Style // one key cap: its shape, fill, border and text
 }
 
-// kbdDefaults returns the built-in look of a keyboard shortcut: small caps in the
+// kbdDefaults sets d to the built-in look of a keyboard shortcut: small caps in the
 // surface color, with a border that is heavier at the bottom, and muted text.
 // Under high contrast the caps are outlined in the text color.
-func kbdDefaults(t *Theme) KbdStyle {
-	d := KbdStyle{
+func kbdDefaults(d *KbdStyle, t *Theme) {
+	*d = KbdStyle{
 		Kbd: Style{Direction: Row, Align: Center, Gap: 6, NoShrink: true, fitWidth: true},
 		Key: Style{Direction: Row, Align: Center, Justify: Center, NoShrink: true, MinWidth: Px(20),
 			Padding: XY(5, 1), Radius: 4, Background: t.Surface, BorderColor: t.Border, FontSize: 12,
@@ -30,18 +30,16 @@ func kbdDefaults(t *Theme) KbdStyle {
 	if t.HighContrast {
 		d.Key.BorderColor, d.Key.TextColor = t.Text, t.Text
 	}
-	return d
 }
 
-// resolveKbd returns the look of a keyboard shortcut: the defaults, merged with
+// resolveKbd sets st to the look of a keyboard shortcut: the defaults, merged with
 // the theme's Kbd and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveKbd(ctx *Context, inst KbdStyle) KbdStyle {
+func resolveKbd(ctx *Context, inst, st *KbdStyle) {
 	t := ctx.Theme()
-	st := kbdDefaults(t)
+	kbdDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Kbd), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Kbd), instanceLayer(inst))
 }
 
 // KbdElement shows a keyboard shortcut as key caps, such as Ctrl, Shift and P for
@@ -105,21 +103,24 @@ func (k *KbdElement) GridSpan(cols, rows int) *KbdElement { k.size.setSpan(cols,
 // Styles sets the look of the parts of the shortcut, for this instance only. Set
 // fields win over the theme's Kbd and the defaults; see KbdStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (k *KbdElement) Styles(st KbdStyle) *KbdElement {
-	k.styles.mergeFrom(&st, false)
+func (k *KbdElement) Styles(st KbdStyle) *KbdElement { return k.stylesOf(&st) }
+
+func (k *KbdElement) stylesOf(st *KbdStyle) *KbdElement {
+	k.styles.mergeFrom(st, false)
 	return k
 }
 
 func (k *KbdElement) expand(ctx *Context) Element {
-	st := resolveKbd(ctx, k.styles)
+	var st KbdStyle
+	resolveKbd(ctx, &k.styles, &st)
 	// The shortcut is one static text, such as "Ctrl+Shift+P", so it is read as
 	// one thing; the caps under it are hidden.
-	row := Div().asPart("Kbd.Kbd").Style(st.Kbd).Role(access.RoleStaticText).Label(k.name).Tooltip(k.tooltip)
+	row := Div().asPart("Kbd.Kbd").styleOf(&st.Kbd).Role(access.RoleStaticText).Label(k.name).Tooltip(k.tooltip)
 	for _, keys := range k.strokes {
 		// The caps of one stroke sit close together; the row's Gap spaces the strokes.
 		stroke := Div().Row().Align(Center).Gap(3).AccessHidden()
 		for _, name := range keys {
-			stroke.Child(Div().asPart("Kbd.Key").Style(st.Key).Child(Text(name).NoWrap()))
+			stroke.Child(Div().asPart("Kbd.Key").styleOf(&st.Key).Child(Text(name).NoWrap()))
 		}
 		row.Child(stroke)
 	}

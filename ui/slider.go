@@ -34,10 +34,10 @@ type SliderStyle struct {
 	ValueText         Style // the readout beside the track
 }
 
-// sliderDefaults returns the built-in look of a slider, from the colors of t.
+// sliderDefaults sets d to the built-in look of a slider, from the colors of t.
 // Under high contrast the parts are outlined and filled with the text color, or
 // with Highlight for the fill; a disabled slider is all GrayText, with no dimming.
-func sliderDefaults(t *Theme, disabled bool) SliderStyle {
+func sliderDefaults(d *SliderStyle, t *Theme, disabled bool) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	fill, edge, readout := t.Accent, t.Text, t.TextMuted
 	thumbFill, thumbEdge := t.Accent, t.Surface
@@ -47,7 +47,7 @@ func sliderDefaults(t *Theme, disabled bool) SliderStyle {
 	if disabled && t.HighContrast {
 		fill, edge, readout, thumbFill = t.Disabled, t.Disabled, t.Disabled, t.Disabled
 	}
-	d := SliderStyle{
+	*d = SliderStyle{
 		Track:             Style{Height: Px(22), Radius: 11},
 		TrackFocusVisible: Style{Shadows: []Shadow{ring}},
 		Rail:              Style{Height: Px(4), Radius: 2, OverflowX: OverflowHidden, OverflowY: OverflowHidden, Background: t.SurfaceActive},
@@ -65,18 +65,16 @@ func sliderDefaults(t *Theme, disabled bool) SliderStyle {
 		d.Thumb.Shadows = nil
 		d.ThumbHover, d.ThumbPressed = Style{}, Style{}
 	}
-	return d
 }
 
-// resolveSlider returns the look of a slider: the defaults, merged with the
+// resolveSlider sets st to the look of a slider: the defaults, merged with the
 // theme's Slider and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveSlider(ctx *Context, disabled bool, inst SliderStyle) SliderStyle {
+func resolveSlider(ctx *Context, disabled bool, inst, st *SliderStyle) {
 	t := ctx.Theme()
-	st := sliderDefaults(t, disabled)
+	sliderDefaults(st, t, disabled)
 	st.layered(ctx,
-		themeLayer(&t.Slider), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Slider), instanceLayer(inst))
 }
 
 // sliderMinWidth is the narrowest a slider is by default, in logical pixels.
@@ -169,8 +167,10 @@ func (s *SliderElement) OnChange(fn func(float64)) *SliderElement { s.onChange =
 // Styles sets the look of the parts of the slider, for this instance only. Set
 // fields win over the theme's Slider and the defaults; see SliderStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (s *SliderElement) Styles(st SliderStyle) *SliderElement {
-	s.styles.mergeFrom(&st, false)
+func (s *SliderElement) Styles(st SliderStyle) *SliderElement { return s.stylesOf(&st) }
+
+func (s *SliderElement) stylesOf(st *SliderStyle) *SliderElement {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
@@ -214,7 +214,8 @@ func (s *SliderElement) at(e *MouseEvent) float64 {
 func (s *SliderElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
-		st := resolveSlider(ctx, s.disabled, s.styles)
+		var st SliderStyle
+		resolveSlider(ctx, s.disabled, &s.styles, &st)
 		v := s.value.Get()
 		dragging := Local(ctx, "dragging", false)
 		small, large := s.steps()
@@ -232,31 +233,31 @@ func (s *SliderElement) expand(ctx *Context) Element {
 
 		// The track is one focusable element. Its rail and thumb are drawn over it
 		// and are not part of the access tree.
-		fill := Div().asPart("Slider.Fill").Height(Full).Style(st.Fill).Grow(f)
-		rail := Div().asPart("Slider.Rail").Row().Style(st.Rail).Grow(1).
+		fill := Div().asPart("Slider.Fill").Height(Full).styleOf(&st.Fill).Grow(f)
+		rail := Div().asPart("Slider.Rail").Row().styleOf(&st.Rail).Grow(1).
 			Child(fill).
 			Child(Div().Height(Full).Grow(1 - f))
 		// While the thumb is dragged the pointer is over it, so its hover style is
 		// left off and ThumbPressed shows instead.
-		thumb := Div().asPart("Slider.Thumb").Style(st.Thumb).Size(Px(sliderThumb), Px(sliderThumb)).Shrink(0)
+		thumb := Div().asPart("Slider.Thumb").styleOf(&st.Thumb).Size(Px(sliderThumb), Px(sliderThumb)).Shrink(0)
 		if dragging.Get() {
-			thumb.Style(st.ThumbPressed)
+			thumb.styleOf(&st.ThumbPressed)
 		} else if !s.disabled {
-			thumb.Hover(st.ThumbHover)
+			thumb.hoverOf(&st.ThumbHover)
 		}
 		overlay := Div().Absolute().Inset(0).Row().Align(Center).
 			Child(Div().Grow(f)).Child(thumb).Child(Div().Grow(1 - f))
-		track := Div().asPart("Slider.Track").Height(Px(22)).Grow(1).Shrink(1).Style(st.Track).
+		track := Div().asPart("Slider.Track").Height(Px(22)).Grow(1).Shrink(1).styleOf(&st.Track).
 			Child(Div().Row().Height(Px(22)).Align(Center).PaddingX(sliderThumb / 2).Child(rail)).
 			Child(overlay).
 			Tooltip(s.tooltip)
 
 		readout := fmtValue(s, v)
-		value := Div().asPart("Slider.ValueText").AccessHidden().MinWidth(Px(44)).Align(End).Style(st.ValueText).
+		value := Div().asPart("Slider.ValueText").AccessHidden().MinWidth(Px(44)).Align(End).styleOf(&st.ValueText).
 			Child(Text(readout))
 		// The default minimum keeps the track usable in a container with no width of its
 		// own, where a percentage has nothing to take.
-		root := Div().Row().Align(Center).Gap(12).Width(Full).Style(Style{MinWidth: Px(sliderMinWidth)}).
+		root := Div().Row().Align(Center).Gap(12).Width(Full).styleOf(&Style{MinWidth: Px(sliderMinWidth)}).
 			Child(track).
 			Child(value)
 		s.size.apply(root)
@@ -284,7 +285,7 @@ func (s *SliderElement) expand(ctx *Context) Element {
 		if s.focusHandle != nil {
 			track.FocusHandle(s.focusHandle)
 		}
-		track.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
+		track.Cursor(CursorPointer).Focusable().focusVisibleOf(&st.TrackFocusVisible).
 			OnMouseDown(func(e *MouseEvent) {
 				if e.Button == input.ButtonLeft {
 					dragging.Set(true)

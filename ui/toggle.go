@@ -27,16 +27,17 @@ type ToggleStyle struct {
 	Icon             Style // the icon
 }
 
-// toggleDefaults returns the built-in look of a toggle of variant v (ButtonGhost
+// toggleDefaults sets d to the built-in look of a toggle of variant v (ButtonGhost
 // or ButtonSecondary), on or off, from the colors of t. At rest it is the button
 // of that variant, so a toggle sits well beside buttons. On, it has a soft accent
 // fill and an accent border, so the state is not carried by the fill alone; the
 // weight of the text does not change. Under high contrast an on toggle is
 // Highlight with HighlightText, also while hovered or pressed, and a disabled one
 // is GrayText and not dimmed.
-func toggleDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly, on, disabled bool) ToggleStyle {
-	b := buttonDefaults(t, v, size, iconOnly)
-	d := ToggleStyle{Root: b.Root, RootHover: b.RootHover, RootPressed: b.RootPressed, RootDisabled: b.RootDisabled,
+func toggleDefaults(d *ToggleStyle, t *Theme, v ButtonVariant, size controlSize, iconOnly, on, disabled bool) {
+	var b ButtonStyle
+	buttonDefaults(&b, t, v, size, iconOnly)
+	*d = ToggleStyle{Root: b.Root, RootHover: b.RootHover, RootPressed: b.RootPressed, RootDisabled: b.RootDisabled,
 		RootFocusVisible: b.RootFocusVisible, Label: b.Label, Icon: b.Icon}
 	if d.Root.BorderWidth == 0 {
 		// A ghost toggle has a border with no color at rest, so turning it on draws the
@@ -57,18 +58,16 @@ func toggleDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly, on, d
 			}
 		}
 	}
-	return d
 }
 
-// resolveToggle returns the look of a toggle: the defaults of its variant and
+// resolveToggle sets st to the look of a toggle: the defaults of its variant and
 // state, merged with the theme's Toggle and then the instance's Styles. Under high
 // contrast the two overrides are plain (see plainStyle).
-func resolveToggle(ctx *Context, v ButtonVariant, size controlSize, iconOnly, on, disabled bool, inst ToggleStyle) ToggleStyle {
+func resolveToggle(ctx *Context, v ButtonVariant, size controlSize, iconOnly, on, disabled bool, inst, st *ToggleStyle) {
 	t := ctx.Theme()
-	st := toggleDefaults(t, v, size, iconOnly, on, disabled)
+	toggleDefaults(st, t, v, size, iconOnly, on, disabled)
 	st.layered(ctx,
-		themeLayer(&t.Toggle), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Toggle), instanceLayer(inst))
 }
 
 // ToggleElement is a button that stays pressed while it is on, such as a Bold
@@ -167,8 +166,10 @@ func (b *ToggleElement) GridSpan(cols, rows int) *ToggleElement { b.size.setSpan
 // Styles sets the look of the parts of the toggle, for this instance only. Set
 // fields win over the theme's Toggle and the defaults; see ToggleStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (b *ToggleElement) Styles(st ToggleStyle) *ToggleElement {
-	b.styles.mergeFrom(&st, false)
+func (b *ToggleElement) Styles(st ToggleStyle) *ToggleElement { return b.stylesOf(&st) }
+
+func (b *ToggleElement) stylesOf(st *ToggleStyle) *ToggleElement {
+	b.styles.mergeFrom(st, false)
 	return b
 }
 
@@ -176,27 +177,28 @@ func (b *ToggleElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	on := b.on.Get()
 	iconOnly := b.iconOnly && b.icon != nil
-	st := resolveToggle(ctx, b.variant, b.ctlSize, iconOnly, on, b.disabled, b.styles)
-	d := Div().asPart("Toggle.Root").Style(st.Root)
+	var st ToggleStyle
+	resolveToggle(ctx, b.variant, b.ctlSize, iconOnly, on, b.disabled, &b.styles, &st)
+	d := Div().asPart("Toggle.Root").styleOf(&st.Root)
 	if on {
-		d.Style(st.RootChecked)
+		d.styleOf(&st.RootChecked)
 	}
 	if b.icon != nil {
-		d.Child(Div().asPart("Toggle.Icon").Style(st.Icon).Child(Icon(b.icon).Size(buttonIconSize(b.ctlSize))))
+		d.Child(Div().asPart("Toggle.Icon").styleOf(&st.Icon).Child(Icon(b.icon).Size(buttonIconSize(b.ctlSize))))
 	}
 	if !iconOnly {
-		d.Child(Div().asPart("Toggle.Label").Style(st.Label).Child(Text(b.label).NoWrap()))
+		d.Child(Div().asPart("Toggle.Label").styleOf(&st.Label).Child(Text(b.label).NoWrap()))
 	}
 	d.Role(access.RoleButton).Label(b.label).AccessChecked(on)
 	d.spaceOnly = true // Enter goes on to the modal default button, as on Windows
 	// A tooltip also shows on a disabled toggle, to say why it is disabled.
 	d.Tooltip(b.tooltip)
 	if b.disabled {
-		d.Style(st.RootDisabled).Cursor(CursorNotAllowed)
+		d.styleOf(&st.RootDisabled).Cursor(CursorNotAllowed)
 		d.access().disabled = true
 		return b.size.apply(d)
 	}
-	d.Hover(st.RootHover).Pressed(st.RootPressed)
+	d.hoverOf(&st.RootHover).pressedOf(&st.RootPressed)
 	if b.focusHandle != nil {
 		d.FocusHandle(b.focusHandle)
 	}
@@ -206,8 +208,7 @@ func (b *ToggleElement) expand(ctx *Context) Element {
 	if on && st.RootChecked.Shadows != nil {
 		shadows = st.RootChecked.Shadows
 	}
-	focus := Style{Shadows: append(slices.Clone(shadows), ring)}.Merge(st.RootFocusVisible)
-	return b.size.apply(d.Cursor(CursorPointer).Focusable().FocusVisible(focus).
+	return b.size.apply(d.Cursor(CursorPointer).Focusable().focusVisibleOf(ringStyle(shadows, ring, &st.RootFocusVisible)).
 		OnClick(func() {
 			b.on.Set(!on)
 			if b.onChange != nil {
@@ -240,13 +241,13 @@ type ToggleGroupStyle struct {
 	Icon             Style // the icon of each option
 }
 
-// toggleGroupDefaults returns the built-in look of a toggle group, from the colors
+// toggleGroupDefaults sets d to the built-in look of a toggle group, from the colors
 // of t. The row is a Secondary button split into items, at the height of a
 // button of the same size, and the selected item is filled with Accent, as the
 // selected tab of TabsSegmented is. Under high contrast the lines are the text
 // color, the selected item is Highlight with HighlightText, and a disabled item is
 // GrayText and not dimmed.
-func toggleGroupDefaults(t *Theme, size controlSize, iconOnly bool) ToggleGroupStyle {
+func toggleGroupDefaults(d *ToggleGroupStyle, t *Theme, size controlSize, iconOnly bool) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	h, _, fs := size.field()
 	px := float32(14)
@@ -263,7 +264,7 @@ func toggleGroupDefaults(t *Theme, size controlSize, iconOnly bool) ToggleGroupS
 	if t.HighContrast {
 		line = t.Text
 	}
-	d := ToggleGroupStyle{
+	*d = ToggleGroupStyle{
 		Group: Style{Direction: Row, Align: Stretch, NoShrink: true, fitWidth: true, Radius: t.Radius,
 			Background: t.Surface, BorderWidth: 1, BorderColor: line},
 		GroupInvalid: Style{BorderColor: messageIconColor(t, Style{})},
@@ -283,18 +284,16 @@ func toggleGroupDefaults(t *Theme, size controlSize, iconOnly bool) ToggleGroupS
 	} else {
 		d.Group.Shadows = []Shadow{ShadowSm}
 	}
-	return d
 }
 
-// resolveToggleGroup returns the look of a toggle group: the defaults, merged with
+// resolveToggleGroup sets st to the look of a toggle group: the defaults, merged with
 // the theme's ToggleGroup and then the instance's Styles. Under high contrast the
 // two overrides are plain (see plainStyle).
-func resolveToggleGroup(ctx *Context, size controlSize, iconOnly bool, inst ToggleGroupStyle) ToggleGroupStyle {
+func resolveToggleGroup(ctx *Context, size controlSize, iconOnly bool, inst, st *ToggleGroupStyle) {
 	t := ctx.Theme()
-	st := toggleGroupDefaults(t, size, iconOnly)
+	toggleGroupDefaults(st, t, size, iconOnly)
 	st.layered(ctx,
-		themeLayer(&t.ToggleGroup), instanceLayer(&inst))
-	return st
+		themeLayer(&t.ToggleGroup), instanceLayer(inst))
 }
 
 // ToggleGroupElement is a row of joined toggles, one per option, of which one is
@@ -378,9 +377,10 @@ func (g *ToggleGroupElement[T]) Validate(rules ...Validator[T]) *ToggleGroupElem
 func (g *ToggleGroupElement[T]) formCheck() error { return firstError(g.value.Get(), g.rules) }
 
 func (g *ToggleGroupElement[T]) formWire(w fieldWire) Element {
-	c := *g
+	c := new(ToggleGroupElement[T])
+	copyLarge(c, g)
 	c.wire = w
-	return &c
+	return c
 }
 
 // FocusHandle lets code focus the group's tab stop: the selected option, or the
@@ -425,7 +425,11 @@ func (g *ToggleGroupElement[T]) GridSpan(cols, rows int) *ToggleGroupElement[T] 
 // ToggleGroupStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (g *ToggleGroupElement[T]) Styles(st ToggleGroupStyle) *ToggleGroupElement[T] {
-	g.styles.mergeFrom(&st, false)
+	return g.stylesOf(&st)
+}
+
+func (g *ToggleGroupElement[T]) stylesOf(st *ToggleGroupStyle) *ToggleGroupElement[T] {
+	g.styles.mergeFrom(st, false)
 	return g
 }
 
@@ -437,7 +441,8 @@ func (g *ToggleGroupElement[T]) expand(ctx *Context) Element {
 		handles := Local(ctx, "handles", newHandles(len(g.options))).Peek()
 		stop := tabStop(g.options, cur, g.disabled)
 		iconOnly := g.iconOnly && slices.ContainsFunc(g.options, func(o Option[T]) bool { return o.Icon != nil })
-		st := resolveToggleGroup(ctx, g.ctlSize, iconOnly, g.styles)
+		var st ToggleGroupStyle
+		resolveToggleGroup(ctx, g.ctlSize, iconOnly, &g.styles, &st)
 		w := g.wire
 		handleOf := func(j int) *FocusHandle {
 			if j == stop && w.handle != nil {
@@ -449,7 +454,7 @@ func (g *ToggleGroupElement[T]) expand(ctx *Context) Element {
 			return handles[j]
 		}
 
-		row := Div().asPart("ToggleGroup.Group").Style(st.Group).Role(access.RoleGroup).SelectionContainer().Tooltip(g.tooltip)
+		row := Div().asPart("ToggleGroup.Group").styleOf(&st.Group).Role(access.RoleGroup).SelectionContainer().Tooltip(g.tooltip)
 		name, labelledBy := g.name, g.labelledBy
 		if w.label != "" {
 			name, labelledBy = w.label, w.labelledBy
@@ -465,7 +470,7 @@ func (g *ToggleGroupElement[T]) expand(ctx *Context) Element {
 		}
 		row.access().invalid, row.access().required = w.invalid, w.required
 		if w.invalid {
-			row.Style(st.GroupInvalid)
+			row.styleOf(&st.GroupInvalid)
 		}
 		// The first and last items round their outer corners inside the group's border.
 		inner := max(st.Group.Radius-st.Group.BorderWidth, 0)
@@ -473,7 +478,7 @@ func (g *ToggleGroupElement[T]) expand(ctx *Context) Element {
 		for i, o := range g.options {
 			on := o.Value == cur
 			dis := g.disabled || o.Disabled
-			item := Div().asPart("ToggleGroup.Item").Style(st.Item)
+			item := Div().asPart("ToggleGroup.Item").styleOf(&st.Item)
 			var c Corners
 			if i == 0 {
 				c.TopLeft, c.BottomLeft = inner, inner
@@ -482,19 +487,19 @@ func (g *ToggleGroupElement[T]) expand(ctx *Context) Element {
 				c.TopRight, c.BottomRight = inner, inner
 			}
 			if i > 0 {
-				item.Style(Style{BorderEdges: Edges{Left: 1}})
+				item.styleOf(&Style{BorderEdges: Edges{Left: 1}})
 			}
 			if !c.isZero() {
-				item.Style(Style{Corners: c})
+				item.styleOf(&Style{Corners: c})
 			}
 			if on {
-				item.Style(st.ItemSelected)
+				item.styleOf(&st.ItemSelected)
 			}
 			if o.Icon != nil {
-				item.Child(Div().asPart("ToggleGroup.Icon").Style(st.Icon).Child(Icon(o.Icon).Size(buttonIconSize(g.ctlSize))))
+				item.Child(Div().asPart("ToggleGroup.Icon").styleOf(&st.Icon).Child(Icon(o.Icon).Size(buttonIconSize(g.ctlSize))))
 			}
 			if !iconOnly || o.Icon == nil {
-				item.Child(Div().asPart("ToggleGroup.Label").Style(st.Label).Child(Text(o.Label).NoWrap()))
+				item.Child(Div().asPart("ToggleGroup.Label").styleOf(&st.Label).Child(Text(o.Label).NoWrap()))
 			}
 			if g.key != "" {
 				item.Keyf("%s/%v", g.key, o.Value)
@@ -502,15 +507,15 @@ func (g *ToggleGroupElement[T]) expand(ctx *Context) Element {
 			item.Role(access.RoleRadioButton).Label(o.Label).AccessChecked(on)
 			if dis {
 				item.access().disabled = true
-				item.Cursor(CursorNotAllowed).Style(st.ItemDisabled)
+				item.Cursor(CursorNotAllowed).styleOf(&st.ItemDisabled)
 				row.Child(item)
 				continue
 			}
 			if !on {
-				item.Hover(st.ItemHover)
+				item.hoverOf(&st.ItemHover)
 			}
-			item.Pressed(st.ItemPressed)
-			item.Cursor(CursorPointer).Focusable().FocusHandle(handleOf(i)).FocusVisible(st.ItemFocusVisible).
+			item.pressedOf(&st.ItemPressed)
+			item.Cursor(CursorPointer).Focusable().FocusHandle(handleOf(i)).focusVisibleOf(&st.ItemFocusVisible).
 				OnClick(func() { g.choose(g.options[i].Value) }).
 				OnKeyDown(func(e *KeyEvent) {
 					if e.Mods != 0 {

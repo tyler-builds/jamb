@@ -57,13 +57,13 @@ func firstLetter(word string) string {
 	return strings.ToUpper(string(r))
 }
 
-// avatarDefaults returns the built-in look of an avatar of name, whose diameter is
+// avatarDefaults sets d to the built-in look of an avatar of name, whose diameter is
 // size at the default Text size. The fill comes from avatarFill. The initials are
 // 0.4 of size: the runtime scales the font with the Text size, as expand scales the
 // circle. Under high contrast the circle is an outlined empty circle, and the
 // initials are the text color.
-func avatarDefaults(t *Theme, name string, size float32) AvatarStyle {
-	d := AvatarStyle{
+func avatarDefaults(d *AvatarStyle, t *Theme, name string, size float32) {
+	*d = AvatarStyle{
 		Avatar:   Style{Direction: Row, Align: Center, Justify: Center, NoShrink: true, Background: AvatarColor(name)},
 		Initials: Style{FontSize: size * 0.4, FontWeight: FontSemibold, TextColor: avatarInk},
 	}
@@ -71,18 +71,16 @@ func avatarDefaults(t *Theme, name string, size float32) AvatarStyle {
 		d.Avatar.Background, d.Avatar.BorderWidth, d.Avatar.BorderColor = t.Surface, 1, t.Text
 		d.Initials.TextColor = t.Text
 	}
-	return d
 }
 
-// resolveAvatar returns the look of an avatar: the defaults, merged with the
+// resolveAvatar sets st to the look of an avatar: the defaults, merged with the
 // theme's Avatar and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveAvatar(ctx *Context, name string, size float32, inst AvatarStyle) AvatarStyle {
+func resolveAvatar(ctx *Context, name string, size float32, inst, st *AvatarStyle) {
 	t := ctx.Theme()
-	st := avatarDefaults(t, name, size)
+	avatarDefaults(st, t, name, size)
 	st.layered(ctx,
-		themeLayer(&t.Avatar), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Avatar), instanceLayer(inst))
 }
 
 // AvatarElement is a circle that stands for a person: the initials of the name in
@@ -129,21 +127,24 @@ func (a *AvatarElement) AccessHidden() *AvatarElement { a.accessHidden = true; r
 // Styles sets the look of the parts of the avatar, for this instance only. Set
 // fields win over the theme's Avatar and the defaults; see AvatarStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (a *AvatarElement) Styles(st AvatarStyle) *AvatarElement {
-	a.styles.mergeFrom(&st, false)
+func (a *AvatarElement) Styles(st AvatarStyle) *AvatarElement { return a.stylesOf(&st) }
+
+func (a *AvatarElement) stylesOf(st *AvatarStyle) *AvatarElement {
+	a.styles.mergeFrom(st, false)
 	return a
 }
 
 func (a *AvatarElement) expand(ctx *Context) Element {
-	st := resolveAvatar(ctx, a.name, a.size, a.styles)
+	var st AvatarStyle
+	resolveAvatar(ctx, a.name, a.size, &a.styles, &st)
 	// The diameter is set after the style, since the circle is always round.
 	d := a.size * textScale(ctx)
-	av := Div().asPart("Avatar.Avatar").Style(st.Avatar).Size(Px(d), Px(d)).Radius(d / 2).Tooltip(a.tooltip)
+	av := Div().asPart("Avatar.Avatar").styleOf(&st.Avatar).Size(Px(d), Px(d)).Radius(d / 2).Tooltip(a.tooltip)
 	if a.src != nil {
 		// The image is hidden: the circle is the one image, and it carries the name.
 		av.Child(Div().AccessHidden().Child(Image(a.src).Size(Px(d), Px(d)).Radius(d / 2)))
 	} else if initials := AvatarInitials(a.name); initials != "" {
-		av.Child(Div().asPart("Avatar.Initials").AccessHidden().Style(st.Initials).Child(Text(initials)))
+		av.Child(Div().asPart("Avatar.Initials").AccessHidden().styleOf(&st.Initials).Child(Text(initials)))
 	}
 	if a.accessHidden {
 		av.AccessHidden()

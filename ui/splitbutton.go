@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"slices"
-
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/icons"
 	"github.com/tyler-builds/jamb/input"
@@ -40,14 +38,15 @@ type SplitButtonStyle struct {
 	Chevron           Style // the arrow's icon
 }
 
-// splitButtonDefaults returns the built-in look of a split button of variant v at
+// splitButtonDefaults sets d to the built-in look of a split button of variant v at
 // size, from the colors of t: a Button of that variant cut in two. The shadow is
 // the row's, so it is not drawn between the segments. A variant with a border keeps
 // it around both segments, and the action segment's right edge is the line between
 // them; a variant with no border draws the line on the arrow segment's left edge,
 // in a tint of its text color (the text color itself under high contrast).
-func splitButtonDefaults(t *Theme, v ButtonVariant, size controlSize) SplitButtonStyle {
-	b := buttonDefaults(t, v, size, false)
+func splitButtonDefaults(d *SplitButtonStyle, t *Theme, v ButtonVariant, size controlSize) {
+	var b ButtonStyle
+	buttonDefaults(&b, t, v, size, false)
 	r := b.Root.Radius
 	main, arrow := b.Root, b.Root
 	main.Shadows, arrow.Shadows = nil, nil
@@ -71,7 +70,7 @@ func splitButtonDefaults(t *Theme, v ButtonVariant, size controlSize) SplitButto
 		}
 		arrow.BorderEdges, arrow.BorderColor = Edges{Left: 1}, line
 	}
-	return SplitButtonStyle{
+	*d = SplitButtonStyle{
 		Root:         Style{Direction: Row, Align: Stretch, NoShrink: true, fitWidth: true, Radius: r, Shadows: b.Root.Shadows},
 		Main:         main,
 		MainHover:    b.RootHover,
@@ -89,15 +88,14 @@ func splitButtonDefaults(t *Theme, v ButtonVariant, size controlSize) SplitButto
 	}
 }
 
-// resolveSplitButton returns the look of a split button: the defaults of its
+// resolveSplitButton sets st to the look of a split button: the defaults of its
 // variant, merged with the theme's SplitButton and then the instance's Styles.
 // Under high contrast the two overrides are plain (see plainStyle).
-func resolveSplitButton(ctx *Context, v ButtonVariant, size controlSize, inst SplitButtonStyle) SplitButtonStyle {
+func resolveSplitButton(ctx *Context, v ButtonVariant, size controlSize, inst, st *SplitButtonStyle) {
 	t := ctx.Theme()
-	st := splitButtonDefaults(t, v, size)
+	splitButtonDefaults(st, t, v, size)
 	st.layered(ctx,
-		themeLayer(&t.SplitButton), instanceLayer(&inst))
-	return st
+		themeLayer(&t.SplitButton), instanceLayer(inst))
 }
 
 // SplitButtonElement is a button with a main action and a menu of related ones,
@@ -205,8 +203,10 @@ func (b *SplitButtonElement) GridSpan(cols, rows int) *SplitButtonElement {
 // Set fields win over the theme's SplitButton and the defaults of the variant; see
 // SplitButtonStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
-func (b *SplitButtonElement) Styles(st SplitButtonStyle) *SplitButtonElement {
-	b.styles.mergeFrom(&st, false)
+func (b *SplitButtonElement) Styles(st SplitButtonStyle) *SplitButtonElement { return b.stylesOf(&st) }
+
+func (b *SplitButtonElement) stylesOf(st *SplitButtonStyle) *SplitButtonElement {
+	b.styles.mergeFrom(st, false)
 	return b
 }
 
@@ -214,7 +214,8 @@ func (b *SplitButtonElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		rt, t := ctx.rt, ctx.Theme()
 		strs := ctx.Strings()
-		st := resolveSplitButton(ctx, b.variant, b.ctlSize, b.styles)
+		var st SplitButtonStyle
+		resolveSplitButton(ctx, b.variant, b.ctlSize, &b.styles, &st)
 		iconSize := buttonIconSize(b.ctlSize)
 		open := Local(ctx, "open", false)
 		items := Local(ctx, "items", []MenuItem(nil))
@@ -242,14 +243,14 @@ func (b *SplitButtonElement) expand(ctx *Context) Element {
 
 		// The focus ring of a segment is added to its shadows, as a Button's is.
 		ring := Shadow{Spread: 2, Color: t.FocusRing}
-		main := Div().asPart("SplitButton.Main").Style(st.Main).Grow(1).Role(access.RoleButton).Label(b.label)
+		main := Div().asPart("SplitButton.Main").styleOf(&st.Main).Grow(1).Role(access.RoleButton).Label(b.label)
 		busy := b.loading && !b.disabled
 		var busyRing Element
 		if busy {
 			busyRing = loadingRing(iconSize, st.Main.Merge(st.MainLoading).TextColor, t)
 		}
 		if b.icon != nil {
-			ic := Div().asPart("SplitButton.Icon").Style(st.Icon)
+			ic := Div().asPart("SplitButton.Icon").styleOf(&st.Icon)
 			if busyRing != nil {
 				ic.Child(busyRing)
 			} else {
@@ -257,7 +258,7 @@ func (b *SplitButtonElement) expand(ctx *Context) Element {
 			}
 			main.Child(ic)
 		}
-		label := Div().asPart("SplitButton.Label").Style(st.Label).Child(Text(b.label).NoWrap())
+		label := Div().asPart("SplitButton.Label").styleOf(&st.Label).Child(Text(b.label).NoWrap())
 		main.Child(label)
 		if busyRing != nil && b.icon == nil {
 			// The label keeps its room and the ring is drawn over it, as on a Button.
@@ -265,33 +266,33 @@ func (b *SplitButtonElement) expand(ctx *Context) Element {
 			main.Child(Div().Absolute().Left(0).Right(0).Top(0).Bottom(0).
 				Row().Align(Center).Justify(Center).Child(busyRing))
 		}
-		arrow := Div().asPart("SplitButton.Arrow").Style(st.Arrow).Role(access.RoleButton).Label(strs.MoreOptions).
+		arrow := Div().asPart("SplitButton.Arrow").styleOf(&st.Arrow).Role(access.RoleButton).Label(strs.MoreOptions).
 			AccessExpanded(open.Get()).
-			Child(Div().asPart("SplitButton.Chevron").Style(st.Chevron).Child(Icon(icons.ChevronDown).Size(iconSize - 2)))
+			Child(Div().asPart("SplitButton.Chevron").styleOf(&st.Chevron).Child(Icon(icons.ChevronDown).Size(iconSize - 2)))
 
-		root := Div().asPart("SplitButton.Root").Style(st.Root).Role(access.RoleGroup).Label(b.label).
+		root := Div().asPart("SplitButton.Root").styleOf(&st.Root).Role(access.RoleGroup).Label(b.label).
 			Tooltip(b.tooltip).Child(main).Child(arrow)
 		b.size.apply(root)
 		if b.disabled {
-			main.Style(st.MainDisabled).Cursor(CursorNotAllowed)
-			arrow.Style(st.ArrowDisabled).Cursor(CursorNotAllowed)
+			main.styleOf(&st.MainDisabled).Cursor(CursorNotAllowed)
+			arrow.styleOf(&st.ArrowDisabled).Cursor(CursorNotAllowed)
 			main.access().disabled, arrow.access().disabled = true, true
 			return root
 		}
 		if busy {
 			// Loading: both segments keep their focus and Tab stops, and do nothing.
-			main.Style(st.MainLoading).OnClick(func() {}).Cursor(CursorDefault).Focusable().
-				FocusVisible(Style{Shadows: append(slices.Clone(st.Main.Shadows), ring)}.Merge(st.MainFocusVisible))
-			arrow.Style(st.ArrowLoading).OnClick(func() {}).Cursor(CursorDefault).Focusable().
-				FocusVisible(Style{Shadows: append(slices.Clone(st.Arrow.Shadows), ring)}.Merge(st.ArrowFocusVisible))
+			main.styleOf(&st.MainLoading).OnClick(func() {}).Cursor(CursorDefault).Focusable().
+				focusVisibleOf(ringStyle(st.Main.Shadows, ring, &st.MainFocusVisible))
+			arrow.styleOf(&st.ArrowLoading).OnClick(func() {}).Cursor(CursorDefault).Focusable().
+				focusVisibleOf(ringStyle(st.Arrow.Shadows, ring, &st.ArrowFocusVisible))
 			if b.handle != nil {
 				main.FocusHandle(b.handle)
 			}
 			main.access().status = strs.Loading
 			return root
 		}
-		main.Hover(st.MainHover).Pressed(st.MainPressed).Focusable().
-			FocusVisible(Style{Shadows: append(slices.Clone(st.Main.Shadows), ring)}.Merge(st.MainFocusVisible))
+		main.hoverOf(&st.MainHover).pressedOf(&st.MainPressed).Focusable().
+			focusVisibleOf(ringStyle(st.Main.Shadows, ring, &st.MainFocusVisible))
 		if b.handle != nil {
 			main.FocusHandle(b.handle)
 		}
@@ -299,12 +300,12 @@ func (b *SplitButtonElement) expand(ctx *Context) Element {
 			main.OnClick(b.onClick)
 		}
 		if open.Get() {
-			arrow.Style(st.ArrowPressed)
+			arrow.styleOf(&st.ArrowPressed)
 		} else {
-			arrow.Hover(st.ArrowHover)
+			arrow.hoverOf(&st.ArrowHover)
 		}
-		arrow.Pressed(st.ArrowPressed).Focusable().
-			FocusVisible(Style{Shadows: append(slices.Clone(st.Arrow.Shadows), ring)}.Merge(st.ArrowFocusVisible)).
+		arrow.pressedOf(&st.ArrowPressed).Focusable().
+			focusVisibleOf(ringStyle(st.Arrow.Shadows, ring, &st.ArrowFocusVisible)).
 			OnClick(func() {
 				if open.Peek() {
 					closeMenu(true)
@@ -329,8 +330,8 @@ func (b *SplitButtonElement) expand(ctx *Context) Element {
 			}
 		})
 		if open.Get() {
-			m := &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: closeMenu, label: b.label,
-				st: resolveMenu(ctx, MenuStyle{})}
+			m := &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: closeMenu, label: b.label}
+			resolveMenu(ctx, &MenuStyle{}, &m.st)
 			root.Child(m.top(4))
 		}
 		return root

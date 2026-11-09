@@ -86,9 +86,9 @@ type ModalStyle struct {
 	Footer Style // the row of buttons, at the bottom
 }
 
-// modalDefaults returns the built-in look of a modal, from the colors of t.
-func modalDefaults(t *Theme) ModalStyle {
-	return ModalStyle{
+// modalDefaults sets d to the built-in look of a modal, from the colors of t.
+func modalDefaults(d *ModalStyle, t *Theme) {
+	*d = ModalStyle{
 		Scrim: Style{Background: t.Scrim},
 		Panel: Style{Width: Px(modalWidth), Background: t.Surface, BorderWidth: 1, BorderColor: t.Border,
 			Radius: 10, Shadows: []Shadow{ShadowLg}, Padding: All(20), Gap: 16},
@@ -100,22 +100,23 @@ func modalDefaults(t *Theme) ModalStyle {
 	}
 }
 
-// resolveModal returns the look of a modal: the defaults, merged with the
+// resolveModal sets st to the look of a modal: the defaults, merged with the
 // theme's Modal and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveModal(ctx *Context, inst ModalStyle) ModalStyle {
+func resolveModal(ctx *Context, inst, st *ModalStyle) {
 	t := ctx.Theme()
-	st := modalDefaults(t)
+	modalDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Modal), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Modal), instanceLayer(inst))
 }
 
 // Styles sets the look of the parts of the modal, for this instance only. Set
 // fields win over the theme's Modal and the defaults; see ModalStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (m *ModalElement) Styles(st ModalStyle) *ModalElement {
-	m.styles.mergeFrom(&st, false)
+func (m *ModalElement) Styles(st ModalStyle) *ModalElement { return m.stylesOf(&st) }
+
+func (m *ModalElement) stylesOf(st *ModalStyle) *ModalElement {
+	m.styles.mergeFrom(st, false)
 	return m
 }
 
@@ -240,14 +241,15 @@ func (m *ModalElement) expand(ctx *Context) Element {
 	var st ModalStyle
 	switch {
 	case m.alert != nil:
-		part, st = "AlertDialog", *m.alert
+		part = "AlertDialog"
+		copyLarge(&st, m.alert)
 	case m.drawer:
 		part = "Drawer"
-		st = resolveDrawer(ctx, m.side, m.styles)
+		resolveDrawer(ctx, m.side, &m.styles, &st)
 	default:
-		st = resolveModal(ctx, m.styles)
+		resolveModal(ctx, &m.styles, &st)
 	}
-	var title Element = Div().asPart(part + ".Title").Style(st.Title).Shrink(0).Child(Text(m.title))
+	var title Element = Div().asPart(part + ".Title").styleOf(&st.Title).Shrink(0).Child(Text(m.title))
 	if m.header != nil {
 		title = m.header
 	}
@@ -267,16 +269,16 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		if m.key != "" {
 			key = m.key + "/close"
 		}
-		closeBox := Div().asPart(part + ".Close").Style(st.Close).Child(
+		closeBox := Div().asPart(part + ".Close").styleOf(&st.Close).Child(
 			IconButton(icons.X).Label(ctx.Strings().Close).Small().Ghost().OnClick(closeFn).Key(key))
 		closeBox.noInitialFocus = true
-		title = Div().asPart(part+".Header").Style(st.Header).Shrink(0).Children(
-			Div().asPart(part+".Title").Style(st.Title).Grow(1).Child(Text(m.title)),
+		title = Div().asPart(part+".Header").styleOf(&st.Header).Shrink(0).Children(
+			Div().asPart(part+".Title").styleOf(&st.Title).Grow(1).Child(Text(m.title)),
 			closeBox)
 	}
 	spec := &modalSpec{def: m.def, initial: m.initial, nonModal: m.nonModal, close: closeFn}
 
-	footer := Div().asPart(part + ".Footer").Style(st.Footer).Shrink(0).Children(m.footer...)
+	footer := Div().asPart(part + ".Footer").styleOf(&st.Footer).Shrink(0).Children(m.footer...)
 	footer.noInitialFocus = true
 	// The panel is at most the window's height less the margin, so its title and footer
 	// stay on screen. A body that does not fit scrolls, and the focus reveals the field
@@ -299,7 +301,7 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		}
 		enter, exit = Fade().Slide(dx, dy), Fade().Slide(dx, dy)
 	}
-	panel := Div().asPart(part+".Panel").Style(st.Panel).
+	panel := Div().asPart(part+".Panel").styleOf(&st.Panel).
 		// The panel and the backdrop take focus by click, so a click on either
 		// does not leave the modal without focus. Neither is in the Tab order.
 		Focusable().TabStop(false).
@@ -308,7 +310,7 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		// A press on the panel is not a press on the backdrop behind it.
 		OnMouseDown(func(e *MouseEvent) { e.StopPropagation() }).
 		Child(title).
-		Child(Div().asPart(part + ".Body").Style(st.Body).Grow(1).ScrollY().Child(m.body)).
+		Child(Div().asPart(part + ".Body").styleOf(&st.Body).Grow(1).ScrollY().Child(m.body)).
 		Child(footer).
 		Role(role).Label(m.title)
 	if !m.nonModal {
@@ -368,7 +370,7 @@ func (m *ModalElement) expand(ctx *Context) Element {
 	}
 	// The backdrop's padding is the margin around the panel, so a panel of 100% is the
 	// window less the margin.
-	backdrop := Div().asPart(part+".Scrim").Absolute().Inset(0).Style(st.Scrim).Padding(margin).
+	backdrop := Div().asPart(part+".Scrim").Absolute().Inset(0).styleOf(&st.Scrim).Padding(margin).
 		Focusable().TabStop(false).
 		Enter(Fade(), Animation{Duration: ctx.Theme().Motion.enter(140 * time.Millisecond)}).
 		Exit(Fade(), Animation{Duration: ctx.Theme().Motion.exit(90 * time.Millisecond)}).

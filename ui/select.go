@@ -42,15 +42,15 @@ type SelectStyle struct {
 // logical pixels. It scales with the Text size.
 const selectWidth = 220
 
-// selectDefaults returns the built-in look of a select of the given width, from
+// selectDefaults sets d to the built-in look of a select of the given width, from
 // the colors of t. Under high contrast a disabled select is all GrayText.
-func selectDefaults(t *Theme, width float32, disabled bool, size controlSize) SelectStyle {
+func selectDefaults(d *SelectStyle, t *Theme, width float32, disabled bool, size controlSize) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	placeholder, chevron := t.TextSubtle, t.TextMuted
 	if disabled && t.HighContrast {
 		placeholder, chevron = t.Disabled, t.Disabled
 	}
-	d := SelectStyle{
+	*d = SelectStyle{
 		Trigger: Style{Direction: Row, Align: Center, Gap: 8, Width: Px(width), MinHeight: Px(34),
 			Padding: XY(10, 0), Radius: t.Radius, Background: t.Surface, BorderWidth: 1, BorderColor: t.BorderStrong,
 			Transition: t.Motion.hover(), Spring: t.Motion.Spring, TextColor: t.Text},
@@ -80,18 +80,16 @@ func selectDefaults(t *Theme, width float32, disabled bool, size controlSize) Se
 		d.TriggerDisabled = Style{Opacity: 0.5}
 		d.OptionHighlighted = Style{Background: t.AccentSoft}
 	}
-	return d
 }
 
-// resolveSelect returns the look of a select: the defaults, merged with the
+// resolveSelect sets st to the look of a select: the defaults, merged with the
 // theme's Select and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveSelect(ctx *Context, width float32, disabled bool, size controlSize, inst SelectStyle) SelectStyle {
+func resolveSelect(ctx *Context, width float32, disabled bool, size controlSize, inst, st *SelectStyle) {
 	t := ctx.Theme()
-	st := selectDefaults(t, width, disabled, size)
+	selectDefaults(st, t, width, disabled, size)
 	st.layered(ctx,
-		themeLayer(&t.Select), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Select), instanceLayer(inst))
 }
 
 // SelectElement is a drop-down list: a field that shows the chosen option, and
@@ -171,9 +169,10 @@ func (s *SelectElement[T]) Validate(rules ...Validator[T]) *SelectElement[T] {
 func (s *SelectElement[T]) formCheck() error { return firstError(s.value.Get(), s.rules) }
 
 func (s *SelectElement[T]) formWire(w fieldWire) Element {
-	c := *s
+	c := new(SelectElement[T])
+	copyLarge(c, s)
 	c.wire = w
-	return &c
+	return c
 }
 
 func (*SelectElement[T]) isElement()           {}
@@ -237,8 +236,10 @@ func (s *SelectElement[T]) GridSpan(cols, rows int) *SelectElement[T] {
 // Styles sets the look of the parts of the select, for this instance only. Set
 // fields win over the theme's Select and the defaults; see SelectStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (s *SelectElement[T]) Styles(st SelectStyle) *SelectElement[T] {
-	s.styles.mergeFrom(&st, false)
+func (s *SelectElement[T]) Styles(st SelectStyle) *SelectElement[T] { return s.stylesOf(&st) }
+
+func (s *SelectElement[T]) stylesOf(st *SelectStyle) *SelectElement[T] {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
@@ -277,7 +278,8 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
 		strs := ctx.Strings()
-		st := resolveSelect(ctx, selectWidth*textScale(ctx), s.disabled, s.ctlSize, s.styles)
+		var st SelectStyle
+		resolveSelect(ctx, selectWidth*textScale(ctx), s.disabled, s.ctlSize, &s.styles, &st)
 		cur := s.value.Get()
 		sel := indexOf(s.options, cur)
 		open := Local(ctx, "open", false)
@@ -378,18 +380,18 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		switch {
 		case sel >= 0 && s.renderValue != nil:
 			ps.Selected = true
-			shown = Div().asPart("Select.Value").Grow(1).MinWidth(Px(0)).ClipContent().AccessHidden().Style(st.Value).
+			shown = Div().asPart("Select.Value").Grow(1).MinWidth(Px(0)).ClipContent().AccessHidden().styleOf(&st.Value).
 				Child(s.renderValue(s.options[sel], ps))
 		case sel >= 0:
-			shown = Div().asPart("Select.Value").Grow(1).MinWidth(Px(0)).AccessHidden().Style(st.Value).
+			shown = Div().asPart("Select.Value").Grow(1).MinWidth(Px(0)).AccessHidden().styleOf(&st.Value).
 				Child(Text(label).Truncate())
 		default:
-			shown = Div().asPart("Select.Placeholder").Grow(1).MinWidth(Px(0)).AccessHidden().Style(st.Placeholder).
+			shown = Div().asPart("Select.Placeholder").Grow(1).MinWidth(Px(0)).AccessHidden().styleOf(&st.Placeholder).
 				Child(Text(s.placeholder).Truncate())
 		}
-		field := Div().asPart("Select.Trigger").Style(st.Trigger).Tooltip(s.tooltip).
+		field := Div().asPart("Select.Trigger").styleOf(&st.Trigger).Tooltip(s.tooltip).
 			Child(shown).
-			Child(Div().asPart("Select.Chevron").Shrink(0).Style(st.Chevron).Child(Icon(chevron).Size(16)))
+			Child(Div().asPart("Select.Chevron").Shrink(0).styleOf(&st.Chevron).Child(Icon(chevron).Size(16)))
 		a := field.access()
 		field.Role(access.RoleComboBox).AccessExpanded(open.Get())
 		a.value, a.readOnly = label, true
@@ -409,7 +411,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		a.invalid, a.required = w.invalid, w.required
 		hover := st.TriggerHover
 		if w.invalid {
-			field.Style(st.TriggerInvalid)
+			field.styleOf(&st.TriggerInvalid)
 			hover = st.TriggerInvalid
 		}
 		if w.onBlur != nil {
@@ -419,11 +421,11 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 		if s.disabled {
 			field.Cursor(CursorNotAllowed)
 			a.disabled = true
-			field.Style(st.TriggerDisabled)
+			field.styleOf(&st.TriggerDisabled)
 			return s.size.apply(field)
 		}
-		field.Cursor(CursorPointer).Hover(hover).
-			FocusVisible(st.TriggerFocusVisible).
+		field.Cursor(CursorPointer).hoverOf(&hover).
+			focusVisibleOf(&st.TriggerFocusVisible).
 			OnClick(func() {
 				if open.Peek() {
 					shut(true)
@@ -464,7 +466,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 			})
 
 		if open.Get() {
-			field.Child(s.list(st, t, sel, hl.Get(), shut, choose, func(r rune) int {
+			field.Child(s.list(&st, t, sel, hl.Get(), shut, choose, func(r rune) int {
 				return search(r, hl.Peek())
 			}, func(i int) { hl.Set(i) }, strs))
 		}
@@ -475,7 +477,7 @@ func (s *SelectElement[T]) expand(ctx *Context) Element {
 // list is the open list of the field: an overlay below it, which takes focus.
 // Its rows are list items, the chosen one is selected, and the highlighted one
 // is the row that has focus.
-func (s *SelectElement[T]) list(st SelectStyle, t *Theme, sel, hl int, shut func(bool), choose func(int),
+func (s *SelectElement[T]) list(st *SelectStyle, t *Theme, sel, hl int, shut func(bool), choose func(int),
 	search func(rune) int, highlight func(int), strs *Strings) Element {
 	name := s.name
 	if name == "" {
@@ -511,7 +513,7 @@ func (s *SelectElement[T]) list(st SelectStyle, t *Theme, sel, hl int, shut func
 		}
 		e.StopPropagation()
 	}
-	panel := Div().asPart("Select.Popup").Key("jamb.listbox").Column().Style(st.Popup).
+	panel := Div().asPart("Select.Popup").Key("jamb.listbox").Column().styleOf(&st.Popup).
 		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: t.Motion.enter(140 * time.Millisecond)}).
 		Exit(Fade().Grow(0.98), Animation{Duration: t.Motion.exit(90 * time.Millisecond)}).
 		Overlay(BelowStart).OverlayGap(4).
@@ -545,7 +547,7 @@ func (s *SelectElement[T]) list(st SelectStyle, t *Theme, sel, hl int, shut func
 			if on {
 				mark.Child(Icon(icons.Check).Size(14))
 			}
-			row := Div().asPart("Select.Option").Style(style).
+			row := Div().asPart("Select.Option").styleOf(&style).
 				Role(access.RoleListItem).AccessSelected(on).Label(o.Label).Child(mark)
 			if s.renderOption != nil {
 				row.Child(Div().AccessHidden().Child(s.renderOption(o, ps)))

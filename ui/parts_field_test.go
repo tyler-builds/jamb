@@ -151,7 +151,9 @@ func TestFieldOverridesUnderHighContrast(t *testing.T) {
 	r.rt.SetSystemSettings(SystemSettings{HighContrast: true, Colors: HighContrastBlack()})
 	r.frame()
 	th = r.rt.theme
-	if got := resolveNumberInput(layerCtx(th), SpinInline, 1, false, false, sizeDefault, NumberInputStyle{}).FrameInvalid.BorderColor; got != th.Text {
+	var look NumberInputStyle
+	resolveNumberInput(layerCtx(th), SpinInline, 1, false, false, sizeDefault, &NumberInputStyle{}, &look)
+	if got := look.FrameInvalid.BorderColor; got != th.Text {
 		t.Errorf("high contrast: the invalid frame is drawn in %v, want the text color %v", got, th.Text)
 	}
 	focusNode(r, r.keyed(t, "nf"))
@@ -240,12 +242,12 @@ func TestTextAreaMinRowsFollowTextScale(t *testing.T) {
 // theme's selection keeps its text color.
 func TestFieldSelectionUnderHighContrast(t *testing.T) {
 	hc := HighContrastTheme(HighContrastBlack(), DarkTheme())
-	sel := fieldDefaults(hc, fieldLayout{}).Selection
+	sel := look(func(st *FieldStyle) { fieldDefaults(st, hc, fieldLayout{}) }).Selection
 	if sel.Background != hc.Accent || sel.TextColor != hc.AccentText {
 		t.Errorf("high contrast selection: background %v text %v, want Highlight %v with HighlightText %v",
 			sel.Background, sel.TextColor, hc.Accent, hc.AccentText)
 	}
-	if got := fieldDefaults(DarkTheme(), fieldLayout{}).Selection.TextColor; !got.IsZero() {
+	if got := look(func(st *FieldStyle) { fieldDefaults(st, DarkTheme(), fieldLayout{}) }).Selection.TextColor; !got.IsZero() {
 		t.Errorf("normal selection sets a text color %v, want none", got)
 	}
 }

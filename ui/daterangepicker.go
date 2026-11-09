@@ -57,64 +57,65 @@ type DateRangePickerStyle struct {
 	DayFocusVisible Style
 }
 
-// dates returns the parts that a date picker's field and calendar have, which the range's
+// dates sets d to the parts that a date picker's field and calendar have, which the range's
 // DayInRange is not among.
-func (s DateRangePickerStyle) dates() DatePickerStyle {
-	return DatePickerStyle{
-		Field:           s.Field,
-		CalendarButton:  s.CalendarButton,
-		Message:         s.Message,
-		Popup:           s.Popup,
-		Header:          s.Header,
-		NavButton:       s.NavButton,
-		WeekdayLabel:    s.WeekdayLabel,
-		Day:             s.Day,
-		DayHover:        s.DayHover,
-		DaySelected:     s.DaySelected,
-		DayToday:        s.DayToday,
-		DayDisabled:     s.DayDisabled,
-		DayOutsideMonth: s.DayOutsideMonth,
-		DayFocusVisible: s.DayFocusVisible,
-	}
+func (s *DateRangePickerStyle) dates(d *DatePickerStyle) {
+	*d = DatePickerStyle{}
+	copyLarge(&d.Field, &s.Field)
+	copyLarge(&d.CalendarButton, &s.CalendarButton)
+	copyLarge(&d.Message, &s.Message)
+	copyLarge(&d.Popup, &s.Popup)
+	copyLarge(&d.Header, &s.Header)
+	copyLarge(&d.NavButton, &s.NavButton)
+	copyLarge(&d.WeekdayLabel, &s.WeekdayLabel)
+	copyLarge(&d.Day, &s.Day)
+	copyLarge(&d.DayHover, &s.DayHover)
+	copyLarge(&d.DaySelected, &s.DaySelected)
+	copyLarge(&d.DayToday, &s.DayToday)
+	copyLarge(&d.DayDisabled, &s.DayDisabled)
+	copyLarge(&d.DayOutsideMonth, &s.DayOutsideMonth)
+	copyLarge(&d.DayFocusVisible, &s.DayFocusVisible)
 }
 
 // rangeStyle returns the parts of a date range picker: the parts of d, which are those of a date
 // picker, and the look of the days between the ends of the range, in.
-func rangeStyle(d DatePickerStyle, in Style) DateRangePickerStyle {
-	return DateRangePickerStyle{
-		Field:           d.Field,
-		CalendarButton:  d.CalendarButton,
-		Message:         d.Message,
-		Popup:           d.Popup,
-		Header:          d.Header,
-		NavButton:       d.NavButton,
-		WeekdayLabel:    d.WeekdayLabel,
-		Day:             d.Day,
-		DayHover:        d.DayHover,
-		DaySelected:     d.DaySelected,
-		DayInRange:      in,
-		DayToday:        d.DayToday,
-		DayDisabled:     d.DayDisabled,
-		DayOutsideMonth: d.DayOutsideMonth,
-		DayFocusVisible: d.DayFocusVisible,
-	}
+func rangeStyle(st *DateRangePickerStyle, d *DatePickerStyle, in *Style) {
+	*st = DateRangePickerStyle{}
+	copyLarge(&st.Field, &d.Field)
+	copyLarge(&st.CalendarButton, &d.CalendarButton)
+	copyLarge(&st.Message, &d.Message)
+	copyLarge(&st.Popup, &d.Popup)
+	copyLarge(&st.Header, &d.Header)
+	copyLarge(&st.NavButton, &d.NavButton)
+	copyLarge(&st.WeekdayLabel, &d.WeekdayLabel)
+	copyLarge(&st.Day, &d.Day)
+	copyLarge(&st.DayHover, &d.DayHover)
+	copyLarge(&st.DaySelected, &d.DaySelected)
+	copyLarge(&st.DayInRange, in)
+	copyLarge(&st.DayToday, &d.DayToday)
+	copyLarge(&st.DayDisabled, &d.DayDisabled)
+	copyLarge(&st.DayOutsideMonth, &d.DayOutsideMonth)
+	copyLarge(&st.DayFocusVisible, &d.DayFocusVisible)
 }
 
-// dateRangePickerDefaults returns the built-in look of a date range picker at the Text size scale,
+// dateRangePickerDefaults sets st to the built-in look of a date range picker at the Text size scale,
 // from the colors of t: the look of a date picker, and the days between the ends drawn as a band.
-func dateRangePickerDefaults(t *Theme, scale float32, disabled bool) DateRangePickerStyle {
-	return rangeStyle(datePickerDefaults(t, scale, disabled), calendarDefaults(t, scale).DayInRange)
+func dateRangePickerDefaults(st *DateRangePickerStyle, t *Theme, scale float32, disabled bool) {
+	var d DatePickerStyle
+	datePickerDefaults(&d, t, scale, disabled)
+	var c CalendarStyle
+	calendarDefaults(&c, t, scale)
+	rangeStyle(st, &d, &c.DayInRange)
 }
 
-// resolveDateRangePicker returns the look of a date range picker: the defaults, merged with the
+// resolveDateRangePicker sets st to the look of a date range picker: the defaults, merged with the
 // theme's DateRangePicker and then the instance's Styles. Under high contrast the overrides are
 // plain (see plainStyle).
-func resolveDateRangePicker(ctx *Context, scale float32, disabled bool, inst DateRangePickerStyle) DateRangePickerStyle {
+func resolveDateRangePicker(ctx *Context, scale float32, disabled bool, inst, st *DateRangePickerStyle) {
 	t := ctx.Theme()
-	st := dateRangePickerDefaults(t, scale, disabled)
+	dateRangePickerDefaults(st, t, scale, disabled)
 	st.layered(ctx,
-		themeLayer(&t.DateRangePicker), instanceLayer(&inst))
-	return st
+		themeLayer(&t.DateRangePicker), instanceLayer(inst))
 }
 
 // DateRangePickerElement is a text field for a range of days, with a calendar that opens below it.
@@ -210,9 +211,10 @@ func (d *DateRangePickerElement) formCheck() error {
 }
 
 func (d *DateRangePickerElement) formWire(w fieldWire) Element {
-	c := *d
+	c := new(DateRangePickerElement)
+	copyLarge(c, d)
 	c.wire = w
-	return &c
+	return c
 }
 
 func (*DateRangePickerElement) isElement()           {}
@@ -334,7 +336,11 @@ func (d *DateRangePickerElement) GridSpan(cols, rows int) *DateRangePickerElemen
 // win over the theme's DateRangePicker and the defaults; see DateRangePickerStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
 func (d *DateRangePickerElement) Styles(st DateRangePickerStyle) *DateRangePickerElement {
-	d.styles.mergeFrom(&st, false)
+	return d.stylesOf(&st)
+}
+
+func (d *DateRangePickerElement) stylesOf(st *DateRangePickerStyle) *DateRangePickerElement {
+	d.styles.mergeFrom(st, false)
 	return d
 }
 
@@ -418,8 +424,10 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
-		rs := resolveDateRangePicker(ctx, scale, d.disabled, d.styles)
-		st := rs.dates()
+		var rs DateRangePickerStyle
+		resolveDateRangePicker(ctx, scale, d.disabled, &d.styles, &rs)
+		var st DatePickerStyle
+		rs.dates(&st)
 		cur := dateRange{start: d.start.Get(), end: d.end.Get()}
 		// The field keeps its own text while the user types. draft is that text, and seen is the
 		// range it was last made from, so that a range set from outside replaces the text.
@@ -641,19 +649,20 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 		from, to := rangeShade(cur.start, cur.end, pending.Get(), hover.Get(), focus.Get(),
 			func(day time.Time) bool { return d.enabled(day, s) })
 
-		fst := resolveField(ctx, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, st.Field)
+		var fst FieldStyle
+		resolveField(ctx, fieldLayout{width: Full, disabled: d.disabled, size: d.ctlSize}, &st.Field, &fst)
 		if d.disabled {
 			a.disabled = true
 			root.Cursor(CursorNotAllowed)
-			frame := Div().asPart("DateRangePicker.Frame").Style(fst.Frame).Style(fst.FrameDisabled).
-				Child(Div().asPart("DateRangePicker.Text").Style(fst.Text).Grow(1).Child(Text(draft.Get()).NoWrap()))
+			frame := Div().asPart("DateRangePicker.Frame").styleOf(&fst.Frame).styleOf(&fst.FrameDisabled).
+				Child(Div().asPart("DateRangePicker.Text").styleOf(&fst.Text).Grow(1).Child(Text(draft.Get()).NoWrap()))
 			root.Child(frame)
 			return d.size.apply(root)
 		}
 
 		// The calendar button is the trailing element of the frame. It is not a Tab stop: the keys
 		// Alt+Down and F4 open the calendar from the field.
-		button := Div().asPart("DateRangePicker.CalendarButton").Style(st.CalendarButton).
+		button := Div().asPart("DateRangePicker.CalendarButton").styleOf(&st.CalendarButton).
 			Role(access.RoleButton).Label(s.ChooseDates).Cursor(CursorPointer).
 			OnClick(openCal).Child(Icon(icons.Calendar).Size(16 * scale))
 
@@ -671,10 +680,10 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, trailing: button}
 		fo.wire.invalid = isInvalid || w.invalid
 		fo.size.setWidth(Full)
-		root.Child(fo.expand(ctx, fst, false, 0))
+		root.Child(fo.expand(ctx, &fst, false, 0))
 		// The message is always in the tree, so that the field keeps its place among its siblings,
 		// and it is shown while the text is not a range that can be chosen.
-		root.Child(Div().asPart("DateRangePicker.Message").Style(st.Message).Display(isInvalid).
+		root.Child(Div().asPart("DateRangePicker.Message").styleOf(&st.Message).Display(isInvalid).
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Message))).
 			Child(Text(shown).Key(errKey)))
 
@@ -691,7 +700,9 @@ func (d *DateRangePickerElement) expand(ctx *Context) Element {
 
 		if open.Get() {
 			enabled := func(day time.Time) bool { return d.enabled(day, s) }
-			root.Child(calendarPanel(calendarView{st: st.calendar(rs.DayInRange), widget: "DateRangePicker", loc: loc,
+			cal := new(CalendarStyle)
+			st.calendar(cal, &rs.DayInRange)
+			root.Child(calendarPanel(&calendarView{st: cal, widget: "DateRangePicker", loc: loc,
 				scale: scale, from: from, to: to, focus: focus.Get(), ring: true, today: dayOf(rt.now()),
 				name: name, fallback: s.DateRangeField, move: moveTo, pick: pick, keys: keys, shut: shut,
 				enabled: enabled, hover: hovered, firstSet: d.firstSet, firstDay: d.firstDay,

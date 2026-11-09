@@ -96,12 +96,17 @@ func (l *UniformListElement) Key(k string) *UniformListElement { l.key = k; retu
 func (l *UniformListElement) Label(name string) *UniformListElement { l.label = name; return l }
 
 // Style is merged into the scroll container: size it with Height, Grow or MaxHeight.
-func (l *UniformListElement) Style(s Style) *UniformListElement { l.style = l.style.Merge(s); return l }
+func (l *UniformListElement) Style(s Style) *UniformListElement { return l.styleOf(&s) }
+
+func (l *UniformListElement) styleOf(s *Style) *UniformListElement {
+	l.style.mergeFrom(s, false)
+	return l
+}
 
 // LayoutSpring moves the list to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
 func (l *UniformListElement) LayoutSpring(s Spring) *UniformListElement {
-	return l.Style(Style{LayoutSpring: s})
+	return l.styleOf(&Style{LayoutSpring: s})
 }
 
 // Handle connects h so the list can be scrolled from code.
@@ -294,7 +299,7 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 	if l.tail != nil && to == l.count {
 		spacer.Child(Div().Key("jamb.list.tail").Absolute().Top(float32(l.count) * ls.rowH).Left(0).Right(0).Child(l.tail))
 	}
-	container := l.size.apply(Div().ScrollY().Style(l.style)).Role(access.RoleList)
+	container := l.size.apply(Div().ScrollY().styleOf(&l.style)).Role(access.RoleList)
 	if l.label != "" {
 		container.Label(l.label)
 	}

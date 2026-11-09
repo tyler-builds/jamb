@@ -54,12 +54,12 @@ type CheckboxStyle struct {
 	LabelDisabled       Style // the text when the box is disabled
 }
 
-// checkboxDefaults returns the built-in look of a check box in state s, from the
+// checkboxDefaults sets d to the built-in look of a check box in state s, from the
 // colors of t. Under high contrast the box is outlined in the text color, or in
 // Highlight when on or mixed, and a disabled box is GrayText and not dimmed.
-func checkboxDefaults(t *Theme, s CheckState, disabled bool) CheckboxStyle {
+func checkboxDefaults(d *CheckboxStyle, t *Theme, s CheckState, disabled bool) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := CheckboxStyle{
+	*d = CheckboxStyle{
 		Control:             Style{Direction: Row, Align: Center, Gap: 8, Radius: 4, NoShrink: true, fitWidth: true},
 		ControlFocusVisible: Style{Shadows: []Shadow{ring}},
 		Box: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(18), Height: Px(18), NoShrink: true,
@@ -88,18 +88,16 @@ func checkboxDefaults(t *Theme, s CheckState, disabled bool) CheckboxStyle {
 	} else if disabled {
 		d.ControlDisabled = Style{Opacity: 0.5}
 	}
-	return d
 }
 
-// resolveCheckbox returns the look of a check box in state s: the defaults,
+// resolveCheckbox sets st to the look of a check box in state s: the defaults,
 // merged with the theme's Checkbox and then the instance's Styles. Under high
 // contrast the two overrides are plain (see plainStyle).
-func resolveCheckbox(ctx *Context, s CheckState, disabled bool, inst CheckboxStyle) CheckboxStyle {
+func resolveCheckbox(ctx *Context, s CheckState, disabled bool, inst, st *CheckboxStyle) {
 	t := ctx.Theme()
-	st := checkboxDefaults(t, s, disabled)
+	checkboxDefaults(st, t, s, disabled)
 	st.layered(ctx,
-		themeLayer(&t.Checkbox), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Checkbox), instanceLayer(inst))
 }
 
 // CheckboxElement is a check box with a text label. Space, a click on the box
@@ -166,9 +164,10 @@ func (c *CheckboxElement) formCheck() error {
 }
 
 func (c *CheckboxElement) formWire(w fieldWire) Element {
-	cp := *c
+	cp := new(CheckboxElement)
+	copyLarge(cp, c)
 	cp.wire = w
-	return &cp
+	return cp
 }
 
 // CheckboxTri creates a check box that shows state, including CheckMixed. It
@@ -225,34 +224,37 @@ func (c *CheckboxElement) GridSpan(cols, rows int) *CheckboxElement {
 // Styles sets the look of the parts of the check box, for this instance only.
 // Set fields win over the theme's Checkbox and the defaults; see CheckboxStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
-func (c *CheckboxElement) Styles(st CheckboxStyle) *CheckboxElement {
-	c.styles.mergeFrom(&st, false)
+func (c *CheckboxElement) Styles(st CheckboxStyle) *CheckboxElement { return c.stylesOf(&st) }
+
+func (c *CheckboxElement) stylesOf(st *CheckboxStyle) *CheckboxElement {
+	c.styles.mergeFrom(st, false)
 	return c
 }
 
 func (c *CheckboxElement) expand(ctx *Context) Element {
 	s := c.state
 	on := s == CheckOn // a mixed box is not checked: its state is the mixed one
-	st := resolveCheckbox(ctx, s, c.disabled, c.styles)
+	var st CheckboxStyle
+	resolveCheckbox(ctx, s, c.disabled, &c.styles, &st)
 	w := c.wire
 
 	// The box is drawn from the state: a check for on, a dash for mixed and an
 	// empty box for off, so the state is not carried by color alone.
-	box := Div().asPart("Checkbox.Box").Style(st.Box)
+	box := Div().asPart("Checkbox.Box").styleOf(&st.Box)
 	switch s {
 	case CheckOn:
-		box.Style(st.BoxChecked).Child(Div().asPart("Checkbox.Mark").Style(st.Mark).Child(Icon(icons.Check).Size(14)))
+		box.styleOf(&st.BoxChecked).Child(Div().asPart("Checkbox.Mark").styleOf(&st.Mark).Child(Icon(icons.Check).Size(14)))
 	case CheckMixed:
-		box.Style(st.BoxMixed).Child(Div().asPart("Checkbox.Dash").Style(st.Dash).Child(Icon(icons.Minus).Size(14)))
+		box.styleOf(&st.BoxMixed).Child(Div().asPart("Checkbox.Dash").styleOf(&st.Dash).Child(Icon(icons.Minus).Size(14)))
 	}
-	label := Div().asPart("Checkbox.Label").Style(st.Label)
+	label := Div().asPart("Checkbox.Label").styleOf(&st.Label)
 	if c.disabled {
-		box.Style(st.BoxDisabled)
-		label.Style(st.LabelDisabled)
+		box.styleOf(&st.BoxDisabled)
+		label.styleOf(&st.LabelDisabled)
 	}
 	label.Child(Text(c.label))
 
-	row := Div().asPart("Checkbox.Control").Style(st.Control).Child(box).Child(label)
+	row := Div().asPart("Checkbox.Control").styleOf(&st.Control).Child(box).Child(label)
 	row.spaceOnly = true
 	a := row.access()
 	row.Role(access.RoleCheckBox).AccessChecked(on)
@@ -262,18 +264,18 @@ func (c *CheckboxElement) expand(ctx *Context) Element {
 		row.Description(w.description)
 	}
 	if w.invalid {
-		box.Style(st.BoxInvalid)
+		box.styleOf(&st.BoxInvalid)
 	}
 	// A tooltip also shows on a disabled box, to say why it is disabled.
 	row.Tooltip(c.tooltip)
 	if c.disabled {
-		row.Style(st.ControlDisabled).Cursor(CursorNotAllowed)
+		row.styleOf(&st.ControlDisabled).Cursor(CursorNotAllowed)
 		a.disabled = true
 		return c.size.apply(row)
 	}
 	// The row takes focus and keys. The box shows the pointer's hover state.
-	box.Hover(st.BoxHover)
-	row.Cursor(CursorPointer).Focusable().FocusVisible(st.ControlFocusVisible).
+	box.hoverOf(&st.BoxHover)
+	row.Cursor(CursorPointer).Focusable().focusVisibleOf(&st.ControlFocusVisible).
 		OnClick(func() {
 			next := s.next()
 			c.set(next)

@@ -101,11 +101,11 @@ func buttonIconSize(s controlSize) float32 {
 	return 16
 }
 
-// buttonDefaults returns the built-in look of a button of variant v, from the
+// buttonDefaults sets d to the built-in look of a button of variant v, from the
 // colors of t. size is its size, iconOnly a button with no label, and
 // disabled the state the disabled style is chosen for. Under high contrast a
 // disabled button is GrayText and not dimmed.
-func buttonDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly bool) ButtonStyle {
+func buttonDefaults(d *ButtonStyle, t *Theme, v ButtonVariant, size controlSize, iconOnly bool) {
 	h, _, fs := size.field()
 	px := float32(14)
 	switch size {
@@ -117,7 +117,7 @@ func buttonDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly bool) 
 	if iconOnly {
 		px = (h - buttonIconSize(size)) / 2
 	}
-	d := ButtonStyle{
+	*d = ButtonStyle{
 		Root: Style{Direction: Row, Align: Center, Justify: Center, Gap: 7, MinHeight: Px(h),
 			Padding: XY(px, 0), Radius: t.Radius, FontSize: fs, FontWeight: FontMedium,
 			Transition: t.Motion.hover(), Spring: t.Motion.Spring, NoShrink: true, fitWidth: true},
@@ -153,18 +153,16 @@ func buttonDefaults(t *Theme, v ButtonVariant, size controlSize, iconOnly bool) 
 		d.RootDisabled = Style{Background: t.Surface, TextColor: t.Disabled, BorderWidth: 1, BorderColor: t.Disabled}
 		d.RootLoading = Style{}
 	}
-	return d
 }
 
-// resolveButton returns the look of a button: the defaults of its variant,
+// resolveButton sets st to the look of a button: the defaults of its variant,
 // merged with the theme's Button, the theme's Buttons for the variant, and then
 // the instance's Styles. Under high contrast the overrides are plain.
-func resolveButton(ctx *Context, v ButtonVariant, size controlSize, iconOnly bool, inst ButtonStyle) ButtonStyle {
+func resolveButton(ctx *Context, v ButtonVariant, size controlSize, iconOnly bool, inst, st *ButtonStyle) {
 	t := ctx.Theme()
-	st := buttonDefaults(t, v, size, iconOnly)
+	buttonDefaults(st, t, v, size, iconOnly)
 	st.layered(ctx,
-		themeLayer(&t.Button), themeLayer(t.Buttons.of(v)), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Button), themeLayer(t.Buttons.of(v)), instanceLayer(inst))
 }
 
 // ButtonElement is a themed, clickable button.
@@ -311,14 +309,18 @@ func (b *ButtonElement) Tooltip(s string) *ButtonElement { b.tooltip = s; return
 
 // Style sets the look of the button's Root part, for this instance only. It is
 // the same as Styles(ButtonStyle{Root: s}); calling it again merges.
-func (b *ButtonElement) Style(s Style) *ButtonElement {
-	b.styles.Root = b.styles.Root.Merge(s)
+func (b *ButtonElement) Style(s Style) *ButtonElement { return b.styleOf(&s) }
+
+func (b *ButtonElement) styleOf(s *Style) *ButtonElement {
+	b.styles.Root.mergeFrom(s, false)
 	return b
 }
 
 // LayoutSpring moves the button to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
-func (b *ButtonElement) LayoutSpring(s Spring) *ButtonElement { return b.Style(Style{LayoutSpring: s}) }
+func (b *ButtonElement) LayoutSpring(s Spring) *ButtonElement {
+	return b.styleOf(&Style{LayoutSpring: s})
+}
 
 // Matched gives the button a shared-element id, as DivElement.Matched does:
 // when a build removes a button with the id and adds another, the new one
@@ -329,28 +331,31 @@ func (b *ButtonElement) Matched(id string) *ButtonElement { b.matched = id; retu
 // fields win over the theme's Button and Buttons and the defaults of the
 // variant; see ButtonStyle and docs/styling.md. Calling Styles again merges with
 // the earlier values.
-func (b *ButtonElement) Styles(st ButtonStyle) *ButtonElement {
-	b.styles.mergeFrom(&st, false)
+func (b *ButtonElement) Styles(st ButtonStyle) *ButtonElement { return b.stylesOf(&st) }
+
+func (b *ButtonElement) stylesOf(st *ButtonStyle) *ButtonElement {
+	b.styles.mergeFrom(st, false)
 	return b
 }
 
 func (b *ButtonElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	iconSize := buttonIconSize(b.ctlSize)
-	st := resolveButton(ctx, b.variant, b.ctlSize, b.label == "", b.styles)
-	d := Div().asPart("Button.Root").Style(st.Root)
+	var st ButtonStyle
+	resolveButton(ctx, b.variant, b.ctlSize, b.label == "", &b.styles, &st)
+	d := Div().asPart("Button.Root").styleOf(&st.Root)
 	if b.matched != "" {
 		d.Matched(b.matched)
 	}
 	busy := b.loading && !b.disabled
 	if b.disabled {
-		d.Style(st.RootDisabled).Cursor(CursorNotAllowed)
+		d.styleOf(&st.RootDisabled).Cursor(CursorNotAllowed)
 		d.hover, d.pressed = nil, nil
 	} else if busy {
 		// A loading button keeps the focus it has and its Tab stop, so that the
 		// focus is not lost while the work it started runs. Its click does nothing:
 		// Enter and Space on it are taken, and do not go on to a modal's Default.
-		d.Style(st.RootLoading).OnClick(func() {}).Cursor(CursorDefault)
+		d.styleOf(&st.RootLoading).OnClick(func() {}).Cursor(CursorDefault)
 		if !b.noFocus {
 			d.Focusable()
 		}
@@ -358,7 +363,7 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 			d.FocusHandle(b.handle)
 		}
 	} else {
-		d.Hover(st.RootHover).Pressed(st.RootPressed)
+		d.hoverOf(&st.RootHover).pressedOf(&st.RootPressed)
 		// Enabled buttons take part in Tab navigation and respond to Enter and
 		// Space. The focus ring is a spread shadow, so it adds no layout shift.
 		if !b.noFocus {
@@ -377,7 +382,7 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 	}
 	var ic *DivElement
 	if b.icon != nil {
-		ic = Div().asPart("Button.Icon").Style(st.Icon)
+		ic = Div().asPart("Button.Icon").styleOf(&st.Icon)
 		if ring != nil {
 			ic.Child(ring) // the ring takes the icon's place, at its size
 		} else {
@@ -388,7 +393,7 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		}
 	}
 	if b.label != "" {
-		label := Div().asPart("Button.Label").Style(st.Label).Child(Text(b.label).NoWrap())
+		label := Div().asPart("Button.Label").styleOf(&st.Label).Child(Text(b.label).NoWrap())
 		if ring != nil && b.icon == nil {
 			// The label keeps its room, so the button keeps its width, and the ring
 			// is drawn over it.
@@ -415,8 +420,7 @@ func (b *ButtonElement) expand(ctx *Context) Element {
 		// The focus ring is added to the shadows of the button, so it is drawn
 		// with the button's own shadow. RootFocusVisible can replace it.
 		ring := Shadow{Spread: 2, Color: t.FocusRing}
-		focus := Style{Shadows: append(slices.Clone(st.Root.Shadows), ring)}.Merge(st.RootFocusVisible)
-		d.FocusVisible(focus)
+		d.focusVisibleOf(ringStyle(st.Root.Shadows, ring, &st.RootFocusVisible))
 	}
 	return b.size.apply(d)
 }
@@ -495,11 +499,11 @@ type fieldLayout struct {
 // Text size, as the number input's width does.
 const textFieldWidth = 240
 
-// fieldDefaults returns the built-in look of a text frame with layout lay, from
+// fieldDefaults sets d to the built-in look of a text frame with layout lay, from
 // the colors of t. Under high contrast a disabled frame is GrayText and not
 // dimmed, and an invalid frame is drawn in the text color.
-func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
-	d := FieldStyle{
+func fieldDefaults(d *FieldStyle, t *Theme, lay fieldLayout) {
+	*d = FieldStyle{
 		Frame: Style{Direction: Row, Align: Center, Gap: 8, Padding: XY(10, 0), MinHeight: Px(34),
 			Width: lay.width, contentMin: true, Radius: t.Radius, Background: t.Surface, BorderWidth: 1, BorderColor: t.BorderStrong,
 			Transition: t.Motion.hover(), Spring: t.Motion.Spring},
@@ -554,18 +558,16 @@ func fieldDefaults(t *Theme, lay fieldLayout) FieldStyle {
 	} else {
 		d.FrameDisabled = Style{Opacity: 0.5, BorderColor: t.Border}
 	}
-	return d
 }
 
-// resolveField returns the look of a text frame with layout lay: the defaults,
+// resolveField sets st to the look of a text frame with layout lay: the defaults,
 // merged with the theme's Field and then the instance's Styles. Under high
 // contrast the two overrides are plain (see plainStyle).
-func resolveField(ctx *Context, lay fieldLayout, inst FieldStyle) FieldStyle {
+func resolveField(ctx *Context, lay fieldLayout, inst, st *FieldStyle) {
 	t := ctx.Theme()
-	st := fieldDefaults(t, lay)
+	fieldDefaults(st, t, lay)
 	st.layered(ctx,
-		themeLayer(&t.Field), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Field), instanceLayer(inst))
 }
 
 // fieldOptions are shared by TextInput, TextArea and NumberInput.
@@ -613,15 +615,17 @@ type fieldOptions struct {
 func (f *fieldOptions) formCheck() error { return firstError(f.value.Get(), f.rules) }
 
 func (ti *TextInputElement) formWire(w fieldWire) Element {
-	c := *ti
+	c := new(TextInputElement)
+	copyLarge(c, ti)
 	c.wire = w
-	return &c
+	return c
 }
 
 func (ta *TextAreaElement) formWire(w fieldWire) Element {
-	c := *ta
+	c := new(TextAreaElement)
+	copyLarge(c, ta)
 	c.wire = w
-	return &c
+	return c
 }
 
 // TextInputElement is a single-line text field bound to a string signal.
@@ -771,22 +775,26 @@ func (ti *TextInputElement) Disabled(d bool) *TextInputElement { ti.disabled = d
 // by the text inside. A size set here is overridden by the sizing methods (Width
 // and the others); see Sizing in docs/styling.md. It is the same as
 // Styles(FieldStyle{Frame: s}).
-func (ti *TextInputElement) Style(s Style) *TextInputElement {
-	ti.styles.Frame = ti.styles.Frame.Merge(s)
+func (ti *TextInputElement) Style(s Style) *TextInputElement { return ti.styleOf(&s) }
+
+func (ti *TextInputElement) styleOf(s *Style) *TextInputElement {
+	ti.styles.Frame.mergeFrom(s, false)
 	return ti
 }
 
 // LayoutSpring moves the field to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
 func (ti *TextInputElement) LayoutSpring(s Spring) *TextInputElement {
-	return ti.Style(Style{LayoutSpring: s})
+	return ti.styleOf(&Style{LayoutSpring: s})
 }
 
 // Styles sets the look of the parts of the field, for this instance only. Set
 // fields win over the theme's Field and the defaults; see FieldStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (ti *TextInputElement) Styles(s FieldStyle) *TextInputElement {
-	ti.styles.mergeFrom(&s, false)
+func (ti *TextInputElement) Styles(s FieldStyle) *TextInputElement { return ti.stylesOf(&s) }
+
+func (ti *TextInputElement) stylesOf(s *FieldStyle) *TextInputElement {
+	ti.styles.mergeFrom(s, false)
 	return ti
 }
 
@@ -856,8 +864,9 @@ func (ti *TextInputElement) Validate(rules ...Validator[string]) *TextInputEleme
 
 func (ti *TextInputElement) expand(ctx *Context) Element {
 	lay := fieldLayout{size: ti.ctlSize, disabled: ti.disabled, width: Px(textFieldWidth * textScale(ctx))}
-	st := resolveField(ctx, lay, ti.styles)
-	return ti.fieldOptions.expand(ctx, st, false, 0)
+	var st FieldStyle
+	resolveField(ctx, lay, &ti.styles, &st)
+	return ti.fieldOptions.expand(ctx, &st, false, 0)
 }
 
 // TextAreaElement is a multi-line text editor bound to a string signal. It
@@ -930,15 +939,17 @@ func (ta *TextAreaElement) Tooltip(s string) *TextAreaElement { ta.tooltip = s; 
 func (ta *TextAreaElement) Disabled(d bool) *TextAreaElement { ta.disabled = d; return ta }
 
 // Style is merged into the Frame part of the editor, as for TextInputElement.Style.
-func (ta *TextAreaElement) Style(s Style) *TextAreaElement {
-	ta.styles.Frame = ta.styles.Frame.Merge(s)
+func (ta *TextAreaElement) Style(s Style) *TextAreaElement { return ta.styleOf(&s) }
+
+func (ta *TextAreaElement) styleOf(s *Style) *TextAreaElement {
+	ta.styles.Frame.mergeFrom(s, false)
 	return ta
 }
 
 // LayoutSpring moves the editor to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
 func (ta *TextAreaElement) LayoutSpring(s Spring) *TextAreaElement {
-	return ta.Style(Style{LayoutSpring: s})
+	return ta.styleOf(&Style{LayoutSpring: s})
 }
 
 // The sizing methods give the editor's frame a size, as for TextInput. A text area
@@ -1005,8 +1016,9 @@ func (ta *TextAreaElement) Validate(rules ...Validator[string]) *TextAreaElement
 
 func (ta *TextAreaElement) expand(ctx *Context) Element {
 	lay := fieldLayout{multiline: true, disabled: ta.disabled, width: Px(textFieldWidth * textScale(ctx))}
-	st := resolveField(ctx, lay, ta.styles)
-	return ta.fieldOptions.expand(ctx, st, true, ta.minRows)
+	var st FieldStyle
+	resolveField(ctx, lay, &ta.styles, &st)
+	return ta.fieldOptions.expand(ctx, &st, true, ta.minRows)
 }
 
 // focusFrame focuses a field's text for a press on the field's frame (its
@@ -1022,15 +1034,19 @@ func focusFrame(h *FocusHandle, e *MouseEvent) {
 // expand returns the field's frame with its editor, in the look st. The frame
 // is the Frame part, and the content before and after the text is in the
 // Leading and Trailing parts. A borderless field draws no Frame part.
-func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRows int) *DivElement {
+func (f *fieldOptions) expand(ctx *Context, st *FieldStyle, multiline bool, minRows int) *DivElement {
 	t := ctx.Theme()
 	// What a Field gives the field replaces or adds to what the field was given. An
 	// invalid frame also stays while the field has focus, so the danger color is not
 	// hidden by the focus color (as in the grid's editor).
 	w := f.wire
 	if w.invalid {
-		st.Frame = st.Frame.Merge(st.FrameInvalid)
-		st.FrameFocusWithin = st.FrameInvalid
+		// The look is the caller's, so the invalid frame goes into a copy.
+		inv := new(FieldStyle)
+		copyLarge(inv, st)
+		inv.Frame.mergeFrom(&st.FrameInvalid, false)
+		copyLarge(&inv.FrameFocusWithin, &st.FrameInvalid)
+		st = inv
 	}
 	name, labelledBy, description := f.name, f.labelledBy, f.description
 	if w.label != "" {
@@ -1125,17 +1141,17 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 			OnMouseDown(func(e *MouseEvent) { focusFrame(h, e) })
 	case f.disabled:
 		// A disabled field takes no pointer input, so it has no hover state.
-		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).Style(st.FrameDisabled).Cursor(CursorDefault)
+		box = Div().asPart(f.widget + ".Frame").styleOf(&st.Frame).styleOf(&st.FrameDisabled).Cursor(CursorDefault)
 	case f.readOnly:
 		// A read-only field is not edited, so it has no hover state either.
-		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).Style(st.FrameReadOnly).
-			FocusWithin(st.FrameFocusWithin).KeepFocus().
+		box = Div().asPart(f.widget + ".Frame").styleOf(&st.Frame).styleOf(&st.FrameReadOnly).
+			focusWithinOf(&st.FrameFocusWithin).KeepFocus().
 			OnMouseDown(func(e *MouseEvent) { focusFrame(h, e) })
 	default:
 		// Clicks on the frame (padding, icon) still focus the text. The press itself leaves
 		// focus alone (KeepFocus), so a focused field is not blurred and focused again.
-		box = Div().asPart(f.widget + ".Frame").Style(st.Frame).
-			Hover(st.FrameHover).FocusWithin(st.FrameFocusWithin).KeepFocus().
+		box = Div().asPart(f.widget + ".Frame").styleOf(&st.Frame).
+			hoverOf(&st.FrameHover).focusWithinOf(&st.FrameFocusWithin).KeepFocus().
 			OnMouseDown(func(e *MouseEvent) { focusFrame(h, e) })
 	}
 	box.Tooltip(f.tooltip)
@@ -1152,7 +1168,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		}
 	}
 	if f.icon != nil || f.leadingEl != nil || symBefore != nil {
-		lead := Div().asPart(f.widget + ".Leading").Style(st.Leading)
+		lead := Div().asPart(f.widget + ".Leading").styleOf(&st.Leading)
 		if f.icon != nil {
 			// The icon takes the Leading part's text color, as text does.
 			lead.Child(Icon(f.icon).Size(16))
@@ -1198,7 +1214,7 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 		})
 	}
 	if len(buttons) > 0 || f.trailingEl != nil || symAfter != nil {
-		trail := Div().asPart(f.widget + ".Trailing").Style(st.Trailing)
+		trail := Div().asPart(f.widget + ".Trailing").styleOf(&st.Trailing)
 		if symAfter != nil {
 			trail.Child(symAfter)
 		}
@@ -1220,8 +1236,8 @@ func (f *fieldOptions) expand(ctx *Context, st FieldStyle, multiline bool, minRo
 // button returns one of the field's own buttons, named name, in the Button part.
 // It is not a Tab stop and does not take focus, so a press on it leaves the focus
 // in the field (the frame keeps it, see KeepFocus).
-func (f *fieldOptions) button(st FieldStyle, ic *icons.Icon, name string, onClick func()) *DivElement {
-	return Div().asPart(f.widget + ".Button").Style(st.Button).Hover(st.ButtonHover).
+func (f *fieldOptions) button(st *FieldStyle, ic *icons.Icon, name string, onClick func()) *DivElement {
+	return Div().asPart(f.widget + ".Button").styleOf(&st.Button).hoverOf(&st.ButtonHover).
 		Role(access.RoleButton).Label(name).Tooltip(name).OnClick(onClick).
 		Child(Icon(ic).Size(14))
 }
