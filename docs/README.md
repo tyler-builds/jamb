@@ -46,6 +46,7 @@ jamb to an app; the other pages cover one topic each.
 - [Testing your app](testing.md): headless UI tests with `ui/uitest`, which find elements, act on them, and read their text, states and drawn style.
 - [Tools for humans and coding agents](tools.md): `jamb dev`, the visual inspector, environment variables, tracing, scripted runs, headless testing, and accessibility checks.
 - [Packaging](packaging.md): `jamb package`, `jamb.json`, the installer, MSIX, signing, and the licenses of what your app ships.
+- [Web](web.md): building an app as a web page, and what a page does (experimental).
 - [Architecture and internals](architecture.md): the repository layout, the architecture and frame pipeline, and GPU device loss.
 - [Comparison with GPUI](comparison-gpui.md): the same hello-world app built with jamb and with GPUI, measured.
 - [Status and known limitations](status.md): the milestone status, the known limitations, and the next steps.

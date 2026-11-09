@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>jamb</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #fff; color: #555; }
+  @media (prefers-color-scheme: dark) { html, body { background: #18181b; color: #a1a1aa; } }
+  #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 24px; text-align: center; font: 15px/1.5 system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<div id="status" role="status">Loading…</div>
+<script src="wasm_exec.js"></script>
+<script>
+// Loads app.wasm, a js build of a jamb app, which draws into a canvas that it
+// adds to the page (or into <canvas id="jamb">, when the page has one). When the
+// app stops because of an error, the page says so.
+(() => {
+  const status = document.getElementById("status");
+  let stopped = false;
+  const stop = (err) => {
+    if (stopped) return;
+    stopped = true;
+    console.error(err);
+    for (const c of document.querySelectorAll("canvas")) c.remove();
+    status.textContent = "This app stopped because of an error. Reload the page to start it again.";
+    document.body.appendChild(status);
+  };
+  addEventListener("error", (e) => stop(e.error || e.message));
+  addEventListener("unhandledrejection", (e) => stop(e.reason));
+  (async () => {
+    const go = new Go();
+    let result;
+    try {
+      result = await WebAssembly.instantiateStreaming(fetch("app.wasm"), go.importObject);
+    } catch {
+      // A server that does not send application/wasm: compile from the bytes.
+      const bytes = await (await fetch("app.wasm")).arrayBuffer();
+      result = await WebAssembly.instantiate(bytes, go.importObject);
+    }
+    status.remove();
+    await go.run(result.instance);
+  })().catch(stop);
+})();
+</script>
+</body>
+</html>

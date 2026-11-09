@@ -142,12 +142,13 @@ jobs:
               (cd "$m" && GOOS=${target%/*} GOARCH=${target#*/} go build ./...)
             done
           done
-      # A js build runs the highlighter in the JavaScript host's WebAssembly, not
-      # wazero (codeedit/internal/lexer/module_js.go), so its tests run under Node.
-      - name: js/wasm tests of the highlighter
+      # The packages that only a js build has, or that a js build runs differently
+      # (the highlighter, in the JavaScript host's WebAssembly, and the web page's
+      # platform adapter), are tested under Node.
+      - name: js/wasm tests
         run: |
           export PATH="$PATH:$(go env GOROOT)/lib/wasm"
-          GOOS=js GOARCH=wasm go test -count=1 ./codeedit/internal/lexer ./codeedit/highlight ./markdown/mdcode
+          GOOS=js GOARCH=wasm go test -count=1 ./codeedit/internal/lexer ./codeedit/highlight ./markdown/mdcode ./internal/platform/web
 
   web:
     # Builds the web build with TinyGo, runs it under Node and checks its size
