@@ -14,21 +14,30 @@ import (
 type scrollRecorder struct {
 	platform.Handler
 	scrolls []platform.Event
+	onEvent func(platform.Event) // sees every event, when set
 }
 
 func (r *scrollRecorder) OnEvent(_ platform.Window, e platform.Event) {
 	if e.Kind == platform.EventScroll {
 		r.scrolls = append(r.scrolls, e)
 	}
+	if r.onEvent != nil {
+		r.onEvent(e)
+	}
 }
+
+func (r *scrollRecorder) OnFrame(platform.Window) bool { return false }
 
 // touchWindow returns a window for touch tests: a canvas at the page's origin,
 // at a pixel ratio of 1, whose events go to the recorder.
 func touchWindow(t *testing.T) (*window, *scrollRecorder) {
 	rect := js.FuncOf(func(js.Value, []js.Value) any { return map[string]any{"left": 0, "top": 0} })
 	t.Cleanup(rect.Release)
+	focus := js.FuncOf(func(js.Value, []js.Value) any { return nil })
+	t.Cleanup(focus.Release)
 	canvas := js.Global().Get("Object").New()
 	canvas.Set("getBoundingClientRect", rect)
+	canvas.Set("focus", focus)
 	rec := &scrollRecorder{}
 	return &window{handler: rec, canvas: canvas, scale: 1, ready: true, cssW: 400, cssH: 800}, rec
 }
@@ -115,4 +124,56 @@ func TestFlingFollowsFrames(t *testing.T) {
 	if got := rec.scrolls[before].DeltaY; got < 1.9*last*float32(ratio) {
 		t.Errorf("a frame two frames late scrolled %v after a step of %v", got, last)
 	}
+}
+
+// A touch during momentum stops it, and a touch that lifts without moving
+// taps what it landed on, however fast the momentum was.
+func TestTapDuringFling(t *testing.T) {
+	w, rec := touchWindow(t)
+	taps := 0
+	rec.onEvent = func(e platform.Event) {
+		if e.Kind == platform.EventMouseUp {
+			taps++
+		}
+	}
+	withPage(t, w)
+	p := &w.in
+	p.flinging, p.flingVX, p.flingVY, p.flingAt = true, 0, 3, 0
+	w.touchDown(touchEvent(t, "pointerdown", 1, 100, 300, 10))
+	runPosted()
+	if p.flinging {
+		t.Error("a touch left the momentum going")
+	}
+	w.touchUp(touchEvent(t, "pointerup", 1, 100, 300, 60))
+	runPosted()
+	if taps != 1 {
+		t.Errorf("a tap during fast momentum delivered %d clicks, want 1", taps)
+	}
+}
+
+// touchEvent is a touch's pointer event of the given type.
+func touchEvent(t *testing.T, typ string, id int, x, y, at float64) js.Value {
+	e := pointer(id, x, y, at)
+	e.Set("type", typ)
+	e.Set("pointerType", "touch")
+	nop := js.FuncOf(func(js.Value, []js.Value) any { return nil })
+	t.Cleanup(nop.Release)
+	e.Set("preventDefault", nop)
+	return e
+}
+
+// withPage gives the test a page whose focus is on w's canvas, and has
+// runNow post its work, which the test runs with runPosted.
+func withPage(t *testing.T, w *window) {
+	g := js.Global()
+	old := g.Get("document")
+	doc := g.Get("Object").New()
+	doc.Set("activeElement", w.canvas)
+	doc.Set("visibilityState", "visible")
+	g.Set("document", doc)
+	uiActive.Store(true)
+	t.Cleanup(func() {
+		uiActive.Store(false)
+		g.Set("document", old)
+	})
 }

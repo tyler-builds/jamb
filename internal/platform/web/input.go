@@ -25,7 +25,9 @@ const touchSlop = 8
 // The momentum of a pan, as iOS scrolls: the finger's speed over its last
 // moves carries on after it lifts, slowing by flingDecay each millisecond (the
 // rate of UIScrollView's normal deceleration), until it is slower than
-// flingStop. A pan that ends slower than flingStart has none.
+// flingStop. A pan that ends slower than flingStart has none. A touch stops
+// the momentum, and if it lifts without moving it also taps what it landed on,
+// so a list in motion takes one tap, not one to stop it and another to act.
 //
 // A pan and its momentum scroll once per display frame (see touchFrame), by
 // how far the finger moved since the last frame, or by how far the momentum
@@ -63,14 +65,12 @@ type pointerState struct {
 
 	// The momentum of the last pan, UI goroutine only: its speed in CSS pixels
 	// per millisecond, where it scrolls, and the time it last scrolled to, on
-	// the clock of performance.now and of display frames. A touch that stops it
-	// is no tap (noTap).
+	// the clock of performance.now and of display frames.
 	flinging       bool
 	flingVX        float64
 	flingVY        float64
 	flingAt        float64
 	flingX, flingY float32
-	noTap          bool
 }
 
 // touchMove is a finger's position at a time: the event's timeStamp, in
@@ -371,7 +371,6 @@ func (w *window) touchDown(e js.Value) {
 	}
 	p.dragging = true
 	Post(func() {
-		w.in.noTap = false
 		clicks := w.countClicks(input.ButtonLeft, x, y)
 		w.emit(platform.Event{Kind: platform.EventMouseMove, X: x, Y: y})
 		w.emit(platform.Event{Kind: platform.EventMouseDown, X: x, Y: y, Button: input.ButtonLeft, Clicks: clicks})
@@ -457,7 +456,6 @@ func (w *window) touchUp(e js.Value) {
 		return
 	}
 	if e.Get("type").String() == "pointercancel" {
-		Post(func() { w.in.noTap = false })
 		return
 	}
 	if p.panning {
@@ -469,10 +467,7 @@ func (w *window) touchUp(e js.Value) {
 			vx, vy = (first.x-last.x)/ms, (first.y-last.y)/ms
 			x, y = float32(last.x)*w.scale, float32(last.y)*w.scale
 		}
-		Post(func() {
-			w.in.noTap = false // the touch that stopped a fling panned instead
-			w.startFling(vx, vy, x, y)
-		})
+		Post(func() { w.startFling(vx, vy, x, y) })
 		return
 	}
 	// The tap is handled, and a frame drawn, while its event lasts: if the tap
@@ -480,10 +475,6 @@ func (w *window) touchUp(e js.Value) {
 	// phone shows its keyboard for only now.
 	x, y := float32(p.touchX0)*w.scale, float32(p.touchY0)*w.scale
 	if runNow(func() {
-		if w.in.noTap {
-			w.in.noTap = false
-			return // the touch stopped a fling
-		}
 		clicks := w.countClicks(input.ButtonLeft, x, y)
 		w.emit(platform.Event{Kind: platform.EventMouseMove, X: x, Y: y})
 		w.emit(platform.Event{Kind: platform.EventMouseDown, X: x, Y: y, Button: input.ButtonLeft, Clicks: clicks})
@@ -507,13 +498,9 @@ func (w *window) startFling(vx, vy float64, x, y float32) {
 	w.Wake()
 }
 
-// stopFling stops the momentum of a pan, when a touch lands while it lasts,
-// and makes that touch no tap. UI goroutine only.
-func (w *window) stopFling() {
-	p := &w.in
-	p.noTap = p.flinging
-	p.flinging = false
-}
+// stopFling stops the momentum of a pan, when a touch lands while it lasts.
+// UI goroutine only.
+func (w *window) stopFling() { w.in.flinging = false }
 
 // wheel delivers a wheel event as scrolling, in logical (CSS) pixels.
 func (w *window) wheel(e js.Value) {
