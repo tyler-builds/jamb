@@ -148,3 +148,23 @@ jobs:
         run: |
           export PATH="$PATH:$(go env GOROOT)/lib/wasm"
           GOOS=js GOARCH=wasm go test -count=1 ./codeedit/internal/lexer ./codeedit/highlight ./markdown/mdcode
+
+  web:
+    # Builds the web build with TinyGo, runs it under Node and checks its size
+    # (scripts/web/check.sh). TinyGo runs from its pinned image.
+    name: Web build (TinyGo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+          cache-dependency-path: "**/go.sum"
+      - name: Install brotli
+        run: sudo apt-get update && sudo apt-get install -y brotli
+      - name: Download modules
+        run: for m in . examples/hello examples/demo; do (cd "$m" && go mod download); done
+      - name: Build, run and measure
+        run: sh scripts/web/check.sh

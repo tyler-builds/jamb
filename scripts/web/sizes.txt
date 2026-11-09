@@ -1,0 +1,6 @@
+# The Brotli-compressed size, in bytes, of each TinyGo web build that
+# scripts/web/check.sh makes. The check fails when a build grows by more than 5%
+# over its line here. Update a line when a change makes a build smaller, or when a
+# larger build is intended (say why in the PR).
+hello 873783
+demo 2758339
