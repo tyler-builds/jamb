@@ -1290,6 +1290,15 @@ func (rt *Runtime) renderInstance(inst *componentInstance) {
 	inst.render()
 	id := expandedID(inst.id)
 	inst.root = rt.buildNode(inst.out, inst.parentNode, id, inst.depth, inst.inh, inst)
+	rt.adoptOutput(inst, id, oldRoot, oldChildren)
+}
+
+// adoptOutput finishes renderInstance once the instance's output is built: it
+// gives an instance that rendered nothing its slot, and retires the old output
+// and the children that were not built again. It is not inlined (see buildDiv).
+//
+//go:noinline
+func (rt *Runtime) adoptOutput(inst *componentInstance, id uint64, oldRoot *node, oldChildren []*componentInstance) {
 	if inst.root == nil {
 		// A component that renders nothing still owns a slot: an inert,
 		// absolutely positioned, zero-size node that takes no part in flex
@@ -1524,6 +1533,15 @@ func (rt *Runtime) buildNode(el Element, parent *node, id uint64, depth int, inh
 	if n == nil {
 		return nil
 	}
+	rt.finishNode(n, el, parent)
+	return n
+}
+
+// finishNode gives a built node its key and its layout motion. It is not
+// inlined (see buildDiv).
+//
+//go:noinline
+func (rt *Runtime) finishNode(n *node, el Element, parent *node) {
 	if n.key == "" {
 		// The output of a keyed component or field answers to its key.
 		if k, ok := el.(keyed); ok {
@@ -1537,7 +1555,34 @@ func (rt *Runtime) buildNode(el Element, parent *node, id uint64, depth int, inh
 	if n.flags&flagMatched != 0 {
 		rt.setMatched(n)
 	}
-	return n
+}
+
+// uniqueChildID returns the identity of the child c at index i of the node id,
+// made unique when another element of this build already has it (see
+// duplicateKey). It is not inlined (see buildDiv).
+//
+//go:noinline
+func (rt *Runtime) uniqueChildID(id uint64, i int, c Element) uint64 {
+	cid := childID(id, i, c)
+	if rt.claimed(cid) {
+		cid = rt.duplicateKey(cid, c)
+	}
+	return cid
+}
+
+// overlayChildren returns the tooltip and the context menu of the div id, or nil
+// for each that does not show. It is not inlined (see buildDiv): the context
+// menu's element is large.
+//
+//go:noinline
+func (rt *Runtime) overlayChildren(e *DivElement, id uint64) (tip, menu Element) {
+	if e.tooltip != "" && rt.tipShown == id {
+		tip = rt.tooltipElement(e.tooltip)
+	}
+	if rt.ctxMenu != nil && rt.ctxMenu.host == id {
+		menu = contextMenuAt(rt, rt.ctxMenu)
+	}
+	return tip, menu
 }
 
 func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int, inh textStyle, owner *componentInstance) *node {
@@ -1560,156 +1605,27 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		if e == nil {
 			return nil
 		}
-		// Held content (see reflowSpec) that the last paint drew and this build
-		// hides is kept as it was, to be drawn while its box shrinks: its node
-		// is not rebuilt in place.
-		var shown, hidden *node
-		if e.reflow != nil && e.reflow.held {
-			if old := rt.byID[id]; old != nil && old.gen != rt.gen {
-				shown = old
-				if e.noDisplay && old.flags&flagNoDisplay == 0 {
-					hidden = old
-					rt.noReuse = old
-				}
-			}
-		}
-		n := rt.newNode(kindDiv, id, parent, owner)
-		rt.noReuse = nil
-		n.div = e
-		if e.revealRow {
-			rt.revealRows = append(rt.revealRows, n)
-		}
-		if e.overlay != 0 {
-			n.flags |= flagOverlay
-		}
-		if e.h.onClickOutside != nil {
-			n.flags |= flagOutside
-			rt.listenOutside(n)
-		}
-		if e.vlist != nil || e.vrows != nil {
-			n.flags |= flagList
-		}
-		if e.exit != nil {
-			n.flags |= flagExit
-		}
-		if e.dragSpec != nil {
-			n.flags |= flagDrag
-		}
-		if len(e.drops) > 0 {
-			n.flags |= flagDrop
-		}
-		if e.noDisplay {
-			n.flags |= flagNoDisplay
-		}
-		if e.reflow != nil {
-			if e.reflow.spring.Duration > 0 {
-				n.flags |= flagLayoutSpring // confirmed by setLayoutSpring
-			}
-			if e.reflow.matched != "" {
-				n.flags |= flagMatched
-			}
-			if e.reflow.held {
-				n.flags |= flagHeld
-				rt.setHeld(n, !e.noDisplay, !e.noDisplay && (n.fresh || shown != nil && shown.flags&flagNoDisplay != 0))
-				if hidden != nil {
-					rt.hold(hidden)
-				}
-			}
-		}
-		if e.onGridCols != nil {
-			if rt.gridWatches == nil {
-				rt.gridWatches = map[uint64]*node{}
-			}
-			rt.gridWatches[n.id] = n
-		} else if rt.gridWatches != nil {
-			delete(rt.gridWatches, n.id)
-		}
-		rt.attachFocus(n)
-		n.style = rt.resolveStyle(n)
-		n.lay.Style = n.style.layoutStyle(1)
-		if e.overlay != 0 {
-			n.lay.Style.Position = layout.Floating
-		}
-		n.lay.Style.MatchParentWidth = e.matchAnchor
-		n.lay.Style.Hidden = e.noDisplay
-		n.ts = inh.inherit(&n.style)
-		if e.hover != nil || e.pressed != nil || e.focused != nil || e.focusWithin != nil || n.style.Transition > 0 ||
-			n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil ||
-			n.style.Spring.Duration > 0 || e.play != nil {
-			n.st = rt.state(id)
-			if n.fresh {
-				// A new element forgets any exit its ID had, and enters now, or
-				// later when it is staggered.
-				n.st.leaveAt, n.st.enterAt = time.Time{}, time.Time{}
-				n.st.enterDone.cancel()
-				n.st.enterDone = nil
-				if e.enter != nil {
-					n.st.enterAt = rt.now().Add(rt.staggered(parent, e.enter.a.Stagger))
-					if a := &e.enter.a; a.OnDone != nil {
-						n.st.enterDone = rt.done(n.st.enterAt.Add(max(a.Delay, 0)+a.Duration), func() func() {
-							if n := rt.byID[id]; n != nil && n.div != nil && n.div.enter != nil {
-								return n.div.enter.a.OnDone
-							}
-							return nil
-						})
-					}
-				}
-			}
-			// Keyframes play from the start when the element appears and when
-			// their key changes.
-			if e.play == nil {
-				n.st.playAt = time.Time{}
-				n.st.playDone.cancel()
-			} else if n.fresh || n.st.playAt.IsZero() || n.st.playKey != e.play.key {
-				n.st.playAt, n.st.playKey = rt.now(), e.play.key
-				n.st.playDone.cancel()
-				n.st.playDone = nil
-				if a := &e.play.a; a.OnDone != nil && !a.Repeat {
-					n.st.playDone = rt.done(n.st.playAt.Add(max(a.Delay, 0)+a.Duration), func() func() {
-						if n := rt.byID[id]; n != nil && n.div != nil && n.div.play != nil {
-							return n.div.play.a.OnDone
-						}
-						return nil
-					})
-				}
-			}
-		}
-		rt.setOverhang(n)
+		n := rt.buildDiv(e, id, parent, owner, inh)
 		if k := len(e.children); k > 0 {
 			// The children are known, so their lists are made once rather than grown.
 			n.children = make([]*node, 0, k)
 			n.lay.Children = make([]*layout.Node, 0, k)
 		}
 		for i, c := range e.children {
-			cid := childID(id, i, c)
-			if rt.claimed(cid) {
-				cid = rt.duplicateKey(cid, c)
-			}
-			cn := rt.buildNode(c, n, cid, depth+1, n.ts, owner)
+			cn := rt.buildNode(c, n, rt.uniqueChildID(id, i, c), depth+1, n.ts, owner)
 			if cn == nil {
 				continue
 			}
 			n.children = append(n.children, cn)
 			n.lay.Children = append(n.lay.Children, &cn.lay)
 		}
-		if e.tooltip != "" && rt.tipShown == id {
-			c := rt.tooltipElement(e.tooltip)
-			cid := childID(id, len(e.children), c)
-			if rt.claimed(cid) {
-				cid = rt.duplicateKey(cid, c)
+		// The div's tooltip and context menu, while they show, follow its children.
+		tip, menu := rt.overlayChildren(e, id)
+		for _, c := range [2]Element{tip, menu} {
+			if c == nil {
+				continue
 			}
-			if cn := rt.buildNode(c, n, cid, depth+1, n.ts, owner); cn != nil {
-				n.children = append(n.children, cn)
-				n.lay.Children = append(n.lay.Children, &cn.lay)
-			}
-		}
-		if rt.ctxMenu != nil && rt.ctxMenu.host == id {
-			c := contextMenuAt(rt, rt.ctxMenu)
-			cid := childID(id, len(e.children), c)
-			if rt.claimed(cid) {
-				cid = rt.duplicateKey(cid, c)
-			}
-			if cn := rt.buildNode(c, n, cid, depth+1, n.ts, owner); cn != nil {
+			if cn := rt.buildNode(c, n, rt.uniqueChildID(id, len(e.children), c), depth+1, n.ts, owner); cn != nil {
 				n.children = append(n.children, cn)
 				n.lay.Children = append(n.lay.Children, &cn.lay)
 			}
@@ -1717,49 +1633,205 @@ func (rt *Runtime) buildNodeKind(el Element, parent *node, id uint64, depth int,
 		rt.reorder(n)
 		return n
 	case *editorElement:
-		n := rt.newNode(kindEditor, id, parent, owner)
-		rt.buildEditor(e, n, inh)
-		rt.attachFocus(n)
-		return n
+		return rt.buildEditorNode(e, id, parent, owner, inh)
 	case *TextElement:
-		n := rt.newNode(kindText, id, parent, owner)
-		n.textEl = e
-		n.style = e.style
-		n.ts = inh.inherit(&e.style)
-		if e.isRich() {
-			n.rich = buildRich(e)
-			if n.rich.interactive {
-				n.flags |= flagRich
-			}
-		}
-		n.lay.Style = e.style.layoutStyle(1)
-		n.lay.Measure = n
-		if e.selectable {
-			if n.style.Cursor == CursorDefault {
-				n.style.Cursor = CursorText
-			}
-			rt.buildSelectable(n)
-		}
-		rt.setOverhang(n)
-		return n
+		return rt.buildText(e, id, parent, owner, inh)
 	case *IconElement:
-		n := rt.newNode(kindIcon, id, parent, owner)
-		n.icon = e
-		n.style = e.style
-		n.lay.Style = e.style.layoutStyle(0)
-		n.lay.Measure = n
-		rt.setOverhang(n)
-		return n
+		return rt.buildIcon(e, id, parent, owner)
 	case *ImageElement:
-		n := rt.newNode(kindImage, id, parent, owner)
-		n.img = e
-		n.style = e.style
-		n.lay.Style = e.style.layoutStyle(1)
-		n.lay.Measure = n
-		rt.setOverhang(n)
-		return n
+		return rt.buildImage(e, id, parent, owner)
 	}
 	panic(fmt.Sprintf("ui: unsupported element type %T; build elements with ui constructors such as ui.Div, ui.Text or ui.Component", el))
+}
+
+// buildDiv builds the node of a div, without its children: its flags, focus,
+// style and motion state. buildNodeKind then builds the children, recursively.
+//
+// It is not inlined, and neither are the builders of the other leaf kinds, so
+// that buildNodeKind, which runs once for each level of the tree, keeps few
+// locals. Safari gives each local of a WebAssembly function its own stack slot,
+// and ran out of stack on deep pages when this code was part of every level.
+//
+//go:noinline
+func (rt *Runtime) buildDiv(e *DivElement, id uint64, parent *node, owner *componentInstance, inh textStyle) *node {
+	// Held content (see reflowSpec) that the last paint drew and this build
+	// hides is kept as it was, to be drawn while its box shrinks: its node
+	// is not rebuilt in place.
+	var shown, hidden *node
+	if e.reflow != nil && e.reflow.held {
+		if old := rt.byID[id]; old != nil && old.gen != rt.gen {
+			shown = old
+			if e.noDisplay && old.flags&flagNoDisplay == 0 {
+				hidden = old
+				rt.noReuse = old
+			}
+		}
+	}
+	n := rt.newNode(kindDiv, id, parent, owner)
+	rt.noReuse = nil
+	n.div = e
+	if e.revealRow {
+		rt.revealRows = append(rt.revealRows, n)
+	}
+	if e.overlay != 0 {
+		n.flags |= flagOverlay
+	}
+	if e.h.onClickOutside != nil {
+		n.flags |= flagOutside
+		rt.listenOutside(n)
+	}
+	if e.vlist != nil || e.vrows != nil {
+		n.flags |= flagList
+	}
+	if e.exit != nil {
+		n.flags |= flagExit
+	}
+	if e.dragSpec != nil {
+		n.flags |= flagDrag
+	}
+	if len(e.drops) > 0 {
+		n.flags |= flagDrop
+	}
+	if e.noDisplay {
+		n.flags |= flagNoDisplay
+	}
+	if e.reflow != nil {
+		if e.reflow.spring.Duration > 0 {
+			n.flags |= flagLayoutSpring // confirmed by setLayoutSpring
+		}
+		if e.reflow.matched != "" {
+			n.flags |= flagMatched
+		}
+		if e.reflow.held {
+			n.flags |= flagHeld
+			rt.setHeld(n, !e.noDisplay, !e.noDisplay && (n.fresh || shown != nil && shown.flags&flagNoDisplay != 0))
+			if hidden != nil {
+				rt.hold(hidden)
+			}
+		}
+	}
+	if e.onGridCols != nil {
+		if rt.gridWatches == nil {
+			rt.gridWatches = map[uint64]*node{}
+		}
+		rt.gridWatches[n.id] = n
+	} else if rt.gridWatches != nil {
+		delete(rt.gridWatches, n.id)
+	}
+	rt.attachFocus(n)
+	n.style = rt.resolveStyle(n)
+	n.lay.Style = n.style.layoutStyle(1)
+	if e.overlay != 0 {
+		n.lay.Style.Position = layout.Floating
+	}
+	n.lay.Style.MatchParentWidth = e.matchAnchor
+	n.lay.Style.Hidden = e.noDisplay
+	n.ts = inh.inherit(&n.style)
+	if e.hover != nil || e.pressed != nil || e.focused != nil || e.focusWithin != nil || n.style.Transition > 0 ||
+		n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil ||
+		n.style.Spring.Duration > 0 || e.play != nil {
+		n.st = rt.state(id)
+		if n.fresh {
+			// A new element forgets any exit its ID had, and enters now, or
+			// later when it is staggered.
+			n.st.leaveAt, n.st.enterAt = time.Time{}, time.Time{}
+			n.st.enterDone.cancel()
+			n.st.enterDone = nil
+			if e.enter != nil {
+				n.st.enterAt = rt.now().Add(rt.staggered(parent, e.enter.a.Stagger))
+				if a := &e.enter.a; a.OnDone != nil {
+					n.st.enterDone = rt.done(n.st.enterAt.Add(max(a.Delay, 0)+a.Duration), func() func() {
+						if n := rt.byID[id]; n != nil && n.div != nil && n.div.enter != nil {
+							return n.div.enter.a.OnDone
+						}
+						return nil
+					})
+				}
+			}
+		}
+		// Keyframes play from the start when the element appears and when
+		// their key changes.
+		if e.play == nil {
+			n.st.playAt = time.Time{}
+			n.st.playDone.cancel()
+		} else if n.fresh || n.st.playAt.IsZero() || n.st.playKey != e.play.key {
+			n.st.playAt, n.st.playKey = rt.now(), e.play.key
+			n.st.playDone.cancel()
+			n.st.playDone = nil
+			if a := &e.play.a; a.OnDone != nil && !a.Repeat {
+				n.st.playDone = rt.done(n.st.playAt.Add(max(a.Delay, 0)+a.Duration), func() func() {
+					if n := rt.byID[id]; n != nil && n.div != nil && n.div.play != nil {
+						return n.div.play.a.OnDone
+					}
+					return nil
+				})
+			}
+		}
+	}
+	rt.setOverhang(n)
+	return n
+}
+
+// buildEditorNode builds the node of a code editor. // It is not inlined; see buildDiv.
+//
+//go:noinline
+func (rt *Runtime) buildEditorNode(e *editorElement, id uint64, parent *node, owner *componentInstance, inh textStyle) *node {
+	n := rt.newNode(kindEditor, id, parent, owner)
+	rt.buildEditor(e, n, inh)
+	rt.attachFocus(n)
+	return n
+}
+
+// buildText builds the node of a text element. // It is not inlined; see buildDiv.
+//
+//go:noinline
+func (rt *Runtime) buildText(e *TextElement, id uint64, parent *node, owner *componentInstance, inh textStyle) *node {
+	n := rt.newNode(kindText, id, parent, owner)
+	n.textEl = e
+	n.style = e.style
+	n.ts = inh.inherit(&e.style)
+	if e.isRich() {
+		n.rich = buildRich(e)
+		if n.rich.interactive {
+			n.flags |= flagRich
+		}
+	}
+	n.lay.Style = e.style.layoutStyle(1)
+	n.lay.Measure = n
+	if e.selectable {
+		if n.style.Cursor == CursorDefault {
+			n.style.Cursor = CursorText
+		}
+		rt.buildSelectable(n)
+	}
+	rt.setOverhang(n)
+	return n
+}
+
+// buildIcon builds the node of an icon. // It is not inlined; see buildDiv.
+//
+//go:noinline
+func (rt *Runtime) buildIcon(e *IconElement, id uint64, parent *node, owner *componentInstance) *node {
+	n := rt.newNode(kindIcon, id, parent, owner)
+	n.icon = e
+	n.style = e.style
+	n.lay.Style = e.style.layoutStyle(0)
+	n.lay.Measure = n
+	rt.setOverhang(n)
+	return n
+}
+
+// buildImage builds the node of an image. // It is not inlined; see buildDiv.
+//
+//go:noinline
+func (rt *Runtime) buildImage(e *ImageElement, id uint64, parent *node, owner *componentInstance) *node {
+	n := rt.newNode(kindImage, id, parent, owner)
+	n.img = e
+	n.style = e.style
+	n.lay.Style = e.style.layoutStyle(1)
+	n.lay.Measure = n
+	rt.setOverhang(n)
+	return n
 }
 
 // attachFocus connects a focus handle to its element and applies AutoFocus
@@ -1804,6 +1876,10 @@ func (rt *Runtime) duplicateKey(id uint64, e Element) uint64 {
 }
 
 // reorder rebuilds a node's paint order (children sorted by ZIndex).
+//
+// It is not inlined (see buildDiv).
+//
+//go:noinline
 func (rt *Runtime) reorder(n *node) {
 	hasZ := false
 	for _, c := range n.children {

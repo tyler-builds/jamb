@@ -4,5 +4,5 @@
 # larger build is intended (say why in the PR). Before the web platform adapter,
 # hello's line was 873783: with no platform, app.Run returned before opening its
 # window, and TinyGo left out all of the UI.
-hello 1580795
-demo 2783062
+hello 1573956
+demo 2764650

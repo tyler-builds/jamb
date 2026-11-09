@@ -7,11 +7,14 @@
 # It builds, with TinyGo and the web build's settings (see tinygo.sh):
 #   - examples/hello, the smallest app, for its size;
 #   - examples/demo/cmd/webcheck, which renders every page of the demo, and must
-#     exit cleanly;
+#     exit cleanly, under Node and under Bun with a 512 KB stack: Bun runs
+#     JavaScriptCore, Safari's engine, which takes several times the stack that
+#     V8 takes for the same code, and iOS gives a page about 1 MB;
 #   - internal/webcheck, a page of cards that must draw the same pixels as the
 #     same program built with Go.
 #
-# It needs Go, Node, brotli, and docker or podman for TinyGo (see tinygo.sh). Run
+# It needs Go, Node (and npx, which fetches Bun), brotli, and docker or podman for
+# TinyGo (see tinygo.sh). Run
 # go mod download in each module it builds (., examples/hello and examples/demo)
 # first.
 set -eu
@@ -30,6 +33,10 @@ go_exec=$(go env GOROOT)/lib/wasm/wasm_exec.js
 
 echo "== demo pages (TinyGo)"
 timeout 300 node "$root/scripts/web/run.js" "$out/tinygo_wasm_exec.js" "$out/demo.wasm"
+
+echo "== demo pages in JavaScriptCore, with a 512 KB stack"
+BUN_JSC_maxPerThreadStackUsage=524288 timeout 300 npx -y bun@1.4.3 \
+	"$root/scripts/web/run.js" "$out/tinygo_wasm_exec.js" "$out/demo.wasm"
 
 echo "== cards page, TinyGo against Go"
 timeout 300 node "$root/scripts/web/run.js" "$out/tinygo_wasm_exec.js" "$out/cards-tinygo.wasm" | tee "$out/cards-tinygo.txt"
