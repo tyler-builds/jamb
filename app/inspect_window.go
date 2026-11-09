@@ -26,6 +26,13 @@ const (
 	inspBudget = 16700 * time.Microsecond // the frame budget at 60 Hz
 )
 
+// inspectorWindow builds the inspector's window. Its methods are not the
+// inspector's own: TinyGo keeps every method of a type that a program uses,
+// with all it builds, so the window's elements would be in every web build.
+// Only openInspector makes an inspectorWindow, and only a program that imports
+// package devtools links openInspector (see RegisterInspector).
+type inspectorWindow struct{ *inspector }
+
 // inspectPick turns pick mode on or off; Ctrl+Shift+C runs it in the inspector.
 var inspectPick = ui.NewAction("inspector.pick", "Pick an element")
 
@@ -39,7 +46,7 @@ var (
 )
 
 // root is the inspector's window.
-func (ins *inspector) root(ctx *ui.Context) ui.Element {
+func (ins inspectorWindow) root(ctx *ui.Context) ui.Element {
 	ins.tick.Get() // read the target again when the signal changes
 	th := ctx.Theme()
 	sel := ins.tg.Selected()
@@ -55,11 +62,11 @@ func (ins *inspector) root(ctx *ui.Context) ui.Element {
 
 // togglePick turns pick mode on or off. The target calls changed, which sets
 // the pick toggle.
-func (ins *inspector) togglePick() { ins.tg.Pick(!ins.tg.Picking()) }
+func (ins inspectorWindow) togglePick() { ins.tg.Pick(!ins.tg.Picking()) }
 
 // toolbar is the row at the top: the pick toggle, the title of the window that
 // is inspected, and the filter of the tree.
-func (ins *inspector) toolbar(th *ui.Theme) ui.Element {
+func (ins inspectorWindow) toolbar(th *ui.Theme) ui.Element {
 	return ui.Div().Row().Align(ui.Center).Gap(12).PaddingX(12).PaddingY(8).Shrink(0).
 		BorderEdges(ui.Edges{Bottom: 1}, th.Border).Children(
 		ui.Toggle("Pick an element", ins.picking).Key("inspector.pick").Icon(icons.Search).Small().
@@ -75,7 +82,7 @@ func (ins *inspector) toolbar(th *ui.Theme) ui.Element {
 // treePane is the element tree. The window's root is not shown: its children
 // are the top level of the tree. While the filter has text, the tree is a flat
 // list of the elements that match it, in tree order.
-func (ins *inspector) treePane(th *ui.Theme) ui.Element {
+func (ins inspectorWindow) treePane(th *ui.Theme) ui.Element {
 	tg := ins.tg
 	names := tg.AccessNames()
 	var nodes []ui.TreeNode
@@ -113,7 +120,7 @@ func (ins *inspector) treePane(th *ui.Theme) ui.Element {
 // treeNode returns the tree node of the element id, named with its row text and
 // the role and name that names holds for it. Its children are read when the
 // node is opened, so a large tree costs only what is open.
-func (ins *inspector) treeNode(id uint64, names map[uint64]string) ui.TreeNode {
+func (ins inspectorWindow) treeNode(id uint64, names map[uint64]string) ui.TreeNode {
 	e, ok := ins.tg.Element(id)
 	node := ui.TreeNode{Key: keyOf(id), Label: rowName(e, names[id])}
 	if ok && len(e.Children) > 0 {
@@ -130,7 +137,7 @@ func (ins *inspector) treeNode(id uint64, names map[uint64]string) ui.TreeNode {
 
 // matches appends a flat node for each element of the subtree at id, below the
 // window's root, whose kind, key, part, text or component contains q.
-func (ins *inspector) matches(id uint64, q string, names map[uint64]string, out *[]ui.TreeNode) {
+func (ins inspectorWindow) matches(id uint64, q string, names map[uint64]string, out *[]ui.TreeNode) {
 	e, ok := ins.tg.Element(id)
 	if !ok {
 		return
@@ -150,7 +157,7 @@ func (ins *inspector) matches(id uint64, q string, names map[uint64]string, out 
 // ellipsis: the kind, the key in the link color, the part, the text in quotes and
 // the component's short name, both muted. A hidden element is dimmed. The full
 // component name and the access name are in the tooltip.
-func (ins *inspector) treeRow(th *ui.Theme, n ui.TreeNode, st ui.PartState) ui.Element {
+func (ins inspectorWindow) treeRow(th *ui.Theme, n ui.TreeNode, st ui.PartState) ui.Element {
 	id := idOf(n.Key)
 	e, _ := ins.tg.Element(id)
 	plain := st.HighContrast && st.Selected // the row's own colors, on the accent fill
@@ -242,7 +249,7 @@ func shortComponent(full string) string {
 
 // detailsPane is what the inspector shows of the selected element, in one
 // scrolling column, over the frame timings of the window.
-func (ins *inspector) detailsPane(ctx *ui.Context, th *ui.Theme, sel uint64) ui.Element {
+func (ins inspectorWindow) detailsPane(ctx *ui.Context, th *ui.Theme, sel uint64) ui.Element {
 	body := ui.Div().Column().Gap(20).Padding(inspPad)
 	e, ok := ins.tg.Element(sel)
 	if sel == 0 || !ok {
@@ -268,7 +275,7 @@ func (ins *inspector) detailsPane(ctx *ui.Context, th *ui.Theme, sel uint64) ui.
 
 // header names the selected element, gives the full name of the component that
 // rendered it, and the trail of its ancestors, each of which selects it.
-func (ins *inspector) header(th *ui.Theme, e inspect.Element) ui.Element {
+func (ins inspectorWindow) header(th *ui.Theme, e inspect.Element) ui.Element {
 	tg := ins.tg
 	title := e.Kind
 	if e.Key != "" {
@@ -340,7 +347,7 @@ func section(th *ui.Theme, title string, content ui.Element) ui.Element {
 // layoutSection draws the box model of the element, with its insets, as the
 // browser's developer tools do, beside its position, size, content size and
 // overflow.
-func (ins *inspector) layoutSection(th *ui.Theme, e inspect.Element) ui.Element {
+func (ins inspectorWindow) layoutSection(th *ui.Theme, e inspect.Element) ui.Element {
 	content := ui.Div().Padding(6).Background(inspContentTint).Border(1, th.Border).Radius(2).
 		Child(ui.Textf("%s × %s", num(contentW(e)), num(contentH(e))).FontSize(inspSmall).Mono())
 	model := boxLayer(th, "padding", e.Padding, inspPaddingTint, content)
@@ -402,7 +409,7 @@ func num(v float32) string { return strconv.FormatFloat(math.Round(float64(v)*10
 
 // accessSection is the accessibility node of the element and its warnings, as
 // JAMB_A11Y_WARN reports them.
-func (ins *inspector) accessSection(th *ui.Theme, id uint64) ui.Element {
+func (ins inspectorWindow) accessSection(th *ui.Theme, id uint64) ui.Element {
 	a := ins.tg.Access(id)
 	if !a.Exposed {
 		return ui.Text("Not in the accessibility tree").FontSize(13).TextColor(th.TextMuted)
@@ -431,7 +438,7 @@ func (ins *inspector) accessSection(th *ui.Theme, id uint64) ui.Element {
 // resolved style in a table: each field, its winning value and the layer it came
 // from, with the values of the layers it overrides under it, struck through,
 // from the highest layer down.
-func (ins *inspector) styleSection(ctx *ui.Context, th *ui.Theme, id uint64) ui.Element {
+func (ins inspectorWindow) styleSection(ctx *ui.Context, th *ui.Theme, id uint64) ui.Element {
 	grid := ui.Div().Grid(ui.Px(130), ui.Fr(1), ui.Auto).Gap(6).Align(ui.Center)
 	mono := func(s string, c ui.Color) *ui.TextElement {
 		return ui.Text(s).Mono().FontSize(inspSmall).TextColor(c).Truncate()
@@ -460,7 +467,7 @@ func (ins *inspector) styleSection(ctx *ui.Context, th *ui.Theme, id uint64) ui.
 
 // editRow sets one style field of the element, copies the live edits as Go, and
 // says what the last action did.
-func (ins *inspector) editRow(ctx *ui.Context, th *ui.Theme, sel uint64) ui.Element {
+func (ins inspectorWindow) editRow(ctx *ui.Context, th *ui.Theme, sel uint64) ui.Element {
 	tg := ins.tg
 	var options []ui.Option[string]
 	for _, name := range tg.EditableFields() {
@@ -500,7 +507,7 @@ func (ins *inspector) editRow(ctx *ui.Context, th *ui.Theme, sel uint64) ui.Elem
 // framesSection is pinned under the details: tiles with the frame timings and
 // the counts of the window's last frame, and a sparkline of the CPU time per
 // frame.
-func (ins *inspector) framesSection(th *ui.Theme) ui.Element {
+func (ins inspectorWindow) framesSection(th *ui.Theme) ui.Element {
 	last := ins.perf.Last()
 	samples := ins.perf.Samples()
 	var sum time.Duration
@@ -545,7 +552,7 @@ func ms(d time.Duration) string { return fmt.Sprintf("%.2f ms", float64(d)/float
 // sparkline draws the CPU time of each kept frame, with the frame budget as a
 // line. It is scaled to the larger of the peak and the budget, so that one slow
 // frame does not flatten the others below the budget.
-func (ins *inspector) sparkline(th *ui.Theme, samples []inspect.Sample) ui.Element {
+func (ins inspectorWindow) sparkline(th *ui.Theme, samples []inspect.Sample) ui.Element {
 	peak := ins.perf.MaxTotal()
 	low := peak
 	for _, s := range samples {

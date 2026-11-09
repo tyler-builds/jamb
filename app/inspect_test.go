@@ -69,7 +69,7 @@ func TestInspectorWindowShowsTheSelectedElementWithoutAccessibilityWarnings(t *t
 	}
 	tg.Select(id)
 
-	irt := ui.NewRuntime(ins.root, ui.DarkTheme(), nil)
+	irt := ui.NewRuntime(inspectorWindow{ins}.root, ui.DarkTheme(), nil)
 	var warnings []string
 	irt.SetWarnFunc(func(s string) { warnings = append(warnings, s) })
 	irt.SetAccessWarnings(true)
@@ -114,7 +114,7 @@ func TestInspectorTreeHoverOutlinesTheElement(t *testing.T) {
 	root, _ := tg.Element(tg.Root())
 	first := root.Children[0]
 
-	irt := ui.NewRuntime(ins.root, ui.DarkTheme(), nil)
+	irt := ui.NewRuntime(inspectorWindow{ins}.root, ui.DarkTheme(), nil)
 	irt.SetViewport(1100, 760, 1)
 	irt.Frame(time.Now())
 	r, ok := irt.Find(keyOf(first))
@@ -136,7 +136,7 @@ func TestInspectorTreeHoverOutlinesTheElement(t *testing.T) {
 // inspectorRuntime renders the inspector's window for ins, at its default
 // size, with its pick shortcut, and collects its accessibility warnings.
 func inspectorRuntime(ins *inspector) (*ui.Runtime, *[]string) {
-	irt := ui.NewRuntime(ins.root, ui.DarkTheme(), nil)
+	irt := ui.NewRuntime(inspectorWindow{ins}.root, ui.DarkTheme(), nil)
 	var warnings []string
 	irt.SetWarnFunc(func(s string) { warnings = append(warnings, s) })
 	irt.SetAccessWarnings(true)

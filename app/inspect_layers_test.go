@@ -54,7 +54,7 @@ func TestInspectorWindowShowsOverriddenLayers(t *testing.T) {
 	}
 	tg.Select(box)
 
-	irt := ui.NewRuntime(ins.root, ui.DarkTheme(), nil)
+	irt := ui.NewRuntime(inspectorWindow{ins}.root, ui.DarkTheme(), nil)
 	var warnings []string
 	irt.SetWarnFunc(func(s string) { warnings = append(warnings, s) })
 	irt.SetAccessWarnings(true)
