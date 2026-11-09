@@ -17,6 +17,7 @@ package web
 
 import (
 	"errors"
+	"os"
 	"sync"
 	"sync/atomic"
 	"syscall/js"
@@ -226,4 +227,22 @@ func watchSettings() {
 	for _, q := range []js.Value{queries.dark, queries.reducedMotion, queries.forcedColors} {
 		q.Call("addEventListener", "change", changed)
 	}
+}
+
+// Getenv returns the environment variable key, or, since a page has no
+// environment (TinyGo passes it none), the page's setting of that name: the
+// key's property of the global object jambEnv, which the page sets before it
+// loads the app.
+func Getenv(key string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	env := js.Global().Get("jambEnv")
+	if env.Type() != js.TypeObject {
+		return ""
+	}
+	if v := env.Get(key); v.Type() == js.TypeString {
+		return v.String()
+	}
+	return ""
 }

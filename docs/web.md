@@ -1,7 +1,7 @@
 # Web
 
-A jamb app can run in a web page. This is experimental: the page draws on the CPU, and file
-dialogs and message boxes are not there yet.
+A jamb app can run in a web page. This is experimental: file dialogs and message boxes are not
+there yet.
 
 ## Building an app for the web
 
@@ -21,6 +21,9 @@ The build uses TinyGo, which runs from its official image in docker or podman (s
 `scripts/web/tinygo.sh` for its settings). `-go` before the arguments builds with Go
 instead, which is quicker to build and makes a larger, slower page.
 
+`scripts/web/browser.sh` checks the demo in Chromium, as CI does: it draws the same frame with
+WebGL 2 as on the CPU, and its text fields take typing.
+
 An app's code does not change for the web: `app.Run` opens its window as a canvas that fills
 the page, or in a `<canvas id="jamb">` when the page has one.
 
@@ -30,7 +33,9 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   not minimize, maximize, move or close itself, so a title bar the app draws shows no caption
   buttons. `Window.OpenURL` opens a new tab.
 - **Input.** The mouse and touchpad (clicks, double clicks, the wheel), the keyboard (keys by
-  their position, and the text they type), and touch: a tap is a click and a drag scrolls.
+  their position, and the text they type), and touch: a tap is a click, a drag scrolls with
+  momentum, and a drag that starts on a slider, a split divider or another element that takes
+  the drag moves it.
   The browser keeps its own shortcuts, such as reloading the page or closing the tab. On a
   Mac, iPhone or iPad, Command is Ctrl, so Command+C copies.
 - **Text input.** While a text field has focus, a hidden textarea of the page has it too, at
@@ -41,6 +46,11 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   Ctrl+V outside a text field, paste the text last copied in the app: a page reads the
   system's clipboard only in the browser's paste event.
 - **Settings.** The page follows the system's dark mode, reduced motion and forced colors.
+- **Drawing.** WebGL 2 draws the frames, with the shaders of the other GPU renderers. A browser
+  without WebGL 2 draws them on the CPU, as `JAMB_RENDERER=cpu` asks for; a page has no
+  environment, so it sets `window.jambEnv = {JAMB_RENDERER: "cpu"}` before it loads the app.
+  When the browser takes the GPU away (a GPU reset, or too many pages using it), the app
+  draws again once the browser gives it back, keeping its state.
 - **Fonts.** The embedded Go fonts and the fonts the app registers with `App.Font`; a page
   reads no font files.
 - **Frames** are paced by the browser's display frames, so a page in a background tab draws
@@ -50,5 +60,4 @@ the page, or in a `<canvas id="jamb">` when the page has one.
 
 ## Not there yet
 
-File dialogs, message boxes, second windows, pinch zoom, images on the clipboard, and drawing
-on the GPU.
+File dialogs, message boxes, second windows, pinch zoom, and images on the clipboard.

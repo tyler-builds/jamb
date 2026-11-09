@@ -23,7 +23,7 @@ type window struct {
 	opts    platform.WindowOptions
 
 	canvas js.Value
-	ctx    js.Value // the canvas's 2D context
+	ctx    js.Value // the canvas's 2D context, made for the CPU renderer (see Buffer)
 	owned  bool     // the window made the canvas, and removes it when it closes
 
 	// The size of the canvas in CSS pixels and its device pixel ratio, read
@@ -38,6 +38,7 @@ type window struct {
 	rafAsked    atomic.Bool // a requestAnimationFrame callback is pending
 	rafFired    atomic.Bool // it ran: the display is ready for a frame
 	rafFunc     js.Func
+	rafTime     float64 // the time of the display frame, from requestAnimationFrame, in milliseconds
 	wakeAt      time.Time
 	wakeTmr     *timer
 
@@ -84,13 +85,12 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 	st.Set("touchAction", "none") // the app handles touches; the page does not scroll or zoom
 	st.Set("userSelect", "none")
 	w.canvas.Set("tabIndex", 0)
-	w.ctx = w.canvas.Call("getContext", "2d", map[string]any{"alpha": false})
-	if !w.ctx.Truthy() {
-		return nil, errors.New("platform/web: the canvas has no 2D context")
-	}
 	w.SetTitle(opts.Title)
 	w.measure()
-	w.rafFunc = js.FuncOf(func(js.Value, []js.Value) any {
+	w.rafFunc = js.FuncOf(func(_ js.Value, args []js.Value) any {
+		if len(args) > 0 {
+			w.rafTime = args[0].Float()
+		}
 		w.rafAsked.Store(false)
 		w.rafFired.Store(true)
 		signal()
@@ -143,7 +143,11 @@ func (w *window) frame() {
 	}
 	if w.rafFired.Swap(false) {
 		w.wakePending.Store(false)
+		w.touchFrame(w.rafTime)
 		w.frameWanted = w.handler.OnFrame(w)
+		if w.in.flinging {
+			w.wakePending.Store(true) // the momentum scrolls in the next frame too
+		}
 		if !w.wakePending.Load() && !w.frameWanted {
 			return
 		}
@@ -208,6 +212,9 @@ func (w *window) destroy() {
 
 // ---- soft.Target ----
 
+// Canvas returns the window's canvas, which a GPU renderer draws into.
+func (w *window) Canvas() js.Value { return w.canvas }
+
 // Target returns where the CPU renderer draws the window's frames: w itself.
 func (w *window) Target() soft.Target { return w }
 
@@ -216,6 +223,14 @@ func (w *window) Target() soft.Target { return w }
 func (w *window) Buffer(width, height int) ([]byte, int, error) {
 	if width <= 0 || height <= 0 {
 		return nil, 0, fmt.Errorf("platform/web: no buffer of %d×%d", width, height)
+	}
+	if w.ctx.IsUndefined() {
+		// A canvas has one kind of context, so the 2D one is made only for the
+		// CPU renderer, which draws when WebGL 2 cannot (see Canvas).
+		w.ctx = w.canvas.Call("getContext", "2d", map[string]any{"alpha": false})
+		if !w.ctx.Truthy() {
+			return nil, 0, errors.New("platform/web: the canvas has no 2D context")
+		}
 	}
 	n := width * height * 4
 	if cap(w.buf) < n {
