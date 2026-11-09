@@ -36,7 +36,16 @@
     status.appendChild(detail);
     document.body.appendChild(status);
   };
-  addEventListener("error", (e) => stop(e.error || e.message));
+  addEventListener("error", (e) => {
+    // An error from a script of another origin arrives as "Script error." with
+    // no error and no file: a browser's or an extension's own script, such as
+    // those Firefox for iOS adds to pages. The app's scripts are this page's.
+    if (!e.error && !(e.filename || "").startsWith(location.origin)) {
+      console.warn("ignored an error from another script:", e.message);
+      return;
+    }
+    stop(e.error || e.message);
+  });
   addEventListener("unhandledrejection", (e) => stop(e.reason));
   (async () => {
     const go = new Go();
