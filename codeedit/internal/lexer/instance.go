@@ -1,14 +1,10 @@
 package lexer
 
 import (
-	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"unicode/utf8"
-
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 )
 
 // The module's memory layout, from src/memory.wat of @pierre/highlights. The
@@ -46,75 +42,84 @@ type LineToken struct {
 	ID  int
 }
 
+// export names a function that the module exports.
+type export int
+
+const (
+	exHighlight export = iota
+	exStage
+	exInitDoc
+	exApplyEdits
+	exRun
+	exStats
+	exLineCount
+	exLineByteLen
+	exLineTextPtr
+	exLineFlags
+	exLineTokPtr
+	exLineTokCount
+	numExports
+)
+
+// exportNames are the module's names of the exports, indexed by export.
+var exportNames = [numExports]string{
+	"highlight", "liveStage", "liveInitDoc", "liveApplyEdits", "liveRun", "liveStats",
+	"liveLineCount", "liveLineByteLen", "liveLineTextPtr", "liveLineFlags", "liveLineTokPtr", "liveLineTokCount",
+}
+
+// module is one instance of the module in a WebAssembly runtime: wazero
+// (module_wazero.go), or the WebAssembly of the JavaScript host in a js build
+// (module_js.go). newModule, in each, returns a new one.
+type module interface {
+	// call invokes f and returns its first result, or zero when it has none.
+	call(f export, args ...uint64) (uint32, error)
+	// read returns n bytes of the memory at p, and false when they are not all
+	// inside it. The bytes are valid until the next call into the module.
+	read(p, n uint32) ([]byte, bool)
+	// write copies b into the memory at p, and reports false when b does not fit.
+	write(p uint32, b []byte) bool
+	// size returns the size of the memory in bytes.
+	size() uint32
+	// grow adds pages of 64 KiB to the memory, and reports false when it cannot.
+	grow(pages uint32) bool
+	// close releases the instance.
+	close() error
+}
+
 // Instance is one instance of the module. It can lex whole texts with Lex, and
 // it holds one live document, opened with Open, that it relexes as it is edited.
 // It is not safe for concurrent use. After a call returns an error, the instance
 // may be in an unknown state and should be closed.
 type Instance struct {
-	mod api.Module
-	fn  struct {
-		highlight, stage, initDoc, applyEdits, run, stats api.Function
-		lineCount, lineByteLen, lineTextPtr, lineFlags    api.Function
-		lineTokPtr, lineTokCount                          api.Function
-	}
+	m module
 }
 
 // New compiles the module if this is its first use in the process, and returns
 // a new instance of it.
 func New() (*Instance, error) {
-	mu.Lock()
-	r, cm, err := module()
-	var mod api.Module
-	if err == nil {
-		mod, err = r.InstantiateModule(context.Background(), cm, wazero.NewModuleConfig().WithName(""))
-	}
-	mu.Unlock()
+	m, err := newModule()
 	if err != nil {
-		return nil, fmt.Errorf("lexer: instantiate module: %w", err)
-	}
-	in := &Instance{mod: mod}
-	get := func(name string) api.Function {
-		f := mod.ExportedFunction(name)
-		if f == nil {
-			err = errors.Join(err, fmt.Errorf("lexer: module does not export %s", name))
-		}
-		return f
-	}
-	f := &in.fn
-	f.highlight, f.stage, f.initDoc = get("highlight"), get("liveStage"), get("liveInitDoc")
-	f.applyEdits, f.run, f.stats = get("liveApplyEdits"), get("liveRun"), get("liveStats")
-	f.lineCount, f.lineByteLen, f.lineTextPtr = get("liveLineCount"), get("liveLineByteLen"), get("liveLineTextPtr")
-	f.lineFlags, f.lineTokPtr, f.lineTokCount = get("liveLineFlags"), get("liveLineTokPtr"), get("liveLineTokCount")
-	if mod.Memory() == nil {
-		err = errors.Join(err, errors.New("lexer: module exports no memory"))
-	}
-	if err != nil {
-		in.Close()
 		return nil, err
 	}
-	return in, nil
+	return &Instance{m: m}, nil
 }
 
 // Close releases the instance and its memory.
-func (in *Instance) Close() error {
-	mu.Lock()
-	defer mu.Unlock()
-	return in.mod.Close(context.Background())
-}
+func (in *Instance) Close() error { return in.m.close() }
 
 // MemorySize returns the size of the instance's linear memory in bytes.
-func (in *Instance) MemorySize() uint32 { return in.mod.Memory().Size() }
+func (in *Instance) MemorySize() uint32 { return in.m.size() }
 
-// call invokes f and returns its first result, or zero when it has none.
-func (in *Instance) call(f api.Function, args ...uint64) (uint32, error) {
-	r, err := f.Call(context.Background(), args...)
-	if err != nil {
-		return 0, err
+// call invokes the export f and returns its first result, or zero when it has none.
+func (in *Instance) call(f export, args ...uint64) (uint32, error) { return in.m.call(f, args...) }
+
+// readUint32 reads the little-endian uint32 of the memory at p.
+func (in *Instance) readUint32(p uint32) (uint32, bool) {
+	b, ok := in.m.read(p, 4)
+	if !ok {
+		return 0, false
 	}
-	if len(r) == 0 {
-		return 0, nil
-	}
-	return uint32(r[0]), nil
+	return binary.LittleEndian.Uint32(b), true
 }
 
 // Sanitize returns a copy of text that the lexers can read: each byte that is not
@@ -148,9 +153,8 @@ func Sanitize(text []byte) []byte {
 
 // grow makes the memory at least size bytes.
 func (in *Instance) grow(size uint64) error {
-	mem := in.mod.Memory()
-	if have := uint64(mem.Size()); have < size {
-		if _, ok := mem.Grow(uint32((size - have + pageSize - 1) / pageSize)); !ok {
+	if have := uint64(in.m.size()); have < size {
+		if !in.m.grow(uint32((size - have + pageSize - 1) / pageSize)) {
 			return errors.New("lexer: module is out of memory")
 		}
 	}
@@ -164,19 +168,18 @@ func (in *Instance) Lex(lang int, text []byte, dst []Token) ([]Token, error) {
 	if err := in.grow(inputStart + uint64(len(text)) + inputSlack); err != nil {
 		return dst, err
 	}
-	mem := in.mod.Memory()
-	mem.Write(inputStart, text)
-	mem.WriteByte(inputStart+uint32(len(text)), 0) // the lexers stop at a NUL at the end
-	mem.WriteByte(ctlLang, byte(lang))
-	mem.WriteByte(ctlMode, modeRecords)
-	mem.WriteUint32Le(ctlInputLen, uint32(len(text)))
-	if _, err := in.call(in.fn.highlight); err != nil {
+	in.m.write(inputStart, text)
+	in.m.write(inputStart+uint32(len(text)), []byte{0}) // the lexers stop at a NUL at the end
+	var ctl [6]byte
+	ctl[ctlLang], ctl[ctlMode] = byte(lang), modeRecords
+	binary.LittleEndian.PutUint32(ctl[ctlInputLen:], uint32(len(text)))
+	in.m.write(0, ctl[:])
+	if _, err := in.call(exHighlight); err != nil {
 		return dst, fmt.Errorf("lexer: highlight: %w", err)
 	}
-	mem = in.mod.Memory()
-	out, _ := mem.ReadUint32Le(ctlOutStart)
-	n, _ := mem.ReadUint32Le(ctlOutLen)
-	rec, ok := mem.Read(out, n)
+	out, _ := in.readUint32(ctlOutStart)
+	n, _ := in.readUint32(ctlOutLen)
+	rec, ok := in.m.read(out, n)
 	if !ok {
 		return dst, errors.New("lexer: output outside module memory")
 	}
@@ -206,7 +209,7 @@ func (in *Instance) Open(lang int, text []byte) error {
 	if err != nil {
 		return err
 	}
-	if _, err := in.call(in.fn.initDoc, uint64(p), uint64(len(text)), uint64(lang)); err != nil {
+	if _, err := in.call(exInitDoc, uint64(p), uint64(len(text)), uint64(lang)); err != nil {
 		return fmt.Errorf("lexer: open document: %w", err)
 	}
 	return nil
@@ -214,11 +217,11 @@ func (in *Instance) Open(lang int, text []byte) error {
 
 // stage copies b into a block of the live heap and returns its address.
 func (in *Instance) stage(b []byte) (uint32, error) {
-	p, err := in.call(in.fn.stage, uint64(len(b)))
+	p, err := in.call(exStage, uint64(len(b)))
 	if err != nil {
 		return 0, fmt.Errorf("lexer: stage: %w", err)
 	}
-	if !in.mod.Memory().Write(p, b) {
+	if !in.m.write(p, b) {
 		return 0, errors.New("lexer: stage outside module memory")
 	}
 	return p, nil
@@ -240,7 +243,7 @@ func (in *Instance) Edit(sl, sc, el, ec int, text []byte) error {
 	if err != nil {
 		return err
 	}
-	if _, err := in.call(in.fn.applyEdits, uint64(p), 0); err != nil {
+	if _, err := in.call(exApplyEdits, uint64(p), 0); err != nil {
 		return fmt.Errorf("lexer: edit: %w", err)
 	}
 	return nil
@@ -249,11 +252,11 @@ func (in *Instance) Edit(sl, sc, el, ec int, text []byte) error {
 // Pending reports whether lines of the live document wait to be tokenized, and
 // the first of them.
 func (in *Instance) Pending() (bool, int, error) {
-	phase, err := in.call(in.fn.stats, statPhase)
+	phase, err := in.call(exStats, statPhase)
 	if err != nil || phase == 0 {
 		return false, 0, err
 	}
-	cursor, err := in.call(in.fn.stats, statCursor)
+	cursor, err := in.call(exStats, statCursor)
 	return true, int(cursor), err
 }
 
@@ -268,7 +271,7 @@ func (in *Instance) Run(end int) error {
 		if err != nil || !pending || end > 0 && cursor >= end {
 			return err
 		}
-		more, err := in.call(in.fn.run, allLines, uint64(end), 0)
+		more, err := in.call(exRun, allLines, uint64(end), 0)
 		if err != nil {
 			return fmt.Errorf("lexer: run: %w", err)
 		}
@@ -281,7 +284,7 @@ func (in *Instance) Run(end int) error {
 
 // RunLines tokenizes at most n of the waiting lines of the live document.
 func (in *Instance) RunLines(n int) error {
-	if _, err := in.call(in.fn.run, uint64(max(n, 1)), 0, 0); err != nil {
+	if _, err := in.call(exRun, uint64(max(n, 1)), 0, 0); err != nil {
 		return fmt.Errorf("lexer: run: %w", err)
 	}
 	return nil
@@ -290,22 +293,22 @@ func (in *Instance) RunLines(n int) error {
 // LineCount returns the number of lines of the live document. Text that ends in
 // a line feed has an empty last line.
 func (in *Instance) LineCount() (int, error) {
-	n, err := in.call(in.fn.lineCount)
+	n, err := in.call(exLineCount)
 	return int(n), err
 }
 
 // LineText returns the bytes of line i of the live document, without its line
-// feed. The slice is a view of the module's memory, valid until the next call.
+// feed. The slice is valid until the next call.
 func (in *Instance) LineText(i int) ([]byte, error) {
-	p, err := in.call(in.fn.lineTextPtr, uint64(i))
+	p, err := in.call(exLineTextPtr, uint64(i))
 	if err != nil {
 		return nil, err
 	}
-	n, err := in.call(in.fn.lineByteLen, uint64(i))
+	n, err := in.call(exLineByteLen, uint64(i))
 	if err != nil {
 		return nil, err
 	}
-	b, ok := in.mod.Memory().Read(p, n)
+	b, ok := in.m.read(p, n)
 	if !ok {
 		return nil, errors.New("lexer: line outside module memory")
 	}
@@ -315,15 +318,15 @@ func (in *Instance) LineText(i int) ([]byte, error) {
 // LineTokens appends the tokens of line i of the live document to dst. A line
 // that waits to be tokenized has the tokens it had before, and a new one none.
 func (in *Instance) LineTokens(i int, dst []LineToken) ([]LineToken, error) {
-	count, err := in.call(in.fn.lineTokCount, uint64(i))
+	count, err := in.call(exLineTokCount, uint64(i))
 	if err != nil || count == 0 {
 		return dst, err
 	}
-	flags, err := in.call(in.fn.lineFlags, uint64(i))
+	flags, err := in.call(exLineFlags, uint64(i))
 	if err != nil {
 		return dst, err
 	}
-	p, err := in.call(in.fn.lineTokPtr, uint64(i))
+	p, err := in.call(exLineTokPtr, uint64(i))
 	if err != nil {
 		return dst, err
 	}
@@ -332,7 +335,7 @@ func (in *Instance) LineTokens(i int, dst []LineToken) ([]LineToken, error) {
 	if wide {
 		size *= 2
 	}
-	b, ok := in.mod.Memory().Read(p, size)
+	b, ok := in.m.read(p, size)
 	if !ok {
 		return dst, errors.New("lexer: tokens outside module memory")
 	}

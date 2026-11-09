@@ -142,3 +142,9 @@ jobs:
               (cd "$m" && GOOS=${target%/*} GOARCH=${target#*/} go build ./...)
             done
           done
+      # A js build runs the highlighter in the JavaScript host's WebAssembly, not
+      # wazero (codeedit/internal/lexer/module_js.go), so its tests run under Node.
+      - name: js/wasm tests of the highlighter
+        run: |
+          export PATH="$PATH:$(go env GOROOT)/lib/wasm"
+          GOOS=js GOARCH=wasm go test -count=1 ./codeedit/internal/lexer ./codeedit/highlight ./markdown/mdcode

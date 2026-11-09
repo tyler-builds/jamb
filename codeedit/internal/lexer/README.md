@@ -12,7 +12,8 @@ the two match.
 Apache License, Version 2.0. The license text, from the package, is in
 [LICENSE-APACHE](LICENSE-APACHE). Only the module is used: the package's themes and
 its JavaScript host are not part of jamb. The Go code of this package, which runs the
-module, is jamb's.
+module, is jamb's: in wazero (`module_wazero.go`), or, in a `js` build, in the
+WebAssembly of the JavaScript host (`module_js.go`).
 
 ## Updating
 

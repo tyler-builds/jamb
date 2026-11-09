@@ -11,7 +11,8 @@
 //
 // The package is separate from markdown so that only the apps that import it link the
 // highlighter: its WebAssembly module (about 170 KB), the runtime that runs it
-// (wazero), and the crypto packages that wazero imports.
+// (wazero, except in a js build, which uses the JavaScript host's WebAssembly), and
+// the crypto packages that wazero imports.
 //
 // A block is lexed the first time a view shows it, while the view renders: a block of
 // a few kilobytes takes some microseconds, and a megabyte about 10 ms. Its colors are

@@ -204,7 +204,8 @@ cache directory, so later runs start faster.
 
 `mdcode` is a separate package so that only the apps that import it link the code
 editor's highlighting: its WebAssembly module, the runtime wazero, which runs it, and
-the `crypto` packages that wazero imports. An app that imports `markdown` alone
+the `crypto` packages that wazero imports (a `js` build uses the JavaScript host's
+WebAssembly instead of wazero). An app that imports `markdown` alone
 links none of them; `go list -deps` on it lists no `codeedit`, `wazero` or `crypto`
 package.
 

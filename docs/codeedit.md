@@ -21,7 +21,8 @@ codeedit.Editor(doc).Language("go")
 The module runs in wazero, which adds about 1.1 MB to an app's binary. wazero uses Go's SHA-256, which links Go's
 FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `codeedit` uses about
 32 MB more private memory than one that does not (see BENCHMARKS.md). Apps that do not import
-`codeedit` link none of this.
+`codeedit` link none of this. A `js` build (a web page, or Node) links no wazero: it runs the
+module in the WebAssembly of the JavaScript host, which compiles it to native code.
 
 ## Building an editor
 
@@ -531,7 +532,8 @@ highlighting depends on the spans shown and is not included in these figures.
   translation is certain. The remaining messages are English in every language, as the `ui.Strings`
   packs describe.
 - Binary size and memory: importing `codeedit` links wazero, the WebAssembly runtime (about 1.1 MB
-  of code), and the highlighter's module (0.17 MB, all 76 languages). The session's copy of a
+  of code; not in a `js` build, which uses the JavaScript host's WebAssembly), and the
+  highlighter's module (0.17 MB, all 76 languages). The session's copy of a
   document takes about five times its size in memory. wazero hashes modules with SHA-256, which links Go's
   FIPS crypto module and its 32 MB zero-filled buffer, so an app that imports `codeedit` reports
   about 32 MB more private bytes than one that does not (see BENCHMARKS.md).
