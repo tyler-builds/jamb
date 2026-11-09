@@ -360,10 +360,15 @@ func (w *window) touchMove(e js.Value) {
 		p.moves = p.moves[1:]
 	}
 	px, py := float32(x)*w.scale, float32(y)*w.scale
-	Post(func() {
-		w.emit(platform.Event{Kind: platform.EventMouseMove, X: px, Y: py})
-		w.emit(platform.Event{Kind: platform.EventScroll, X: px, Y: py, DeltaX: dx, DeltaY: dy, Precise: true})
-	})
+	Post(func() { w.touchScroll(px, py, dx, dy) })
+}
+
+// touchScroll scrolls at x, y for a touch, which is no pointer that rests
+// there: the app is told it left at once, so what scrolls under the finger
+// shows no hover. UI goroutine only.
+func (w *window) touchScroll(x, y, dx, dy float32) {
+	w.emit(platform.Event{Kind: platform.EventScroll, X: x, Y: y, DeltaX: dx, DeltaY: dy, Precise: true})
+	w.emit(platform.Event{Kind: platform.EventMouseLeave})
 }
 
 func (w *window) touchUp(e js.Value) {
@@ -435,8 +440,7 @@ func (w *window) flingFrame() {
 	dist := (1 - k) / -math.Log(flingDecay)
 	dx, dy := p.flingVX*dist, p.flingVY*dist
 	p.flingVX, p.flingVY = p.flingVX*k, p.flingVY*k
-	w.emit(platform.Event{Kind: platform.EventScroll, X: p.flingX, Y: p.flingY,
-		DeltaX: float32(dx), DeltaY: float32(dy), Precise: true})
+	w.touchScroll(p.flingX, p.flingY, float32(dx), float32(dy))
 	if math.Hypot(p.flingVX, p.flingVY) < flingStop || w.destroyed {
 		p.fling = nil
 		return
