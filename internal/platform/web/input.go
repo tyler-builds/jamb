@@ -103,6 +103,17 @@ func (w *window) listen() {
 		}
 	})
 	w.on(c, "contextmenu", func(e js.Value) { e.Call("preventDefault") })
+	// The mouse events that a browser makes from a touch would move the focus
+	// to the canvas, away from the textarea, which hides a phone's keyboard.
+	// The pointer events above stand for them.
+	w.on(c, "mousedown", func(e js.Value) { e.Call("preventDefault") })
+	w.on(c, "touchend", func(e js.Value) {
+		if e.Get("cancelable").Bool() {
+			e.Call("preventDefault")
+		}
+		// Some browsers show the keyboard only for a focus in a touch event.
+		w.syncTextFocus()
+	})
 	// The wheel listener is not passive, so that it can keep the page from
 	// scrolling and from zooming on Ctrl+wheel.
 	w.on(c, "wheel", w.wheel, map[string]any{"passive": false})
