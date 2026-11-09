@@ -148,7 +148,9 @@ jobs:
       - name: js/wasm tests
         run: |
           export PATH="$PATH:$(go env GOROOT)/lib/wasm"
-          GOOS=js GOARCH=wasm go test -count=1 ./codeedit/internal/lexer ./codeedit/highlight ./markdown/mdcode ./internal/platform/web
+          # Node has no server to fetch the fonts from: jamb_embedfonts compiles them
+          # in (see internal/text/fonts_js.go). check.sh runs the fetching builds.
+          GOOS=js GOARCH=wasm go test -tags=jamb_embedfonts -count=1 ./codeedit/internal/lexer ./codeedit/highlight ./markdown/mdcode ./internal/platform/web
 
   web:
     # Builds the web build with TinyGo, runs it under Node and checks its size

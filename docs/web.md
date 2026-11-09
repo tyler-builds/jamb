@@ -51,8 +51,15 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   environment, so it sets `window.jambEnv = {JAMB_RENDERER: "cpu"}` before it loads the app.
   When the browser takes the GPU away (a GPU reset, or too many pages using it), the app
   draws again once the browser gives it back, keeping its state.
-- **Fonts.** The embedded Go fonts and the fonts the app registers with `App.Font`; a page
-  reads no font files.
+- **Fonts.** The Go fonts and the fonts the app registers with `App.Font`. The Go fonts are not
+  compiled into the app, where the nine faces would add 315 KB: the page fetches them from the
+  `fonts` directory that `build.sh` writes next to `app.wasm`, as web pages fetch their fonts,
+  and the browser caches them. The page fetches Go Regular while the app downloads, and draws
+  its first frame once it is there; each other face (medium, bold, mono, the italics) is
+  fetched the first time text uses it, and that text is drawn in the nearest face that is
+  there until it arrives. `window.jambEnv = {JAMB_FONTS: "https://cdn.example.com/fonts/"}`
+  fetches the fonts from elsewhere. The `jamb_embedfonts` build tag compiles them in instead,
+  for an app that cannot serve files.
 - **Frames** are paced by the browser's display frames, so a page in a background tab draws
   nothing.
 - **Panics** end the app, and the page says so: `recover` does not catch a panic in a TinyGo
