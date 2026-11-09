@@ -150,7 +150,7 @@ func openInspector(h *host) {
 		Width:    1100,
 		Height:   760,
 		Strings:  h.cfg.Strings,
-		Root:     ins.root,
+		Root:     inspectorWindow{ins}.root,
 		Bindings: []ui.Binding{ui.Bind("ctrl+shift+c", inspectPick)},
 		OnClosed: ins.close,
 	})
