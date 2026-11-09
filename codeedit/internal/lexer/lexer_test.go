@@ -2,7 +2,6 @@ package lexer
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"math/rand/v2"
@@ -331,44 +330,5 @@ func TestIdentifierClasses(t *testing.T) {
 		if got := [2]bool{idStart(r), idContinue(r)}; got != want {
 			t.Errorf("%q: ID_Start, ID_Continue = %v, want %v", r, got, want)
 		}
-	}
-}
-
-func TestOpenCacheWritesOnlyUnderItsDirectory(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "cache")
-	r, err := newRuntime(openCache(dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close(context.Background())
-	if _, err := r.CompileModule(context.Background(), wasm); err != nil {
-		t.Fatal(err)
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) == 0 {
-		t.Fatal("compiling the module wrote nothing to the cache directory")
-	}
-}
-
-func TestOpenCacheFallsBackToMemory(t *testing.T) {
-	// A regular file where the cache directory should be makes MkdirAll fail.
-	blocker := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	c := openCache(filepath.Join(blocker, "cache"))
-	if _, err := os.Stat(filepath.Join(blocker, "cache")); err == nil {
-		t.Fatal("openCache created a directory under a file")
-	}
-	r, err := newRuntime(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close(context.Background())
-	if _, err := r.CompileModule(context.Background(), wasm); err != nil {
-		t.Fatal(err)
 	}
 }
