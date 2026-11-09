@@ -50,6 +50,7 @@ type window struct {
 	funcs    []js.Func // listeners, released when the window closes
 	removers []func()  // remove the listeners from their targets
 	in       pointerState
+	text     textState
 
 	clipText string // the page's own clipboard (see Clipboard)
 }
@@ -96,6 +97,7 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 		return nil
 	})
 	w.listen()
+	w.makeTextArea()
 	windows = append(windows, w)
 	if err := h.OnCreate(w); err != nil {
 		w.destroy()
@@ -333,7 +335,7 @@ func (w *window) OpenURL(url string) error {
 	return nil
 }
 
-func (w *window) Focus() { w.canvas.Call("focus") }
+func (w *window) Focus() { w.focusWindow() }
 
 func (w *window) Wake() {
 	if w.wakePending.CompareAndSwap(false, true) {
@@ -357,9 +359,11 @@ func (w *window) WakeAt(t time.Time) {
 	})
 }
 
-// The clipboard is the page's own for now: text copied in the app pastes in
-// the app. Copied text is also offered to the browser's clipboard, which may
-// refuse it outside a user gesture.
+// Clipboard returns the text last copied in the app, or the text of the
+// paste being delivered (see paste): a page reads the system's clipboard only
+// in a paste event, or after asking, which a synchronous read cannot.
+// SetClipboard writes the system's clipboard too, which the browser allows
+// during a key press or a click (see runNow).
 func (w *window) Clipboard() (string, bool) { return w.clipText, w.clipText != "" }
 
 func (w *window) SetClipboard(text string) {
@@ -383,9 +387,6 @@ func ignoreRejection(p js.Value) {
 func (w *window) ClipboardImage() (image.Image, bool) { return nil, false }
 func (w *window) HasClipboardImage() bool             { return false }
 func (w *window) SetClipboardImage(img image.Image)   {}
-
-func (w *window) SetTextInputRect(r platform.Rect) {}
-func (w *window) CancelComposition()               {}
 
 // ShowFileDialog answers as canceled: a page's file dialogs come later.
 func (w *window) ShowFileDialog(kind dialog.FileKind, o dialog.FileOptions, done func(dialog.FileResult)) {

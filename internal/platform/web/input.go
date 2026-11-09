@@ -7,7 +7,6 @@ import (
 	"strings"
 	"syscall/js"
 	"time"
-	"unicode/utf8"
 
 	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/platform"
@@ -104,6 +103,17 @@ func (w *window) listen() {
 		}
 	})
 	w.on(c, "contextmenu", func(e js.Value) { e.Call("preventDefault") })
+	// The mouse events that a browser makes from a touch would move the focus
+	// to the canvas, away from the textarea, which hides a phone's keyboard.
+	// The pointer events above stand for them.
+	w.on(c, "mousedown", func(e js.Value) { e.Call("preventDefault") })
+	w.on(c, "touchend", func(e js.Value) {
+		if e.Get("cancelable").Bool() {
+			e.Call("preventDefault")
+		}
+		// Some browsers show the keyboard only for a focus in a touch event.
+		w.syncTextFocus()
+	})
 	// The wheel listener is not passive, so that it can keep the page from
 	// scrolling and from zooming on Ctrl+wheel.
 	w.on(c, "wheel", w.wheel, map[string]any{"passive": false})
@@ -190,10 +200,26 @@ func mods(e js.Value) input.Modifiers {
 		m |= input.ModAlt
 	}
 	if e.Get("metaKey").Bool() {
-		m |= input.ModSuper
+		if appleKeys {
+			m |= input.ModCtrl
+		} else {
+			m |= input.ModSuper
+		}
 	}
 	return m
 }
+
+// appleKeys reports whether the page runs on a Mac, iPhone or iPad, where
+// Command does what Ctrl does elsewhere, as copying and pasting. jamb's
+// shortcuts use Ctrl, so Command counts as Ctrl there.
+var appleKeys = func() bool {
+	nav := js.Global().Get("navigator")
+	if !nav.Truthy() {
+		return false
+	}
+	p := nav.Get("platform")
+	return p.Type() == js.TypeString && (strings.HasPrefix(p.String(), "Mac") || strings.HasPrefix(p.String(), "iP"))
+}()
 
 func button(e js.Value) (input.MouseButton, bool) {
 	switch e.Get("button").Int() {
@@ -216,8 +242,8 @@ func (w *window) pointerDown(e js.Value) {
 	if !ok {
 		return
 	}
-	e.Call("preventDefault") // keeps the focus on the canvas, and no text is selected
-	w.canvas.Call("focus")
+	e.Call("preventDefault") // keeps the focus where it is, and no text is selected
+	w.focusWindow()
 	w.in.pressed++
 	x, y := w.pos(e)
 	m := mods(e)
@@ -260,7 +286,18 @@ func (w *window) pointerUp(e js.Value) {
 	w.in.pressed--
 	x, y := w.pos(e)
 	m := mods(e)
-	Post(func() { w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: b, Mods: m}) })
+	// The release is handled while its event lasts, which lets a click copy
+	// to the system's clipboard (see SetClipboard).
+	runNow(func() { w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: b, Mods: m}) })
+}
+
+// focusWindow gives the canvas the page's focus, unless the window has it
+// already: the textarea keeps it while a text field has the app's focus.
+func (w *window) focusWindow() {
+	active := js.Global().Get("document").Get("activeElement")
+	if !active.Equal(w.canvas) && !active.Equal(w.text.area) {
+		w.canvas.Call("focus", map[string]any{"preventScroll": true})
+	}
 }
 
 // countClicks returns 2 for the second press of a double click, else 1, as
@@ -295,7 +332,8 @@ func (w *window) touchDown(e js.Value) {
 	if p.touching {
 		return
 	}
-	w.canvas.Call("focus")
+	e.Call("preventDefault") // the press does not move the focus, which would hide a phone's keyboard
+	w.focusWindow()
 	p.touching, p.panning = true, false
 	p.touchID = e.Get("pointerId").Int()
 	p.touchX0, p.touchY0 = w.cssPos(e)
@@ -353,8 +391,11 @@ func (w *window) touchUp(e js.Value) {
 		})
 		return
 	}
+	// The tap is handled, and a frame drawn, while its event lasts: if the tap
+	// focused a text field, the event then focuses the textarea, which a
+	// phone shows its keyboard for only now.
 	x, y := float32(p.touchX0)*w.scale, float32(p.touchY0)*w.scale
-	Post(func() {
+	if runNow(func() {
 		if w.in.noTap {
 			w.in.noTap = false
 			return // the touch stopped a fling
@@ -364,7 +405,10 @@ func (w *window) touchUp(e js.Value) {
 		w.emit(platform.Event{Kind: platform.EventMouseDown, X: x, Y: y, Button: input.ButtonLeft, Clicks: clicks})
 		w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: input.ButtonLeft})
 		w.emit(platform.Event{Kind: platform.EventMouseLeave})
-	})
+		w.drawNow()
+	}) {
+		w.syncTextFocus()
+	}
 }
 
 // startFling carries a pan on at the speed vx, vy, in CSS pixels per
@@ -437,23 +481,29 @@ func (w *window) wheel(e js.Value) {
 
 // key delivers a key press or release, and the text a press types. It keeps
 // the browser from acting on the keys the app uses, but not on the browser's
-// own shortcuts, such as reloading or closing the tab.
+// own shortcuts, such as reloading or closing the tab. In a text field, the
+// textarea types a press's text, and its input event delivers it (see
+// makeTextArea), as an input method's or a phone keyboard's.
 func (w *window) key(e js.Value, down bool) {
-	code, keyName := e.Get("code").String(), e.Get("key").String()
-	k := keyCodes[code]
-	m := mods(e)
-	text := ""
-	if down && m&(input.ModCtrl|input.ModSuper) == 0 && utf8.RuneCountInString(keyName) == 1 {
-		text = keyName
+	if e.Get("isComposing").Bool() || e.Get("keyCode").Int() == 229 {
+		return // a press of an input method's, whose text comes with its composition
 	}
-	if k == input.KeyUnknown && text == "" {
+	code, name := e.Get("code").String(), e.Get("key").String()
+	k := keyCodes[code]
+	if k == input.KeyUnknown {
+		k = keyNames[name]
+	}
+	m := mods(e)
+	typed := down && printable(name, m)
+	if k == input.KeyUnknown && !typed {
 		return
 	}
-	if !browserShortcut(k, m) {
-		e.Call("preventDefault")
+	text, field := "", w.text.focused
+	if typed && !field {
+		text = name
 	}
 	repeat := e.Get("repeat").Bool()
-	Post(func() {
+	deliver := func() {
 		if !down {
 			w.emit(platform.Event{Kind: platform.EventKeyUp, Key: k, Mods: m})
 			return
@@ -464,7 +514,25 @@ func (w *window) key(e js.Value, down bool) {
 		if text != "" {
 			w.emit(platform.Event{Kind: platform.EventTextInput, Text: text})
 		}
-	})
+	}
+	switch {
+	case clipboardKey(k, m) && k == input.KeyV && field:
+		return // the paste event delivers it, with the clipboard's text
+	case clipboardKey(k, m):
+		// Copy and cut, and paste of the app's own clipboard outside a text
+		// field: handled while the event lasts, so a copy reaches the system's
+		// clipboard (see SetClipboard).
+		e.Call("preventDefault")
+		runNow(deliver)
+		return
+	case browserShortcut(k, m), field && (typed || name == "Dead"):
+	default:
+		e.Call("preventDefault")
+	}
+	if down {
+		w.text.lastKey, w.text.lastKeyAt = k, time.Now()
+	}
+	Post(deliver)
 }
 
 // browserShortcut reports whether the browser keeps the key press: reload,
