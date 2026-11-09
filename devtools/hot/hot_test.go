@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -165,6 +166,7 @@ func TestLocalsKeepTheirValues(t *testing.T) {
 	rt.Frame(time.Now())
 	open.Set(true)
 	restart(t)
+	goruntime.KeepAlive(rt) // the checkpoint keeps the locals of live components
 	rt2 := ui.NewRuntime(root, nil, nil)
 	rt2.SetViewport(100, 100, 1)
 	rt2.Frame(time.Now())
@@ -271,15 +273,20 @@ func TestLocalsFollowTheirComponent(t *testing.T) {
 		}
 		return ui.Div().Children(ca, cb)
 	}
-	frame := func() {
+	frame := func() *ui.Runtime {
 		rt := ui.NewRuntime(root, nil, nil)
 		rt.SetViewport(100, 100, 1)
 		rt.Frame(time.Now())
+		return rt
 	}
-	frame()
+	rt := frame()
 	a.Set(1)
 	b.Set(2)
 	restart(t)
+	// A checkpoint keeps the locals of the components that are alive, and the
+	// components live as long as their runtime: a collection before the
+	// checkpoint must not take them.
+	goruntime.KeepAlive(rt)
 	swapped = true // the code changed: B comes first now
 	frame()
 	if a.Peek() != 1 || b.Peek() != 2 {
