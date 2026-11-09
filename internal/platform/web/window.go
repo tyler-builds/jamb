@@ -316,10 +316,10 @@ func (w *window) SetFullscreen(on bool) {
 	switch {
 	case on && !w.Fullscreen():
 		if f := w.canvas.Get("requestFullscreen"); f.Type() == js.TypeFunction {
-			w.canvas.Call("requestFullscreen")
+			ignoreRejection(w.canvas.Call("requestFullscreen"))
 		}
 	case !on && w.Fullscreen():
-		doc.Call("exitFullscreen")
+		ignoreRejection(doc.Call("exitFullscreen"))
 	}
 }
 
@@ -365,11 +365,19 @@ func (w *window) Clipboard() (string, bool) { return w.clipText, w.clipText != "
 func (w *window) SetClipboard(text string) {
 	w.clipText = text
 	if c := js.Global().Get("navigator").Get("clipboard"); c.Truthy() {
-		p := c.Call("writeText", text)
-		var ignore js.Func
-		ignore = js.FuncOf(func(js.Value, []js.Value) any { ignore.Release(); return nil })
-		p.Call("catch", ignore)
+		ignoreRejection(c.Call("writeText", text))
 	}
+}
+
+// ignoreRejection keeps a promise's rejection from reaching the page as an
+// unhandled one, which the page takes for the app failing.
+func ignoreRejection(p js.Value) {
+	if p.Type() != js.TypeObject || p.Get("catch").Type() != js.TypeFunction {
+		return
+	}
+	var ignore js.Func
+	ignore = js.FuncOf(func(js.Value, []js.Value) any { ignore.Release(); return nil })
+	p.Call("catch", ignore)
 }
 
 func (w *window) ClipboardImage() (image.Image, bool) { return nil, false }

@@ -23,6 +23,18 @@ const (
 // pan rather than a tap.
 const touchSlop = 8
 
+// The momentum of a pan, as iOS scrolls: the finger's speed over its last
+// moves carries on after it lifts, slowing by flingDecay each millisecond (the
+// rate of UIScrollView's normal deceleration), until it is slower than
+// flingStop. A pan that ends slower than flingStart has none.
+const (
+	flingWindow = 100 * time.Millisecond // the moves that give a pan's speed
+	flingDecay  = 0.998                  // per millisecond
+	flingStart  = 0.3                    // CSS pixels per millisecond
+	flingStop   = 0.02                   // CSS pixels per millisecond
+	flingStep   = 16 * time.Millisecond
+)
+
 // pointerState is what the window remembers of the pointer between events.
 type pointerState struct {
 	lastButton input.MouseButton
@@ -30,13 +42,32 @@ type pointerState struct {
 	lastX      float32
 	lastY      float32
 	lastClicks int
+	pressed    int // mouse buttons pressed on the canvas and not released
 
 	// The finger of a touch: where it went down and was last, and whether it
-	// moved far enough to pan.
+	// moved far enough to pan. moves are its recent positions, for the speed
+	// the pan carries on with.
 	touchID           int
 	touching, panning bool
 	touchX0, touchY0  float64
 	touchX, touchY    float64
+	moves             []touchMove
+
+	// The momentum of the last pan, UI goroutine only: its speed in CSS pixels
+	// per millisecond, where it scrolls, and when it last scrolled. A touch
+	// that stops it is no tap (noTap).
+	fling          *timer
+	flingVX        float64
+	flingVY        float64
+	flingAt        time.Time
+	flingX, flingY float32
+	noTap          bool
+}
+
+// touchMove is a finger's position at a time.
+type touchMove struct {
+	at   time.Time
+	x, y float64
 }
 
 // on adds a listener for the event type on target, and keeps it to remove when
@@ -59,12 +90,16 @@ func (w *window) on(target js.Value, typ string, fn func(e js.Value), opts ...ma
 func (w *window) listen() {
 	c, win, doc := w.canvas, js.Global(), js.Global().Get("document")
 
+	// A press starts on the canvas, and its moves and its release are heard on
+	// the whole window, so a drag goes on outside the canvas. This takes the
+	// place of setPointerCapture, which throws when the browser no longer
+	// knows the pointer, and a JavaScript exception ends a TinyGo build.
 	w.on(c, "pointerdown", w.pointerDown)
-	w.on(c, "pointermove", w.pointerMove)
-	w.on(c, "pointerup", w.pointerUp)
-	w.on(c, "pointercancel", w.pointerUp)
+	w.on(win, "pointermove", w.pointerMove)
+	w.on(win, "pointerup", w.pointerUp)
+	w.on(win, "pointercancel", w.pointerUp)
 	w.on(c, "pointerleave", func(e js.Value) {
-		if e.Get("pointerType").String() != "touch" {
+		if e.Get("pointerType").String() != "touch" && e.Get("buttons").Int() == 0 {
 			Post(func() { w.emit(platform.Event{Kind: platform.EventMouseLeave}) })
 		}
 	})
@@ -124,9 +159,23 @@ func (w *window) unlisten() {
 	w.removers, w.funcs = nil, nil
 }
 
+// cssPos returns the event's position in CSS pixels relative to the canvas.
+// The event's target may be another element, when a drag has left the canvas.
+func (w *window) cssPos(e js.Value) (float64, float64) {
+	r := w.canvas.Call("getBoundingClientRect")
+	return e.Get("clientX").Float() - r.Get("left").Float(), e.Get("clientY").Float() - r.Get("top").Float()
+}
+
 // pos returns the event's position in device pixels relative to the canvas.
 func (w *window) pos(e js.Value) (float32, float32) {
-	return float32(e.Get("offsetX").Float()) * w.scale, float32(e.Get("offsetY").Float()) * w.scale
+	x, y := w.cssPos(e)
+	return float32(x) * w.scale, float32(y) * w.scale
+}
+
+// over reports whether the event's position is over the canvas.
+func (w *window) over(e js.Value) bool {
+	x, y := w.cssPos(e)
+	return x >= 0 && y >= 0 && x < w.cssW && y < w.cssH
 }
 
 func mods(e js.Value) input.Modifiers {
@@ -169,7 +218,7 @@ func (w *window) pointerDown(e js.Value) {
 	}
 	e.Call("preventDefault") // keeps the focus on the canvas, and no text is selected
 	w.canvas.Call("focus")
-	w.canvas.Call("setPointerCapture", e.Get("pointerId"))
+	w.in.pressed++
 	x, y := w.pos(e)
 	m := mods(e)
 	Post(func() {
@@ -184,8 +233,18 @@ func (w *window) pointerMove(e js.Value) {
 		w.touchMove(e)
 		return
 	}
+	if w.in.pressed == 0 && !w.over(e) {
+		return // the pointer is elsewhere on the page, and no press of the canvas holds it
+	}
 	x, y := w.pos(e)
 	m := mods(e)
+	if w.in.pressed > 0 && e.Get("buttons").Int() == 0 {
+		// The press ended outside the browser, where the page heard no release.
+		w.in.pressed = 0
+		Post(func() {
+			w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: input.ButtonLeft, Mods: m})
+		})
+	}
 	Post(func() { w.emit(platform.Event{Kind: platform.EventMouseMove, X: x, Y: y, Mods: m}) })
 }
 
@@ -195,9 +254,10 @@ func (w *window) pointerUp(e js.Value) {
 		return
 	}
 	b, ok := button(e)
-	if !ok {
-		return
+	if !ok || w.in.pressed == 0 {
+		return // not the release of a press of the canvas
 	}
+	w.in.pressed--
 	x, y := w.pos(e)
 	m := mods(e)
 	Post(func() { w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: b, Mods: m}) })
@@ -226,8 +286,9 @@ func abs(v float32) float32 {
 
 // A touch is a tap or a pan. A finger that lifts before it moves touchSlop is
 // a tap, delivered as a click where it went down; one that moves further pans,
-// delivered as precise scrolling, as a touchpad scrolls. Only the first finger
-// counts: a pinch is not recognized yet.
+// delivered as precise scrolling, as a touchpad scrolls, and keeps scrolling
+// with its momentum after it lifts. A touch while that momentum lasts stops it,
+// and is no tap. Only the first finger counts: a pinch is not recognized yet.
 
 func (w *window) touchDown(e js.Value) {
 	p := &w.in
@@ -235,11 +296,12 @@ func (w *window) touchDown(e js.Value) {
 		return
 	}
 	w.canvas.Call("focus")
-	w.canvas.Call("setPointerCapture", e.Get("pointerId"))
 	p.touching, p.panning = true, false
 	p.touchID = e.Get("pointerId").Int()
-	p.touchX0, p.touchY0 = e.Get("offsetX").Float(), e.Get("offsetY").Float()
+	p.touchX0, p.touchY0 = w.cssPos(e)
 	p.touchX, p.touchY = p.touchX0, p.touchY0
+	p.moves = append(p.moves[:0], touchMove{time.Now(), p.touchX0, p.touchY0})
+	Post(w.stopFling)
 }
 
 func (w *window) touchMove(e js.Value) {
@@ -247,13 +309,18 @@ func (w *window) touchMove(e js.Value) {
 	if !p.touching || e.Get("pointerId").Int() != p.touchID {
 		return
 	}
-	x, y := e.Get("offsetX").Float(), e.Get("offsetY").Float()
+	x, y := w.cssPos(e)
 	if !p.panning && math.Hypot(x-p.touchX0, y-p.touchY0) < touchSlop {
 		return
 	}
 	p.panning = true
 	dx, dy := float32(p.touchX-x), float32(p.touchY-y)
 	p.touchX, p.touchY = x, y
+	now := time.Now()
+	p.moves = append(p.moves, touchMove{now, x, y})
+	for len(p.moves) > 2 && now.Sub(p.moves[0].at) > flingWindow {
+		p.moves = p.moves[1:]
+	}
 	px, py := float32(x)*w.scale, float32(y)*w.scale
 	Post(func() {
 		w.emit(platform.Event{Kind: platform.EventMouseMove, X: px, Y: py})
@@ -267,17 +334,79 @@ func (w *window) touchUp(e js.Value) {
 		return
 	}
 	p.touching = false
-	if p.panning || e.Get("type").String() == "pointercancel" {
+	if e.Get("type").String() == "pointercancel" {
+		Post(func() { w.in.noTap = false })
+		return
+	}
+	if p.panning {
+		// The speed over the last moves, if the finger was still moving when
+		// it lifted, carries the scrolling on.
+		vx, vy, x, y := 0.0, 0.0, float32(0), float32(0)
+		first, last := p.moves[0], p.moves[len(p.moves)-1]
+		if ms := float64(last.at.Sub(first.at).Microseconds()) / 1000; ms > 0 && time.Since(last.at) < flingWindow {
+			vx, vy = (first.x-last.x)/ms, (first.y-last.y)/ms
+			x, y = float32(last.x)*w.scale, float32(last.y)*w.scale
+		}
+		Post(func() {
+			w.in.noTap = false // the touch that stopped a fling panned instead
+			w.startFling(vx, vy, x, y)
+		})
 		return
 	}
 	x, y := float32(p.touchX0)*w.scale, float32(p.touchY0)*w.scale
 	Post(func() {
+		if w.in.noTap {
+			w.in.noTap = false
+			return // the touch stopped a fling
+		}
 		clicks := w.countClicks(input.ButtonLeft, x, y)
 		w.emit(platform.Event{Kind: platform.EventMouseMove, X: x, Y: y})
 		w.emit(platform.Event{Kind: platform.EventMouseDown, X: x, Y: y, Button: input.ButtonLeft, Clicks: clicks})
 		w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: input.ButtonLeft})
 		w.emit(platform.Event{Kind: platform.EventMouseLeave})
 	})
+}
+
+// startFling carries a pan on at the speed vx, vy, in CSS pixels per
+// millisecond, scrolling at x, y. UI goroutine only.
+func (w *window) startFling(vx, vy float64, x, y float32) {
+	if math.Hypot(vx, vy) < flingStart {
+		return
+	}
+	p := &w.in
+	p.fling.stop()
+	p.flingVX, p.flingVY, p.flingX, p.flingY, p.flingAt = vx, vy, x, y, time.Now()
+	p.fling = after(flingStep, w.flingFrame)
+}
+
+// flingFrame scrolls by the momentum's distance since its last frame, and
+// slows it down. UI goroutine only.
+func (w *window) flingFrame() {
+	p := &w.in
+	now := time.Now()
+	ms := float64(now.Sub(p.flingAt).Microseconds()) / 1000
+	p.flingAt = now
+	// The distance is the integral of the decaying speed over the frame.
+	k := math.Pow(flingDecay, ms)
+	dist := (1 - k) / -math.Log(flingDecay)
+	dx, dy := p.flingVX*dist, p.flingVY*dist
+	p.flingVX, p.flingVY = p.flingVX*k, p.flingVY*k
+	w.emit(platform.Event{Kind: platform.EventScroll, X: p.flingX, Y: p.flingY,
+		DeltaX: float32(dx), DeltaY: float32(dy), Precise: true})
+	if math.Hypot(p.flingVX, p.flingVY) < flingStop || w.destroyed {
+		p.fling = nil
+		return
+	}
+	p.fling = after(flingStep, w.flingFrame)
+}
+
+// stopFling stops the momentum of a pan, when a touch lands while it lasts,
+// and makes that touch no tap. UI goroutine only.
+func (w *window) stopFling() {
+	p := &w.in
+	p.noTap = p.fling != nil
+	p.fling.stop()
+	p.fling = nil
 }
 
 // wheel delivers a wheel event as scrolling, in logical (CSS) pixels.
