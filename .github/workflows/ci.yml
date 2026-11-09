@@ -152,7 +152,9 @@ jobs:
 
   web:
     # Builds the web build with TinyGo, runs it under Node and checks its size
-    # (scripts/web/check.sh). TinyGo runs from its pinned image.
+    # (scripts/web/check.sh), then checks the demo in Chromium: WebGL 2 against
+    # the CPU renderer, and text input (scripts/web/browser.sh). TinyGo runs
+    # from its pinned image.
     name: Web build (TinyGo)
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -169,3 +171,5 @@ jobs:
         run: for m in . examples/hello examples/demo; do (cd "$m" && go mod download); done
       - name: Build, run and measure
         run: sh scripts/web/check.sh
+      - name: Check in a browser
+        run: PLAYWRIGHT_DEPS=1 sh scripts/web/browser.sh
