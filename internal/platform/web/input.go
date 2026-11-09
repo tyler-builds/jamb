@@ -48,6 +48,7 @@ type pointerState struct {
 	// the pan carries on with.
 	touchID           int
 	touching, panning bool
+	dragging          bool // the touch drags an element that takes the drag (see platform.TouchHandler)
 	touchX0, touchY0  float64
 	touchX, touchY    float64
 	moves             []touchMove
@@ -321,7 +322,9 @@ func abs(v float32) float32 {
 	return v
 }
 
-// A touch is a tap or a pan. A finger that lifts before it moves touchSlop is
+// A touch is a drag, a tap or a pan. A touch on an element that takes the drag
+// itself, as a slider does (see platform.TouchHandler), presses the mouse at
+// once and drags it. Otherwise a finger that lifts before it moves touchSlop is
 // a tap, delivered as a click where it went down; one that moves further pans,
 // delivered as precise scrolling, as a touchpad scrolls, and keeps scrolling
 // with its momentum after it lifts. A touch while that momentum lasts stops it,
@@ -334,12 +337,31 @@ func (w *window) touchDown(e js.Value) {
 	}
 	e.Call("preventDefault") // the press does not move the focus, which would hide a phone's keyboard
 	w.focusWindow()
-	p.touching, p.panning = true, false
+	p.touching, p.panning, p.dragging = true, false, false
 	p.touchID = e.Get("pointerId").Int()
 	p.touchX0, p.touchY0 = w.cssPos(e)
 	p.touchX, p.touchY = p.touchX0, p.touchY0
 	p.moves = append(p.moves[:0], touchMove{time.Now(), p.touchX0, p.touchY0})
-	Post(w.stopFling)
+	// The app says, while the event lasts, whether the element under the
+	// finger takes the drag; if it cannot answer now, the touch pans.
+	x, y := float32(p.touchX0)*w.scale, float32(p.touchY0)*w.scale
+	drags := false
+	runNow(func() {
+		w.stopFling()
+		if th, ok := w.handler.(platform.TouchHandler); ok && w.ready && !w.destroyed {
+			drags = th.TouchDrags(w, x, y)
+		}
+	})
+	if !drags {
+		return
+	}
+	p.dragging = true
+	Post(func() {
+		w.in.noTap = false
+		clicks := w.countClicks(input.ButtonLeft, x, y)
+		w.emit(platform.Event{Kind: platform.EventMouseMove, X: x, Y: y})
+		w.emit(platform.Event{Kind: platform.EventMouseDown, X: x, Y: y, Button: input.ButtonLeft, Clicks: clicks})
+	})
 }
 
 func (w *window) touchMove(e js.Value) {
@@ -348,6 +370,11 @@ func (w *window) touchMove(e js.Value) {
 		return
 	}
 	x, y := w.cssPos(e)
+	if p.dragging {
+		px, py := float32(x)*w.scale, float32(y)*w.scale
+		Post(func() { w.emit(platform.Event{Kind: platform.EventMouseMove, X: px, Y: py}) })
+		return
+	}
 	if !p.panning && math.Hypot(x-p.touchX0, y-p.touchY0) < touchSlop {
 		return
 	}
@@ -377,6 +404,15 @@ func (w *window) touchUp(e js.Value) {
 		return
 	}
 	p.touching = false
+	if p.dragging {
+		p.dragging = false
+		x, y := w.pos(e)
+		Post(func() {
+			w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: input.ButtonLeft})
+			w.emit(platform.Event{Kind: platform.EventMouseLeave})
+		})
+		return
+	}
 	if e.Get("type").String() == "pointercancel" {
 		Post(func() { w.in.noTap = false })
 		return

@@ -33,7 +33,9 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   not minimize, maximize, move or close itself, so a title bar the app draws shows no caption
   buttons. `Window.OpenURL` opens a new tab.
 - **Input.** The mouse and touchpad (clicks, double clicks, the wheel), the keyboard (keys by
-  their position, and the text they type), and touch: a tap is a click and a drag scrolls.
+  their position, and the text they type), and touch: a tap is a click, a drag scrolls with
+  momentum, and a drag that starts on a slider, a split divider or another element that takes
+  the drag moves it.
   The browser keeps its own shortcuts, such as reloading the page or closing the tab. On a
   Mac, iPhone or iPad, Command is Ctrl, so Command+C copies.
 - **Text input.** While a text field has focus, a hidden textarea of the page has it too, at

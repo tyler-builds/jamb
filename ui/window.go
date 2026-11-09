@@ -74,6 +74,19 @@ func (rt *Runtime) hostWindowAreaAt(x, y float32) WindowArea {
 	return WindowAreaNone
 }
 
+// hostDragsAt reports whether a press at x, y, in logical pixels, lands in an
+// element that captures the pointer (see CapturePointer), which takes the drag
+// that follows: a touch there drags it rather than scrolling.
+func (rt *Runtime) hostDragsAt(x, y float32) bool {
+	x, y = x/rt.zoom, y/rt.zoom
+	for _, n := range rt.hitTest(x, y) {
+		if n.div != nil && n.div.capture {
+			return true
+		}
+	}
+	return false
+}
+
 // interactive reports whether the element takes pointer or keyboard input of
 // its own.
 func (d *DivElement) interactive() bool {

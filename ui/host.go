@@ -103,6 +103,10 @@ func (h *runtimeHost) TextInputRect() (scene.Rect, bool) { return h.rt().hostTex
 // WindowAreaAt returns the custom title bar area at a point, in logical pixels.
 func (h *runtimeHost) WindowAreaAt(x, y float32) WindowArea { return h.rt().hostWindowAreaAt(x, y) }
 
+// DragsAt reports whether a press at a point, in logical pixels, starts a drag
+// that an element takes itself (see hostDragsAt).
+func (h *runtimeHost) DragsAt(x, y float32) bool { return h.rt().hostDragsAt(x, y) }
+
 // ---- for ui/uitest ----
 //
 // A headless runtime in a test is driven by ui/uitest, which uses these as a

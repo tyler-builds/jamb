@@ -1017,6 +1017,16 @@ func (h *host) TitleArea(w platform.Window, x, y float32) platform.TitleArea {
 	return platform.TitleNone
 }
 
+// TouchDrags implements platform.TouchHandler: a touch at a point, in physical
+// client pixels, drags the element there when it captures the pointer.
+func (h *host) TouchDrags(w platform.Window, x, y float32) bool {
+	if h.rt == nil {
+		return false
+	}
+	s := w.Scale()
+	return h.rh.DragsAt(x/s, y/s)
+}
+
 // Presented implements platform.Presenter: the last frame was shown, so the
 // window needs no repaint on WM_PAINT at its size.
 func (h *host) Presented() bool { return h.presented }
@@ -1259,6 +1269,7 @@ type runtimeHost interface {
 	HasMenuBar() bool
 	TextInputRect() (scene.Rect, bool)
 	WindowAreaAt(x, y float32) ui.WindowArea
+	DragsAt(x, y float32) bool
 	FlushTimers()
 	Close()
 }

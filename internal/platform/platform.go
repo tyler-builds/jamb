@@ -131,6 +131,15 @@ type TitleBarHandler interface {
 	TitleArea(w Window, x, y float32) TitleArea
 }
 
+// TouchHandler is optionally implemented by a Handler. An adapter that sees
+// touches asks it, when a finger goes down, whether the element under it takes
+// the drag itself, as a slider or a split divider does: then the touch is a
+// press and drag of the mouse, and otherwise a drag of the finger scrolls. The
+// point is in physical pixels relative to the client area.
+type TouchHandler interface {
+	TouchDrags(w Window, x, y float32) bool
+}
+
 // MenuBarHandler is optionally implemented by a Handler whose window shows an
 // application menu bar. When Alt is pressed and released alone, the adapter
 // asks it, and if the bar takes that key itself, the system menu does not
