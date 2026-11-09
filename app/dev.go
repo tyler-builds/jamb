@@ -329,7 +329,7 @@ func (s *stress) end(h *host, w platform.Window, cpu int64) bool {
 		float64(m.TotalAlloc-s.mem0.TotalAlloc)/frames/1024, float64(m.Mallocs-s.mem0.Mallocs)/frames,
 		float64(m.TotalAlloc-s.mem0.TotalAlloc)/elapsed.Seconds()/1e6,
 		m.NumGC-s.mem0.NumGC, float64(m.NumGC-s.mem0.NumGC)/elapsed.Seconds(),
-		time.Duration(m.PauseTotalNs-s.mem0.PauseTotalNs), float64(m.HeapAlloc)/1e6)
+		time.Duration(gcPauseTotal(&m)-gcPauseTotal(&s.mem0)), float64(m.HeapAlloc)/1e6)
 	w.Close()
 	return false
 }
