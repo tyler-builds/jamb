@@ -113,6 +113,14 @@ func (inst *componentInstance) unsubscribe() {
 
 // render runs the component function (or expands the composite element)
 // with dependency tracking.
+//
+// render is never inlined. It runs every element's expand, through one interface
+// call that TinyGo turns into a dispatch with the expand methods inlined, which
+// is thousands of locals. Inlined into renderInstance, those locals were part of
+// every level of the build's recursion, and Safari, which gives each local of a
+// WebAssembly function its own stack slot, ran out of stack on deep pages.
+//
+//go:noinline
 func (inst *componentInstance) render() {
 	inst.unsubscribe()
 	inst.dirty.Store(false)

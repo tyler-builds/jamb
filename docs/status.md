@@ -63,7 +63,9 @@ The milestone status, and the known limitations and next steps.
 - **Inspector.** An element picked in the window inside a collapsed branch of the
   tree is selected, but its row is not revealed: `ui.Tree` cannot open nodes from
   outside yet. The breadcrumb of the details and the tree filter reach it.
-- **Platforms.** Windows is the supported platform. A Linux adapter for Wayland
+- **Platforms.** Windows is the supported platform. A web page is experimental (see
+  [Web](web.md)): it draws on the CPU, and has no input methods, system clipboard or file
+  dialogs yet. A Linux adapter for Wayland
   compositors is experimental (`internal/platform/linux`): it speaks the Wayland
   protocol in pure Go, loads libxkbcommon with purego for keyboard layouts and
   libfontconfig for the desktop's fonts (the UI, monospace and emoji fonts, and

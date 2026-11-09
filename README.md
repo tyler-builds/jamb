@@ -8,7 +8,8 @@ parts that depend on it.
 
 > **Status:** jamb is pre-1.0. The API may change between versions. It runs on Windows 10 and 11.
 > Linux support for Wayland desktops is experimental: it draws on the CPU and lacks some features
-> (see [docs/status.md](docs/status.md)). macOS is planned.
+> (see [docs/status.md](docs/status.md)). A web page is experimental too (see [docs/web.md](docs/web.md)).
+> macOS is planned.
 
 ## Highlights
 
