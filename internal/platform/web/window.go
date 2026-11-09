@@ -23,8 +23,15 @@ type window struct {
 	opts    platform.WindowOptions
 
 	canvas js.Value
+	style  js.Value // the canvas's style
+	cursor string   // the cursor the style has, when the window set one
 	ctx    js.Value // the canvas's 2D context, made for the CPU renderer (see Buffer)
 	owned  bool     // the window made the canvas, and removes it when it closes
+
+	// The page's host script, when it delivers the window's frames and input
+	// (see host.go).
+	host   js.Value
+	hosted bool
 
 	// The size of the canvas in CSS pixels and its device pixel ratio, read
 	// on the UI goroutine when the page reports a change.
@@ -32,6 +39,7 @@ type window struct {
 	scale      float32
 
 	ready, hidden, destroyed, closing bool
+	pageHidden                        bool // the page is in a background tab (see listen)
 
 	frameWanted bool        // OnFrame asked for another frame
 	wakePending atomic.Bool // Wake asked for a frame
@@ -80,22 +88,24 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 		st.Set("display", "block")
 		doc.Get("body").Call("appendChild", w.canvas)
 	}
-	st := w.canvas.Get("style")
-	st.Set("outline", "none")
-	st.Set("touchAction", "none") // the app handles touches; the page does not scroll or zoom
-	st.Set("userSelect", "none")
+	w.style = w.canvas.Get("style")
+	w.style.Set("outline", "none")
+	w.style.Set("touchAction", "none") // the app handles touches; the page does not scroll or zoom
+	w.style.Set("userSelect", "none")
 	w.canvas.Set("tabIndex", 0)
 	w.SetTitle(opts.Title)
 	w.measure()
-	w.rafFunc = js.FuncOf(func(_ js.Value, args []js.Value) any {
-		if len(args) > 0 {
-			w.rafTime = args[0].Float()
-		}
-		w.rafAsked.Store(false)
-		w.rafFired.Store(true)
-		signal()
-		return nil
-	})
+	w.pageHidden = doc.Get("visibilityState").String() == "hidden"
+	if w.host, w.hosted = pageHost(); !w.hosted {
+		w.rafFunc = js.FuncOf(func(_ js.Value, args []js.Value) any {
+			t := 0.0
+			if len(args) > 0 {
+				t = args[0].Float()
+			}
+			w.displayFrame(t)
+			return nil
+		})
+	}
 	w.listen()
 	w.makeTextArea()
 	windows = append(windows, w)
@@ -153,7 +163,7 @@ func (w *window) frame() {
 		}
 	}
 	if w.rafAsked.CompareAndSwap(false, true) {
-		js.Global().Call("requestAnimationFrame", w.rafFunc)
+		w.requestFrame()
 	}
 }
 
@@ -197,7 +207,9 @@ func (w *window) destroy() {
 	w.destroyed = true
 	w.wakeTmr.stop()
 	w.unlisten()
-	w.rafFunc.Release()
+	if !w.hosted {
+		w.rafFunc.Release()
+	}
 	if w.owned {
 		w.canvas.Call("remove")
 	}
@@ -300,12 +312,26 @@ var cursors = map[input.Cursor]string{
 	input.CursorNotAllowed: "not-allowed",
 }
 
+// SetCursor sets the canvas's cursor. The app calls it with each move of the
+// pointer, so it writes the style only when the cursor changes.
 func (w *window) SetCursor(c input.Cursor) {
 	name, ok := cursors[c]
 	if !ok {
 		name = "default"
 	}
-	w.canvas.Get("style").Set("cursor", name)
+	if name == w.cursor {
+		return
+	}
+	w.cursor = name
+	w.canvasStyle().Set("cursor", name)
+}
+
+// canvasStyle returns the canvas's style.
+func (w *window) canvasStyle() js.Value {
+	if w.style.IsUndefined() {
+		w.style = w.canvas.Get("style")
+	}
+	return w.style
 }
 
 func (w *window) Show() {
@@ -313,7 +339,7 @@ func (w *window) Show() {
 		return
 	}
 	w.hidden = false
-	w.canvas.Get("style").Set("visibility", "visible")
+	w.canvasStyle().Set("visibility", "visible")
 	w.Wake()
 }
 
@@ -415,15 +441,16 @@ func (w *window) ShowMessageBox(o dialog.MessageOptions, done func(dialog.Button
 
 func (w *window) Hide() {
 	w.hidden = true
-	w.canvas.Get("style").Set("visibility", "hidden")
+	w.canvasStyle().Set("visibility", "hidden")
 }
 
 func (w *window) Restore() { w.Show() }
 
 // Visible reports whether the window shows: not hidden, in a page that is not
-// in a background tab.
+// in a background tab. Each frame asks, so the page's state is kept as its
+// visibilitychange event reports it (see listen).
 func (w *window) Visible() bool {
-	return !w.hidden && !w.destroyed && js.Global().Get("document").Get("visibilityState").String() != "hidden"
+	return !w.hidden && !w.destroyed && !w.pageHidden
 }
 
 func (w *window) Shown() bool { return !w.hidden && !w.destroyed }

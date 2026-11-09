@@ -80,8 +80,88 @@ type touchMove struct {
 	x, y float64
 }
 
+// performance is the page's clock.
+var performance = js.Global().Get("performance")
+
 // now returns the time on the clock of display frames, in milliseconds.
-func now() float64 { return js.Global().Get("performance").Call("now").Float() }
+func now() float64 { return performance.Call("now").Float() }
+
+// The page's input reaches the window as plain values: a pointerEvent, a
+// wheelEvent or a keyEvent, with everything the window needs of the browser's
+// event. The page's host script makes them from numbers it passes to the app
+// (see host.go), and without it a listener reads them from the event (see
+// listen). Each handler reports whether the event's default action is
+// prevented, which only the event's own listener can do.
+
+// pointerKind is the type of a pointer event.
+type pointerKind int
+
+const (
+	pointerDown pointerKind = iota
+	pointerMove
+	pointerUp
+	pointerCancel
+	pointerLeave
+)
+
+// pointerEvent is a pointer event of the page.
+type pointerEvent struct {
+	kind    pointerKind
+	touch   bool    // a finger, not a mouse or a pen
+	id      int     // the pointer's ID
+	x, y    float64 // CSS pixels, relative to the canvas
+	button  int     // the button that changed, as the browser numbers them
+	buttons int     // the buttons held, as bits
+	mods    input.Modifiers
+	at      float64 // the event's timeStamp, in milliseconds
+}
+
+// wheelEvent is a wheel event of the page.
+type wheelEvent struct {
+	x, y   float64 // CSS pixels, relative to the canvas
+	dx, dy float64
+	mode   int // the unit of dx and dy: 0 pixels, 1 lines, 2 pages
+	mods   input.Modifiers
+}
+
+// keyEvent is a key press or release.
+type keyEvent struct {
+	down      bool
+	code, key string // KeyboardEvent.code and .key
+	mods      input.Modifiers
+	repeat    bool
+	composing bool // a press of an input method's (isComposing, or keyCode 229)
+}
+
+// The modifier keys of an event as bits, as the host script passes them.
+const (
+	pageShift = 1 << iota
+	pageCtrl
+	pageAlt
+	pageMeta
+)
+
+// pageMods returns the modifiers of an event from their bits.
+func pageMods(bits int) input.Modifiers {
+	var m input.Modifiers
+	if bits&pageShift != 0 {
+		m |= input.ModShift
+	}
+	if bits&pageCtrl != 0 {
+		m |= input.ModCtrl
+	}
+	if bits&pageAlt != 0 {
+		m |= input.ModAlt
+	}
+	if bits&pageMeta != 0 {
+		if appleKeys {
+			m |= input.ModCtrl
+		} else {
+			m |= input.ModSuper
+		}
+	}
+	return m
+}
 
 // on adds a listener for the event type on target, and keeps it to remove when
 // the window closes. Each listener only reads the event and posts the work to
@@ -103,24 +183,43 @@ func (w *window) on(target js.Value, typ string, fn func(e js.Value), opts ...ma
 func (w *window) listen() {
 	c, win, doc := w.canvas, js.Global(), js.Global().Get("document")
 
-	// A press starts on the canvas, and its moves and its release are heard on
-	// the whole window, so a drag goes on outside the canvas. This takes the
-	// place of setPointerCapture, which throws when the browser no longer
-	// knows the pointer, and a JavaScript exception ends a TinyGo build.
-	w.on(c, "pointerdown", w.pointerDown)
-	w.on(win, "pointermove", w.pointerMove)
-	w.on(win, "pointerup", w.pointerUp)
-	w.on(win, "pointercancel", w.pointerUp)
-	w.on(c, "pointerleave", func(e js.Value) {
-		if e.Get("pointerType").String() != "touch" && e.Get("buttons").Int() == 0 {
-			Post(func() { w.emit(platform.Event{Kind: platform.EventMouseLeave}) })
+	// The pointer, the wheel and the keys, which make most of the page's
+	// events: the host script delivers them when the page has it (see
+	// host.go), and listeners of the window's own read them otherwise.
+	if !w.hostListen() {
+		// A press starts on the canvas, and its moves and its release are heard
+		// on the whole window, so a drag goes on outside the canvas. This takes
+		// the place of setPointerCapture, which throws when the browser no
+		// longer knows the pointer, and a JavaScript exception ends a TinyGo
+		// build.
+		pointer := func(kind pointerKind) func(js.Value) {
+			return func(e js.Value) {
+				if w.pointer(w.pointerOf(kind, e)) {
+					e.Call("preventDefault")
+				}
+			}
 		}
-	})
-	w.on(c, "contextmenu", func(e js.Value) { e.Call("preventDefault") })
-	// The mouse events that a browser makes from a touch would move the focus
-	// to the canvas, away from the textarea, which hides a phone's keyboard.
-	// The pointer events above stand for them.
-	w.on(c, "mousedown", func(e js.Value) { e.Call("preventDefault") })
+		w.on(c, "pointerdown", pointer(pointerDown))
+		w.on(win, "pointermove", pointer(pointerMove))
+		w.on(win, "pointerup", pointer(pointerUp))
+		w.on(win, "pointercancel", pointer(pointerCancel))
+		w.on(c, "pointerleave", pointer(pointerLeave))
+		// The wheel listener is not passive, so that it can keep the page from
+		// scrolling and from zooming on Ctrl+wheel.
+		w.on(c, "wheel", func(e js.Value) {
+			x, y := w.cssPos(e)
+			if w.wheel(wheelEvent{x: x, y: y, dx: e.Get("deltaX").Float(), dy: e.Get("deltaY").Float(),
+				mode: e.Get("deltaMode").Int(), mods: mods(e)}) {
+				e.Call("preventDefault")
+			}
+		}, map[string]any{"passive": false})
+		w.listenKeys(c)
+		w.on(c, "contextmenu", func(e js.Value) { e.Call("preventDefault") })
+		// The mouse events that a browser makes from a touch would move the
+		// focus to the canvas, away from the textarea, which hides a phone's
+		// keyboard. The pointer events above stand for them.
+		w.on(c, "mousedown", func(e js.Value) { e.Call("preventDefault") })
+	}
 	w.on(c, "touchend", func(e js.Value) {
 		if e.Get("cancelable").Bool() {
 			e.Call("preventDefault")
@@ -128,14 +227,12 @@ func (w *window) listen() {
 		// Some browsers show the keyboard only for a focus in a touch event.
 		w.syncTextFocus()
 	})
-	// The wheel listener is not passive, so that it can keep the page from
-	// scrolling and from zooming on Ctrl+wheel.
-	w.on(c, "wheel", w.wheel, map[string]any{"passive": false})
-	w.on(c, "keydown", func(e js.Value) { w.key(e, true) })
-	w.on(c, "keyup", func(e js.Value) { w.key(e, false) })
 	w.on(c, "focus", func(js.Value) { Post(func() { w.emit(platform.Event{Kind: platform.EventFocus}) }) })
 	w.on(c, "blur", func(js.Value) { Post(func() { w.emit(platform.Event{Kind: platform.EventBlur}) }) })
-	w.on(doc, "visibilitychange", func(js.Value) { Post(w.Wake) })
+	w.on(doc, "visibilitychange", func(js.Value) {
+		w.pageHidden = doc.Get("visibilityState").String() == "hidden"
+		Post(w.Wake)
+	})
 
 	if ro := win.Get("ResizeObserver"); ro.Truthy() {
 		f := js.FuncOf(func(js.Value, []js.Value) any { Post(w.resized); return nil })
@@ -183,6 +280,22 @@ func (w *window) unlisten() {
 	w.removers, w.funcs = nil, nil
 }
 
+// listenKeys hears the key presses and releases of an element with listeners
+// of the window's own.
+func (w *window) listenKeys(target js.Value) {
+	key := func(down bool) func(js.Value) {
+		return func(e js.Value) {
+			if w.key(keyEvent{down: down, code: e.Get("code").String(), key: e.Get("key").String(), mods: mods(e),
+				repeat:    e.Get("repeat").Bool(),
+				composing: e.Get("isComposing").Bool() || e.Get("keyCode").Int() == 229}) {
+				e.Call("preventDefault")
+			}
+		}
+	}
+	w.on(target, "keydown", key(true))
+	w.on(target, "keyup", key(false))
+}
+
 // cssPos returns the event's position in CSS pixels relative to the canvas.
 // The event's target may be another element, when a drag has left the canvas.
 func (w *window) cssPos(e js.Value) (float64, float64) {
@@ -190,37 +303,40 @@ func (w *window) cssPos(e js.Value) (float64, float64) {
 	return e.Get("clientX").Float() - r.Get("left").Float(), e.Get("clientY").Float() - r.Get("top").Float()
 }
 
-// pos returns the event's position in device pixels relative to the canvas.
-func (w *window) pos(e js.Value) (float32, float32) {
+// pointerOf reads a pointer event of the browser's.
+func (w *window) pointerOf(kind pointerKind, e js.Value) pointerEvent {
 	x, y := w.cssPos(e)
+	return pointerEvent{kind: kind, touch: e.Get("pointerType").String() == "touch", id: e.Get("pointerId").Int(),
+		x: x, y: y, button: e.Get("button").Int(), buttons: e.Get("buttons").Int(), mods: mods(e),
+		at: e.Get("timeStamp").Float()}
+}
+
+// device returns a position in CSS pixels in device pixels.
+func (w *window) device(x, y float64) (float32, float32) {
 	return float32(x) * w.scale, float32(y) * w.scale
 }
 
-// over reports whether the event's position is over the canvas.
-func (w *window) over(e js.Value) bool {
-	x, y := w.cssPos(e)
+// over reports whether a position in CSS pixels is over the canvas.
+func (w *window) over(x, y float64) bool {
 	return x >= 0 && y >= 0 && x < w.cssW && y < w.cssH
 }
 
+// mods reads the modifier keys of a browser's event.
 func mods(e js.Value) input.Modifiers {
-	var m input.Modifiers
+	bits := 0
 	if e.Get("shiftKey").Bool() {
-		m |= input.ModShift
+		bits |= pageShift
 	}
 	if e.Get("ctrlKey").Bool() {
-		m |= input.ModCtrl
+		bits |= pageCtrl
 	}
 	if e.Get("altKey").Bool() {
-		m |= input.ModAlt
+		bits |= pageAlt
 	}
 	if e.Get("metaKey").Bool() {
-		if appleKeys {
-			m |= input.ModCtrl
-		} else {
-			m |= input.ModSuper
-		}
+		bits |= pageMeta
 	}
-	return m
+	return pageMods(bits)
 }
 
 // appleKeys reports whether the page runs on a Mac, iPhone or iPad, where
@@ -235,8 +351,9 @@ var appleKeys = func() bool {
 	return p.Type() == js.TypeString && (strings.HasPrefix(p.String(), "Mac") || strings.HasPrefix(p.String(), "iP"))
 }()
 
-func button(e js.Value) (input.MouseButton, bool) {
-	switch e.Get("button").Int() {
+// mouseButton returns the button of the browser's number n.
+func mouseButton(n int) (input.MouseButton, bool) {
+	switch n {
 	case 0:
 		return input.ButtonLeft, true
 	case 1:
@@ -247,38 +364,55 @@ func button(e js.Value) (input.MouseButton, bool) {
 	return 0, false
 }
 
-func (w *window) pointerDown(e js.Value) {
-	if e.Get("pointerType").String() == "touch" {
-		w.touchDown(e)
-		return
+// pointer handles a pointer event, and reports whether its default action is
+// prevented.
+func (w *window) pointer(e pointerEvent) bool {
+	switch e.kind {
+	case pointerDown:
+		return w.pointerDown(e)
+	case pointerMove:
+		w.pointerMove(e)
+	case pointerUp, pointerCancel:
+		w.pointerUp(e)
+	case pointerLeave:
+		if !e.touch && e.buttons == 0 {
+			Post(func() { w.emit(platform.Event{Kind: platform.EventMouseLeave}) })
+		}
 	}
-	b, ok := button(e)
+	return false
+}
+
+func (w *window) pointerDown(e pointerEvent) bool {
+	if e.touch {
+		return w.touchDown(e)
+	}
+	b, ok := mouseButton(e.button)
 	if !ok {
-		return
+		return false
 	}
-	e.Call("preventDefault") // keeps the focus where it is, and no text is selected
 	w.focusWindow()
 	w.in.pressed++
-	x, y := w.pos(e)
-	m := mods(e)
+	x, y := w.device(e.x, e.y)
+	m := e.mods
 	Post(func() {
 		clicks := w.countClicks(b, x, y)
 		w.emit(platform.Event{Kind: platform.EventMouseMove, X: x, Y: y, Mods: m})
 		w.emit(platform.Event{Kind: platform.EventMouseDown, X: x, Y: y, Button: b, Clicks: clicks, Mods: m})
 	})
+	return true // keeps the focus where it is, and no text is selected
 }
 
-func (w *window) pointerMove(e js.Value) {
-	if e.Get("pointerType").String() == "touch" {
+func (w *window) pointerMove(e pointerEvent) {
+	if e.touch {
 		w.touchMove(e)
 		return
 	}
-	if w.in.pressed == 0 && !w.over(e) {
+	if w.in.pressed == 0 && !w.over(e.x, e.y) {
 		return // the pointer is elsewhere on the page, and no press of the canvas holds it
 	}
-	x, y := w.pos(e)
-	m := mods(e)
-	if w.in.pressed > 0 && e.Get("buttons").Int() == 0 {
+	x, y := w.device(e.x, e.y)
+	m := e.mods
+	if w.in.pressed > 0 && e.buttons == 0 {
 		// The press ended outside the browser, where the page heard no release.
 		w.in.pressed = 0
 		Post(func() {
@@ -288,18 +422,18 @@ func (w *window) pointerMove(e js.Value) {
 	Post(func() { w.emit(platform.Event{Kind: platform.EventMouseMove, X: x, Y: y, Mods: m}) })
 }
 
-func (w *window) pointerUp(e js.Value) {
-	if e.Get("pointerType").String() == "touch" {
+func (w *window) pointerUp(e pointerEvent) {
+	if e.touch {
 		w.touchUp(e)
 		return
 	}
-	b, ok := button(e)
+	b, ok := mouseButton(e.button)
 	if !ok || w.in.pressed == 0 {
 		return // not the release of a press of the canvas
 	}
 	w.in.pressed--
-	x, y := w.pos(e)
-	m := mods(e)
+	x, y := w.device(e.x, e.y)
+	m := e.mods
 	// The release is handled while its event lasts, which lets a click copy
 	// to the system's clipboard (see SetClipboard).
 	runNow(func() { w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: b, Mods: m}) })
@@ -343,46 +477,46 @@ func abs(v float32) float32 {
 // with its momentum after it lifts. A touch while that momentum lasts stops it,
 // and is no tap. Only the first finger counts: a pinch is not recognized yet.
 
-func (w *window) touchDown(e js.Value) {
+func (w *window) touchDown(e pointerEvent) bool {
 	p := &w.in
 	if p.touching {
-		return
+		return false
 	}
-	e.Call("preventDefault") // the press does not move the focus, which would hide a phone's keyboard
 	w.focusWindow()
 	p.touching, p.panning, p.dragging = true, false, false
-	p.touchID = e.Get("pointerId").Int()
-	p.touchX0, p.touchY0 = w.cssPos(e)
+	p.touchID = e.id
+	p.touchX0, p.touchY0 = e.x, e.y
 	p.touchX, p.touchY = p.touchX0, p.touchY0
-	p.moves = append(p.moves[:0], touchMove{e.Get("timeStamp").Float(), p.touchX0, p.touchY0})
+	p.moves = append(p.moves[:0], touchMove{e.at, p.touchX0, p.touchY0})
 	p.panDX, p.panDY = 0, 0
 	// The app says, while the event lasts, whether the element under the
-	// finger takes the drag; if it cannot answer now, the touch pans.
-	x, y := float32(p.touchX0)*w.scale, float32(p.touchY0)*w.scale
-	drags := false
+	// finger takes the drag. If it answers later, after the finger moved or
+	// lifted, the touch stays the pan or the tap that it has become.
+	x, y := w.device(p.touchX0, p.touchY0)
+	id := p.touchID
 	runNow(func() {
 		w.stopFling()
-		if th, ok := w.handler.(platform.TouchHandler); ok && w.ready && !w.destroyed {
-			drags = th.TouchDrags(w, x, y)
+		th, ok := w.handler.(platform.TouchHandler)
+		if !ok || !w.ready || w.destroyed || !p.touching || p.touchID != id || p.panning {
+			return
 		}
-	})
-	if !drags {
-		return
-	}
-	p.dragging = true
-	Post(func() {
+		if !th.TouchDrags(w, x, y) {
+			return
+		}
+		p.dragging = true
 		clicks := w.countClicks(input.ButtonLeft, x, y)
 		w.emit(platform.Event{Kind: platform.EventMouseMove, X: x, Y: y})
 		w.emit(platform.Event{Kind: platform.EventMouseDown, X: x, Y: y, Button: input.ButtonLeft, Clicks: clicks})
 	})
+	return true // the press does not move the focus, which would hide a phone's keyboard
 }
 
-func (w *window) touchMove(e js.Value) {
+func (w *window) touchMove(e pointerEvent) {
 	p := &w.in
-	if !p.touching || e.Get("pointerId").Int() != p.touchID {
+	if !p.touching || e.id != p.touchID {
 		return
 	}
-	x, y := w.cssPos(e)
+	x, y := e.x, e.y
 	if p.dragging {
 		px, py := float32(x)*w.scale, float32(y)*w.scale
 		Post(func() { w.emit(platform.Event{Kind: platform.EventMouseMove, X: px, Y: py}) })
@@ -395,7 +529,7 @@ func (w *window) touchMove(e js.Value) {
 	p.panDX += p.touchX - x
 	p.panDY += p.touchY - y
 	p.touchX, p.touchY = x, y
-	at := e.Get("timeStamp").Float()
+	at := e.at
 	p.moves = append(p.moves, touchMove{at, x, y})
 	for len(p.moves) > 2 && at-p.moves[0].at > flingWindow {
 		p.moves = p.moves[1:]
@@ -440,22 +574,22 @@ func (w *window) touchScroll(x, y, dx, dy float32) {
 	w.emit(platform.Event{Kind: platform.EventMouseLeave})
 }
 
-func (w *window) touchUp(e js.Value) {
+func (w *window) touchUp(e pointerEvent) {
 	p := &w.in
-	if !p.touching || e.Get("pointerId").Int() != p.touchID {
+	if !p.touching || e.id != p.touchID {
 		return
 	}
 	p.touching = false
 	if p.dragging {
 		p.dragging = false
-		x, y := w.pos(e)
+		x, y := w.device(e.x, e.y)
 		Post(func() {
 			w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: input.ButtonLeft})
 			w.emit(platform.Event{Kind: platform.EventMouseLeave})
 		})
 		return
 	}
-	if e.Get("type").String() == "pointercancel" {
+	if e.kind == pointerCancel {
 		return
 	}
 	if p.panning {
@@ -463,7 +597,7 @@ func (w *window) touchUp(e js.Value) {
 		// it lifted, carries the scrolling on.
 		vx, vy, x, y := 0.0, 0.0, float32(0), float32(0)
 		first, last := p.moves[0], p.moves[len(p.moves)-1]
-		if ms := last.at - first.at; ms > 0 && e.Get("timeStamp").Float()-last.at < flingWindow {
+		if ms := last.at - first.at; ms > 0 && e.at-last.at < flingWindow {
 			vx, vy = (first.x-last.x)/ms, (first.y-last.y)/ms
 			x, y = float32(last.x)*w.scale, float32(last.y)*w.scale
 		}
@@ -471,19 +605,18 @@ func (w *window) touchUp(e js.Value) {
 		return
 	}
 	// The tap is handled, and a frame drawn, while its event lasts: if the tap
-	// focused a text field, the event then focuses the textarea, which a
-	// phone shows its keyboard for only now.
-	x, y := float32(p.touchX0)*w.scale, float32(p.touchY0)*w.scale
-	if runNow(func() {
+	// focused a text field, the textarea then takes the focus, which a phone
+	// shows its keyboard for only now.
+	x, y := w.device(p.touchX0, p.touchY0)
+	runNow(func() {
 		clicks := w.countClicks(input.ButtonLeft, x, y)
 		w.emit(platform.Event{Kind: platform.EventMouseMove, X: x, Y: y})
 		w.emit(platform.Event{Kind: platform.EventMouseDown, X: x, Y: y, Button: input.ButtonLeft, Clicks: clicks})
 		w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: input.ButtonLeft})
 		w.emit(platform.Event{Kind: platform.EventMouseLeave})
 		w.drawNow()
-	}) {
 		w.syncTextFocus()
-	}
+	})
 }
 
 // startFling carries a pan on at the speed vx, vy, in CSS pixels per
@@ -502,12 +635,13 @@ func (w *window) startFling(vx, vy float64, x, y float32) {
 // UI goroutine only.
 func (w *window) stopFling() { w.in.flinging = false }
 
-// wheel delivers a wheel event as scrolling, in logical (CSS) pixels.
-func (w *window) wheel(e js.Value) {
-	e.Call("preventDefault")
-	dx, dy := e.Get("deltaX").Float(), e.Get("deltaY").Float()
+// wheel delivers a wheel event as scrolling, in logical (CSS) pixels. Its
+// default action is prevented, which keeps the page from scrolling and from
+// zooming on Ctrl+wheel.
+func (w *window) wheel(e wheelEvent) bool {
+	dx, dy := e.dx, e.dy
 	var unit float64
-	switch e.Get("deltaMode").Int() {
+	switch e.mode {
 	case 0: // pixels
 		unit = 1
 	case 1: // lines
@@ -518,40 +652,42 @@ func (w *window) wheel(e js.Value) {
 	dx, dy = dx*unit, dy*unit
 	// A mouse wheel moves in steps of 100 pixels or more (or in lines), and is
 	// smoothed; a touchpad moves in small or fractional amounts, and is not.
-	precise := e.Get("deltaMode").Int() == 0 && (math.Abs(dy) < 50 && math.Abs(dx) < 50 ||
+	precise := e.mode == 0 && (math.Abs(dy) < 50 && math.Abs(dx) < 50 ||
 		dy != math.Trunc(dy) || dx != math.Trunc(dx))
-	x, y := w.pos(e)
-	m := mods(e)
+	x, y := w.device(e.x, e.y)
+	m := e.mods
 	Post(func() {
 		w.emit(platform.Event{Kind: platform.EventScroll, X: x, Y: y, DeltaX: float32(dx), DeltaY: float32(dy),
 			Precise: precise, Mods: m})
 	})
+	return true
 }
 
 // key delivers a key press or release, and the text a press types. It keeps
 // the browser from acting on the keys the app uses, but not on the browser's
 // own shortcuts, such as reloading or closing the tab. In a text field, the
 // textarea types a press's text, and its input event delivers it (see
-// makeTextArea), as an input method's or a phone keyboard's.
-func (w *window) key(e js.Value, down bool) {
-	if e.Get("isComposing").Bool() || e.Get("keyCode").Int() == 229 {
-		return // a press of an input method's, whose text comes with its composition
+// makeTextArea), as an input method's or a phone keyboard's. It reports
+// whether the press's default action is prevented.
+func (w *window) key(e keyEvent) bool {
+	if e.composing {
+		return false // a press of an input method's, whose text comes with its composition
 	}
-	code, name := e.Get("code").String(), e.Get("key").String()
-	k := keyCodes[code]
+	down, name := e.down, e.key
+	k := keyCodes[e.code]
 	if k == input.KeyUnknown {
 		k = keyNames[name]
 	}
-	m := mods(e)
+	m := e.mods
 	typed := down && printable(name, m)
 	if k == input.KeyUnknown && !typed {
-		return
+		return false
 	}
 	text, field := "", w.text.focused
 	if typed && !field {
 		text = name
 	}
-	repeat := e.Get("repeat").Bool()
+	repeat := e.repeat
 	deliver := func() {
 		if !down {
 			w.emit(platform.Event{Kind: platform.EventKeyUp, Key: k, Mods: m})
@@ -564,24 +700,25 @@ func (w *window) key(e js.Value, down bool) {
 			w.emit(platform.Event{Kind: platform.EventTextInput, Text: text})
 		}
 	}
+	prevent := false
 	switch {
 	case clipboardKey(k, m) && k == input.KeyV && field:
-		return // the paste event delivers it, with the clipboard's text
+		return false // the paste event delivers it, with the clipboard's text
 	case clipboardKey(k, m):
 		// Copy and cut, and paste of the app's own clipboard outside a text
 		// field: handled while the event lasts, so a copy reaches the system's
 		// clipboard (see SetClipboard).
-		e.Call("preventDefault")
 		runNow(deliver)
-		return
+		return true
 	case browserShortcut(k, m), field && (typed || name == "Dead"):
 	default:
-		e.Call("preventDefault")
+		prevent = true
 	}
 	if down {
 		w.text.lastKey, w.text.lastKeyAt = k, time.Now()
 	}
 	Post(deliver)
+	return prevent
 }
 
 // browserShortcut reports whether the browser keeps the key press: reload,

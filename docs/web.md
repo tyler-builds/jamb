@@ -13,9 +13,29 @@ python3 -m http.server -d site/hello
 ```
 
 The first argument is the app's module directory, the second its package, and the third the
-directory for the page: `index.html`, which loads the app (`app.wasm`) with `wasm_exec.js`.
-Serve it with any static file server; one that sends `.wasm` files as `application/wasm`
-lets the browser compile the app while it downloads.
+directory for the page: `index.html`, which loads the app (`app.wasm`) with `wasm_exec.js` and
+`jamb.js`. Serve it with any static file server; one that sends `.wasm` files as
+`application/wasm` lets the browser compile the app while it downloads.
+
+A page of your own loads the same scripts, and gives `jamb.js` the app's instance before it
+runs the app:
+
+```html
+<script src="wasm_exec.js"></script>
+<script src="jamb.js"></script>
+<script>
+  const go = new Go();
+  WebAssembly.instantiateStreaming(fetch("app.wasm"), go.importObject).then((result) => {
+    jambHost.attach(result.instance);
+    go.run(result.instance);
+  });
+</script>
+```
+
+`jamb.js` is the page's host script: it delivers the display's frames, and the pointer, wheel,
+key and text events, to the app. The app runs without it, and says so in the console, but
+then it pauses to collect memory every few frames while the pointer moves, for longer the more
+memory it holds (see [Frames and memory](#frames-and-memory)).
 
 The build uses TinyGo, which runs from its official image in docker or podman (see
 `scripts/web/tinygo.sh` for its settings). `-go` before the arguments builds with Go
@@ -64,6 +84,27 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   nothing.
 - **Panics** end the app, and the page says so: `recover` does not catch a panic in a TinyGo
   build.
+
+## Frames and memory
+
+TinyGo's collector stops the app while it collects, for a time in proportion to the app's
+memory: about half a millisecond for a small app, and 40 ms for one that holds 100 MB. It
+collects when the app runs out of free memory, and also whenever the app has made 32
+references to JavaScript values, which every call from the page into Go through `syscall/js`
+does. So jamb keeps both low on a page:
+
+- `jamb.js` delivers frames and input by calling functions that the app exports, with numbers,
+  which makes no references. Moving the pointer, scrolling, typing and animating collect
+  nothing.
+- Events that are rare still arrive through `syscall/js`: the focus, resizing, pasting, and a
+  change of the page's settings.
+- Your own code's calls of `syscall/js` count too: a value read each frame collects every few
+  frames. Keep the JavaScript values you use, rather than reading them again.
+- An app's memory does not shrink, and collections take longer as it grows, so data that an
+  app builds once and keeps (a table of 100,000 rows) costs time in every later collection.
+
+A build with Go (`build.sh -go`) uses Go's collector, which does not count references, and
+listens for itself.
 
 ## Not there yet
 

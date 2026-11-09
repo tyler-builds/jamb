@@ -18,6 +18,7 @@
 <body>
 <div id="status" role="status">Loading…</div>
 <script src="wasm_exec.js"></script>
+<script src="jamb.js"></script>
 <script>
 // Loads app.wasm, a js build of a jamb app, which draws into a canvas that it
 // adds to the page (or into <canvas id="jamb">, when the page has one). When the
@@ -61,6 +62,8 @@
       result = await WebAssembly.instantiate(bytes, go.importObject);
     }
     status.remove();
+    // The host script delivers the app's frames and input (see jamb.js).
+    jambHost.attach(result.instance);
     await go.run(result.instance);
   })().catch(stop);
 })();

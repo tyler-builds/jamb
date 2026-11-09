@@ -28,28 +28,20 @@ func (r *scrollRecorder) OnEvent(_ platform.Window, e platform.Event) {
 
 func (r *scrollRecorder) OnFrame(platform.Window) bool { return false }
 
-// touchWindow returns a window for touch tests: a canvas at the page's origin,
-// at a pixel ratio of 1, whose events go to the recorder.
+// touchWindow returns a window for touch tests, at a pixel ratio of 1, whose
+// events go to the recorder.
 func touchWindow(t *testing.T) (*window, *scrollRecorder) {
-	rect := js.FuncOf(func(js.Value, []js.Value) any { return map[string]any{"left": 0, "top": 0} })
-	t.Cleanup(rect.Release)
 	focus := js.FuncOf(func(js.Value, []js.Value) any { return nil })
 	t.Cleanup(focus.Release)
 	canvas := js.Global().Get("Object").New()
-	canvas.Set("getBoundingClientRect", rect)
 	canvas.Set("focus", focus)
 	rec := &scrollRecorder{}
 	return &window{handler: rec, canvas: canvas, scale: 1, ready: true, cssW: 400, cssH: 800}, rec
 }
 
-func pointer(id int, x, y, at float64) js.Value {
-	e := js.Global().Get("Object").New()
-	e.Set("pointerId", id)
-	e.Set("clientX", x)
-	e.Set("clientY", y)
-	e.Set("timeStamp", at)
-	e.Set("type", "pointermove")
-	return e
+// pointer is a finger's move to x, y, in CSS pixels relative to the canvas.
+func pointer(id int, x, y, at float64) pointerEvent {
+	return pointerEvent{kind: pointerMove, touch: true, id: id, x: x, y: y, at: at}
 }
 
 // A pan scrolls once in each frame, by all that the finger moved since the
@@ -139,26 +131,24 @@ func TestTapDuringFling(t *testing.T) {
 	withPage(t, w)
 	p := &w.in
 	p.flinging, p.flingVX, p.flingVY, p.flingAt = true, 0, 3, 0
-	w.touchDown(touchEvent(t, "pointerdown", 1, 100, 300, 10))
+	if !w.pointer(touchEvent(pointerDown, 1, 100, 300, 10)) {
+		t.Error("a touch's press keeps its default action, which moves the focus")
+	}
 	runPosted()
 	if p.flinging {
 		t.Error("a touch left the momentum going")
 	}
-	w.touchUp(touchEvent(t, "pointerup", 1, 100, 300, 60))
+	w.pointer(touchEvent(pointerUp, 1, 100, 300, 60))
 	runPosted()
 	if taps != 1 {
 		t.Errorf("a tap during fast momentum delivered %d clicks, want 1", taps)
 	}
 }
 
-// touchEvent is a touch's pointer event of the given type.
-func touchEvent(t *testing.T, typ string, id int, x, y, at float64) js.Value {
+// touchEvent is a touch's pointer event of the given kind.
+func touchEvent(kind pointerKind, id int, x, y, at float64) pointerEvent {
 	e := pointer(id, x, y, at)
-	e.Set("type", typ)
-	e.Set("pointerType", "touch")
-	nop := js.FuncOf(func(js.Value, []js.Value) any { return nil })
-	t.Cleanup(nop.Release)
-	e.Set("preventDefault", nop)
+	e.kind = kind
 	return e
 }
 

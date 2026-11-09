@@ -1,7 +1,8 @@
 #!/bin/sh
 # browser.sh builds the demo as a page and checks it in Chromium with
-# browser.cjs: it draws with WebGL 2, its frame matches the CPU renderer's, and
-# its text fields take typing. CI runs it in the Web build job.
+# browser.cjs: it draws with WebGL 2, its frame matches the CPU renderer's, the
+# host script delivers its input, and its text fields take typing. CI runs it in
+# the Web build job.
 #
 # It needs what build.sh needs, and Node with npm. It installs Playwright, at the
 # version pinned here, in a temporary directory; Playwright downloads Chromium

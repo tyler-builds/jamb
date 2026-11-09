@@ -1,8 +1,9 @@
 #!/bin/sh
 # build.sh [-go] MODULE PKG DIR builds PKG of the Go module in the directory
 # MODULE (relative to the repository) as a web page in DIR: index.html, which
-# loads app.wasm with wasm_exec.js, and the fonts directory, the font files the
-# app fetches. Serve DIR with any static file server, such as
+# loads app.wasm with wasm_exec.js and jamb.js (the host script, which delivers
+# the app's frames and input), and the fonts directory, the font files the app
+# fetches. Serve DIR with any static file server, such as
 # python3 -m http.server -d DIR, and open it in a browser.
 #
 # It builds with TinyGo and the web build's settings (see tinygo.sh), or with
@@ -31,5 +32,5 @@ else
 fi
 # The fonts a page fetches (see internal/text/fonts_js.go).
 (cd "$root" && go run scripts/web/fonts.go "$dir/fonts")
-cp "$root/scripts/web/index.html" "$dir/index.html"
+cp "$root/scripts/web/index.html" "$root/scripts/web/jamb.js" "$dir/"
 echo "built $dir"

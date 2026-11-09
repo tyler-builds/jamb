@@ -3,6 +3,7 @@
 //   - the app draws with WebGL 2, and its frame matches the CPU renderer's,
 //     which the page asks for with jambEnv (see web.Getenv), within a small
 //     tolerance for rounding;
+//   - the page's host script delivers the app's frames and input;
 //   - a click in a text field gives the hidden textarea the focus, and typing
 //     there reaches the field.
 //
@@ -92,6 +93,12 @@ async function main() {
     console.log("renderer:", context);
     if (context !== "webgl2") {
       console.log("FAIL: the page does not draw with WebGL 2");
+      failed = true;
+    }
+    // The host script delivers the app's frames and input (see jamb.js);
+    // without it the app pauses to collect memory as the pointer moves.
+    if (!(await gl.evaluate(() => Boolean(globalThis.jambHost && globalThis.jambHost.ready)))) {
+      console.log("FAIL: the page's host script, jamb.js, did not find the app's exports");
       failed = true;
     }
     const shotGL = await gl.screenshot();
