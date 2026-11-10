@@ -82,6 +82,7 @@ type DivElement struct {
 	// canvasKey, when set, says what the drawing depends on: it is drawn again
 	// when the key changes, rather than whenever the element is built (see SVG).
 	canvasKey    any
+	grid         *cellGrid // see CellGrid
 	style        Style
 	hover        *Style
 	pressed      *Style

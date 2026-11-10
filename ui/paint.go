@@ -280,6 +280,9 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		if visible && n.div != nil && n.div.canvas != nil {
 			rt.paintCanvas(n, x, y, n.lay.W, n.lay.H, fg, opacity)
 		}
+		if visible && n.div != nil && n.div.grid != nil {
+			rt.paintCellGrid(n, x, y, n.lay.W, n.lay.H, fg, opacity)
+		}
 	case kindText:
 		if visible {
 			rt.paintText(n, x, y, n.lay.W, fg, opacity)
