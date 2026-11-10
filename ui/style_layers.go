@@ -16,7 +16,8 @@ import (
 // names along with the values. The resolved style of an element then knows the
 // layer of every field, state layers and live edits included. Without an
 // inspector nothing is recorded: the records are nil and Merge does not touch
-// them.
+// them. The functions that make the records are called through inspecting, so
+// that a program without the inspector does not link them (see inspectFuncs).
 
 // styleProv records, by field name, the layers that set a style's fields, the
 // lowest first. The last entry of a field is the layer that its value came from,
@@ -63,7 +64,7 @@ func StyleLayerRef[S any](ctx *Context, s *S, name string) *S {
 	}
 	c := new(S)
 	copyLarge(c, s)
-	tagLayer(reflect.ValueOf(c).Elem(), name)
+	inspecting.Load().tagLayer(reflect.ValueOf(c).Elem(), name)
 	return c
 }
 
@@ -71,7 +72,7 @@ func StyleLayerRef[S any](ctx *Context, s *S, name string) *S {
 // because taking the address of its argument moves the argument to the heap, which
 // StyleLayer must not do when nothing is recorded.
 func recordLayer[S any](s S, name string) S {
-	tagLayer(reflect.ValueOf(&s).Elem(), name)
+	inspecting.Load().tagLayer(reflect.ValueOf(&s).Elem(), name)
 	return s
 }
 
@@ -155,9 +156,9 @@ func (rt *Runtime) inState(s Style, state string) Style {
 	}
 	name := inspect.SourceState + state
 	if s.prov == nil {
-		return tagStyle(s, name)
+		return inspecting.Load().tagStyle(s, name)
 	}
-	return renameLayers(s, name)
+	return inspecting.Load().renameLayers(s, name)
 }
 
 // recordSizing names the sizing method as the layer of the fields that it set, on
@@ -171,7 +172,7 @@ func (s *Style) recordSizing(set sizeSet) {
 	for name, bit := range sizingFields {
 		if set&bit != 0 {
 			f := v.FieldByName(name)
-			s.prov[name] = append(slices.Clip(s.prov[name]), provEntry{inspect.SourceSizing, formatStyleValue(f)})
+			s.prov[name] = append(slices.Clip(s.prov[name]), provEntry{inspect.SourceSizing, inspecting.Load().formatValue(f)})
 		}
 	}
 }
@@ -215,7 +216,8 @@ type styleParts[S any] interface {
 // without what the system colors replace. st and the layers are the caller's
 // copies, which it changes.
 func layeredRecorded[S any, P styleParts[S]](st P, layers []layer[S], hc bool) {
-	tagLayer(reflect.ValueOf(st).Elem(), inspect.SourceDefault)
+	fn := inspecting.Load()
+	fn.tagLayer(reflect.ValueOf(st).Elem(), inspect.SourceDefault)
 	for _, l := range layers {
 		// A layer is made plain before its name is recorded, as it is merged,
 		// so that it names only what the layer sets.
@@ -225,10 +227,10 @@ func layeredRecorded[S any, P styleParts[S]](st P, layers []layer[S], hc bool) {
 			P(pl).mergeFrom(o, true)
 			o = pl
 		}
-		tagLayer(reflect.ValueOf(o).Elem(), l.name())
+		fn.tagLayer(reflect.ValueOf(o).Elem(), l.name())
 		st.mergeFrom(o, false)
 	}
-	nameStateFields(reflect.ValueOf(st).Elem())
+	fn.nameStateFields(reflect.ValueOf(st).Elem())
 }
 
 // appliedStates names the states that a widget applies with a Style of its own

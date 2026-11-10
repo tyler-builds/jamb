@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/tyler-builds/jamb/internal/inspect"
@@ -33,6 +34,27 @@ type inspectState struct {
 	changed  func()           // called on the UI thread when the selection or the picking changes
 }
 
+// inspectFuncs are the functions of the inspector's that the rest of the package
+// calls while an inspector is attached: those that record the layer of each
+// field of a style (see style_layers.go), and the one that paints the
+// inspector's marks. The rest of the package calls them through inspecting,
+// and names none of them. Attach sets inspecting, and only the inspector calls
+// Attach, so a program that does not link the inspector (see
+// app.RegisterInspector) links none of these functions, nor what only they use.
+type inspectFuncs struct {
+	tagLayer        func(v reflect.Value, name string)
+	nameStateFields func(v reflect.Value)
+	tagStyle        func(s Style, layer string) Style
+	renameLayers    func(s Style, name string) Style
+	mergeProv       func(sp, op styleProv, r Style) styleProv
+	formatValue     func(v reflect.Value) string
+	paint           func(rt *Runtime, view scene.Rect)
+}
+
+// inspecting is nil until the first Attach. A window has an inspector's state,
+// and a style has records of its layers, only after it.
+var inspecting atomic.Pointer[inspectFuncs]
+
 // inspect.Target is implemented by the window's host side, see above.
 var _ inspect.Target = (*runtimeHost)(nil)
 
@@ -40,6 +62,17 @@ var _ inspect.Target = (*runtimeHost)(nil)
 // UI thread when the selection or the picking changes.
 func (h *runtimeHost) Attach(changed func()) {
 	rt := h.rt()
+	if inspecting.Load() == nil {
+		inspecting.Store(&inspectFuncs{
+			tagLayer:        tagLayer,
+			nameStateFields: nameStateFields,
+			tagStyle:        tagStyle,
+			renameLayers:    renameLayers,
+			mergeProv:       mergeProv,
+			formatValue:     formatStyleValue,
+			paint:           (*Runtime).paintInspect,
+		})
+	}
 	if rt.insp == nil {
 		rt.insp = &inspectState{edits: map[uint64]Style{}}
 		// The elements built before the inspector was attached have no records of
