@@ -190,6 +190,14 @@ type gridRow struct {
 	bgs  []gridSpan
 	runs []gridRun
 	ul   []gridSpan
+	// shapes are the cells drawn as shapes rather than glyphs (see cellShape).
+	shapes []gridShape
+}
+
+type gridShape struct {
+	col   int
+	r     rune
+	color Color
 }
 
 type gridSpan struct {
@@ -259,10 +267,16 @@ func (rt *Runtime) paintCellGrid(n *node, x, y, w, h float32, fg Color, opacity 
 	cell := func(col, row, n int) scene.Rect {
 		return rt.px(scene.Rect{X: box.X + float32(col)*cw, Y: box.Y + float32(row)*ch, W: float32(n) * cw, H: ch})
 	}
-	// Backgrounds first, so the glyphs of every row draw over them in one batch.
+	// Backgrounds first, so the glyphs of every row draw over them in one batch,
+	// then the cells drawn as shapes, which are quads too.
 	for r := range shown {
 		for _, bg := range b.paintRows[r].bgs {
 			sc.AddQuad(scene.Quad{Bounds: cell(bg.col, r, bg.n), Background: bg.color.Alpha(opacity).scene()})
+		}
+	}
+	for r := range shown {
+		for _, sh := range b.paintRows[r].shapes {
+			drawCellShape(sc, sh.r, cell(sh.col, r, 1), sh.color.Alpha(opacity))
 		}
 	}
 	for r := range shown {
@@ -305,8 +319,12 @@ func (rt *Runtime) paintCellGrid(n *node, x, y, w, h float32, fg Color, opacity 
 				if under.IsZero() {
 					under = rt.theme.Background
 				}
-				l := rt.text.Layout(cl.Text, cellStyle(st, cl), float32(math.Inf(1)))
-				rt.text.Draw(sc, l, box.X+float32(c.X)*cw, box.Y+float32(c.Y)*ch, l.Width, rt.scale, 0, under.Alpha(opacity).scene())
+				if sh, ok := cellShape(cl.Text); ok {
+					drawCellShape(sc, sh, q, under.Alpha(opacity))
+				} else {
+					l := rt.text.Layout(cl.Text, cellStyle(st, cl), float32(math.Inf(1)))
+					rt.text.Draw(sc, l, box.X+float32(c.X)*cw, box.Y+float32(c.Y)*ch, l.Width, rt.scale, 0, under.Alpha(opacity).scene())
+				}
 			}
 		}
 	}
@@ -322,12 +340,12 @@ func cellStyle(st text.Style, c Cell) text.Style {
 }
 
 // layoutGridRow lays out row r of b into pr: spans of one background, runs of
-// text in one style, and underlines. An ASCII run is one layout; any other
-// grapheme is laid out alone at its cell, so a fallback font's advance cannot
-// push the rest of the row off the grid.
+// text in one style, underlines, and the cells drawn as shapes. An ASCII run is
+// one layout; any other grapheme is laid out alone at its cell, so a fallback
+// font's advance cannot push the rest of the row off the grid.
 func (rt *Runtime) layoutGridRow(b *CellBuffer, r int, pr *gridRow, st text.Style, fg Color) {
 	pr.gen, pr.ok = b.rowGen[r], true
-	pr.bgs, pr.runs, pr.ul = pr.bgs[:0], pr.runs[:0], pr.ul[:0]
+	pr.bgs, pr.runs, pr.ul, pr.shapes = pr.bgs[:0], pr.runs[:0], pr.ul[:0], pr.shapes[:0]
 	row := b.cells[r*b.cols : (r+1)*b.cols]
 	var buf []byte
 	runCol := -1
@@ -360,6 +378,11 @@ func (rt *Runtime) layoutGridRow(b *CellBuffer, r int, pr *gridRow, st text.Styl
 			if runCol >= 0 {
 				buf = append(buf, ' ') // a monospace space keeps the run on the grid
 			}
+			continue
+		}
+		if r, ok := cellShape(c.Text); ok {
+			flush()
+			pr.shapes = append(pr.shapes, gridShape{col: x, r: r, color: cellFG(c, fg)})
 			continue
 		}
 		ascii := len(c.Text) == 1 && c.Text[0] < 0x80

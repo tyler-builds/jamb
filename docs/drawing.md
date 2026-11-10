@@ -145,7 +145,10 @@ builds nothing. The grid fills its parent; `onResize` is called with how many wh
 cells fit when that changes, on the UI thread while the grid paints, and
 `buf.CellAt(e.LocalX, e.LocalY)` turns a pointer position into a cell. A run of ASCII
 text in one style is laid out as one piece; any other grapheme is laid out alone at its
-cell, so a fallback font cannot push the row off the grid. `examples/term` uses it
+cell, so a fallback font cannot push the row off the grid. Box drawing, block elements
+and braille are drawn as quads that fill their cells, as terminals draw them, so the
+lines of a frame or a graph meet across rows whatever the font's line height; the
+diagonals (U+2571 to U+2573) come from the font. `examples/term` uses it
 (see [the terminal](examples.md#the-terminal)).
 
 ## Charts
