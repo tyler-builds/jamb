@@ -174,16 +174,16 @@ func severityName(s Severity, strs *ui.Strings) string {
 }
 
 // diagnosticStyle returns the part of the style st that marks a diagnostic of severity s.
-func diagnosticStyle(st Style, s Severity) ui.Style {
+func diagnosticStyle(st *Style, s Severity) *ui.Style {
 	switch s {
 	case SeverityWarning:
-		return st.DiagnosticWarning
+		return &st.DiagnosticWarning
 	case SeverityInfo:
-		return st.DiagnosticInfo
+		return &st.DiagnosticInfo
 	case SeverityHint:
-		return st.DiagnosticHint
+		return &st.DiagnosticHint
 	}
-	return st.DiagnosticError
+	return &st.DiagnosticError
 }
 
 // onRow reports whether the diagnostic shows on the display row dr of a row that ends at le: its

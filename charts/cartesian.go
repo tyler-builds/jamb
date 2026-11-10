@@ -135,7 +135,7 @@ type cartLayout struct {
 }
 
 // axisFont returns the size of the axis labels, from the Axis part.
-func axisFont(st Style) float32 {
+func axisFont(st *Style) float32 {
 	if st.Axis.FontSize > 0 {
 		return st.Axis.FontSize
 	}
@@ -294,7 +294,7 @@ func axisScale(lo, hi float64, plot rect, horizontal, reverse bool) scale {
 // the plot they are drawn in. The first pass sizes the labels from an estimated plot and
 // the second sizes the plot from the labels of the first, which is enough for the
 // labels that a plot holds.
-func (c *Chart) layout(p *ui.Painter, w, h float64, m cartModel, st Style) cartLayout {
+func (c *Chart) layout(p *ui.Painter, w, h float64, m cartModel, st *Style) cartLayout {
 	L := cartLayout{vert: c.vertical()}
 	size := axisFont(st)
 	_, lineH, _ := measureLabels(p, []string{probeText}, size)

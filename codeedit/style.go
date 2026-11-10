@@ -65,51 +65,51 @@ type Style struct {
 	PopupGroup ui.Style
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s Style) merge(o Style) Style {
-	return Style{
-		Box:          s.Box.Merge(o.Box),
-		BoxFocused:   s.BoxFocused.Merge(o.BoxFocused),
-		Text:         s.Text.Merge(o.Text),
-		Gutter:       s.Gutter.Merge(o.Gutter),
-		ActiveLine:   s.ActiveLine.Merge(o.ActiveLine),
-		Selection:    s.Selection.Merge(o.Selection),
-		Match:        s.Match.Merge(o.Match),
-		CurrentMatch: s.CurrentMatch.Merge(o.CurrentMatch),
-		Find:         s.Find.Merge(o.Find),
+// mergeFrom applies the set fields of o on top of s, part by part, in place. With
+// plain, o's parts go without their colors (see mergePart).
+func (s *Style) mergeFrom(o *Style, plain bool) {
+	mergePart(&s.Box, &o.Box, plain)
+	mergePart(&s.BoxFocused, &o.BoxFocused, plain)
+	mergePart(&s.Text, &o.Text, plain)
+	mergePart(&s.Gutter, &o.Gutter, plain)
+	mergePart(&s.ActiveLine, &o.ActiveLine, plain)
+	mergePart(&s.Selection, &o.Selection, plain)
+	mergePart(&s.Match, &o.Match, plain)
+	mergePart(&s.CurrentMatch, &o.CurrentMatch, plain)
+	mergePart(&s.Find, &o.Find, plain)
+	mergePart(&s.DiagnosticError, &o.DiagnosticError, plain)
+	mergePart(&s.DiagnosticWarning, &o.DiagnosticWarning, plain)
+	mergePart(&s.DiagnosticInfo, &o.DiagnosticInfo, plain)
+	mergePart(&s.DiagnosticHint, &o.DiagnosticHint, plain)
+	mergePart(&s.Popup, &o.Popup, plain)
+	mergePart(&s.PopupItem, &o.PopupItem, plain)
+	mergePart(&s.PopupItemSelected, &o.PopupItemSelected, plain)
+	mergePart(&s.Lightbulb, &o.Lightbulb, plain)
+	mergePart(&s.PopupItemDisabled, &o.PopupItemDisabled, plain)
+	mergePart(&s.PopupGroup, &o.PopupGroup, plain)
+}
 
-		DiagnosticError:   s.DiagnosticError.Merge(o.DiagnosticError),
-		DiagnosticWarning: s.DiagnosticWarning.Merge(o.DiagnosticWarning),
-		DiagnosticInfo:    s.DiagnosticInfo.Merge(o.DiagnosticInfo),
-		DiagnosticHint:    s.DiagnosticHint.Merge(o.DiagnosticHint),
-
-		Popup:             s.Popup.Merge(o.Popup),
-		PopupItem:         s.PopupItem.Merge(o.PopupItem),
-		PopupItemSelected: s.PopupItemSelected.Merge(o.PopupItemSelected),
-		Lightbulb:         s.Lightbulb.Merge(o.Lightbulb),
-		PopupItemDisabled: s.PopupItemDisabled.Merge(o.PopupItemDisabled),
-		PopupGroup:        s.PopupGroup.Merge(o.PopupGroup),
+// mergePart applies the set fields of src on top of dst. With plain, src goes
+// without the colors, gradients and shadows, which high contrast takes from the
+// system colors. It is never inlined, so that a web build has one copy of its code
+// (see ui.Style.MergeFrom).
+//
+//go:noinline
+func mergePart(dst, src *ui.Style, plain bool) {
+	if plain {
+		p := *src
+		p.Background, p.BorderColor, p.TextColor = ui.Color{}, ui.Color{}, ui.Color{}
+		p.Gradient, p.Shadows, p.Opacity = ui.Gradient{}, nil, 0
+		src = &p
 	}
+	dst.MergeFrom(src)
 }
 
-// plainPart returns s without the colors, gradients and shadows, which high contrast takes
-// from the system colors.
-func plainPart(s ui.Style) ui.Style {
-	s.Background, s.BorderColor, s.TextColor = ui.Color{}, ui.Color{}, ui.Color{}
-	s.Gradient, s.Shadows, s.Opacity = ui.Gradient{}, nil, 0
-	return s
-}
-
-// editorDefaults returns the built-in look of the parts, from the colors of t.
-func editorDefaults(t *ui.Theme) Style {
+// editorDefaults sets st to the built-in look of the parts, from the colors of t.
+func editorDefaults(st *Style, t *ui.Theme) {
 	ec := t.CodeEditor
-	var focused ui.Style // the caret shows focus; the frame does not change
-	if t.HighContrast {
-		focused = ui.Style{BorderColor: t.Accent} // the Highlight color of the system
-	}
-	return Style{
+	*st = Style{
 		Box:          ui.Style{Background: ec.Background, BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius},
-		BoxFocused:   focused,
 		Text:         ui.Style{TextColor: ec.Foreground, FontSize: t.FontSize},
 		Gutter:       ui.Style{TextColor: ec.LineNumber, FontSize: t.FontSize, Background: ec.Background},
 		ActiveLine:   ui.Style{Background: ec.ActiveLine},
@@ -131,63 +131,46 @@ func editorDefaults(t *ui.Theme) Style {
 		PopupItemDisabled: ui.Style{TextColor: t.Disabled},
 		PopupGroup:        ui.Style{TextColor: t.TextMuted},
 	}
-}
-
-// plain returns s with each part without its colors (see plainPart).
-func (s Style) plain() Style {
-	return Style{
-		Box:          plainPart(s.Box),
-		BoxFocused:   plainPart(s.BoxFocused),
-		Text:         plainPart(s.Text),
-		Gutter:       plainPart(s.Gutter),
-		ActiveLine:   plainPart(s.ActiveLine),
-		Selection:    plainPart(s.Selection),
-		Match:        plainPart(s.Match),
-		CurrentMatch: plainPart(s.CurrentMatch),
-		Find:         plainPart(s.Find),
-
-		DiagnosticError:   plainPart(s.DiagnosticError),
-		DiagnosticWarning: plainPart(s.DiagnosticWarning),
-		DiagnosticInfo:    plainPart(s.DiagnosticInfo),
-		DiagnosticHint:    plainPart(s.DiagnosticHint),
-
-		Popup:             plainPart(s.Popup),
-		PopupItem:         plainPart(s.PopupItem),
-		PopupItemSelected: plainPart(s.PopupItemSelected),
-		Lightbulb:         plainPart(s.Lightbulb),
-		PopupItemDisabled: plainPart(s.PopupItemDisabled),
-		PopupGroup:        plainPart(s.PopupGroup),
+	// The caret shows focus; the frame changes only under high contrast.
+	if t.HighContrast {
+		st.BoxFocused.BorderColor = t.Accent // the Highlight color of the system
 	}
 }
 
-// resolve returns the look of the parts in the theme t: the defaults, merged with the
-// theme's codeedit.Style (see ui.ThemeStyle), then with the editor's Styles. Under high
-// contrast the colors are the system colors, which the theme holds, so the colors of the
-// theme's style and of the Styles are dropped.
-func (s Style) resolve(ctx *ui.Context) Style {
+// resolve sets st to the look of the parts in the theme of ctx: the defaults, merged
+// with the theme's codeedit.Style (see ui.ThemeStyle), then with s, the editor's
+// Styles. Under high contrast the colors are the system colors, which the theme
+// holds, so the colors of the theme's style and of the Styles are dropped. The
+// layers are read where they are and merged into st: a Style is 19 parts of 109
+// values each, which a web build cannot afford to copy (see ui.Style.MergeFrom).
+func (s *Style) resolve(ctx *ui.Context, st *Style) {
 	t := ctx.Theme()
-	themed, _ := ui.ThemeStyle[Style](t)
-	if t.HighContrast {
-		themed, s = themed.plain(), s.plain()
+	hc := t.HighContrast
+	var base Style
+	editorDefaults(&base, t)
+	*st = Style{}
+	st.mergeFrom(ui.StyleLayerRef(ctx, &base, "built-in default"), false)
+	if themed := ui.ThemeStyleRef[Style](t); themed != nil {
+		st.mergeFrom(ui.StyleLayerRef(ctx, themed, "theme"), hc)
 	}
-	st := ui.StyleLayer(ctx, editorDefaults(t), "built-in default").
-		merge(ui.StyleLayer(ctx, themed, "theme")).
-		merge(ui.StyleLayer(ctx, s, "instance Styles"))
-	if t.HighContrast {
-		st.Text = st.Text.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.CodeEditor.Foreground}, "high contrast"))
-		st.Gutter = st.Gutter.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.CodeEditor.LineNumber}, "high contrast"))
+	st.mergeFrom(ui.StyleLayerRef(ctx, s, "instance Styles"), hc)
+	if hc {
+		// system merges a system color that the theme holds over a part's text color.
+		system := func(part *ui.Style, c ui.Color) {
+			part.MergeFrom(ui.StyleLayerRef(ctx, &ui.Style{TextColor: c}, "high contrast"))
+		}
+		system(&st.Text, t.CodeEditor.Foreground)
+		system(&st.Gutter, t.CodeEditor.LineNumber)
 		// The marks of the diagnostics take the system colors that the theme holds; the gutter
 		// markers differ in shape, so the severities do not rest on color.
-		hc := func(c ui.Color) ui.Style { return ui.StyleLayer(ctx, ui.Style{TextColor: c}, "high contrast") }
-		st.DiagnosticError = st.DiagnosticError.Merge(hc(t.Danger))
-		st.DiagnosticWarning = st.DiagnosticWarning.Merge(hc(t.Warning))
-		st.DiagnosticInfo = st.DiagnosticInfo.Merge(hc(t.Accent))
-		st.DiagnosticHint = st.DiagnosticHint.Merge(hc(t.TextMuted))
+		system(&st.DiagnosticError, t.Danger)
+		system(&st.DiagnosticWarning, t.Warning)
+		system(&st.DiagnosticInfo, t.Accent)
+		system(&st.DiagnosticHint, t.TextMuted)
 		// The lightbulb and the group headers take the text color, and a disabled action the
 		// disabled color, which is GrayText; the shape of the lightbulb marks it, not the color.
-		st.Lightbulb = st.Lightbulb.Merge(hc(t.Text))
-		st.PopupGroup = st.PopupGroup.Merge(hc(t.Text))
-		st.PopupItemDisabled = st.PopupItemDisabled.Merge(hc(t.Disabled))
+		system(&st.Lightbulb, t.Text)
+		system(&st.PopupGroup, t.Text)
+		system(&st.PopupItemDisabled, t.Disabled)
 	}
-	return st
 }

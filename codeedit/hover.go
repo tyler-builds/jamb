@@ -209,7 +209,7 @@ func (vs *viewState) uiStrings() *ui.Strings {
 // hoverPopup returns the open hover popup: an overlay under the start of its range, with the
 // messages of the diagnostics, each marked with its severity and its source, and then the
 // provider's answer.
-func (vs *viewState) hoverPopup(st Style) ui.Element {
+func (vs *viewState) hoverPopup(st *Style) ui.Element {
 	hv := &vs.hover
 	strs := vs.uiStrings()
 	panel := ui.Div().Key("codeedit.hover").Column().Style(st.Popup).

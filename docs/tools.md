@@ -475,8 +475,8 @@ The inspector shows:
   - `cleared by <layer>`: the layer cleared the field (see `Clear`).
 
   A widget that builds a part's style from layers names each layer with
-  `ui.StyleLayer` before it merges the layer, so the inspector can report it. The
-  built-in widgets do this.
+  `ui.StyleLayer`, or `ui.StyleLayerRef` for a layer it passes by pointer, before it
+  merges the layer, so the inspector can report it. The built-in widgets do this.
 - **Live edits**, at the top of the Style section: choose a style field, enter
   a value and click **Apply** (or press Enter). The value takes effect at once
   in the window. **Clear edits** drops them, and **Copy as Go** copies them to

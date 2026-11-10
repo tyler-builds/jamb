@@ -16,7 +16,8 @@ func resolvedIn(v *ViewElement, th *ui.Theme, hc bool) (Style, *ui.Theme) {
 	var st Style
 	var used *ui.Theme
 	rt := ui.NewRuntime(func(ctx *ui.Context) ui.Element {
-		st, used = v.resolveStyle(ctx), ctx.Theme()
+		v.resolveStyle(ctx, &st)
+		used = ctx.Theme()
 		return ui.Div()
 	}, th, nil)
 	if hc {
@@ -83,7 +84,8 @@ func TestStyleUnderHighContrast(t *testing.T) {
 // No part changes the weight of its text for a state: the parts have no state styles,
 // and the weights they set are those of their content (headings), not of hover.
 func TestDefaultsSetNoStateWeight(t *testing.T) {
-	st := defaults(ui.DarkTheme())
+	var st Style
+	defaults(&st, ui.DarkTheme())
 	if st.LinkHover.FontWeight != 0 || st.Link.FontWeight != 0 || st.TaskChecked.FontWeight != 0 {
 		t.Errorf("link %v, hover %v, done task %v; want no weight", st.Link.FontWeight, st.LinkHover.FontWeight, st.TaskChecked.FontWeight)
 	}
@@ -96,10 +98,15 @@ func TestMergeCoversEveryPart(t *testing.T) {
 	for i := range v.NumField() {
 		v.Field(i).Set(reflect.ValueOf(ui.Style{Gap: float32(i + 1)}))
 	}
-	if got := (Style{}).merge(full); !reflect.DeepEqual(got, full) {
+	var got Style
+	if got.mergeFrom(&full, false); !reflect.DeepEqual(got, full) {
 		t.Errorf("merge dropped parts: %+v", got)
 	}
-	if got := full.plain(); !reflect.DeepEqual(got, full) {
+	got = Style{}
+	if got.mergeFrom(&full, true); !reflect.DeepEqual(got, full) {
+		t.Errorf("a plain merge dropped parts: %+v", got)
+	}
+	if got.plain(); !reflect.DeepEqual(got, full) {
 		t.Errorf("plain dropped parts: %+v", got)
 	}
 }

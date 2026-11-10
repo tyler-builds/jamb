@@ -51,6 +51,22 @@ func StyleLayer[S any](ctx *Context, s S, name string) S {
 	return recordLayer(s, name)
 }
 
+// StyleLayerRef is StyleLayer for a style that the caller passes by pointer. When no
+// inspector is attached to the window of ctx it returns s itself, and nothing is
+// copied. When one is attached it returns a copy of *s with the name of the layer
+// recorded, and leaves *s as it was, so s may be a value that is shared, such as a
+// theme's (see ThemeStyleRef). The caller merges what it returns and does not change
+// it.
+func StyleLayerRef[S any](ctx *Context, s *S, name string) *S {
+	if ctx == nil || ctx.rt.insp == nil {
+		return s
+	}
+	c := new(S)
+	copyLarge(c, s)
+	tagLayer(reflect.ValueOf(c).Elem(), name)
+	return c
+}
+
 // recordLayer is StyleLayer while an inspector is attached. It is kept apart from StyleLayer
 // because taking the address of its argument moves the argument to the heap, which
 // StyleLayer must not do when nothing is recorded.

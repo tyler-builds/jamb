@@ -58,12 +58,12 @@ func (b *builder) table(n *east.Table) ui.Element {
 // a header item of the column col, or the data item at row and col. A nil node is an
 // empty cell.
 func (b *builder) tableCell(n ast.Node, align east.Alignment, header bool, row, col int) ui.Element {
-	st := b.st.TableCell
-	if header {
-		st = st.Merge(b.st.TableHeader)
-	}
 	w := b.st.Table.BorderWidth
-	cell := ui.Div().Style(st).BorderEdges(ui.Edges{Right: w, Bottom: w}, b.st.Table.BorderColor)
+	cell := ui.Div().Style(b.st.TableCell)
+	if header {
+		cell.Style(b.st.TableHeader)
+	}
+	cell.BorderEdges(ui.Edges{Right: w, Bottom: w}, b.st.Table.BorderColor)
 	if header {
 		cell.Role(access.RoleHeaderItem).AccessCell(0, col)
 	} else {
@@ -80,7 +80,7 @@ func (b *builder) tableCell(n ast.Node, align east.Alignment, header bool, row, 
 		a = ui.End
 	}
 	if in := b.collect(n); !in.blank() {
-		cell.Child(b.flow(in, ui.Style{}, a))
+		cell.Child(b.flow(in, &ui.Style{}, a))
 	}
 	return cell
 }

@@ -157,7 +157,7 @@ func (vs *viewState) goToLine() {
 // findBar returns the bar above the text: the find row, with the options, the count and the
 // buttons, and for replace a second row with the replacement. Enter finds the next match,
 // Shift+Enter the previous one, F3 and Shift+F3 do the same, and Escape closes the bar.
-func (vs *viewState) findBar(ctx *ui.Context, st Style, readOnly bool) ui.Element {
+func (vs *viewState) findBar(ctx *ui.Context, st *Style, readOnly bool) ui.Element {
 	s := ctx.Strings()
 	bar := ui.Div().Column().Style(st.Find)
 	bar.OnKeyDown(func(ev *ui.KeyEvent) {

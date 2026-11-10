@@ -83,6 +83,39 @@ Under high contrast `ctx.Theme()` is the high contrast theme, which keeps the sl
 of the app's theme. Treat them as the Styles of an instance: keep their sizes and
 spacing, and drop their colors for the system colors, as `charts` and `codeedit` do.
 
+A widget whose style is a struct of several parts, each a `ui.Style`, should merge
+through pointers when it is built for the web. TinyGo copies a struct field by field
+and passes one by value as a parameter per field, and a `ui.Style` is 109 values, so
+each copy of such a style is kilobytes of code in the page. Three functions do what
+`ThemeStyle`, `StyleLayer` and `Style.Merge` do, without a copy:
+
+- `ui.ThemeStyleRef[MyStyle](t)` returns a pointer to the theme's value, or nil. The
+  value is the theme's: read it, and do not change it.
+- `ui.StyleLayerRef(ctx, &layer, "theme")` returns the layer to merge: the pointer it
+  was given, or, while an inspector is attached, a copy that carries the layer's name.
+- `dst.MergeFrom(&src)` merges one `ui.Style` into another in place.
+
+```go
+func (w *MyWidget) resolve(ctx *ui.Context, st *MyStyle) {
+	var base MyStyle
+	myDefaults(&base, ctx.Theme())
+	*st = MyStyle{}
+	st.mergeFrom(ui.StyleLayerRef(ctx, &base, "built-in default"))
+	if themed := ui.ThemeStyleRef[MyStyle](ctx.Theme()); themed != nil {
+		st.mergeFrom(ui.StyleLayerRef(ctx, themed, "theme"))
+	}
+	st.mergeFrom(ui.StyleLayerRef(ctx, &w.styles, "instance Styles"))
+}
+
+// mergeFrom merges o into s, part by part.
+func (s *MyStyle) mergeFrom(o *MyStyle) {
+	s.Box.MergeFrom(&o.Box)
+	s.Label.MergeFrom(&o.Label)
+}
+```
+
+`charts`, `markdown` and `codeedit` are written this way.
+
 ## Reusable styles
 
 Reusable styles are ordinary values. Zero-valued fields mean "unset":
