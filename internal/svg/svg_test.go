@@ -1,6 +1,7 @@
 package svg
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -236,4 +237,58 @@ func TestRobust(t *testing.T) {
 		t.Errorf("self-referring use: area %v", area(c))
 	}
 	render(t, `<svg xmlns="http://www.w3.org/2000/svg"><rect width="-5" height="10"/><circle r="0"/><path d="M"/><text>hi</text></svg>`, 10, 10)
+}
+
+// ParsePlain reads the subset that the icons are written in as Parse reads it,
+// and refuses a source outside the subset rather than read it differently.
+func TestParsePlain(t *testing.T) {
+	const root = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">`
+	for _, inside := range []string{
+		``,
+		`<path d="M4 12h16"/>`,
+		`<circle cx="12" cy="13" r="8"/><path d="m9 13 2 2 4-4"/>`,
+		`<g fill="currentColor" id="a"><rect x="4" y="4" width="16" height="16" rx="1"/><g><path d="M0 0"/></g></g><path d="M1 1"/>`,
+		`<path style="stroke: red; fill: none" d="M4 12h16"/>`,
+	} {
+		plain, ok := ParsePlain(root, inside)
+		if !ok {
+			t.Errorf("ParsePlain does not read %s", inside)
+			continue
+		}
+		whole, err := Parse([]byte(root + inside + "</svg>"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(plain, whole) {
+			t.Errorf("ParsePlain and Parse read different documents from %s", inside)
+		}
+	}
+	for _, inside := range []string{
+		`text`,
+		`<path d="M0 0"/> <path d="M1 1"/>`,
+		`<!-- a comment --><path d="M0 0"/>`,
+		`<path d='M0 0'/>`,
+		`<path d="M0 0" />`,
+		`<path  d="M0 0"/>`,
+		`<path d="M0 0" d="M1 1"/>`,
+		`<path d="&amp;"/>`,
+		`<use xlink:href="#a"/>`,
+		`<g><path d="M0 0"/>`,
+		`<g><path d="M0 0"/></a>`,
+		`<g>text</g>`,
+		`<path d="M0 0"`,
+		`<path d="M0 0>`,
+		`<path d=M0/>`,
+		`</g>`,
+		`<>`,
+	} {
+		if _, ok := ParsePlain(root, inside); ok {
+			t.Errorf("ParsePlain reads %s, which is outside its subset", inside)
+		}
+	}
+	for _, root := range []string{``, `<g>`, `<svg/>`, `<svg><path d="M0 0"/>`, `<svg> `} {
+		if _, ok := ParsePlain(root, `<path d="M0 0"/>`); ok {
+			t.Errorf("ParsePlain takes %q as a root element", root)
+		}
+	}
 }

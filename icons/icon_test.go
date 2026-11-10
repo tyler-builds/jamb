@@ -6,8 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
+
+	"github.com/tyler-builds/jamb/internal/svg"
 )
 
 // The SVG of an icon is parsed on the first Rasterize, not when the icon is
@@ -125,9 +128,30 @@ func TestAliasesPointAtLucideIcons(t *testing.T) {
 	}
 }
 
+// Every icon of the package's own is in the subset that svg.ParsePlain reads,
+// and is the document that the XML decoder reads from the same source.
+func TestOwnIconsParsePlain(t *testing.T) {
+	for _, ic := range All() {
+		plain, ok := svg.ParsePlain(svgStart, ic.src)
+		if !ok {
+			t.Errorf("%s: svg.ParsePlain does not read the icon", ic.Name)
+			continue
+		}
+		whole, err := svg.Parse([]byte(svgStart + ic.src + "</svg>"))
+		if err != nil {
+			t.Errorf("%s: %v", ic.Name, err)
+			continue
+		}
+		if !reflect.DeepEqual(plain, whole) {
+			t.Errorf("%s: svg.ParsePlain and svg.Parse read different documents", ic.Name)
+		}
+	}
+}
+
 // An icon that a program does not name is not linked into its binary. The
 // program in testdata names Bell only; the binary holds Bell's SVG and not the
-// SVG of other icons, including an alias's target.
+// SVG of other icons, including an alias's target. It does not hold the XML
+// decoder either, which only New needs.
 func TestUnnamedIconsStayOutOfABinary(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds a program")
@@ -148,5 +172,8 @@ func TestUnnamedIconsStayOutOfABinary(t *testing.T) {
 		if bytes.Contains(bin, []byte(ic.src)) {
 			t.Errorf("the binary holds the SVG of %s, which it does not name", ic.Name)
 		}
+	}
+	if bytes.Contains(bin, []byte("encoding/xml.(*Decoder)")) {
+		t.Error("the binary holds the XML decoder, though it does not call New")
 	}
 }
