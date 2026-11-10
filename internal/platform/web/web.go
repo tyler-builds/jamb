@@ -8,7 +8,8 @@
 // The UI runs on one goroutine, as on every platform. Browser callbacks run on
 // goroutines of their own; they only queue events for it and wake it, since a
 // callback must not block. Frames are paced by requestAnimationFrame, so a page
-// in a background tab draws nothing.
+// in a background tab draws nothing. In a TinyGo build, the page's host script
+// delivers the frames and most input (see host.go).
 //
 // A page holds one window. Text input methods, the system clipboard, file
 // dialogs and message boxes come later: text arrives from key presses, the

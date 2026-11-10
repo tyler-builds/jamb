@@ -73,42 +73,30 @@ func (w *window) makeTextArea() {
 	w.text.area = a
 	w.removers = append(w.removers, func() { a.Call("remove") })
 
-	w.on(a, "keydown", func(e js.Value) { w.key(e, true) })
-	w.on(a, "keyup", func(e js.Value) { w.key(e, false) })
 	w.on(a, "focus", func(e js.Value) { w.text.focused = true; w.focusChanged(e, true) })
 	w.on(a, "blur", func(e js.Value) { w.text.focused = false; w.focusChanged(e, false) })
-	w.on(a, "compositionstart", func(js.Value) { w.text.composing = true })
-	w.on(a, "compositionupdate", func(e js.Value) {
-		s := e.Get("data").String()
-		Post(func() {
-			w.emit(platform.Event{Kind: platform.EventComposition, Text: s, Cursor: len(s), ClauseStart: len(s), ClauseEnd: len(s)})
-		})
-	})
-	w.on(a, "compositionend", func(e js.Value) {
-		if !w.text.composing {
-			return // canceled (see CancelComposition)
-		}
-		w.text.composing = false
-		s := e.Get("data").String()
-		a.Set("value", "")
-		Post(func() {
-			w.emit(platform.Event{Kind: platform.EventComposition})
-			if s != "" {
-				w.emit(platform.Event{Kind: platform.EventTextInput, Text: s})
+	// The keys and the text that is typed: the host script delivers them when
+	// the page has it (see host.go).
+	if !w.hostListenText(a) {
+		w.listenKeys(a)
+		w.on(a, "compositionstart", func(js.Value) { w.composition(compositionStart, "") })
+		w.on(a, "compositionupdate", func(e js.Value) { w.composition(compositionUpdate, e.Get("data").String()) })
+		w.on(a, "compositionend", func(e js.Value) {
+			if w.composition(compositionEnd, e.Get("data").String()) {
+				a.Set("value", "")
 			}
 		})
-	})
-	w.on(a, "beforeinput", w.beforeInput)
-	w.on(a, "input", func(e js.Value) {
-		if w.text.composing || e.Get("isComposing").Bool() {
-			return
-		}
-		s := a.Get("value").String()
-		a.Set("value", "")
-		if s != "" {
-			Post(func() { w.emit(platform.Event{Kind: platform.EventTextInput, Text: s}) })
-		}
-	})
+		w.on(a, "beforeinput", func(e js.Value) {
+			if w.beforeInput(e.Get("inputType").String()) {
+				e.Call("preventDefault")
+			}
+		})
+		w.on(a, "input", func(e js.Value) {
+			if !e.Get("isComposing").Bool() && w.textInput(a.Get("value").String()) {
+				a.Set("value", "")
+			}
+		})
+	}
 	w.on(a, "paste", w.paste)
 	// Copy and cut are the app's, as key presses (see key); the textarea has
 	// nothing to copy.
@@ -130,15 +118,66 @@ func (w *window) focusChanged(e js.Value, focus bool) {
 	Post(func() { w.emit(platform.Event{Kind: k}) })
 }
 
+// compositionKind is a step of an input method's composition.
+type compositionKind int
+
+const (
+	compositionStart compositionKind = iota
+	compositionUpdate
+	compositionEnd
+)
+
+// composition handles a step of an input method's composition in the
+// textarea: text is what is composed so far, or at the end what it commits. It
+// reports, at the end, whether the textarea is to be emptied.
+func (w *window) composition(kind compositionKind, text string) bool {
+	switch kind {
+	case compositionStart:
+		w.text.composing = true
+	case compositionUpdate:
+		Post(func() {
+			w.emit(platform.Event{Kind: platform.EventComposition, Text: text, Cursor: len(text),
+				ClauseStart: len(text), ClauseEnd: len(text)})
+		})
+	case compositionEnd:
+		if !w.text.composing {
+			return false // canceled (see CancelComposition)
+		}
+		w.text.composing = false
+		Post(func() {
+			w.emit(platform.Event{Kind: platform.EventComposition})
+			if text != "" {
+				w.emit(platform.Event{Kind: platform.EventTextInput, Text: text})
+			}
+		})
+		return true
+	}
+	return false
+}
+
+// textInput delivers the text that the textarea's input event typed, and
+// reports whether the textarea is to be emptied: not while an input method
+// composes in it.
+func (w *window) textInput(text string) bool {
+	if w.text.composing {
+		return false
+	}
+	if text != "" {
+		Post(func() { w.emit(platform.Event{Kind: platform.EventTextInput, Text: text}) })
+	}
+	return true
+}
+
 // beforeInput turns the edits that a phone's keyboard makes without a key
 // press, deleting and new lines, into the key presses that the app knows, since
 // the empty textarea has nothing to delete. Text goes on to the input event.
-func (w *window) beforeInput(e js.Value) {
+// inputType is the event's; it reports whether the edit is prevented.
+func (w *window) beforeInput(inputType string) bool {
 	if w.text.composing {
-		return
+		return false
 	}
 	var k input.Key
-	switch e.Get("inputType").String() {
+	switch inputType {
 	case "deleteContentBackward":
 		k = input.KeyBackspace
 	case "deleteContentForward":
@@ -146,19 +185,18 @@ func (w *window) beforeInput(e js.Value) {
 	case "insertLineBreak", "insertParagraph":
 		k = input.KeyEnter
 	case "insertText", "insertReplacementText", "insertFromPaste", "insertFromDrop", "insertCompositionText":
-		return
+		return false
 	default:
-		e.Call("preventDefault") // formatting and the like, which the app's text does not have
-		return
+		return true // formatting and the like, which the app's text does not have
 	}
-	e.Call("preventDefault")
 	if w.text.lastKey == k && time.Since(w.text.lastKeyAt) < recentKey {
-		return // the press itself was delivered
+		return true // the press itself was delivered
 	}
 	Post(func() {
 		w.emit(platform.Event{Kind: platform.EventKeyDown, Key: k})
 		w.emit(platform.Event{Kind: platform.EventKeyUp, Key: k})
 	})
+	return true
 }
 
 // paste delivers the page's paste event in a text field as Ctrl+V, with the
@@ -190,11 +228,15 @@ func (w *window) SetTextInputRect(r platform.Rect) {
 }
 
 // placeTextArea moves the textarea to the caret, where an input method puts
-// its window.
+// its window. The caret moves with each character typed.
 func (w *window) placeTextArea() {
-	cr := w.canvas.Call("getBoundingClientRect")
 	s := float64(w.scale)
 	r := w.text.rect
+	if w.hosted {
+		w.host.Call("place", float64(r.X)/s, float64(r.Y)/s, max(float64(r.W)/s, 1), max(float64(r.H)/s, 1))
+		return
+	}
+	cr := w.canvas.Call("getBoundingClientRect")
 	st := w.text.area.Get("style")
 	st.Set("left", px(cr.Get("left").Float()+float64(r.X)/s))
 	st.Set("top", px(cr.Get("top").Float()+float64(r.Y)/s))
@@ -205,14 +247,14 @@ func (w *window) placeTextArea() {
 // syncTextFocus gives the textarea the page's focus while there is text input,
 // and the canvas the focus otherwise, unless the window has lost the focus.
 func (w *window) syncTextFocus() {
-	active := js.Global().Get("document").Get("activeElement")
-	inWindow := active.Equal(w.canvas) || active.Equal(w.text.area)
-	opts := map[string]any{"preventScroll": true}
-	switch {
-	case w.text.rect != (platform.Rect{}) && !w.text.focused:
-		w.text.area.Call("focus", opts)
-	case w.text.rect == (platform.Rect{}) && w.text.focused && inWindow:
-		w.canvas.Call("focus", opts)
+	switch input := w.text.rect != (platform.Rect{}); {
+	case input && !w.text.focused:
+		w.text.area.Call("focus", map[string]any{"preventScroll": true})
+	case !input && w.text.focused:
+		active := js.Global().Get("document").Get("activeElement")
+		if active.Equal(w.canvas) || active.Equal(w.text.area) {
+			w.canvas.Call("focus", map[string]any{"preventScroll": true})
+		}
 	}
 }
 
@@ -231,14 +273,17 @@ func (w *window) CancelComposition() {
 	w.text.moving = false
 }
 
-// runNow runs fn on the UI goroutine and waits for it, so that a browser event
-// can act on the app's answer before it ends: a tap that focuses a text field
-// shows the keyboard, and a copy reaches the system's clipboard. A goroutine
-// runs only while the others wait, so the UI goroutine is waiting for work
-// (uiActive is clear), or it waits for the browser, for which this event would
-// wait in turn: then fn is only posted. It reports whether fn ran.
+// runNow runs fn on the UI goroutine while the browser event that the caller
+// handles lasts, so that the browser lets the app do what it allows only in an
+// event: a tap that focuses a text field shows the keyboard, and a copy
+// reaches the system's clipboard. A listener of the window's own waits for fn.
+// A goroutine runs only while the others wait, so the UI goroutine is waiting
+// for work (uiActive is clear), or it waits for the browser, for which this
+// event would wait in turn: then fn is only posted. An event that the host
+// script delivers cannot wait (see hostEntry): fn is posted, and the script
+// runs the UI goroutine before the event ends. It reports whether fn ran.
 func runNow(fn func()) bool {
-	if uiActive.Load() {
+	if uiActive.Load() || hostEntry {
 		Post(fn)
 		return false
 	}

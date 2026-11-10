@@ -590,8 +590,12 @@ func (r *Renderer) uploadRegion(t *scene.Texture, x0, y0, x1, y1 int) {
 	}
 	js.CopyBytesToJS(r.stagingJS, buf)
 	_, format := r.formats(t)
+	// The region is the start of the staging array (the last argument is its
+	// offset there); a view of just the region would be one more JavaScript
+	// value for each upload, which TinyGo's collector counts (see
+	// platform/web's host.go).
 	gl.Call("texSubImage2D", gl.Get("TEXTURE_2D"), 0, x0, y0, x1-x0, y1-y0, format, gl.Get("UNSIGNED_BYTE"),
-		r.stagingJS.Call("subarray", 0, n))
+		r.stagingJS, 0)
 }
 
 // sweepTextures releases the textures no frame has drawn for textureIdle.
