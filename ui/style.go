@@ -487,7 +487,7 @@ func (s *Style) mergeFrom(o *Style, plain bool) {
 		s.LayoutSpring = o.LayoutSpring
 	}
 	if sp != nil || o.prov != nil {
-		s.prov = mergeProv(sp, o.prov, *s) // a copy, so that s does not escape
+		s.prov = inspecting.Load().mergeProv(sp, o.prov, *s) // a copy, so that s does not escape
 	}
 }
 

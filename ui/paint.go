@@ -41,7 +41,9 @@ func (rt *Runtime) paint(dt float32) {
 		// Held content whose box did not draw it has gone (see reflowSpec).
 		rt.held = slices.DeleteFunc(rt.held, func(h heldNode) bool { return h.gen != rt.paintGen })
 	}
-	rt.paintInspect(view)
+	if rt.insp != nil {
+		inspecting.Load().paint(rt, view)
+	}
 	rt.revealTabFocus()
 	rt.revealRowsNow()
 }
