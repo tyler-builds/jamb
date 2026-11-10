@@ -22,7 +22,7 @@ type themeStyleKey[T any] struct{}
 func SetThemeStyle[T any](t *Theme, v T) {
 	m := make(map[any]any, len(t.styles)+1)
 	maps.Copy(m, t.styles)
-	m[themeStyleKey[T]{}] = v
+	m[themeStyleKey[T]{}] = &v // a pointer, which ThemeStyleRef returns
 	t.styles = m
 }
 
@@ -36,12 +36,26 @@ func SetThemeStyle[T any](t *Theme, v T) {
 // instance there: keep their sizes and spacing, and take its colors from the system
 // colors, as the built-in widgets do.
 func ThemeStyle[T any](t *Theme) (T, bool) {
-	if t != nil {
-		if v, ok := t.styles[themeStyleKey[T]{}]; ok {
-			s, _ := v.(T) // a nil stored under an interface type is the zero value
-			return s, true
-		}
+	if p := ThemeStyleRef[T](t); p != nil {
+		return *p, true
 	}
 	var zero T
 	return zero, false
+}
+
+// ThemeStyleRef returns a pointer to the value that SetThemeStyle stored on the theme
+// t under the type T, or nil when none is stored or t is nil. It is ThemeStyle
+// without the copy: the value is the theme's, so the caller reads it and does not
+// change it.
+//
+// A widget whose style is a struct of several Styles reads it this way, and merges
+// it with Style.MergeFrom, in a build for the web: TinyGo copies a struct field by
+// field and passes one by value as a parameter per field, so each copy of such a
+// style is kilobytes of code (see docs/theming.md).
+func ThemeStyleRef[T any](t *Theme) *T {
+	if t == nil {
+		return nil
+	}
+	p, _ := t.styles[themeStyleKey[T]{}].(*T)
+	return p
 }

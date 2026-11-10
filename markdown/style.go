@@ -54,76 +54,101 @@ type Style struct {
 	ImagePlaceholder ui.Style
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s Style) merge(o Style) Style {
-	return Style{
-		Document:         s.Document.Merge(o.Document),
-		Paragraph:        s.Paragraph.Merge(o.Paragraph),
-		Heading1:         s.Heading1.Merge(o.Heading1),
-		Heading2:         s.Heading2.Merge(o.Heading2),
-		Heading3:         s.Heading3.Merge(o.Heading3),
-		Heading4:         s.Heading4.Merge(o.Heading4),
-		Heading5:         s.Heading5.Merge(o.Heading5),
-		Heading6:         s.Heading6.Merge(o.Heading6),
-		Link:             s.Link.Merge(o.Link),
-		LinkHover:        s.LinkHover.Merge(o.LinkHover),
-		InlineCode:       s.InlineCode.Merge(o.InlineCode),
-		CodeBlock:        s.CodeBlock.Merge(o.CodeBlock),
-		Quote:            s.Quote.Merge(o.Quote),
-		List:             s.List.Merge(o.List),
-		ListMarker:       s.ListMarker.Merge(o.ListMarker),
-		Task:             s.Task.Merge(o.Task),
-		TaskChecked:      s.TaskChecked.Merge(o.TaskChecked),
-		Table:            s.Table.Merge(o.Table),
-		TableHeader:      s.TableHeader.Merge(o.TableHeader),
-		TableCell:        s.TableCell.Merge(o.TableCell),
-		Rule:             s.Rule.Merge(o.Rule),
-		ImagePlaceholder: s.ImagePlaceholder.Merge(o.ImagePlaceholder),
-	}
+// mergeFrom applies the set fields of o on top of s, part by part, in place. With
+// plain, o's parts go without their colors (see mergePart).
+func (s *Style) mergeFrom(o *Style, plain bool) {
+	mergePart(&s.Document, &o.Document, plain)
+	mergePart(&s.Paragraph, &o.Paragraph, plain)
+	mergePart(&s.Heading1, &o.Heading1, plain)
+	mergePart(&s.Heading2, &o.Heading2, plain)
+	mergePart(&s.Heading3, &o.Heading3, plain)
+	mergePart(&s.Heading4, &o.Heading4, plain)
+	mergePart(&s.Heading5, &o.Heading5, plain)
+	mergePart(&s.Heading6, &o.Heading6, plain)
+	mergePart(&s.Link, &o.Link, plain)
+	mergePart(&s.LinkHover, &o.LinkHover, plain)
+	mergePart(&s.InlineCode, &o.InlineCode, plain)
+	mergePart(&s.CodeBlock, &o.CodeBlock, plain)
+	mergePart(&s.Quote, &o.Quote, plain)
+	mergePart(&s.List, &o.List, plain)
+	mergePart(&s.ListMarker, &o.ListMarker, plain)
+	mergePart(&s.Task, &o.Task, plain)
+	mergePart(&s.TaskChecked, &o.TaskChecked, plain)
+	mergePart(&s.Table, &o.Table, plain)
+	mergePart(&s.TableHeader, &o.TableHeader, plain)
+	mergePart(&s.TableCell, &o.TableCell, plain)
+	mergePart(&s.Rule, &o.Rule, plain)
+	mergePart(&s.ImagePlaceholder, &o.ImagePlaceholder, plain)
 }
 
-// plain returns s with each part without the colors, gradients, shadows and opacity
-// that high contrast takes from the system colors, as the ui's own parts do.
-func (s Style) plain() Style {
-	p := func(s ui.Style) ui.Style {
-		s.Background, s.BorderColor, s.TextColor = ui.Color{}, ui.Color{}, ui.Color{}
-		s.Gradient, s.Shadows, s.Opacity = ui.Gradient{}, nil, 0
-		return s
+// mergePart applies the set fields of src on top of dst. With plain, src goes
+// without the colors, gradients, shadows and opacity that high contrast takes from
+// the system colors, as the ui's own parts do. It is never inlined, so that a web
+// build has one copy of its code (see ui.Style.MergeFrom).
+//
+//go:noinline
+func mergePart(dst, src *ui.Style, plain bool) {
+	if plain {
+		p := *src
+		plainPart(&p)
+		src = &p
 	}
-	return Style{
-		Document: p(s.Document), Paragraph: p(s.Paragraph),
-		Heading1: p(s.Heading1), Heading2: p(s.Heading2), Heading3: p(s.Heading3),
-		Heading4: p(s.Heading4), Heading5: p(s.Heading5), Heading6: p(s.Heading6),
-		Link: p(s.Link), LinkHover: p(s.LinkHover), InlineCode: p(s.InlineCode), CodeBlock: p(s.CodeBlock),
-		Quote: p(s.Quote), List: p(s.List), ListMarker: p(s.ListMarker), Task: p(s.Task), TaskChecked: p(s.TaskChecked),
-		Table: p(s.Table), TableHeader: p(s.TableHeader), TableCell: p(s.TableCell), Rule: p(s.Rule),
-		ImagePlaceholder: p(s.ImagePlaceholder),
-	}
+	dst.MergeFrom(src)
+}
+
+// plainPart drops from s the colors, gradients, shadows and opacity.
+func plainPart(s *ui.Style) {
+	s.Background, s.BorderColor, s.TextColor = ui.Color{}, ui.Color{}, ui.Color{}
+	s.Gradient, s.Shadows, s.Opacity = ui.Gradient{}, nil, 0
+}
+
+// plain drops the colors of each part of s (see plainPart).
+func (s *Style) plain() {
+	plainPart(&s.Document)
+	plainPart(&s.Paragraph)
+	plainPart(&s.Heading1)
+	plainPart(&s.Heading2)
+	plainPart(&s.Heading3)
+	plainPart(&s.Heading4)
+	plainPart(&s.Heading5)
+	plainPart(&s.Heading6)
+	plainPart(&s.Link)
+	plainPart(&s.LinkHover)
+	plainPart(&s.InlineCode)
+	plainPart(&s.CodeBlock)
+	plainPart(&s.Quote)
+	plainPart(&s.List)
+	plainPart(&s.ListMarker)
+	plainPart(&s.Task)
+	plainPart(&s.TaskChecked)
+	plainPart(&s.Table)
+	plainPart(&s.TableHeader)
+	plainPart(&s.TableCell)
+	plainPart(&s.Rule)
+	plainPart(&s.ImagePlaceholder)
 }
 
 // heading returns the part of the headings of level 1 to 6.
-func (s *Style) heading(level int) ui.Style {
-	return [...]ui.Style{s.Heading1, s.Heading2, s.Heading3, s.Heading4, s.Heading5, s.Heading6}[min(max(level, 1), 6)-1]
+func (s *Style) heading(level int) *ui.Style {
+	return [...]*ui.Style{&s.Heading1, &s.Heading2, &s.Heading3, &s.Heading4, &s.Heading5, &s.Heading6}[min(max(level, 1), 6)-1]
 }
 
-// defaults returns the built-in look of the parts, from the colors and the text size
-// of t. Headings are semibold by their content; no part changes its weight for a
-// state such as hover or focus.
-func defaults(t *ui.Theme) Style {
+// defaults sets st to the built-in look of the parts, from the colors and the text
+// size of t. Headings are semibold by their content; no part changes its weight for
+// a state such as hover or focus.
+func defaults(st *Style, t *ui.Theme) {
 	fs := t.FontSize
 	if fs <= 0 {
 		fs = 14
 	}
-	ruled := func(size float32) ui.Style {
-		return ui.Style{FontSize: size, FontWeight: ui.FontSemibold, BorderEdges: ui.Edges{Bottom: 1},
-			BorderColor: t.Border, Padding: ui.Edges{Bottom: 6}, Margin: ui.Edges{Top: 6}}
-	}
 	ec := t.CodeEditor
-	return Style{
-		Document:   ui.Style{Direction: ui.Column, Gap: 12},
-		Paragraph:  ui.Style{LineHeight: 1.5},
-		Heading1:   ruled(fs * 2),
-		Heading2:   ruled(fs * 1.5),
+	*st = Style{
+		Document:  ui.Style{Direction: ui.Column, Gap: 12},
+		Paragraph: ui.Style{LineHeight: 1.5},
+		Heading1: ui.Style{FontSize: fs * 2, FontWeight: ui.FontSemibold, BorderEdges: ui.Edges{Bottom: 1},
+			BorderColor: t.Border, Padding: ui.Edges{Bottom: 6}, Margin: ui.Edges{Top: 6}},
+		Heading2: ui.Style{FontSize: fs * 1.5, FontWeight: ui.FontSemibold, BorderEdges: ui.Edges{Bottom: 1},
+			BorderColor: t.Border, Padding: ui.Edges{Bottom: 6}, Margin: ui.Edges{Top: 6}},
 		Heading3:   ui.Style{FontSize: fs * 1.25, FontWeight: ui.FontSemibold, Margin: ui.Edges{Top: 4}},
 		Heading4:   ui.Style{FontSize: fs, FontWeight: ui.FontSemibold},
 		Heading5:   ui.Style{FontSize: fs * 0.9, FontWeight: ui.FontSemibold},
@@ -146,13 +171,13 @@ func defaults(t *ui.Theme) Style {
 	}
 }
 
-// highContrast returns the system colors of the parts under high contrast, which
+// highContrast sets st to the system colors of the parts under high contrast, which
 // the high contrast theme t holds: text, links and borders in the text, link and
 // highlight colors, with no fills but the code block's and a done task's.
-func highContrast(t *ui.Theme) Style {
-	line := ui.Style{BorderColor: t.Text}
-	return Style{
-		Heading1: line, Heading2: line,
+func highContrast(st *Style, t *ui.Theme) {
+	*st = Style{
+		Heading1:         ui.Style{BorderColor: t.Text},
+		Heading2:         ui.Style{BorderColor: t.Text},
 		Heading6:         ui.Style{TextColor: t.Text},
 		Link:             ui.Style{TextColor: t.Link},
 		InlineCode:       ui.Style{TextColor: t.Text},
@@ -161,32 +186,35 @@ func highContrast(t *ui.Theme) Style {
 		ListMarker:       ui.Style{TextColor: t.Text},
 		Task:             ui.Style{BorderColor: t.Text},
 		TaskChecked:      ui.Style{Background: t.Accent, BorderColor: t.Accent, TextColor: t.AccentText},
-		Table:            line,
+		Table:            ui.Style{BorderColor: t.Text},
 		Rule:             ui.Style{Background: t.Text},
 		ImagePlaceholder: ui.Style{BorderColor: t.Text, TextColor: t.Text},
 	}
 }
 
-// resolveStyle returns the look of the parts in the theme of ctx: the defaults,
+// resolveStyle sets st to the look of the parts in the theme of ctx: the defaults,
 // merged with the theme's markdown.Style (see ui.ThemeStyle), then with the view's
 // Styles. Under high contrast the colors of the theme's style and of the Styles are
-// dropped, and the parts take the system colors (see highContrast).
-func (v *ViewElement) resolveStyle(ctx *ui.Context) Style {
+// dropped, and the parts take the system colors (see highContrast). The layers are
+// read where they are and merged into st: a Style is 22 parts of 109 values each,
+// which a web build cannot afford to copy (see ui.Style.MergeFrom).
+func (v *ViewElement) resolveStyle(ctx *ui.Context, st *Style) {
 	t := ctx.Theme()
-	themed, _ := ui.ThemeStyle[Style](t)
-	own := v.styles
-	if t.HighContrast {
-		themed, own = themed.plain(), own.plain()
+	hc := t.HighContrast
+	var base Style
+	defaults(&base, t)
+	if hc {
+		base.plain()
 	}
-	base := defaults(t)
-	if t.HighContrast {
-		base = base.plain()
+	*st = Style{}
+	st.mergeFrom(ui.StyleLayerRef(ctx, &base, "built-in default"), false)
+	if themed := ui.ThemeStyleRef[Style](t); themed != nil {
+		st.mergeFrom(ui.StyleLayerRef(ctx, themed, "theme"), hc)
 	}
-	st := ui.StyleLayer(ctx, base, "built-in default").
-		merge(ui.StyleLayer(ctx, themed, "theme")).
-		merge(ui.StyleLayer(ctx, own, "instance Styles"))
-	if t.HighContrast {
-		st = st.merge(ui.StyleLayer(ctx, highContrast(t), "high contrast"))
+	st.mergeFrom(ui.StyleLayerRef(ctx, &v.styles, "instance Styles"), hc)
+	if hc {
+		var system Style
+		highContrast(&system, t)
+		st.mergeFrom(ui.StyleLayerRef(ctx, &system, "high contrast"), false)
 	}
-	return st
 }

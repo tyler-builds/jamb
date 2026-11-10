@@ -511,7 +511,7 @@ func (vs *viewState) applyAction(i int) bool {
 // actionsPopup returns the open menu of code actions: an overlay under the caret, with the group
 // headers and the actions, the highlighted one selected, or a row that says the menu is loading,
 // could not load, or has no actions.
-func (vs *viewState) actionsPopup(st Style) ui.Element {
+func (vs *viewState) actionsPopup(st *Style) ui.Element {
 	as := &vs.actions
 	strs := vs.uiStrings()
 	panel := ui.Div().Key("codeedit.actions").Column().Style(st.Popup).
@@ -609,7 +609,7 @@ func drawLightbulb(p *ui.Painter, x, w, y, lineH float32, c ui.Color) {
 
 // actionRow returns the row of the action on the line i of the menu. A disabled action shows its
 // reason after its title, dimmed, and its name for assistive technology includes the reason.
-func (vs *viewState) actionRow(st Style, i int, l actionLine) ui.Element {
+func (vs *viewState) actionRow(st *Style, i int, l actionLine) ui.Element {
 	as := &vs.actions
 	a := as.items[l.item]
 	style := st.PopupItem

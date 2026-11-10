@@ -15,7 +15,8 @@ func resolvedIn(c *Chart, th *ui.Theme, hc bool) (Style, *ui.Theme) {
 	var st Style
 	var used *ui.Theme
 	rt := ui.NewRuntime(func(ctx *ui.Context) ui.Element {
-		st, used = c.resolveStyle(ctx), ctx.Theme()
+		c.resolveStyle(ctx, &st)
+		used = ctx.Theme()
 		return ui.Div()
 	}, th, nil)
 	if hc {

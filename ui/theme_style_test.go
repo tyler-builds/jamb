@@ -84,3 +84,74 @@ func TestThemeStyleCopiesAreIsolated(t *testing.T) {
 		t.Error("a predefined theme has a style stored on another theme")
 	}
 }
+
+// ThemeStyleRef returns the stored value itself, and nil when none is stored.
+func TestThemeStyleRef(t *testing.T) {
+	if ThemeStyleRef[widgetStyle](nil) != nil || ThemeStyleRef[widgetStyle](LightTheme()) != nil {
+		t.Fatal("ThemeStyleRef found a value where none is stored")
+	}
+	th := DarkTheme()
+	SetThemeStyle(th, widgetStyle{Box: Style{Gap: 3}})
+	p := ThemeStyleRef[widgetStyle](th)
+	if p == nil || p.Box.Gap != 3 {
+		t.Fatalf("ThemeStyleRef = %+v, want the value set", p)
+	}
+	if again := ThemeStyleRef[widgetStyle](th); again != p {
+		t.Error("two reads returned two values: the value was copied")
+	}
+	if ThemeStyleRef[otherStyle](th) != nil {
+		t.Error("ThemeStyleRef found a value stored under another type")
+	}
+	// A clone keeps the value, and a store on the clone leaves the base's.
+	clone := th.Clone()
+	SetThemeStyle(clone, widgetStyle{Box: Style{Gap: 9}})
+	if ThemeStyleRef[widgetStyle](th) != p || p.Box.Gap != 3 {
+		t.Error("a store on a clone changed the base's value")
+	}
+}
+
+// MergeFrom merges in place what Merge returns.
+func TestMergeFromMatchesMerge(t *testing.T) {
+	base := Style{Gap: 4, Padding: All(8), Background: Hex("#112233"), FontSize: 12}
+	over := Style{Gap: 6, TextColor: Hex("#445566"), Clear: ClearBackground, Radius: 3}
+	want := base.Merge(over)
+	got := base
+	got.MergeFrom(&over)
+	if got.Gap != want.Gap || got.Padding != want.Padding || got.Background != want.Background ||
+		got.FontSize != want.FontSize || got.TextColor != want.TextColor || got.Radius != want.Radius || got.Clear != want.Clear {
+		t.Errorf("MergeFrom gave %+v, Merge %+v", got, want)
+	}
+	if over.Gap != 6 || over.Clear != ClearBackground {
+		t.Error("MergeFrom changed the style it read")
+	}
+}
+
+// StyleLayerRef returns the style itself when no inspector is attached, and a
+// named copy when one is, without changing the style it was given.
+func TestStyleLayerRef(t *testing.T) {
+	s := &widgetStyle{Box: Style{Gap: 3}}
+	if got := StyleLayerRef(nil, s, "theme"); got != s {
+		t.Error("with no context the style was copied")
+	}
+	ctx := layerCtx(DarkTheme())
+	if got := StyleLayerRef(ctx, s, "theme"); got != s {
+		t.Error("with no inspector the style was copied")
+	}
+	ctx.rt.insp = &inspectState{edits: map[uint64]Style{}}
+	got := StyleLayerRef(ctx, s, "theme")
+	if got == s {
+		t.Fatal("with an inspector the layer was recorded on the caller's style")
+	}
+	if s.Box.prov != nil {
+		t.Error("the caller's style has records")
+	}
+	if recs := got.Box.prov["Gap"]; len(recs) != 1 || recs[0].layer != "theme" {
+		t.Errorf("the copy's Gap has the records %v, want one of the layer \"theme\"", recs)
+	}
+	// The records follow a merge, as StyleLayer's do.
+	var merged Style
+	merged.MergeFrom(&got.Box)
+	if recs := merged.prov["Gap"]; len(recs) != 1 || recs[0].layer != "theme" {
+		t.Errorf("after a merge Gap has the records %v", recs)
+	}
+}

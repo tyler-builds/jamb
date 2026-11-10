@@ -37,8 +37,10 @@ type builder struct {
 
 // newBuilder returns the builder of one render of v.
 func newBuilder(v *ViewElement, ctx *ui.Context, doc *document, images *imageCache, update func(func()), code context.Context) *builder {
-	return &builder{v: v, ctx: ctx, t: ctx.Theme(), s: ctx.Strings(), st: v.resolveStyle(ctx), doc: doc,
+	b := &builder{v: v, ctx: ctx, t: ctx.Theme(), s: ctx.Strings(), doc: doc,
 		images: images, update: update, code: code, slugs: slugger{}, anchors: map[string]*ui.FocusHandle{}, notes: map[int]*ui.FocusHandle{}}
+	v.resolveStyle(ctx, &b.st)
+	return b
 }
 
 // document returns the column of the document's blocks, with the view's sizes.
@@ -98,13 +100,13 @@ func (b *builder) paragraph(n ast.Node) ui.Element {
 	if in.blank() {
 		return nil
 	}
-	return b.flow(in, b.st.Paragraph, ui.Start)
+	return b.flow(in, &b.st.Paragraph, ui.Start)
 }
 
 // flow returns the inline content in as elements: each run of text between images
 // one selectable rich text in the style st, aligned by align, and each image a block
 // of its own, with images that follow one another in a row that wraps.
-func (b *builder) flow(in *inlines, st ui.Style, align ui.Alignment) ui.Element {
+func (b *builder) flow(in *inlines, st *ui.Style, align ui.Alignment) ui.Element {
 	var out []ui.Element
 	var run []part
 	var imgs []ui.Element
@@ -114,7 +116,7 @@ func (b *builder) flow(in *inlines, st ui.Style, align ui.Alignment) ui.Element 
 			blank = blank && strings.TrimSpace(p.text) == ""
 		}
 		if !blank {
-			t := ui.Rich(in.segments(run)...).Style(st).Selectable()
+			t := ui.Rich(in.segments(run)...).Style(*st).Selectable()
 			if align != ui.Start {
 				t.Align(align)
 			}
@@ -156,13 +158,13 @@ func (b *builder) flow(in *inlines, st ui.Style, align ui.Alignment) ui.Element 
 // level. A heading that a "#name" link leads to takes focus when the link is followed,
 // which scrolls it into view; Tab does not stop on it.
 func (b *builder) heading(n *ast.Heading) ui.Element {
-	box := ui.Div().Heading(min(max(n.Level, 1), 6)).Style(b.st.heading(n.Level))
+	box := ui.Div().Heading(min(max(n.Level, 1), 6)).Style(*b.st.heading(n.Level))
 	if slug := b.slugs.slug(plainText(n, b.doc.src)); b.doc.targets[slug] {
 		h := ui.NewFocusHandle()
 		box.Focusable().TabStop(false).FocusHandle(h)
 		b.anchors[slug] = h
 	}
-	return box.Child(b.flow(b.collect(n), ui.Style{}, ui.Start))
+	return box.Child(b.flow(b.collect(n), &ui.Style{}, ui.Start))
 }
 
 // follow returns what following a link to url does: the view's OnLink, or else for
@@ -258,11 +260,11 @@ func (b *builder) taskBox(item ast.Node, checked bool) ui.Element {
 	if name == "" {
 		name = b.s.MarkdownTask
 	}
-	st := b.st.Task
+	box := ui.Div().Role(access.RoleCheckBox).AccessChecked(checked).Label(name).Style(b.st.Task)
 	if checked {
-		st = st.Merge(b.st.TaskChecked)
+		box.Style(b.st.TaskChecked)
 	}
-	box := ui.Div().Role(access.RoleCheckBox).AccessChecked(checked).Label(name).Style(st).Shrink(0)
+	box.Shrink(0)
 	if checked {
 		box.Child(ui.Canvas(func(p *ui.Painter, w, h float32) {
 			mark := ui.NewPath().MoveTo(w*0.22, h*0.52).LineTo(w*0.42, h*0.72).LineTo(w*0.78, h*0.3)

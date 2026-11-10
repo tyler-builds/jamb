@@ -413,7 +413,7 @@ func (d *Document) complete(n int, insert string, extra []Change) error {
 // completionPopup returns the open completion list: an overlay under the start of the word, with
 // the items around the highlighted one, the highlighted one selected, or a row that says the list
 // is loading or could not load.
-func (vs *viewState) completionPopup(st Style) ui.Element {
+func (vs *viewState) completionPopup(st *Style) ui.Element {
 	cs := &vs.completion
 	strs := vs.uiStrings()
 	panel := ui.Div().Key("codeedit.completions").Column().Style(st.Popup).

@@ -356,6 +356,10 @@ func (s Style) Merge(o Style) Style {
 	return s
 }
 
+// MergeFrom applies every set field of *o on top of s, in place: it is
+// s = s.Merge(*o) without the copies. It reads o and does not keep it.
+func (s *Style) MergeFrom(o *Style) { s.mergeFrom(o, false) }
+
 // plainClears are the clears that plainStyle drops.
 const plainClears = ClearBackground | ClearTextColor | ClearBorder | ClearShadows
 

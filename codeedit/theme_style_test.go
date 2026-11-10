@@ -15,7 +15,8 @@ func resolvedIn(s Style, th *ui.Theme, hc bool) (Style, *ui.Theme) {
 	var st Style
 	var used *ui.Theme
 	rt := ui.NewRuntime(func(ctx *ui.Context) ui.Element {
-		st, used = s.resolve(ctx), ctx.Theme()
+		s.resolve(ctx, &st)
+		used = ctx.Theme()
 		return ui.Div()
 	}, th, nil)
 	if hc {

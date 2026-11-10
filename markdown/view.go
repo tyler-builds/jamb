@@ -93,7 +93,7 @@ func (v *ViewElement) Label(s string) *ViewElement { v.label = s; return v }
 // Styles sets the look of the parts of the view, for this view only. Set fields win
 // over the theme's Style and the defaults. Calling Styles again merges with the
 // earlier values.
-func (v *ViewElement) Styles(st Style) *ViewElement { v.styles = v.styles.merge(st); return v }
+func (v *ViewElement) Styles(st Style) *ViewElement { v.styles.mergeFrom(&st, false); return v }
 
 // OnLink makes fn handle every link the user follows, with the destination as it is
 // written in the text: absolute URLs, relative paths and "#name" anchors alike, and

@@ -12,7 +12,7 @@ import (
 // paintSettings is what one render of the editor gives the paint: the resolved look, the
 // theme, and the options that change the drawing.
 type paintSettings struct {
-	st       Style
+	st       *Style
 	t        *ui.Theme
 	numbers  bool
 	tab      int
@@ -405,7 +405,7 @@ func (vs *viewState) drawFoldMarker(p *ui.Painter, row int, foldX, foldW, y, lin
 
 // drawBrackets outlines the bracket at the primary caret and the one that pairs with it, when
 // the caret is at a bracket and there is one caret. x is the index of the display rows.
-func (vs *viewState) drawBrackets(p *ui.Painter, x rowIndex, tx, charW, lineH float32, first, last int, st Style) {
+func (vs *viewState) drawBrackets(p *ui.Painter, x rowIndex, tx, charW, lineH float32, first, last int, st *Style) {
 	doc := vs.doc
 	if len(doc.sels) != 1 || st.CurrentMatch.Background.IsZero() {
 		return

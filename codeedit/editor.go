@@ -111,7 +111,7 @@ func (e *EditorElement) GridSpan(cols, rows int) *EditorElement {
 // Styles sets the look of the parts of the editor, for this editor only. Set fields win
 // over the theme's Style and the defaults. Calling Styles again merges with the earlier values.
 func (e *EditorElement) Styles(st Style) *EditorElement {
-	e.styles = e.styles.merge(st)
+	e.styles.mergeFrom(&st, false)
 	return e
 }
 
@@ -177,7 +177,8 @@ func (e *EditorElement) Render(ctx *ui.Context) ui.Element {
 	vs.syncLightbulb()
 	vs.doc.SetTabSize(e.tabSize)
 	t := ctx.Theme()
-	st := e.styles.resolve(ctx)
+	st := new(Style) // the canvas keeps it for its paints
+	e.styles.resolve(ctx, st)
 	name := e.label
 	if name == "" {
 		name = ctx.Strings().CodeEditorLabel

@@ -278,7 +278,7 @@ func (c *Chart) GridSpan(cols, rows int) *Chart { c.size.setSpan(cols, rows); re
 // Styles sets the look of the parts of the chart, for this chart only. Set fields win
 // over the theme's Style and the defaults. Calling Styles again merges with the earlier values.
 func (c *Chart) Styles(st Style) *Chart {
-	c.styles = c.styles.merge(st)
+	c.styles.mergeFrom(&st)
 	return c
 }
 
@@ -311,30 +311,27 @@ type Style struct {
 	Tooltip ui.Style
 }
 
-// merge returns s with the set fields of o applied on top, part by part.
-func (s Style) merge(o Style) Style {
-	return Style{
-		Chart:      s.Chart.Merge(o.Chart),
-		Title:      s.Title.Merge(o.Title),
-		Axis:       s.Axis.Merge(o.Axis),
-		Grid:       s.Grid.Merge(o.Grid),
-		Legend:     s.Legend.Merge(o.Legend),
-		LegendItem: s.LegendItem.Merge(o.LegendItem),
-		Tooltip:    s.Tooltip.Merge(o.Tooltip),
-	}
+// mergeFrom applies the set fields of o on top of s, part by part, in place.
+func (s *Style) mergeFrom(o *Style) {
+	s.Chart.MergeFrom(&o.Chart)
+	s.Title.MergeFrom(&o.Title)
+	s.Axis.MergeFrom(&o.Axis)
+	s.Grid.MergeFrom(&o.Grid)
+	s.Legend.MergeFrom(&o.Legend)
+	s.LegendItem.MergeFrom(&o.LegendItem)
+	s.Tooltip.MergeFrom(&o.Tooltip)
 }
 
-// plain returns s without the colors, gradients, shadows and opacity that high
-// contrast takes from the system colors, as the ui's own parts do.
-func plain(s ui.Style) ui.Style {
+// plain drops from s the colors, gradients, shadows and opacity that high contrast
+// takes from the system colors, as the ui's own parts do.
+func plain(s *ui.Style) {
 	s.Background, s.BorderColor, s.TextColor = ui.Color{}, ui.Color{}, ui.Color{}
 	s.Gradient, s.Shadows, s.Opacity = ui.Gradient{}, nil, 0
-	return s
 }
 
-// chartDefaults returns the built-in look of the parts, from the colors of t.
-func chartDefaults(t *ui.Theme) Style {
-	return Style{
+// chartDefaults sets st to the built-in look of the parts, from the colors of t.
+func chartDefaults(st *Style, t *ui.Theme) {
+	*st = Style{
 		Chart:      ui.Style{Gap: 8, Direction: ui.Column},
 		Title:      ui.Style{FontSize: 15, FontWeight: ui.FontSemibold, TextColor: t.Text},
 		Axis:       ui.Style{FontSize: 12, TextColor: t.TextMuted},
@@ -346,27 +343,31 @@ func chartDefaults(t *ui.Theme) Style {
 	}
 }
 
-// resolveStyle returns the look of the parts in the theme t: the defaults, merged with
-// the theme's charts.Style (see ui.ThemeStyle), then with the chart's Styles. Under high
-// contrast the colors are the system colors (see plain).
-func (c *Chart) resolveStyle(ctx *ui.Context) Style {
+// resolveStyle sets st to the look of the parts in the theme of ctx: the defaults,
+// merged with the theme's charts.Style (see ui.ThemeStyle), then with the chart's
+// Styles. Under high contrast the colors are the system colors (see plain). The
+// layers are read where they are and merged into st (see ui.Style.MergeFrom).
+func (c *Chart) resolveStyle(ctx *ui.Context, st *Style) {
 	t := ctx.Theme()
-	themed, _ := ui.ThemeStyle[Style](t)
-	st := ui.StyleLayer(ctx, chartDefaults(t), "built-in default").
-		merge(ui.StyleLayer(ctx, themed, "theme")).
-		merge(ui.StyleLayer(ctx, c.styles, "instance Styles"))
+	var base Style
+	chartDefaults(&base, t)
+	*st = Style{}
+	st.mergeFrom(ui.StyleLayerRef(ctx, &base, "built-in default"))
+	if themed := ui.ThemeStyleRef[Style](t); themed != nil {
+		st.mergeFrom(ui.StyleLayerRef(ctx, themed, "theme"))
+	}
+	st.mergeFrom(ui.StyleLayerRef(ctx, &c.styles, "instance Styles"))
 	if t.HighContrast {
-		st = Style{Chart: plain(st.Chart), Title: plain(st.Title), Axis: plain(st.Axis), Grid: plain(st.Grid),
-			Legend: plain(st.Legend), LegendItem: plain(st.LegendItem), Tooltip: plain(st.Tooltip)}
+		for _, part := range []*ui.Style{&st.Chart, &st.Title, &st.Axis, &st.Grid, &st.Legend, &st.LegendItem, &st.Tooltip} {
+			plain(part)
+		}
 		// The grid's border is set field by field, as it was before the inspector: its
 		// records show it as an element method.
 		st.Grid.BorderColor, st.Grid.BorderWidth = t.Text, 1
-		st.Axis = st.Axis.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.Text}, "high contrast"))
-		st.LegendItem = st.LegendItem.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.Text}, "high contrast"))
-		st.Tooltip = st.Tooltip.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.Text}, "high contrast"))
-		st.Title = st.Title.Merge(ui.StyleLayer(ctx, ui.Style{TextColor: t.Text}, "high contrast"))
+		for _, part := range []*ui.Style{&st.Axis, &st.LegendItem, &st.Tooltip, &st.Title} {
+			part.MergeFrom(ui.StyleLayerRef(ctx, &ui.Style{TextColor: t.Text}, "high contrast"))
+		}
 	}
-	return st
 }
 
 // view is what one render of a chart knows: the theme, the parts, the state the
@@ -376,7 +377,7 @@ type view struct {
 	c        *Chart
 	t        *ui.Theme
 	s        *ui.Strings
-	st       Style
+	st       *Style
 	hidden   []bool
 	pointer  pointerAt
 	cursor   cursorAt
@@ -448,7 +449,9 @@ func (c *Chart) render(ctx *ui.Context) ui.Element {
 	// The pointer, the keyboard position and the focus are read without
 	// subscribing: they change the hover layer only (see hoverLayer), so moving
 	// the pointer does not draw the chart again.
-	v := &view{c: c, t: t, s: ctx.Strings(), st: c.resolveStyle(ctx), hidden: hidden.Get(), pointer: pointer.Peek(),
+	st := new(Style) // the view's copies share it
+	c.resolveStyle(ctx, st)
+	v := &view{c: c, t: t, s: ctx.Strings(), st: st, hidden: hidden.Get(), pointer: pointer.Peek(),
 		cursor: cursor.Peek(), focused: focused.Peek(), geo: geo}
 	build := func(progress float32) ui.Element {
 		v.progress = progress
