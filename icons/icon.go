@@ -5,6 +5,8 @@
 // The icons are generated from a pinned Lucide release (see generate.go and
 // third_party/lucide). An icon's SVG is parsed on its first Rasterize, not when
 // the package loads, and an icon that a binary does not name is not linked into it.
+// The package's own icons are written in a plain subset of XML that a few lines
+// read (see svg.ParsePlain), so only a binary that calls New links an XML decoder.
 package icons
 
 import (
@@ -16,8 +18,8 @@ import (
 	"github.com/tyler-builds/jamb/internal/vector"
 )
 
-// svgStart is the root element of every icon: a 24 grid, 2-unit strokes with
-// round caps and joins, and currentColor for the stroke.
+// svgStart is the root element of every icon of the package's own: a 24 grid,
+// 2-unit strokes with round caps and joins, and currentColor for the stroke.
 const svgStart = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`
 
 // Icon is a vector icon: a Lucide icon on a 24×24 grid, or an SVG document of
@@ -27,16 +29,14 @@ type Icon struct {
 	// identifies the icon's drawing, so two icons with different drawings have
 	// different names.
 	Name string
-	// src is the inside of the icon's SVG: its elements, without the root. For
-	// an icon made with New it is the whole document (see whole).
+	// src is the inside of the icon's SVG: its elements, without the root, in
+	// the subset that svg.ParsePlain reads. An icon made with New has none.
 	src string
-	// whole is set when src is a whole SVG document, with its own root.
-	whole bool
 	// colored keeps the icon's own colors (see KeepColors).
 	colored bool
 
 	// once parses src on the first Rasterize; doc is the result, nil for an
-	// icon with no source.
+	// icon with no source. New sets doc itself.
 	once sync.Once
 	doc  *svg.Doc
 }
@@ -71,7 +71,7 @@ func New(name, svgDoc string, opts ...NewOption) (*Icon, error) {
 	if err != nil {
 		return nil, err
 	}
-	ic := &Icon{Name: name, src: svgDoc, whole: true}
+	ic := &Icon{Name: name}
 	for _, o := range opts {
 		if o == KeepColors {
 			ic.colored = true
@@ -95,18 +95,14 @@ func MustNew(name, svgDoc string, opts ...NewOption) *Icon {
 // is drawn with RasterizeRGBA and not tinted.
 func (ic *Icon) Colored() bool { return ic.colored }
 
-// document returns the parsed SVG of the icon, parsing it once.
+// document returns the parsed SVG of the icon, parsing it once. It does not
+// call svg.Parse, which only New does: see the package comment.
 func (ic *Icon) document() *svg.Doc {
 	ic.once.Do(func() {
 		if ic.src == "" {
 			return
 		}
-		src := svgStart + ic.src + "</svg>"
-		if ic.whole {
-			src = ic.src
-		}
-		doc, err := svg.Parse([]byte(src))
-		if err == nil {
+		if doc, ok := svg.ParsePlain(svgStart, ic.src); ok {
 			ic.doc = doc
 		}
 	})

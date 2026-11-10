@@ -93,8 +93,13 @@ func Parse(data []byte) (*Doc, error) {
 	if root == nil {
 		return nil, errors.New("svg: no svg element")
 	}
+	return newDoc(root, parseSheet(strings.Join(sheets, "\n"))), nil
+}
+
+// newDoc returns the document of the root element, with the rules of its style
+// sheets and its style attributes applied.
+func newDoc(root *node, rules []rule) *Doc {
 	d := &Doc{root: root, ids: map[string]*node{}}
-	rules := parseSheet(strings.Join(sheets, "\n"))
 	var walk func(n *node)
 	walk = func(n *node) {
 		applyStyles(n, rules)
@@ -107,7 +112,7 @@ func Parse(data []byte) (*Doc, error) {
 	}
 	walk(root)
 	d.size()
-	return d, nil
+	return d
 }
 
 // size reads the image's size and viewBox.

@@ -31,6 +31,8 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/tyler-builds/jamb/internal/svg"
 )
 
 // The pinned Lucide release: its tag, its commit, and the SHA-256 of its SVG files
@@ -93,6 +95,11 @@ func main() {
 		body, err := inside(icons[file])
 		if err != nil {
 			log.Fatalf("lucidegen: %s: %v", file, err)
+		}
+		// The icons package reads its icons with svg.ParsePlain, and not with
+		// the XML decoder, which a program that draws them then does not link.
+		if _, ok := svg.ParsePlain("<svg>", body); !ok {
+			log.Fatalf("lucidegen: %s: the icon is outside the subset of XML that svg.ParsePlain reads", file)
 		}
 		name := camel(file)
 		if reserved[name] {

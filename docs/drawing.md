@@ -168,7 +168,9 @@ round caps and joins, and are drawn like an SVG image.
 An icon's SVG is compiled into the binary as text and parsed the first time the
 icon is drawn. A binary holds only the icons it names, so an app that uses ten
 icons carries ten. `icons.All()` returns every icon and so holds all of them; it
-is for tools such as `internal/iconsheet`, not for apps.
+is for tools such as `internal/iconsheet`, not for apps. The icons are written
+in a plain form that a few lines of code read, so an app links an XML decoder
+only when it parses SVG of its own, with `icons.New` or `ui.SVGFromBytes`.
 
 Names from before the Lucide set still work, as the same icons:
 
