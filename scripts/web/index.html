@@ -27,6 +27,24 @@
 (() => {
   Error.stackTraceLimit = 100000; // the whole stack, so its depth shows
   const status = document.getElementById("status");
+  // named gives the functions of a stack their names. A TinyGo build leaves
+  // them out of app.wasm, so a frame shows its function's number, as
+  // wasm-function[N]; app.names lists the names (see tinygo.sh).
+  const named = async (stack) => {
+    if (!/wasm-function\[\d+\]/.test(stack)) return stack;
+    try {
+      const res = await fetch("app.names");
+      if (!res.ok) return stack;
+      const names = new Map();
+      for (const line of (await res.text()).split("\n")) {
+        const i = line.indexOf(":");
+        if (i > 0) names.set(line.slice(0, i), line.slice(i + 1));
+      }
+      return stack.replace(/wasm-function\[(\d+)\]/g, (frame, n) => names.get(n) || frame);
+    } catch {
+      return stack;
+    }
+  };
   let stopped = false;
   const stop = (err) => {
     if (stopped) return;
@@ -34,11 +52,20 @@
     console.error(err);
     for (const c of document.querySelectorAll("canvas")) c.remove();
     status.textContent = "This app stopped because of an error. Reload the page to start it again.";
-    const stack = String((err && err.stack) || "").split("\n");
     const detail = document.createElement("pre");
-    detail.textContent = String(err) + "\n" + stack.length + " frames, deepest first:\n" + stack.slice(0, 4).join("\n");
+    const show = (stack) => {
+      const frames = stack.split("\n");
+      detail.textContent = String(err) + "\n" + frames.length + " frames, deepest first:\n" + frames.slice(0, 4).join("\n");
+    };
+    const stack = String((err && err.stack) || "");
+    show(stack);
     status.appendChild(detail);
     document.body.appendChild(status);
+    named(stack).then((withNames) => {
+      if (withNames === stack) return;
+      show(withNames);
+      console.error(withNames);
+    });
   };
   addEventListener("error", (e) => {
     // An error from a script of another origin arrives as "Script error." with
