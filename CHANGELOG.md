@@ -9,6 +9,15 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-10
+
+### Fixed
+
+- A `CellGrid` draws box drawing (U+2500 to U+2570, U+2574 to U+257F), block elements (U+2580 to
+  U+259F) and braille (U+2800 to U+28FF) as shapes that fill their cells, as terminals do, so the
+  lines of frames, tables and graphs no longer break between rows where the cell is taller than the
+  font's glyphs. Rounded corners are drawn as arcs, and the diagonals are left to the font.
+
 ## [0.8.0] - 2026-11-10
 
 ### Added
@@ -1123,7 +1132,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/tyler-builds/jamb/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/tyler-builds/jamb/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/tyler-builds/jamb/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/tyler-builds/jamb/compare/v0.6.4...v0.7.0
