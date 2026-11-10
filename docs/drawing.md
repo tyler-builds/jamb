@@ -116,6 +116,38 @@ ui.Canvas(drawBanner).Size(ui.Full, ui.Px(220)).Radius(20).Role(access.RoleUnkno
 		Child(ui.Button("Open").OnClick(open)))
 ```
 
+## Cell grid
+
+`ui.CellGrid(buf, onResize)` shows a `*ui.CellBuffer`, a fixed-pitch grid of
+character cells in the monospace font, as a terminal shows its screen. Each `ui.Cell`
+has its `Text` (one grapheme), `FG` and `BG` colors (zero means the grid's text color
+and no background), and `Bold`, `Italic` and `Underline`. The buffer also holds a
+`CellCursor`: a block, a bar, an underline or a hollow block.
+
+```go
+buf := ui.NewCellBuffer(80, 24)
+
+go func() { // any goroutine
+	buf.Lock()
+	buf.Set(0, 0, ui.Cell{Text: "$", FG: ui.Hex("#9ece6a"), Bold: true})
+	buf.SetCursor(ui.CellCursor{X: 2, Y: 0, Visible: true})
+	buf.Unlock() // repaints the grid if something changed
+}()
+
+ui.CellGrid(buf, func(cols, rows int) { /* resize the buffer, and a PTY */ }).
+	FontSize(14).TextColor(fg)
+```
+
+Unlike a canvas, a grid is drawn by the GPU: the backgrounds are quads, the text is
+glyphs from the atlas, and a row whose cells did not change since the last frame is
+drawn from the runs that frame laid out. A change to the buffer repaints the grid and
+builds nothing. The grid fills its parent; `onResize` is called with how many whole
+cells fit when that changes, on the UI thread while the grid paints, and
+`buf.CellAt(e.LocalX, e.LocalY)` turns a pointer position into a cell. A run of ASCII
+text in one style is laid out as one piece; any other grapheme is laid out alone at its
+cell, so a fallback font cannot push the row off the grid. `examples/term` uses it
+(see [the terminal](examples.md#the-terminal)).
+
 ## Charts
 
 The `charts` package builds line, area, bar, scatter, pie and donut, radar, candlestick

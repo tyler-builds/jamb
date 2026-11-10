@@ -393,7 +393,9 @@ func (s *session) view(ctx *ui.Context, t *tabs) ui.Element {
 		e.StopPropagation()
 	}
 
-	return ui.CellGrid(s.buf, s.resize).FontSize(14).TextColor(fgText).
+	// Its own key gives each tab's grid its own element, so switching tabs moves
+	// focus, and OnFocus runs, rather than keeping the last tab's focused element.
+	return ui.CellGrid(s.buf, s.resize).Key(s.key + "-grid").FontSize(14).TextColor(fgText).
 		FocusHandle(s.focus).
 		OnFocus(func() { s.mu.Lock(); s.focused = true; s.mu.Unlock(); s.sync() }).
 		OnBlur(func() { s.mu.Lock(); s.focused = false; s.mu.Unlock(); s.sync() }).

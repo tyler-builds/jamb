@@ -117,6 +117,11 @@ type DivElement struct {
 	tabIndex     int               // see TabIndex
 	overlayGap   float32
 	fillBase     Color
+	// These one-byte fields sit here, in the gap before kidsSpring's alignment,
+	// so that DivElement keeps its size class (see TestElementSizeClasses).
+	overlay Placement
+	sized   sizeSet    // the sizes a sizing method gave the element, for the inspector (see sizing.apply)
+	area    WindowArea // see WindowArea
 	// kidsSpring is the layout spring of the children that set none of their
 	// own (see ChildrenLayoutSpring).
 	kidsSpring Spring
@@ -144,9 +149,6 @@ type DivElement struct {
 	// element's own, so that the element is opaque in its parent's state (a pinned
 	// cell of a DataGrid; see paintNode).
 	fillFromParent bool
-	overlay        Placement
-	sized          sizeSet    // the sizes a sizing method gave the element, for the inspector (see sizing.apply)
-	area           WindowArea // see WindowArea
 }
 
 // Div creates an empty container. Children stack vertically (Column) unless

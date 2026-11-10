@@ -1,6 +1,6 @@
 # Examples
 
-The demo app, the notes app, the Git app, the monitor and the budget in this repository.
+The demo app, the notes app, the Git app, the monitor, the budget and the terminal in this repository.
 
 ## The demo app
 
@@ -357,3 +357,24 @@ assistive technology.
 - The ledger is kept in `jamb-budget\budget.json` in the user's configuration folder
   (`JAMB_BUDGET_FILE` names another). The first run starts from a made-up household's last
   six months. The tests in `examples/budget/views` drive the app headlessly.
+
+## The terminal
+
+`examples/term/` is a small terminal for Linux: a shell per tab, each in a PTY
+(`creack/pty`) read by an `x/vt` emulator, and shown with `ui.CellGrid`. It needs a
+PTY, so it runs on Linux (and builds, but does not start, on Windows).
+
+- **Tabs** sit in the app's own title bar (`app.ChromeCustom`, `ui.TitleBar`), each
+  named by the title the shell sets. Ctrl+Shift+T opens one, Ctrl+Shift+W or its
+  close button closes it, and Ctrl+PageUp and Ctrl+PageDown move between them. Closing
+  the last tab, or the shell exiting in it, closes the window.
+- **Scrollback** keeps 10,000 lines. The wheel and Shift+PageUp and Shift+PageDown
+  scroll it, and typing goes back to the bottom. In a full-screen program the wheel goes
+  to the program instead: as mouse wheel reports when it asked for the mouse, or else
+  as arrow keys.
+- **Selection** is a drag; Ctrl+Shift+C copies it and Ctrl+Shift+V pastes, bracketed
+  when the shell asks for it.
+
+The emulator writes each read of the shell's output into the grid's `CellBuffer` from
+the reading goroutine; the buffer skips cells that did not change, and the grid
+repaints without anything being built again.
