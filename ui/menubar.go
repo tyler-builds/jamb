@@ -31,9 +31,9 @@ type MenuBarStyle struct {
 	BarItemOpen         Style // the label of the open menu
 }
 
-// menuBarDefaults returns the built-in look of a menu bar, from the colors of t.
-func menuBarDefaults(t *Theme) MenuBarStyle {
-	return MenuBarStyle{
+// menuBarDefaults sets d to the built-in look of a menu bar, from the colors of t.
+func menuBarDefaults(d *MenuBarStyle, t *Theme) {
+	*d = MenuBarStyle{
 		BarItem: Style{Direction: Row, Align: Center, MinHeight: Px(26), Padding: XY(10, 0), Radius: 4,
 			NoShrink: true, FontSize: 13, TextColor: t.Text},
 		BarItemHover:        Style{Background: t.SurfaceHover},
@@ -42,15 +42,14 @@ func menuBarDefaults(t *Theme) MenuBarStyle {
 	}
 }
 
-// resolveMenuBar returns the look of a menu bar: the defaults, merged with the
+// resolveMenuBar sets st to the look of a menu bar: the defaults, merged with the
 // theme's MenuBar and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveMenuBar(ctx *Context, inst MenuBarStyle) MenuBarStyle {
+func resolveMenuBar(ctx *Context, inst, st *MenuBarStyle) {
 	t := ctx.Theme()
-	st := menuBarDefaults(t)
+	menuBarDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.MenuBar), instanceLayer(&inst))
-	return st
+		themeLayer(&t.MenuBar), instanceLayer(inst))
 }
 
 // MenuBarElement is a row of top-level menus. See MenuBar.
@@ -71,16 +70,21 @@ func (*MenuBarElement) isElement() {}
 // Styles sets the look of the labels on the bar, for this instance only. Set
 // fields win over the theme's MenuBar and the defaults; see MenuBarStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (mb *MenuBarElement) Styles(st MenuBarStyle) *MenuBarElement {
-	mb.styles.mergeFrom(&st, false)
+func (mb *MenuBarElement) Styles(st MenuBarStyle) *MenuBarElement { return mb.stylesOf(&st) }
+
+func (mb *MenuBarElement) stylesOf(st *MenuBarStyle) *MenuBarElement {
+	mb.styles.mergeFrom(st, false)
 	return mb
 }
 
 func (mb *MenuBarElement) expand(ctx *Context) Element {
-	menus, styles := mb.menus, mb.styles
+	menus := mb.menus
+	styles := new(MenuBarStyle)
+	copyLarge(styles, &mb.styles)
 	return Component(func(ctx *Context) Element {
 		rt, t := ctx.rt, ctx.Theme()
-		st := resolveMenuBar(ctx, styles)
+		var st MenuBarStyle
+		resolveMenuBar(ctx, styles, &st)
 		open := Local(ctx, "open", -1) // index of the open menu, or -1
 		hl := Local(ctx, "hl", 0)      // the label that has keyboard focus
 		items := Local(ctx, "items", []MenuItem(nil))
@@ -157,12 +161,13 @@ func (mb *MenuBarElement) expand(ctx *Context) Element {
 		var panel *menuView
 		if cur >= 0 {
 			panel = &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: hide,
-				label: menus[cur].Label, st: resolveMenu(ctx, MenuStyle{}),
+				label: menus[cur].Label,
 				move: func(dir int) {
 					if at := open.Peek(); at >= 0 {
 						show((at+dir+len(menus))%len(menus), true)
 					}
 				}}
+			resolveMenu(ctx, &MenuStyle{}, &panel.st)
 		}
 		for i, tm := range menus {
 			// The open label keeps its highlight while the pointer is on it.
@@ -170,9 +175,9 @@ func (mb *MenuBarElement) expand(ctx *Context) Element {
 			if i == cur {
 				hover = st.BarItemOpen
 			}
-			lbl := Div().asPart("MenuBar.BarItem").Keyf("jamb.menubar.%d", i).Style(st.BarItem).
-				Hover(hover).
-				FocusVisible(st.BarItemFocusVisible).
+			lbl := Div().asPart("MenuBar.BarItem").Keyf("jamb.menubar.%d", i).styleOf(&st.BarItem).
+				hoverOf(&hover).
+				focusVisibleOf(&st.BarItemFocusVisible).
 				FocusHandle(handles[i]).TabStop(false).
 				OnFocus(func() { hl.Set(i) }).
 				OnClick(func() {
@@ -189,7 +194,7 @@ func (mb *MenuBarElement) expand(ctx *Context) Element {
 				}).
 				Child(Text(tm.Label).NoWrap()).Role(access.RoleMenuItem).AccessExpanded(i == cur)
 			if i == cur {
-				lbl.Style(st.BarItemOpen)
+				lbl.styleOf(&st.BarItemOpen)
 				lbl.Child(panel.top(2))
 			}
 			bar.Child(lbl)

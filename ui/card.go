@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"slices"
-
 	"github.com/tyler-builds/jamb/access"
 )
 
@@ -42,11 +40,11 @@ func (cv *CardVariants) of(v CardVariant) *CardStyle {
 	return &cv.Filled
 }
 
-// cardDefaults returns the built-in look of a card of variant v. Under high
+// cardDefaults sets d to the built-in look of a card of variant v. Under high
 // contrast both variants are the window color outlined in the text color, and a
 // hovered card's border is the highlight color.
-func cardDefaults(t *Theme, v CardVariant) CardStyle {
-	d := CardStyle{
+func cardDefaults(d *CardStyle, t *Theme, v CardVariant) {
+	*d = CardStyle{
 		Card:        Style{Direction: Column, Gap: 8, Padding: All(16), Radius: t.Radius, Background: t.Surface},
 		CardHover:   Style{Background: t.SurfaceHover},
 		CardPressed: Style{Background: t.SurfaceActive},
@@ -61,18 +59,16 @@ func cardDefaults(t *Theme, v CardVariant) CardStyle {
 		d.CardHover = Style{BorderColor: t.Accent}
 		d.CardPressed = Style{BorderColor: t.Accent}
 	}
-	return d
 }
 
-// resolveCard returns the look of a card: the defaults, merged with the theme's
+// resolveCard sets st to the look of a card: the defaults, merged with the theme's
 // Card and Cards and then the instance's Styles. Under high contrast the
 // overrides are plain (see plainStyle).
-func resolveCard(ctx *Context, v CardVariant, inst CardStyle) CardStyle {
+func resolveCard(ctx *Context, v CardVariant, inst, st *CardStyle) {
 	t := ctx.Theme()
-	st := cardDefaults(t, v)
+	cardDefaults(st, t, v)
 	st.layered(ctx,
-		themeLayer(&t.Card), themeLayer(t.Cards.of(v)), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Card), themeLayer(t.Cards.of(v)), instanceLayer(inst))
 }
 
 // CardElement is a surface that holds related content, such as one item of a
@@ -180,24 +176,27 @@ func (c *CardElement) GridSpan(cols, rows int) *CardElement { c.size.setSpan(col
 // Styles sets the look of the parts of the card, for this instance only. Set
 // fields win over the theme's Card and Cards and the defaults; see CardStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (c *CardElement) Styles(st CardStyle) *CardElement {
-	c.styles.mergeFrom(&st, false)
+func (c *CardElement) Styles(st CardStyle) *CardElement { return c.stylesOf(&st) }
+
+func (c *CardElement) stylesOf(st *CardStyle) *CardElement {
+	c.styles.mergeFrom(st, false)
 	return c
 }
 
 func (c *CardElement) expand(ctx *Context) Element {
-	st := resolveCard(ctx, c.variant, c.styles)
-	d := Div().asPart("Card.Card").Style(st.Card).Style(c.layout).Tooltip(c.tooltip).Children(c.children...)
+	var st CardStyle
+	resolveCard(ctx, c.variant, &c.styles, &st)
+	d := Div().asPart("Card.Card").styleOf(&st.Card).styleOf(&c.layout).Tooltip(c.tooltip).Children(c.children...)
 	if c.onClick == nil {
 		if c.label != "" {
 			d.Role(access.RoleGroup).Label(c.label)
 		}
 		return c.size.apply(d)
 	}
-	d.Hover(st.CardHover).Pressed(st.CardPressed).Focusable().OnClick(c.onClick)
+	d.hoverOf(&st.CardHover).pressedOf(&st.CardPressed).Focusable().OnClick(c.onClick)
 	// The focus ring is added to the card's own shadows, as a button's is.
 	ring := Shadow{Spread: 2, Color: ctx.Theme().FocusRing}
-	d.FocusVisible(Style{Shadows: append(slices.Clone(st.Card.Shadows), ring)}.Merge(st.CardFocusVisible))
+	d.focusVisibleOf(ringStyle(st.Card.Shadows, ring, &st.CardFocusVisible))
 	d.Role(access.RoleButton)
 	if c.label != "" {
 		d.Label(c.label)

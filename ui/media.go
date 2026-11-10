@@ -41,11 +41,13 @@ func (i *IconElement) Size(px float32) *IconElement { i.size = px; return i }
 func (i *IconElement) Color(c Color) *IconElement { i.color = c; return i }
 
 // Style merges layout fields (margins, alignment...) of s.
-func (i *IconElement) Style(s Style) *IconElement { i.style = i.style.Merge(s); return i }
+func (i *IconElement) Style(s Style) *IconElement { return i.styleOf(&s) }
+
+func (i *IconElement) styleOf(s *Style) *IconElement { i.style.mergeFrom(s, false); return i }
 
 // LayoutSpring moves the icon to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
-func (i *IconElement) LayoutSpring(s Spring) *IconElement { return i.Style(Style{LayoutSpring: s}) }
+func (i *IconElement) LayoutSpring(s Spring) *IconElement { return i.styleOf(&Style{LayoutSpring: s}) }
 
 // ImageSource is decoded pixel data ready for the GPU. Create it once (for
 // example at package init) and reuse it.
@@ -164,8 +166,12 @@ func (i *ImageElement) Alt(s string) *ImageElement { i.alt = s; return i }
 func (i *ImageElement) Opacity(o float32) *ImageElement { i.style.Opacity = o; return i }
 
 // Style merges layout fields of s.
-func (i *ImageElement) Style(s Style) *ImageElement { i.style = i.style.Merge(s); return i }
+func (i *ImageElement) Style(s Style) *ImageElement { return i.styleOf(&s) }
+
+func (i *ImageElement) styleOf(s *Style) *ImageElement { i.style.mergeFrom(s, false); return i }
 
 // LayoutSpring moves the image to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
-func (i *ImageElement) LayoutSpring(s Spring) *ImageElement { return i.Style(Style{LayoutSpring: s}) }
+func (i *ImageElement) LayoutSpring(s Spring) *ImageElement {
+	return i.styleOf(&Style{LayoutSpring: s})
+}

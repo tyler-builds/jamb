@@ -105,3 +105,11 @@ func TestStyleMergeGenUpToDate(t *testing.T) {
 		t.Fatal("style_merge_gen.go is out of date: run go generate ./ui")
 	}
 }
+
+// look returns the style that fill writes: a widget's defaults and its
+// resolver take the style to fill.
+func look[T any](fill func(st *T)) T {
+	var st T
+	fill(&st)
+	return st
+}

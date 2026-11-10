@@ -26,28 +26,26 @@ const skeletonGap = 8
 // skeletonPeriod is the length of one pulse of a skeleton.
 const skeletonPeriod = 1200 * time.Millisecond
 
-// skeletonDefaults returns the built-in look of a placeholder bar at the Text
+// skeletonDefaults sets d to the built-in look of a placeholder bar at the Text
 // scale scale: a rounded block in the surface-active color, a full-width bar of
 // text height. Under high contrast the bar is an outlined empty box, since it
 // does not pulse.
-func skeletonDefaults(t *Theme, scale float32) SkeletonStyle {
-	d := SkeletonStyle{Bone: Style{Background: t.SurfaceActive, Radius: 4, NoShrink: true,
+func skeletonDefaults(d *SkeletonStyle, t *Theme, scale float32) {
+	*d = SkeletonStyle{Bone: Style{Background: t.SurfaceActive, Radius: 4, NoShrink: true,
 		Width: Full, Height: Px(skeletonBarHeight * scale)}}
 	if t.HighContrast {
 		d.Bone.Background, d.Bone.BorderWidth, d.Bone.BorderColor = t.Surface, 1, t.Text
 	}
-	return d
 }
 
-// resolveSkeleton returns the look of a skeleton: the defaults, merged with the
+// resolveSkeleton sets st to the look of a skeleton: the defaults, merged with the
 // theme's Skeleton and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveSkeleton(ctx *Context, scale float32, inst SkeletonStyle) SkeletonStyle {
+func resolveSkeleton(ctx *Context, scale float32, inst, st *SkeletonStyle) {
 	t := ctx.Theme()
-	st := skeletonDefaults(t, scale)
+	skeletonDefaults(st, t, scale)
 	st.layered(ctx,
-		themeLayer(&t.Skeleton), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Skeleton), instanceLayer(inst))
 }
 
 // skeletonShape is the form of a skeleton.
@@ -120,15 +118,18 @@ func (s *SkeletonElement) GridSpan(cols, rows int) *SkeletonElement {
 // Styles sets the look of the parts of the skeleton, for this instance only. Set
 // fields win over the theme's Skeleton and the defaults; see SkeletonStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (s *SkeletonElement) Styles(st SkeletonStyle) *SkeletonElement {
-	s.styles.mergeFrom(&st, false)
+func (s *SkeletonElement) Styles(st SkeletonStyle) *SkeletonElement { return s.stylesOf(&st) }
+
+func (s *SkeletonElement) stylesOf(st *SkeletonStyle) *SkeletonElement {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
 func (s *SkeletonElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
 	scale := textScale(ctx)
-	st := resolveSkeleton(ctx, scale, s.styles)
+	var st SkeletonStyle
+	resolveSkeleton(ctx, scale, &s.styles, &st)
 	if ctx.ReducedMotion() || t.HighContrast {
 		return s.build(st, scale, 1)
 	}
@@ -144,7 +145,7 @@ func (s *SkeletonElement) expand(ctx *Context) Element {
 // Its bones are hidden from assistive technology.
 func (s *SkeletonElement) build(st SkeletonStyle, scale, opacity float32) Element {
 	bone := func() *DivElement {
-		return Div().asPart("Skeleton.Bone").Style(st.Bone).Opacity(opacity).AccessHidden()
+		return Div().asPart("Skeleton.Bone").styleOf(&st.Bone).Opacity(opacity).AccessHidden()
 	}
 	switch s.shape {
 	case skeletonCircle:

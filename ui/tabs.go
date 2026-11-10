@@ -99,11 +99,11 @@ func (s *TabsStyle) mergeFrom(o *TabsStyle, plain bool) {
 	s.MenuButton.mergeFrom(&o.MenuButton, plain)
 }
 
-// tabsDefaults returns the built-in look of a tab list of variant v, from the
+// tabsDefaults sets d to the built-in look of a tab list of variant v, from the
 // colors of th.
-func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
+func tabsDefaults(d *TabsStyle, th *Theme, v TabsVariant) {
 	ring := Shadow{Spread: 2, Color: th.FocusRing}
-	d := TabsStyle{
+	*d = TabsStyle{
 		Bar:  Style{Direction: Row, Align: Center, Gap: 4},
 		List: Style{Direction: Row, Gap: 4, BorderEdges: Edges{Bottom: 1}, BorderColor: th.Border},
 		Tab: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(36), Padding: XY(12, 0),
@@ -138,18 +138,16 @@ func tabsDefaults(th *Theme, v TabsVariant) TabsStyle {
 			d.TabSelected = Style{Background: th.Accent, TextColor: th.AccentText}
 		}
 	}
-	return d
 }
 
-// resolveTabs returns the look of a tab list: the defaults of v, merged with
+// resolveTabs sets st to the look of a tab list: the defaults of v, merged with
 // the theme's Tabs and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveTabs(ctx *Context, v TabsVariant, inst TabsStyle) TabsStyle {
+func resolveTabs(ctx *Context, v TabsVariant, inst, st *TabsStyle) {
 	th := ctx.Theme()
-	st := tabsDefaults(th, v)
+	tabsDefaults(st, th, v)
 	st.layered(ctx,
-		themeLayer(&th.Tabs), instanceLayer(&inst))
-	return st
+		themeLayer(&th.Tabs), instanceLayer(inst))
 }
 
 // TabsElement is a tab list and the panel of the selected tab. The selected tab
@@ -366,7 +364,8 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		th := ctx.Theme()
 		strs := ctx.Strings()
-		st := resolveTabs(ctx, t.variant, t.styles)
+		var st TabsStyle
+		resolveTabs(ctx, t.variant, &t.styles, &st)
 		cur := t.selected.Get()
 		// order is the order of the values once the user has moved a tab (see
 		// Reorderable); until then the tabs are shown in the order given.
@@ -538,7 +537,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			if tb.Disabled {
 				style = style.Merge(st.TabDisabled)
 			}
-			tab := Div().asPart("Tabs.Tab").Key(t.tabKey(tb.Value)).Style(style).
+			tab := Div().asPart("Tabs.Tab").Key(t.tabKey(tb.Value)).styleOf(&style).
 				Role(access.RoleTab).Label(tb.Label).AccessSelected(on)
 			tab.revealRow = on && reveal // the next paint scrolls the strip to it
 			capped := !t.tabMax.IsAuto()
@@ -560,7 +559,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			if t.variant == TabsUnderline {
 				// The line is drawn under the selected tab only. The others have a
 				// transparent one, so that it eases in when the tab is selected.
-				ind := Div().asPart("Tabs.Indicator").Absolute().Left(0).Right(0).Bottom(0).Style(st.Indicator)
+				ind := Div().asPart("Tabs.Indicator").Absolute().Left(0).Right(0).Bottom(0).styleOf(&st.Indicator)
 				if !on {
 					ind.Background(Transparent)
 				} else if tb.Disabled && th.HighContrast {
@@ -577,10 +576,10 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				// Under high contrast it is always drawn, as the system draws its buttons.
 				shown := on || ps.Hovered || ps.Focused || th.HighContrast
 				x := IconButton(icons.X).Small().Label(strs.CloseTab(tb.Label)).Key("close").
-					Style(Style{Transition: th.Motion.hover()}).OnClick(func() { closeTab(i) })
+					styleOf(&Style{Transition: th.Motion.hover()}).OnClick(func() { closeTab(i) })
 				x.noFocus = true
 				if !shown {
-					x.Style(Style{Opacity: 0.0001})
+					x.styleOf(&Style{Opacity: 0.0001})
 				}
 				tab.Child(x)
 			}
@@ -599,7 +598,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				// beside it; the half of the tab under the pointer picks the side.
 				key := t.tabKey(tb.Value)
 				if m := mark.Get(); m.key == key {
-					line := Div().asPart("Tabs.DropLine").Absolute().Top(0).Bottom(0).Style(st.DropLine)
+					line := Div().asPart("Tabs.DropLine").Absolute().Top(0).Bottom(0).styleOf(&st.DropLine)
 					if m.after {
 						line.Right(-3)
 					} else {
@@ -630,7 +629,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			}
 			if t.reorder {
 				label := tb.Label
-				tab.Dragging(source).OnDrag(Drag(tabDrag{scope: t.scope(), value: tb.Value}).Preview(func() Element {
+				tab.draggingOf(&source).OnDrag(Drag(tabDrag{scope: t.scope(), value: tb.Value}).Preview(func() Element {
 					return Div().Padding(6).Background(th.Surface).Border(1, th.Border).Child(Text(label))
 				}).End(func(DragEnd) { setMark(tabDropMark{}) }))
 			}
@@ -641,7 +640,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				tab.TabStop(false) // reached with the arrow keys, not Tab
 			}
 			if !on {
-				tab.Hover(st.TabHover)
+				tab.hoverOf(&st.TabHover)
 			}
 			if canClose(i) {
 				tab.OnMouseDown(func(e *MouseEvent) {
@@ -650,7 +649,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 					}
 				})
 			}
-			tab.Cursor(CursorPointer).Focusable().FocusVisible(st.TabFocusVisible).
+			tab.Cursor(CursorPointer).Focusable().focusVisibleOf(&st.TabFocusVisible).
 				OnClick(func() { choose(i) }).
 				OnKeyDown(func(e *KeyEvent) {
 					if e.Repeat || inPopup() {
@@ -709,7 +708,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				strip.Grow(1)
 			}
 		}
-		strip = t.size.apply(strip.Style(st.List))
+		strip = t.size.apply(strip.styleOf(&st.List))
 		if t.name != "" {
 			strip.Label(t.name)
 		}
@@ -767,7 +766,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				// nextEnabled wraps around, as TabView does for these keys.
 				choose(nextEnabled(opts, sel, dir, false))
 			}).
-			Child(t.bar(ctx, st, strip, inBar, e, watch, slot, tabs, sel, pick))
+			Child(t.bar(ctx, &st, strip, inBar, e, watch, slot, tabs, sel, pick))
 		if t.keep {
 			group.Children(t.keptPanels(ctx, tabs, sel, panels, st.Panel)...)
 		} else if sel >= 0 && tabs[sel].Panel != nil {
@@ -775,7 +774,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				// The panel is named by its tab: the label is its name, and LabelledBy
 				// links it to the tab for the relation.
 				group.Child(Div().asPart("Tabs.Panel").Key(t.scope() + "/panel").Column().Grow(1).MinHeight(Px(0)).
-					Role(access.RoleTabPanel).Label(tabs[sel].Label).Style(st.Panel).
+					Role(access.RoleTabPanel).Label(tabs[sel].Label).styleOf(&st.Panel).
 					LabelledBy(t.tabKey(tabs[sel].Value)).Child(p))
 			}
 		}
@@ -802,13 +801,13 @@ type tabsView[T comparable] struct {
 // the overflow menu's button and the suffix. The scroll buttons stay in the bar
 // while the tabs fit, hidden by Display, so that nothing after them is built anew
 // when they appear.
-func (t *TabsElement[T]) bar(ctx *Context, st TabsStyle, strip *DivElement, inBar bool, e tabsExtent,
+func (t *TabsElement[T]) bar(ctx *Context, st *TabsStyle, strip *DivElement, inBar bool, e tabsExtent,
 	watch, slot *extentWatch, tabs []Tab[T], sel int, pick func(int)) Element {
 	if !inBar {
 		return strip
 	}
 	strs := ctx.Strings()
-	bar := Div().asPart("Tabs.Bar").Key(t.scope() + "/bar").Style(st.Bar)
+	bar := Div().asPart("Tabs.Bar").Key(t.scope() + "/bar").styleOf(&st.Bar)
 	if t.prefix != nil {
 		bar.Child(t.prefix)
 	}
@@ -821,9 +820,9 @@ func (t *TabsElement[T]) bar(ctx *Context, st TabsStyle, strip *DivElement, inBa
 			return func() { watch.scrollBy(dir * 0.75 * watch.last[2]) }
 		}
 		back := IconButton(icons.ChevronLeft).Small().Label(strs.ScrollTabsBack).Key("back").
-			Disabled(!e.back).Style(st.ScrollButton).OnClick(step(-1))
+			Disabled(!e.back).styleOf(&st.ScrollButton).OnClick(step(-1))
 		fwd := IconButton(icons.ChevronRight).Small().Label(strs.ScrollTabsForward).Key("forward").
-			Disabled(!e.forward).Style(st.ScrollButton).OnClick(step(1))
+			Disabled(!e.forward).styleOf(&st.ScrollButton).OnClick(step(1))
 		back.noFocus, fwd.noFocus = true, true
 		buttons := Div().Key(t.scope() + "/scroll").Row().Align(Center).Gap(2).KeepFocus().
 			Display(e.over).Child(back).Child(fwd)
@@ -831,7 +830,7 @@ func (t *TabsElement[T]) bar(ctx *Context, st TabsStyle, strip *DivElement, inBa
 		bar.Child(buttons)
 	}
 	if t.menu {
-		trigger := IconButton(icons.MoreHorizontal).Small().Label(strs.AllTabs).Key("all").Style(st.MenuButton)
+		trigger := IconButton(icons.MoreHorizontal).Small().Label(strs.AllTabs).Key("all").styleOf(&st.MenuButton)
 		bar.Child(DropdownMenu(trigger, func() []MenuItem {
 			items := make([]MenuItem, len(tabs))
 			for i, tb := range tabs {
@@ -889,8 +888,9 @@ func arrangeTabs[T comparable](tabs []Tab[T], order []T) []Tab[T] {
 // first field or button, and it closes on a click outside it and on Escape.
 func (t *TabsElement[T]) popupPanel(ctx *Context, tb Tab[T], h *FocusHandle, entering *Signal[bool], closeFn func()) Element {
 	rt := ctx.rt
-	st := resolvePopover(ctx, PopoverStyle{})
-	return Div().asPart("Popover.Panel").Overlay(BelowStart).OverlayGap(6).Style(st.Panel).
+	var st PopoverStyle
+	resolvePopover(ctx, &PopoverStyle{}, &st)
+	return Div().asPart("Popover.Panel").Overlay(BelowStart).OverlayGap(6).styleOf(&st.Panel).
 		Role(access.RoleDialog).Label(tb.Label).
 		Focusable().TabStop(false).AutoFocus().FocusHandle(h).
 		OnFocus(func() {
@@ -927,7 +927,7 @@ func (t *TabsElement[T]) keptPanels(ctx *Context, tabs []Tab[T], sel int, panels
 		}
 		// Each panel has its own key, and is named by its tab as the panel is by default.
 		out = append(out, Div().asPart("Tabs.Panel").Key(t.scope()+"/panel:"+fmt.Sprint(tb.Value)).Column().Grow(1).MinHeight(Px(0)).
-			Role(access.RoleTabPanel).Label(tb.Label).Display(i == sel).Style(panel).
+			Role(access.RoleTabPanel).Label(tb.Label).Display(i == sel).styleOf(&panel).
 			LabelledBy(t.tabKey(tb.Value)).Child(pc))
 	}
 	return out

@@ -183,7 +183,7 @@ func TestDataGridSelectedRowIsNotBold(t *testing.T) {
 	if !found {
 		t.Fatal("the selected row is not built")
 	}
-	if w := dataGridDefaults(DarkTheme(), DataGridComfortable, 1).HeaderCellSorted.FontWeight; w != 0 {
+	if w := look(func(st *DataGridStyle) { dataGridDefaults(st, DarkTheme(), DataGridComfortable, 1) }).HeaderCellSorted.FontWeight; w != 0 {
 		t.Errorf("the sorted header has weight %v, want the default", w)
 	}
 }

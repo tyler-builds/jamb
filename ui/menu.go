@@ -115,11 +115,11 @@ type MenuStyle struct {
 	SubmenuChevron  Style // the arrow of a row that opens a submenu
 }
 
-// menuDefaults returns the built-in look of a menu, from the colors of t. Under
+// menuDefaults sets d to the built-in look of a menu, from the colors of t. Under
 // high contrast the highlighted row is the Highlight color with HighlightText on
 // it, since the soft tint of the normal theme is the window color there.
-func menuDefaults(t *Theme) MenuStyle {
-	d := MenuStyle{
+func menuDefaults(d *MenuStyle, t *Theme) {
+	*d = MenuStyle{
 		Panel: Style{Padding: All(4), MinWidth: Px(200), Background: t.Surface, BorderWidth: 1,
 			BorderColor: t.Border, Radius: t.Radius, Shadows: []Shadow{ShadowMd}},
 		Item: Style{Direction: Row, Align: Center, Gap: 8, MinHeight: Px(28), Padding: XY(8, 0),
@@ -136,18 +136,16 @@ func menuDefaults(t *Theme) MenuStyle {
 	if t.HighContrast {
 		d.ItemHighlighted = Style{Background: t.Accent, TextColor: t.AccentText}
 	}
-	return d
 }
 
-// resolveMenu returns the look of a menu: the defaults, merged with the theme's
+// resolveMenu sets st to the look of a menu: the defaults, merged with the theme's
 // Menu and then the instance's Styles. Under high contrast the two overrides are
 // plain (see plainStyle).
-func resolveMenu(ctx *Context, inst MenuStyle) MenuStyle {
+func resolveMenu(ctx *Context, inst, st *MenuStyle) {
 	t := ctx.Theme()
-	st := menuDefaults(t)
+	menuDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Menu), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Menu), instanceLayer(inst))
 }
 
 // TopMenu is one menu of a MenuBar: the label on the bar, and the function that
@@ -423,7 +421,7 @@ func (m *menuView) box(k int, items []MenuItem, path []int) *DivElement {
 	for _, it := range items {
 		gutter = gutter || it.Icon != nil || it.Check != MenuCheckNone
 	}
-	d := Div().asPart("Menu.Panel").Style(m.st.Panel).
+	d := Div().asPart("Menu.Panel").styleOf(&m.st.Panel).
 		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: m.t.Motion.enter(140 * time.Millisecond)}).
 		Exit(Fade().Grow(0.98), Animation{Duration: m.t.Motion.exit(90 * time.Millisecond)}).
 		Role(access.RoleMenu)
@@ -439,14 +437,14 @@ func (m *menuView) box(k int, items []MenuItem, path []int) *DivElement {
 func (m *menuView) row(k, i int, it MenuItem, path []int, gutter bool) Element {
 	switch it.Kind {
 	case MenuKindSeparator:
-		return Div().asPart("Menu.Separator").Style(m.st.Separator).Role(access.RoleSeparator)
+		return Div().asPart("Menu.Separator").styleOf(&m.st.Separator).Role(access.RoleSeparator)
 	case MenuKindSection:
-		return Div().asPart("Menu.SectionLabel").Style(m.st.SectionLabel).
+		return Div().asPart("Menu.SectionLabel").styleOf(&m.st.SectionLabel).
 			Child(Text(it.text()).NoWrap())
 	}
 	on := it.selectable()
 	hl := k < len(path) && path[k] == i
-	r := Div().asPart("Menu.Item").Keyf("jamb.menu.%d.%d", k, i).Style(m.st.Item)
+	r := Div().asPart("Menu.Item").Keyf("jamb.menu.%d.%d", k, i).styleOf(&m.st.Item)
 	// The name is the label alone: the shortcut is shown, but assistive technology
 	// reads the label, as a menu does.
 	a := r.access()
@@ -466,20 +464,20 @@ func (m *menuView) row(k, i int, it MenuItem, path []int, gutter bool) Element {
 		}
 	}
 	if !on {
-		r.Style(m.st.ItemDisabled)
+		r.styleOf(&m.st.ItemDisabled)
 	}
 	if hl && on {
-		r.Style(m.st.ItemHighlighted)
+		r.styleOf(&m.st.ItemHighlighted)
 	}
 	if gutter {
 		r.Child(m.mark(it))
 	}
 	r.Child(Text(it.text()).NoWrap()).Child(Spacer())
 	if sc := m.shortcut(it); sc != "" {
-		r.Child(Div().asPart("Menu.Shortcut").Style(m.st.Shortcut).Child(Text(sc).NoWrap()))
+		r.Child(Div().asPart("Menu.Shortcut").styleOf(&m.st.Shortcut).Child(Text(sc).NoWrap()))
 	}
 	if len(it.Submenu) > 0 {
-		r.Child(Div().asPart("Menu.SubmenuChevron").Style(m.st.SubmenuChevron).Child(Icon(icons.ChevronRight).Size(14)))
+		r.Child(Div().asPart("Menu.SubmenuChevron").styleOf(&m.st.SubmenuChevron).Child(Icon(icons.ChevronRight).Size(14)))
 	}
 	r.OnMouseEnter(func() { m.hover(k, i) })
 	if on {
@@ -495,7 +493,7 @@ func (m *menuView) row(k, i int, it MenuItem, path []int, gutter bool) Element {
 // icon.
 func (m *menuView) mark(it MenuItem) Element {
 	t := m.t
-	slot := Div().asPart("Menu.Check").Style(m.st.Check)
+	slot := Div().asPart("Menu.Check").styleOf(&m.st.Check)
 	switch {
 	case it.Check == MenuCheckRadio && it.Checked:
 		slot.Child(Div().Size(Px(6), Px(6)).Radius(3).Background(t.Text))
@@ -569,13 +567,17 @@ func (*DropdownMenuElement) isElement() {}
 // Styles sets the look of the parts of the menu, for this instance only. Set
 // fields win over the theme's Menu and the defaults; see MenuStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (dm *DropdownMenuElement) Styles(st MenuStyle) *DropdownMenuElement {
-	dm.styles.mergeFrom(&st, false)
+func (dm *DropdownMenuElement) Styles(st MenuStyle) *DropdownMenuElement { return dm.stylesOf(&st) }
+
+func (dm *DropdownMenuElement) stylesOf(st *MenuStyle) *DropdownMenuElement {
+	dm.styles.mergeFrom(st, false)
 	return dm
 }
 
 func (dm *DropdownMenuElement) expand(ctx *Context) Element {
-	trigger, build, styles := dm.trigger, dm.build, dm.styles
+	trigger, build := dm.trigger, dm.build
+	styles := new(MenuStyle)
+	copyLarge(styles, &dm.styles)
 	return Component(func(ctx *Context) Element {
 		rt, t := ctx.rt, ctx.Theme()
 		open := Local(ctx, "open", false)
@@ -633,8 +635,8 @@ func (dm *DropdownMenuElement) expand(ctx *Context) Element {
 			d.access().focusInside = !b.disabled
 		}
 		if open.Get() {
-			m := &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: closeMenu, label: name,
-				st: resolveMenu(ctx, styles)}
+			m := &menuView{ctx: ctx, t: t, items: items.Get(), path: path, close: closeMenu, label: name}
+			resolveMenu(ctx, styles, &m.st)
 			d.Child(m.top(4))
 		}
 		return d
@@ -898,7 +900,8 @@ func contextMenuAt(rt *Runtime, c *contextMenu) Element {
 		Component(func(ctx *Context) Element {
 			m := &menuView{ctx: ctx, t: ctx.Theme(), items: c.items,
 				path:  Local(ctx, "path", highlightPath(c.items, c.keyboard)),
-				close: rt.closeContextMenu, label: c.label, st: resolveMenu(ctx, MenuStyle{})}
+				close: rt.closeContextMenu, label: c.label}
+			resolveMenu(ctx, &MenuStyle{}, &m.st)
 			return m.top(0)
 		}))
 }

@@ -96,11 +96,13 @@ func (l *ListElement) Key(k string) *ListElement { l.key = k; return l }
 func (l *ListElement) Label(name string) *ListElement { l.label = name; return l }
 
 // Style is merged into the scroll container: size it with Height, Grow or MaxHeight.
-func (l *ListElement) Style(s Style) *ListElement { l.style = l.style.Merge(s); return l }
+func (l *ListElement) Style(s Style) *ListElement { return l.styleOf(&s) }
+
+func (l *ListElement) styleOf(s *Style) *ListElement { l.style.mergeFrom(s, false); return l }
 
 // LayoutSpring moves the list to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
-func (l *ListElement) LayoutSpring(s Spring) *ListElement { return l.Style(Style{LayoutSpring: s}) }
+func (l *ListElement) LayoutSpring(s Spring) *ListElement { return l.styleOf(&Style{LayoutSpring: s}) }
 
 // Handle connects h so the list can be scrolled from code.
 func (l *ListElement) Handle(h *ListHandle) *ListElement { l.handle = h; return l }
@@ -329,7 +331,7 @@ func (l *ListElement) expand(ctx *Context) Element {
 	}
 	vs.rows = rows
 	vs.builtFrom, vs.built = from, to
-	container := l.size.apply(Div().ScrollY().Style(l.style)).Role(access.RoleList)
+	container := l.size.apply(Div().ScrollY().styleOf(&l.style)).Role(access.RoleList)
 	if l.label != "" {
 		container.Label(l.label)
 	}

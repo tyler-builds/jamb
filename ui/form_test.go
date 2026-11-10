@@ -403,38 +403,50 @@ func TestEveryControlReportsItsRequiredState(t *testing.T) {
 }
 
 func TestMessagesLookAlikeInANumberInputAndAField(t *testing.T) {
-	if !reflect.DeepEqual(messageStyle(DarkTheme()), numberInputDefaults(DarkTheme(), SpinInline, 1, false, false, sizeDefault).Message) {
+	if !reflect.DeepEqual(messageStyle(DarkTheme()), look(func(st *NumberInputStyle) {
+		numberInputDefaults(st, DarkTheme(), SpinInline, 1, false, false, sizeDefault)
+	}).Message) {
 		t.Fatal("a number input's message and a field's error have different looks")
 	}
-	if !reflect.DeepEqual(messageStyle(DarkTheme()), formFieldDefaults(DarkTheme()).Error) {
+	if !reflect.DeepEqual(messageStyle(DarkTheme()), look(func(st *FormFieldStyle) { formFieldDefaults(st, DarkTheme()) }).Error) {
 		t.Fatal("a field's error is not the shared message look")
 	}
+}
+
+// formFieldLook returns the look of a form field with the instance's styles.
+func formFieldLook(ctx *Context, inst FormFieldStyle) FormFieldStyle {
+	var st FormFieldStyle
+	resolveFormField(ctx, &inst, &st)
+	return st
 }
 
 func TestFormPartsResolveInOrder(t *testing.T) {
 	th := DarkTheme().Clone()
 	th.FormField = FormFieldStyle{Label: Style{TextColor: Hex("#111111")}}
-	if got := resolveFormField(layerCtx(th), FormFieldStyle{}).Label.TextColor; got != Hex("#111111") {
+	if got := formFieldLook(layerCtx(th), FormFieldStyle{}).Label.TextColor; got != Hex("#111111") {
 		t.Fatalf("theme label color = %v, want the theme's", got)
 	}
-	if got := resolveFormField(layerCtx(th), FormFieldStyle{Label: Style{TextColor: Hex("#222222")}}).Label.TextColor; got != Hex("#222222") {
+	if got := formFieldLook(layerCtx(th), FormFieldStyle{Label: Style{TextColor: Hex("#222222")}}).Label.TextColor; got != Hex("#222222") {
 		t.Fatalf("instance label color = %v, want the instance's", got)
 	}
-	if got := resolveFormField(layerCtx(th), FormFieldStyle{Label: Style{Clear: ClearTextColor}}).Label.TextColor; !got.IsZero() {
+	if got := formFieldLook(layerCtx(th), FormFieldStyle{Label: Style{Clear: ClearTextColor}}).Label.TextColor; !got.IsZero() {
 		t.Fatalf("a cleared label color = %v, want none", got)
 	}
 }
 
 func TestFormPartsFollowHighContrast(t *testing.T) {
 	hc := HighContrastTheme(HighContrastBlack(), DarkTheme())
-	st := resolveFormField(layerCtx(hc), FormFieldStyle{Label: Style{TextColor: Hex("#222222")}})
+	var st FormFieldStyle
+	resolveFormField(layerCtx(hc), &FormFieldStyle{Label: Style{TextColor: Hex("#222222")}}, &st)
 	if st.Label.TextColor != hc.Text {
 		t.Fatalf("a label under high contrast is %v, want the system text color", st.Label.TextColor)
 	}
 	if got := messageIconColor(hc, Style{}); got != hc.Text {
 		t.Fatalf("the error icon under high contrast is %v, want the system text color", got)
 	}
-	if got := resolveForm(layerCtx(hc), FormStyle{Summary: Style{BorderColor: Hex("#333333")}}).Summary.BorderColor; got != hc.Text {
+	var form FormStyle
+	resolveForm(layerCtx(hc), &FormStyle{Summary: Style{BorderColor: Hex("#333333")}}, &form)
+	if got := form.Summary.BorderColor; got != hc.Text {
 		t.Fatalf("the summary border under high contrast is %v, want the system text color", got)
 	}
 }

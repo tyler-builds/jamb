@@ -64,12 +64,12 @@ type CommandPaletteStyle struct {
 	Empty Style
 }
 
-// commandPaletteDefaults returns the built-in look of a command palette, from the
+// commandPaletteDefaults sets d to the built-in look of a command palette, from the
 // colors of t: the panel of a modal, and the rows of a menu. The highlighted row is
 // the Highlight color under high contrast and a soft accent otherwise, as a menu's
 // highlighted item is.
-func commandPaletteDefaults(t *Theme) CommandPaletteStyle {
-	d := CommandPaletteStyle{
+func commandPaletteDefaults(d *CommandPaletteStyle, t *Theme) {
+	*d = CommandPaletteStyle{
 		Panel: Style{Direction: Column, Width: Px(520), Background: t.Surface, BorderWidth: 1, BorderColor: t.Border,
 			Radius: 10, Shadows: []Shadow{ShadowLg}, Padding: All(6), Gap: 4},
 		Input: Style{Direction: Row, Align: Center, Padding: XY(10, 8)},
@@ -88,18 +88,16 @@ func commandPaletteDefaults(t *Theme) CommandPaletteStyle {
 	} else {
 		d.ItemHighlighted = Style{Background: t.AccentSoft}
 	}
-	return d
 }
 
-// resolveCommandPalette returns the parts of a command palette: the defaults, merged
+// resolveCommandPalette sets st to the parts of a command palette: the defaults, merged
 // with the theme's CommandPalette and then the instance's Styles. Under high contrast
 // the two overrides are plain (see plainStyle).
-func resolveCommandPalette(ctx *Context, inst CommandPaletteStyle) CommandPaletteStyle {
+func resolveCommandPalette(ctx *Context, inst, st *CommandPaletteStyle) {
 	t := ctx.Theme()
-	st := commandPaletteDefaults(t)
+	commandPaletteDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.CommandPalette), instanceLayer(&inst))
-	return st
+		themeLayer(&t.CommandPalette), instanceLayer(inst))
 }
 
 // CommandPaletteElement is a floating panel that lists commands to run: a search
@@ -240,7 +238,11 @@ func (p *CommandPaletteElement) ItemsOnly() *CommandPaletteElement {
 // CommandPaletteStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (p *CommandPaletteElement) Styles(st CommandPaletteStyle) *CommandPaletteElement {
-	p.styles.mergeFrom(&st, false)
+	return p.stylesOf(&st)
+}
+
+func (p *CommandPaletteElement) stylesOf(st *CommandPaletteStyle) *CommandPaletteElement {
+	p.styles.mergeFrom(st, false)
 	return p
 }
 
@@ -360,7 +362,8 @@ func (p *CommandPaletteElement) expand(ctx *Context) Element {
 				query: NewSignal(""), hl: NewSignal(0)}
 		}
 		t := ctx.Theme()
-		st := resolveCommandPalette(ctx, p.styles)
+		var st CommandPaletteStyle
+		resolveCommandPalette(ctx, &p.styles, &st)
 		strs := ctx.Strings()
 		query := s.query.Get()
 		vis := p.entries(s.cmds, query)
@@ -420,7 +423,7 @@ func (p *CommandPaletteElement) expand(ctx *Context) Element {
 				}
 			}).
 			OnAction(commandPaletteClose, func() { closeFn(true) }).
-			Child(Div().asPart("CommandPalette.Input").Style(st.Input).Child(field))
+			Child(Div().asPart("CommandPalette.Input").styleOf(&st.Input).Child(field))
 		a := combo.access()
 		a.value = query
 		// Collapse from assistive technology closes the palette, as Escape does.
@@ -433,12 +436,12 @@ func (p *CommandPaletteElement) expand(ctx *Context) Element {
 		reveal := s.reveal
 		s.reveal = 0
 		maxH := float32(p.maxRows)*commandPaletteRowHeight*textScale(ctx) + float32(p.maxRows-1)*st.List.Gap
-		list := Div().asPart("CommandPalette.List").Style(st.List).MaxHeight(Px(maxH)).ScrollY().
+		list := Div().asPart("CommandPalette.List").styleOf(&st.List).MaxHeight(Px(maxH)).ScrollY().
 			Role(access.RoleList).SelectionContainer().Label(strs.CommandPalette)
 		words := strings.Fields(query)
 		match := Highlight{Color: st.Match.TextColor, Background: st.Match.Background, Underline: t.HighContrast}
 		for i, e := range vis {
-			list.Child(p.row(ctx, st, e, words, match, i == hl, i == reveal-1, func() { s.hl.Set(i) }, run))
+			list.Child(p.row(ctx, &st, e, words, match, i == hl, i == reveal-1, func() { s.hl.Set(i) }, run))
 		}
 		combo.Child(list)
 		if len(vis) == 0 {
@@ -446,11 +449,11 @@ func (p *CommandPaletteElement) expand(ctx *Context) Element {
 			if items, _, _ := p.sources(query); items {
 				msg = strs.NoResults // the app's items are listed too, so the message is not about commands
 			}
-			combo.Child(Div().asPart("CommandPalette.Empty").Style(st.Empty).Child(Text(msg)))
+			combo.Child(Div().asPart("CommandPalette.Empty").styleOf(&st.Empty).Child(Text(msg)))
 		}
 
 		panel := Div().asPart("CommandPalette.Panel").Key("jamb.palette").KeyContext("CommandPalette").
-			Overlay(BelowCenter).Style(st.Panel).
+			Overlay(BelowCenter).styleOf(&st.Panel).
 			Role(access.RoleDialog).Label(strs.CommandPalette).
 			Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: t.Motion.enter(140 * time.Millisecond)}).
 			Exit(Fade().Grow(0.98), Animation{Duration: t.Motion.exit(90 * time.Millisecond)}).
@@ -468,7 +471,7 @@ func (p *CommandPaletteElement) expand(ctx *Context) Element {
 // row is one row of the list: its name, with the matches of the query highlighted. A
 // command shows its key binding at the right; an item shows its icon before the name
 // and its detail after it.
-func (p *CommandPaletteElement) row(ctx *Context, st CommandPaletteStyle, e paletteEntry, words []string, match Highlight,
+func (p *CommandPaletteElement) row(ctx *Context, st *CommandPaletteStyle, e paletteEntry, words []string, match Highlight,
 	hi, reveal bool, highlight func(), run func(paletteEntry)) Element {
 	style := st.Item
 	if hi {
@@ -480,24 +483,24 @@ func (p *CommandPaletteElement) row(ctx *Context, st CommandPaletteStyle, e pale
 			label.Highlight(r[0], r[1], match)
 		}
 	}
-	r := Div().asPart("CommandPalette.Item").Key(e.key()).Style(style).
+	r := Div().asPart("CommandPalette.Item").Key(e.key()).styleOf(&style).
 		Role(access.RoleListItem).AccessSelected(hi).Label(e.label())
 	if e.item != nil && e.item.Icon != nil {
 		r.Child(Icon(e.item.Icon).Size(16))
 	}
-	r.Child(Div().asPart("CommandPalette.Label").Style(st.Label).Child(label))
+	r.Child(Div().asPart("CommandPalette.Label").styleOf(&st.Label).Child(label))
 	r.revealRow = reveal
 	r.access().highlighted = hi
 	if e.item != nil {
 		if d := e.item.Detail; d != "" {
 			// The detail is read after the name, as the description of the row.
 			r.Description(d)
-			r.Child(Div().asPart("CommandPalette.Detail").Style(st.Detail).Child(Text(d).NoWrap().Truncate()))
+			r.Child(Div().asPart("CommandPalette.Detail").styleOf(&st.Detail).Child(Text(d).NoWrap().Truncate()))
 		}
 	} else if keys := ctx.KeysFor(e.act); keys != "" {
 		// The binding is read after the name, as the description of the row.
 		r.Description(keys)
-		r.Child(Div().asPart("CommandPalette.Keys").Style(st.Keys).Child(Text(keys).NoWrap()))
+		r.Child(Div().asPart("CommandPalette.Keys").styleOf(&st.Keys).Child(Text(keys).NoWrap()))
 	}
 	return r.OnMouseEnter(highlight).OnClick(func() { run(e) })
 }

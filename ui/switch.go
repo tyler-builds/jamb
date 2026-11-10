@@ -28,13 +28,13 @@ type SwitchStyle struct {
 	Label             Style // the text beside the track, with ShowLabel
 }
 
-// switchDefaults returns the built-in look of a switch that is on or off and
+// switchDefaults sets d to the built-in look of a switch that is on or off and
 // disabled or not, from the colors of t. Under high contrast the track is an
 // outlined empty track, or a solid Highlight track when on, with the knob in the
 // text color (AccentText when on); a disabled switch is GrayText and not dimmed.
-func switchDefaults(t *Theme, on, disabled bool) SwitchStyle {
+func switchDefaults(d *SwitchStyle, t *Theme, on, disabled bool) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := SwitchStyle{
+	*d = SwitchStyle{
 		Track: Style{Width: Px(38), Height: Px(22), NoShrink: true, Radius: 11,
 			Background: t.SurfaceActive},
 		TrackChecked:      Style{Background: t.Accent},
@@ -71,18 +71,16 @@ func switchDefaults(t *Theme, on, disabled bool) SwitchStyle {
 			d.Label.Opacity = 0.5
 		}
 	}
-	return d
 }
 
-// resolveSwitch returns the look of a switch: the defaults for its state, merged
+// resolveSwitch sets st to the look of a switch: the defaults for its state, merged
 // with the theme's Switch and then the instance's Styles. Under high contrast the
 // two overrides are plain (see plainStyle).
-func resolveSwitch(ctx *Context, on, disabled bool, inst SwitchStyle) SwitchStyle {
+func resolveSwitch(ctx *Context, on, disabled bool, inst, st *SwitchStyle) {
 	t := ctx.Theme()
-	st := switchDefaults(t, on, disabled)
+	switchDefaults(st, t, on, disabled)
 	st.layered(ctx,
-		themeLayer(&t.Switch), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Switch), instanceLayer(inst))
 }
 
 // SwitchElement is an on/off switch bound to a bool signal. It is drawn as a
@@ -162,29 +160,32 @@ func (s *SwitchElement) GridSpan(cols, rows int) *SwitchElement { s.size.setSpan
 // Styles sets the look of the parts of the switch, for this instance only. Set
 // fields win over the theme's Switch and the defaults; see SwitchStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (s *SwitchElement) Styles(st SwitchStyle) *SwitchElement {
-	s.styles.mergeFrom(&st, false)
+func (s *SwitchElement) Styles(st SwitchStyle) *SwitchElement { return s.stylesOf(&st) }
+
+func (s *SwitchElement) stylesOf(st *SwitchStyle) *SwitchElement {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
 func (s *SwitchElement) expand(ctx *Context) Element {
 	on := s.on.Get()
-	st := resolveSwitch(ctx, on, s.disabled, s.styles)
-	d := Div().asPart("Switch.Track").Style(st.Track).
+	var st SwitchStyle
+	resolveSwitch(ctx, on, s.disabled, &s.styles, &st)
+	d := Div().asPart("Switch.Track").styleOf(&st.Track).
 		Role(access.RoleSwitch).Label(s.label).AccessChecked(on)
 	d.spaceOnly = true // Enter goes on to the modal default button, as on Windows
 	if on {
-		d.Style(st.TrackChecked)
+		d.styleOf(&st.TrackChecked)
 	}
 	// The knob sits 3 px in from the end it is at, so the track can be any width.
-	k := Div().asPart("Switch.Knob").Style(st.Knob).Absolute().Top(3)
+	k := Div().asPart("Switch.Knob").styleOf(&st.Knob).Absolute().Top(3)
 	if on {
-		k.Right(3).Style(st.KnobChecked)
+		k.Right(3).styleOf(&st.KnobChecked)
 	} else {
 		k.Left(3)
 	}
 	if s.disabled {
-		k.Style(st.KnobDisabled)
+		k.styleOf(&st.KnobDisabled)
 	}
 	d.Child(k)
 	// A tooltip also shows on a disabled switch, to say why it is disabled.
@@ -196,26 +197,26 @@ func (s *SwitchElement) expand(ctx *Context) Element {
 		}
 	}
 	if s.disabled {
-		d.Style(st.TrackDisabled).Cursor(CursorNotAllowed)
+		d.styleOf(&st.TrackDisabled).Cursor(CursorNotAllowed)
 		d.access().disabled = true
-		return s.withLabel(st, s.size.apply(d), nil)
+		return s.withLabel(&st, s.size.apply(d), nil)
 	}
-	d.Hover(st.TrackHover)
+	d.hoverOf(&st.TrackHover)
 	if s.focusHandle != nil {
 		d.FocusHandle(s.focusHandle)
 	}
-	return s.withLabel(st, s.size.apply(d.Cursor(CursorPointer).Focusable().FocusVisible(st.TrackFocusVisible).
+	return s.withLabel(&st, s.size.apply(d.Cursor(CursorPointer).Focusable().focusVisibleOf(&st.TrackFocusVisible).
 		OnClick(toggle)), toggle)
 }
 
 // withLabel returns track, in a row with the label beside it when ShowLabel is
 // set. A click on the label runs toggle, unless it is nil. The label is hidden from
 // assistive technology, which reads it as the track's name.
-func (s *SwitchElement) withLabel(st SwitchStyle, track Element, toggle func()) Element {
+func (s *SwitchElement) withLabel(st *SwitchStyle, track Element, toggle func()) Element {
 	if !s.showLabel {
 		return track
 	}
-	label := Div().asPart("Switch.Label").Style(st.Label).AccessHidden().Child(Text(s.label))
+	label := Div().asPart("Switch.Label").styleOf(&st.Label).AccessHidden().Child(Text(s.label))
 	if toggle != nil {
 		label.Cursor(CursorPointer).OnClick(toggle)
 	} else {

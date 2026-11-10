@@ -44,14 +44,14 @@ type CarouselStyle struct {
 	DotDisabled     Style // each dot when the carousel is disabled
 }
 
-// carouselDefaults returns the built-in look of a carousel, from the colors of t. A dot
+// carouselDefaults sets d to the built-in look of a carousel, from the colors of t. A dot
 // is a 10 px circle in TextSubtle, 14 px from the next, so that the dots keep the spacing
 // of a 24 px target; the current one is a pill in the accent color. Under high contrast
 // the dots are the text color and the current one Highlight, a disabled carousel is not
 // dimmed, and its dots are GrayText.
-func carouselDefaults(t *Theme) CarouselStyle {
+func carouselDefaults(d *CarouselStyle, t *Theme) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := CarouselStyle{
+	*d = CarouselStyle{
 		Root:         Style{Direction: Column, Gap: 8},
 		RootDisabled: Style{Opacity: 0.5},
 		Viewport: Style{Direction: Column, Grow: 1, Radius: t.Radius,
@@ -73,18 +73,16 @@ func carouselDefaults(t *Theme) CarouselStyle {
 		d.DotHover = Style{Background: t.Accent}
 		d.DotDisabled = Style{Background: t.Disabled}
 	}
-	return d
 }
 
-// resolveCarousel returns the look of a carousel: the defaults, merged with the theme's
+// resolveCarousel sets st to the look of a carousel: the defaults, merged with the theme's
 // Carousel and then the instance's Styles. Under high contrast the overrides are plain
 // (see plainStyle).
-func resolveCarousel(ctx *Context, inst CarouselStyle) CarouselStyle {
+func resolveCarousel(ctx *Context, inst, st *CarouselStyle) {
 	t := ctx.Theme()
-	st := carouselDefaults(t)
+	carouselDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Carousel), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Carousel), instanceLayer(inst))
 }
 
 // CarouselElement shows slides one at a time, bound to the index of the slide shown, from
@@ -201,8 +199,10 @@ func (c *CarouselElement) GridSpan(cols, rows int) *CarouselElement {
 // Styles sets the look of the parts of the carousel, for this instance only. Set fields
 // win over the theme's Carousel and the defaults; see CarouselStyle and docs/styling.md.
 // Calling Styles again merges with the earlier values.
-func (c *CarouselElement) Styles(st CarouselStyle) *CarouselElement {
-	c.styles.mergeFrom(&st, false)
+func (c *CarouselElement) Styles(st CarouselStyle) *CarouselElement { return c.stylesOf(&st) }
+
+func (c *CarouselElement) stylesOf(st *CarouselStyle) *CarouselElement {
+	c.styles.mergeFrom(st, false)
 	return c
 }
 
@@ -243,7 +243,8 @@ func (c *CarouselElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		rt := ctx.rt
 		s := ctx.Strings()
-		st := resolveCarousel(ctx, c.styles)
+		var st CarouselStyle
+		resolveCarousel(ctx, &c.styles, &st)
 		run := Local(ctx, "run", &carouselRun{last: -1}).Peek()
 		dot := Local(ctx, "dot", NewFocusHandle()).Peek()
 		if c.focusHandle != nil {
@@ -269,7 +270,7 @@ func (c *CarouselElement) expand(ctx *Context) Element {
 		if name == "" {
 			name = s.Carousel
 		}
-		root := Div().asPart("Carousel.Root").Style(st.Root).Role(access.RoleGroup).Label(name).Tooltip(c.tooltip)
+		root := Div().asPart("Carousel.Root").styleOf(&st.Root).Role(access.RoleGroup).Label(name).Tooltip(c.tooltip)
 		if c.key != "" {
 			root.Key(c.key)
 		}
@@ -279,7 +280,7 @@ func (c *CarouselElement) expand(ctx *Context) Element {
 			root.Description(s.Carousel)
 		}
 		if c.disabled {
-			root.Style(st.RootDisabled)
+			root.styleOf(&st.RootDisabled)
 		}
 		if !run.watched {
 			run.watched = true
@@ -340,45 +341,45 @@ func (c *CarouselElement) expand(ctx *Context) Element {
 		// Only the slide shown is built, so the others are not drawn and not in the
 		// accessibility tree. A new key for each slide makes it a new element, which
 		// enters; reduced motion turns the entrance off.
-		slide := Div().asPart("Carousel.Slide").Key(fmt.Sprintf("slide:%d", idx)).Style(st.Slide).
+		slide := Div().asPart("Carousel.Slide").Key(fmt.Sprintf("slide:%d", idx)).styleOf(&st.Slide).
 			Role(access.RoleGroup).Label(s.SlideOf(idx+1, n)).Child(c.slides[idx])
 		if entering {
 			slide.Enter(Fade().Slide(carouselShift*run.dir, 0), Animation{Duration: carouselMotion})
 		}
-		root.Child(Div().asPart("Carousel.Viewport").Style(st.Viewport).Child(slide))
+		root.Child(Div().asPart("Carousel.Viewport").styleOf(&st.Viewport).Child(slide))
 
 		_, canPrev := stepOf(idx, -1, n, c.loop)
 		_, canNext := stepOf(idx, 1, n, c.loop)
 		nav := func(ic *icons.Icon, label string, on bool, by int) *DivElement {
-			return Div().asPart("Carousel.NavButton").Style(st.NavButton).
+			return Div().asPart("Carousel.NavButton").styleOf(&st.NavButton).
 				Child(IconButton(ic).Label(label).Disabled(c.disabled || !on).OnClick(func() { move(by) }))
 		}
 		// The dots are a group in which the dot of the slide shown is selected. Only that
 		// dot is a Tab stop; the keys move the slide, and the focus with it.
-		dots := Div().asPart("Carousel.Dots").Style(st.Dots).Role(access.RoleGroup).Label(s.Slides).SelectionContainer()
+		dots := Div().asPart("Carousel.Dots").styleOf(&st.Dots).Role(access.RoleGroup).Label(s.Slides).SelectionContainer()
 		for i := range n {
-			d := Div().asPart("Carousel.Dot").Style(st.Dot).Role(access.RoleButton).Label(s.GoToSlide(i + 1)).
+			d := Div().asPart("Carousel.Dot").styleOf(&st.Dot).Role(access.RoleButton).Label(s.GoToSlide(i + 1)).
 				AccessSelected(i == idx)
 			if i == idx {
-				d.Style(st.DotCurrent)
+				d.styleOf(&st.DotCurrent)
 			}
 			switch {
 			case c.disabled:
-				d.Style(st.DotDisabled)
+				d.styleOf(&st.DotDisabled)
 				d.access().disabled = true
 			case i == idx:
-				d.FocusVisible(st.DotFocusVisible).FocusHandle(dot).OnClick(func() {})
+				d.focusVisibleOf(&st.DotFocusVisible).FocusHandle(dot).OnClick(func() {})
 			default:
 				dir := float32(1)
 				if i < idx {
 					dir = -1
 				}
-				d.Hover(st.DotHover).FocusVisible(st.DotFocusVisible).TabStop(false).Cursor(CursorPointer).
+				d.hoverOf(&st.DotHover).focusVisibleOf(&st.DotFocusVisible).TabStop(false).Cursor(CursorPointer).
 					OnClick(func() { show(i, dir, true) })
 			}
 			dots.Child(d)
 		}
-		controls := Div().asPart("Carousel.Controls").Style(st.Controls)
+		controls := Div().asPart("Carousel.Controls").styleOf(&st.Controls)
 		if c.autoPlay > 0 && n > 1 {
 			// The play button reads the choice, so that a press renders the carousel again.
 			play.Get()
@@ -387,7 +388,7 @@ func (c *CarouselElement) expand(ctx *Context) Element {
 			if !playing {
 				ic, label, next = icons.Play, s.PlaySlides, carouselPlaying
 			}
-			controls.Child(Div().asPart("Carousel.PlayPause").Style(st.PlayPause).
+			controls.Child(Div().asPart("Carousel.PlayPause").styleOf(&st.PlayPause).
 				Child(IconButton(ic).Label(label).Disabled(c.disabled).
 					OnClick(func() { play.Set(next) })))
 		}

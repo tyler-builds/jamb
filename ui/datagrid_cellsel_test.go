@@ -148,7 +148,8 @@ func TestDataGridCellSelectionFromAssistiveTechnology(t *testing.T) {
 	if got := dgCellNames(cells.Peek()); got != "i1/Name i2/N" {
 		t.Errorf("Select and AddToSelection selected %q, want i1/Name and i2/N", got)
 	}
-	st := resolveDataGrid(&Context{rt: r.rt}, DataGridComfortable, 1, DataGridStyle{})
+	var st DataGridStyle
+	resolveDataGrid(&Context{rt: r.rt}, DataGridComfortable, 1, &DataGridStyle{}, &st)
 	if got := dgCell(r, 2, 1).style.Background; got != st.CellSelected.Background {
 		t.Errorf("a selected cell has the background %v, want CellSelected's %v", got, st.CellSelected.Background)
 	}

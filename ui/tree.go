@@ -53,11 +53,11 @@ type TreeStyle struct {
 	Indent           float32 // the indent of each level below the top, in logical pixels
 }
 
-// treeDefaults returns the built-in look of a tree, from the colors of t. Under
+// treeDefaults sets d to the built-in look of a tree, from the colors of t. Under
 // high contrast the selected row is the Highlight color with HighlightText on it.
-func treeDefaults(t *Theme) TreeStyle {
+func treeDefaults(d *TreeStyle, t *Theme) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := TreeStyle{
+	*d = TreeStyle{
 		Row: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(26), NoShrink: true,
 			Radius: t.Radius / 2, Padding: Edges{Top: 2, Right: 8, Bottom: 2}, TextColor: t.Text},
 		RowHover:    Style{Background: t.SurfaceHover},
@@ -72,18 +72,16 @@ func treeDefaults(t *Theme) TreeStyle {
 	if t.HighContrast {
 		d.RowSelected = Style{Background: t.Accent, TextColor: t.AccentText}
 	}
-	return d
 }
 
-// resolveTree returns the look of a tree: the defaults, merged with the theme's
+// resolveTree sets st to the look of a tree: the defaults, merged with the theme's
 // Tree and then the instance's Styles. Under high contrast the two overrides
 // are plain (see plainStyle).
-func resolveTree(ctx *Context, inst TreeStyle) TreeStyle {
+func resolveTree(ctx *Context, inst, st *TreeStyle) {
 	t := ctx.Theme()
-	st := treeDefaults(t)
+	treeDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Tree), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Tree), instanceLayer(inst))
 }
 
 // TreeElement is a hierarchy of nodes that open and close, shown as a list of the
@@ -185,11 +183,15 @@ func (tv *TreeElement) Key(k string) *TreeElement { tv.key = k; return tv }
 func (tv *TreeElement) Label(name string) *TreeElement { tv.name = name; return tv }
 
 // Style is merged into the scroll container: size it with Height, Grow or MaxHeight.
-func (tv *TreeElement) Style(s Style) *TreeElement { tv.style = tv.style.Merge(s); return tv }
+func (tv *TreeElement) Style(s Style) *TreeElement { return tv.styleOf(&s) }
+
+func (tv *TreeElement) styleOf(s *Style) *TreeElement { tv.style.mergeFrom(s, false); return tv }
 
 // LayoutSpring moves the tree to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
-func (tv *TreeElement) LayoutSpring(s Spring) *TreeElement { return tv.Style(Style{LayoutSpring: s}) }
+func (tv *TreeElement) LayoutSpring(s Spring) *TreeElement {
+	return tv.styleOf(&Style{LayoutSpring: s})
+}
 
 // Styles sets the look of the parts of the tree, for this instance only. Set
 // fields win over the theme's Tree and the defaults; see TreeStyle and
@@ -512,7 +514,8 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		rt := ctx.rt
-		st := resolveTree(ctx, tv.styles)
+		var st TreeStyle
+		resolveTree(ctx, &tv.styles, &st)
 		sel := tv.selected.Get()
 		// The open keys are the app's signal when Expanded set one, else the tree's state.
 		store := Local(ctx, "open", []string(nil))
@@ -638,12 +641,12 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 		list := UniformList(len(rows), func(i int) Element {
 			return tv.row(&st, t, rows[i], i, sel, setOpen, choose)
 		})
-		list.Key(tv.key).SelectionContainer().Style(Style{Grow: 1}).Handle(handle)
+		list.Key(tv.key).SelectionContainer().styleOf(&Style{Grow: 1}).Handle(handle)
 		list.ownPos = true
 		list.decorate = func(c *DivElement) {
 			// The ring is the tree's own, drawn on the list while it has focus.
 			focus := Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}.Merge(st.TreeFocusVisible)
-			c.asPart("Tree.Tree").Role(access.RoleTree).Focusable().FocusVisible(focus).
+			c.asPart("Tree.Tree").Role(access.RoleTree).Focusable().focusVisibleOf(&focus).
 				OnKeyDown(keys).OnTextInput(typeahead)
 			if tv.focusHandle != nil {
 				c.FocusHandle(tv.focusHandle)
@@ -655,7 +658,7 @@ func (tv *TreeElement) expand(ctx *Context) Element {
 		// The list sits in a column that takes the tree's style, so that the list
 		// fills the space the style gives it. The column may shrink below its rows,
 		// so that the list windows them to the space instead of building them all.
-		root := tv.size.apply(Div().Column().MinHeight(Px(0)).Style(tv.style)).Child(list)
+		root := tv.size.apply(Div().Column().MinHeight(Px(0)).styleOf(&tv.style)).Child(list)
 		if tv.menu != nil {
 			// Shift+F10 and the Menu key open the menu of the selected row, from the tree's
 			// own box. A pointer press that is not on a row opens nothing.
@@ -681,16 +684,16 @@ func (tv *TreeElement) row(st *TreeStyle, t *Theme, r treeRow, i int, sel string
 	// padding, which the Row style replaces when it sets one.
 	draw := func(ps PartState) *DivElement {
 		row := Div().asPart("Tree.Row").Key(r.key).
-			Style(Style{Padding: Edges{Left: 4 + float32(r.level-1)*st.Indent}}).Style(st.Row)
+			styleOf(&Style{Padding: Edges{Left: 4 + float32(r.level-1)*st.Indent}}).styleOf(&st.Row)
 		if on {
-			row.Style(st.RowSelected)
+			row.styleOf(&st.RowSelected)
 		} else {
-			row.Hover(st.RowHover)
+			row.hoverOf(&st.RowHover)
 		}
 
 		// The chevron is a click target of its own: a click on it opens or closes the
 		// node and does not select it, as the Windows glyph does.
-		chev := Div().asPart("Tree.Chevron").Style(st.Chevron)
+		chev := Div().asPart("Tree.Chevron").styleOf(&st.Chevron)
 		chev.access().inert = true // the row is the item; assistive technology uses its Expand action
 		if r.expandable {
 			glyph := icons.ChevronRight
@@ -707,9 +710,9 @@ func (tv *TreeElement) row(st *TreeStyle, t *Theme, r treeRow, i int, sel string
 			row.Child(Div().AccessHidden().Child(tv.renderRow(node, ps)))
 		} else {
 			if r.icon != nil {
-				row.Child(Div().asPart("Tree.Icon").Style(st.Icon).Child(Icon(r.icon).Size(16)))
+				row.Child(Div().asPart("Tree.Icon").styleOf(&st.Icon).Child(Icon(r.icon).Size(16)))
 			}
-			label := Div().asPart("Tree.Label").Style(st.Label)
+			label := Div().asPart("Tree.Label").styleOf(&st.Label)
 			if tv.renderLabel != nil {
 				label.Child(Div().AccessHidden().Child(tv.renderLabel(node, ps)))
 			} else {
@@ -720,7 +723,7 @@ func (tv *TreeElement) row(st *TreeStyle, t *Theme, r treeRow, i int, sel string
 		// The description and the trailing content are hidden from assistive technology:
 		// the row reports the description, and the trailing content is for sighted users.
 		if r.description != "" {
-			row.Child(Div().asPart("Tree.Description").AccessHidden().Style(st.Description).
+			row.Child(Div().asPart("Tree.Description").AccessHidden().styleOf(&st.Description).
 				Child(Text(r.description).NoWrap().Truncate()))
 		}
 		if tv.trailing != nil {
@@ -728,7 +731,7 @@ func (tv *TreeElement) row(st *TreeStyle, t *Theme, r treeRow, i int, sel string
 				row.Child(Div().Grow(1)) // pushes the trailing content to the row's end
 			}
 			row.Child(Div().asPart("Tree.Trailing").AccessHidden().Row().Align(Center).
-				Style(Style{NoShrink: true}).Child(tv.trailing(node, ps)))
+				styleOf(&Style{NoShrink: true}).Child(tv.trailing(node, ps)))
 		}
 
 		a := row.access()

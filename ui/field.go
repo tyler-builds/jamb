@@ -50,13 +50,13 @@ func messageIconColor(t *Theme, st Style) Color {
 	return t.Danger
 }
 
-// formFieldDefaults returns the built-in look of a field, from the colors of t.
-func formFieldDefaults(t *Theme) FormFieldStyle {
+// formFieldDefaults sets d to the built-in look of a field, from the colors of t.
+func formFieldDefaults(d *FormFieldStyle, t *Theme) {
 	required := t.Danger
 	if t.HighContrast {
 		required = t.Text
 	}
-	return FormFieldStyle{
+	*d = FormFieldStyle{
 		Label:       Style{FontSize: 13, FontWeight: FontMedium, TextColor: t.Text},
 		InlineLabel: Style{Width: Px(180), Padding: Edges{Top: 9}},
 		Required:    Style{TextColor: required, FontWeight: FontSemibold},
@@ -65,15 +65,14 @@ func formFieldDefaults(t *Theme) FormFieldStyle {
 	}
 }
 
-// resolveFormField returns the look of a field: the defaults, merged with the
+// resolveFormField sets st to the look of a field: the defaults, merged with the
 // theme's FormField and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveFormField(ctx *Context, inst FormFieldStyle) FormFieldStyle {
+func resolveFormField(ctx *Context, inst, st *FormFieldStyle) {
 	t := ctx.Theme()
-	st := formFieldDefaults(t)
+	formFieldDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.FormField), instanceLayer(&inst))
-	return st
+		themeLayer(&t.FormField), instanceLayer(inst))
 }
 
 // fieldWire is what a Field gives the control it wraps. The control applies it in
@@ -194,8 +193,10 @@ func (f *FieldElement) Grow(g float32) *FieldElement { f.size.setGrow(g); return
 // Styles sets the look of the parts of the field, for this instance only. Set fields
 // win over the theme's FormField and the defaults; see FormFieldStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (f *FieldElement) Styles(st FormFieldStyle) *FieldElement {
-	f.styles.mergeFrom(&st, false)
+func (f *FieldElement) Styles(st FormFieldStyle) *FieldElement { return f.stylesOf(&st) }
+
+func (f *FieldElement) stylesOf(st *FormFieldStyle) *FieldElement {
+	f.styles.mergeFrom(st, false)
 	return f
 }
 
@@ -203,7 +204,8 @@ func (f *FieldElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
 		s := ctx.Strings()
-		st := resolveFormField(ctx, f.styles)
+		var st FormFieldStyle
+		resolveFormField(ctx, &f.styles, &st)
 		fc, _ := f.control.(formControl)
 		// base prefixes the keys of the label, the help text and the error. A field in
 		// a form is keyed by its form key; a field on its own gets a number of its own.
@@ -289,21 +291,21 @@ func (f *FieldElement) expand(ctx *Context) Element {
 		if f.inline {
 			labelPart = "FormField.InlineLabel"
 		}
-		label := Div().asPart(labelPart).Style(st.Label)
+		label := Div().asPart(labelPart).styleOf(&st.Label)
 		if f.inline {
-			label.Style(st.InlineLabel)
+			label.styleOf(&st.InlineLabel)
 		}
 		label.Row().Align(Center).Gap(4).Child(Text(f.label).Key(labelKey))
 		if f.required {
-			label.Child(Div().asPart("FormField.Required").AccessHidden().Style(st.Required).Child(Text("*")))
+			label.Child(Div().asPart("FormField.Required").AccessHidden().styleOf(&st.Required).Child(Text("*")))
 		}
 		// The help text and the error are always in the tree, in the same places, and are
 		// not displayed when they have nothing to say. A child's identity is its position
 		// among its siblings, so a message that came and went would move the control and
 		// rebuild it, and the control would lose its focus.
-		help := Div().asPart("FormField.Description").Style(st.Description).Display(f.help != "").
+		help := Div().asPart("FormField.Description").styleOf(&st.Description).Display(f.help != "").
 			Child(Text(f.help).Key(helpKey))
-		errRow := Div().asPart("FormField.Error").Style(st.Error).Display(shown != "").
+		errRow := Div().asPart("FormField.Error").styleOf(&st.Error).Display(shown != "").
 			Child(Icon(icons.Alert).Size(14).Color(messageIconColor(t, st.Error))).
 			Child(Text(shown).Key(errKey))
 		// The error is drawn above the control, under the help text, so the user reads
@@ -313,10 +315,10 @@ func (f *FieldElement) expand(ctx *Context) Element {
 			// The label takes the left column, and the help, the error and the control
 			// the right one.
 			body := Div().Column().Gap(6).Grow(1).Child(help).Child(errRow).Child(control)
-			root = Div().asPart("FormField.Root").Row().Align(Start).Gap(16).Style(st.Root).
+			root = Div().asPart("FormField.Root").Row().Align(Start).Gap(16).styleOf(&st.Root).
 				Child(label).Child(body)
 		} else {
-			root = Div().asPart("FormField.Root").Column().Gap(6).Style(st.Root).
+			root = Div().asPart("FormField.Root").Column().Gap(6).styleOf(&st.Root).
 				Child(label).Child(help).Child(errRow).Child(control)
 		}
 		if fc == nil {

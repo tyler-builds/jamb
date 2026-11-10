@@ -77,17 +77,17 @@ func (tv *ToastVariants) of(v ToastVariant) *ToastStyle {
 	return &tv.Info
 }
 
-// toastDefaults returns the built-in look of a toast of variant v, from the
+// toastDefaults sets st to the built-in look of a toast of variant v, from the
 // colors of t. Under high contrast every icon is the text color, and the border
 // is drawn in the text color, so the shape tells the variant. A toast with a
 // title has a semibold title, and its message is in the muted text color.
-func toastDefaults(t *Theme, v ToastVariant, titled bool) ToastStyle {
+func toastDefaults(st *ToastStyle, t *Theme, v ToastVariant, titled bool) {
 	edge, width := t.Border, float32(1)
 	if t.HighContrast {
 		edge, width = t.Text, 2
 	}
 	_, c := toastIcon(t, v)
-	st := ToastStyle{
+	*st = ToastStyle{
 		Container: Style{Direction: Row, Align: Center, Gap: 10, MinWidth: Px(280), MaxWidth: Px(420),
 			Padding: XY(14, 10), Radius: t.Radius, Background: t.Surface, BorderWidth: width, BorderColor: edge,
 			Shadows: []Shadow{ShadowMd}},
@@ -97,18 +97,16 @@ func toastDefaults(t *Theme, v ToastVariant, titled bool) ToastStyle {
 	if titled && !t.HighContrast {
 		st.Text = Style{TextColor: t.TextMuted}
 	}
-	return st
 }
 
-// resolveToast returns the look of a toast of variant v: the defaults, merged
+// resolveToast sets st to the look of a toast of variant v: the defaults, merged
 // with the theme's Toast, the theme's Toasts for the variant, and the toast's own
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveToast(ctx *Context, v ToastVariant, titled bool, inst ToastStyle) ToastStyle {
+func resolveToast(ctx *Context, v ToastVariant, titled bool, inst, st *ToastStyle) {
 	t := ctx.Theme()
-	st := toastDefaults(t, v, titled)
+	toastDefaults(st, t, v, titled)
 	st.layered(ctx,
-		themeLayer(&t.Toast), themeLayer(t.Toasts.of(v)), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Toast), themeLayer(t.Toasts.of(v)), instanceLayer(inst))
 }
 
 // ToastPlacement is where a Toaster shows its stack of toasts.
@@ -219,8 +217,10 @@ func (t *Toast) Dismiss() { t.rt.closeToast(t.e) }
 // Styles sets the look of the parts of this toast alone. Set fields win over the
 // theme's Toast and Toasts and the defaults of its kind; see ToastStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (t *Toast) Styles(st ToastStyle) *Toast {
-	t.e.styles.mergeFrom(&st, false)
+func (t *Toast) Styles(st ToastStyle) *Toast { return t.stylesOf(&st) }
+
+func (t *Toast) stylesOf(st *ToastStyle) *Toast {
+	t.e.styles.mergeFrom(st, false)
 	return t
 }
 
@@ -550,7 +550,7 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 	region := Div().Key("jamb.toasts").Absolute().Column().Gap(8).
 		LayoutSpring(reflow).ChildrenLayoutSpring(reflow).
 		Role(access.RoleGroup).Label(strs.Notifications).
-		Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
+		Focusable().focusVisibleOf(&Style{Shadows: []Shadow{ring}}).
 		OnKeyDown(func(e *KeyEvent) {
 			if e.Key == input.KeyEscape && e.Mods == 0 {
 				e.StopPropagation()
@@ -582,9 +582,10 @@ func (tv *ToasterElement) expand(ctx *Context) Element {
 // and a close button. It is a group named by its title and described by its
 // text, or named by its text when it has no title.
 func (rt *Runtime) toastView(ctx *Context, strs *Strings, t *Theme, e *toastEntry) *DivElement {
-	st := resolveToast(ctx, e.variant, e.title != "", e.styles)
+	var st ToastStyle
+	resolveToast(ctx, e.variant, e.title != "", &e.styles, &st)
 	ic, _ := toastIcon(t, e.variant)
-	box := Div().asPart("Toast.Container").Key(toastKey(e.id)).Style(st.Container).
+	box := Div().asPart("Toast.Container").Key(toastKey(e.id)).styleOf(&st.Container).
 		Enter(Fade().Slide(0, 8), Animation{Duration: 160 * time.Millisecond}).
 		Exit(Fade(), Animation{Duration: 120 * time.Millisecond}).
 		Role(access.RoleGroup).Label(e.text).
@@ -599,24 +600,24 @@ func (rt *Runtime) toastView(ctx *Context, strs *Strings, t *Theme, e *toastEntr
 	if e.title != "" {
 		box.Label(e.title).Description(e.text)
 	}
-	box.Child(Div().asPart("Toast.Icon").Style(st.Icon).Child(Icon(ic).Size(18)))
+	box.Child(Div().asPart("Toast.Icon").styleOf(&st.Icon).Child(Icon(ic).Size(18)))
 	if e.title == "" {
-		box.Child(Div().asPart("Toast.Text").Style(st.Text).Grow(1).Child(Text(e.text)))
+		box.Child(Div().asPart("Toast.Text").styleOf(&st.Text).Grow(1).Child(Text(e.text)))
 	} else {
 		body := Div().Column().Gap(2).Grow(1).MinWidth(Px(0))
-		body.Child(Div().asPart("Toast.Title").Style(st.Title).Child(Text(e.title)))
-		body.Child(Div().asPart("Toast.Text").Style(st.Text).Child(Text(e.text)))
+		body.Child(Div().asPart("Toast.Title").styleOf(&st.Title).Child(Text(e.title)))
+		body.Child(Div().asPart("Toast.Text").styleOf(&st.Text).Child(Text(e.text)))
 		box.Child(body)
 	}
 	if e.action != "" {
-		box.Child(Div().asPart("Toast.Action").Key(toastActionKey(e.id)).Style(st.Action).Child(Button(e.action).Small().Ghost().OnClick(func() {
+		box.Child(Div().asPart("Toast.Action").Key(toastActionKey(e.id)).styleOf(&st.Action).Child(Button(e.action).Small().Ghost().OnClick(func() {
 			if e.onAction != nil {
 				e.onAction()
 			}
 			rt.dismissToast(e)
 		})))
 	}
-	box.Child(Div().asPart("Toast.Close").Style(st.Close).Child(
+	box.Child(Div().asPart("Toast.Close").styleOf(&st.Close).Child(
 		IconButton(icons.X).Label(strs.DismissNotification).Ghost().OnClick(func() { rt.closeToast(e) })))
 	return box
 }

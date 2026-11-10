@@ -299,7 +299,7 @@ func resolveListBoxFor(t *testing.T, hc bool) ListBoxStyle {
 	if hc {
 		th = HighContrastTheme(SystemColors{}, DarkTheme())
 	}
-	return listBoxDefaults(th)
+	return look(func(st *ListBoxStyle) { listBoxDefaults(st, th) })
 }
 
 func TestListBoxDefaultsDoNotChangeFontWeight(t *testing.T) {

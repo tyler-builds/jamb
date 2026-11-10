@@ -18,14 +18,14 @@ type DescriptionListStyle struct {
 	Value           Style // the value of the term
 }
 
-// descriptionListDefaults returns the built-in look of a description list: the
+// descriptionListDefaults sets d to the built-in look of a description list: the
 // term in muted text, in a column of its own beside the value, or above the value
 // when vertical. The column is termW wide, the width of the widest term, and at
 // most half of the item. A bordered list is outlined, with a line between its
 // items, which are padded. Under high contrast the lines and the term are the text
 // color.
-func descriptionListDefaults(t *Theme, vertical, bordered bool, termW float32) DescriptionListStyle {
-	d := DescriptionListStyle{
+func descriptionListDefaults(d *DescriptionListStyle, t *Theme, vertical, bordered bool, termW float32) {
+	*d = DescriptionListStyle{
 		DescriptionList: Style{Gap: 12},
 		Term:            Style{FontSize: 13, TextColor: t.TextMuted},
 		Value:           Style{Direction: Column, MinWidth: Px(0), TextColor: t.Text},
@@ -44,18 +44,16 @@ func descriptionListDefaults(t *Theme, vertical, bordered bool, termW float32) D
 	if t.HighContrast {
 		d.DescriptionList.BorderColor, d.Item.BorderColor, d.Term.TextColor = t.Text, t.Text, t.Text
 	}
-	return d
 }
 
-// resolveDescriptionList returns the look of a description list: the defaults,
+// resolveDescriptionList sets st to the look of a description list: the defaults,
 // merged with the theme's DescriptionList and then the instance's Styles. Under
 // high contrast the two overrides are plain (see plainStyle).
-func resolveDescriptionList(ctx *Context, vertical, bordered bool, termW float32, inst DescriptionListStyle) DescriptionListStyle {
+func resolveDescriptionList(ctx *Context, vertical, bordered bool, termW float32, inst, st *DescriptionListStyle) {
 	t := ctx.Theme()
-	st := descriptionListDefaults(t, vertical, bordered, termW)
+	descriptionListDefaults(st, t, vertical, bordered, termW)
 	st.layered(ctx,
-		themeLayer(&t.DescriptionList), instanceLayer(&inst))
-	return st
+		themeLayer(&t.DescriptionList), instanceLayer(inst))
 }
 
 // termWidth is the width of the widest of terms, set in the font of the Term part
@@ -171,27 +169,32 @@ func (l *DescriptionListElement) GridSpan(cols, rows int) *DescriptionListElemen
 // DescriptionListStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (l *DescriptionListElement) Styles(st DescriptionListStyle) *DescriptionListElement {
-	l.styles.mergeFrom(&st, false)
+	return l.stylesOf(&st)
+}
+
+func (l *DescriptionListElement) stylesOf(st *DescriptionListStyle) *DescriptionListElement {
+	l.styles.mergeFrom(st, false)
 	return l
 }
 
 func (l *DescriptionListElement) expand(ctx *Context) Element {
 	// The term column is measured in the term's font, which the look may change, so the
 	// look is resolved once for its font and again with the column's width.
-	st := resolveDescriptionList(ctx, l.vertical, l.bordered, 0, l.styles)
+	var st DescriptionListStyle
+	resolveDescriptionList(ctx, l.vertical, l.bordered, 0, &l.styles, &st)
 	if !l.vertical {
 		terms := make([]string, len(l.items))
 		for i, it := range l.items {
 			terms[i] = it.term
 		}
-		st = resolveDescriptionList(ctx, l.vertical, l.bordered, termWidth(ctx, terms, st.Term), l.styles)
+		resolveDescriptionList(ctx, l.vertical, l.bordered, termWidth(ctx, terms, st.Term), &l.styles, &st)
 	}
 	cols := make([]Length, l.columns)
 	for i := range cols {
 		cols[i] = Fr(1)
 	}
-	list := Div().asPart("DescriptionList.DescriptionList").Style(Style{GridColumns: cols}).
-		Style(st.DescriptionList).Tooltip(l.tooltip)
+	list := Div().asPart("DescriptionList.DescriptionList").styleOf(&Style{GridColumns: cols}).
+		styleOf(&st.DescriptionList).Tooltip(l.tooltip)
 	for i, it := range l.items {
 		// Each item is a group named by its term, so the value is read with it.
 		item := Div().asPart("DescriptionList.Item").Role(access.RoleGroup).Label(it.term)
@@ -204,11 +207,11 @@ func (l *DescriptionListElement) expand(ctx *Context) Element {
 			if i%l.columns != 0 {
 				edges.Left = 1
 			}
-			item.Style(Style{BorderEdges: edges})
+			item.styleOf(&Style{BorderEdges: edges})
 		}
-		item.Style(st.Item).
-			Child(Div().asPart("DescriptionList.Term").Style(st.Term).Child(Text(it.term))).
-			Child(Div().asPart("DescriptionList.Value").Style(st.Value).Child(it.value))
+		item.styleOf(&st.Item).
+			Child(Div().asPart("DescriptionList.Term").styleOf(&st.Term).Child(Text(it.term))).
+			Child(Div().asPart("DescriptionList.Value").styleOf(&st.Value).Child(it.value))
 		list.Child(item)
 	}
 	return l.size.apply(list)

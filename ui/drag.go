@@ -73,7 +73,12 @@ func (d *DivElement) OnDrag(s *DragSpec) *DivElement { d.dragSpec = s; return d 
 
 // Dragging merges s on top while this element is the source of a drag. It is
 // the feedback for an element that is dragged in place, such as dimming it.
-func (d *DivElement) Dragging(s Style) *DivElement { d.dragging = mergeInto(d.dragging, s); return d }
+func (d *DivElement) Dragging(s Style) *DivElement { return d.draggingOf(&s) }
+
+func (d *DivElement) draggingOf(s *Style) *DivElement {
+	d.dragging = mergeInto(d.dragging, s)
+	return d
+}
 
 // DropEvent describes a drop, or a pointer position over a target during a
 // drag. Coordinates are logical pixels; X and Y are relative to the window,
@@ -126,7 +131,7 @@ func Drop[T any](fn func(v T, e *DropEvent)) *DropSpec[T] {
 func (s *DropSpec[T]) Accept(fn func(v T) bool) *DropSpec[T] { s.acceptFn = fn; return s }
 
 // Over merges st on top of the target while an accepted drag is over it.
-func (s *DropSpec[T]) Over(st Style) *DropSpec[T] { s.over = mergeInto(s.over, st); return s }
+func (s *DropSpec[T]) Over(st Style) *DropSpec[T] { s.over = mergeInto(s.over, &st); return s }
 
 // Move runs when the pointer moves over the target during an accepted drag,
 // for example to show an insertion line where the payload would go.

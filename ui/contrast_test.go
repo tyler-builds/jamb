@@ -245,7 +245,8 @@ func alertPairs(th *Theme) []contrastPair {
 		name string
 		v    AlertVariant
 	}{{"Info", AlertInfo}, {"Success", AlertSuccess}, {"Warning", AlertWarning}, {"Danger", AlertDanger}} {
-		d := alertDefaults(th, v.v)
+		var d AlertStyle
+		alertDefaults(&d, th, v.v)
 		fill := d.Alert.Background
 		ps = append(ps,
 			contrastPair{name: "Alert_" + v.name + "_title", role: "alert title (alert.go) on its fill", fg: d.Title.TextColor, bg: fill, min: minText},

@@ -55,14 +55,14 @@ func (av *AlertVariants) of(v AlertVariant) *AlertStyle {
 	return &av.Info
 }
 
-// alertDefaults returns the built-in look of an alert of variant v, from the
+// alertDefaults sets d to the built-in look of an alert of variant v, from the
 // colors of t: a box tinted with the variant's color, the icon in that color, the
 // title in the text color and the description in the muted text color. Under
 // high contrast the box is the window color outlined in the text color, and the
 // icon is the text color, so the icon's shape tells the variant.
-func alertDefaults(t *Theme, v AlertVariant) AlertStyle {
+func alertDefaults(d *AlertStyle, t *Theme, v AlertVariant) {
 	fill, edge, ink := alertColors(t, v)
-	d := AlertStyle{
+	*d = AlertStyle{
 		Alert: Style{Direction: Row, Align: Start, Gap: 10, Padding: XY(12, 10), Radius: t.Radius,
 			Background: fill, BorderWidth: 1, BorderColor: edge},
 		Icon:        Style{NoShrink: true, Padding: Edges{Top: 1}, TextColor: ink},
@@ -73,7 +73,6 @@ func alertDefaults(t *Theme, v AlertVariant) AlertStyle {
 	if t.HighContrast {
 		d.Description.TextColor = t.Text
 	}
-	return d
 }
 
 // alertColors returns the fill, the border and the icon color of an alert. The
@@ -108,15 +107,14 @@ func alertIcon(v AlertVariant) *icons.Icon {
 	return icons.Info
 }
 
-// resolveAlert returns the look of an alert of variant v: the defaults, merged
+// resolveAlert sets st to the look of an alert of variant v: the defaults, merged
 // with the theme's Alert, the theme's Alerts for the variant, and the instance's
 // Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveAlert(ctx *Context, v AlertVariant, inst AlertStyle) AlertStyle {
+func resolveAlert(ctx *Context, v AlertVariant, inst, st *AlertStyle) {
 	t := ctx.Theme()
-	st := alertDefaults(t, v)
+	alertDefaults(st, t, v)
 	st.layered(ctx,
-		themeLayer(&t.Alert), themeLayer(t.Alerts.of(v)), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Alert), themeLayer(t.Alerts.of(v)), instanceLayer(inst))
 }
 
 // AlertElement is a message box in the flow of the page, such as a note above a
@@ -204,13 +202,16 @@ func (a *AlertElement) GridSpan(cols, rows int) *AlertElement { a.size.setSpan(c
 // Styles sets the look of the parts of the alert, for this instance only. Set
 // fields win over the theme's Alert and Alerts and the defaults; see AlertStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
-func (a *AlertElement) Styles(st AlertStyle) *AlertElement {
-	a.styles.mergeFrom(&st, false)
+func (a *AlertElement) Styles(st AlertStyle) *AlertElement { return a.stylesOf(&st) }
+
+func (a *AlertElement) stylesOf(st *AlertStyle) *AlertElement {
+	a.styles.mergeFrom(st, false)
 	return a
 }
 
 func (a *AlertElement) expand(ctx *Context) Element {
-	st := resolveAlert(ctx, a.variant, a.styles)
+	var st AlertStyle
+	resolveAlert(ctx, a.variant, &a.styles, &st)
 	strs := ctx.Strings()
 	// The alert is a group named by its title, and described by its description.
 	// An alert with no title is named by its description.
@@ -218,7 +219,7 @@ func (a *AlertElement) expand(ctx *Context) Element {
 	if name == "" {
 		name, desc = desc, ""
 	}
-	box := Div().asPart("Alert.Alert").Style(st.Alert).Role(access.RoleGroup).Label(name).Tooltip(a.tooltip)
+	box := Div().asPart("Alert.Alert").styleOf(&st.Alert).Role(access.RoleGroup).Label(name).Tooltip(a.tooltip)
 	if desc != "" {
 		box.Description(desc)
 	}
@@ -227,21 +228,21 @@ func (a *AlertElement) expand(ctx *Context) Element {
 		ic = a.icon
 	}
 	if ic != nil {
-		box.Child(Div().asPart("Alert.Icon").Style(st.Icon).Child(Icon(ic).Size(16)))
+		box.Child(Div().asPart("Alert.Icon").styleOf(&st.Icon).Child(Icon(ic).Size(16)))
 	}
 	body := Div().Column().Gap(2).Grow(1).MinWidth(Px(0))
 	if a.title != "" {
-		body.Child(Div().asPart("Alert.Title").Style(st.Title).Child(Text(a.title)))
+		body.Child(Div().asPart("Alert.Title").styleOf(&st.Title).Child(Text(a.title)))
 	}
 	if a.desc != "" {
-		body.Child(Div().asPart("Alert.Description").Style(st.Description).Child(Text(a.desc)))
+		body.Child(Div().asPart("Alert.Description").styleOf(&st.Description).Child(Text(a.desc)))
 	}
 	if a.action != nil {
 		body.Child(Div().Row().PaddingY(4).Child(a.action))
 	}
 	box.Child(body)
 	if a.onClose != nil {
-		box.Child(Div().asPart("Alert.Close").Style(st.Close).Child(
+		box.Child(Div().asPart("Alert.Close").styleOf(&st.Close).Child(
 			IconButton(icons.X).Label(strs.Close).Small().Ghost().OnClick(a.onClose)))
 	}
 	return a.size.apply(box)

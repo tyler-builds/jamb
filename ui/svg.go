@@ -100,11 +100,13 @@ func (e *SVGElement) Color(c Color) *SVGElement { e.color = c; return e }
 func (e *SVGElement) Alt(s string) *SVGElement { e.alt = s; return e }
 
 // Style merges layout fields (margins, alignment, opacity...) of s.
-func (e *SVGElement) Style(s Style) *SVGElement { e.style = e.style.Merge(s); return e }
+func (e *SVGElement) Style(s Style) *SVGElement { return e.styleOf(&s) }
+
+func (e *SVGElement) styleOf(s *Style) *SVGElement { e.style.mergeFrom(s, false); return e }
 
 // LayoutSpring moves the drawing to a new place in the layout as the spring s, as
 // DivElement.LayoutSpring does. It is the same as Style(Style{LayoutSpring: s}).
-func (e *SVGElement) LayoutSpring(s Spring) *SVGElement { return e.Style(Style{LayoutSpring: s}) }
+func (e *SVGElement) LayoutSpring(s Spring) *SVGElement { return e.styleOf(&Style{LayoutSpring: s}) }
 
 // svgKey is what an SVG's drawing depends on besides its size and the
 // inherited text color.
@@ -121,7 +123,7 @@ func (e *SVGElement) expand(*Context) Element {
 	w, h := src.Size()
 	st := Style{Width: Px(w), Height: Px(h), NoShrink: true}.Merge(e.style)
 	fit, fitSet, radii := e.fit, e.fitSet, st.radii()
-	d := Div().Style(st)
+	d := Div().styleOf(&st)
 	d.canvas = func(p *Painter, w, h float32) {
 		c := color
 		if c.IsZero() || p.rt.sys.HighContrast {

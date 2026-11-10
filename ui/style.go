@@ -174,7 +174,7 @@ var (
 // changes the fields that are set. Define reusable styles as variables:
 //
 //	var Card = ui.Style{Padding: ui.All(16), Radius: 12, Background: ui.Hex("#18181b")}
-//	ui.Div().Style(Card)
+//	ui.Div().styleOf(&Card)
 type Style struct {
 	// The fields are ordered so that the struct has no padding: the 4-byte fields are
 	// together, and so are the bytes, which keeps Style within 480 bytes, a malloc size

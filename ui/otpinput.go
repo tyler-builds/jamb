@@ -36,15 +36,15 @@ const (
 	otpBoxHeight = 44
 )
 
-// otpInputDefaults returns the built-in look of a one-time code input, from the
+// otpInputDefaults sets d to the built-in look of a one-time code input, from the
 // colors of t, with its boxes scaled by scale (the Text size). The boxes are framed
 // as a text field is; the box at the caret has the Accent border and the focus
 // ring, and an invalid box the thicker Danger border. Under high contrast a filled
 // box keeps the frame of an empty one, the invalid border is the text color, and a
 // disabled box is GrayText, not dimmed.
-func otpInputDefaults(t *Theme, scale float32, disabled bool) OTPInputStyle {
+func otpInputDefaults(d *OTPInputStyle, t *Theme, scale float32, disabled bool) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := OTPInputStyle{
+	*d = OTPInputStyle{
 		Root:  Style{Direction: Row, Align: Center, Gap: 12, fitWidth: true},
 		Group: Style{Direction: Row, Align: Center, Gap: 8},
 		Box: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(otpBoxWidth * scale),
@@ -69,18 +69,16 @@ func otpInputDefaults(t *Theme, scale float32, disabled bool) OTPInputStyle {
 	} else {
 		d.BoxDisabled = Style{Opacity: 0.5, BorderColor: t.Border}
 	}
-	return d
 }
 
-// resolveOTPInput returns the look of a one-time code input: the defaults, merged
+// resolveOTPInput sets st to the look of a one-time code input: the defaults, merged
 // with the theme's OTPInput and then the instance's Styles. Under high contrast the
 // two overrides are plain (see plainStyle).
-func resolveOTPInput(ctx *Context, scale float32, disabled bool, inst OTPInputStyle) OTPInputStyle {
+func resolveOTPInput(ctx *Context, scale float32, disabled bool, inst, st *OTPInputStyle) {
 	t := ctx.Theme()
-	st := otpInputDefaults(t, scale, disabled)
+	otpInputDefaults(st, t, scale, disabled)
 	st.layered(ctx,
-		themeLayer(&t.OTPInput), instanceLayer(&inst))
-	return st
+		themeLayer(&t.OTPInput), instanceLayer(inst))
 }
 
 // OTPInputElement is an input for a one-time code, such as a verification code
@@ -199,9 +197,10 @@ func (o *OTPInputElement) Validate(rules ...Validator[string]) *OTPInputElement 
 func (o *OTPInputElement) formCheck() error { return firstError(o.value.Get(), o.rules) }
 
 func (o *OTPInputElement) formWire(w fieldWire) Element {
-	c := *o
+	c := new(OTPInputElement)
+	copyLarge(c, o)
 	c.wire = w
-	return &c
+	return c
 }
 
 // FocusHandle lets code focus the input (see NewFocusHandle). A Field that wraps
@@ -218,8 +217,10 @@ func (o *OTPInputElement) Tooltip(s string) *OTPInputElement { o.tooltip = s; re
 // Styles sets the look of the parts of the input, for this instance only. Set
 // fields win over the theme's OTPInput and the defaults; see OTPInputStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (o *OTPInputElement) Styles(st OTPInputStyle) *OTPInputElement {
-	o.styles.mergeFrom(&st, false)
+func (o *OTPInputElement) Styles(st OTPInputStyle) *OTPInputElement { return o.stylesOf(&st) }
+
+func (o *OTPInputElement) stylesOf(st *OTPInputStyle) *OTPInputElement {
+	o.styles.mergeFrom(st, false)
 	return o
 }
 
@@ -287,7 +288,8 @@ func (o *OTPInputElement) fill(rs []rune, c int, text string) ([]rune, int, bool
 func (o *OTPInputElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		scale := textScale(ctx)
-		st := resolveOTPInput(ctx, scale, o.disabled, o.styles)
+		var st OTPInputStyle
+		resolveOTPInput(ctx, scale, o.disabled, &o.styles, &st)
 		w := o.wire
 		v := o.code(o.value.Get())
 		caret := Local(ctx, "caret", 0)
@@ -338,7 +340,7 @@ func (o *OTPInputElement) expand(ctx *Context) Element {
 		}
 		// The row keeps the input's key when the input renders again on its own, as
 		// when the caret moves.
-		root := o.size.apply(Div().asPart("OTPInput.Root").Key(o.key).Style(st.Root).Role(access.RoleTextField).
+		root := o.size.apply(Div().asPart("OTPInput.Root").Key(o.key).styleOf(&st.Root).Role(access.RoleTextField).
 			Tooltip(o.tooltip))
 		if name != "" {
 			root.Label(name)
@@ -367,9 +369,9 @@ func (o *OTPInputElement) expand(ctx *Context) Element {
 		}
 		i := 0
 		for _, size := range sizes {
-			g := Div().asPart("OTPInput.Group").Style(st.Group).AccessHidden()
+			g := Div().asPart("OTPInput.Group").styleOf(&st.Group).AccessHidden()
 			for range size {
-				g.Child(o.box(ctx, st, v, i, focused && i == min(at, o.length-1), caret))
+				g.Child(o.box(ctx, &st, v, i, focused && i == min(at, o.length-1), caret))
 				i++
 			}
 			root.Child(g)
@@ -434,22 +436,22 @@ func (o *OTPInputElement) expand(ctx *Context) Element {
 // box returns the box at index i of the code v. The box at the caret is drawn
 // focused while the input has focus, and a press on a box moves the caret to it, or
 // to the first empty box when it is past that.
-func (o *OTPInputElement) box(ctx *Context, st OTPInputStyle, v []rune, i int, atCaret bool, caret *Signal[int]) *DivElement {
-	b := Div().asPart("OTPInput.Box").Style(st.Box)
+func (o *OTPInputElement) box(ctx *Context, st *OTPInputStyle, v []rune, i int, atCaret bool, caret *Signal[int]) *DivElement {
+	b := Div().asPart("OTPInput.Box").styleOf(&st.Box)
 	filled := i < len(v)
 	if filled {
-		b.Style(st.BoxFilled)
+		b.styleOf(&st.BoxFilled)
 		if o.masked {
-			b.Child(Div().asPart("OTPInput.Dot").Style(st.Dot))
+			b.Child(Div().asPart("OTPInput.Dot").styleOf(&st.Dot))
 		} else {
-			b.Child(Div().asPart("OTPInput.Text").Style(st.Text).Child(Text(string(v[i])).NoWrap()))
+			b.Child(Div().asPart("OTPInput.Text").styleOf(&st.Text).Child(Text(string(v[i])).NoWrap()))
 		}
 	}
 	if o.wire.invalid {
-		b.Style(st.BoxInvalid)
+		b.styleOf(&st.BoxInvalid)
 	}
 	if o.disabled {
-		return b.Style(st.BoxDisabled)
+		return b.styleOf(&st.BoxDisabled)
 	}
 	if atCaret {
 		// The caret's box is the focus state of the input, which is the element that

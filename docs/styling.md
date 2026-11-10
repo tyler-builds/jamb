@@ -497,23 +497,34 @@ A new widget that has parts follows the same pattern as `Tabs`, `Select`, `Slide
    copy of a large struct into code for each of its fields. A type whose merge needs more
    than a merge of each field writes its own `mergeFrom`, as `TabsStyle` does, and stylegen
    writes only its `layered`.
-2. **Write the defaults.** A `<widget>Defaults(t *Theme, ...)` function returns the built-in
-   look from the theme's tokens. It reads the state it needs (disabled, variant, width).
-   Under high contrast it uses the system colors, and it keeps the focus ring.
-3. **Resolve the layers.** A `resolve<Widget>` function starts from the defaults, then
-   merges `t.<Widget>` and the instance's styles, in that order, with
-   `st.layered(ctx, themeLayer(&t.<Widget>), instanceLayer(&inst))`. Under high contrast,
-   `layered` merges both overrides as plain (see `plainStyle`).
+2. **Write the defaults.** A `<widget>Defaults(d *<Widget>Style, t *Theme, ...)` function
+   sets `*d` to the built-in look from the theme's tokens. It reads the state it needs
+   (disabled, variant, width). Under high contrast it uses the system colors, and it keeps
+   the focus ring.
+3. **Resolve the layers.** A `resolve<Widget>(ctx, ..., inst, st *<Widget>Style)` function
+   fills `st` with the defaults, then merges `t.<Widget>` and the instance's styles over
+   it, in that order, with `st.layered(ctx, themeLayer(&t.<Widget>), instanceLayer(inst))`.
+   Under high contrast, `layered` merges both overrides as plain (see `plainStyle`). The
+   widget calls it with a variable of its own: `var st <Widget>Style` and
+   `resolve<Widget>(ctx, ..., &w.styles, &st)`.
 4. **Add the fields.** Add the `<Widget>Style` field to `Theme`; `HighContrastTheme` copies
    it from the base theme with the rest. Add a `Styles` method to the widget that merges
    into an unexported field with `mergeFrom`.
-5. **Name the elements.** Call `asPart("<Widget>.<Part>")` on the element that draws each
+5. **Pass the look by pointer.** Inside `ui`, a widget's look and its parts go to functions
+   and to elements through pointers: a helper takes `st *<Widget>Style`, and an element
+   takes a part with `styleOf(&st.Part)` (and `hoverOf`, `pressedOf`, `focusVisibleOf`),
+   the twins of `Style`, `Hover` and the others, which take a `Style` by value for apps.
+   A `Style` is 109 values, and a widget's look several of them. TinyGo passes a struct
+   by value as one parameter per value, and copies one field by field, so each call or
+   assignment that copies a look is kilobytes of code in a web build. To copy one, use
+   `copyLarge`.
+6. **Name the elements.** Call `asPart("<Widget>.<Part>")` on the element that draws each
    part. The name is how the drift test finds the part. A state with no element of its own
    is drawn by the element of the part it belongs to.
-6. **Test it.** Add the part to the table in `TestEveryPartIsApplied`: set a distinctive style on
+7. **Test it.** Add the part to the table in `TestEveryPartIsApplied`: set a distinctive style on
    the part, put its state in effect, and assert that the style reaches the node. Add the
    widget to the precedence and high-contrast tests.
-7. **Document it.** Add the widget's parts to the table below and to its section in the topic docs
+8. **Document it.** Add the widget's parts to the table below and to its section in the topic docs
    for the widget.
 
 ## Naming conventions

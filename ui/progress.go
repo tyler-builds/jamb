@@ -36,12 +36,12 @@ type ProgressBarStyle struct {
 	Label Style // the readout beside the bar, a percentage by default
 }
 
-// progressBarDefaults returns the built-in look of a progress bar from the colors
+// progressBarDefaults sets d to the built-in look of a progress bar from the colors
 // of t. The fill is color when the app gave one (see ProgressBarElement.Color),
 // else the accent. Under high contrast the groove is an outlined empty box and
 // the fill is the Highlight color, whatever the app asked for.
-func progressBarDefaults(t *Theme, color Color) ProgressBarStyle {
-	d := ProgressBarStyle{
+func progressBarDefaults(d *ProgressBarStyle, t *Theme, color Color) {
+	*d = ProgressBarStyle{
 		Track: Style{Height: Px(6), Grow: 1, Radius: 3, OverflowX: OverflowHidden, OverflowY: OverflowHidden,
 			Background: t.SurfaceActive},
 		Fill:  Style{Background: t.Accent, Radius: 3},
@@ -55,18 +55,16 @@ func progressBarDefaults(t *Theme, color Color) ProgressBarStyle {
 			Background: t.Surface, BorderWidth: 1, BorderColor: t.Text}
 		d.Fill = Style{Background: t.Accent}
 	}
-	return d
 }
 
-// resolveProgressBar returns the look of a progress bar: the defaults, merged with
+// resolveProgressBar sets st to the look of a progress bar: the defaults, merged with
 // the theme's ProgressBar and then the instance's Styles. Under high contrast the
 // two overrides are plain (see plainStyle).
-func resolveProgressBar(ctx *Context, color Color, inst ProgressBarStyle) ProgressBarStyle {
+func resolveProgressBar(ctx *Context, color Color, inst, st *ProgressBarStyle) {
 	t := ctx.Theme()
-	st := progressBarDefaults(t, color)
+	progressBarDefaults(st, t, color)
 	st.layered(ctx,
-		themeLayer(&t.ProgressBar), instanceLayer(&inst))
-	return st
+		themeLayer(&t.ProgressBar), instanceLayer(inst))
 }
 
 // ProgressRingStyle is the look of a progress ring. A part's style merges over
@@ -80,15 +78,14 @@ type ProgressRingStyle struct {
 	Dot  Style // each dot of the ring
 }
 
-// resolveProgressRing returns the look of a progress ring: the theme's
+// resolveProgressRing sets st to the look of a progress ring: the theme's
 // ProgressRing, then the instance's Styles, over the built-in ring, which takes
 // no colors of its own. Under high contrast the two overrides are plain.
-func resolveProgressRing(ctx *Context, inst ProgressRingStyle) ProgressRingStyle {
+func resolveProgressRing(ctx *Context, inst, st *ProgressRingStyle) {
 	t := ctx.Theme()
-	st := ProgressRingStyle{Ring: Style{NoShrink: true}}
+	*st = ProgressRingStyle{Ring: Style{NoShrink: true}}
 	st.layered(ctx,
-		themeLayer(&t.ProgressRing), instanceLayer(&inst))
-	return st
+		themeLayer(&t.ProgressRing), instanceLayer(inst))
 }
 
 // ProgressBarElement shows how far an operation has got, as a bar. A
@@ -188,8 +185,10 @@ func (p *ProgressBarElement) HideValue() *ProgressBarElement {
 // Styles sets the look of the parts of the bar, for this instance only. Set
 // fields win over the theme's ProgressBar and the defaults; see ProgressBarStyle
 // and docs/styling.md. Calling Styles again merges with the earlier values.
-func (p *ProgressBarElement) Styles(st ProgressBarStyle) *ProgressBarElement {
-	p.styles.mergeFrom(&st, false)
+func (p *ProgressBarElement) Styles(st ProgressBarStyle) *ProgressBarElement { return p.stylesOf(&st) }
+
+func (p *ProgressBarElement) stylesOf(st *ProgressBarStyle) *ProgressBarElement {
+	p.styles.mergeFrom(st, false)
 	return p
 }
 
@@ -215,12 +214,13 @@ func (p *ProgressBarElement) readout() string {
 }
 
 func (p *ProgressBarElement) expand(ctx *Context) Element {
-	st := resolveProgressBar(ctx, p.color, p.styles)
+	var st ProgressBarStyle
+	resolveProgressBar(ctx, p.color, &p.styles, &st)
 	strs := ctx.Strings()
 	// The track is drawn as a thin bar. Under high contrast it is an outlined
 	// empty box and the fill is solid Highlight, so the empty part does not read
 	// as filled, as the demo's bars do.
-	track := Div().asPart("ProgressBar.Track").Style(st.Track)
+	track := Div().asPart("ProgressBar.Track").styleOf(&st.Track)
 
 	name := p.name
 	a := track.access()
@@ -230,25 +230,25 @@ func (p *ProgressBarElement) expand(ctx *Context) Element {
 		if name == "" {
 			name = strs.LoadingEllipsis
 		}
-		track.Child(p.segment(ctx, st))
+		track.Child(p.segment(ctx, &st))
 	} else {
 		if name == "" {
 			name = strs.Progress
 		}
 		// The value is read-only: the range has no setter, so no SetValue action.
 		a.rng = &access.Range{Value: p.clamped(), Min: min(p.lo, p.hi), Max: max(p.lo, p.hi)}
-		track.Child(p.fill(st))
+		track.Child(p.fill(&st))
 	}
 	track.Label(name)
 
 	// The bar's default minimum keeps it visible in a container with no width of its
 	// own, where a percentage has nothing to take.
-	root := Div().Row().Align(Center).Gap(12).Width(Full).Style(Style{MinWidth: Px(progressBarMinWidth)}).Child(track)
+	root := Div().Row().Align(Center).Gap(12).Width(Full).styleOf(&Style{MinWidth: Px(progressBarMinWidth)}).Child(track)
 	if !p.indeterminate && !p.hideValue {
 		// The value is what assistive technology reads through the range, so the
 		// readout is hidden from it.
 		if text := p.readout(); text != "" {
-			root.Child(Div().asPart("ProgressBar.Label").AccessHidden().MinWidth(Px(44)).Align(End).Style(st.Label).
+			root.Child(Div().asPart("ProgressBar.Label").AccessHidden().MinWidth(Px(44)).Align(End).styleOf(&st.Label).
 				Child(Text(text)))
 		}
 	}
@@ -256,18 +256,18 @@ func (p *ProgressBarElement) expand(ctx *Context) Element {
 }
 
 // fill is the filled part of a determinate bar.
-func (p *ProgressBarElement) fill(st ProgressBarStyle) *DivElement {
+func (p *ProgressBarElement) fill(st *ProgressBarStyle) *DivElement {
 	f := float32(p.fraction())
-	return Div().asPart("ProgressBar.Fill").Style(st.Fill).Height(Full).Width(Percent(f * 100))
+	return Div().asPart("ProgressBar.Fill").styleOf(&st.Fill).Height(Full).Width(Percent(f * 100))
 }
 
 // segment is the sliding part of an indeterminate bar. It enters at the left
 // end, slides across and leaves at the right end, then enters again: at the
 // start and end of each cycle it is wholly outside the track, so the repeat is
 // seamless. With reduced motion it stays in the middle.
-func (p *ProgressBarElement) segment(ctx *Context, st ProgressBarStyle) Element {
+func (p *ProgressBarElement) segment(ctx *Context, st *ProgressBarStyle) Element {
 	row := func(start, width float32) *DivElement {
-		seg := Div().asPart("ProgressBar.Fill").Style(st.Fill).Height(Full).Grow(width)
+		seg := Div().asPart("ProgressBar.Fill").styleOf(&st.Fill).Height(Full).Grow(width)
 		return Div().Row().Height(Full).
 			Child(Div().Grow(start)).Child(seg).Child(Div().Grow(1 - start - width))
 	}
@@ -329,7 +329,11 @@ func (r *ProgressRingElement) Label(name string) *ProgressRingElement { r.name =
 // ProgressRingStyle and docs/styling.md. Calling Styles again merges with the
 // earlier values.
 func (r *ProgressRingElement) Styles(st ProgressRingStyle) *ProgressRingElement {
-	r.styles.mergeFrom(&st, false)
+	return r.stylesOf(&st)
+}
+
+func (r *ProgressRingElement) stylesOf(st *ProgressRingStyle) *ProgressRingElement {
+	r.styles.mergeFrom(st, false)
 	return r
 }
 
@@ -338,7 +342,8 @@ const ringDots = 8
 
 func (r *ProgressRingElement) expand(ctx *Context) Element {
 	t := ctx.Theme()
-	st := resolveProgressRing(ctx, r.styles)
+	var st ProgressRingStyle
+	resolveProgressRing(ctx, &r.styles, &st)
 	strs := ctx.Strings()
 	name := r.name
 	if name == "" {
@@ -347,7 +352,7 @@ func (r *ProgressRingElement) expand(ctx *Context) Element {
 	// ring is the box of the indicator. It is one node with the busy role, and
 	// its dots are not exposed.
 	ring := func() *DivElement {
-		return Div().asPart("ProgressRing.Ring").Style(st.Ring).Size(Px(r.size), Px(r.size)).Role(access.RoleProgressBar).Label(name)
+		return Div().asPart("ProgressRing.Ring").styleOf(&st.Ring).Size(Px(r.size), Px(r.size)).Role(access.RoleProgressBar).Label(name)
 	}
 	if ctx.ReducedMotion() {
 		// Reduced motion: every dot is drawn, with no turning. Under high contrast the
@@ -356,9 +361,9 @@ func (r *ProgressRingElement) expand(ctx *Context) Element {
 		box := ring()
 		for i := range ringDots {
 			if t.HighContrast {
-				box.Child(r.dot(st, i, t.Text, 1))
+				box.Child(r.dot(&st, i, t.Text, 1))
 			} else {
-				box.Child(r.dot(st, i, t.Accent, 0.35))
+				box.Child(r.dot(&st, i, t.Accent, 0.35))
 			}
 		}
 		return box
@@ -375,9 +380,9 @@ func (r *ProgressRingElement) expand(ctx *Context) Element {
 					continue
 				}
 				if t.HighContrast {
-					box.Child(r.dot(st, i, t.Text, 1))
+					box.Child(r.dot(&st, i, t.Text, 1))
 				} else {
-					box.Child(r.dot(st, i, t.Accent, 1-2*phase))
+					box.Child(r.dot(&st, i, t.Accent, 1-2*phase))
 				}
 			}
 			return box
@@ -387,7 +392,7 @@ func (r *ProgressRingElement) expand(ctx *Context) Element {
 // dot is the i-th dot of a ring. It sits on the circle at an angle of i/8 of a
 // turn, starting at the top, with the given color and opacity, and the dot style
 // merged over them.
-func (r *ProgressRingElement) dot(st ProgressRingStyle, i int, c Color, opacity float32) *DivElement {
+func (r *ProgressRingElement) dot(st *ProgressRingStyle, i int, c Color, opacity float32) *DivElement {
 	d := r.size / 4
 	radius := r.size/2 - d/2
 	angle := 2*math.Pi*float64(i)/ringDots - math.Pi/2
@@ -397,5 +402,5 @@ func (r *ProgressRingElement) dot(st ProgressRingStyle, i int, c Color, opacity 
 		c = r.color
 	}
 	return Div().asPart("ProgressRing.Dot").Absolute().Left(x).Top(y).Size(Px(d), Px(d)).Radius(d / 2).
-		Background(c).Opacity(opacity).Style(st.Dot)
+		Background(c).Opacity(opacity).styleOf(&st.Dot)
 }

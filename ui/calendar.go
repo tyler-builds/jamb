@@ -55,7 +55,7 @@ func monthGrid(t time.Time, first time.Weekday) [6][7]time.Time {
 // and to are its first and last day, or zero, drawn with st.DayInRange between them; hover is set
 // for a range and is nil for a date.
 type calendarView struct {
-	st       CalendarStyle
+	st       *CalendarStyle
 	widget   string
 	loc      *dateLocale
 	scale    float32
@@ -132,8 +132,8 @@ func calendarKeys(e *KeyEvent, f time.Time, first time.Weekday, move, pick func(
 // calendarPanel returns the open calendar of a picker: an overlay below the field (above it when
 // there is no room), which holds the month of calendarGrid. It takes focus when it opens, and the
 // day the keys have reached is its highlighted cell, which the screen reader reads.
-func calendarPanel(c calendarView, s *Strings) Element {
-	panel := Div().asPart(c.widget+".Popup").Key("jamb.calendar").Style(c.st.Root).
+func calendarPanel(c *calendarView, s *Strings) Element {
+	panel := Div().asPart(c.widget+".Popup").Key("jamb.calendar").styleOf(&c.st.Root).
 		Enter(Fade().Slide(0, -6).Grow(0.98), Animation{Duration: c.motion.enter(140 * time.Millisecond)}).
 		Exit(Fade().Grow(0.98), Animation{Duration: c.motion.exit(90 * time.Millisecond)}).
 		Overlay(BelowStart).OverlayGap(4).
@@ -147,7 +147,7 @@ func calendarPanel(c calendarView, s *Strings) Element {
 // assistive technology, a grid of six week rows, each with seven days, under a header of the weekday
 // names (see docs/widgets-selection.md, Date and time). The navigation buttons are for a pointer; the
 // keys are PageUp and PageDown for a month, and Shift with them for a year.
-func calendarGrid(panel *DivElement, c calendarView, s *Strings) *DivElement {
+func calendarGrid(panel *DivElement, c *calendarView, s *Strings) *DivElement {
 	first := c.loc.firstDay
 	if c.firstSet {
 		first = c.firstDay
@@ -166,7 +166,7 @@ func calendarGrid(panel *DivElement, c calendarView, s *Strings) *DivElement {
 	panel.AccessGrid(6, 7)
 	focus := c.focus
 	nav := func(label string, glyph *icons.Icon, text string, step time.Time) *DivElement {
-		b := Div().asPart(c.widget + ".NavButton").Style(st.NavButton).Role(access.RoleButton).Label(label)
+		b := Div().asPart(c.widget + ".NavButton").styleOf(&st.NavButton).Role(access.RoleButton).Label(label)
 		if c.disabled {
 			b.access().disabled = true
 		} else {
@@ -182,7 +182,7 @@ func calendarGrid(panel *DivElement, c calendarView, s *Strings) *DivElement {
 	header := Div().Row().Align(Center).Gap(4 * c.scale).
 		Child(nav(s.PreviousYear, nil, "«", addMonths(focus, -12))).
 		Child(nav(s.PreviousMonth, icons.ChevronLeft, "", addMonths(focus, -1))).
-		Child(Div().asPart(c.widget + ".Header").Style(st.Header).Child(Text(c.loc.monthYear(focus)).NoWrap())).
+		Child(Div().asPart(c.widget + ".Header").styleOf(&st.Header).Child(Text(c.loc.monthYear(focus)).NoWrap())).
 		Child(nav(s.NextMonth, icons.ChevronRight, "", addMonths(focus, 1))).
 		Child(nav(s.NextYear, nil, "»", addMonths(focus, 12)))
 	panel.Child(header)
@@ -192,7 +192,7 @@ func calendarGrid(panel *DivElement, c calendarView, s *Strings) *DivElement {
 	names := Div().Row().Gap(2 * c.scale)
 	for i := range 7 {
 		wd := time.Weekday((int(first) + i) % 7)
-		names.Child(Div().asPart(c.widget + ".WeekdayLabel").Style(st.WeekdayLabel).
+		names.Child(Div().asPart(c.widget + ".WeekdayLabel").styleOf(&st.WeekdayLabel).
 			Role(access.RoleHeaderItem).Label(c.loc.weekdayLong(wd)).
 			Child(Text(c.loc.weekdayShort(wd)).NoWrap()))
 	}
@@ -232,24 +232,24 @@ func rangeShade(start, end, pending, hover, focus time.Time, enabled func(day ti
 // 1-based). It is a data item of the grid, named by the long date of the day. It is selected when the
 // day is the chosen one, or the start or the end of a range. A day between the ends of a range is
 // drawn with the look of the band, and a day that cannot be chosen is disabled.
-func calendarDay(c calendarView, s *Strings, day time.Time, row, col int) *DivElement {
+func calendarDay(c *calendarView, s *Strings, day time.Time, row, col int) *DivElement {
 	st := c.st
 	start := !c.from.IsZero() && sameDay(day, c.from)
 	end := !c.to.IsZero() && sameDay(day, c.to)
 	between := !c.from.IsZero() && !c.to.IsZero() && day.After(c.from) && day.Before(c.to)
 	on := start || end || (!c.value.IsZero() && sameDay(day, c.value))
 	ok := c.enabled(day)
-	cell := Div().asPart(c.widget + ".Day").Style(st.Day).Role(access.RoleDataItem).
+	cell := Div().asPart(c.widget + ".Day").styleOf(&st.Day).Role(access.RoleDataItem).
 		Label(c.loc.longDate(day)).Child(Text(strconv.Itoa(day.Day())).NoWrap())
 	a := cell.access()
 	cell.AccessCell(row, col).AccessSelected(on)
 	if day.Month() != c.focus.Month() || day.Year() != c.focus.Year() {
-		cell.Style(st.DayOutsideMonth)
+		cell.styleOf(&st.DayOutsideMonth)
 	}
 	// The description tells what the day is in the calendar: today, and its place in a range.
 	var notes []string
 	if sameDay(day, c.today) {
-		cell.Style(st.DayToday)
+		cell.styleOf(&st.DayToday)
 		notes = append(notes, s.Today)
 	}
 	if start {
@@ -259,21 +259,21 @@ func calendarDay(c calendarView, s *Strings, day time.Time, row, col int) *DivEl
 		notes = append(notes, s.EndOfRange)
 	}
 	if between {
-		cell.Style(st.DayInRange)
+		cell.styleOf(&st.DayInRange)
 		notes = append(notes, s.InRange)
 	}
 	if len(notes) > 0 {
 		cell.Description(strings.Join(notes, ", "))
 	}
 	if on {
-		cell.Style(st.DaySelected)
+		cell.styleOf(&st.DaySelected)
 	}
 	if !ok {
 		a.disabled = true
-		cell.Style(st.DayDisabled)
+		cell.styleOf(&st.DayDisabled)
 	} else {
 		pick := c.pick // the closure keeps the function, not the whole calendar
-		cell.Hover(st.DayHover).Cursor(CursorPointer).OnClick(func() { pick(day) })
+		cell.hoverOf(&st.DayHover).Cursor(CursorPointer).OnClick(func() { pick(day) })
 	}
 	if hover := c.hover; hover != nil {
 		cell.OnMouseEnter(func() { hover(day) })
@@ -281,7 +281,7 @@ func calendarDay(c calendarView, s *Strings, day time.Time, row, col int) *DivEl
 	if sameDay(day, c.focus) {
 		a.highlighted = true
 		if c.ring {
-			cell.Style(st.DayFocusVisible)
+			cell.styleOf(&st.DayFocusVisible)
 		}
 	}
 	return cell
@@ -329,13 +329,13 @@ type CalendarStyle struct {
 	DayFocusVisible Style
 }
 
-// calendarDefaults returns the built-in look of a calendar at the Text size scale, from the colors
+// calendarDefaults sets d to the built-in look of a calendar at the Text size scale, from the colors
 // of t. The days, the header and the weekday names are also those of the pickers' calendars (see
 // datePickerDefaults), and the band between the ends of a range is that of a DateRangePicker.
-func calendarDefaults(t *Theme, scale float32) CalendarStyle {
+func calendarDefaults(d *CalendarStyle, t *Theme, scale float32) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	cell := dayCellSize * scale
-	d := CalendarStyle{
+	*d = CalendarStyle{
 		Root: Style{Direction: Column, Gap: 4 * scale, Padding: All(8 * scale), Background: t.Surface,
 			BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius, NoShrink: true, fitWidth: true},
 		RootDisabled: Style{Opacity: 0.5},
@@ -367,17 +367,15 @@ func calendarDefaults(t *Theme, scale float32) CalendarStyle {
 		d.DayDisabled = Style{Opacity: 0.45}
 		d.DayOutsideMonth = Style{TextColor: t.TextSubtle}
 	}
-	return d
 }
 
-// resolveCalendar returns the look of a calendar: the defaults, merged with the theme's Calendar
+// resolveCalendar sets st to the look of a calendar: the defaults, merged with the theme's Calendar
 // and then the instance's Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveCalendar(ctx *Context, scale float32, inst CalendarStyle) CalendarStyle {
+func resolveCalendar(ctx *Context, scale float32, inst, st *CalendarStyle) {
 	t := ctx.Theme()
-	st := calendarDefaults(t, scale)
+	calendarDefaults(st, t, scale)
 	st.layered(ctx,
-		themeLayer(&t.Calendar), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Calendar), instanceLayer(inst))
 }
 
 // dayAllowed reports whether day can be chosen: it is not before earliest or after latest (a zero
@@ -429,8 +427,8 @@ func (o *calendarOptions) first(loc *dateLocale) time.Weekday {
 // view returns the panel of a calendar on the page, which shows c with the settings of o. The panel
 // is a Tab stop with the keys of keys, unless the calendar is disabled. The rest of c (the value or
 // the range, and the functions) is the caller's.
-func (o *calendarOptions) view(ctx *Context, c calendarView, keys func(e *KeyEvent)) *DivElement {
-	root := Div().asPart("Calendar.Root").Style(c.st.Root).Tooltip(o.tooltip)
+func (o *calendarOptions) view(ctx *Context, c *calendarView, keys func(e *KeyEvent)) *DivElement {
+	root := Div().asPart("Calendar.Root").styleOf(&c.st.Root).Tooltip(o.tooltip)
 	if o.key != "" {
 		root.Key(o.key)
 	}
@@ -441,7 +439,7 @@ func (o *calendarOptions) view(ctx *Context, c calendarView, keys func(e *KeyEve
 	c.firstSet, c.firstDay, c.disabled = o.firstSet, o.firstDay, o.disabled
 	if o.disabled {
 		root.access().disabled = true
-		root.Style(c.st.RootDisabled).Cursor(CursorNotAllowed)
+		root.styleOf(&c.st.RootDisabled).Cursor(CursorNotAllowed)
 	} else {
 		root.Focusable().OnKeyDown(keys)
 		if o.focusHandle != nil {
@@ -561,8 +559,10 @@ func (c *CalendarElement) GridSpan(cols, rows int) *CalendarElement {
 // Styles sets the look of the parts of the calendar, for this instance only. Set fields win
 // over the theme's Calendar and the defaults; see CalendarStyle and docs/styling.md. Calling
 // Styles again merges with the earlier values.
-func (c *CalendarElement) Styles(st CalendarStyle) *CalendarElement {
-	c.styles.mergeFrom(&st, false)
+func (c *CalendarElement) Styles(st CalendarStyle) *CalendarElement { return c.stylesOf(&st) }
+
+func (c *CalendarElement) stylesOf(st *CalendarStyle) *CalendarElement {
+	c.styles.mergeFrom(st, false)
 	return c
 }
 
@@ -572,7 +572,8 @@ func (c *CalendarElement) expand(ctx *Context) Element {
 		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
-		st := resolveCalendar(ctx, scale, c.styles)
+		var st CalendarStyle
+		resolveCalendar(ctx, scale, &c.styles, &st)
 		v := c.value.Get()
 		today := dayOf(rt.now())
 		start := today
@@ -616,7 +617,7 @@ func (c *CalendarElement) expand(ctx *Context) Element {
 			}
 		}
 		keys := func(e *KeyEvent) { calendarKeys(e, focus.Peek(), c.first(loc), moveTo, pick, nil) }
-		return c.view(ctx, calendarView{st: st, loc: loc, scale: scale, value: v, focus: focus.Get(), today: today,
+		return c.view(ctx, &calendarView{st: &st, loc: loc, scale: scale, value: v, focus: focus.Get(), today: today,
 			fallback: s.DateField, move: moveTo, pick: pick, enabled: c.enabled}, keys)
 	})
 }
@@ -746,8 +747,10 @@ func (c *CalendarRangeElement) GridSpan(cols, rows int) *CalendarRangeElement {
 // Styles sets the look of the parts of the calendar, for this instance only. Set fields win over
 // the theme's Calendar and the defaults; see CalendarStyle and docs/styling.md. Calling Styles
 // again merges with the earlier values.
-func (c *CalendarRangeElement) Styles(st CalendarStyle) *CalendarRangeElement {
-	c.styles.mergeFrom(&st, false)
+func (c *CalendarRangeElement) Styles(st CalendarStyle) *CalendarRangeElement { return c.stylesOf(&st) }
+
+func (c *CalendarRangeElement) stylesOf(st *CalendarStyle) *CalendarRangeElement {
+	c.styles.mergeFrom(st, false)
 	return c
 }
 
@@ -757,7 +760,8 @@ func (c *CalendarRangeElement) expand(ctx *Context) Element {
 		s := ctx.Strings()
 		loc := currentLocale()
 		scale := textScale(ctx)
-		st := resolveCalendar(ctx, scale, c.styles)
+		var st CalendarStyle
+		resolveCalendar(ctx, scale, &c.styles, &st)
 		cur := dateRange{start: c.start.Get(), end: c.end.Get()}
 		today := dayOf(rt.now())
 		first := today
@@ -823,7 +827,7 @@ func (c *CalendarRangeElement) expand(ctx *Context) Element {
 			calendarKeys(e, focus.Peek(), c.first(loc), moveTo, pick, shut)
 		}
 		from, to := rangeShade(cur.start, cur.end, pending.Get(), hover.Get(), focus.Get(), c.enabled)
-		root := c.view(ctx, calendarView{st: st, loc: loc, scale: scale, from: from, to: to, focus: focus.Get(),
+		root := c.view(ctx, &calendarView{st: &st, loc: loc, scale: scale, from: from, to: to, focus: focus.Get(),
 			today: today, fallback: s.DateRangeField, move: moveTo, pick: pick, enabled: c.enabled,
 			hover: func(day time.Time) { hover.Set(day) }}, keys)
 		if !c.disabled {

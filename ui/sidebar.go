@@ -69,12 +69,12 @@ type SidebarStyle struct {
 	Toggle           Style // the button that collapses and expands the sidebar
 }
 
-// sidebarDefaults returns the built-in look of a sidebar, from the colors of t.
+// sidebarDefaults sets d to the built-in look of a sidebar, from the colors of t.
 // Under high contrast the selected item is the Accent color with AccentText on
 // it, and the borders are in Text.
-func sidebarDefaults(t *Theme) SidebarStyle {
+func sidebarDefaults(d *SidebarStyle, t *Theme) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
-	d := SidebarStyle{
+	*d = SidebarStyle{
 		Pane: Style{Gap: 2, Padding: All(6), Background: t.Panel, BorderEdges: Edges{Right: 1}, BorderColor: t.Border},
 		Item: Style{Direction: Row, Align: Center, Gap: 10, MinHeight: Px(36), NoShrink: true,
 			Radius: t.Radius / 2, Padding: XY(10, 0), TextColor: t.Text},
@@ -98,18 +98,16 @@ func sidebarDefaults(t *Theme) SidebarStyle {
 	} else {
 		d.ItemDisabled = Style{Opacity: 0.5}
 	}
-	return d
 }
 
-// resolveSidebar returns the look of a sidebar: the defaults, merged with the
+// resolveSidebar sets st to the look of a sidebar: the defaults, merged with the
 // theme's Sidebar and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveSidebar(ctx *Context, inst SidebarStyle) SidebarStyle {
+func resolveSidebar(ctx *Context, inst, st *SidebarStyle) {
 	t := ctx.Theme()
-	st := sidebarDefaults(t)
+	sidebarDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Sidebar), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Sidebar), instanceLayer(inst))
 }
 
 // SidebarElement is a vertical navigation pane, as the left pane of WinUI's
@@ -183,8 +181,10 @@ func (s *SidebarElement) OnChange(fn func(key string)) *SidebarElement { s.onCha
 // Styles sets the look of the parts of the sidebar, for this instance only. Set
 // fields win over the theme's Sidebar and the defaults; see SidebarStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (s *SidebarElement) Styles(st SidebarStyle) *SidebarElement {
-	s.styles.mergeFrom(&st, false)
+func (s *SidebarElement) Styles(st SidebarStyle) *SidebarElement { return s.stylesOf(&st) }
+
+func (s *SidebarElement) stylesOf(st *SidebarStyle) *SidebarElement {
+	s.styles.mergeFrom(st, false)
 	return s
 }
 
@@ -236,7 +236,8 @@ func (s *SidebarElement) scope() string {
 func (s *SidebarElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		t := ctx.Theme()
-		st := resolveSidebar(ctx, s.styles)
+		var st SidebarStyle
+		resolveSidebar(ctx, &s.styles, &st)
 		cur := s.selected.Get()
 		collapsed := s.collapsed != nil && s.collapsed.Get()
 		reflow := t.Motion.ReflowSpring()
@@ -289,15 +290,15 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 			on := i == sel
 			// The item springs to its new width as the sidebar collapses and
 			// expands, clipping its label while it moves.
-			row := Div().asPart("Sidebar.Item").Key(scope+"/item:"+it.Key).Style(st.Item).
+			row := Div().asPart("Sidebar.Item").Key(scope+"/item:"+it.Key).styleOf(&st.Item).
 				listItem(pos, size).Label(it.Label).AccessSelected(on).springBox(reflow, false)
 			if on {
-				row.Style(st.ItemSelected)
+				row.styleOf(&st.ItemSelected)
 			}
 			if on && !s.noIndicator {
 				// The bar is the selection's mark that is not a color, in the expanded and
 				// the collapsed sidebar alike.
-				row.Child(Div().asPart("Sidebar.Indicator").Absolute().Left(0).Top(8).Bottom(8).Style(st.Indicator))
+				row.Child(Div().asPart("Sidebar.Indicator").Absolute().Left(0).Top(8).Bottom(8).styleOf(&st.Indicator))
 			}
 			if collapsed {
 				row.Justify(Center).Tooltip(it.Label)
@@ -321,13 +322,13 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 			}
 			if it.Disabled {
 				row.access().disabled = true
-				row.Style(st.ItemDisabled).Cursor(CursorNotAllowed)
+				row.styleOf(&st.ItemDisabled).Cursor(CursorNotAllowed)
 				return row
 			}
 			if !on {
-				row.Hover(st.ItemHover)
+				row.hoverOf(&st.ItemHover)
 			}
-			row.Cursor(CursorPointer).Focusable().FocusHandle(handles[it.Key]).FocusVisible(st.ItemFocusVisible)
+			row.Cursor(CursorPointer).Focusable().FocusHandle(handles[it.Key]).focusVisibleOf(&st.ItemFocusVisible)
 			if i != stop {
 				row.TabStop(false) // reached with the arrow keys, not Tab
 			}
@@ -362,7 +363,7 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 		pos := 0
 		for i, it := range s.items {
 			if it.divider {
-				list.Child(Div().asPart("Sidebar.Divider").Keyf("%s/divider:%d", scope, i).AccessHidden().Style(st.Divider))
+				list.Child(Div().asPart("Sidebar.Divider").Keyf("%s/divider:%d", scope, i).AccessHidden().styleOf(&st.Divider))
 				continue
 			}
 			if it.heading {
@@ -370,9 +371,9 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 				if collapsed {
 					// A heading is a thin rule when the sidebar is collapsed, and its label is
 					// not drawn.
-					h.Style(st.Divider)
+					h.styleOf(&st.Divider)
 				} else {
-					h.Style(st.Heading).Child(Div().heldContent().Child(Text(it.Label).NoWrap()))
+					h.styleOf(&st.Heading).Child(Div().heldContent().Child(Text(it.Label).NoWrap()))
 				}
 				list.Child(h)
 				continue
@@ -386,11 +387,11 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 		// moves. What is beside it takes its new place at once, unless it
 		// springs itself (ChildrenLayoutSpring on the row).
 		pane := Div().asPart("Sidebar.Pane").Key(scope).Column().Role(access.RoleGroup).Label(name).
-			Style(Style{Width: Px(sidebarWidth * textScale(ctx))}).Style(st.Pane).Tooltip(s.tooltip).
+			styleOf(&Style{Width: Px(sidebarWidth * textScale(ctx))}).styleOf(&st.Pane).Tooltip(s.tooltip).
 			springBox(reflow, true)
 		if collapsed {
 			w := Px(sidebarCollapsedWidth)
-			pane.Style(Style{Width: w, MinWidth: w, MaxWidth: w})
+			pane.styleOf(&Style{Width: w, MinWidth: w, MaxWidth: w})
 		} else {
 			s.size.apply(pane)
 		}
@@ -400,9 +401,9 @@ func (s *SidebarElement) expand(ctx *Context) Element {
 				label = strs.ExpandNavigation
 			}
 			c := s.collapsed
-			pane.Child(Div().asPart("Sidebar.Toggle").Key(scope + "/toggle").Style(st.Toggle).
+			pane.Child(Div().asPart("Sidebar.Toggle").Key(scope + "/toggle").styleOf(&st.Toggle).
 				Role(access.RoleButton).Label(label).AccessExpanded(!collapsed).
-				Cursor(CursorPointer).Focusable().FocusVisible(Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}).
+				Cursor(CursorPointer).Focusable().focusVisibleOf(&Style{Shadows: []Shadow{{Spread: 2, Color: t.FocusRing}}}).
 				OnClick(func() { c.Set(!c.Peek()) }).
 				Child(Icon(icons.Menu).Size(16)))
 		}

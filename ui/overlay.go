@@ -144,27 +144,27 @@ type TooltipStyle struct {
 	Text  Style // the text in it
 }
 
-// tooltipDefaults returns the built-in look of a tooltip, from the colors of t.
-func tooltipDefaults(t *Theme) TooltipStyle {
-	return TooltipStyle{Panel: Style{Padding: XY(8, 4), Radius: 6, Background: t.Surface, BorderWidth: 1,
+// tooltipDefaults sets d to the built-in look of a tooltip, from the colors of t.
+func tooltipDefaults(d *TooltipStyle, t *Theme) {
+	*d = TooltipStyle{Panel: Style{Padding: XY(8, 4), Radius: 6, Background: t.Surface, BorderWidth: 1,
 		BorderColor: t.Border, Shadows: []Shadow{ShadowMd}, TextColor: t.Text, FontSize: 12}}
 }
 
-// resolveTooltip returns the look of a tooltip: the defaults, merged with the
+// resolveTooltip sets st to the look of a tooltip: the defaults, merged with the
 // theme's Tooltip. Under high contrast the override is plain (see plainStyle).
-func resolveTooltip(t *Theme) TooltipStyle {
-	st := tooltipDefaults(t)
+func resolveTooltip(t *Theme, st *TooltipStyle) {
+	tooltipDefaults(st, t)
 	st.mergeFrom(&t.Tooltip, t.HighContrast)
-	return st
 }
 
 // tooltipElement builds the label shown for a tooltip. It fades in and out.
 func (rt *Runtime) tooltipElement(s string) Element {
-	st := resolveTooltip(rt.theme)
-	return Div().asPart("Tooltip.Panel").Key("jamb.tooltip").Overlay(BelowCenter).OverlayGap(6).Style(st.Panel).
+	var st TooltipStyle
+	resolveTooltip(rt.theme, &st)
+	return Div().asPart("Tooltip.Panel").Key("jamb.tooltip").Overlay(BelowCenter).OverlayGap(6).styleOf(&st.Panel).
 		Enter(Fade(), Animation{Duration: rt.theme.Motion.enter(120 * time.Millisecond)}).
 		Exit(Fade(), Animation{Duration: rt.theme.Motion.exit(80 * time.Millisecond)}).
-		Child(Div().asPart("Tooltip.Text").Style(st.Text).Child(Text(s).NoWrap())).Role(access.RoleTooltip)
+		Child(Div().asPart("Tooltip.Text").styleOf(&st.Text).Child(Text(s).NoWrap())).Role(access.RoleTooltip)
 }
 
 // showTip makes id the element whose tooltip is displayed (0 hides it),

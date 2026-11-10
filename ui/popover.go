@@ -59,30 +59,33 @@ type PopoverStyle struct {
 	Panel Style // the floating panel that holds the content
 }
 
-// popoverDefaults returns the built-in look of a popover, from the colors of t:
+// popoverDefaults sets d to the built-in look of a popover, from the colors of t:
 // the surface and border of a menu, with room around the content.
-func popoverDefaults(t *Theme) PopoverStyle {
-	return PopoverStyle{Panel: Style{Direction: Column, Gap: 10, Padding: All(14), Background: t.Surface,
+func popoverDefaults(d *PopoverStyle, t *Theme) {
+	*d = PopoverStyle{Panel: Style{Direction: Column, Gap: 10, Padding: All(14), Background: t.Surface,
 		BorderWidth: 1, BorderColor: t.Border, Radius: t.Radius, Shadows: []Shadow{ShadowMd}}}
 }
 
-func resolvePopover(ctx *Context, inst PopoverStyle) PopoverStyle {
+func resolvePopover(ctx *Context, inst, st *PopoverStyle) {
 	t := ctx.Theme()
-	st := popoverDefaults(t)
+	popoverDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Popover), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Popover), instanceLayer(inst))
 }
 
 // Styles sets the look of the panel, for this instance only. Set fields win
 // over the theme's Popover and the defaults. Calling Styles again merges.
-func (p *PopoverElement) Styles(st PopoverStyle) *PopoverElement {
-	p.styles.mergeFrom(&st, false)
+func (p *PopoverElement) Styles(st PopoverStyle) *PopoverElement { return p.stylesOf(&st) }
+
+func (p *PopoverElement) stylesOf(st *PopoverStyle) *PopoverElement {
+	p.styles.mergeFrom(st, false)
 	return p
 }
 
 func (p *PopoverElement) expand(ctx *Context) Element {
-	trigger, content, placement, label, styles, onChange := p.trigger, p.content, p.placement, p.label, p.styles, p.onChange
+	trigger, content, placement, label, onChange := p.trigger, p.content, p.placement, p.label, p.onChange
+	styles := new(PopoverStyle)
+	copyLarge(styles, &p.styles)
 	return Component(func(ctx *Context) Element {
 		rt := ctx.rt
 		open := Local(ctx, "open", false)
@@ -144,8 +147,9 @@ func (p *PopoverElement) expand(ctx *Context) Element {
 			}
 		}
 		if open.Get() {
-			st := resolvePopover(ctx, styles)
-			panel := Div().asPart("Popover.Panel").Overlay(placement).OverlayGap(6).Style(st.Panel).
+			var st PopoverStyle
+			resolvePopover(ctx, styles, &st)
+			panel := Div().asPart("Popover.Panel").Overlay(placement).OverlayGap(6).styleOf(&st.Panel).
 				Role(access.RoleDialog).Label(name).
 				// The panel takes focus when it opens, and hands it to its first field
 				// or button; a click on its background keeps focus inside it.

@@ -94,7 +94,7 @@ func TestAlertDialogDestructive(t *testing.T) {
 	if !a.r.focusedAccess(t, access.RoleButton, "Cancel") {
 		t.Fatal("a destructive dialog does not open on Cancel")
 	}
-	danger := buttonDefaults(a.r.rt.theme, ButtonDanger, sizeDefault, false).Root.Background
+	danger := look(func(st *ButtonStyle) { buttonDefaults(st, a.r.rt.theme, ButtonDanger, sizeDefault, false) }).Root.Background
 	confirm := partNodes(a.r.rt, "Button.Root")
 	found := false
 	for _, n := range confirm {

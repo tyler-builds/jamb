@@ -541,21 +541,21 @@ func captionButtons(atStart bool) Element {
 				// pointer and while pressed, as libadwaita draws them.
 				icon := Icon(ic).Size(14)
 				if b == captionMinimize {
-					icon.Style(Style{Margin: Edges{Top: 7}}) // GNOME's minimize is a low line
+					icon.styleOf(&Style{Margin: Edges{Top: 7}}) // GNOME's minimize is a low line
 				}
 				d.Size(Px(24), Px(24)).Radius(12).Shrink(0).TextColor(t.Text).
 					Background(t.Text.Alpha(0.1)).
-					Hover(Style{Background: t.Text.Alpha(0.15)}).
-					Pressed(Style{Background: t.Text.Alpha(0.3)}).
+					hoverOf(&Style{Background: t.Text.Alpha(0.15)}).
+					pressedOf(&Style{Background: t.Text.Alpha(0.3)}).
 					Child(icon)
 			} else {
 				d.Width(Px(46)).MinHeight(Px(32)).AlignSelf(Stretch).TextColor(t.TextMuted).
-					Hover(Style{Background: t.SurfaceHover, TextColor: t.Text}).
-					Pressed(Style{Background: t.SurfaceActive, TextColor: t.Text}).
+					hoverOf(&Style{Background: t.SurfaceHover, TextColor: t.Text}).
+					pressedOf(&Style{Background: t.SurfaceActive, TextColor: t.Text}).
 					Child(Icon(ic).Size(10))
 				if b == captionClose {
-					d.Hover(Style{Background: Hex("#e81123"), TextColor: Hex("#ffffff")}).
-						Pressed(Style{Background: Hex("#f1707a"), TextColor: Hex("#ffffff")})
+					d.hoverOf(&Style{Background: Hex("#e81123"), TextColor: Hex("#ffffff")}).
+						pressedOf(&Style{Background: Hex("#f1707a"), TextColor: Hex("#ffffff")})
 				}
 			}
 			// The native hit test does the press, and the runtime leaves a

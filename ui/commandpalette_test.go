@@ -473,7 +473,8 @@ func testCommandPaletteParts(t *testing.T, applied map[string]bool) {
 // The defaults never change the weight of the text for the highlighted row.
 func TestCommandPaletteHighlightKeepsTheWeight(t *testing.T) {
 	for _, th := range []*Theme{DarkTheme(), LightTheme(), HighContrastTheme(HighContrastBlack(), DarkTheme())} {
-		d := commandPaletteDefaults(th)
+		var d CommandPaletteStyle
+		commandPaletteDefaults(&d, th)
 		if d.ItemHighlighted.FontWeight != 0 || d.Item.FontWeight != 0 {
 			t.Errorf("the defaults set a font weight on a row: %v, %v", d.Item.FontWeight, d.ItemHighlighted.FontWeight)
 		}

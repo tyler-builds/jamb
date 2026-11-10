@@ -23,12 +23,12 @@ type PaginationStyle struct {
 	Ellipsis    Style // the "..." where pages are skipped
 }
 
-// paginationDefaults returns the built-in look of a pagination control, from the
+// paginationDefaults sets d to the built-in look of a pagination control, from the
 // colors of t. The current page is filled with Accent, as a selected segment is.
-func paginationDefaults(t *Theme) PaginationStyle {
+func paginationDefaults(d *PaginationStyle, t *Theme) {
 	cell := Style{Direction: Row, Align: Center, Justify: Center, MinWidth: Px(32), MinHeight: Px(32),
 		Padding: XY(6, 0), Radius: t.Radius, NoShrink: true, TextColor: t.TextMuted, Transition: t.Motion.hover(), Spring: t.Motion.Spring}
-	return PaginationStyle{
+	*d = PaginationStyle{
 		Bar:         Style{Direction: Row, Align: Center, Gap: 4, fitWidth: true, TextColor: t.Text},
 		Page:        cell,
 		PageHover:   Style{Background: t.SurfaceHover, TextColor: t.Text},
@@ -48,15 +48,14 @@ func paginationDisabled(t *Theme) Style {
 	return Style{Opacity: 0.5}
 }
 
-// resolvePagination returns the look of a pagination control: the defaults, merged
+// resolvePagination sets st to the look of a pagination control: the defaults, merged
 // with the theme's Pagination and then the instance's Styles. Under high contrast
 // the two overrides are plain (see plainStyle).
-func resolvePagination(ctx *Context, inst PaginationStyle) PaginationStyle {
+func resolvePagination(ctx *Context, inst, st *PaginationStyle) {
 	t := ctx.Theme()
-	st := paginationDefaults(t)
+	paginationDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Pagination), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Pagination), instanceLayer(inst))
 }
 
 // pageSlots returns the pages to show of a control over pages pages, in order, with
@@ -200,7 +199,8 @@ func (p *PaginationElement) choose(n int) {
 func (p *PaginationElement) expand(ctx *Context) Element {
 	return Component(func(ctx *Context) Element {
 		th := ctx.Theme()
-		st := resolvePagination(ctx, p.styles)
+		var st PaginationStyle
+		resolvePagination(ctx, &p.styles, &st)
 		s := ctx.Strings()
 		pages := max(p.pages, 1)
 		cur := min(max(p.page.Get(), 1), pages)
@@ -208,53 +208,54 @@ func (p *PaginationElement) expand(ctx *Context) Element {
 		if name == "" {
 			name = s.Pagination
 		}
-		bar := p.size.apply(Div().asPart("Pagination.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().Style(st.Bar).
+		bar := p.size.apply(Div().asPart("Pagination.Bar").Role(access.RoleGroup).Label(name).SelectionContainer().styleOf(&st.Bar).
 			Tooltip(p.tooltip))
-		bar.Child(p.nav(th, st, "previous", s.PreviousPage, icons.ChevronLeft, cur-1, cur > 1))
+		bar.Child(p.nav(th, &st, "previous", s.PreviousPage, icons.ChevronLeft, cur-1, cur > 1))
 		if p.compact {
 			bar.Child(Text(s.PageOf(cur, pages)).NoWrap())
 		} else {
 			for _, n := range pageSlots(cur, pages, p.siblings) {
 				if n == 0 {
-					bar.Child(Div().asPart("Pagination.Ellipsis").AccessHidden().Style(st.Ellipsis).Child(Text("...").NoWrap()))
+					bar.Child(Div().asPart("Pagination.Ellipsis").AccessHidden().styleOf(&st.Ellipsis).Child(Text("...").NoWrap()))
 					continue
 				}
-				bar.Child(p.cell(s, th, st, n, cur))
+				bar.Child(p.cell(s, th, &st, n, cur))
 			}
 		}
-		bar.Child(p.nav(th, st, "next", s.NextPage, icons.ChevronRight, cur+1, cur < pages))
+		bar.Child(p.nav(th, &st, "next", s.NextPage, icons.ChevronRight, cur+1, cur < pages))
 		return bar
 	})
 }
 
 // cell returns the button of page n. The current page, cur, is drawn filled and is
 // not a button: it is named as the current page and is selected in the group.
-func (p *PaginationElement) cell(s *Strings, th *Theme, st PaginationStyle, n, cur int) *DivElement {
+func (p *PaginationElement) cell(s *Strings, th *Theme, st *PaginationStyle, n, cur int) *DivElement {
 	key := p.scope() + fmt.Sprintf("/page:%d", n)
 	label := fmt.Sprint(n)
 	if n == cur {
-		return Div().asPart("Pagination.Page").Key(key).Style(st.Page.Merge(st.PageCurrent)).
+		return Div().asPart("Pagination.Page").Key(key).styleOf(&st.Page).styleOf(&st.PageCurrent).
 			Role(access.RoleStaticText).Label(s.CurrentPage(n)).AccessSelected(true).
 			Child(Text(label).NoWrap())
 	}
 	ring := Shadow{Spread: 2, Color: th.FocusRing}
-	return Div().asPart("Pagination.Page").Key(key).Style(st.Page).
-		Role(access.RoleButton).Label(s.Page(n)).Hover(st.PageHover).
-		Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
+	return Div().asPart("Pagination.Page").Key(key).styleOf(&st.Page).
+		Role(access.RoleButton).Label(s.Page(n)).hoverOf(&st.PageHover).
+		Focusable().focusVisibleOf(&Style{Shadows: []Shadow{ring}}).
 		OnClick(func() { p.choose(n) }).Child(Text(label).NoWrap())
 }
 
 // nav returns the Previous or the Next button, which goes to page to. A button that
 // is not enabled is dimmed and cannot be chosen.
-func (p *PaginationElement) nav(th *Theme, st PaginationStyle, key, name string, ic *icons.Icon, to int, enabled bool) *DivElement {
-	d := Div().asPart("Pagination.Nav").Key(p.scope() + "/" + key).Style(st.Nav).
+func (p *PaginationElement) nav(th *Theme, st *PaginationStyle, key, name string, ic *icons.Icon, to int, enabled bool) *DivElement {
+	d := Div().asPart("Pagination.Nav").Key(p.scope() + "/" + key).styleOf(&st.Nav).
 		Role(access.RoleButton).Label(name).Child(Icon(ic).Size(16))
 	if !enabled {
-		d.Style(paginationDisabled(th)).Cursor(CursorNotAllowed)
+		disabled := paginationDisabled(th)
+		d.styleOf(&disabled).Cursor(CursorNotAllowed)
 		d.access().disabled = true
 		return d
 	}
 	ring := Shadow{Spread: 2, Color: th.FocusRing}
-	return d.Hover(st.PageHover).Focusable().FocusVisible(Style{Shadows: []Shadow{ring}}).
+	return d.hoverOf(&st.PageHover).Focusable().focusVisibleOf(&Style{Shadows: []Shadow{ring}}).
 		OnClick(func() { p.choose(to) })
 }

@@ -99,7 +99,7 @@ func (r *dateRangeRig) clearText(t *testing.T) {
 // dateRangeLooks returns the fill of a day between the ends of a range and the radius of a day, in
 // the dark theme at the Text size of 100 percent.
 func dateRangeLooks() (fill Color, dayRadius float32) {
-	d := dateRangePickerDefaults(DarkTheme(), 1, false)
+	d := look(func(st *DateRangePickerStyle) { dateRangePickerDefaults(st, DarkTheme(), 1, false) })
 	return d.DayInRange.Background, d.Day.Radius
 }
 

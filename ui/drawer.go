@@ -78,7 +78,7 @@ func (d *DrawerElement) NonModal() *DrawerElement { d.m.NonModal(); return d }
 func (d *DrawerElement) CloseOnClickOutside() *DrawerElement { d.m.CloseOnClickOutside(); return d }
 
 // Styles sets the look of the parts of the drawer, for this instance only.
-func (d *DrawerElement) Styles(st DrawerStyle) *DrawerElement { d.m.Styles(st); return d }
+func (d *DrawerElement) Styles(st DrawerStyle) *DrawerElement { d.m.stylesOf(&st); return d }
 
 // The sizing methods size the panel across its side: the width of a left or
 // right drawer (360 px by default) and the height of a top or bottom one (280 px).
@@ -100,27 +100,25 @@ func (d *DrawerElement) MinHeight(l Length) *DrawerElement { d.m.size.setMinHeig
 // MaxHeight sets the largest height of the drawer.
 func (d *DrawerElement) MaxHeight(l Length) *DrawerElement { d.m.size.setMaxHeight(l); return d }
 
-// drawerDefaults returns the built-in look of a drawer at side, from the colors
+// drawerDefaults sets d to the built-in look of a drawer at side, from the colors
 // of t: a modal's parts, with a square panel against the window's edge.
-func drawerDefaults(t *Theme, side DrawerSide) DrawerStyle {
-	d := modalDefaults(t)
+func drawerDefaults(d *DrawerStyle, t *Theme, side DrawerSide) {
+	modalDefaults(d, t)
 	d.Panel.Radius = 0
 	d.Panel.Width, d.Panel.Height = Px(drawerWidth), Auto
 	if side == DrawerTop || side == DrawerBottom {
 		d.Panel.Width, d.Panel.Height = Auto, Px(drawerHeight)
 	}
-	return d
 }
 
-// resolveDrawer returns the look of a drawer: the defaults, merged with the
+// resolveDrawer sets st to the look of a drawer: the defaults, merged with the
 // theme's Drawer and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveDrawer(ctx *Context, side DrawerSide, inst DrawerStyle) DrawerStyle {
+func resolveDrawer(ctx *Context, side DrawerSide, inst, st *DrawerStyle) {
 	t := ctx.Theme()
-	st := drawerDefaults(t, side)
+	drawerDefaults(st, t, side)
 	st.layered(ctx,
-		themeLayer(&t.Drawer), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Drawer), instanceLayer(inst))
 }
 
 // Edge placements put a drawer's panel against a side of its anchor, the

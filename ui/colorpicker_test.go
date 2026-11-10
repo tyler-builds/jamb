@@ -426,11 +426,12 @@ func TestColorPickerTooltipAndLabelledBy(t *testing.T) {
 // disabled color under high contrast, and dimmed otherwise.
 func TestColorPickerDisabledHighContrast(t *testing.T) {
 	hc := HighContrastTheme(HighContrastBlack(), DarkTheme())
-	d := colorPickerDefaults(hc)
+	var d ColorPickerStyle
+	colorPickerDefaults(&d, hc)
 	if d.TriggerDisabled.TextColor != hc.Disabled || d.TriggerDisabled.BorderColor != hc.Disabled || d.TriggerDisabled.Opacity != 0 {
 		t.Errorf("high contrast disabled trigger %+v, want the disabled color and no opacity", d.TriggerDisabled)
 	}
-	if d := colorPickerDefaults(DarkTheme()); d.TriggerDisabled.Opacity != 0.5 {
+	if d := look(func(st *ColorPickerStyle) { colorPickerDefaults(st, DarkTheme()) }); d.TriggerDisabled.Opacity != 0.5 {
 		t.Errorf("disabled trigger opacity %v, want 0.5", d.TriggerDisabled.Opacity)
 	}
 }

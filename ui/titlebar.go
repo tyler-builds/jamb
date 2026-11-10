@@ -25,27 +25,25 @@ const (
 	titleCenterKey = "titlebar.center"
 )
 
-// titleBarDefaults returns the built-in look of a title bar, from the colors of t
+// titleBarDefaults sets d to the built-in look of a title bar, from the colors of t
 // and the Text size scale: a strip in the panel color with a border along its
 // bottom. Under high contrast the strip is the surface color, and its border and
 // text the text color.
-func titleBarDefaults(t *Theme, scale float32) TitleBarStyle {
-	d := TitleBarStyle{
+func titleBarDefaults(d *TitleBarStyle, t *Theme, scale float32) {
+	*d = TitleBarStyle{
 		// No fill and no border: the bar is part of the window's content, as a
 		// Windows 11 title bar over Mica is, and an app that wants a band styles Bar.
 		Bar:    Style{Direction: Row, Align: Center, Height: Px(titleBarHeight * scale), NoShrink: true, TextColor: t.Text},
 		Center: Style{Direction: Row, Align: Center, Justify: Center},
 	}
-	return d
 }
 
-// resolveTitleBar returns the look of a title bar: the defaults, merged with the
+// resolveTitleBar sets st to the look of a title bar: the defaults, merged with the
 // instance's Styles. Under high contrast the overrides are plain (see plainStyle).
-func resolveTitleBar(ctx *Context, inst TitleBarStyle) TitleBarStyle {
-	st := titleBarDefaults(ctx.Theme(), textScale(ctx))
+func resolveTitleBar(ctx *Context, inst, st *TitleBarStyle) {
+	titleBarDefaults(st, ctx.Theme(), textScale(ctx))
 	st.layered(ctx,
-		instanceLayer(&inst))
-	return st
+		instanceLayer(inst))
 }
 
 // TitleBarElement is a window's own title bar, for a window with the app's
@@ -126,23 +124,28 @@ func (t *TitleBarElement) Height(l Length) *TitleBarElement { t.size.setHeight(l
 
 // Style sets the look of the bar's Bar part, for this instance only. It is the same
 // as Styles(TitleBarStyle{Bar: s}); calling it again merges.
-func (t *TitleBarElement) Style(s Style) *TitleBarElement {
-	t.styles.Bar = t.styles.Bar.Merge(s)
+func (t *TitleBarElement) Style(s Style) *TitleBarElement { return t.styleOf(&s) }
+
+func (t *TitleBarElement) styleOf(s *Style) *TitleBarElement {
+	t.styles.Bar.mergeFrom(s, false)
 	return t
 }
 
 // Styles sets the look of the parts of the bar, for this instance only. Set fields
 // win over the defaults; see TitleBarStyle and docs/styling.md. Calling Styles
 // again merges with the earlier values.
-func (t *TitleBarElement) Styles(st TitleBarStyle) *TitleBarElement {
-	t.styles.mergeFrom(&st, false)
+func (t *TitleBarElement) Styles(st TitleBarStyle) *TitleBarElement { return t.stylesOf(&st) }
+
+func (t *TitleBarElement) stylesOf(st *TitleBarStyle) *TitleBarElement {
+	t.styles.mergeFrom(st, false)
 	return t
 }
 
 func (t *TitleBarElement) expand(*Context) Element {
 	return Component(func(ctx *Context) Element {
 		th := ctx.Theme()
-		st := resolveTitleBar(ctx, t.styles)
+		var st TitleBarStyle
+		resolveTitleBar(ctx, &t.styles, &st)
 		// The content dims while the window is not focused, as the window's own title
 		// bar does. Under high contrast it keeps full strength.
 		dim := float32(1)
@@ -155,7 +158,7 @@ func (t *TitleBarElement) expand(*Context) Element {
 			// titleBarInset), and the bar renders again when they change.
 			inset := ctx.rt.titleBarInset(ctx.inst)
 			ctx.rt.watchTitleBar(ctx.inst, inset, true)
-			center = Div().Key(titleCenterKey).Style(st.Center).Absolute().Top(0).Bottom(0).
+			center = Div().Key(titleCenterKey).styleOf(&st.Center).Absolute().Top(0).Bottom(0).
 				Left(inset).Right(inset).ClipContent().Opacity(dim).Child(t.center)
 		} else {
 			ctx.rt.watchTitleBar(ctx.inst, 0, false)
@@ -176,7 +179,7 @@ func (t *TitleBarElement) expand(*Context) Element {
 		if !t.noButtons {
 			end.Child(TitleBarButtons())
 		}
-		bar := Div().Key(t.key).asPart("TitleBar.Bar").Style(st.Bar).WindowArea(WindowAreaDrag).
+		bar := Div().Key(t.key).asPart("TitleBar.Bar").styleOf(&st.Bar).WindowArea(WindowAreaDrag).
 			Child(start).Child(Div().Grow(1).MinWidth(Px(0))).Child(end)
 		if center != nil {
 			bar.Child(center)

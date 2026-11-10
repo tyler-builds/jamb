@@ -224,8 +224,10 @@ func TestToggleDisabledIsNotFocusable(t *testing.T) {
 func TestToggleStateKeepsTheWeight(t *testing.T) {
 	for _, th := range []*Theme{DarkTheme(), LightTheme(), HighContrastTheme(HighContrastBlack(), DarkTheme())} {
 		for _, v := range []ButtonVariant{ButtonGhost, ButtonSecondary} {
-			off := toggleDefaults(th, v, sizeDefault, false, false, false)
-			on := toggleDefaults(th, v, sizeDefault, false, true, false)
+			var off ToggleStyle
+			toggleDefaults(&off, th, v, sizeDefault, false, false, false)
+			var on ToggleStyle
+			toggleDefaults(&on, th, v, sizeDefault, false, true, false)
 			for _, s := range []Style{off.RootChecked, off.RootHover, off.RootPressed, off.RootFocusVisible,
 				on.RootChecked, on.RootHover, on.RootPressed} {
 				if s.FontWeight != 0 {

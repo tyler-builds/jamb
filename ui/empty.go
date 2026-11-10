@@ -19,12 +19,12 @@ type EmptyStyle struct {
 	Action      Style // the box around the action
 }
 
-// emptyDefaults returns the built-in look of an empty state, from the colors of
+// emptyDefaults sets d to the built-in look of an empty state, from the colors of
 // t: the parts centered in a column, the icon and the description muted, and the
 // title semibold in the text color. Under high contrast the icon and the
 // description are the text color.
-func emptyDefaults(t *Theme) EmptyStyle {
-	d := EmptyStyle{
+func emptyDefaults(d *EmptyStyle, t *Theme) {
+	*d = EmptyStyle{
 		Empty:       Style{Direction: Column, Align: Center, Justify: Center, Gap: 6, Padding: All(24)},
 		Icon:        Style{Padding: Edges{Bottom: 4}, TextColor: t.TextMuted},
 		Title:       Style{FontSize: 15, FontWeight: FontSemibold, TextColor: t.Text, TextAlign: Center},
@@ -34,18 +34,16 @@ func emptyDefaults(t *Theme) EmptyStyle {
 	if t.HighContrast {
 		d.Icon.TextColor, d.Description.TextColor = t.Text, t.Text
 	}
-	return d
 }
 
-// resolveEmpty returns the look of an empty state: the defaults, merged with the
+// resolveEmpty sets st to the look of an empty state: the defaults, merged with the
 // theme's Empty and then the instance's Styles. Under high contrast the two
 // overrides are plain (see plainStyle).
-func resolveEmpty(ctx *Context, inst EmptyStyle) EmptyStyle {
+func resolveEmpty(ctx *Context, inst, st *EmptyStyle) {
 	t := ctx.Theme()
-	st := emptyDefaults(t)
+	emptyDefaults(st, t)
 	st.layered(ctx,
-		themeLayer(&t.Empty), instanceLayer(&inst))
-	return st
+		themeLayer(&t.Empty), instanceLayer(inst))
 }
 
 // EmptyElement is what a list, a table or a page shows when it has nothing to
@@ -102,15 +100,18 @@ func (e *EmptyElement) GridSpan(cols, rows int) *EmptyElement { e.size.setSpan(c
 // Styles sets the look of the parts of the empty state, for this instance only.
 // Set fields win over the theme's Empty and the defaults; see EmptyStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
-func (e *EmptyElement) Styles(st EmptyStyle) *EmptyElement {
-	e.styles.mergeFrom(&st, false)
+func (e *EmptyElement) Styles(st EmptyStyle) *EmptyElement { return e.stylesOf(&st) }
+
+func (e *EmptyElement) stylesOf(st *EmptyStyle) *EmptyElement {
+	e.styles.mergeFrom(st, false)
 	return e
 }
 
 func (e *EmptyElement) expand(ctx *Context) Element {
-	st := resolveEmpty(ctx, e.styles)
+	var st EmptyStyle
+	resolveEmpty(ctx, &e.styles, &st)
 	// The box is a group named by its title, and described by its description.
-	box := Div().asPart("Empty.Empty").Style(st.Empty).Role(access.RoleGroup).Label(e.title)
+	box := Div().asPart("Empty.Empty").styleOf(&st.Empty).Role(access.RoleGroup).Label(e.title)
 	if e.desc != "" {
 		box.Description(e.desc)
 	}
@@ -119,16 +120,16 @@ func (e *EmptyElement) expand(ctx *Context) Element {
 		ic = e.icon
 	}
 	if ic != nil {
-		box.Child(Div().asPart("Empty.Icon").Style(st.Icon).Child(Icon(ic).Size(32)))
+		box.Child(Div().asPart("Empty.Icon").styleOf(&st.Icon).Child(Icon(ic).Size(32)))
 	}
 	if e.title != "" {
-		box.Child(Div().asPart("Empty.Title").Style(st.Title).Child(Text(e.title)))
+		box.Child(Div().asPart("Empty.Title").styleOf(&st.Title).Child(Text(e.title)))
 	}
 	if e.desc != "" {
-		box.Child(Div().asPart("Empty.Description").Style(st.Description).Child(Text(e.desc)))
+		box.Child(Div().asPart("Empty.Description").styleOf(&st.Description).Child(Text(e.desc)))
 	}
 	if e.action != nil {
-		box.Child(Div().asPart("Empty.Action").Style(st.Action).Child(e.action))
+		box.Child(Div().asPart("Empty.Action").styleOf(&st.Action).Child(e.action))
 	}
 	return e.size.apply(box)
 }
