@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/tyler-builds/jamb v0.0.0
-	golang.org/x/sys v0.49.0
+	golang.org/x/sys v0.50.0
 )
 
 require (
