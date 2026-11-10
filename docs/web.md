@@ -41,6 +41,15 @@ The build uses TinyGo, which runs from its official image in docker or podman (s
 `scripts/web/tinygo.sh` for its settings). `-go` before the arguments builds with Go
 instead, which is quicker to build and makes a larger, slower page.
 
+The build leaves the names of the app's functions out of `app.wasm`, where they would be 3% of
+its size, and writes them to `app.names`, one `index:name` line for each function. A stack
+trace of the app shows a function by its number, as `wasm-function[45]`, and the file gives
+its name. The page that `build.sh` makes fetches `app.names` only when the app stops because
+of an error, and shows the stack with the names; without the file it shows the numbers. Keep
+the file of each build you publish, if you do not publish it with the page, to read the stack
+traces that users send. `KEEP_NAMES=1 sh scripts/web/build.sh ...` keeps the names in
+`app.wasm` instead.
+
 `scripts/web/browser.sh` checks the demo in Chromium, as CI does: it draws the same frame with
 WebGL 2 as on the CPU, and its text fields take typing.
 
@@ -82,8 +91,8 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   for an app that cannot serve files.
 - **Frames** are paced by the browser's display frames, so a page in a background tab draws
   nothing.
-- **Panics** end the app, and the page says so: `recover` does not catch a panic in a TinyGo
-  build.
+- **Panics** end the app, and the page says so, with the error and the top of its stack:
+  `recover` does not catch a panic in a TinyGo build.
 
 ## Frames and memory
 

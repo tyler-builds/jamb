@@ -7,5 +7,5 @@
 # page fetches them (internal/text/fonts_js.go), Go Regular, 56 KB in Brotli,
 # before its first frame and the other faces when text uses them; compiled in,
 # the nine Go fonts were 315 KB of each build.
-hello 1051989
-demo 1883722
+hello 958295
+demo 1765041

@@ -8,6 +8,11 @@
 #
 # It builds with TinyGo and the web build's settings (see tinygo.sh), or with
 # Go when -go comes first: a larger and slower build that is quicker to make.
+#
+# A TinyGo build leaves the names of the app's functions out of app.wasm and
+# writes them to app.names, which the page fetches only when the app stops
+# because of an error, to name the functions of the stack it shows. Without the
+# file the page shows their numbers. KEEP_NAMES=1 keeps the names in app.wasm.
 set -eu
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
@@ -25,6 +30,7 @@ mkdir -p "$3"
 dir=$(cd "$3" && pwd)
 if $gobuild; then
 	(cd "$root/$module" && GOOS=js GOARCH=wasm go build -o "$dir/app.wasm" "$pkg")
+	rm -f "$dir/app.names" # a build with Go keeps its names
 	cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" "$dir/wasm_exec.js"
 else
 	sh "$root/scripts/web/tinygo.sh" "$module" "$pkg" "$dir/app.wasm"

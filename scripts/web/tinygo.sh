@@ -15,6 +15,13 @@
 # the main code runs on one and jamb's layout recursion overflows a smaller one,
 # which corrupts memory instead of failing cleanly.
 #
+# The build leaves the names of its functions out of OUT, where they are 3% of
+# its size, and writes them to the file OUT with .names in place of .wasm, as
+# lines of index:name. A stack trace of the build shows wasm-function[N] for
+# the function N, so keep the file with the build to read one; the page that
+# build.sh makes reads it when the app stops. KEEP_NAMES=1 keeps the names in
+# OUT instead, and writes no file.
+#
 # GOWORK passes through, so CI builds each module on its own. The build runs as
 # root, and git refuses a checkout that another user owns, as CI's is, so it
 # stamps no VCS information; TinyGo passes GOFLAGS, not its own -buildvcs flag,
@@ -36,11 +43,16 @@ outname=$(basename "$3")
 modcache=$(go env GOMODCACHE)
 cache=${TINYGO_CACHE:-$HOME/.cache/jamb-tinygo}
 mkdir -p "$cache"
+names=${outname%.wasm}.names
+rm -f "$outdir/$names"
+if [ "${KEEP_NAMES:-}" = 1 ]; then
+	names=
+fi
 echo "== tinygo build $module/$pkg"
 "$engine" run --rm -u 0 \
 	-v "$root:/src:ro,z" -v "$modcache:/gomod:ro,z" -v "$outdir:/out:z" -v "$cache:/tmp/.cache:z" \
 	-e GOMODCACHE=/gomod -e GOPROXY=off -e GOFLAGS=-buildvcs=false -e GOWORK="${GOWORK:-}" -e HOME=/tmp \
-	-e WASMOPT=/src/scripts/web/wasm-opt.sh \
+	-e WASMOPT=/src/scripts/web/wasm-opt.sh -e NAMES="${names:+/out/$names}" \
 	-w "/src/$module" "$image" \
 	tinygo build -target wasm -no-debug -scheduler=asyncify -panic-unwind=none -stack-size=1MB \
 	-o "/out/$outname" "$pkg"
