@@ -16,7 +16,10 @@
 // A value whose type changed so that the old one does not fit, and one that
 // cannot be kept (it holds a func or a channel), starts from its initial value,
 // and the app says which. Nothing of this package is in a program that does not
-// link package devtools, and a program not run by `jamb dev` keeps nothing.
+// link package devtools, or in a web build, which `jamb dev` does not run. A
+// program that `jamb dev` did not start keeps nothing and does no work for it:
+// keeping a value means encoding it when it is made (see entry.Base), which for
+// a local that holds a large table takes longer than the frame it is made in.
 package hot
 
 import (
@@ -85,16 +88,33 @@ var state = struct {
 	views    []json.RawMessage // the checkpoint's view states, by that order
 }{counts: map[string]int{}, restored: map[string]*entry{}}
 
+// keeping reports whether this process keeps its state: `jamb dev` started it.
+// Otherwise the hooks stay unset and Signal returns its signal untouched, so
+// the app runs as it does without this package.
+var keeping bool
+
 func init() {
-	devhook.Local = local
-	devhook.Checkpoint = Checkpoint
-	devhook.Started = started
-	devhook.Runtime = runtime
-	if path := os.Getenv("JAMB_STATE_FILE"); path != "" {
+	// jamb dev sets JAMB_DEV_CHANGED_AT for every build it starts, and
+	// JAMB_STATE_FILE for one that takes over the state of the build before.
+	path := os.Getenv("JAMB_STATE_FILE")
+	if path == "" && os.Getenv("JAMB_DEV_CHANGED_AT") == "" {
+		return
+	}
+	keep()
+	if path != "" {
 		if err := load(path); err != nil && !os.IsNotExist(err) {
 			fmt.Fprintln(os.Stderr, "jamb dev: the state from before the restart was not read:", err)
 		}
 	}
+}
+
+// keep starts keeping the state of the signals and locals made from now on.
+func keep() {
+	keeping = true
+	devhook.Local = local
+	devhook.Checkpoint = Checkpoint
+	devhook.Started = started
+	devhook.Runtime = runtime
 }
 
 // load reads a checkpoint.
@@ -128,6 +148,9 @@ func load(path string) error {
 // app.Run, gets its value when the app has started, after any code that sets it
 // at startup (see restore). One made later gets it at once.
 func Signal[T any](s *ui.Signal[T], key string) *ui.Signal[T] {
+	if !keeping {
+		return s // a build of jamb dev's, run by hand
+	}
 	state.Lock()
 	defer state.Unlock()
 	state.counts[key]++
