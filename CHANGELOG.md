@@ -9,6 +9,124 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-10
+
+### Added
+
+- Text fields, selectable text and `codeedit` editors have a context menu: Undo, Redo, Cut, Copy,
+  Paste and Select all (Copy and Select all for read-only text). A right click focuses the text and
+  keeps a selection it lands in, or else moves the caret to it.
+- `Segment.ContextMenu` gives a rich text segment, such as a link, its own context menu, which a
+  right click opens, and Shift+F10 or the Menu key while the link has focus.
+- `markdown.ViewElement.OnLinkMenu` gives every link of a Markdown view a context menu for its
+  destination.
+- `ui.Style.MergeFrom`, `ui.StyleLayerRef` and `ui.ThemeStyleRef` do what `Style.Merge`,
+  `ui.StyleLayer` and `ui.ThemeStyle` do, through pointers and without copying the style. A
+  widget whose style is a struct of several `ui.Style` parts uses them to stay small in a web
+  build (see "Styles of other widgets on a theme" in docs/theming.md).
+- An app runs in a web page, experimentally: a js build opens its window as a canvas that fills the
+  page (or `<canvas id="jamb">`), draws on the CPU, and takes the page's mouse, wheel, keyboard and
+  touch input and its dark mode, reduced motion and forced colors settings. `scripts/web/build.sh`
+  builds an app as a page, with TinyGo or with Go. Input methods, the system clipboard and file
+  dialogs are not there yet (see docs/web.md).
+- In a web page, text fields take text from a phone's keyboard and from input methods (IME), whose
+  window sits by the caret, and copy and paste use the system's clipboard. On Apple devices Command
+  works as Ctrl (see docs/web.md).
+- In a web page, WebGL 2 draws the frames, about ten times faster than the CPU renderer, which
+  draws only in a browser without WebGL 2 or when `JAMB_RENDERER=cpu` asks for it (a page sets it
+  in `window.jambEnv`). An app draws again after the browser restores a lost WebGL context.
+- `ui.CellGrid` shows a `ui.CellBuffer`, a grid of character cells such as a terminal's
+  screen, drawn by the GPU. Its writer may run on any goroutine; a change repaints the grid
+  without building anything, and lays out again only the rows that changed.
+- `examples/term`, a small terminal for Linux with tabs, scrollback, selection and copy
+  and paste, built on `ui.CellGrid`.
+
+### Changed
+
+- A `js` build (a web page, or Node) runs the code editor's highlighter in the JavaScript host's
+  WebAssembly instead of wazero, so it no longer links wazero, and TinyGo can build apps that import
+  `codeedit` or `markdown/mdcode`. Native builds still use wazero.
+- While a context menu has focus, the element it returns focus to no longer gets `OnBlur`; it runs
+  when the menu closes, only if focus went elsewhere.
+- A right press runs the `OnMouseDown` handlers under the pointer before the context menu opens,
+  and presses inside an open context menu no longer reach the `OnMouseDown` of the element it hangs
+  from.
+- A `DataGrid` that renders again keeps the rows that did not change instead of building every row
+  in view: a row with the same text in every cell, in the same state (selected, holding the cursor,
+  open), keeps its elements and only takes its new position. A click, a move of the cursor, a new
+  selection or a new slice of rows builds the rows it changed. Inserting and removing a row among
+  10,000 takes less than half the time it did, and moving one less than a third. A grid whose
+  columns have `Cell`, `Edit`, `Editor` or `Interactive`, or that selects cells, builds every row as
+  before.
+- A `DataGrid` handles a change to its rows faster when it has many of them. It keeps a copy of the
+  rows it made keys for, finds the rows a new slice changed by comparing it with that copy, and calls
+  the key function for those rows alone. It no longer makes a table of every row's position on each
+  change, and checks for a repeated key only among the rows that changed. Inserting and removing a
+  row among 100,000 takes a quarter of the time it did. The copy costs memory as large as the rows,
+  for rows of up to 128 bytes; larger rows are keyed again on each change, as before.
+- Widget styles merge in place, through pointers, instead of as copies. A frame full of widgets
+  builds about a third faster (`BenchmarkWidgetFrameNoInspector`: 1.99 to 1.34 ms), with the same
+  allocations. Under TinyGo, which turns each copy of a large struct into code for every field, the
+  change takes 1.2 MB of code out of a build, so its optimizer can run on jamb.
+- `HighContrastTheme` and `Theme.Clone` copy the theme as a whole.
+- `charts`, `markdown` and `codeedit` merge their styles through pointers. A web build of the
+  demo, which uses all three, is 2.13 MB in Brotli, down from 2.31 MB.
+- The widgets pass their looks through pointers: the defaults and the resolved look of a widget
+  are filled in place, and its parts reach the elements by pointer. TinyGo passes a struct by value
+  as one parameter per field and copies one field by field, so every such call was kilobytes of
+  code. A web build of the demo is 2.31 MB in Brotli, down from 2.68 MB, and the smallest app
+  1.05 MB, down from 1.12 MB. On the desktop a frame full of widgets builds 6% faster, with the
+  same allocations.
+- A web page fetches the Go fonts from the `fonts` directory that `scripts/web/build.sh` writes
+  next to the app, instead of compiling them in: the smallest app is 1.26 MB in Brotli, down from
+  1.57 MB. The page waits only for Go Regular, which it fetches while the app downloads; it fetches
+  each other face the first time text uses it, and lays that text out again when it arrives. The
+  `jamb_embedfonts` build tag compiles the fonts in, as before (see docs/web.md).
+- A web page loads `jamb.js`, the host script that `build.sh` writes beside the app, and gives it
+  the app's instance (`jambHost.attach(result.instance)`) before it runs the app. The script
+  delivers the display's frames and the pointer, wheel, key and text events by calling functions
+  the app exports. A page that does not load it still runs, and says so in the console.
+- A web build without the devtools package no longer carries the inspector's window and the
+  elements only it uses (tree, split, select and others): the smallest app is 1.12 MB in Brotli,
+  down from 1.26 MB.
+- An app that draws the icons of package `icons`, and parses no SVG of its own with `icons.New`
+  or `ui.SVGFromBytes`, no longer links the XML decoder: the icons are written in a plain form
+  that a few lines of code read. The smallest web app is 947 KB in Brotli, down from 958 KB.
+- A program that does not import package `devtools` no longer links the functions that record,
+  for the inspector, the layer that set each field of a style, or those that paint the
+  inspector's marks. The smallest web app is 933 KB in Brotli, down from 947 KB.
+- A web build is smaller: the smallest app is 958 KB in Brotli, down from 1.05 MB, and the demo
+  1.77 MB, down from 1.88 MB. The build no longer rewrites the text shaper, the map functions
+  and every caller of a panic so that goroutines can pause in them, since none of them pauses
+  (see `scripts/web/wasm-opt.sh`). It also leaves the names of the app's functions out of
+  `app.wasm` and writes them to `app.names`, which the page fetches only when the app stops
+  because of an error, to show the stack with the names. `KEEP_NAMES=1` keeps the names in
+  `app.wasm` (see docs/web.md).
+
+### Fixed
+
+- An app that imports package `devtools` no longer encodes every `ui.Local` as it is made when
+  `jamb dev` did not start it. The demo's Components page, whose data grid holds 100,000 rows in
+  a local, opens in 0.4 s in a browser instead of 3 s, and the page uses half the memory or less.
+  A web build leaves the package that keeps state across restarts (`devtools/hot`) out.
+- A `js` build no longer reads system font files. Under Node it read the host's, so the same build
+  drew with different fonts there than in a browser; it now uses the embedded Go fonts and the fonts
+  the app registers everywhere.
+- A web page no longer pauses to collect memory every few frames while the pointer moves, the
+  page scrolls or text is typed. Each call from the page into Go through `syscall/js` made
+  references to JavaScript values, and TinyGo collects after every 32 of them, for a time in
+  proportion to the app's memory. In the demo, a frame of scrolling the Components page took
+  8.8 ms of work on average, with a pause of over 50 ms every seventh frame; it now takes 1 ms,
+  with none over 3 ms.
+- In a web page, a tap on a list that is still scrolling from a flick stops it and taps what it lands
+  on, rather than only stopping the list.
+- In a web page, a touch drags sliders, split dividers and the other elements that capture the
+  pointer, instead of scrolling the page, and a touch scroll leaves no hover behind. An adapter asks
+  the app with the new platform.TouchHandler whether a touch drags what is under it.
+- In a web page, a touch scroll and its momentum move once per display frame, by what the finger
+  moved since the last frame and by the momentum up to the frame's time, so they no longer judder
+  when touch events and frames fall out of step.
+
 ## [0.7.1] - 2026-11-08
 
 ### Fixed
@@ -1005,7 +1123,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/tyler-builds/jamb/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/tyler-builds/jamb/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/tyler-builds/jamb/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/tyler-builds/jamb/compare/v0.6.3...v0.6.4
