@@ -9,4 +9,5 @@ use (
 	./examples/hello
 	./examples/monitor
 	./examples/notes
+	./examples/term
 )
