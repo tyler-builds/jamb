@@ -187,7 +187,7 @@ The full documentation is in [docs/](docs/README.md). Each page covers one topic
 - [Text](docs/text.md): rich text, selectable text, fonts, and emoji.
 - [Input](docs/input.md): keyboard and focus, text fields, the clipboard, actions and key bindings, drag and drop, and gestures.
 - [Windows and dialogs](docs/windows.md): windows, zoom, custom title bars, and native dialogs.
-- [OS integration](docs/os-integration.md): jump lists, the notification area, OS notifications, and opening URLs.
+- [OS integration](docs/os-integration.md): jump lists, the notification area, OS notifications, opening URLs, and running programs without console windows.
 - [Translations](docs/translations.md): languages and translated strings.
 - [Form widgets](docs/widgets-forms.md), [selection and date widgets](docs/widgets-selection.md),
   [navigation widgets](docs/widgets-navigation.md), [feedback widgets](docs/widgets-feedback.md),

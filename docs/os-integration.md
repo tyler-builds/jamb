@@ -1,6 +1,7 @@
 # OS integration
 
-Jump lists and single instance, the notification area, OS notifications, opening URLs, and file icons.
+Jump lists and single instance, the notification area, OS notifications, opening URLs,
+file icons, and running other programs without console windows.
 
 ## Opening URLs
 
@@ -9,6 +10,31 @@ a help page in the default browser, for a `ui.Link` or a button. Other schemes a
 file paths are refused with an error, because opening them could run a program, so
 a URL built from text the app does not control stays safe. A headless runtime opens
 nothing.
+
+## Running other programs
+
+An app packaged for Windows is a GUI program, so it has no console. When it starts a
+console program, such as `git`, with `os/exec`, Windows opens a console window for that
+program, which shows for as long as it runs. An app that runs a program every few
+seconds flashes a window every few seconds.
+
+The `proc` package starts a background program with a console but no window:
+
+```go
+cmd := proc.CommandContext(ctx, "git", "status", "--porcelain")
+cmd.Dir = repo
+out, err := cmd.Output()
+```
+
+`proc.Command` and `proc.CommandContext` are `exec.Command` and `exec.CommandContext`
+with `proc.Hide` applied, which sets `HideWindow` and `CREATE_NO_WINDOW`. The programs
+the started program runs in turn share its hidden console, so they open no window
+either. On other systems they change nothing. Use `exec.Command` with flags of your own
+for a program that should show a window, such as a terminal the user asked for: a GUI
+program started through `proc` keeps its first window hidden.
+
+The framework's own helpers start no console programs on Windows: opening a URL, the
+theme, the clipboard and notifications use Windows APIs.
 
 ## File icons
 

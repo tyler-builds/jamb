@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tyler-builds/jamb/proc"
 )
 
 // emptyTree is the hash of Git's empty tree, the base a root commit is compared to.
@@ -344,8 +346,7 @@ func git(dir string, args ...string) (string, error) {
 
 // gitCtx is git, stopped when ctx is canceled.
 func gitCtx(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir, "-c", "core.quotepath=off", "-c", "log.showSignature=false"}, args...)...)
-	hideWindow(cmd)
+	cmd := proc.CommandContext(ctx, "git", append([]string{"-C", dir, "-c", "core.quotepath=off", "-c", "log.showSignature=false"}, args...)...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
