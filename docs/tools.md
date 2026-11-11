@@ -135,9 +135,9 @@ the value it had before. The app declares nothing for this.
 
 The control channel lets a coding agent, a script or you read and drive a
 running app: list its windows, read their accessibility trees, find elements,
-click, type, press keys, scroll, take screenshots, and wait until the UI has
-settled or an element appears. It is `JAMB_SCRIPT` made interactive, and every
-answer is JSON.
+click, type, press keys, scroll, take screenshots, wait until the UI has
+settled or an element appears, and drive the app's clock. It is `JAMB_SCRIPT`
+made interactive, and every answer is JSON.
 
 Every app that `jamb dev` runs has it open. Another program opens it when it
 links package `devtools` (`import _ "github.com/tyler-builds/jamb/devtools"`)
@@ -154,6 +154,7 @@ jamb ctl type text="hello world"
 jamb ctl key keys="ctrl+a backspace"
 jamb ctl wait for=found contains="saved" timeout_ms=2000
 jamb ctl shot path=after.png
+jamb ctl clock +500                             # time moves only when the agent moves it
 ```
 
 With one app running, `jamb ctl` talks to it; with several, `-app PID` picks one.
@@ -196,6 +197,7 @@ top left, as in `JAMB_SCRIPT`.
 | `run` | `command`, `args` (the input, a JSON value) | Runs the command and returns its `result`; it takes no `window` |
 | `scenes` | none | The app's scenes and the one the first window shows (`current`, empty for the app's own root); see [Scenes](#scenes). It takes no `window` |
 | `scene` | `name`, a scene's name; none goes back to the app's own root | Opens the scene in the first window, from fresh state, and returns it as `current`. A scene opened this way is not kept across `jamb dev`'s restarts; `JAMB_SCENE` is |
+| `clock` | one of `advance_ms` (at most 3600000), `settle` (`true`) and `mode` (`live` or `seek`), or none | Moves the app's clock forward, moves it until the UI comes to rest, or switches its mode; see [Clock](#clock). Answers with the clock's `mode` and `now`, how far it moved (`elapsed_ms`), whether `settle` came to rest (`settled`), and how long until the next timer is due (`next_timer_ms`). It takes no `window` |
 
 A node has an `id`, its `parent`, `role`, `name`, `key`, `value`, `description`,
 `states` (such as `focused`, `disabled` or `offscreen`), `bounds` and the number
@@ -209,7 +211,8 @@ Each request sees the effects of the requests before it on the same window: a
 request that arrives while earlier input is still to be drawn runs after the
 next frame, so a `find` right after a `type` finds what the typing changed.
 Effects that take longer than a frame, such as a `ui.Query` fetch or an
-animation, need `wait for=idle` or `wait for=found`.
+animation, need `wait for=idle` or `wait for=found`, or, while the agent drives
+the clock, `clock`.
 
 `click`, `move`, `drag` and `scroll` aimed at a node wait for the node to be
 ready before they act: on screen, scrolled into view if a scroll container has
@@ -222,6 +225,45 @@ retried, since a click that may have landed must not land twice.
 The error codes are `bad_request`, `unknown_op`, `no_window`, `not_found`,
 `not_visible` (a point outside the window, or a hidden window), `stale`,
 `timeout`, `failed` and `quit`.
+
+### Clock
+
+An agent can drive the app's time instead of sleeping, as with Expo's Exact.
+The clock starts live, following the wall clock. The first `clock` request that
+moves it puts it in seek mode: it then stands still between requests, and moves
+only when the agent moves it. Timers (`Context.After` and the debounces built on
+it), tooltip and menu delays, toasts, transitions and animations, the caret and
+the windows' frames all read it, so nothing changes between two requests, and a
+`tree` or a `shot` shows the moment the clock reached.
+
+```
+jamb ctl clock                # the mode (live or seek) and the time
+jamb ctl clock seek           # stops the clock where it is (mode=seek)
+jamb ctl click key=save
+jamb ctl clock +60000         # moves it a minute forward (advance_ms=60000)
+jamb ctl clock settle         # moves it until the UI is at rest (settle=true)
+jamb ctl clock live           # gives it back to the wall clock (mode=live)
+```
+
+- `advance_ms` runs a frame of every window for every 16 ms of the time it
+  moves, as `uitest.Advance` does, so animations and timers run as they would
+  in that time, and visible windows then draw the moment it reached.
+- `settle` advances a frame at a time until every window has come to rest (as
+  `ui.Runtime.Settled` means) and no timer is due within 10 seconds, so a
+  debounce runs and a query's cache expiry, minutes away, does not. It stops
+  after 10 seconds of clock time with `settled` false, when something keeps
+  animating or a timer keeps coming due, as one that repeats does; repeating
+  animations are ignored, as in `uitest.Settle`. It does not wait for a
+  `ui.Query` fetch, which runs in real time: `wait for=idle` waits for that.
+- There is one clock for the app: every window follows it, so a timer in one
+  window never runs ahead of what another shows.
+- In seek mode, `wait for=idle` and the input ops do not wait for an animation,
+  which moves only when the clock does: idle means that a frame at the clock's
+  time has nothing new to show.
+- `clock live` goes on from where the agent left the clock, or from the wall
+  clock's time if that is later, so the clock never steps back.
+- `jamb ctl clock` also takes Exact's short form: `+MS`, `settle`, `seek` and
+  `live`.
 
 ### Commands
 
@@ -314,7 +356,8 @@ jamb ctl shot path=$PWD/after.png
   `JAMB_HEADLESS_SCALE` (1 by default), and the fonts are the ones the app
   bundles or the system has.
 - Frames are drawn when something changes, and at 60 per second while
-  something animates, on the real clock.
+  something animates, on the real clock, until `jamb ctl clock` drives it
+  (see [Clock](#clock)).
 - A headless run does not touch the system: the clipboard is the process's
   own, file dialogs answer as canceled and message boxes with no button, links
   are printed instead of opened, notifications are printed, and no tray icon,

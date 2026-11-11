@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"weak"
 
 	"github.com/tyler-builds/jamb/access"
 )
@@ -274,6 +275,11 @@ func setListPosition(w *DivElement, r Element, pos, size int) {
 var accessAnnouncements struct {
 	sync.Mutex
 	queue []access.Announcement
+	// readers are the runtimes whose bridge an assistive technology activated,
+	// which publish the queue. An announcement asks each for a frame, since it
+	// may come with no change that would ask for one: a write of the value a
+	// signal has, or none at all.
+	readers []weak.Pointer[Runtime]
 }
 
 // maxAnnouncements bounds the queue. Without an assistive technology nothing
@@ -290,12 +296,35 @@ func Announce(text string, p access.Politeness) { announceFrom(text, p, "") }
 // is empty for the default source. Toasts with an ID announce from their own source.
 func announceFrom(text string, p access.Politeness, source string) {
 	accessAnnouncements.Lock()
-	defer accessAnnouncements.Unlock()
 	q := append(accessAnnouncements.queue, access.Announcement{Text: text, Politeness: p, Source: source})
 	if len(q) > maxAnnouncements {
 		q = q[len(q)-maxAnnouncements:]
 	}
 	accessAnnouncements.queue = q
+	// Ask the runtimes that publish the queue for a frame, and forget those
+	// that are gone.
+	var wake []*Runtime
+	readers := accessAnnouncements.readers[:0]
+	for _, w := range accessAnnouncements.readers {
+		if rt := w.Value(); rt != nil {
+			readers = append(readers, w)
+			wake = append(wake, rt)
+		}
+	}
+	clear(accessAnnouncements.readers[len(readers):])
+	accessAnnouncements.readers = readers
+	accessAnnouncements.Unlock()
+	for _, rt := range wake {
+		rt.requestFrame()
+	}
+}
+
+// announcementsPending reports whether Announce queued text that no tree has
+// published yet.
+func announcementsPending() bool {
+	accessAnnouncements.Lock()
+	defer accessAnnouncements.Unlock()
+	return len(accessAnnouncements.queue) > 0
 }
 
 // takeAnnouncements returns the queued announcements and empties the queue.
@@ -375,22 +404,35 @@ func (rt *Runtime) markAccess() {
 // for the tree. It publishes at once, so the first request already sees the
 // tree, rather than waiting for the next frame.
 func (rt *Runtime) activateAccess() {
+	accessAnnouncements.Lock()
+	accessAnnouncements.readers = append(accessAnnouncements.readers, weak.Make(rt))
+	accessAnnouncements.Unlock()
 	rt.acc.dirty = true
 	rt.publishAccess()
 }
 
 // publishAccess rebuilds the tree if the UI changed and it is wanted, and
-// publishes it with the changes since the previous tree.
+// publishes it with the changes since the previous tree and the queued
+// announcements. With the UI unchanged, it publishes the announcements alone.
 func (rt *Runtime) publishAccess() {
 	a := rt.acc
-	if a == nil || !a.dirty || !(a.bridge.Active() || a.warn) {
+	if a == nil {
+		return
+	}
+	active := a.bridge.Active()
+	if !a.dirty || !(active || a.warn) {
+		if active && a.tree != nil && announcementsPending() {
+			// Nothing changed, but text is waiting to be spoken, such as a chart's
+			// repeat of the point that a walk past its end stays on.
+			a.bridge.Publish(a.tree, access.Update{Focus: a.tree.Focus, Announcements: takeAnnouncements()})
+		}
 		return
 	}
 	a.dirty = false
 	prev := a.tree
 	t, targets := rt.buildAccess()
 	a.tree, a.targets = t, targets
-	if a.bridge.Active() {
+	if active {
 		u := access.Diff(prev, t)
 		u.Announcements = takeAnnouncements()
 		a.bridge.Publish(t, u)

@@ -54,9 +54,16 @@ type componentInstance struct {
 	out Element
 
 	dirty atomic.Bool
-	depMu sync.Mutex // guards deps; signals may be read from other goroutines
-	deps  []subscribable
-	tr    tracker // records this instance's reads while it renders
+	// check is set when a Computed the instance read may have changed: before
+	// the next build, the Computeds are brought up to date, and those that
+	// changed set dirty.
+	check atomic.Bool
+	// queued is set while the instance is in its runtime's dirty queue, so
+	// that it is queued once.
+	queued atomic.Bool
+	depMu  sync.Mutex // guards deps; signals may be read from other goroutines
+	deps   []subscribable
+	tr     tracker // records this instance's reads while it renders
 
 	// Tree bookkeeping, UI thread only.
 	gen        uint32 // frame in which the instance was last claimed by its parent
@@ -89,9 +96,26 @@ type componentInstance struct {
 }
 
 func (inst *componentInstance) invalidate() {
-	if inst.dirty.CompareAndSwap(false, true) {
+	inst.dirty.Store(true)
+	if inst.queued.CompareAndSwap(false, true) {
 		inst.rt.enqueueDirty(inst)
 	}
+}
+
+func (inst *componentInstance) stale() {
+	inst.check.Store(true)
+	if inst.queued.CompareAndSwap(false, true) {
+		inst.rt.enqueueDirty(inst)
+	}
+}
+
+// refreshDeps brings the Computeds the instance read up to date. Those whose
+// value changed make it dirty.
+func (inst *componentInstance) refreshDeps() {
+	inst.depMu.Lock()
+	deps := append([]subscribable(nil), inst.deps...)
+	inst.depMu.Unlock()
+	refreshAll(deps)
 }
 
 func (inst *componentInstance) addDep(s subscribable) {
@@ -124,6 +148,7 @@ func (inst *componentInstance) unsubscribe() {
 func (inst *componentInstance) render() {
 	inst.unsubscribe()
 	inst.dirty.Store(false)
+	inst.check.Store(false) // the render reads every Computed afresh
 	inst.watchesFocus = false
 	inst.watchesPointer = false
 	ctx := &Context{rt: inst.rt, inst: inst, id: inst.id}

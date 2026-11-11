@@ -1,7 +1,7 @@
 # Benchmarks
 
-This file reports jamb's measured performance. The v0.4.0 update of 2026-10-23
-comes first: it measured again what the release's resize fix changed, and the GPUI
+This file reports jamb's measured performance. The 3,000-row benchmark of
+2026-11-10 comes first; then the v0.4.0 update of 2026-10-23: it measured again what the release's resize fix changed, and the GPUI
 comparison. The current results of the performance work, dated 2026-10-22, follow
 it. They are compared with the results of 2026-10-21, which
 were measured before the performance work of 2026-10-22 and follow them. Each
@@ -10,6 +10,30 @@ measurements (2026-10-06 to 2026-10-14) follow under
 [Earlier measurements](#earlier-measurements), with their original dates. Where a
 later figure replaces an earlier one, the earlier figure is marked superseded and
 kept, so the history stays readable.
+
+## 3,000 rows and equal writes (2026-11-10)
+
+`BenchmarkRows3000` (`ui/rows_bench_test.go`) asks of jamb what "A Critique of GPUI"
+(zortax, 2026-11-08) asks of other frameworks: when one value changes among 3,000 live rows,
+what runs? All 3,000 rows are in the window (800 x 60,000), so none is virtualized or culled.
+Each row is a component reading its own label signal and whether it is selected. Each case
+writes once and runs a frame. It was run before and after the equality cutoff of the same day,
+which skips writes that change nothing (see CHANGELOG.md), on Linux, Intel Core i5-11600K, Go
+1.27.3, `-benchtime 1s -count 5`, medians compared by benchstat; the machine was not dedicated
+to benchmarking.
+
+| Case | Before | After | Rendered per op, before / after |
+|---|--:|--:|--:|
+| `label`: one row's label changes | 4.32 ms | 3.60 ms | 1 / 1 |
+| `label-same`: one label written with the value it has | 4.29 ms | 89 ns | 1 / 0 |
+| `selected-same`: the selection every row reads written with the value it has | 68.3 ms | 80 ns | 3,000 / 0 |
+| `selected-move`: the selection moves, each row reading it through a Computed | 68.9 ms | 33.1 ms | 3,000 / 2 |
+
+`label` did not change with the cutoff (the run-to-run spread is wide); a profile puts about
+80% of its time in painting the 3,000 rows and 16% in layout, since a frame repaints the whole
+window. `selected-move` renders 2 rows but still takes 33 ms: the 3,000 Computeds all read one
+signal, and a signal finds and removes a subscriber by a linear scan, so recomputing them all is
+quadratic in the number of readers. Both are open.
 
 ## v0.4.0 update (2026-10-23)
 

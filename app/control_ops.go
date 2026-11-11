@@ -324,7 +324,7 @@ func (c *control) target(w *ctlWin, index int, req ctlRequest, reply ctlReply, a
 		reply(nil, err)
 		return
 	}
-	if n == nil || (ctlOnScreen(w, n) && w.rt.Settled()) {
+	if n == nil || (ctlOnScreen(w, n) && c.atRestNow(w)) {
 		act(w, x, y)
 		return
 	}
@@ -662,7 +662,7 @@ func (c *control) frame(index int, w *ctlWin) bool {
 			return c.check(wt, w)
 		}
 		switch {
-		case !w.rt.Settled():
+		case !c.atRestNow(w):
 			wt.quiet = 0
 			more = true
 			return false

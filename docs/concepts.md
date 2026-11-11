@@ -146,11 +146,20 @@ total := ui.NewComputed(func() int {           // *ui.Computed[int]
     }
     return sum
 })
-ui.Textf("Total: %d", total.Get())             // re-renders when cart changes
+ui.Textf("Total: %d", total.Get())             // re-renders when the total changes
 ```
 
+A write that changes nothing re-renders nothing. `Set` and `Update` compare
+the new value with the current one by `==`, and a `Computed` compares its new
+result with the last one before its readers re-render: setting a selection to
+the row already selected, or a change to `cart` that leaves the total as it
+was, costs a comparison. Values that `==` cannot compare (slices, maps,
+functions) always notify; `EqualFunc` gives a signal or a Computed its own
+comparison, such as `slices.Equal`.
+
 Treat a signal's value as immutable. To change a slice or map, build a new
-one and `Set` it. Changing it in place notifies nobody.
+one and `Set` it. Changing it in place notifies nobody, and neither does
+setting the same pointer again.
 
 ## Keys and identity
 

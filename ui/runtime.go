@@ -1203,10 +1203,19 @@ func (rt *Runtime) rebuildDirty() {
 	// which clears their dirty flags so they are skipped below.
 	sort.SliceStable(queue, func(i, j int) bool { return queue[i].depth < queue[j].depth })
 	for _, inst := range queue {
-		if inst.disposed || inst.parked || inst.rt != rt || !inst.dirty.Load() {
+		inst.queued.Store(false) // a change from now on queues it again
+		if inst.disposed || inst.parked || inst.rt != rt {
 			continue // parked, or moved to another runtime, since it was queued (see retain.go)
 		}
-		rt.rerender(inst)
+		if !inst.dirty.Load() && inst.check.Swap(false) {
+			// Only Computeds it read may have changed: it re-renders if one did.
+			// One that changed makes its other readers dirty too, and they are
+			// in this queue, since it told them it may have changed.
+			inst.refreshDeps()
+		}
+		if inst.dirty.Load() {
+			rt.rerender(inst)
+		}
 	}
 	if rt.focusID != 0 && rt.byID[rt.focusID] == nil {
 		rt.focusID, rt.focusLink = 0, 0

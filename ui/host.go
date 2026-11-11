@@ -87,6 +87,28 @@ func (h *runtimeHost) PointerLeave() { h.rt().hostPointerLeave() }
 // saves what it has not yet saved (see Runtime.at).
 func (h *runtimeHost) FlushTimers() { h.rt().runTimers(time.Time{}, true) }
 
+// NextTimer returns the time of the earliest pending timer, such as one of
+// Context.After or an animation's OnDone, on the runtime's clock, and false
+// when none is pending.
+func (h *runtimeHost) NextTimer() (time.Time, bool) {
+	var next time.Time
+	for _, tm := range h.rt().timers {
+		if next.IsZero() || tm.at.Before(next) {
+			next = tm.at
+		}
+	}
+	return next, !next.IsZero()
+}
+
+// Changed reports whether a frame at the time of the last one would show
+// something new: NeedsFrame without the animations, which move only as the
+// clock does. The control channel's agent clock (see app/control_clock.go)
+// asks for no frames while it stands still and nothing has changed.
+func (h *runtimeHost) Changed() bool {
+	rt := h.rt()
+	return rt.rootInst == nil || rt.needLayout || rt.needPaint || rt.hasDirty.Load()
+}
+
 // Close tells the runtime that its window has closed: the fetches of its Query calls
 // are canceled, and none starts again (see Query).
 func (h *runtimeHost) Close() { h.rt().hostClose() }
@@ -110,14 +132,15 @@ func (h *runtimeHost) WindowAreaAt(x, y float32) WindowArea { return h.rt().host
 // that an element takes itself (see hostDragsAt).
 func (h *runtimeHost) DragsAt(x, y float32) bool { return h.rt().hostDragsAt(x, y) }
 
+// SetClock replaces the clock that timers, tooltips, motion and the caret read
+// (time.Now by default), so a test, or an agent through the control channel,
+// steps time itself.
+func (h *runtimeHost) SetClock(now func() time.Time) { h.rt().clock = now }
+
 // ---- for ui/uitest ----
 //
 // A headless runtime in a test is driven by ui/uitest, which uses these as a
 // window host uses the methods above.
-
-// SetClock replaces the clock that timers, tooltips, motion and the caret read
-// (time.Now by default), so a test steps time itself.
-func (h *runtimeHost) SetClock(now func() time.Time) { h.rt().clock = now }
 
 // LocalClipboard and SetLocalClipboard read and replace the text of the
 // in-process clipboard, which a runtime uses when no platform clipboard is

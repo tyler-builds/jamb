@@ -21,24 +21,29 @@ import (
 )
 
 // ctlFixture is a control channel over one headless window, with a clock and
-// timers of its own.
+// timers of its own. now is the wall clock; the window's runtime reads clock,
+// which follows it while live.
 type ctlFixture struct {
 	t          *testing.T
 	c          *control
 	w          *ctlWin
 	rt         *ui.Runtime
 	now        time.Time
+	clock      *uiClock
 	timers     []func()
 	timerDurs  []time.Duration // how long each of timers waits
 	redraws    int
 	offscreens int                               // undrawn frames the control channel ran
+	wakes      []time.Time                       // the frames asked for at a time, on the app's clock
 	shot       func(fn func(*image.RGBA, error)) // what capture does; nil captures nothing
 }
 
 func newCtlFixture(t *testing.T, root func(ctx *ui.Context) ui.Element) *ctlFixture {
 	t.Helper()
 	f := &ctlFixture{t: t, now: time.Unix(1000, 0)}
+	f.clock = &uiClock{wall: func() time.Time { return f.now }}
 	f.rt = ui.NewRuntime(root, nil, nil)
+	hostOf(f.rt).SetClock(f.clock.now)
 	f.rt.SetViewport(400, 300, 2) // scale 2: the tree's physical pixels are halved
 	f.frame()
 	f.w = &ctlWin{rt: f.rt, title: "Test", w: 400, h: 300, scale: 2, visible: true,
@@ -50,6 +55,7 @@ func newCtlFixture(t *testing.T, root func(ctx *ui.Context) ui.Element) *ctlFixt
 			}
 		},
 		offscreen: func() { f.offscreens++; f.frame() },
+		wakeAt:    func(t time.Time) { f.wakes = append(f.wakes, t) },
 	}
 	f.c = &control{dir: t.TempDir(), pid: 7, quit: make(chan struct{}),
 		post:    func(fn func()) { fn() },
@@ -59,11 +65,13 @@ func newCtlFixture(t *testing.T, root func(ctx *ui.Context) ui.Element) *ctlFixt
 			f.timers = append(f.timers, fn)
 			f.timerDurs = append(f.timerDurs, d)
 		},
+		clock: f.clock,
 	}
 	return f
 }
 
-func (f *ctlFixture) frame() { f.rt.Frame(f.now) }
+// frame runs a frame at the clock's time, as a window draws one.
+func (f *ctlFixture) frame() { f.rt.Frame(f.clock.now()) }
 
 type ctlGot struct {
 	result any
