@@ -37,6 +37,40 @@ func TestCtlRequest(t *testing.T) {
 	}
 }
 
+// The clock op takes Exact's short form as well as name=value.
+func TestCtlClockRequest(t *testing.T) {
+	for _, c := range []struct {
+		args []string
+		name string
+		want any
+	}{
+		{[]string{"+60000"}, "advance_ms", 60000.0},
+		{[]string{"advance_ms=250"}, "advance_ms", 250.0},
+		{[]string{"settle"}, "settle", true},
+		{[]string{"settle=true"}, "settle", true},
+		{[]string{"live"}, "mode", "live"},
+		{[]string{"seek"}, "mode", "seek"},
+		{[]string{"mode=live"}, "mode", "live"},
+	} {
+		req, err := ctlRequest("clock", c.args)
+		if err != nil || req[c.name] != c.want || len(req) != 2 {
+			t.Errorf("%q: %v %v; want %s %v", c.args, req, err, c.name, c.want)
+		}
+	}
+	if req, err := ctlRequest("clock", nil); err != nil || len(req) != 1 {
+		t.Errorf("no arguments: %v %v", req, err)
+	}
+	for _, bad := range []string{"+", "+0", "+-5", "+1.5", "+2s", "60000", "-60000", "soon"} {
+		if _, err := ctlRequest("clock", []string{bad}); err == nil {
+			t.Errorf("clock %q was accepted", bad)
+		}
+	}
+	// Only the clock op has a short form.
+	if _, err := ctlRequest("wait", []string{"settle"}); err == nil {
+		t.Error("wait settle was accepted")
+	}
+}
+
 // fakeApp listens like an app's control channel and answers each request with
 // the answer it is given, the request's op echoed in the result.
 func fakeApp(t *testing.T, dir string, pid int) string {

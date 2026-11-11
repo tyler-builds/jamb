@@ -486,6 +486,9 @@ var application struct {
 	// scene switches the first window between the app's scenes, when the
 	// program has any (see scene.go).
 	scene *sceneSwitch
+	// clock is the windows' clock: the wall clock, or the agent's while the
+	// control channel's clock op drives it (see control_clock.go).
+	clock uiClock
 }
 
 func withDefaults(w Window) Window {
@@ -709,7 +712,8 @@ func (h *host) OnCreate(w platform.Window) error {
 	}
 	h.rh = hostOf(h.rt)
 	h.rh.SetWakeFunc(w.Wake)
-	h.rh.SetServices(w.Clipboard, w.SetClipboard, w.WakeAt)
+	h.rh.SetClock(application.clock.now)
+	h.rh.SetServices(w.Clipboard, w.SetClipboard, h.wakeAt)
 	h.rh.SetImageClipboard(w.ClipboardImage, w.SetClipboardImage, w.HasClipboardImage)
 	h.rh.SetOpenURL(w.OpenURL)
 	// A desktop that draws no window frames, such as GNOME, leaves a window that
@@ -763,7 +767,7 @@ func (h *host) OnCreate(w platform.Window) error {
 	// prepareDevice): the layout and paint do not need the device, so the window
 	// waits only for what is left of it. OnFrame presents this scene.
 	if width, height := w.Size(); width > 0 && height > 0 {
-		h.preScene = h.rh.Frame(time.Now())
+		h.preScene = h.rh.Frame(application.clock.now())
 		h.preW, h.preH = width, height
 	}
 	width, height := w.Size()
@@ -1097,6 +1101,14 @@ func (h *host) fitBuffers(w platform.Window) {
 	}
 }
 
+// wakeAt asks the platform for a frame at t, a time on the app's clock. While
+// the agent's clock seeks, it asks for none: the agent runs the frames.
+func (h *host) wakeAt(t time.Time) {
+	if t, ok := application.clock.wakeTime(t); ok {
+		h.win.WakeAt(t)
+	}
+}
+
 // OnFrame implements platform.Handler.
 func (h *host) OnFrame(w platform.Window) bool {
 	h.presented = false
@@ -1125,7 +1137,7 @@ func (h *host) OnFrame(w platform.Window) bool {
 	sc := h.preScene
 	h.preScene = nil
 	if !preSceneFits(sc, h.preW, h.preH, width, height) {
-		sc = h.rh.Frame(frameStart)
+		sc = h.rh.Frame(application.clock.now())
 	}
 	if h.insp != nil {
 		h.insp.frame(h.rt, frameStart)
@@ -1169,6 +1181,11 @@ func (h *host) OnFrame(w platform.Window) bool {
 		}
 	}
 	again := h.rt.NeedsFrame()
+	if application.clock.seek {
+		// The agent's clock stands still: an animation would draw the same
+		// frame again until the agent moves it, which runs its own frames.
+		again = h.rh.Changed()
+	}
 	if h.dev.trace {
 		st := h.rt.Stats()
 		if st.Built || st.LaidOut {
@@ -1293,6 +1310,9 @@ type runtimeHost interface {
 	WindowAreaAt(x, y float32) ui.WindowArea
 	DragsAt(x, y float32) bool
 	FlushTimers()
+	NextTimer() (time.Time, bool)
+	Changed() bool
+	SetClock(now func() time.Time)
 	Close()
 }
 

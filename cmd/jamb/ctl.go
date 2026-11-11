@@ -26,7 +26,7 @@ failed request exits with status 1.
 
   list     the running apps that have the channel open
   OP       one request: info, tree, find, click, move, drag, type, key, scroll,
-           shot, wait, actions, dispatch, commands or run,
+           shot, wait, actions, dispatch, commands, run or clock,
            with its arguments as name=value, such as
              jamb ctl find role=button name=Save
              jamb ctl click key=save
@@ -34,16 +34,24 @@ failed request exits with status 1.
              jamb ctl wait for=found key=done timeout_ms=2000
              jamb ctl dispatch action=notes.new
              jamb ctl run command=notes.create args='{"title":"Hi"}'
+             jamb ctl clock advance_ms=500
   -        requests as JSON lines on stdin, answers as JSON lines on stdout
+
+clock drives the app's clock, so that time moves only when the agent moves it:
+  jamb ctl clock           the clock's mode (live or seek) and time
+  jamb ctl clock +500      moves it 500 ms forward (advance_ms=500)
+  jamb ctl clock settle    moves it until the UI comes to rest (settle=true)
+  jamb ctl clock seek      stops it where it is (mode=seek)
+  jamb ctl clock live      gives it back to the wall clock (mode=live)
 
 With one app running, -app is not needed.`
 
 // ctlNumbers are the request fields that take numbers; the others take text.
 var ctlNumbers = map[string]bool{"window": true, "x": true, "y": true, "dx": true, "dy": true,
-	"count": true, "limit": true, "offset": true, "timeout_ms": true}
+	"count": true, "limit": true, "offset": true, "timeout_ms": true, "advance_ms": true}
 
 // ctlBools are the request fields that take true or false.
-var ctlBools = map[string]bool{"freeze": true}
+var ctlBools = map[string]bool{"freeze": true, "settle": true}
 
 // ctlDial is how long ctl waits for an app to answer a connection.
 const ctlDial = 2 * time.Second
@@ -85,6 +93,12 @@ func ctlCmd(args []string) error {
 func ctlRequest(op string, args []string) (map[string]any, error) {
 	req := map[string]any{"op": op}
 	for _, a := range args {
+		if op == "clock" && !strings.Contains(a, "=") {
+			if err := ctlClockWord(req, a); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		name, value, ok := strings.Cut(a, "=")
 		if !ok || name == "" {
 			return nil, fmt.Errorf("argument %q is not name=value", a)
@@ -118,6 +132,29 @@ func ctlRequest(op string, args []string) (map[string]any, error) {
 		}
 	}
 	return req, nil
+}
+
+// ctlClockWord reads a word of the clock op's short form, as Exact writes it:
+// +N advances the clock by N milliseconds, and settle, live and seek stand for
+// settle=true, mode=live and mode=seek.
+func ctlClockWord(req map[string]any, word string) error {
+	switch word {
+	case "settle":
+		req["settle"] = true
+		return nil
+	case "live", "seek":
+		req["mode"] = word
+		return nil
+	}
+	if ms, ok := strings.CutPrefix(word, "+"); ok {
+		n, err := strconv.ParseUint(ms, 10, 31)
+		if err != nil || n == 0 {
+			return fmt.Errorf("%q is not a number of milliseconds to advance by, such as +500", word)
+		}
+		req["advance_ms"] = float64(n)
+		return nil
+	}
+	return fmt.Errorf("clock takes +MS, settle, live, seek or name=value, not %q", word)
 }
 
 // ctlDir is the directory of the apps' sockets; app/control.go names it the same way.

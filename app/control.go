@@ -117,8 +117,11 @@ type ctlWin struct {
 	capture func(fn func(*image.RGBA, error))
 	// offscreen runs a frame of the runtime without drawing it: it builds and
 	// lays out the tree, for a window that draws no frames because it is
-	// hidden, minimized or, on GNOME, covered by other windows.
+	// hidden, minimized or, on GNOME, covered by other windows, and for each
+	// step of the clock op. It runs at the time of the app's clock.
 	offscreen func()
+	// wakeAt asks for a frame at t, a time on the app's clock; nil does nothing.
+	wakeAt func(t time.Time)
 }
 
 // control is an open control channel. Its waits are touched only on the UI thread.
@@ -141,6 +144,7 @@ type control struct {
 	shots    int                         // screenshots taken, which name the files of those without a path
 	now      func() time.Time            // the clock of waits, replaced by tests
 	after    func(time.Duration, func()) // runs a function later, replaced by tests
+	clock    *uiClock                    // the windows' clock, which the clock op drives
 }
 
 // ctlDescription is the PID.json file beside the socket.
@@ -167,7 +171,8 @@ func listenControl(dir string, pid int) (*control, error) {
 	}
 	os.Chmod(socket, 0o600)
 	c := &control{ln: ln, dir: dir, pid: pid, socket: socket, desc: filepath.Join(dir, strconv.Itoa(pid)+".json"),
-		quit: make(chan struct{}), now: time.Now, after: func(d time.Duration, fn func()) { time.AfterFunc(d, fn) }}
+		quit: make(chan struct{}), now: time.Now, after: func(d time.Duration, fn func()) { time.AfterFunc(d, fn) },
+		clock: &application.clock}
 	exe, _ := os.Executable()
 	wd, _ := os.Getwd()
 	b, _ := json.MarshalIndent(ctlDescription{Protocol: ctlProtocol, PID: pid, Socket: socket, Exe: exe, Dir: wd,
@@ -288,6 +293,11 @@ type ctlRequest struct {
 	Args    json.RawMessage `json:"args,omitempty"`    // run: the command's input, a JSON value
 
 	Freeze bool `json:"freeze,omitempty"` // checkpoint: drop input from now on, as the app is about to stop
+
+	// clock: one of them, or none to read the clock.
+	AdvanceMS int    `json:"advance_ms,omitempty"` // move the clock forward, in milliseconds
+	Settle    bool   `json:"settle,omitempty"`     // move it until the UI comes to rest
+	Mode      string `json:"mode,omitempty"`       // live or seek
 }
 
 type ctlResponse struct {
@@ -372,7 +382,7 @@ type ctlReply func(result any, err *ctlError)
 
 // ctlOps are the ops. They are a list and run's switch rather than a map of
 // functions, so that a program that never opens the channel links none of them.
-var ctlOps = []string{"actions", "checkpoint", "click", "commands", "dispatch", "drag", "find", "info", "key", "move", "run", "scene", "scenes", "scroll", "shot", "tree", "type", "wait"}
+var ctlOps = []string{"actions", "checkpoint", "click", "clock", "commands", "dispatch", "drag", "find", "info", "key", "move", "run", "scene", "scenes", "scroll", "shot", "tree", "type", "wait"}
 
 func ctlOpList() string {
 	b, _ := json.Marshal(ctlOps)
@@ -400,6 +410,9 @@ func (c *control) run(req ctlRequest, reply ctlReply) {
 		return
 	case "scene":
 		c.opScene(req, reply)
+		return
+	case "clock":
+		c.opClock(req, reply)
 		return
 	}
 	i := req.Window
@@ -564,7 +577,8 @@ func (h *host) ctlWin() *ctlWin {
 			h.win.Wake()
 		},
 		capture:   h.r.CaptureNextFrame,
-		offscreen: func() { h.rh.Frame(time.Now()) },
+		offscreen: func() { h.rh.Frame(application.clock.now()) },
+		wakeAt:    h.wakeAt,
 	}
 }
 
