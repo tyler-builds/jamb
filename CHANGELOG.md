@@ -9,6 +9,17 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-10
+
+### Changed
+
+- On Linux, a window shows its first frames drawn on the CPU while the GPU device is still being created,
+  and moves to the GPU at the first frame after it is ready, so it appears in about a third of the time
+  (45 ms instead of 150 ms with an NVIDIA driver).
+- On Linux, the desktop's settings are read from the settings portal in one call, started with the app
+  and kept until the desktop reports a change, instead of eight calls made twice while the first window
+  opens.
+
 ## [0.8.1] - 2026-11-10
 
 ### Fixed
@@ -1132,7 +1143,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/tyler-builds/jamb/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/tyler-builds/jamb/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/tyler-builds/jamb/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/tyler-builds/jamb/compare/v0.7.0...v0.7.1
