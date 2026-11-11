@@ -375,6 +375,7 @@ func (a *App) RunE(w Window) error {
 	application.keepRunning = a.keepRunning
 	application.gpu.adapter = gpuAdapter
 	prepareDevice()
+	prefetchSettings()
 	// Parse fonts and warm the shaper while the first window and GPU device
 	// are being created; the first window's runtime picks the result up.
 	ready := make(chan textResult, 1)
@@ -856,6 +857,7 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 		h.reportGeometry(w)
 		h.fitBuffers(w)
 	case platform.EventSettingsChanged:
+		forgetPlatformSettings()
 		h.applySettings()
 	case platform.EventWindowState:
 		h.rh.SetMaximized(w.Maximized())
