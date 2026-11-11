@@ -5,6 +5,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // A format makes a TextInput show its text in a fixed shape as the user types it:
@@ -155,6 +157,14 @@ func (f *InputFormat) complete(raw string) bool {
 type presented struct {
 	shown   string
 	raw, at []int
+	// hides is set when shown is the value with some of it left out, the hidden
+	// syntax of a field with marks: raw and at then have a stop at every rune of
+	// the value (see presentMarks).
+	hides bool
+	// spans and paint are the styled ranges of shown and how each looks, for a
+	// field with marks.
+	spans []text.Span
+	paint []Highlight
 }
 
 // toShown returns the offset in the shown text of the raw offset r: 0 for 0, the
@@ -181,6 +191,9 @@ func (p presented) endShown(r int) int {
 	if p.raw == nil {
 		return r
 	}
+	if p.hides {
+		return p.toShown(r)
+	}
 	i := len(p.raw) - 1
 	if r >= p.raw[i] {
 		return len(p.shown)
@@ -193,6 +206,19 @@ func (p presented) endShown(r int) int {
 	}
 	_, size := utf8.DecodeRuneInString(p.shown[p.at[i-1]:])
 	return p.at[i-1] + size
+}
+
+// lastFromShown is fromShown, but past any hidden raw text at q: the last raw
+// offset drawn at q.
+func (p presented) lastFromShown(q int) int {
+	if p.raw == nil {
+		return q
+	}
+	k := len(p.at) - 1
+	for k > 0 && p.at[k] > q {
+		k--
+	}
+	return p.raw[k]
 }
 
 // fromShown returns the raw offset of the offset q in the shown text: the offset

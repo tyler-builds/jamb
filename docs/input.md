@@ -47,6 +47,20 @@ program that copied it offered one (browsers, Office and the Snipping Tool do)
 and otherwise as a bitmap, and written as both, with its transparency. HTML is
 future work.
 
+A `TextArea` with `.Marks(fn)` styles its text as it is edited: fn returns
+`ui.TextMark`s for a value, each a range with a `Highlight` (bold, italic, a color,
+monospace, strikethrough). A mark with `Syntax` set is syntax, such as the `**`
+around bold text: it hides unless the field has focus and the caret or selection
+touches its construct (`ScopeStart` to `ScopeEnd`, either end included), so the text
+reads as formatted until the caret comes to edit it. Hidden syntax is only not drawn:
+the value keeps it, and copy, undo, the signal and assistive technology all see the
+text as typed. `markdown.EditMarks` gives the marks of Markdown (see
+[Markdown](markdown.md#formatting-as-it-is-typed)):
+
+```go
+ui.TextArea(draft).Marks(markdown.EditMarks(markdown.EditStyle{Syntax: ui.Highlight{Color: muted}}))
+```
+
 A `TextInput` or `TextArea` with `.OnKeyDown(fn)` sees each key press while it has
 focus, before the key bindings run and before the field handles the key. `e.StopPropagation()` keeps the field from handling that key, so a search can
 take Shift+Enter for the previous match:

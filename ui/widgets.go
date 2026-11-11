@@ -582,21 +582,22 @@ type fieldOptions struct {
 	trailingEl  Element // drawn in the Trailing part, after the text (see Trailing)
 	onSubmit    func(string)
 	onChange    func(string)
-	onKeyDown   func(*KeyEvent)   // see TextInputElement.OnKeyDown
-	onPasteImg  func(image.Image) // see OnPasteImage
-	onBlur      func()            // set by NumberInput, which checks its text on blur
-	onCancel    func()            // set by DataGrid, which ends an edit on Escape in place of Cancel
-	description string            // set by DataGrid, to say why the last save failed (a literal, not a key)
-	onStep      func(dir int)     // set by NumberInput, for Up and Down
-	readOnly    bool              // see ReadOnly
-	masked      bool              // see TextInputElement.Masked
-	revealable  bool              // see TextInputElement.Revealable
-	clearable   bool              // see TextInputElement.Clearable
-	format      *InputFormat      // see TextInputElement.Format
-	accept      func(string) bool // see TextInputElement.Accept
-	tooltip     string            // shown over the frame; the field's description when it has none
-	disabled    bool              // see Disabled
-	styles      FieldStyle        // the instance's parts: from Styles, and the frame's Style
+	onKeyDown   func(*KeyEvent)         // see TextInputElement.OnKeyDown
+	onPasteImg  func(image.Image)       // see OnPasteImage
+	onBlur      func()                  // set by NumberInput, which checks its text on blur
+	onCancel    func()                  // set by DataGrid, which ends an edit on Escape in place of Cancel
+	description string                  // set by DataGrid, to say why the last save failed (a literal, not a key)
+	onStep      func(dir int)           // set by NumberInput, for Up and Down
+	readOnly    bool                    // see ReadOnly
+	masked      bool                    // see TextInputElement.Masked
+	revealable  bool                    // see TextInputElement.Revealable
+	clearable   bool                    // see TextInputElement.Clearable
+	format      *InputFormat            // see TextInputElement.Format
+	accept      func(string) bool       // see TextInputElement.Accept
+	marks       func(string) []TextMark // see TextAreaElement.Marks
+	tooltip     string                  // shown over the frame; the field's description when it has none
+	disabled    bool                    // see Disabled
+	styles      FieldStyle              // the instance's parts: from Styles, and the frame's Style
 	key         string
 	borderless  bool
 	ctlSize     controlSize // see Small and Large
@@ -930,6 +931,17 @@ func (ta *TextAreaElement) OnPasteImage(fn func(image.Image)) *TextAreaElement {
 	return ta
 }
 
+// Marks styles the text as it is edited: fn returns the marks of a value (see
+// TextMark), such as the bold and code of markdown, and runs once each time the
+// text area is built with a new value. Syntax marks hide until the caret comes
+// to them, so the text reads as formatted while the value keeps its syntax:
+// what is copied, read by assistive technology and set in the signal is the
+// value as typed. markdown.EditMarks gives the marks of markdown.
+func (ta *TextAreaElement) Marks(fn func(value string) []TextMark) *TextAreaElement {
+	ta.marks = fn
+	return ta
+}
+
 // Tooltip shows s below the field after the pointer rests on it. Assistive
 // technology reads it as the field's description, unless it has another.
 func (ta *TextAreaElement) Tooltip(s string) *TextAreaElement { ta.tooltip = s; return ta }
@@ -1121,6 +1133,7 @@ func (f *fieldOptions) expand(ctx *Context, st *FieldStyle, multiline bool, minR
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
 		readOnly: f.readOnly, disabled: f.disabled, onPasteImage: f.onPasteImg,
 		password: f.masked, revealed: revealed, clearable: f.clearable, format: f.format, accept: f.accept,
+		marks: f.marks,
 	}
 	if multiline && minRows > 0 {
 		size := t.FontSize

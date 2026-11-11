@@ -64,9 +64,18 @@ type editState struct {
 	// comp is what an input method is composing here (see composition).
 	comp composition
 
+	// The marks of the value marksV, for a field with marks (see marksOf), and
+	// the syntax hidden when it was last laid out (see marksChanged).
+	marks    []TextMark
+	marksV   string
+	marksSet bool
+	hid      [][2]int
+
 	// From the last paint, for hit testing. While a composition shows, the
-	// layout is of the text with the composition in it.
+	// layout is of the text with the composition in it. drawn is what the
+	// layout shows of the value, and how offsets map between them.
 	layout           *text.Layout
+	drawn            presented
 	originX, originY float32 // text origin relative to the node
 }
 
@@ -145,6 +154,8 @@ type editorElement struct {
 	// edit by the user may change the text (see TextInputElement.Format and Accept).
 	format *InputFormat
 	accept func(string) bool
+	// marks styles the text as it is edited (see TextAreaElement.Marks).
+	marks func(string) []TextMark
 }
 
 // hidden reports whether the editor draws its text as bullets (see present).
@@ -207,16 +218,18 @@ const fieldMinChars = "000000"
 func (n *node) measureEditor(maxWidth float32) (float32, float32) {
 	e := n.editor
 	v := e.value.Peek()
+	var spans []text.Span
 	if v == "" {
 		v = e.placeholder
 	} else {
-		v = n.rt.present(e, v).shown
+		pr := n.rt.presentDrawn(n, v)
+		v, spans = pr.shown, pr.spans
 	}
 	w := maxWidth
 	if !e.multiline {
 		w = float32(math.Inf(1))
 	}
-	l := n.rt.text.Layout(v, e.textStyle(n), w)
+	l := n.rt.text.LayoutSpans(v, e.textStyle(n), spans, w)
 	return l.Width + 2, l.Height // room for the caret at the end
 }
 
@@ -233,6 +246,7 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	if n.st.edit == nil {
 		n.st.edit = &editState{}
 	}
+	n.st.edit.marksSet = false // the marks function may be new
 	id := n.id
 	if e.disabled {
 		// A disabled field shows its text and nothing else: it can't be focused,
@@ -279,6 +293,18 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	d.h.onTextInput = func(s string) { rt.editorTyped(id, s) }
 	d.h.onFocus = func() { rt.editorTouched(id) }
 	d.h.onBlur = e.onBlur
+	if e.marks != nil {
+		// A field with marks hides its syntax without focus.
+		blur := e.onBlur
+		d.h.onBlur = func() {
+			if n := rt.byID[id]; n != nil {
+				rt.invalidateLayout(n)
+			}
+			if blur != nil {
+				blur()
+			}
+		}
+	}
 	if e.format != nil {
 		// Leaving the field puts its value in its shortest form first, so that the
 		// field's own onBlur (a Field's check) sees it.
@@ -318,6 +344,7 @@ func (rt *Runtime) editorTouched(id uint64) {
 	if n := rt.byID[id]; n != nil && n.st != nil && n.st.edit != nil {
 		n.st.edit.activity = rt.now()
 		n.st.edit.reveal = true
+		rt.marksChanged(n)
 	}
 	rt.needPaint = true
 	rt.requestFrame()
@@ -490,12 +517,13 @@ func (rt *Runtime) editorUndo(id uint64, redo bool) {
 
 // editorVertical moves the caret by lines, keeping its horizontal position.
 func (rt *Runtime) editorVertical(es *editState, v string, k input.Key) int {
-	l := es.layout
+	l, pr := es.layout, es.drawn
 	if l == nil || len(l.Lines) == 0 {
 		return es.caret
 	}
+	caret := pr.toShown(es.caret)
 	if !es.havePrefX {
-		es.prefX, _ = l.Caret(es.caret)
+		es.prefX, _ = l.Caret(caret)
 		es.havePrefX = true
 	}
 	step := 1
@@ -505,14 +533,14 @@ func (rt *Runtime) editorVertical(es *editState, v string, k input.Key) int {
 	if k == input.KeyUp || k == input.KeyPageUp {
 		step = -step
 	}
-	target := l.LineOf(es.caret) + step
+	target := l.LineOf(caret) + step
 	switch {
 	case target < 0:
 		return 0
 	case target >= len(l.Lines):
 		return len(v)
 	}
-	return l.PositionInLine(target, es.prefX)
+	return pr.fromShown(l.PositionInLine(target, es.prefX))
 }
 
 // ---- mouse ----
@@ -522,9 +550,10 @@ func (rt *Runtime) editorHit(n *node, es *editState, ev *MouseEvent) int {
 		return es.caret
 	}
 	p := es.layout.HitTest(ev.LocalX-es.originX, ev.LocalY-es.originY)
-	// The layout is of the text shown: the bullets, or the text in its format, where
-	// a click on a literal puts the caret before the slot after it.
-	return rt.present(n.editor, n.editor.value.Peek()).fromShown(p)
+	// The layout is of the text shown: the bullets, the text in its format, where
+	// a click on a literal puts the caret before the slot after it, or the text
+	// without its hidden syntax.
+	return es.drawn.fromShown(p)
 }
 
 func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
@@ -647,16 +676,17 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	// While an input method composes, the text shown has the composition at
 	// the caret, and the caret is the input method's.
 	composing := focused && rt.composing == n.id && es.comp.text != ""
-	pr := rt.present(e, v)
+	pr := rt.presentDrawn(n, v)
 	// pos maps an offset of v to one of the text shown.
 	pos := pr.toShown
-	shown, at, caretAt := pr.shown, 0, pos(es.caret)
+	shown, at, caretAt, spans := pr.shown, 0, pos(es.caret), pr.spans
 	if composing {
 		shown, at = composedText(pr.shown, caretAt, es)
 		caretAt = at + es.comp.cursor
+		spans = shiftSpans(spans, at, len(shown)-len(pr.shown))
 	}
-	l := rt.text.Layout(shown, st, wrap)
-	es.layout = l
+	l := rt.text.LayoutSpans(shown, st, spans, wrap)
+	es.layout, es.drawn = l, pr
 	caretX, caretTop := l.Caret(caretAt)
 
 	// A single-line text that fits is not scrolled: it sits at its alignment, and the
@@ -722,7 +752,11 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 			rt.text.Draw(&rt.scene, pl, tx, cy, cw, rt.scale, 0, pc.Alpha(opacity).scene())
 		}
 	} else {
-		rt.text.Draw(&rt.scene, l, tx, cy, cw, rt.scale, 0, fg.Alpha(opacity).scene())
+		if len(spans) > 0 {
+			rt.text.DrawRich(&rt.scene, l, tx, cy, cw, rt.scale, 0, func(i int) text.RunPaint { return pr.runPaint(i, fg, opacity) })
+		} else {
+			rt.text.Draw(&rt.scene, l, tx, cy, cw, rt.scale, 0, fg.Alpha(opacity).scene())
+		}
 		if selected && !e.selectionText.IsZero() {
 			// The selected text is drawn again over its background, clipped to the
 			// selection, in the selection's text color (HighlightText under high contrast).
