@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/tyler-builds/jamb/proc"
 )
 
 // Sample builds a small repository in a temporary folder: a main branch with a
@@ -20,7 +22,7 @@ func Sample(t testing.TB) string {
 	dir := t.TempDir()
 	run := func(date string, args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", args...)
+		cmd := proc.Command("git", args...)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(),
 			"GIT_AUTHOR_NAME=Ada Lovelace", "GIT_AUTHOR_EMAIL=ada@example.com",

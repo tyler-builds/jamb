@@ -11,7 +11,7 @@ jamb to an app; the other pages cover one topic each.
 - [Layout](layout.md): shrinking, grid layout, split panes, and docking.
 - [Input](input.md): keyboard and focus, text fields and the clipboard, actions and key bindings, events, drag and drop, and gestures.
 - [Windows and dialogs](windows.md): windows, zoom, custom title bars, and native dialogs.
-- [OS integration](os-integration.md): jump lists and single instance, the notification area, OS notifications, and opening URLs.
+- [OS integration](os-integration.md): jump lists and single instance, the notification area, OS notifications, opening URLs, and running programs without console windows.
 - [Translations](translations.md): languages and translated strings.
 - [Examples](examples.md): the demo app and the notes app in this repository.
 

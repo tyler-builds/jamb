@@ -7,7 +7,6 @@ import (
 	"image"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"sync/atomic"
@@ -18,6 +17,7 @@ import (
 	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/platform/linux/wl"
 	"github.com/tyler-builds/jamb/internal/render/soft"
+	"github.com/tyler-builds/jamb/proc"
 )
 
 // xdg_toplevel states.
@@ -534,7 +534,7 @@ func (w *window) SetDark(on bool) {}
 
 // OpenURL opens url with the desktop's handler for it.
 func (w *window) OpenURL(url string) error {
-	cmd := exec.Command("xdg-open", url)
+	cmd := proc.Command("xdg-open", url)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
