@@ -9,6 +9,19 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-11-10
+
+### Added
+
+- `TextAreaElement.Marks` styles a text area's text as it is edited, from `ui.TextMark`s that the app
+  computes for each value. A mark can be syntax, such as the `**` around bold text, which hides
+  unless the caret or selection touches its construct, so text reads as formatted until the caret
+  comes to edit it. The value keeps the syntax: copy, undo and assistive technology see the text as
+  typed.
+- `markdown.EditMarks` gives those marks for Markdown: bold, italic, strikethrough, inline code and
+  links, with their syntax hidden away from the caret, and headings and code blocks, whose syntax
+  stays in view.
+
 ## [0.8.2] - 2026-11-10
 
 ### Changed
@@ -1143,7 +1156,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/tyler-builds/jamb/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/tyler-builds/jamb/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/tyler-builds/jamb/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/tyler-builds/jamb/compare/v0.7.1...v0.8.0
