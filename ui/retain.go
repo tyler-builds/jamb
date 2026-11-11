@@ -153,6 +153,7 @@ func (rt *Runtime) adopt(inst *componentInstance, parent *node) {
 		move(c.id)
 		c.rt = rt
 		c.parked = false
+		c.queued.Store(false) // the queue it may be in is the other runtime's, which skips it
 		c.gen = stale
 		rt.instances[c.id] = c
 		if moved {
