@@ -112,8 +112,8 @@ func (l *ListElement) Handle(h *ListHandle) *ListElement { l.handle = h; return 
 func (l *ListElement) SelectionContainer() *ListElement { l.selectable = true; return l }
 
 // Bottom is for chat-like lists. When the rows are shorter than the viewport
-// they sit at its bottom. While the list is at its end, appended items (and
-// rows growing) keep it there.
+// they sit at its bottom. While the list is at its end, appended items, rows
+// growing or shrinking, and the viewport changing height keep it there.
 func (l *ListElement) Bottom() *ListElement { l.bottom = true; return l }
 
 // OnAtEnd calls fn when the list moves to its end or away from it, during the
@@ -155,6 +155,7 @@ type varState struct {
 	atEnd    bool    // the list was at its end at the last paint
 	overflow bool    // the rows were taller than the viewport at the last paint
 	endKnown bool    // a paint has recorded atEnd
+	endY     float32 // the scroll target when atEnd was recorded
 	warned   bool
 	rebuilds int // O(n) index rebuilds, for tests and benchmarks
 }
@@ -269,6 +270,9 @@ func (vs *varState) restore(st *nodeState, a vAnchor) {
 		return
 	}
 	if d := t - st.targetY; d != 0 {
+		if st.targetY == vs.endY {
+			vs.endY += d // the list did not scroll away from where its end was recorded
+		}
 		st.targetY += d
 		st.scrollY += d
 	}
@@ -386,9 +390,12 @@ func hasOwnRole(r Element) bool {
 	return ok && d.acc != nil && d.acc.role != access.RoleUnknown
 }
 
-// setAtEnd records whether the list is at its end. onAtEnd is called on the
-// first paint and then on each change.
-func (vs *varState) setAtEnd(atEnd bool) {
+// setAtEnd records whether the list is at its end, its scroll target at or
+// past maxY, and the target it was found at. onAtEnd is called on the first
+// paint and then on each change.
+func (vs *varState) setAtEnd(st *nodeState, maxY float32) {
+	atEnd := st.targetY >= maxY-1
+	vs.endY = st.targetY
 	if vs.endKnown && atEnd == vs.atEnd {
 		return
 	}
@@ -424,9 +431,20 @@ func (rt *Runtime) checkVList(n *node, sy float32) {
 	}
 	vs.top = spacer.lay.Y
 	maxY := n.lay.ContentH - n.lay.H
+	// A list at its end stays there when its viewport changes height (a
+	// composer under a chat grows, a bar above it appears) or its content
+	// grows outside the rows: nothing scrolled it away, so it follows the end.
+	// As in capture, only a Bottom list or one that already overflowed.
+	if vs.endKnown && vs.atEnd && st.targetY == vs.endY && st.targetY < maxY-1 && (vs.bottom || vs.overflow) {
+		d := maxY - st.targetY
+		st.targetY += d
+		st.scrollY += d
+		sy = st.scrollY
+		rt.markVList(vs) // paint again at the new offset before the frame returns
+	}
 	vs.overflow = maxY > 0
 	if vs.count == 0 {
-		vs.setAtEnd(st.targetY >= maxY-1)
+		vs.setAtEnd(st, maxY)
 		if h := vs.handle; h != nil {
 			h.end, h.has = false, false // nothing to scroll to
 		}
@@ -448,6 +466,11 @@ func (rt *Runtime) checkVList(n *node, sy float32) {
 	if changed {
 		vs.restore(st, a)
 		sy = st.scrollY // the restore moved the offset too; the window follows it
+		// The layout still has the old heights. The end moved with them, so
+		// the list is at its end when it was before: measured against the old
+		// end, a row that shrank would report the list away from its end for a
+		// paint, and an append in that window would not follow.
+		maxY += float32(vs.end() - a.end)
 		rt.markVList(vs)
 	}
 
@@ -487,7 +510,7 @@ func (rt *Runtime) checkVList(n *node, sy float32) {
 		vs.windowSet = true
 		rt.markVList(vs)
 	}
-	vs.setAtEnd(st.targetY >= maxY-1)
+	vs.setAtEnd(st, maxY)
 }
 
 // heightIndex holds the height of every item of a ListOf: the measured height
