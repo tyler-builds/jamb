@@ -487,7 +487,8 @@ type Runtime struct {
 	pendingFocus   uint64
 	pendingHandles []*FocusHandle
 	selRects       []text.Rect
-	textInput      scene.Rect // caret of the focused editor, logical pixels
+	selReported    reportedSelection // see reportTextSelection
+	textInput      scene.Rect        // caret of the focused editor, logical pixels
 	hasTextInput   bool
 	reveal         scene.Rect
 	revealFrom     *node
@@ -1038,6 +1039,9 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 	}
 	if dragScrolled {
 		rt.dropOver()
+	}
+	if painted && rt.reportTextSelection() {
+		rt.listStale = true // what the OnTextSelect changed is built and painted in this frame
 	}
 	// A UniformList whose visible rows are missing (or whose row height was
 	// just measured) rebuilds now, so no frame is returned with gaps.
@@ -1767,7 +1771,7 @@ func (rt *Runtime) buildDiv(e *DivElement, id uint64, parent *node, owner *compo
 			}
 		}
 	}
-	if e.onGridCols != nil {
+	if e.onGridCols() != nil {
 		if rt.gridWatches == nil {
 			rt.gridWatches = map[uint64]*node{}
 		}
@@ -2167,13 +2171,13 @@ func (rt *Runtime) isPressed(id uint64) bool { return contains(rt.pressIDs, id) 
 // functions change is built before the frame ends (see listStale).
 func (rt *Runtime) reportGridColumns() {
 	for id, n := range rt.gridWatches {
-		if rt.byID[id] != n || n.div == nil || n.div.onGridCols == nil || n.flags&flagNoDisplay != 0 {
+		if rt.byID[id] != n || n.div == nil || n.div.onGridCols() == nil || n.flags&flagNoDisplay != 0 {
 			continue
 		}
 		st := rt.state(id)
 		if cols := n.lay.GridColumns(); cols > 0 && cols != st.gridCols {
 			st.gridCols = cols
-			n.div.onGridCols(cols)
+			n.div.onGridCols()(cols)
 			rt.listStale = true
 		}
 	}

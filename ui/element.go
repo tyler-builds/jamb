@@ -98,7 +98,7 @@ type DivElement struct {
 	actions      []actionHandler // see OnAction
 	drops        []DropTarget    // see OnDrop
 	handle       *FocusHandle
-	onGridCols   func(n int)  // see OnGridColumns
+	watch        *divWatch    // OnGridColumns and OnTextSelect, which few elements set
 	extent       *extentWatch // set by Tabs: paint reports the element's scroll offset and range (see extentWatch)
 	vlist        *listState   // set on the scroll container of a UniformList
 	vrows        *varState    // set on the scroll container of a ListOf
@@ -317,7 +317,37 @@ func (d *DivElement) Grid(columns ...Length) *DivElement {
 //
 // The count depends only on the grid's width and gap, not on its children, so
 // changing the children in fn does not change it again.
-func (d *DivElement) OnGridColumns(fn func(n int)) *DivElement { d.onGridCols = fn; return d }
+func (d *DivElement) OnGridColumns(fn func(n int)) *DivElement { d.watches().gridCols = fn; return d }
+
+// divWatch holds the functions that report on an element after layout or paint.
+// Few elements set one, so they share a pointer and DivElement keeps its size.
+type divWatch struct {
+	gridCols   func(n int)         // see OnGridColumns
+	textSelect func(TextSelection) // see OnTextSelect
+}
+
+func (d *DivElement) watches() *divWatch {
+	if d.watch == nil {
+		d.watch = &divWatch{}
+	}
+	return d.watch
+}
+
+// onGridCols is the element's OnGridColumns, or nil.
+func (d *DivElement) onGridCols() func(n int) {
+	if d.watch == nil {
+		return nil
+	}
+	return d.watch.gridCols
+}
+
+// onTextSelect is the element's OnTextSelect, or nil.
+func (d *DivElement) onTextSelect() func(TextSelection) {
+	if d == nil || d.watch == nil {
+		return nil
+	}
+	return d.watch.textSelect
+}
 
 // GridRows sizes the first rows of a grid, as Grid sizes its columns; rows
 // past them fit their content. Fr rows share the grid's height, when it has

@@ -28,6 +28,10 @@ type textSelection struct {
 	lastClick     time.Time
 	lastX, lastY  float32
 	layout        *text.Layout // from the last paint, for hit testing
+	// Where the last paint drew the selection, in logical window coordinates:
+	// the box around it, and its last line. drawnGen is that paint's paintGen.
+	drawn, drawnLast scene.Rect
+	drawnGen         uint32
 }
 
 func (s *textSelection) bounds() (int, int) { return min(s.anchor, s.caret), max(s.anchor, s.caret) }
@@ -249,12 +253,20 @@ func (rt *Runtime) textSelectionRects(n *node, l *text.Layout, x, y, opacity flo
 	}
 	var out []scene.Rect
 	rt.selRects = l.SelectionRects(a, b, rt.selRects[:0])
-	for _, r := range rt.selRects {
+	s.drawn, s.drawnLast, s.drawnGen = scene.Rect{}, scene.Rect{}, rt.paintGen
+	for i, r := range rt.selRects {
 		li := 0
 		if l.LineHeight > 0 {
 			li = min(max(int(r.Y/l.LineHeight+0.5), 0), len(l.Lines)-1)
 		}
-		b := rt.px(scene.Rect{X: x + n.lineOffset(l, li) + r.X, Y: y + r.Y, W: r.W, H: r.H})
+		lr := scene.Rect{X: x + n.lineOffset(l, li) + r.X, Y: y + r.Y, W: r.W, H: r.H}
+		if i == 0 {
+			s.drawn = lr
+		} else {
+			s.drawn = union(s.drawn, lr)
+		}
+		s.drawnLast = lr
+		b := rt.px(lr)
 		rt.scene.AddQuad(scene.Quad{Bounds: b, Background: c.Alpha(opacity).scene(), Radii: scene.Uniform(2 * rt.scale)})
 		if rt.theme.HighContrast {
 			out = append(out, b)
@@ -271,4 +283,106 @@ func (rt *Runtime) redrawSelected(rects []scene.Rect, draw func(Color)) {
 		draw(rt.theme.AccentText)
 		rt.scene.PopClip()
 	}
+}
+
+// union is the smallest rectangle around a and b.
+func union(a, b scene.Rect) scene.Rect {
+	x, y := min(a.X, b.X), min(a.Y, b.Y)
+	return scene.Rect{X: x, Y: y, W: max(a.Right(), b.Right()) - x, H: max(a.Bottom(), b.Bottom()) - y}
+}
+
+// TextSelection is the text selected in a Selectable text, and where it is
+// drawn. The zero value is no selection.
+type TextSelection struct {
+	Text string // the selected text
+	// Bounds is the box around the selected text, and Last the selected part
+	// of its last line, in logical pixels relative to the border box of the
+	// element whose OnTextSelect reports it, so that an Absolute child of that
+	// element can be placed by them. They are where the text is drawn, even
+	// when part of it is scrolled out of view.
+	Bounds, Last Rect
+}
+
+// OnTextSelect calls fn when the text the user has selected in a Selectable
+// text inside the element changes or moves (as its scroll container
+// scrolls), and with the zero TextSelection when the selection is cleared,
+// loses focus or is scrolled entirely out of view. The innermost element with
+// an OnTextSelect around the text reports it. fn runs after the frame is
+// painted; what it changes is built, laid out and painted before the frame
+// ends, so an element placed by the selection follows it as it scrolls.
+//
+// A selection is within one selectable text, such as one paragraph of a
+// markdown.View.
+//
+//	sel := ui.Local(ctx, "sel", ui.TextSelection{})
+//	ui.Div().OnTextSelect(sel.Set).Child(markdown.View(doc)).
+//		Child(ui.If(sel.Get().Text != "", quoteButton(sel.Get().Last)))
+func (d *DivElement) OnTextSelect(fn func(TextSelection)) *DivElement {
+	d.watches().textSelect = fn
+	return d
+}
+
+// ClearTextSelection clears the selection of the selectable text that has
+// focus, if one has. Its OnTextSelect then reports no selection.
+func (c *Context) ClearTextSelection() { c.rt.clearTextSelection() }
+
+func (rt *Runtime) clearTextSelection() {
+	if n, s := rt.selectionOf(rt.focusID); n != nil && s.anchor != s.caret {
+		s.anchor = s.caret
+		s.dragging = false
+		rt.needPaint = true
+		rt.requestFrame()
+	}
+}
+
+// reportedSelection is the selection last reported to an OnTextSelect, and
+// the id of the element it was reported to.
+type reportedSelection struct {
+	id  uint64
+	sel TextSelection
+}
+
+// reportTextSelection calls the OnTextSelect around the focused selectable
+// text when its selection has changed or moved since the last report, and the
+// one last reported to with no selection when the selection has gone or
+// another element now reports it. It runs after a paint, which records where
+// the selection is drawn. It reports whether it called a function.
+func (rt *Runtime) reportTextSelection() bool {
+	var sel TextSelection
+	var watcher *node
+	if n := rt.byID[rt.focusID]; n != nil && n.textEl != nil && n.st != nil && n.st.sel != nil && n.paintGen == rt.paintGen {
+		s := n.st.sel
+		if a, b := s.bounds(); a < b && s.text == n.textEl.text && s.drawnGen == rt.paintGen && !s.drawn.Intersect(n.clip).Empty() {
+			for p := n.parent; p != nil; p = p.parent {
+				if p.div.onTextSelect() != nil {
+					watcher = p
+					break
+				}
+			}
+			if watcher != nil {
+				ox, oy := watcher.abs.X, watcher.abs.Y
+				sel = TextSelection{Text: n.textEl.text[a:b],
+					Bounds: Rect{X: s.drawn.X - ox, Y: s.drawn.Y - oy, W: s.drawn.W, H: s.drawn.H},
+					Last:   Rect{X: s.drawnLast.X - ox, Y: s.drawnLast.Y - oy, W: s.drawnLast.W, H: s.drawnLast.H}}
+			}
+		}
+	}
+	var id uint64
+	if watcher != nil {
+		id = watcher.id
+	}
+	old := rt.selReported
+	if old.id == id && old.sel == sel {
+		return false
+	}
+	rt.selReported = reportedSelection{id, sel}
+	if old.id != 0 && old.id != id {
+		if o := rt.byID[old.id]; o != nil && o.div.onTextSelect() != nil {
+			o.div.onTextSelect()(TextSelection{})
+		}
+	}
+	if watcher != nil {
+		watcher.div.onTextSelect()(sel)
+	}
+	return true
 }
