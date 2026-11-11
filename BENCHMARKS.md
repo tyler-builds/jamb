@@ -1,7 +1,7 @@
 # Benchmarks
 
-This file reports jamb's measured performance. The 3,000-row benchmark of
-2026-11-10 comes first; then the v0.4.0 update of 2026-10-23: it measured again what the release's resize fix changed, and the GPUI
+This file reports jamb's measured performance. The text draw cache of 2026-11-11
+comes first, then the 3,000-row benchmark of 2026-11-10; then the v0.4.0 update of 2026-10-23: it measured again what the release's resize fix changed, and the GPUI
 comparison. The current results of the performance work, dated 2026-10-22, follow
 it. They are compared with the results of 2026-10-21, which
 were measured before the performance work of 2026-10-22 and follow them. Each
@@ -10,6 +10,50 @@ measurements (2026-10-06 to 2026-10-14) follow under
 [Earlier measurements](#earlier-measurements), with their original dates. Where a
 later figure replaces an earlier one, the earlier figure is marked superseded and
 kept, so the history stays readable.
+
+## Text draw cache (2026-11-11)
+
+Each text node now keeps what its last paint drew: its layout, and where each of its glyphs is
+in the glyph atlas. When the text is drawn again with the same left edge, scale and colors, as
+in each frame of a vertical scroll, it draws from those instead of looking each glyph up in the
+glyph table. Text that moves sideways, changes, or is drawn once costs what it did. A node
+rebuilt in place keeps its cache, and a retired node gives its cache to the next new text node.
+Measured on Linux, Intel Core i5-11600K, Go 1.27.3, `-count 6`, medians compared by benchstat,
+`origin/main` at `b8631c1` against the branch, run one after the other on the same machine
+(load about 3.5 from other work).
+
+| Benchmark | main | Cache | Change | Allocs/op, main / cache |
+|---|--:|--:|--:|--:|
+| `DataGridCompare` vertical small scrolls, 10,000 rows | 147.4 µs | 72.2 µs | -51% | 18 / 19 |
+| `DataGridCompare` vertical jitter scrolls, 10,000 rows | 130.9 µs | 64.0 µs | -51% | 0 / 0 |
+| `DataGridCompare` forced stationary layouts, 10,000 rows | 130.1 µs | 62.5 µs | -52% | 0 / 0 |
+| `DataGridCompare` vertical row scrolls, 10,000 rows | 309.0 µs | 232.3 µs | -25% | 441 / 443 |
+| `DataGridCompare` horizontal small scrolls, 200 columns | 167.8 µs | 153.2 µs | -9% | 90 / 91 |
+| `Rows3000/label`: one row's label changes | 3.26 ms | 1.92 ms | -41% | 12 / 21 |
+| `Rows3000/selected-move` | 30.9 ms | 29.5 ms | -5% | 9,034 / 9,192 |
+| `ShrinkingTextRows` | 49.0 µs | 34.2 µs | -30% | 0 / 0 |
+| `UniformList` scroll step, list 100k / div 10k | 153.1 / 630.7 µs | 121.3 / 574.8 µs | -21% / -9% | 327 / 327; 72 / 87 |
+| `ListOf` scroll step, 100,000 rows | 77.8 µs | 71.5 µs | -8% | 279 / 279 |
+| `FrameRebuild` | 235.7 µs | 204.4 µs | -13% | 661 / 661 |
+| `WidgetFrameNoInspector` | 1.469 ms | 1.422 ms | -3% | 6,000 / 6,000 |
+
+`Rows3000/label-same` and `selected-same` (about 80 ns, no frame drawn) went up 5 to 6 ns, and
+`UniformList` build by 2.5%; `ListOf` build and rebuild did not change. In `internal/text`,
+`BenchmarkDrawCells` draws 200 grid cells a frame: 110.7 µs without the cache, 34.1 µs with it
+when the cells stay still, and 110.7 µs with it when they move one pixel sideways each frame.
+
+The unfinished version of this change allocated more: a cache for each text node it painted, and
+its glyph buffer grown one glyph at a time. Sizing the buffers once, keeping the cache when a node
+is rebuilt in place and reusing the caches of retired nodes took `Rows3000/label` from 44 to 21
+allocs/op, a 10,000-row row scroll from 498 to 443, and a `UniformList` 100k scroll step from 405
+to 327.
+
+To reproduce:
+
+```
+go test -run '^$' -bench 'BenchmarkDataGridCompare/(.*scroll|.*stationary)|BenchmarkUniformList|BenchmarkListOf|BenchmarkRows3000|BenchmarkFrameRebuild|BenchmarkShrinkingTextRows|BenchmarkWidgetFrameNoInspector' -benchmem -count=6 ./ui
+go test -run '^$' -bench 'BenchmarkGlyphRaster|BenchmarkDrawCells' -benchmem -count=6 ./internal/text
+```
 
 ## 3,000 rows and equal writes (2026-11-10)
 

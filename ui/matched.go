@@ -173,7 +173,7 @@ func (rt *Runtime) setMatched(n *node) {
 		n.st.lay = ls
 	}
 	m := ls.match
-	if m == nil || n.fresh {
+	if m == nil || n.fresh() {
 		m = &matchState{}
 		ls.match = m
 		if n.flags&flagLayoutSpring == 0 {
@@ -188,7 +188,7 @@ func (rt *Runtime) setMatched(n *node) {
 	if rt.match == nil {
 		rt.match = &matchRuntime{}
 	}
-	if n.fresh && !rt.sys.ReducedMotion {
+	if n.fresh() && !rt.sys.ReducedMotion {
 		rt.match.in = append(rt.match.in, n)
 	}
 }
