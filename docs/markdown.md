@@ -321,6 +321,29 @@ The notes example does this (`examples/notes/views/editor.go`, with its test in
 highlighter's colors are kept by language and code, so an update after a pause
 parses only the code blocks that changed.
 
+## Formatting as it is typed
+
+`EditMarks` gives a `ui.TextArea` the marks that show Markdown formatted while it is
+written (see `TextAreaElement.Marks` in [Input](input.md)), as a chat box or a
+notes app wants:
+
+```go
+ui.TextArea(draft).Marks(markdown.EditMarks(markdown.EditStyle{
+	Syntax: ui.Highlight{Color: t.TextSubtle},           // the ** and ` while they show
+	Code:   ui.Highlight{Color: t.Link},                 // inline code and code blocks, always monospace
+	Link:   ui.Highlight{Color: t.Link},                 // a link's text; underlined by default
+}))
+```
+
+Bold, italic, strikethrough, inline code and links are formatted, and their syntax
+(`**`, `_`, `~~`, backticks, and a link's brackets and URL) hides until the caret
+touches the construct. A heading is bold and a code block monospace, and their `#`
+and fences stay in view, styled as syntax, since they say what the line is. Images,
+escapes (`\*`), intraword underscores (`snake_case`) and lone stars (`2 * 3`) are left
+as they are. Each line is read on its own, as text still being written must be:
+emphasis and inline code end at the end of a line, and a heading is no larger than
+the text, since a text area's text is one size.
+
 ## Limits
 
 - Selection is per block: a drag selects within one paragraph, heading, cell or

@@ -302,14 +302,19 @@ func (rt *Runtime) editorLineEdge(id uint64, home, extend bool) {
 		p = 0
 	}
 	if n.editor.multiline && es.layout != nil {
-		start, end := es.layout.LineBounds(es.layout.LineOf(es.caret))
-		if home {
-			p = start
-		} else {
-			p = end
-			if end > start && end < len(v) && v[end-1] == ' ' && v[end] != '\n' {
-				p-- // soft-wrapped line: stay before the space that wrapped
-			}
+		// The layout is of the text drawn (see editState.drawn).
+		pr := es.drawn
+		s := pr.shown
+		start, end := es.layout.LineBounds(es.layout.LineOf(pr.toShown(es.caret)))
+		switch {
+		case home:
+			p = pr.fromShown(start)
+		case end > start && end < len(s) && s[end-1] == ' ' && s[end] != '\n':
+			p = pr.fromShown(end - 1) // soft-wrapped line: stay before the space that wrapped
+		case pr.hides && (end == len(s) || s[end] == '\n'):
+			p = pr.lastFromShown(end) // after the hidden syntax that ends the line
+		default:
+			p = pr.fromShown(end)
 		}
 	}
 	rt.editorMoveTo(id, p, extend)

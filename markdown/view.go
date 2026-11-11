@@ -27,6 +27,10 @@
 // They are plain unless the view has a CodeHighlighter (see Code), such as the one of
 // the mdcode package, which colors them with the theme's syntax colors.
 //
+// EditMarks formats Markdown in a text area as it is typed, through
+// ui.TextAreaElement.Marks: the text shows bold, code and links, and their syntax
+// shows only where the caret is.
+//
 // The words that the view adds, such as the name of a table or of an image without
 // alternative text, are the Markdown fields of the window's ui.Strings. The parts of
 // the view are styled with Style (see Styles).
