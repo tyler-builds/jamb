@@ -332,8 +332,10 @@ others are design decisions and are marked as such.
   of "spinner" would be ambiguous. The ring is named "Loading…" unless `Label` gives
   another name.
 - **Reduced motion (decided).** With reduced motion on, an indeterminate bar is drawn
-  in the middle of its track, and a busy ring is drawn with all its dots still. Neither
-  asks for frames.
+  in the middle of its track and asks for no frames. A busy ring keeps turning, at half
+  its speed: its turning is what says that work goes on, so it is essential motion
+  (WCAG 2.3.3), and only its dots' opacity changes. A ring drawn still read as a static
+  glyph rather than a busy indicator.
 - **Badges (decided).** A count of zero draws nothing. A badge is a pill with its text,
   and under high contrast it is outlined, so the variant is also told by its text. A
   badge attached to an element with `Badged` adds its text to the element's name, as in
@@ -403,7 +405,8 @@ others are design decisions and are marked as such.
 
 - Unit tests in `ui/feedback_test.go` (13 tests): the determinate range and its
   read-only state, the readout and clamping, the indeterminate bar with no range, the
-  ring's name and bounds, reduced motion for both (no frames asked), the high-contrast
+  ring's name and bounds, reduced motion (no frames asked by the bar; the ring turns at
+  half speed), the high-contrast
   outline, badge counts and the 99+ cap, a count of zero drawing nothing, the attached
   badge's name and its hidden node, the dot, and the high-contrast badge.
 - Unit tests in `ui/toast_test.go` (16 tests): announcements by variant (politeness),

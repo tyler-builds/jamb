@@ -298,7 +298,8 @@ func segmentSpan(p float32) (start, width float32) {
 }
 
 // ProgressRingElement is a busy indicator: a ring of dots that turns while the
-// app waits for something. It has no value, so it says only that work is
+// app waits for something. It turns under reduced motion too, more slowly,
+// since a still ring would not show that work goes on. It has no value, so it says only that work is
 // under way. It is named with the LoadingEllipsis text of the window's Strings
 // unless Label gives another name.
 type ProgressRingElement struct {
@@ -354,21 +355,14 @@ func (r *ProgressRingElement) expand(ctx *Context) Element {
 	ring := func() *DivElement {
 		return Div().asPart("ProgressRing.Ring").styleOf(&st.Ring).Size(Px(r.size), Px(r.size)).Role(access.RoleProgressBar).Label(name)
 	}
+	// The turning is what says that work goes on, so it is essential motion and
+	// runs under reduced motion too, at half the speed. Only the dots' opacity
+	// changes; nothing moves across the screen.
+	turn := 900 * time.Millisecond
 	if ctx.ReducedMotion() {
-		// Reduced motion: every dot is drawn, with no turning. Under high contrast the
-		// dots are solid; otherwise they are dimmed, so the ring reads as busy without
-		// moving.
-		box := ring()
-		for i := range ringDots {
-			if t.HighContrast {
-				box.Child(r.dot(&st, i, t.Text, 1))
-			} else {
-				box.Child(r.dot(&st, i, t.Accent, 0.35))
-			}
-		}
-		return box
+		turn *= 2
 	}
-	return Animate("ring", Animation{Duration: 900 * time.Millisecond, Repeat: true, Easing: ease.Linear},
+	anim := Animate("ring", Animation{Duration: turn, Repeat: true, Easing: ease.Linear},
 		func(head float32) Element {
 			box := ring()
 			for i := range ringDots {
@@ -387,6 +381,8 @@ func (r *ProgressRingElement) expand(ctx *Context) Element {
 			}
 			return box
 		})
+	anim.essential = true
+	return anim
 }
 
 // dot is the i-th dot of a ring. It sits on the circle at an angle of i/8 of a

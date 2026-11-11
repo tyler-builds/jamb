@@ -13,12 +13,14 @@ import (
 // runs after the first frame and leaves the rig after its own frame. animates says
 // whether the action starts a motion when reduced motion is off: a transition, an
 // enter or exit, or a repeating animation. Under reduced motion no case may ask for
-// a frame.
+// a frame, except an essential one: a motion that carries meaning, as a busy
+// ring's turning does, which must keep asking for frames.
 type motionCase struct {
-	name     string
-	animates bool
-	root     func(open *Signal[bool]) func(*Context) Element
-	act      func(t *testing.T, r *accessRig, open *Signal[bool])
+	name      string
+	animates  bool
+	essential bool
+	root      func(open *Signal[bool]) func(*Context) Element
+	act       func(t *testing.T, r *accessRig, open *Signal[bool])
 }
 
 // hoverPart moves the pointer to the center of the part's node, and frames.
@@ -37,8 +39,9 @@ func clickPart(t *testing.T, r *accessRig, part string) {
 }
 
 // TestWidgetsRequestNoFramesUnderReducedMotion runs each widget's action with
-// reduced motion on and off. Under reduced motion no widget asks for a frame, and
-// the widgets that animate ask for frames without it, so the check is real.
+// reduced motion on and off. Under reduced motion no widget asks for a frame but
+// the busy ring, whose turning is essential, and the widgets that animate ask
+// for frames without it, so the check is real.
 func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 	cases := []motionCase{
 		{name: "TextInput", animates: true,
@@ -162,14 +165,14 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				}
 			},
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) {}},
-		{name: "ProgressRing", animates: true,
+		{name: "ProgressRing", animates: true, essential: true,
 			root: func(open *Signal[bool]) func(*Context) Element {
 				return func(ctx *Context) Element {
 					return Div().Column().Child(ProgressRing().Label("Sending"))
 				}
 			},
 			act: func(t *testing.T, r *accessRig, _ *Signal[bool]) {}},
-		{name: "Button.Loading", animates: true,
+		{name: "Button.Loading", animates: true, essential: true,
 			root: func(open *Signal[bool]) func(*Context) Element {
 				return func(ctx *Context) Element {
 					return Div().Column().Child(Button("Save").Loading(open.Get()))
@@ -244,8 +247,11 @@ func TestWidgetsRequestNoFramesUnderReducedMotion(t *testing.T) {
 				r.frame()
 				c.act(t, r, open)
 				asks := r.rt.NeedsFrame()
-				if reduced && asks {
+				if reduced && asks && !c.essential {
 					t.Errorf("reduced motion %v: the action asks for frames", reduced)
+				}
+				if reduced && c.essential && !asks {
+					t.Errorf("reduced motion on: the essential motion asks for no frames; it should keep going")
 				}
 				if !reduced && c.animates && !asks {
 					t.Errorf("reduced motion off: the action asks for no frames; it should animate")

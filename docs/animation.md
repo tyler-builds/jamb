@@ -391,7 +391,9 @@ at once, and keep nothing drawn after it has gone), nothing is matched by
 and `Enter`, in place, which reduced motion makes immediate), and smooth scrolling
 jumps to its target. An `Animate`, `Play` or `AnimateTimeline`
 that is finite jumps to its last frame (the last stop, every step at 1), and a
-repeating one stops at its first frame, so nothing asks for more frames. Delays
+repeating one stops at its first frame, so nothing asks for more frames (the
+busy `ProgressRing` is the exception: its turning is essential, so it keeps
+turning, at half its speed). Delays
 and stagger are ignored, and an `OnDone` runs at the next frame. Apps should check `ctx.ReducedMotion()`
 before they run their own motion.
 
