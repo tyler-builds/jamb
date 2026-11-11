@@ -66,30 +66,53 @@ func readSetting(namespace, key string) any {
 func ReadSettings() platform.Settings {
 	s := platform.DefaultSettings()
 	s.RoundCaptionButtons = true
-	if v, ok := readSetting(gnomeWM, "button-layout").(string); ok {
+	read := readAllSettings()
+	if v, ok := read(gnomeWM, "button-layout").(string); ok {
 		s.CaptionButtons = v
 	}
-	if v, ok := readSetting(appearance, "color-scheme").(uint32); ok {
+	if v, ok := read(appearance, "color-scheme").(uint32); ok {
 		s.Dark = v == 1 // 1 prefers dark, 2 prefers light, 0 has no preference
 	}
-	if v, ok := readSetting(appearance, "contrast").(uint32); ok {
+	if v, ok := read(appearance, "contrast").(uint32); ok {
 		s.HighContrast = v == 1
 	}
-	if v, ok := readSetting(appearance, "reduced-motion").(uint32); ok {
+	if v, ok := read(appearance, "reduced-motion").(uint32); ok {
 		s.ReducedMotion = v == 1
 	}
-	if v, ok := readSetting(gnomeInterface, "text-scaling-factor").(float64); ok && v > 0 {
+	if v, ok := read(gnomeInterface, "text-scaling-factor").(float64); ok && v > 0 {
 		s.TextScale = min(max(int(v*100+0.5), 100), 225)
 	}
-	if v, ok := readSetting(gnomeInterface, "enable-animations").(bool); ok && !v {
+	if v, ok := read(gnomeInterface, "enable-animations").(bool); ok && !v {
 		s.ReducedMotion = true
 	}
-	if v, ok := readSetting(gnomeInterface, "cursor-blink").(bool); ok && !v {
+	if v, ok := read(gnomeInterface, "cursor-blink").(bool); ok && !v {
 		s.CaretBlink = 0
-	} else if v, ok := readSetting(gnomeInterface, "cursor-blink-time").(int32); ok && v > 0 {
+	} else if v, ok := read(gnomeInterface, "cursor-blink-time").(int32); ok && v > 0 {
 		s.CaretBlink = msDuration(v / 2) // the setting is a whole on-off cycle
 	}
 	return s
+}
+
+// readAllSettings reads every setting of the namespaces ReadSettings uses in
+// one call to the portal (ReadAll), and returns a function that looks one up.
+// When the portal cannot, the function reads each setting on its own.
+func readAllSettings() func(namespace, key string) any {
+	conn, err := sessionBus()
+	if err != nil {
+		return func(string, string) any { return nil }
+	}
+	var all map[string]map[string]dbus.Variant
+	err = conn.Object(portalName, portalPath).
+		Call(portalSettings+".ReadAll", 0, []string{appearance, gnomeInterface, gnomeWM}).Store(&all)
+	if err != nil {
+		return readSetting
+	}
+	return func(namespace, key string) any {
+		if v, ok := all[namespace][key]; ok {
+			return v.Value()
+		}
+		return nil
+	}
 }
 
 // watchSettings tells every window when a desktop setting changes. It runs

@@ -119,12 +119,48 @@ func gpuAdapter() string {
 	return osGpuAdapter()
 }
 
+// settingsPrefetch delivers the desktop's settings that prefetchSettings
+// started reading, until the first window takes them.
+var settingsPrefetch chan platform.Settings
+
+// prefetchSettings starts reading the desktop's settings on another goroutine:
+// on Linux they come from the settings portal over D-Bus, which takes long
+// enough to overlap with creating the first window.
+func prefetchSettings() {
+	if headlessOn {
+		return
+	}
+	c := make(chan platform.Settings, 1)
+	settingsPrefetch = c
+	go func() { c <- osReadPlatformSettings() }()
+}
+
+// settingsCache holds the desktop's settings once read, until they change.
+var settingsCache *platform.Settings
+
+// readPlatformSettings returns the desktop's settings, reading them only the
+// first time and after forgetPlatformSettings.
 func readPlatformSettings() platform.Settings {
 	if headlessOn {
 		return platform.DefaultSettings()
 	}
-	return osReadPlatformSettings()
+	if settingsCache != nil {
+		return *settingsCache
+	}
+	var s platform.Settings
+	if c := settingsPrefetch; c != nil {
+		settingsPrefetch = nil
+		s = <-c
+	} else {
+		s = osReadPlatformSettings()
+	}
+	settingsCache = &s
+	return s
 }
+
+// forgetPlatformSettings makes the next readPlatformSettings read them again,
+// when the desktop reports that one changed.
+func forgetPlatformSettings() { settingsCache = nil }
 
 func clockNow() int64 {
 	if headlessOn {

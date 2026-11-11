@@ -5,20 +5,25 @@ package app
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/tyler-builds/jamb/internal/dmabuf"
 	"github.com/tyler-builds/jamb/internal/platform"
 	"github.com/tyler-builds/jamb/internal/render"
 	"github.com/tyler-builds/jamb/internal/render/vulkan"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // gpu is the Vulkan device that every window renders with, or nil when there
 // is none: windows are then drawn on the CPU. The first window creates it.
 var gpu *vulkan.Device
 
-// gpuPending delivers the device that prepareDevice started creating, until
-// the first window takes it.
-var gpuPending chan gpuResult
+// gpuPrepared is closed when the device that prepareDevice started creating
+// is ready, in gpuPrepResult, and nil once the first window has taken it.
+var (
+	gpuPrepared   chan struct{}
+	gpuPrepResult gpuResult
+)
 
 type gpuResult struct {
 	dev *vulkan.Device
@@ -37,10 +42,11 @@ func osPrepareDevice() {
 	if cpuOnly() {
 		return
 	}
-	gpuPending = make(chan gpuResult, 1)
+	ready := make(chan struct{})
+	gpuPrepared = ready
 	go func() {
-		dev, err := vulkan.NewDevice()
-		gpuPending <- gpuResult{dev, err}
+		gpuPrepResult.dev, gpuPrepResult.err = vulkan.NewDevice()
+		close(ready)
 	}()
 }
 
@@ -55,6 +61,17 @@ type dmabufWindow interface {
 func osNewRenderer(w platform.Window, width, height int) (render.Renderer, error) {
 	if cpuOnly() {
 		return newSoftRenderer(w)
+	}
+	// Creating the device takes a GPU driver a long time, 100 ms or more. Until
+	// it is ready, the window is drawn on the CPU, so that it appears at once.
+	if ready := gpuPrepared; gpu == nil && ready != nil && !closed(ready) {
+		if soft, err := newSoftRenderer(w); err == nil {
+			go func() {
+				<-ready
+				w.Wake() // the next frame moves the window to the GPU
+			}()
+			return &bootRenderer{Renderer: soft, w: w, ready: ready}, nil
+		}
 	}
 	r, err := newGPURenderer(w)
 	if err == nil {
@@ -78,9 +95,10 @@ func newGPURenderer(w platform.Window) (render.Renderer, error) {
 	}
 	if gpu == nil {
 		var res gpuResult
-		if gpuPending != nil {
-			res = <-gpuPending
-			gpuPending = nil
+		if gpuPrepared != nil {
+			<-gpuPrepared
+			res = gpuPrepResult
+			gpuPrepared, gpuPrepResult = nil, gpuResult{}
 		} else {
 			res.dev, res.err = vulkan.NewDevice()
 		}
@@ -128,4 +146,67 @@ func osGpuAdapter() string {
 		return "CPU"
 	}
 	return gpu.Adapter()
+}
+
+func closed(c chan struct{}) bool {
+	select {
+	case <-c:
+		return true
+	default:
+		return false
+	}
+}
+
+// bootRenderer draws a window on the CPU while the GPU device is still being
+// created, and moves it to the GPU at the first frame after the device is
+// ready. A window that cannot be drawn on the GPU stays on the CPU.
+type bootRenderer struct {
+	render.Renderer
+	w     platform.Window
+	ready chan struct{} // closed when the device is ready; nil once moved
+}
+
+// BeginFrame implements render.Renderer.
+func (b *bootRenderer) BeginFrame(width, height int, clear scene.Color) error {
+	if b.ready != nil && closed(b.ready) {
+		b.ready = nil
+		r, err := newGPURenderer(b.w)
+		if err == nil {
+			b.Renderer.Close()
+			b.Renderer = r
+			application.dev.tracef("window moved to the GPU %v after process start", time.Since(processStart))
+		} else if !gpuReported {
+			gpuReported = true
+			fmt.Fprintf(os.Stderr, "jamb: drawing on the CPU: %v\n", err)
+		}
+	}
+	return b.Renderer.BeginFrame(width, height, clear)
+}
+
+// Describe names the renderer in use, for JAMB_TRACE.
+func (b *bootRenderer) Describe() string {
+	if b.ready != nil {
+		return "CPU until the GPU is ready"
+	}
+	if d, ok := b.Renderer.(interface{ Describe() string }); ok {
+		return d.Describe()
+	}
+	return "CPU"
+}
+
+// Recreate rebuilds the GPU renderer's objects after a device loss.
+func (b *bootRenderer) Recreate() error {
+	if rb, ok := b.Renderer.(interface{ Recreate() error }); ok {
+		return rb.Recreate()
+	}
+	return nil
+}
+
+// LastPresent reports the last frame's present times, for JAMB_FRAMESTATS.
+func (b *bootRenderer) LastPresent() (start, end int64) {
+	if p, ok := b.Renderer.(interface{ LastPresent() (start, end int64) }); ok {
+		return p.LastPresent()
+	}
+	now := clockNow()
+	return now, now
 }
