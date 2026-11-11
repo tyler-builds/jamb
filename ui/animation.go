@@ -80,6 +80,9 @@ type AnimateElement struct {
 	fn   func(t float32) Element
 	tl   *Timeline // set by AnimateTimeline, which renders tfn
 	tfn  func(p []float32) Element
+	// essential marks motion that carries meaning, such as a busy ring's: it
+	// runs under reduced motion too (WCAG 2.3.3 exempts essential animation).
+	essential bool
 }
 
 func (*AnimateElement) isElement() {}
@@ -177,7 +180,8 @@ func (a *AnimateElement) expand(ctx *Context) Element {
 	}
 	as := st.anim
 	as.el = a
-	if due := as.start.Add(a.delay()); now.Before(due) && !rt.sys.ReducedMotion {
+	reduced := rt.sys.ReducedMotion && !a.essential
+	if due := as.start.Add(a.delay()); now.Before(due) && !reduced {
 		// In its delay the animation shows its first frame and asks for no
 		// frames; a timer renders it again when it is due.
 		if as.wait == nil {
@@ -203,7 +207,7 @@ func (a *AnimateElement) expand(ctx *Context) Element {
 		p -= float32(math.Floor(float64(p)))
 	}
 	p = min(max(p, 0), 1)
-	if rt.sys.ReducedMotion {
+	if reduced {
 		// With reduced motion a finite animation jumps to its end, and a
 		// repeating one stops at its first frame, so nothing asks for a frame.
 		running = false

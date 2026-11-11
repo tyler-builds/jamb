@@ -198,6 +198,8 @@ With reduced motion (`ctx.ReducedMotion()`):
 - A finite `Animate` renders its end value and asks for no frame.
 - A repeating `Animate` renders its first frame (progress 0) and asks for no frame,
   so it stops. Apps that want a different still frame can check `ctx.ReducedMotion()`.
+  The one exception is the busy ring (`ProgressRing`), whose turning is essential: it
+  keeps turning, at half its speed.
 
 Caret: the blink uses the system's blink time (`caretVisible`), and the blink
 stays solid when the system's blink is off. The caret width is 1.5 logical pixels

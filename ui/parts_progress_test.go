@@ -4,8 +4,9 @@ import (
 	"testing"
 )
 
-// reducedRig is a rig with reduced motion on, so that the ring's dots and the
-// indeterminate segment have a fixed place to test.
+// reducedRig is a rig with reduced motion on, so that the indeterminate segment
+// has a fixed place to test. The ring turns even so; its first frame has half
+// its dots lit.
 func reducedRig(root func(*Context) Element) *accessRig {
 	r := newAccessRig(root)
 	r.rt.SetSystemSettings(SystemSettings{ReducedMotion: true})
@@ -77,8 +78,8 @@ func testProgressParts(t *testing.T, applied map[string]bool) {
 			return Div().Column().Child(ProgressRing().Label("Sending").Styles(st))
 		})
 		dots := partNodes(r.rt, "ProgressRing.Dot")
-		if len(dots) != ringDots {
-			t.Fatalf("the ring draws %d dots, want %d", len(dots), ringDots)
+		if len(dots) != ringDots/2 {
+			t.Fatalf("the ring draws %d dots, want %d", len(dots), ringDots/2)
 		}
 		for _, d := range dots {
 			wantBackground(t, d, "ProgressRing.Dot", markBG)

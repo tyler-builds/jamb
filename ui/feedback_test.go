@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"math"
+	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/access/accesstest"
@@ -115,7 +118,6 @@ func TestProgressReducedMotionIsStatic(t *testing.T) {
 		el   func() Element
 	}{
 		{"indeterminate bar", func() Element { return ProgressBar(0).Indeterminate() }},
-		{"ring", func() Element { return ProgressRing() }},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			moving := newAccessRig(feedbackRoot(c.el()))
@@ -130,6 +132,50 @@ func TestProgressReducedMotionIsStatic(t *testing.T) {
 				t.Error("with reduced motion, the indicator still asks for frames")
 			}
 		})
+	}
+}
+
+// litDots returns the ring's drawn dots: the opacity of each, by its place.
+func litDots(r *accessRig) map[[2]float32]float32 {
+	out := map[[2]float32]float32{}
+	for _, d := range partNodes(r.rt, "ProgressRing.Dot") {
+		rc := r.rt.nodeRect(d)
+		out[[2]float32{rc.X, rc.Y}] = d.style.Opacity
+	}
+	return out
+}
+
+// The busy ring's turning is what says that work goes on, so under reduced
+// motion it keeps turning, at half the speed: after 450 ms it shows what a ring
+// without reduced motion shows after 225 ms.
+func TestProgressRingTurnsUnderReducedMotion(t *testing.T) {
+	at := func(reduced bool, after time.Duration) (first, later map[[2]float32]float32, asks bool) {
+		r := newAccessRig(feedbackRoot(ProgressRing()))
+		r.rt.SetSystemSettings(SystemSettings{ReducedMotion: reduced})
+		r.frame()
+		first = litDots(r)
+		r.now = r.now.Add(after)
+		r.rt.Frame(r.now)
+		return first, litDots(r), r.rt.NeedsFrame()
+	}
+	first, slow, asks := at(true, 450*time.Millisecond)
+	if !asks {
+		t.Fatal("with reduced motion, the ring asks for no frames; it should keep turning")
+	}
+	if len(first) != ringDots/2 {
+		t.Fatalf("the ring draws %d dots, want %d lit at once", len(first), ringDots/2)
+	}
+	if reflect.DeepEqual(first, slow) {
+		t.Fatal("with reduced motion, the ring did not turn")
+	}
+	_, fast, _ := at(false, 225*time.Millisecond)
+	if len(fast) != len(slow) {
+		t.Fatalf("the ring draws %d dots under reduced motion and %d without, want the same", len(slow), len(fast))
+	}
+	for at, o := range fast {
+		if so, ok := slow[at]; !ok || math.Abs(float64(so-o)) > 0.02 {
+			t.Fatalf("after 450 ms with reduced motion the dot at %v has opacity %v (drawn %v), want %v as after 225 ms without", at, so, ok, o)
+		}
 	}
 }
 
