@@ -9,6 +9,49 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-11-11
+
+### Added
+
+- `jamb ctl clock` lets an agent drive an app's time instead of sleeping, as in Expo's Exact:
+  `clock +500` moves the clock half a second forward, running the frames of that time, `clock
+  settle` moves it until the UI is at rest and no timer is due, and `clock live` gives it back to the
+  wall clock. Once the agent moves it, the clock stands still between requests, so timers, motion,
+  the caret and frames wait for the agent. One clock serves all of the app's windows.
+- `Signal.EqualFunc` and `Computed.EqualFunc` set how a new value is compared with the current one,
+  such as `slices.Equal` for a slice of strings.
+- `DivElement.OnTextSelect` reports the text the user selects in a `Selectable` text inside the
+  element, with where it is drawn relative to the element, as a `ui.TextSelection`, again as it
+  scrolls, and with the zero value once it is cleared, loses focus or scrolls out of view. What the
+  function changes is drawn in the same frame, so a control placed by the selection, such as a
+  "Quote" button, follows it.
+- `Context.ClearTextSelection` clears the selection of the focused selectable text.
+
+### Changed
+
+- A write that leaves a signal's value as it was re-renders nothing: `Signal.Set` and
+  `Signal.Update` compare the new value with the current one by `==`, and skip the readers when they
+  are the same. Values that `==` cannot compare (slices, maps, functions, and structs holding them)
+  still notify on every write. Setting the same pointer again no longer re-renders the readers; build
+  a new value instead of changing one in place, or give the signal an `EqualFunc` that returns false.
+- A `Computed` re-renders its readers only when its new result differs from the last one. When a
+  signal it read changes, its readers learn that it may have changed, and before the next frame it
+  computes again and re-renders them only if the result changed. Rows that read "is this row
+  selected" through a Computed each now re-render two rows when the selection moves, not all of
+  them. In a list of 3,000 rows, writing a row's label with the value it has went from 4.3 ms to
+  90 ns, and moving the selection from 69 ms to 33 ms.
+- Text that is drawn again where it was, as in each frame of a vertical scroll, draws faster. Each
+  text keeps its layout and where its glyphs are in the glyph atlas from its last paint, and draws
+  from them without looking each glyph up. Scrolling a 10,000-row DataGrid by a few pixels went
+  from 147 µs to 72 µs a frame, and changing one label among 3,000 rows from 3.3 ms to 1.9 ms.
+  Text that moves sideways draws as before.
+
+### Fixed
+
+- `ui.Announce` is spoken even when nothing on screen changes with it, such as a chart's repeat of
+  the point that a keyboard walk past its end stays on. It asks for a frame, and the frame publishes
+  the announcement with the accessibility tree as it was; before, it waited for the next change.
+
 ## [0.8.3] - 2026-11-10
 
 ### Added
@@ -1156,7 +1199,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.4...HEAD
+[0.8.4]: https://github.com/tyler-builds/jamb/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/tyler-builds/jamb/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/tyler-builds/jamb/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/tyler-builds/jamb/compare/v0.8.0...v0.8.1
