@@ -142,7 +142,7 @@ func (rt *Runtime) setLayoutSpring(n, parent *node) {
 	ls.boxOnly = widget && spec.boxOnly
 	ls.quiet = widget
 	ls.clip = spec != nil && spec.clip
-	if n.fresh {
+	if n.fresh() {
 		// A new element appears at its place; its Enter, if any, moves it in.
 		ls.ready, ls.moving, ls.warned = false, false, false
 	}

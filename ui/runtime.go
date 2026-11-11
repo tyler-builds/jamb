@@ -32,6 +32,23 @@ const (
 // live on the node: reading the element instead costs a cache miss per node.
 type nodeFlags uint16
 
+// nodeBits are the states of a node of the build under way.
+type nodeBits uint8
+
+const (
+	// nodeFresh: the element did not exist before this build.
+	nodeFresh nodeBits = 1 << iota
+	// nodeReused: rebuilt in place by the build under way; retire has yet to deal
+	// with oldKids.
+	nodeReused
+)
+
+// fresh reports whether n's element did not exist before this build.
+func (n *node) fresh() bool { return n.bits&nodeFresh != 0 }
+
+// reused reports whether n was rebuilt in place by the build under way.
+func (n *node) reused() bool { return n.bits&nodeReused != 0 }
+
 const (
 	flagOverlay      nodeFlags = 1 << iota // Overlay: painted and hit-tested from the overlay list
 	flagOutside                            // has OnClickOutside
@@ -108,13 +125,19 @@ type nodeState struct {
 // painted. Nodes are retained between frames; a component re-render replaces
 // only the nodes of its own subtree.
 type node struct {
-	lay      layout.Node
-	rt       *Runtime
-	id       uint64
-	kind     nodeKind
-	fresh    bool      // the element did not exist before this build
-	flags    nodeFlags // copied from the element so paint and hit testing need not load it
-	reused   bool      // rebuilt in place by the build under way; retire has yet to deal with oldKids
+	lay   layout.Node
+	rt    *Runtime
+	id    uint64
+	kind  nodeKind
+	bits  nodeBits  // nodeFresh and nodeReused
+	flags nodeFlags // copied from the element so paint and hit testing need not load it
+	// paintGen is the paint in which the node was last painted, and painted
+	// lists the children it painted in that paint, in paint order. Only
+	// painted nodes are hit. keepGen marks the focused node and its
+	// ancestors, which are painted even when off screen. paintGen sits here,
+	// beside the small fields, so that node stays in its size class (see
+	// TestElementSizeClasses).
+	paintGen uint32
 	parent   *node
 	children []*node
 	order    []*node // paint order: children sorted by ZIndex
@@ -126,10 +149,15 @@ type node struct {
 	div    *DivElement
 	textEl *TextElement
 	rich   *richText // set when textEl has segments or highlights
-	icon   *IconElement
-	img    *ImageElement
-	editor *editorElement
-	st     *nodeState
+	// textPaint is what the last paint of a text drew, so that the next paint at
+	// the same place takes its layout and its glyphs' atlas entries without
+	// looking them up (see paintText). It checks what it holds against each paint,
+	// so a rebuild in place keeps it, and retireNode recycles it.
+	textPaint *paintedText
+	icon      *IconElement
+	img       *ImageElement
+	editor    *editorElement
+	st        *nodeState
 
 	// owner is the innermost component instance that built this node;
 	// boundary is set when this node is the root of an instance's output.
@@ -153,11 +181,6 @@ type node struct {
 	scale     float32 // the element's own scale as drawn, read by StyleOf
 	gen       uint32  // frame in which the node was built
 
-	// paintGen is the paint in which the node was last painted, and painted
-	// lists the children it painted in that paint, in paint order. Only
-	// painted nodes are hit. keepGen marks the focused node and its
-	// ancestors, which are painted even when off screen.
-	paintGen uint32
 	keepGen  uint32
 	reuseGen uint32 // the build that last rebuilt the node in place (see newNode)
 	painted  []*node
@@ -329,6 +352,9 @@ type Runtime struct {
 	tree        *node
 	byID        map[uint64]*node
 	nodesReused int // nodes rebuilt in place (see newNode), for tests
+	// textPaints holds the paintedTexts of retired text nodes, with their
+	// buffers, for the next new text nodes (see newPaintedText).
+	textPaints []*paintedText
 
 	instances map[uint64]*componentInstance
 	states    map[uint64]*nodeState
@@ -1371,10 +1397,10 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	if b := n.boundary; b != nil && b.root == n && !b.disposed && (b.rt != rt || b.gen == rt.gen && n.gen != rt.gen) {
 		return // a reused instance's subtree, now part of the new tree, or one taken by another runtime
 	}
-	if n.reused {
+	if n.reused() {
 		// Rebuilt in place (see newNode): the node stays, and of the children it had
 		// before, those that were not rebuilt in place are retired as usual.
-		n.reused = false
+		n.bits &^= nodeReused
 		kids := n.oldKids
 		for i, c := range kids {
 			kids[i] = nil
@@ -1427,6 +1453,12 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	for _, c := range n.children {
 		rt.retireNode(c, !exits && !held)
 	}
+	if p := n.textPaint; p != nil {
+		// The node is gone, unless it is drawn as part of content that leaves or is
+		// held; then its next paint makes another.
+		n.textPaint = nil
+		rt.recyclePaintedText(p)
+	}
 }
 
 func (rt *Runtime) disposeInstance(inst *componentInstance) {
@@ -1475,19 +1507,24 @@ func (rt *Runtime) newNode(kind nodeKind, id uint64, parent *node, owner *compon
 		prev, spare, lc, pa := old.children, old.oldKids[:0], old.lay.Children[:0], old.painted[:0]
 		clear(lc[:cap(lc)])
 		clear(pa[:cap(pa)])
+		tp := old.textPaint // checked against each paint, so it stays (see paintedText)
 		*old = node{rt: rt, kind: kind, id: id, parent: parent, owner: owner, gen: rt.gen}
 		old.oldKids, old.children, old.lay.Children, old.painted = prev, spare, lc, pa
-		old.reused, old.reuseGen = true, rt.gen
+		old.textPaint = tp
+		old.bits |= nodeReused
+		old.reuseGen = rt.gen
 		rt.nodesReused++
 		n = old
 	} else {
 		n = &node{rt: rt, kind: kind, id: id, parent: parent, owner: owner, gen: rt.gen}
-		n.fresh = rt.byID[id] == nil // a new element, not a rebuild of an existing one
+		if rt.byID[id] == nil { // a new element, not a rebuild of an existing one
+			n.bits |= nodeFresh
+		}
 	}
 	if rt.insp != nil {
 		delete(rt.insp.edits, id) // a live edit lasts until its element is built again
 	}
-	if n.fresh {
+	if n.fresh() {
 		rt.dropGhost(id)
 	}
 	rt.byID[id] = n
@@ -1724,7 +1761,7 @@ func (rt *Runtime) buildDiv(e *DivElement, id uint64, parent *node, owner *compo
 		}
 		if e.reflow.held {
 			n.flags |= flagHeld
-			rt.setHeld(n, !e.noDisplay, !e.noDisplay && (n.fresh || shown != nil && shown.flags&flagNoDisplay != 0))
+			rt.setHeld(n, !e.noDisplay, !e.noDisplay && (n.fresh() || shown != nil && shown.flags&flagNoDisplay != 0))
 			if hidden != nil {
 				rt.hold(hidden)
 			}
@@ -1751,7 +1788,7 @@ func (rt *Runtime) buildDiv(e *DivElement, id uint64, parent *node, owner *compo
 		n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil ||
 		n.style.Spring.Duration > 0 || e.play != nil {
 		n.st = rt.state(id)
-		if n.fresh {
+		if n.fresh() {
 			// A new element forgets any exit its ID had, and enters now, or
 			// later when it is staggered.
 			n.st.leaveAt, n.st.enterAt = time.Time{}, time.Time{}
@@ -1774,7 +1811,7 @@ func (rt *Runtime) buildDiv(e *DivElement, id uint64, parent *node, owner *compo
 		if e.play == nil {
 			n.st.playAt = time.Time{}
 			n.st.playDone.cancel()
-		} else if n.fresh || n.st.playAt.IsZero() || n.st.playKey != e.play.key {
+		} else if n.fresh() || n.st.playAt.IsZero() || n.st.playKey != e.play.key {
 			n.st.playAt, n.st.playKey = rt.now(), e.play.key
 			n.st.playDone.cancel()
 			n.st.playDone = nil
@@ -1867,10 +1904,10 @@ func (rt *Runtime) attachFocus(n *node) {
 			rt.pendingHandles = append(rt.pendingHandles, h)
 		}
 	}
-	if d.autoFocus && n.fresh {
+	if d.autoFocus && n.fresh() {
 		rt.pendingFocus = n.id
 	}
-	if d.modal != nil && n.fresh {
+	if d.modal != nil && n.fresh() {
 		rt.modalMounted(n)
 	}
 }

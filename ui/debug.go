@@ -143,7 +143,7 @@ func (rt *Runtime) findKey(n *node, key string) *node {
 		return n
 	}
 	kids := n.children
-	if n.reused {
+	if n.reused() {
 		// Rebuilt in place by the build under way: until the build ends, the tree as
 		// last laid out is the one its old children make.
 		kids = n.oldKids

@@ -438,11 +438,14 @@ func (rt *Runtime) paintText(n *node, x, y, w float32, fg Color, opacity float32
 		align = 2
 	}
 	tx, ty := x+s.Padding.Left, y+s.Padding.Top
+	if n.textPaint == nil {
+		n.textPaint = rt.newPaintedText()
+	}
 	if n.rich != nil {
-		l := rt.text.LayoutSpans(n.textEl.text, n.textStyle(), n.rich.spans, contentW+0.01)
+		l := n.textPaint.layout(rt, n, contentW+0.01)
 		n.rich.lay = l
 		rects := rt.textSelectionRects(n, l, tx, ty, opacity)
-		rt.text.DrawRich(&rt.scene, l, tx, ty, contentW, rt.scale, align, func(span int) text.RunPaint {
+		rt.text.DrawRichCached(&rt.scene, l, &n.textPaint.glyphs, tx, ty, contentW, rt.scale, align, func(span int) text.RunPaint {
 			return rt.runPaint(n, span, fg, opacity)
 		})
 		rt.redrawSelected(rects, func(c Color) { rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, c.Alpha(opacity).scene()) })
@@ -451,10 +454,79 @@ func (rt *Runtime) paintText(n *node, x, y, w float32, fg Color, opacity float32
 		}
 		return
 	}
-	l := rt.text.Layout(n.textEl.text, n.textStyle(), contentW+0.01)
+	l := n.textPaint.layout(rt, n, contentW+0.01)
 	rects := rt.textSelectionRects(n, l, tx, ty, opacity)
-	rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, fg.Alpha(opacity).scene())
+	rt.text.DrawCached(&rt.scene, l, &n.textPaint.glyphs, tx, ty, contentW, rt.scale, align, fg.Alpha(opacity).scene())
 	rt.redrawSelected(rects, func(c Color) { rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, c.Alpha(opacity).scene()) })
+}
+
+// paintedText is what the last paint of a text node drew: the layout, found for
+// the text, style, spans and width, and the atlas entries of its glyphs.
+type paintedText struct {
+	text   string
+	style  text.Style
+	spans  []text.Span
+	width  float32
+	ref    text.LayoutRef
+	glyphs text.DrawCache
+}
+
+// layout returns the layout of n's text at width, as rt.text.LayoutSpans does. It
+// takes the one of the last paint when the text, the style, the spans and the width
+// are the same, which saves the lookup of the text system's cache, whose key holds
+// the whole text, on each frame that paints the node again.
+func (p *paintedText) layout(rt *Runtime, n *node, width float32) *text.Layout {
+	st := n.textStyle()
+	var spans []text.Span
+	if n.rich != nil {
+		spans = n.rich.spans
+	}
+	if p.ref.Layout() != nil && p.text == n.textEl.text && p.style == st && p.width == width && sameSpans(p.spans, spans) {
+		if l, ok := rt.text.Reuse(p.ref); ok {
+			return l
+		}
+	}
+	p.text, p.style, p.spans, p.width = n.textEl.text, st, spans, width
+	p.ref = rt.text.LayoutRef(n.textEl.text, st, spans, width)
+	return p.ref.Layout()
+}
+
+// maxRecycledTexts bounds the paintedTexts kept for new text nodes, and
+// maxRecycledGlyphs the glyphs one may keep room for, so that the pool holds
+// little memory after a large view goes.
+const (
+	maxRecycledTexts  = 1024
+	maxRecycledGlyphs = 256
+)
+
+// newPaintedText returns an empty paintedText for a text node, one a retired
+// node had when there is one, so that scrolling new rows in does not allocate one
+// and its buffers for each text.
+func (rt *Runtime) newPaintedText() *paintedText {
+	if k := len(rt.textPaints); k > 0 {
+		p := rt.textPaints[k-1]
+		rt.textPaints[k-1] = nil
+		rt.textPaints = rt.textPaints[:k-1]
+		return p
+	}
+	return &paintedText{}
+}
+
+// recyclePaintedText empties p, the paintedText of a retired node, and keeps it
+// for newPaintedText.
+func (rt *Runtime) recyclePaintedText(p *paintedText) {
+	if len(rt.textPaints) >= maxRecycledTexts || p.glyphs.Room() > maxRecycledGlyphs {
+		return
+	}
+	p.glyphs.Reset()
+	*p = paintedText{glyphs: p.glyphs}
+	rt.textPaints = append(rt.textPaints, p)
+}
+
+// sameSpans reports whether a and b are the same slice of spans. Spans equal in
+// another slice are taken as different, which costs a lookup.
+func sameSpans(a, b []text.Span) bool {
+	return len(a) == len(b) && (len(a) == 0 || &a[0] == &b[0])
 }
 
 // paintLinkRing draws the focus ring around the link of rich text n that has

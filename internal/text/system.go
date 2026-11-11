@@ -113,6 +113,7 @@ type layoutKey struct {
 type cachedLayout struct {
 	l        *Layout
 	lastUsed int
+	evicted  bool // dropped from the cache (see EndFrame)
 }
 
 // NewSystem creates a text system with the platform fonts.
@@ -179,6 +180,22 @@ func (sys *System) Layout(s string, st Style, maxWidth float32) *Layout {
 // in its own family, weight or slant, and the text wraps as one paragraph.
 // spans must be sorted, non-overlapping and on rune boundaries (see Span).
 func (sys *System) LayoutSpans(s string, st Style, spans []Span, maxWidth float32) *Layout {
+	return sys.LayoutRef(s, st, spans, maxWidth).l
+}
+
+// LayoutRef refers to the cached layouts that a LayoutSpans call used, so that a
+// caller that asks again for the same layout takes it with Reuse, without the
+// lookup, whose key holds the whole text.
+type LayoutRef struct {
+	l            *Layout
+	full, narrow *cachedLayout
+}
+
+// Layout returns the layout r refers to.
+func (r LayoutRef) Layout() *Layout { return r.l }
+
+// LayoutRef is LayoutSpans, and returns a reference to the layout for Reuse.
+func (sys *System) LayoutRef(s string, st Style, spans []Span, maxWidth float32) LayoutRef {
 	if st.Size <= 0 {
 		st.Size = 14
 	}
@@ -189,10 +206,26 @@ func (sys *System) LayoutSpans(s string, st Style, spans []Span, maxWidth float3
 	// The unconstrained layout answers every width at or above its natural
 	// width, so look it up first.
 	full := sys.cached(s, st, spans, sk, float32(math.Inf(1)))
-	if full.Width <= maxWidth || (st.NoWrap && st.MaxLines == 0) {
-		return full
+	if full.l.Width <= maxWidth || (st.NoWrap && st.MaxLines == 0) {
+		return LayoutRef{l: full.l, full: full}
 	}
-	return sys.cached(s, st, spans, sk, maxWidth)
+	narrow := sys.cached(s, st, spans, sk, maxWidth)
+	return LayoutRef{l: narrow.l, full: full, narrow: narrow}
+}
+
+// Reuse returns the layout r refers to, which the same LayoutSpans call returns
+// again, and marks the cached layouts it used as used, as that call does. It
+// reports false when one of them has been dropped from the cache since, and then
+// the caller asks LayoutRef again.
+func (sys *System) Reuse(r LayoutRef) (*Layout, bool) {
+	if r.full == nil || r.full.evicted || r.narrow != nil && r.narrow.evicted {
+		return nil, false
+	}
+	r.full.lastUsed = sys.frame
+	if r.narrow != nil {
+		r.narrow.lastUsed = sys.frame
+	}
+	return r.l, true
 }
 
 // minContent is the width that asks build for the min-content layout of a text:
@@ -219,7 +252,7 @@ func (sys *System) MinContentWidth(s string, st Style, spans []Span) (width floa
 	}
 	// build treats NoWrap without MaxLines as one line, so NoWrap goes too.
 	st.NoWrap, st.MaxLines = false, 0
-	return sys.cached(s, st, spans, spansKey(spans), minContent).Width, true
+	return sys.cached(s, st, spans, spansKey(spans), minContent).l.Width, true
 }
 
 // spansKey encodes spans for the layout cache key.
@@ -234,15 +267,15 @@ func spansKey(spans []Span) string {
 	return b.String()
 }
 
-func (sys *System) cached(s string, st Style, spans []Span, sk string, maxWidth float32) *Layout {
+func (sys *System) cached(s string, st Style, spans []Span, sk string, maxWidth float32) *cachedLayout {
 	k := layoutKey{s, st, maxWidth, sk}
 	if c, ok := sys.layouts[k]; ok {
 		c.lastUsed = sys.frame
-		return c.l
+		return c
 	}
-	l := sys.build(s, st, spans, maxWidth)
-	sys.layouts[k] = &cachedLayout{l: l, lastUsed: sys.frame}
-	return l
+	c := &cachedLayout{l: sys.build(s, st, spans, maxWidth), lastUsed: sys.frame}
+	sys.layouts[k] = c
+	return c
 }
 
 // EndFrame evicts layouts that have not been used for a while. Call once per
@@ -254,6 +287,7 @@ func (sys *System) EndFrame() {
 	}
 	for k, c := range sys.layouts {
 		if sys.frame-c.lastUsed > 240 {
+			c.evicted = true
 			delete(sys.layouts, k)
 		}
 	}
@@ -279,10 +313,136 @@ type RunPaint struct {
 	DecorationColor scene.Color
 }
 
+// DrawCached is Draw with the atlas entries of the glyphs kept in c, for the next
+// draw at the same place (see DrawCache). c may be nil.
+func (sys *System) DrawCached(sc *scene.Scene, l *Layout, c *DrawCache, x, y, boxWidth, scale float32, align int, color scene.Color) {
+	sys.DrawRichCached(sc, l, c, x, y, boxWidth, scale, align, func(int) RunPaint { return RunPaint{Color: color} })
+}
+
 // DrawRich is Draw with paint per span: paint(span) says how the runs of that
 // span look, and span is -1 for text outside every span. A run draws its
 // background, then its glyphs, then its underline and strikethrough.
 func (sys *System) DrawRich(sc *scene.Scene, l *Layout, x, y, boxWidth, scale float32, align int, paint func(span int) RunPaint) {
+	sys.DrawRichCached(sc, l, nil, x, y, boxWidth, scale, align, paint)
+}
+
+// DrawCache keeps the atlas entries of the glyphs of a text as a draw found them,
+// so that the next draw of the text at the same place takes them from here rather
+// than from the table of glyphs, whose lookup for each glyph was the largest part
+// of drawing text that had not changed, as in each frame of a vertical scroll.
+//
+// The entries were found for the layout l, at the scale, with the left edge at x,
+// aligned as align in a box of boxWidth, with the colors of the runs, and with the
+// atlases at gens. Together these decide the key of every glyph: the scale, x and
+// the alignment its size and subpixel bin, the colors the entry of a color glyph.
+// The top of the text decides only where the glyphs go, not their entries. An
+// entry stays where it is until its atlas is cleared, which changes its
+// generation. So a draw with the same of each finds the same entries. x is
+// compared exactly, not by its fraction of a pixel: two edges with the same
+// fraction can round to different bins in float32 arithmetic.
+//
+// Each place that draws text has a DrawCache of its own, since texts with the same
+// content share one Layout. A draw records the entries only when the draw before
+// it was of the same layout at the same x and scale, so that text drawn once, or
+// moving sideways each frame as in a horizontal scroll, costs no recording that
+// no later draw could use. The zero DrawCache is empty.
+type DrawCache struct {
+	valid              bool // the entries were recorded, for the draw described here
+	l                  *Layout
+	scale, x, boxWidth float32
+	align              int
+	gens               [3]int
+	colors             []scene.Color
+	entries            []drawnGlyph
+	// The last draw's layout, x and scale, recorded or not.
+	lastL            *Layout
+	lastX, lastScale float32
+}
+
+// Reset empties c, keeping its buffers, for another text to use.
+func (c *DrawCache) Reset() {
+	*c = DrawCache{colors: c.colors[:0], entries: c.entries[:0]}
+}
+
+// Room returns how many glyphs c has room for without allocating.
+func (c *DrawCache) Room() int { return cap(c.entries) }
+
+// counts returns the number of runs of l, and of its glyphs that have a font,
+// which are what a DrawCache records.
+func (l *Layout) counts() (runs, glyphs int) {
+	for _, ln := range l.Lines {
+		runs += len(ln.Runs)
+		for _, run := range ln.Runs {
+			for _, g := range run.Glyphs {
+				if g.font != nil {
+					glyphs++
+				}
+			}
+		}
+	}
+	return runs, glyphs
+}
+
+// sized returns s emptied, with room for n elements: s itself when it has the
+// room, so that recording allocates once at most for each buffer.
+func sized[T any](s []T, n int) []T {
+	if cap(s) < n {
+		return make([]T, 0, n)
+	}
+	return s[:0]
+}
+
+// drawnGlyph is the atlas entry of a glyph in 16 bits a field (atlases are at most
+// atlasMax wide), or ok false when the glyph has none.
+type drawnGlyph struct {
+	x, y, w, h, dx, dy int16
+	in                 uint8
+	ok                 bool
+}
+
+// packGlyph returns e as a drawnGlyph, and false if a field does not fit.
+func packGlyph(e maskEntry, ok bool) (drawnGlyph, bool) {
+	g := drawnGlyph{int16(e.x), int16(e.y), int16(e.w), int16(e.h), int16(e.dx), int16(e.dy), e.in, ok}
+	fits := int(g.x) == e.x && int(g.y) == e.y && int(g.w) == e.w && int(g.h) == e.h &&
+		int(g.dx) == e.dx && int(g.dy) == e.dy
+	return g, fits
+}
+
+// gens returns the generations of the atlases, -1 for one not made.
+func (sys *System) gens() [3]int {
+	g := [3]int{sys.atlas.Generation, -1, -1}
+	if sys.sub != nil {
+		g[1] = sys.sub.Generation
+	}
+	if sys.color != nil {
+		g[2] = sys.color.Generation
+	}
+	return g
+}
+
+// DrawRichCached is DrawRich with the atlas entries of the glyphs kept in c, for
+// the next draw at the same place (see DrawCache). c may be nil.
+func (sys *System) DrawRichCached(sc *scene.Scene, l *Layout, c *DrawCache, x, y, boxWidth, scale float32, align int, paint func(span int) RunPaint) {
+	if align == 0 {
+		boxWidth = 0 // the box does not move left-aligned text
+	}
+	var rec *DrawCache
+	var gens [3]int
+	if c != nil {
+		gens = sys.gens()
+		if c.valid && c.l == l && c.scale == scale && c.x == x && c.align == align && c.boxWidth == boxWidth && c.gens == gens {
+			sys.drawFrom(sc, l, c, x, y, boxWidth, scale, align, paint)
+			return
+		}
+		if c.lastL == l && c.lastX == x && c.lastScale == scale {
+			rec = c
+			rec.valid = false
+			runs, glyphs := l.counts()
+			rec.colors = sized(rec.colors, runs)
+			rec.entries = sized(rec.entries, glyphs)
+		}
+		c.lastL, c.lastX, c.lastScale = l, x, scale
+	}
 	physSize := l.Style.Size * scale
 	aa := aaGray
 	if sys.sub != nil {
@@ -302,6 +462,9 @@ func (sys *System) DrawRich(sc *scene.Scene, l *Layout, x, y, boxWidth, scale fl
 		baseline := y + ln.Baseline
 		for _, run := range ln.Runs {
 			rp := paint(run.Span)
+			if rec != nil {
+				rec.colors = append(rec.colors, rp.Color)
+			}
 			if rp.Background.A > 0 {
 				sc.AddQuad(scene.Quad{Bounds: pixelRect(lx+run.X, top, run.Width, l.LineHeight, scale), Background: rp.Background})
 			}
@@ -327,6 +490,152 @@ func (sys *System) DrawRich(sc *scene.Scene, l *Layout, x, y, boxWidth, scale fl
 					continue
 				}
 				sc.AddGlyph(sys.atlasOf(e.in).Texture, scene.Glyph{Bounds: bounds, Src: src, Color: rp.Color})
+			}
+			if !rp.Underline && !rp.Strike {
+				continue
+			}
+			dec := rp.DecorationColor
+			if dec.A == 0 {
+				dec = rp.Color
+			}
+			if rp.Underline {
+				r := pixelRect(lx+run.X, baseline+max(1, l.Style.Size*0.08), run.Width, 0, scale)
+				r.H = thick
+				sc.AddQuad(scene.Quad{Bounds: r, Background: dec})
+			}
+			if rp.Strike {
+				r := pixelRect(lx+run.X, baseline-0.3*l.Style.Size, run.Width, 0, scale)
+				r.H = thick
+				sc.AddQuad(scene.Quad{Bounds: r, Background: dec})
+			}
+		}
+	}
+	if rec != nil {
+		sys.record(rec, l, x, boxWidth, scale, align)
+	}
+}
+
+// record records in c the atlas entries of the glyphs of l, drawn with the colors
+// of c at x, aligned as align in a box of boxWidth, at the scale, as DrawRichCached
+// has just drawn it. It looks the glyphs up again, as the draw did, rather than
+// collecting them during the draw: the draw's loop is the one every text runs, and
+// collecting in it made all of them slower. A text is recorded once, at its second
+// draw at the same place (see DrawCache).
+func (sys *System) record(c *DrawCache, l *Layout, x, boxWidth, scale float32, align int) {
+	physSize := l.Style.Size * scale
+	aa := aaGray
+	if sys.sub != nil {
+		aa = aaSubpixel
+	}
+	sizeKey := uint32(physSize*64 + 0.5)
+	gens := sys.gens()
+	fits := true
+	ri := 0
+	for _, ln := range l.Lines {
+		lx := x
+		switch align {
+		case 1:
+			lx += (boxWidth - ln.Width) / 2
+		case 2:
+			lx += boxWidth - ln.Width
+		}
+		for _, run := range ln.Runs {
+			if ri >= len(c.colors) {
+				return
+			}
+			color := c.colors[ri]
+			ri++
+			for _, g := range run.Glyphs {
+				if g.font == nil {
+					continue
+				}
+				px := (lx + run.X + g.X) * scale
+				ix := float32(math.Floor(float64(px)))
+				bin := uint8((px - ix) * subpixelBins)
+				if bin >= subpixelBins {
+					bin = subpixelBins - 1
+				}
+				e, ok := sys.glyph(glyphKey{g.font, g.ID, sizeKey, bin, aa, colorKey(g.font, color)}, physSize)
+				pg, f := packGlyph(e, ok)
+				fits = fits && f
+				c.entries = append(c.entries, pg)
+			}
+		}
+	}
+	// An atlas cleared while the glyphs were looked up dropped entries found before
+	// it: then they are not kept.
+	if fits && sys.gens() == gens {
+		c.valid = true
+		c.l, c.scale, c.x, c.align, c.boxWidth, c.gens = l, scale, x, align, boxWidth, gens
+	}
+}
+
+// drawFrom draws l as DrawRich does, with the atlas entries of its glyphs from c,
+// which were recorded for this draw. A run whose color is not the one recorded has
+// its glyphs looked up, and c is left as it is.
+func (sys *System) drawFrom(sc *scene.Scene, l *Layout, c *DrawCache, x, y, boxWidth, scale float32, align int, paint func(span int) RunPaint) {
+	physSize := l.Style.Size * scale
+	aa := aaGray
+	if sys.sub != nil {
+		aa = aaSubpixel
+	}
+	sizeKey := uint32(physSize*64 + 0.5)
+	thick := float32(max(1, math.Round(float64(physSize/14))))
+	ri, gi := 0, 0
+	for _, ln := range l.Lines {
+		lx := x
+		switch align {
+		case 1:
+			lx += (boxWidth - ln.Width) / 2
+		case 2:
+			lx += boxWidth - ln.Width
+		}
+		top := y + ln.Top
+		baseline := y + ln.Baseline
+		for _, run := range ln.Runs {
+			rp := paint(run.Span)
+			same := ri < len(c.colors) && c.colors[ri] == rp.Color
+			ri++
+			if rp.Background.A > 0 {
+				sc.AddQuad(scene.Quad{Bounds: pixelRect(lx+run.X, top, run.Width, l.LineHeight, scale), Background: rp.Background})
+			}
+			for _, g := range run.Glyphs {
+				if g.font == nil {
+					continue
+				}
+				px := (lx + run.X + g.X) * scale
+				ix := float32(math.Floor(float64(px)))
+				py := float32(math.Round(float64((baseline + g.Y) * scale)))
+				var bounds, src scene.Rect
+				var in uint8
+				if same && gi < len(c.entries) {
+					d := c.entries[gi]
+					gi++
+					if !d.ok || d.w == 0 {
+						continue
+					}
+					bounds = scene.Rect{X: ix + float32(d.dx), Y: py + float32(d.dy), W: float32(d.w), H: float32(d.h)}
+					src = scene.Rect{X: float32(d.x), Y: float32(d.y), W: float32(d.w), H: float32(d.h)}
+					in = d.in
+				} else {
+					gi++
+					bin := uint8((px - ix) * subpixelBins)
+					if bin >= subpixelBins {
+						bin = subpixelBins - 1
+					}
+					e, ok := sys.glyph(glyphKey{g.font, g.ID, sizeKey, bin, aa, colorKey(g.font, rp.Color)}, physSize)
+					if !ok || e.w == 0 {
+						continue
+					}
+					bounds = scene.Rect{X: ix + float32(e.dx), Y: py + float32(e.dy), W: float32(e.w), H: float32(e.h)}
+					src = scene.Rect{X: float32(e.x), Y: float32(e.y), W: float32(e.w), H: float32(e.h)}
+					in = e.in
+				}
+				if in == inColor {
+					sc.AddImage(scene.ImageDraw{Bounds: bounds, Texture: sys.color.Texture, Src: src, Opacity: rp.Color.A})
+					continue
+				}
+				sc.AddGlyph(sys.atlasOf(in).Texture, scene.Glyph{Bounds: bounds, Src: src, Color: rp.Color})
 			}
 			if !rp.Underline && !rp.Strike {
 				continue

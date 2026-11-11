@@ -55,3 +55,48 @@ func BenchmarkGlyphRaster(b *testing.B) {
 		})
 	}
 }
+
+// BenchmarkDrawCells draws the short texts of a grid's cells, 200 of them with 70
+// texts among them, as a frame of a scroll does. "still" draws each at the same
+// left edge every frame, as a vertical scroll does (the top changes, the left edge
+// does not), and "moving" one pixel further right every frame, as a horizontal
+// scroll does. "cached" gives each cell a DrawCache, as each text node has one;
+// "plain" draws without.
+func BenchmarkDrawCells(b *testing.B) {
+	sys := NewSystem()
+	cells := make([]*Layout, 200)
+	for i := range cells {
+		cells[i] = sys.Layout("Item "+strings.Repeat("x", i%7)+"-"+string(rune('0'+i%10)), Style{Size: 14}, inf)
+	}
+	white := scene.Color{R: 1, G: 1, B: 1, A: 1}
+	for _, c := range []struct {
+		name   string
+		dx     float32
+		cached bool
+	}{{"still/plain", 0, false}, {"still/cached", 0, true}, {"moving/plain", 1, false}, {"moving/cached", 1, true}} {
+		b.Run(c.name, func(b *testing.B) {
+			var sc scene.Scene
+			caches := make([]DrawCache, len(cells))
+			frame := 0
+			draw := func() {
+				sc.Reset()
+				off := float32(frame) * c.dx
+				for i, l := range cells {
+					var dc *DrawCache
+					if c.cached {
+						dc = &caches[i]
+					}
+					sys.DrawCached(&sc, l, dc, float32(i%8)*100+off, float32(frame+i/8*24), 0, 1, 0, white)
+				}
+				frame++
+			}
+			for range 3 {
+				draw()
+			}
+			b.ReportAllocs()
+			for b.Loop() {
+				draw()
+			}
+		})
+	}
+}
