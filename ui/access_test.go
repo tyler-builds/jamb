@@ -412,6 +412,36 @@ func TestAccessAnnouncementsAreDelivered(t *testing.T) {
 	}
 }
 
+// An announcement made with nothing else changing, as by a handler that writes a
+// signal the value it has (which re-renders nothing), asks for a frame, and that
+// frame publishes it with the tree as it was.
+func TestAccessAnnouncementWithoutAChange(t *testing.T) {
+	takeAnnouncements()
+	pos := NewSignal(0)
+	var got []access.Update
+	r := newAccessRig(func(ctx *Context) Element { return Button(fmt.Sprint("At ", pos.Get())) })
+	r.bridge.Listen(func(u access.Update) { got = append(got, u) })
+	r.settle()
+	r.frame()
+	got = nil
+	woken := 0
+	r.rt.wake = func() { woken++ }
+	r.rt.framePending.Store(false)
+
+	pos.Set(pos.Peek()) // at the start already: the position stays
+	Announce("At the start", access.Polite)
+	if woken == 0 || !r.rt.FrameRequested() {
+		t.Fatal("an announcement asked for no frame")
+	}
+	r.frame()
+	if len(got) != 1 || len(got[0].Announcements) != 1 || got[0].Announcements[0].Text != "At the start" {
+		t.Fatalf("the frame after the announcement published %+v", got)
+	}
+	if u := got[0]; u.FocusChanged || u.Structure || len(u.Changed)+len(u.Added)+len(u.Removed) != 0 {
+		t.Fatalf("an announcement alone published changes: %+v", u)
+	}
+}
+
 func TestAccessNothingIsBuiltWithoutAnAssistiveTechnology(t *testing.T) {
 	text := NewSignal("a")
 	rt := NewRuntime(func(ctx *Context) Element {
