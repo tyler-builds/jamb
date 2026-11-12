@@ -9,6 +9,39 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-11-11
+
+### Added
+
+- The `proc` package starts background programs without a console window on Windows:
+  `proc.Command`, `proc.CommandContext` and `proc.Hide`. A GUI app that runs a console
+  program such as `git` through it no longer flashes a console window for each run.
+- In a web page, a finger's long press selects the word under it in selectable text and in a text
+  field, a drag without lifting selects more words, and lifting opens the text's menu. On any other
+  element a long press opens its context menu, as a right click does (see docs/web.md).
+- In a web page, a window that is the whole page ends at the top of a phone's keyboard, and stays
+  out of the insets of a display with a notch or a home indicator, where the page shows the theme's
+  background color. The browser's frame takes that color too, through the page's `theme-color`.
+- In a web page, `Window.OpenFiles` opens the browser's file picker. `dialog.FileResult` has
+  `Files`, with each chosen file's name and a `Read` method for its contents, which works on every
+  platform; a page's files have no paths, so `Paths` is empty there.
+- In a web page, a paste delivers the clipboard's image, such as a screenshot, to a field's
+  `OnPasteImage`, and `ctx.SetClipboardImage` writes the system's clipboard.
+- In a web page, a paste chosen in a menu, and Ctrl+V outside a text field, paste the system's
+  clipboard, which the browser may ask the user for first. They pasted only what was last copied in
+  the app.
+
+### Changed
+
+- A `ProgressRing` (and a loading button's ring) keeps turning under reduced motion, at half its
+  speed, such as when Windows' Animation effects are off. Its turning is essential motion: drawn
+  still, with every dot dimmed, it read as a static glyph rather than a busy indicator. Only the
+  dots' opacity changes, so nothing moves across the screen.
+- In a web page, a finger's drag over selectable text or in a text field scrolls. It selected the
+  text, so a page of selectable text, such as a rendered Markdown document, could not be scrolled
+  by touch. A long press selects.
+- A text's selection stays drawn while its context menu is open.
+
 ## [0.8.4] - 2026-11-11
 
 ### Added
@@ -1199,7 +1232,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.5...HEAD
+[0.8.5]: https://github.com/tyler-builds/jamb/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/tyler-builds/jamb/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/tyler-builds/jamb/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/tyler-builds/jamb/compare/v0.8.1...v0.8.2
