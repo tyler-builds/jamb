@@ -167,3 +167,109 @@ func withPage(t *testing.T, w *window) {
 		g.Set("document", old)
 	})
 }
+
+// presser is a Handler whose long presses do what does says, and that counts
+// them and keeps the mouse events it gets.
+type presser struct {
+	scrollRecorder
+	does    platform.LongPress
+	presses int
+	mouse   []platform.EventKind
+}
+
+func (r *presser) TouchDrags(platform.Window, float32, float32) bool { return false }
+
+func (r *presser) TouchLongPress(platform.Window, float32, float32) platform.LongPress {
+	r.presses++
+	return r.does
+}
+
+func (r *presser) OnEvent(_ platform.Window, e platform.Event) {
+	switch e.Kind {
+	case platform.EventMouseMove, platform.EventMouseDown, platform.EventMouseUp:
+		r.mouse = append(r.mouse, e.Kind)
+	}
+}
+
+// pressWindow returns a window whose finger went down at 100, 300, and the
+// timer of its long press.
+func pressWindow(t *testing.T, does platform.LongPress) (*window, *presser, *timer) {
+	w, _ := touchWindow(t)
+	rec := &presser{does: does}
+	w.handler = rec
+	withPage(t, w)
+	timers = nil
+	t.Cleanup(func() { timers = nil })
+	w.pointer(touchEvent(pointerDown, 1, 100, 300, 0))
+	runPosted()
+	if len(timers) != 1 {
+		t.Fatalf("a finger that went down started %d timers, want the long press's", len(timers))
+	}
+	return w, rec, timers[0]
+}
+
+// A finger that stays where it went down presses long, and when the app acts
+// on the press, as by opening a menu, the finger's lifting is no tap.
+func TestLongPressTaken(t *testing.T) {
+	w, rec, tmr := pressWindow(t, platform.LongPressTaken)
+	w.pointer(touchEvent(pointerMove, 1, 102, 301, 100)) // within the slop
+	tmr.fn()
+	if rec.presses != 1 {
+		t.Fatalf("%d long presses, want 1", rec.presses)
+	}
+	w.pointer(touchEvent(pointerMove, 1, 100, 200, 600))
+	w.touchFrame(700)
+	w.pointer(touchEvent(pointerUp, 1, 100, 200, 800))
+	runPosted()
+	if len(rec.mouse) != 0 || len(rec.scrolls) != 0 {
+		t.Errorf("after a long press that the app acted on, the touch delivered %v and %d scrolls, want nothing",
+			rec.mouse, len(rec.scrolls))
+	}
+}
+
+// A long press that begins a drag, as of a text selection, makes the finger's
+// moves the mouse's, and its lifting the button's release.
+func TestLongPressDrags(t *testing.T) {
+	w, rec, tmr := pressWindow(t, platform.LongPressDrags)
+	tmr.fn()
+	w.pointer(touchEvent(pointerMove, 1, 100, 200, 600))
+	w.pointer(touchEvent(pointerUp, 1, 100, 200, 800))
+	runPosted()
+	want := []platform.EventKind{platform.EventMouseMove, platform.EventMouseUp}
+	if len(rec.mouse) != len(want) || rec.mouse[0] != want[0] || rec.mouse[1] != want[1] {
+		t.Errorf("the drag of a long press delivered %v, want a move and a release", rec.mouse)
+	}
+}
+
+// A long press that does nothing leaves the touch a tap, and a finger that
+// pans or lifts before the time of a long press does not press long.
+func TestLongPressNot(t *testing.T) {
+	w, rec, tmr := pressWindow(t, platform.LongPressNone)
+	tmr.fn()
+	w.pointer(touchEvent(pointerUp, 1, 100, 300, 800))
+	runPosted()
+	if rec.presses != 1 || len(rec.mouse) != 3 {
+		t.Errorf("%d long presses and %v, want 1 and a tap's move, press and release", rec.presses, rec.mouse)
+	}
+
+	w, rec, tmr = pressWindow(t, platform.LongPressTaken)
+	w.pointer(touchEvent(pointerMove, 1, 100, 250, 100)) // a pan
+	if !tmr.stopped {
+		t.Error("a pan left the long press's timer running")
+	}
+	tmr.fn()
+	if rec.presses != 0 {
+		t.Error("a finger that pans pressed long")
+	}
+
+	w, rec, tmr = pressWindow(t, platform.LongPressTaken)
+	w.pointer(touchEvent(pointerUp, 1, 100, 300, 100))
+	runPosted()
+	if !tmr.stopped {
+		t.Error("a tap left the long press's timer running")
+	}
+	tmr.fn()
+	if rec.presses != 0 {
+		t.Error("a finger that lifted pressed long")
+	}
+}

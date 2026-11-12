@@ -1,7 +1,7 @@
 # Web
 
-A jamb app can run in a web page. This is experimental: file dialogs and message boxes are not
-there yet.
+A jamb app can run in a web page, in a desktop browser or on a phone. This is experimental:
+message boxes, and the dialogs that save a file or pick a folder, are not there yet.
 
 ## Building an app for the web
 
@@ -61,19 +61,48 @@ the page, or in a `<canvas id="jamb">` when the page has one.
 - **Window.** A page holds one window. It is as large as the page or its canvas, and it does
   not minimize, maximize, move or close itself, so a title bar the app draws shows no caption
   buttons. `Window.OpenURL` opens a new tab.
+- **Phones.** A window that is the whole page covers what shows of the page, so it ends at the
+  top of a phone's keyboard, and the app lays itself out again in what is left: a text field at
+  the bottom of the window stays above the keyboard. It also stays out of the insets of a display
+  with a notch, round corners or a home indicator (the safe area), where the page's background
+  shows, in the theme's background color; the browser's own frame takes that color too, where
+  it follows the page's `theme-color`. Give the page
+  `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`,
+  as the page of `build.sh` has. `ctx.WindowSize()` is the size to lay out for: a phone in
+  portrait is about 360 to 430 wide. A `<canvas id="jamb">` of the page's own is the page's to
+  place.
 - **Input.** The mouse and touchpad (clicks, double clicks, the wheel), the keyboard (keys by
   their position, and the text they type), and touch: a tap is a click, a drag scrolls with
   momentum, and a drag that starts on a slider, a split divider or another element that takes
-  the drag moves it.
+  the drag (`CapturePointer`) moves it.
+- **Long press.** A finger that rests for half a second presses long. On selectable text or in
+  a text field it selects the word under it, a drag without lifting selects more words, and
+  lifting opens the text's menu (Copy, Paste and the rest). Anywhere else it opens the context
+  menu of the element, as a right click does. A finger's drag over text scrolls: only a long
+  press selects.
   The browser keeps its own shortcuts, such as reloading the page or closing the tab. On a
   Mac, iPhone or iPad, Command is Ctrl, so Command+C copies.
 - **Text input.** While a text field has focus, a hidden textarea of the page has it too, at
   the field's caret: a phone shows its keyboard, and input methods (IME) compose in the field
   and put their window by the caret.
-- **Clipboard.** Copying writes the system's clipboard, and pasting into a text field with
-  Ctrl+V (or the browser's paste) reads it. A paste chosen in the app's own context menu, and
-  Ctrl+V outside a text field, paste the text last copied in the app: a page reads the
-  system's clipboard only in the browser's paste event.
+- **Clipboard.** Copying writes the system's clipboard, text or an image
+  (`ctx.SetClipboardImage`), and pasting into a text field with Ctrl+V (or the browser's paste)
+  reads it: its text, or else its image, such as a screenshot, which a field's `OnPasteImage`
+  takes. A paste chosen in a menu, as on a phone, which has no Ctrl+V, and Ctrl+V outside a text
+  field, ask the browser for the clipboard. The browser may ask the user first, with a prompt
+  or a Paste button of its own, and the paste arrives when it answers; if it refuses, what is
+  pasted is what was last copied in the app. So `ctx.Clipboard()` in a click's handler of your
+  own finds the clipboard empty, and the paste arrives later as a press of Ctrl+V, with the
+  clipboard to read: paste in the handler of that key. A page that is not served over HTTPS (or
+  from localhost) has no system clipboard, and keeps one of its own. The browser decodes a pasted image, at most
+  8192 pixels on a side and 32 million in all; a larger one is scaled down.
+- **Files.** `Window.OpenFiles` opens the browser's file picker, with the extensions of its
+  `Filters`. A page has no file system, so the chosen files have no paths: `FileResult.Paths`
+  is empty, and `FileResult.Files` holds each file's name and its contents, which
+  `File.Read` returns. Code that reads `Files` works on every platform, where `Read` reads the
+  file at its path. The browser shows the picker only from a click, a tap or a key press, and
+  each file is read whole into the app's memory. `SaveFile` and `PickFolder` answer as
+  canceled.
 - **Settings.** The page follows the system's dark mode, reduced motion and forced colors.
 - **Drawing.** WebGL 2 draws the frames, with the shaders of the other GPU renderers. A browser
   without WebGL 2 draws them on the CPU, as `JAMB_RENDERER=cpu` asks for; a page has no
@@ -117,4 +146,5 @@ listens for itself.
 
 ## Not there yet
 
-File dialogs, message boxes, second windows, pinch zoom, and images on the clipboard.
+Message boxes, saving a file, picking a folder, files dropped on the page, second windows, pinch
+zoom, and handles that adjust a selection after the finger has lifted.

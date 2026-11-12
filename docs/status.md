@@ -64,7 +64,7 @@ The milestone status, and the known limitations and next steps.
   tree is selected, but its row is not revealed: `ui.Tree` cannot open nodes from
   outside yet. The breadcrumb of the details and the tree filter reach it.
 - **Platforms.** Windows is the supported platform. A web page is experimental (see
-  [Web](web.md)): it draws with WebGL 2, and has no file dialogs yet. A Linux adapter for Wayland
+  [Web](web.md)): it draws with WebGL 2, on a phone too, and has no message boxes yet. A Linux adapter for Wayland
   compositors is experimental (`internal/platform/linux`): it speaks the Wayland
   protocol in pure Go, loads libxkbcommon with purego for keyboard layouts and
   libfontconfig for the desktop's fonts (the UI, monospace and emoji fonts, and

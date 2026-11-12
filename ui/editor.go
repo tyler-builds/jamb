@@ -48,9 +48,13 @@ type editState struct {
 	known      string // value as last seen, to notice outside changes
 	knownSet   bool
 
-	scrollX   float32 // single-line horizontal scroll
-	activity  time.Time
-	dragging  bool
+	scrollX  float32 // single-line horizontal scroll
+	activity time.Time
+	dragging bool
+	// wordA and wordB are the word a finger's long press selected, while its
+	// drag selects by words from it (see wordDrag); equal otherwise.
+	wordA     int
+	wordB     int
 	clicks    int
 	lastClick time.Time
 	lastX     float32
@@ -261,7 +265,7 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 		rt.setOverhang(n)
 		return
 	}
-	d := &DivElement{style: s, focusable: true, capture: true, autoFocus: e.autoFocus, handle: e.handle}
+	d := &DivElement{style: s, focusable: true, capture: true, selects: true, autoFocus: e.autoFocus, handle: e.handle}
 	d.asPart(e.part)
 	if e.multiline {
 		d.KeyContext("Editor mode=full")
@@ -282,6 +286,7 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 	d.h.onMouseUp = func(*MouseEvent) {
 		if n := rt.byID[id]; n != nil {
 			n.st.edit.dragging = false
+			n.st.edit.wordA, n.st.edit.wordB = 0, 0
 		}
 	}
 	if e.onStep != nil {
@@ -579,6 +584,10 @@ func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
 	}
 	es.lastClick, es.lastX, es.lastY = now, ev.X, ev.Y
 	es.havePrefX = false
+	es.wordA, es.wordB = 0, 0
+	if rt.wordPress {
+		es.clicks = 2 // a finger's long press selects the word, and its drag more words
+	}
 	switch {
 	case es.clicks >= 2 && n.editor.password:
 		// The words of a password are not shown, so a double-click selects it all.
@@ -603,6 +612,10 @@ func (rt *Runtime) editorMouseDown(id uint64, ev *MouseEvent) {
 		es.caret, es.anchor = p, p
 		es.dragging = true
 	}
+	if rt.wordPress && !n.editor.password && n.editor.format == nil {
+		es.wordA, es.wordB = es.selection()
+		es.dragging = true
+	}
 	rt.editorTouched(id)
 }
 
@@ -623,12 +636,17 @@ func (rt *Runtime) editorContextPress(id uint64, n *node, es *editState, ev *Mou
 }
 
 func (rt *Runtime) editorMouseMove(id uint64, ev *MouseEvent) {
-	n, es, _ := rt.editorOf(id)
+	n, es, v := rt.editorOf(id)
 	if n == nil || !es.dragging {
 		return
 	}
-	if p := rt.editorHit(n, es, ev); p != es.caret {
-		es.caret = p
+	p := rt.editorHit(n, es, ev)
+	anchor, caret := es.anchor, p
+	if es.wordA != es.wordB {
+		anchor, caret = wordDrag(v, es.wordA, es.wordB, p)
+	}
+	if anchor != es.anchor || caret != es.caret {
+		es.anchor, es.caret = anchor, caret
 		rt.editorTouched(id)
 	}
 }
@@ -718,7 +736,10 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	if clip {
 		rt.scene.PushClip(rt.px(scene.Rect{X: cx - 1, Y: y, W: cw + 2, H: n.lay.H}))
 	}
-	selected := focused && !composing && es.hasSelection() && (!e.selection.IsZero() || !e.selectionText.IsZero())
+	// The selection shows while the field's context menu has the focus too: its
+	// Cut and Copy are of what shows.
+	selected := (focused || rt.menuHeld == n.id) && !composing && es.hasSelection() &&
+		(!e.selection.IsZero() || !e.selectionText.IsZero())
 	if selected {
 		a, b := es.selection()
 		sel := e.selection.Alpha(opacity)
@@ -783,6 +804,12 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 		if rt.caretVisible(es) {
 			rt.scene.AddQuad(scene.Quad{Bounds: rt.px(caret), Background: fg.Alpha(opacity).scene()})
 		}
+	} else if rt.menuHeld == n.id && rt.ctxMenu != nil {
+		// The field's context menu has the focus, which comes back to the field:
+		// text input stays at the caret meanwhile, so that a phone keeps its
+		// keyboard up while the menu is open.
+		rt.textInput = scene.Rect{X: tx + caretX - rt.caretWidth/2, Y: cy + caretTop, W: rt.caretWidth, H: l.LineHeight}
+		rt.hasTextInput = true
 	}
 	if clip {
 		rt.scene.PopClip()

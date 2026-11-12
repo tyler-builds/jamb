@@ -27,6 +27,10 @@ type window struct {
 	cursor string   // the cursor the style has, when the window set one
 	ctx    js.Value // the canvas's 2D context, made for the CPU renderer (see Buffer)
 	owned  bool     // the window made the canvas, and removes it when it closes
+	// The window's own canvas follows the part of the page that shows (see
+	// followPage): box is where it is, and probe tells the safe area's insets.
+	box   pageBox
+	probe js.Value
 
 	// The page's host script, when it delivers the window's frames and input
 	// (see host.go).
@@ -61,7 +65,13 @@ type window struct {
 	in       pointerState
 	text     textState
 
-	clipText string // the page's own clipboard (see Clipboard)
+	// The page's own clipboard (see Clipboard): the text or the image last
+	// copied in the app, or those of the paste being delivered.
+	clipText  string
+	clipImage image.Image
+	// clipPending is set while the browser is asked for the system's clipboard
+	// (see requestPaste): the clipboard reads as empty until it answers.
+	clipPending bool
 }
 
 // Open makes the page's window. It must be called on the UI goroutine, inside
@@ -82,16 +92,22 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 		w.canvas, w.owned = doc.Call("createElement", "canvas"), true
 		st := w.canvas.Get("style")
 		st.Set("position", "fixed")
-		st.Set("inset", "0")
-		st.Set("width", "100vw")
-		st.Set("height", "100vh")
 		st.Set("display", "block")
 		doc.Get("body").Call("appendChild", w.canvas)
 	}
 	w.style = w.canvas.Get("style")
+	if w.owned {
+		w.followPage()
+	}
 	w.style.Set("outline", "none")
 	w.style.Set("touchAction", "none") // the app handles touches; the page does not scroll or zoom
 	w.style.Set("userSelect", "none")
+	// A long press is the app's too (see longPress): iOS shows no callout or
+	// magnifier for it, and no browser selects the canvas or flashes it for a tap.
+	for _, name := range []string{"webkitUserSelect", "webkitTouchCallout"} {
+		w.style.Set(name, "none")
+	}
+	w.style.Set("webkitTapHighlightColor", "transparent")
 	w.canvas.Set("tabIndex", 0)
 	w.SetTitle(opts.Title)
 	w.measure()
@@ -400,15 +416,25 @@ func (w *window) WakeAt(t time.Time) {
 	})
 }
 
-// Clipboard returns the text last copied in the app, or the text of the
-// paste being delivered (see paste): a page reads the system's clipboard only
-// in a paste event, or after asking, which a synchronous read cannot.
+// Clipboard returns the text of the paste being delivered (see paste), or the
+// text last copied in the app. A page reads the system's clipboard only in a
+// paste event, or by asking the browser, whose answer comes later. So a read
+// while the app handles a click, a tap or a key press, as when the user
+// chooses Paste in a menu, asks the browser (see requestPaste) and finds the
+// clipboard empty, and the answer arrives as a paste does: as Ctrl+V, with the
+// system's clipboard to read.
+//
 // SetClipboard writes the system's clipboard too, which the browser allows
 // during a key press or a click (see runNow).
-func (w *window) Clipboard() (string, bool) { return w.clipText, w.clipText != "" }
+func (w *window) Clipboard() (string, bool) {
+	if w.clipPending || gesture && w.requestPaste() {
+		return "", false
+	}
+	return w.clipText, w.clipText != ""
+}
 
 func (w *window) SetClipboard(text string) {
-	w.clipText = text
+	w.clipText, w.clipImage = text, nil
 	if c := js.Global().Get("navigator").Get("clipboard"); c.Truthy() {
 		ignoreRejection(c.Call("writeText", text))
 	}
@@ -423,15 +449,6 @@ func ignoreRejection(p js.Value) {
 	var ignore js.Func
 	ignore = js.FuncOf(func(js.Value, []js.Value) any { ignore.Release(); return nil })
 	p.Call("catch", ignore)
-}
-
-func (w *window) ClipboardImage() (image.Image, bool) { return nil, false }
-func (w *window) HasClipboardImage() bool             { return false }
-func (w *window) SetClipboardImage(img image.Image)   {}
-
-// ShowFileDialog answers as canceled: a page's file dialogs come later.
-func (w *window) ShowFileDialog(kind dialog.FileKind, o dialog.FileOptions, done func(dialog.FileResult)) {
-	Post(func() { done(dialog.FileResult{Canceled: true}) })
 }
 
 // ShowMessageBox answers with no button, as a box that could not be shown does.

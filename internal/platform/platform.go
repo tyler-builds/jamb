@@ -132,12 +132,40 @@ type TitleBarHandler interface {
 }
 
 // TouchHandler is optionally implemented by a Handler. An adapter that sees
-// touches asks it, when a finger goes down, whether the element under it takes
-// the drag itself, as a slider or a split divider does: then the touch is a
-// press and drag of the mouse, and otherwise a drag of the finger scrolls. The
-// point is in physical pixels relative to the client area.
+// touches asks it what a finger does where it lands. The points are in
+// physical pixels relative to the client area.
 type TouchHandler interface {
+	// TouchDrags reports, when a finger goes down, whether the element under
+	// it takes the drag itself, as a slider or a split divider does: then the
+	// touch is a press and drag of the mouse, and otherwise a drag of the
+	// finger scrolls.
 	TouchDrags(w Window, x, y float32) bool
+	// TouchLongPress handles a finger that stayed where it went down for the
+	// time of a long press, and reports what the press did (see LongPress).
+	TouchLongPress(w Window, x, y float32) LongPress
+}
+
+// LongPress is what a long press of a finger did (see TouchHandler).
+type LongPress uint8
+
+const (
+	// LongPressNone means the press did nothing: the touch is still a tap when
+	// the finger lifts.
+	LongPressNone LongPress = iota
+	// LongPressTaken means the press was acted on, as by opening a context
+	// menu: the finger's moves and its lifting do nothing more.
+	LongPressTaken
+	// LongPressDrags means the press began a drag, as of a text selection: it
+	// pressed the left mouse button, the finger's moves are the mouse's, and
+	// its lifting releases the button.
+	LongPressDrags
+)
+
+// BackgroundWindow is optionally implemented by a Window that shows the app's
+// background color around what the app draws, as a web page does in the
+// insets of a phone's display. The app sets it to the theme's background.
+type BackgroundWindow interface {
+	SetBackground(r, g, b uint8)
 }
 
 // MenuBarHandler is optionally implemented by a Handler whose window shows an

@@ -14,6 +14,8 @@
 // to TaskDialog, with MessageBoxW as the fallback, without changing this package.
 package dialog
 
+import "os"
+
 // FileKind selects the file dialog to show.
 type FileKind uint8
 
@@ -52,10 +54,36 @@ type Filter struct {
 // Err is set only when the dialog could not be shown.
 type FileResult struct {
 	Paths []string // the chosen paths, as the dialog returns them
+	// Files are the files chosen in an Open dialog, one for each of Paths. A web
+	// page has no file system, so its files have no paths: Paths is empty
+	// there, and each of Files holds a file's name and its contents. Code that
+	// reads the chosen files through Files works in a page too.
+	Files []File
 	// Canceled reports whether the user closed the dialog without choosing.
 	Canceled bool
 	// Err reports a failure to show the dialog or to read the choice.
 	Err error
+}
+
+// File is a file chosen in an Open dialog.
+type File struct {
+	// Name is the file's name, without its folder.
+	Name string
+	// Path is the file's path. It is empty in a web page, whose files have none.
+	Path string
+	// Data is the file's contents in a web page, which reads a chosen file
+	// before the dialog's result arrives. It is nil elsewhere, where Read reads
+	// the file at Path.
+	Data []byte
+}
+
+// Read returns the file's contents: those of the file at Path, or Data for a
+// file without a path.
+func (f File) Read() ([]byte, error) {
+	if f.Path == "" {
+		return f.Data, nil
+	}
+	return os.ReadFile(f.Path)
 }
 
 // MessageOptions describes a message box.

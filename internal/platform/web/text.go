@@ -3,6 +3,7 @@
 package web
 
 import (
+	"image"
 	"strconv"
 	"syscall/js"
 	"time"
@@ -200,7 +201,9 @@ func (w *window) beforeInput(inputType string) bool {
 }
 
 // paste delivers the page's paste event in a text field as Ctrl+V, with the
-// event's text as the clipboard that the app reads.
+// event's text as the clipboard that the app reads, or, when it has no text,
+// its image: a screenshot, or an image file that was copied. The browser
+// decodes the image first, so its paste arrives a moment later.
 func (w *window) paste(e js.Value) {
 	e.Call("preventDefault")
 	data := e.Get("clipboardData")
@@ -208,11 +211,23 @@ func (w *window) paste(e js.Value) {
 		return
 	}
 	s := data.Call("getData", "text/plain").String()
-	Post(func() {
-		w.clipText = s
-		w.emit(platform.Event{Kind: platform.EventKeyDown, Key: input.KeyV, Mods: input.ModCtrl})
-		w.emit(platform.Event{Kind: platform.EventKeyUp, Key: input.KeyV, Mods: input.ModCtrl})
-	})
+	if file, ok := pastedImage(data); ok && s == "" {
+		decodeImage(file, func(img image.Image) {
+			if img != nil {
+				Post(func() { w.deliverPaste("", img) })
+			}
+		})
+		return
+	}
+	Post(func() { w.deliverPaste(s, nil) })
+}
+
+// deliverPaste makes text and img the clipboard that the app reads, and
+// presses Ctrl+V. UI goroutine only.
+func (w *window) deliverPaste(text string, img image.Image) {
+	w.clipText, w.clipImage = text, img
+	w.emit(platform.Event{Kind: platform.EventKeyDown, Key: input.KeyV, Mods: input.ModCtrl})
+	w.emit(platform.Event{Kind: platform.EventKeyUp, Key: input.KeyV, Mods: input.ModCtrl})
 }
 
 // SetTextInputRect implements platform.Window. The app calls it in each frame.
@@ -284,16 +299,28 @@ func (w *window) CancelComposition() {
 // runs the UI goroutine before the event ends. It reports whether fn ran.
 func runNow(fn func()) bool {
 	if uiActive.Load() || hostEntry {
-		Post(fn)
+		Post(func() { inGesture(fn) })
 		return false
 	}
 	done := make(chan struct{})
 	Post(func() {
 		defer close(done)
-		fn()
+		inGesture(fn)
 	})
 	<-done
 	return true
+}
+
+// gesture is set while the app handles a click, a tap or a key press of the
+// user's, for which a browser lets a page ask for the system's clipboard (see
+// Clipboard). UI goroutine only.
+var gesture bool
+
+// inGesture runs fn as the app's handling of a click, a tap or a key press.
+func inGesture(fn func()) {
+	gesture = true
+	fn()
+	gesture = false
 }
 
 // drawNow draws a frame at once, outside the display's pacing, so that the

@@ -122,6 +122,9 @@ type DivElement struct {
 	overlay Placement
 	sized   sizeSet    // the sizes a sizing method gave the element, for the inspector (see sizing.apply)
 	area    WindowArea // see WindowArea
+	// selects is set on a text whose drag selects it: a finger's drag there
+	// scrolls instead, and its long press selects (see hostLongPress).
+	selects bool
 	// kidsSpring is the layout spring of the children that set none of their
 	// own (see ChildrenLayoutSpring).
 	kidsSpring Spring

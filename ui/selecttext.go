@@ -24,10 +24,13 @@ type textSelection struct {
 	text          string // the text the selection is of; another text clears it
 	anchor, caret int    // byte offsets; the selection is between them
 	dragging      bool
-	clicks        int
-	lastClick     time.Time
-	lastX, lastY  float32
-	layout        *text.Layout // from the last paint, for hit testing
+	// wordA and wordB are the word a finger's long press selected, while its
+	// drag selects by words from it (see wordDrag); equal otherwise.
+	wordA, wordB int
+	clicks       int
+	lastClick    time.Time
+	lastX, lastY float32
+	layout       *text.Layout // from the last paint, for hit testing
 	// Where the last paint drew the selection, in logical window coordinates:
 	// the box around it, and its last line. drawnGen is that paint's paintGen.
 	drawn, drawnLast scene.Rect
@@ -57,7 +60,7 @@ func (rt *Runtime) buildSelectable(n *node) {
 		n.st.sel = &textSelection{}
 	}
 	id := n.id
-	d := &DivElement{style: Style{Cursor: CursorText}.Merge(n.style), focusable: true, noTabStop: true, capture: true}
+	d := &DivElement{style: Style{Cursor: CursorText}.Merge(n.style), focusable: true, noTabStop: true, capture: true, selects: true}
 	d.KeyContext("SelectableText")
 	d.OnAction(textCopy, func() { rt.copySelection(id) })
 	d.OnAction(textSelectAll, func() {
@@ -76,6 +79,7 @@ func (rt *Runtime) buildSelectable(n *node) {
 	d.h.onMouseUp = func(*MouseEvent) {
 		if n := rt.byID[id]; n != nil {
 			n.st.sel.dragging = false
+			n.st.sel.wordA, n.st.sel.wordB = 0, 0
 		}
 	}
 	d.h.onBlur = func() {
@@ -180,7 +184,13 @@ func (rt *Runtime) selectMouseDown(id uint64, e *MouseEvent) {
 		s.clicks = 1
 	}
 	s.lastClick, s.lastX, s.lastY = now, e.X, e.Y
+	s.wordA, s.wordB = 0, 0
 	switch {
+	case rt.wordPress:
+		// A finger's long press selects the word, and its drag more words.
+		s.anchor, s.caret = text.WordAt(v, p)
+		s.wordA, s.wordB = s.anchor, s.caret
+		s.dragging = true
 	case s.clicks == 2:
 		s.anchor, s.caret = text.WordAt(v, p)
 	case s.clicks >= 3:
@@ -207,11 +217,30 @@ func (rt *Runtime) selectMouseMove(id uint64, e *MouseEvent) {
 	if n == nil || !s.dragging {
 		return
 	}
-	if p := rt.selectHit(n, s, e.X, e.Y); p != s.caret {
-		s.caret = p
+	p := rt.selectHit(n, s, e.X, e.Y)
+	anchor, caret := s.anchor, p
+	if s.wordA != s.wordB {
+		anchor, caret = wordDrag(n.textEl.text, s.wordA, s.wordB, p)
+	}
+	if anchor != s.anchor || caret != s.caret {
+		s.anchor, s.caret = anchor, caret
 		rt.needPaint = true
 		rt.requestFrame()
 	}
+}
+
+// wordDrag returns the selection of a drag by words to the position p of the
+// text v, which began at the word from a to b: that word, and the words from
+// it to the one at p.
+func wordDrag(v string, a, b, p int) (anchor, caret int) {
+	start, end := text.WordAt(v, p)
+	switch {
+	case p < a:
+		return b, start
+	case p > b:
+		return a, end
+	}
+	return a, b
 }
 
 // copySelection puts the selected text on the clipboard.
@@ -235,7 +264,9 @@ func (rt *Runtime) textSelectionRects(n *node, l *text.Layout, x, y, opacity flo
 	}
 	s := n.st.sel
 	s.layout = l
-	if rt.focusID != n.id {
+	// The selection shows while the text has the focus, and while its context
+	// menu has it, whose Copy is of what shows.
+	if rt.focusID != n.id && rt.menuHeld != n.id {
 		return nil
 	}
 	if s.text != n.textEl.text {

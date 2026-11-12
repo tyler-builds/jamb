@@ -8,6 +8,7 @@ import (
 	"github.com/tyler-builds/jamb/access"
 	"github.com/tyler-builds/jamb/dialog"
 	"github.com/tyler-builds/jamb/icons"
+	"github.com/tyler-builds/jamb/input"
 )
 
 // WindowArea marks the part of a custom title bar an element is in. The
@@ -76,15 +77,67 @@ func (rt *Runtime) hostWindowAreaAt(x, y float32) WindowArea {
 
 // hostDragsAt reports whether a press at x, y, in logical pixels, lands in an
 // element that captures the pointer (see CapturePointer), which takes the drag
-// that follows: a touch there drags it rather than scrolling.
+// that follows: a touch there drags it rather than scrolling. A text whose
+// drag selects it is not one: a finger's drag scrolls there, as it does
+// everywhere on a phone, and its long press selects (see hostLongPress).
 func (rt *Runtime) hostDragsAt(x, y float32) bool {
 	x, y = x/rt.zoom, y/rt.zoom
 	for _, n := range rt.hitTest(x, y) {
 		if n.div != nil && n.div.capture {
-			return true
+			return !n.div.selects
 		}
 	}
 	return false
+}
+
+// hostLongPress handles a finger's long press at x, y, in logical pixels, as
+// phones do. On a text that can be selected, or a text field, it selects the
+// word under the finger, and the finger's drag then selects by words; when the
+// finger lifts, the text's context menu opens, with Copy and the rest. On a
+// link, and anywhere else, it opens the context menu there, as a right click
+// does, and does nothing where there is none.
+//
+// taken reports whether the press did something, so that the touch is no tap
+// when the finger lifts. drags reports whether it selected a word, with the
+// left button down: the finger's moves, delivered as the pointer's, then select
+// more words, and the button's release opens the menu.
+func (rt *Runtime) hostLongPress(x, y float32) (taken, drags bool) {
+	if rt.picking() || rt.drag.active || rt.sbDrag.active {
+		return false, false
+	}
+	lx, ly := x/rt.zoom, y/rt.zoom
+	path := append([]*node(nil), rt.hitTest(lx, ly)...)
+	link := rt.segmentAt(path, lx, ly).node != 0
+	for _, n := range path {
+		if link || n.div == nil {
+			continue
+		}
+		if n.div.selects {
+			rt.wordPress = true
+			rt.PointerDown(x, y, input.ButtonLeft, 1, 0)
+			rt.wordPress = false
+			// The press is no click of the elements around the text.
+			rt.setPressed(nil)
+			rt.pressSeg = segRef{}
+			// A press on the text's scroll bar drags the bar instead.
+			rt.touchSelect, rt.touchX, rt.touchY = !rt.sbDrag.active, lx, ly
+			return true, true
+		}
+		if n.div.capture || n.div.overlay != 0 {
+			break
+		}
+	}
+	menu := menuTarget(path) != nil
+	if link && !menu {
+		menu = segMenu(path[0].rich.segs, rt.segmentAt(path, lx, ly).seg) != nil
+	}
+	if !menu {
+		return false, false
+	}
+	open := rt.ctxMenu
+	rt.PointerDown(x, y, input.ButtonRight, 1, 0)
+	rt.PointerUp(x, y, input.ButtonRight, 0)
+	return rt.ctxMenu != nil && rt.ctxMenu != open, false
 }
 
 // interactive reports whether the element takes pointer or keyboard input of
