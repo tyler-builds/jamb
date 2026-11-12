@@ -846,8 +846,11 @@ func (rt *Runtime) caretBlink(activity time.Time) (on bool, next time.Time) {
 	return phase%2 == 0, activity.Add(time.Duration(phase+1) * blink)
 }
 
-// revealCaret scrolls the nearest vertical scroll container so the caret
-// rectangle is visible. It reports whether anything scrolled.
+// revealCaret scrolls the vertical scroll containers around the caret, from the
+// nearest out, so the caret rectangle is visible: a text area that scrolls its
+// own text moves it into the text area's box, and a page that scrolls then
+// moves that part of the text area into the window. It reports whether anything
+// scrolled.
 func (rt *Runtime) revealCaret() bool {
 	n := rt.revealFrom
 	r := rt.reveal
@@ -856,11 +859,18 @@ func (rt *Runtime) revealCaret() bool {
 		return false
 	}
 	const margin = 12
+	moved := false
 	for a := n.parent; a != nil; a = a.parent {
 		if a.style.OverflowY != OverflowScroll || a.st == nil {
 			continue
 		}
-		view := a.abs.Intersect(a.clip)
+		// A container inside another one shows the caret in its own box, and the
+		// outer one brings that into view. The outermost one also leaves out
+		// what the window, or a box that clips it, cuts off.
+		view := a.abs
+		if !hasScrollYAncestor(a) {
+			view = view.Intersect(a.clip)
+		}
 		var delta float32
 		switch {
 		case r.Y < view.Y+margin:
@@ -869,12 +879,25 @@ func (rt *Runtime) revealCaret() bool {
 			delta = r.Bottom() - (view.Bottom() - margin)
 		}
 		if delta == 0 {
-			return false
+			continue
 		}
 		maxY := max(a.lay.ContentH-a.lay.H, 0)
-		a.st.targetY = min(max(a.st.targetY+delta, 0), maxY)
-		a.st.scrollY = a.st.targetY
-		return true
+		to := min(max(a.st.targetY+delta, 0), maxY)
+		if d := to - a.st.scrollY; d != 0 {
+			moved = true
+			r.Y -= d // the caret moves with the content
+		}
+		a.st.targetY, a.st.scrollY = to, to
+	}
+	return moved
+}
+
+// hasScrollYAncestor reports whether a node is inside a vertical scroll container.
+func hasScrollYAncestor(n *node) bool {
+	for a := n.parent; a != nil; a = a.parent {
+		if a.style.OverflowY == OverflowScroll && a.st != nil {
+			return true
+		}
 	}
 	return false
 }

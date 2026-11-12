@@ -54,6 +54,9 @@ type accessInfo struct {
 	// (see DropdownMenu): the element takes focus for it, and an action to focus
 	// the element moves focus to that child.
 	focusInside bool
+	// plainScroll keeps a scroll container from being exposed as a scroll area
+	// for its scrolling alone, as a text area's frame is (see fieldOptions.expand).
+	plainScroll bool
 	// highlighted marks the row a menu highlights (its keyboard position). The
 	// menu's panel passes focus to that row, so the highlight is what a screen
 	// reader hears (see focusTarget).
@@ -977,7 +980,7 @@ func accessRole(n *node) (access.Role, bool) {
 	if d.acc != nil && d.acc.name != "" {
 		return access.RoleGroup, true
 	}
-	if isScroll(n) {
+	if isScroll(n) && (d.acc == nil || !d.acc.plainScroll) {
 		return access.RoleScrollArea, true
 	}
 	return access.RoleUnknown, false
