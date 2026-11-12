@@ -1158,7 +1158,11 @@ func UiaReturnRawElementProvider(hwnd, wp, lp, el uintptr) uintptr {
 
 // UiaHostProviderFromHwnd writes to out the host provider of the window hwnd,
 // the native element that UI Automation makes for a window. It returns the
-// HRESULT.
+// HRESULT. The caller converts out with uintptr(unsafe.Pointer(...)) in the call
+// expression, and go:uintptrescapes keeps what it points to off the goroutine's
+// stack, which can move before the native call writes to it.
+//
+//go:uintptrescapes
 func UiaHostProviderFromHwnd(hwnd, out uintptr) uintptr {
 	r, _, _ := procUiaHostProviderFromHwnd.Call(hwnd, out)
 	return r

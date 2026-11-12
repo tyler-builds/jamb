@@ -98,8 +98,21 @@ func comMethod(obj uintptr, i int) uintptr {
 }
 
 // comCall calls method i of obj with args, and reports a failing HRESULT as an
-// error that names what was attempted. Pointer arguments must be kept alive by
-// the caller until the call returns.
+// error that names what was attempted. Pointer arguments are converted with
+// uintptr(unsafe.Pointer(...)) in the call expression: go:uintptrescapes then
+// moves what they point to to the heap and keeps it alive for the call.
+//
+// The heap matters because a goroutine's stack moves when it grows or shrinks,
+// and the address in a uintptr is not updated when it does. The stack can move
+// between the conversion and the native call (in comCall's own prologue), and
+// during the call, when the method calls back into Go on the same goroutine: a
+// toast event source calls the handler's QueryInterface and AddRef, and a call
+// that waits in the COM modal loop dispatches window messages to the window
+// procedure. A method that then writes its result through an out pointer to the
+// old stack writes to freed memory, which another goroutine's stack or a heap
+// object may already be using, and the caller reads zero.
+//
+//go:uintptrescapes
 func comCall(what string, obj uintptr, i int, args ...uintptr) error {
 	hr, _, _ := syscall.SyscallN(comMethod(obj, i), append([]uintptr{obj}, args...)...)
 	if h := hresult(hr); h.failed() {

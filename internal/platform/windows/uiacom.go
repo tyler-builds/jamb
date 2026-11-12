@@ -718,7 +718,8 @@ func hostFor(hwnd uintptr) uintptr {
 
 // makeHost asks UI Automation for the host provider of hwnd and records it. The
 // caller holds hostMu. The variable it writes to is local to this function, so
-// the cache hit in hostFor does not allocate.
+// only a miss allocates it (on the heap; see UiaHostProviderFromHwnd), and the
+// cache hit in hostFor does not allocate.
 func makeHost(hwnd uintptr) uintptr {
 	var h uintptr
 	if win32.UiaHostProviderFromHwnd(hwnd, uintptr(unsafe.Pointer(&h))) != hrOK || h == 0 {
