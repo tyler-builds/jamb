@@ -282,7 +282,7 @@ ctx.Window().OpenFiles(dialog.FileOptions{
 	switch {
 	case r.Err != nil: // the dialog could not open
 	case r.Canceled:   // the user closed it without choosing: a result, not an error
-	default:           // r.Paths, as the dialog returns them
+	default:           // r.Paths, as the dialog returns them, and r.Files, which read them
 	}
 })
 

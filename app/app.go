@@ -667,8 +667,12 @@ type host struct {
 	rh  runtimeHost // the host side of rt
 	// darkFrame is whether the window's decorations are dark, as last set.
 	darkFrame bool
-	r         render.Renderer
-	focused   bool
+	// pageBackground is the background color last given to a window that shows
+	// it around its content (see platform.BackgroundWindow).
+	pageBackground    ui.Color
+	pageBackgroundSet bool
+	r                 render.Renderer
+	focused           bool
 
 	keymapFile *keymap.File
 	stopWatch  func() // stops the keymap file watcher, if one runs
@@ -1052,6 +1056,34 @@ func (h *host) TouchDrags(w platform.Window, x, y float32) bool {
 	return h.rh.DragsAt(x/s, y/s)
 }
 
+// TouchLongPress implements platform.TouchHandler: a finger's long press at a
+// point, in physical client pixels, selects the word of a text there, or opens
+// the context menu there (see ui's hostLongPress).
+func (h *host) TouchLongPress(w platform.Window, x, y float32) platform.LongPress {
+	if h.rt == nil || application.frozen {
+		return platform.LongPressNone
+	}
+	s := w.Scale()
+	taken, drags := h.rh.LongPressAt(x/s, y/s)
+	if taken {
+		h.inputSeq++
+	}
+	w.SetCursor(h.rh.Cursor())
+	if h.rt.NeedsFrame() {
+		w.Wake()
+	}
+	switch {
+	case drags:
+		return platform.LongPressDrags
+	case taken:
+		return platform.LongPressTaken
+	}
+	return platform.LongPressNone
+}
+
+// channel8 returns a color channel, from 0 to 1, as a byte.
+func channel8(v float32) uint8 { return uint8(min(max(v, 0), 1)*255 + 0.5) }
+
 // Presented implements platform.Presenter: the last frame was shown, so the
 // window needs no repaint on WM_PAINT at its size.
 func (h *host) Presented() bool { return h.presented }
@@ -1125,6 +1157,14 @@ func (h *host) OnFrame(w platform.Window) bool {
 	if dark := h.rt.Theme().Dark; dark != h.darkFrame {
 		h.darkFrame = dark
 		w.SetDark(dark)
+	}
+	if bw, ok := w.(platform.BackgroundWindow); ok {
+		// What shows around the window's content, as in the insets of a phone's
+		// display, follows the theme too.
+		if bg := h.rt.Theme().Background; bg != h.pageBackground || !h.pageBackgroundSet {
+			h.pageBackground, h.pageBackgroundSet = bg, true
+			bw.SetBackground(channel8(bg.R), channel8(bg.G), channel8(bg.B))
+		}
 	}
 	frameStart := time.Now()
 	frameAt := clockNow()
@@ -1309,6 +1349,7 @@ type runtimeHost interface {
 	TextInputRect() (scene.Rect, bool)
 	WindowAreaAt(x, y float32) ui.WindowArea
 	DragsAt(x, y float32) bool
+	LongPressAt(x, y float32) (taken, drags bool)
 	FlushTimers()
 	NextTimer() (time.Time, bool)
 	Changed() bool

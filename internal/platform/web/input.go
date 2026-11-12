@@ -22,6 +22,10 @@ const (
 // pan rather than a tap.
 const touchSlop = 8
 
+// longPressTime is how long a finger stays where it went down before its
+// touch is a long press, as Android and iOS count it.
+const longPressTime = 500 * time.Millisecond
+
 // The momentum of a pan, as iOS scrolls: the finger's speed over its last
 // moves carries on after it lifts, slowing by flingDecay each millisecond (the
 // rate of UIScrollView's normal deceleration), until it is slower than
@@ -56,9 +60,14 @@ type pointerState struct {
 	touchID           int
 	touching, panning bool
 	dragging          bool // the touch drags an element that takes the drag (see platform.TouchHandler)
-	touchX0, touchY0  float64
-	touchX, touchY    float64
-	moves             []touchMove
+	// longTmr makes the touch a long press, unless the finger moves or lifts
+	// first. held is set when the app acted on the long press, as by opening a
+	// menu: the rest of the touch does nothing.
+	longTmr          *timer
+	held             bool
+	touchX0, touchY0 float64
+	touchX, touchY   float64
+	moves            []touchMove
 	// panDX, panDY is how far the pan moved since the last frame scrolled it,
 	// in CSS pixels (see touchFrame).
 	panDX, panDY float64
@@ -475,7 +484,10 @@ func abs(v float32) float32 {
 // a tap, delivered as a click where it went down; one that moves further pans,
 // delivered as precise scrolling, as a touchpad scrolls, and keeps scrolling
 // with its momentum after it lifts. A touch while that momentum lasts stops it,
-// and is no tap. Only the first finger counts: a pinch is not recognized yet.
+// and is no tap. A finger that stays where it went down for longPressTime
+// presses long: the app selects the word of a text there, which the finger then
+// drags further, or opens the context menu there (see longPress). Only the
+// first finger counts: a pinch is not recognized yet.
 
 func (w *window) touchDown(e pointerEvent) bool {
 	p := &w.in
@@ -483,7 +495,8 @@ func (w *window) touchDown(e pointerEvent) bool {
 		return false
 	}
 	w.focusWindow()
-	p.touching, p.panning, p.dragging = true, false, false
+	p.touching, p.panning, p.dragging, p.held = true, false, false, false
+	p.longTmr.stop()
 	p.touchID = e.id
 	p.touchX0, p.touchY0 = e.x, e.y
 	p.touchX, p.touchY = p.touchX0, p.touchY0
@@ -501,6 +514,7 @@ func (w *window) touchDown(e pointerEvent) bool {
 			return
 		}
 		if !th.TouchDrags(w, x, y) {
+			p.longTmr = after(longPressTime, func() { w.longPress(id) })
 			return
 		}
 		p.dragging = true
@@ -522,10 +536,11 @@ func (w *window) touchMove(e pointerEvent) {
 		Post(func() { w.emit(platform.Event{Kind: platform.EventMouseMove, X: px, Y: py}) })
 		return
 	}
-	if !p.panning && math.Hypot(x-p.touchX0, y-p.touchY0) < touchSlop {
+	if p.held || !p.panning && math.Hypot(x-p.touchX0, y-p.touchY0) < touchSlop {
 		return
 	}
 	p.panning = true
+	p.longTmr.stop()
 	p.panDX += p.touchX - x
 	p.panDY += p.touchY - y
 	p.touchX, p.touchY = x, y
@@ -535,6 +550,28 @@ func (w *window) touchMove(e pointerEvent) {
 		p.moves = p.moves[1:]
 	}
 	w.Wake() // the next frame scrolls by the move (see touchFrame)
+}
+
+// longPress makes the touch of the finger id a long press, when the finger
+// still rests where it went down. The app says what the press does there (see
+// platform.LongPress): a drag that it began goes on as the drag of an element
+// that takes one does, and a press that it acted on ends the touch, so the
+// finger's lifting is no tap. UI goroutine only.
+func (w *window) longPress(id int) {
+	p := &w.in
+	th, ok := w.handler.(platform.TouchHandler)
+	if !ok || !w.ready || w.destroyed || !p.touching || p.touchID != id || p.panning || p.dragging || p.held {
+		return
+	}
+	x, y := w.device(p.touchX0, p.touchY0)
+	switch th.TouchLongPress(w, x, y) {
+	case platform.LongPressDrags:
+		p.dragging = true
+	case platform.LongPressTaken:
+		p.held = true
+		// A finger is no pointer that rests on the menu: nothing shows hover.
+		w.emit(platform.Event{Kind: platform.EventMouseLeave})
+	}
 }
 
 // touchFrame scrolls by what the pan moved since the last frame, and by the
@@ -580,6 +617,11 @@ func (w *window) touchUp(e pointerEvent) {
 		return
 	}
 	p.touching = false
+	p.longTmr.stop()
+	if p.held {
+		p.held = false
+		return
+	}
 	if p.dragging {
 		p.dragging = false
 		x, y := w.device(e.x, e.y)
@@ -716,6 +758,11 @@ func (w *window) key(e keyEvent) bool {
 	}
 	if down {
 		w.text.lastKey, w.text.lastKeyAt = k, time.Now()
+	}
+	if down && (k == input.KeyEnter || k == input.KeySpace) {
+		// The keys that choose a menu's item or press a button, as a click does.
+		Post(func() { inGesture(deliver) })
+		return prevent
 	}
 	Post(deliver)
 	return prevent

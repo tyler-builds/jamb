@@ -11,9 +11,11 @@
 // in a background tab draws nothing. In a TinyGo build, the page's host script
 // delivers the frames and most input (see host.go).
 //
-// A page holds one window. Text input methods, the system clipboard, file
-// dialogs and message boxes come later: text arrives from key presses, the
-// clipboard is the page's own, and dialogs answer as canceled.
+// A page holds one window, which covers what shows of the page (see
+// viewport.go). Text input goes through a hidden textarea (text.go), touches
+// are taps, pans and long presses (input.go), and files come from the browser's
+// file picker and from pastes (files.go). Message boxes, and the dialogs that
+// save a file or pick a folder, come later: they answer as canceled.
 package web
 
 import (

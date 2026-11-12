@@ -132,6 +132,12 @@ func (h *runtimeHost) WindowAreaAt(x, y float32) WindowArea { return h.rt().host
 // that an element takes itself (see hostDragsAt).
 func (h *runtimeHost) DragsAt(x, y float32) bool { return h.rt().hostDragsAt(x, y) }
 
+// LongPressAt handles a finger's long press at a point, in logical pixels, and
+// reports what it did (see hostLongPress).
+func (h *runtimeHost) LongPressAt(x, y float32) (taken, drags bool) {
+	return h.rt().hostLongPress(x, y)
+}
+
 // SetClock replaces the clock that timers, tooltips, motion and the caret read
 // (time.Now by default), so a test, or an agent through the control channel,
 // steps time itself.

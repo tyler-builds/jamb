@@ -538,6 +538,14 @@ type Runtime struct {
 	ownerAt   *componentInstance
 	followers []*Runtime
 
+	// A finger's long press on a text selects the word under it (see
+	// hostLongPress). wordPress is set while its press is delivered, which the
+	// text takes as a double click whose drag selects by words. touchSelect is
+	// set from then until the finger lifts, when the text's context menu opens;
+	// touchX and touchY are where the finger went down.
+	wordPress, touchSelect bool
+	touchX, touchY         float32
+
 	// Menus (see menu.go). ctxMenu is the open context menu. menuReturn is the
 	// focus that the open menu chain returns to when it closes. pointerFocus is
 	// the focus before the latest press, which a menu opened by the pointer

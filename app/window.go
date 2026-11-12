@@ -1,6 +1,7 @@
 package app
 
 import (
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 
@@ -143,7 +144,17 @@ func (w *appWindow) Fullscreen() bool {
 }
 
 func (w *appWindow) OpenFiles(o dialog.FileOptions, done func(dialog.FileResult)) {
-	w.do(func(h *host) { h.win.ShowFileDialog(dialog.Open, o, done) })
+	w.do(func(h *host) {
+		h.win.ShowFileDialog(dialog.Open, o, func(r dialog.FileResult) {
+			// A file with a path is read where it is (see dialog.File).
+			if len(r.Files) == 0 {
+				for _, p := range r.Paths {
+					r.Files = append(r.Files, dialog.File{Name: filepath.Base(p), Path: p})
+				}
+			}
+			done(r)
+		})
+	})
 }
 
 func (w *appWindow) SaveFile(o dialog.FileOptions, done func(dialog.FileResult)) {

@@ -172,6 +172,10 @@ type dragRecorder struct {
 
 func (dragRecorder) TouchDrags(platform.Window, float32, float32) bool { return true }
 
+func (dragRecorder) TouchLongPress(platform.Window, float32, float32) platform.LongPress {
+	return platform.LongPressNone
+}
+
 // A touch on an element that takes the drag presses the mouse and drags it,
 // and scrolls nothing.
 func TestTouchDragsElement(t *testing.T) {

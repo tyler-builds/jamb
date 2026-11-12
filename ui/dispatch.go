@@ -296,6 +296,7 @@ func (rt *Runtime) hostPointerLeave() {
 func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mods input.Modifiers) {
 	x, y = x/rt.zoom, y/rt.zoom
 	rt.mouseX, rt.mouseY, rt.mouseIn = x, y, true
+	rt.touchSelect = false
 	if rt.picking() {
 		rt.pickPress(x, y)
 		return
@@ -428,6 +429,18 @@ func (rt *Runtime) PointerUp(x, y float32, b input.MouseButton, mods input.Modif
 		}
 	}
 	if b != input.ButtonLeft {
+		return
+	}
+	if rt.touchSelect {
+		// The finger of a long press lifted (see hostLongPress): the menu of the
+		// text it selected in opens where it lifted.
+		rt.touchSelect = false
+		rt.setPressed(nil)
+		rt.pressSeg = segRef{}
+		if rt.ctxMenu == nil {
+			rt.pointerFocus = rt.focusID
+			rt.openPointerMenu(append([]*node(nil), rt.hitTest(rt.touchX, rt.touchY)...), x, y)
+		}
 		return
 	}
 	// A link inside a clickable row gets the click, not the row. Only the
