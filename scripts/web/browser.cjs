@@ -4,8 +4,8 @@
 //     which the page asks for with jambEnv (see web.Getenv), within a small
 //     tolerance for rounding;
 //   - the page's host script delivers the app's frames and input;
-//   - a click in a text field gives the hidden textarea the focus, and typing
-//     there reaches the field.
+//   - a click in a text field gives the hidden textarea the focus, typing
+//     there reaches the field, and the field's caret blinks.
 //
 // Usage: node browser.cjs DIR X Y, where DIR is the page and X, Y is a point of
 // a text field in its first view, in CSS pixels of a 1280×800 page.
@@ -128,6 +128,23 @@ async function main() {
       failed = true;
     } else if (before.equals(after)) {
       console.log("FAIL: the text typed does not show in the field");
+      failed = true;
+    }
+
+    // The focused field's caret blinks, on and then off for 530 ms each: the
+    // field draws differently within a blink. The page's focus moving to the
+    // textarea once made the app take its window as inactive, which hides
+    // the caret.
+    const clip = { x: fieldX - 100, y: fieldY - 16, width: 240, height: 32 };
+    const first = await gl.screenshot({ clip });
+    let blinks = false;
+    for (let i = 0; i < 8 && !blinks; i++) {
+      await gl.waitForTimeout(150);
+      blinks = !first.equals(await gl.screenshot({ clip }));
+    }
+    console.log("caret blinks in the focused text field:", blinks);
+    if (!blinks) {
+      console.log("FAIL: the focused text field's caret does not blink");
       failed = true;
     }
   } finally {

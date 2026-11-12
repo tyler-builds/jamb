@@ -74,8 +74,7 @@ func (w *window) makeTextArea() {
 	w.text.area = a
 	w.removers = append(w.removers, func() { a.Call("remove") })
 
-	w.on(a, "focus", func(e js.Value) { w.text.focused = true; w.focusChanged(e, true) })
-	w.on(a, "blur", func(e js.Value) { w.text.focused = false; w.focusChanged(e, false) })
+	w.listenFocus()
 	// The keys and the text that is typed: the host script delivers them when
 	// the page has it (see host.go).
 	if !w.hostListenText(a) {
@@ -103,6 +102,19 @@ func (w *window) makeTextArea() {
 	// nothing to copy.
 	w.on(a, "copy", func(e js.Value) { e.Call("preventDefault") })
 	w.on(a, "cut", func(e js.Value) { e.Call("preventDefault") })
+}
+
+// listenFocus listens for the page's focus coming to and leaving the canvas
+// and the textarea. The focus moves from the canvas to the textarea when a text
+// field of the app takes it, and back when it gives it up: the window keeps the
+// focus then (see focusChanged). Were that a blur, the app would take the
+// window as inactive, and hide the text field's caret.
+func (w *window) listenFocus() {
+	c, a := w.canvas, w.text.area
+	w.on(c, "focus", func(e js.Value) { w.focusChanged(e, true) })
+	w.on(c, "blur", func(e js.Value) { w.focusChanged(e, false) })
+	w.on(a, "focus", func(e js.Value) { w.text.focused = true; w.focusChanged(e, true) })
+	w.on(a, "blur", func(e js.Value) { w.text.focused = false; w.focusChanged(e, false) })
 }
 
 // focusChanged tells the app when the page's focus comes to or leaves the

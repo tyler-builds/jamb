@@ -3,6 +3,7 @@
 package web
 
 import (
+	"syscall/js"
 	"testing"
 
 	"github.com/tyler-builds/jamb/input"
@@ -280,5 +281,72 @@ func TestTextInputAndComposition(t *testing.T) {
 	}
 	if e := (*got)[3]; e.Text != "日本" {
 		t.Errorf("the composition committed %q, want 日本", e.Text)
+	}
+}
+
+// listener is a fake element that keeps the listeners added to it.
+type listener struct {
+	el  js.Value
+	fns map[string]js.Value
+}
+
+func newListener(t *testing.T) *listener {
+	l := &listener{el: js.Global().Get("Object").New(), fns: map[string]js.Value{}}
+	add := js.FuncOf(func(_ js.Value, args []js.Value) any {
+		l.fns[args[0].String()] = args[1]
+		return nil
+	})
+	t.Cleanup(add.Release)
+	l.el.Set("addEventListener", add)
+	l.el.Set("removeEventListener", js.FuncOf(func(js.Value, []js.Value) any { return nil }))
+	return l
+}
+
+// fire calls the element's listener for typ with an event whose relatedTarget
+// is other, the element the focus comes from or goes to (null for none).
+func (l *listener) fire(t *testing.T, typ string, other js.Value) {
+	t.Helper()
+	fn, ok := l.fns[typ]
+	if !ok {
+		t.Fatalf("no %s listener", typ)
+	}
+	e := js.Global().Get("Object").New()
+	e.Set("relatedTarget", other)
+	fn.Invoke(e)
+}
+
+// The focus moving between the canvas and the textarea, as it does when a text
+// field takes the focus and gives it up, leaves the window focused: a blur then
+// would make the app hide the text field's caret. The focus coming from or
+// leaving for elsewhere focuses and blurs the window.
+func TestFocusWithinWindow(t *testing.T) {
+	w, got := eventWindow(t)
+	canvas, area := newListener(t), newListener(t)
+	w.canvas, w.text.area = canvas.el, area.el
+	w.listenFocus()
+	t.Cleanup(func() {
+		for _, f := range w.funcs {
+			f.Release()
+		}
+	})
+	null := js.Null()
+
+	canvas.fire(t, "focus", null) // the page's focus comes to the window
+	// A text field takes the focus: the textarea takes the page's.
+	canvas.fire(t, "blur", area.el)
+	area.fire(t, "focus", canvas.el)
+	// The text field gives it up.
+	area.fire(t, "blur", canvas.el)
+	canvas.fire(t, "focus", area.el)
+	// Again, and then the page's focus goes elsewhere from the textarea.
+	canvas.fire(t, "blur", area.el)
+	area.fire(t, "focus", canvas.el)
+	area.fire(t, "blur", null)
+	runPosted()
+	if !sameKinds(kinds(*got), platform.EventFocus, platform.EventBlur) {
+		t.Fatalf("events %v, want only the focus coming to the window and leaving it", kinds(*got))
+	}
+	if w.text.focused {
+		t.Error("the textarea is taken as focused after its blur")
 	}
 }
