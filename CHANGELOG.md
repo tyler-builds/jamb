@@ -9,6 +9,19 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-11-12
+
+### Fixed
+
+- A text field in a web page shows its blinking caret when it has the focus. The page's focus
+  moving from the canvas to the hidden text input made the app take its window as inactive, which
+  hides the caret.
+- `app.Notify` no longer crashes an app on Windows with an access violation after it has shown
+  notifications for a while. The Windows COM calls now keep their result variables on the heap,
+  where a native call can still write them after the goroutine's stack moves, and each
+  notification gets the Windows Runtime factories it uses instead of calling through ones kept
+  from the first notification.
+
 ## [0.8.5] - 2026-11-11
 
 ### Added
@@ -1232,7 +1245,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.5...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.6...HEAD
+[0.8.6]: https://github.com/tyler-builds/jamb/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/tyler-builds/jamb/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/tyler-builds/jamb/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/tyler-builds/jamb/compare/v0.8.2...v0.8.3

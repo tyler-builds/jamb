@@ -68,7 +68,7 @@ func main() {
 In the module that holds it, add jamb and run the app:
 
 ```
-go get github.com/tyler-builds/jamb@v0.8.5
+go get github.com/tyler-builds/jamb@v0.8.6
 go mod tidy    # records the checksums of jamb's own dependencies
 go run .
 ```
