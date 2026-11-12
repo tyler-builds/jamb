@@ -236,8 +236,6 @@ func (w *window) listen() {
 		// Some browsers show the keyboard only for a focus in a touch event.
 		w.syncTextFocus()
 	})
-	w.on(c, "focus", func(js.Value) { Post(func() { w.emit(platform.Event{Kind: platform.EventFocus}) }) })
-	w.on(c, "blur", func(js.Value) { Post(func() { w.emit(platform.Event{Kind: platform.EventBlur}) }) })
 	w.on(doc, "visibilitychange", func(js.Value) {
 		w.pageHidden = doc.Get("visibilityState").String() == "hidden"
 		Post(w.Wake)
