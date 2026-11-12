@@ -150,16 +150,19 @@ func SetToastCallbacks(activated func(arguments string), failed func(hr uint32))
 	toastCB.Store(&toastCallbacks{activated, failed})
 }
 
-// The factories and the shown toasts are only touched on the UI thread.
-var (
-	toastManagerObj uintptr // IToastNotificationManagerStatics
-	toastStaticsV2  uintptr // IToastNotificationManagerStatics2
-	toastFactoryObj uintptr // IToastNotificationFactory
-	xmlFactoryObj   uintptr // IActivationFactory of XmlDocument
-	// shownToasts keeps the toasts that have been shown, so their events are still
-	// delivered; the oldest are released beyond shownKeep.
-	shownToasts []uintptr
-)
+// shownToasts keeps the toasts that have been shown, so their events are still
+// delivered; the oldest are released beyond shownKeep. It is only touched on the UI
+// thread.
+//
+// The activation factories are not kept: each call gets the ones it uses and
+// releases them before it returns. A factory kept for the life of the process was
+// called through its vtable at the start of every toast, so anything that ended its
+// life early (a module that COM unloads once none of its objects are left, as
+// classic COM does not count class objects, or a stray Release) left a pointer to
+// memory that was later reused, and the next toast jumped through it. A factory
+// that is only held during a call cannot outlive what it points to.
+// RoGetActivationFactory keeps its own cache, so getting them again is cheap.
+var shownToasts []uintptr
 
 const shownKeep = 32
 
@@ -266,38 +269,23 @@ func queryInterface(what string, obj uintptr, iid *guid) (uintptr, error) {
 	return out, nil
 }
 
-// toastManager returns the ToastNotificationManager statics and their second
-// interface, which has the history. They are made once.
-func toastManager() (uintptr, uintptr, error) {
-	if toastManagerObj == 0 {
-		f, err := rtFactory("Windows.UI.Notifications.ToastNotificationManager", &iidToastStatics)
-		if err != nil {
-			return 0, 0, err
-		}
-		toastManagerObj = f
-	}
-	if toastStaticsV2 == 0 {
-		v2, err := queryInterface("IToastNotificationManagerStatics2", toastManagerObj, &iidToastStatics2)
-		if err != nil {
-			return 0, 0, err
-		}
-		toastStaticsV2 = v2
-	}
-	return toastManagerObj, toastStaticsV2, nil
+// toastManager returns the ToastNotificationManager statics as iid, which is
+// IToastNotificationManagerStatics or IToastNotificationManagerStatics2 (which has
+// the history). The caller releases them.
+func toastManager(iid *guid) (uintptr, error) {
+	return rtFactory("Windows.UI.Notifications.ToastNotificationManager", iid)
 }
 
 // newToastDocument returns an XmlDocument holding xml, as IXmlDocument. The caller
 // releases it.
 func newToastDocument(xml string) (uintptr, error) {
-	if xmlFactoryObj == 0 {
-		f, err := rtFactory("Windows.Data.Xml.Dom.XmlDocument", &iidActivationFactory)
-		if err != nil {
-			return 0, err
-		}
-		xmlFactoryObj = f
+	factory, err := rtFactory("Windows.Data.Xml.Dom.XmlDocument", &iidActivationFactory)
+	if err != nil {
+		return 0, err
 	}
+	defer release(factory)
 	var insp uintptr
-	if err := comCall("ActivateInstance", xmlFactoryObj, afActivateInstance, uintptr(unsafe.Pointer(&insp))); err != nil {
+	if err := comCall("ActivateInstance", factory, afActivateInstance, uintptr(unsafe.Pointer(&insp))); err != nil {
 		return 0, err
 	}
 	defer release(insp)
@@ -324,10 +312,11 @@ func newToastDocument(xml string) (uintptr, error) {
 // are delivered to the callbacks set by SetToastCallbacks. It must run on the UI
 // thread, which has COM.
 func ShowToast(appID, content, tag string) error {
-	mgr, _, err := toastManager()
+	mgr, err := toastManager(&iidToastStatics)
 	if err != nil {
 		return err
 	}
+	defer release(mgr)
 	var notifier uintptr
 	if appID == "" {
 		err = comCall("CreateToastNotifier", mgr, tmsCreateToastNotifier, uintptr(unsafe.Pointer(&notifier)))
@@ -350,13 +339,13 @@ func ShowToast(appID, content, tag string) error {
 	}
 	defer release(doc)
 
-	if toastFactoryObj == 0 {
-		if toastFactoryObj, err = rtFactory("Windows.UI.Notifications.ToastNotification", &iidToastFactory); err != nil {
-			return err
-		}
+	factory, err := rtFactory("Windows.UI.Notifications.ToastNotification", &iidToastFactory)
+	if err != nil {
+		return err
 	}
+	defer release(factory)
 	var toast uintptr
-	if err := comCall("CreateToastNotification", toastFactoryObj, tfCreateToastNotification, doc, uintptr(unsafe.Pointer(&toast))); err != nil {
+	if err := comCall("CreateToastNotification", factory, tfCreateToastNotification, doc, uintptr(unsafe.Pointer(&toast))); err != nil {
 		return err
 	}
 	// The toast is kept by shownToasts when it is shown, and released here otherwise.
@@ -417,10 +406,11 @@ func ShowToast(appID, content, tag string) error {
 // history returns the notification history of the process's identity, as
 // IToastNotificationHistory. The caller releases it.
 func history() (uintptr, error) {
-	_, v2, err := toastManager()
+	v2, err := toastManager(&iidToastStatics2)
 	if err != nil {
 		return 0, err
 	}
+	defer release(v2)
 	var h uintptr
 	if err := comCall("get_History", v2, tmsGetHistory, uintptr(unsafe.Pointer(&h))); err != nil {
 		return 0, err
