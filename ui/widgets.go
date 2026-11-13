@@ -871,8 +871,10 @@ func (ti *TextInputElement) expand(ctx *Context) Element {
 }
 
 // TextAreaElement is a multi-line text editor bound to a string signal. It
-// wraps lines, grows with its content and keeps the caret visible inside
-// the nearest scrolling ancestor.
+// wraps lines and grows with its content. With a Height or MaxHeight (or Grow
+// in a bounded room) it grows up to that height and then scrolls its text inside
+// its frame. It keeps the caret visible, in its own frame and in the scrolling
+// ancestors around it.
 type TextAreaElement struct {
 	fieldOptions
 	minRows int
@@ -980,7 +982,8 @@ func (ta *TextAreaElement) MinHeight(l Length) *TextAreaElement { ta.size.setMin
 // MaxWidth sets the largest width of the text area.
 func (ta *TextAreaElement) MaxWidth(l Length) *TextAreaElement { ta.size.setMaxWidth(l); return ta }
 
-// MaxHeight sets the largest height of the text area.
+// MaxHeight sets the largest height of the text area. A text area grows with
+// its text up to it, and then scrolls the text.
 func (ta *TextAreaElement) MaxHeight(l Length) *TextAreaElement { ta.size.setMaxHeight(l); return ta }
 
 // Grow makes the text area take a share of the free space on its parent's main axis.
@@ -1243,7 +1246,26 @@ func (f *fieldOptions) expand(ctx *Context, st *FieldStyle, multiline bool, minR
 	for _, o := range f.overlays {
 		box.Child(o)
 	}
-	return f.size.apply(box)
+	box = f.size.apply(box)
+	if multiline && heightBounded(&box.style) {
+		// A text area grows with its text up to its Height or MaxHeight (or the
+		// room it is given to Grow in), and then scrolls the text, as a textarea
+		// does in a browser: the frame clips the text to its box and takes the
+		// wheel, and the caret is kept in view (see revealCaret). One with no
+		// bound is not a scroll container, which may shrink to nothing in a
+		// column: it keeps its text's height, and the page around it scrolls.
+		// The frame is no scroll area of its own to assistive technology: the
+		// text field is the control, as a native text area is.
+		box.ScrollY()
+		box.access().plainScroll = true
+	}
+	return box
+}
+
+// heightBounded reports whether a box's height is limited by its style: a
+// height, a largest height, or the room it grows into.
+func heightBounded(s *Style) bool {
+	return s.Height != Auto || s.MaxHeight != Auto || s.Grow > 0
 }
 
 // button returns one of the field's own buttons, named name, in the Button part.
