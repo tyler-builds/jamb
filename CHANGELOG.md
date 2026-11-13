@@ -9,6 +9,16 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-11-13
+
+### Fixed
+
+- A `TextArea` with a `Height` or `MaxHeight`, or one that grows into a bounded room, scrolls its
+  text when the text is taller than the box, instead of drawing it past the box and over what comes
+  after. It clips the text to its frame, scrolls with the wheel, shows a scroll bar, and keeps the
+  caret in view as it moves, inside a page that scrolls too. A text area with no height bound still
+  grows with its text.
+
 ## [0.8.6] - 2026-11-12
 
 ### Fixed
@@ -1245,7 +1255,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.6...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.7...HEAD
+[0.8.7]: https://github.com/tyler-builds/jamb/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/tyler-builds/jamb/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/tyler-builds/jamb/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/tyler-builds/jamb/compare/v0.8.3...v0.8.4

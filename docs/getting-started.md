@@ -34,7 +34,7 @@ other applications were running, so they are a reference, not a guarantee:
 
 ## Using jamb in your app
 
-The module is `github.com/tyler-builds/jamb`, and the latest release is `v0.8.6`. A minimal
+The module is `github.com/tyler-builds/jamb`, and the latest release is `v0.8.7`. A minimal
 `main.go` is a window with a greeting and a button that counts its clicks:
 
 ```go
@@ -69,7 +69,7 @@ In the module that holds it, add jamb and run the app. `go get` on a module path
 that module's checksum, so `go mod tidy` adds the checksums of jamb's own dependencies:
 
 ```
-go get github.com/tyler-builds/jamb@v0.8.6
+go get github.com/tyler-builds/jamb@v0.8.7
 go mod tidy
 go run .
 ```
