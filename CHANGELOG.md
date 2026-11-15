@@ -9,6 +9,30 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-11-15
+
+### Added
+
+- `TextInput.Purpose` and `TextArea.Purpose` say what a text field holds, for a phone's keyboard:
+  prose (`ui.PurposeText`, the default), which it corrects and capitalizes, text typed as it is
+  (`PurposeVerbatim`), an email address, a web address, a number or a phone number, or a search.
+
+### Fixed
+
+- A text field's caret keeps blinking, and a timer that waits behind another runs on time, when a
+  timer that is due sooner, such as a search's debounce after a key, takes the window's wake-up.
+  A window keeps only the earliest wake-up it was asked for, and the app asks again for the next
+  one after each frame.
+- In a web page, a finger's drag scrolls along one axis, which its first move decides, with a
+  bias to vertical: a page scrolled with a finger that drifts sideways scrolls the page, rather
+  than a table that scrolls sideways under the finger, and a sideways drag scrolls only the table.
+- In a web page, a phone's keyboard corrects words, capitalizes sentences, suggests and completes
+  words, types a period for a double space, expands text replacements and takes dictation in a
+  text field, and its cursor movement, as a long press of an iPhone's space bar, moves the
+  field's caret. The page's hidden textarea now holds the field's text around the caret, with its
+  selection, and its edits reach the field as edits of its text. A masked field, a field with a
+  format and a code editor still correct nothing. A page needs the `jamb.js` of this version.
+
 ## [0.8.7] - 2026-11-13
 
 ### Fixed
@@ -1255,7 +1279,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.7...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.8...HEAD
+[0.8.8]: https://github.com/tyler-builds/jamb/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/tyler-builds/jamb/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/tyler-builds/jamb/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/tyler-builds/jamb/compare/v0.8.4...v0.8.5
