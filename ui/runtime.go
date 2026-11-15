@@ -1077,11 +1077,45 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 		// The last paint started a layout spring's motion; the next frame steps it.
 		rt.animating, rt.reflowStart = true, false
 	}
+	rt.wakeForDue()
 	rt.publishAccess()
 	rt.stats.Nodes = len(rt.byID)
 	rt.stats.Quads, rt.stats.Glyphs = len(rt.scene.Quads), len(rt.scene.Glyphs)
 	rt.text.EndFrame()
 	return &rt.scene
+}
+
+// wakeForDue asks the window again for a frame at the next time that something
+// waits for: a timer (see Context.After), the next frame of an animated image or
+// of a caret's blink, a delayed motion, a tooltip, a menu's hover change, or the
+// end of a chord. A window keeps only the earliest wake-up it was asked for (see
+// platform.Window.WakeAt): one asked for a caret's blink and then for an earlier
+// timer, such as a search's debounce, wakes for the timer and has forgotten the
+// blink, which would stop until something else drew a frame.
+func (rt *Runtime) wakeForDue() {
+	var next time.Time
+	note := func(t time.Time) {
+		if !t.IsZero() && (next.IsZero() || t.Before(next)) {
+			next = t
+		}
+	}
+	for _, tm := range rt.timers {
+		note(tm.at)
+	}
+	note(rt.imageDue)
+	note(rt.motionDue)
+	if rt.tipCandidate != 0 && rt.tipShown != rt.tipCandidate && rt.tipCandidate != rt.tipDismissed {
+		note(rt.tipAt)
+	}
+	if rt.menuFn != nil {
+		note(rt.menuAt)
+	}
+	if len(rt.pending) > 0 {
+		note(rt.pendingAt.Add(chordTimeout))
+	}
+	if !next.IsZero() {
+		rt.wakeAt(next)
+	}
 }
 
 // buildDirty re-renders the dirty components and accumulates the time spent.

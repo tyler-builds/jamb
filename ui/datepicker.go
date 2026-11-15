@@ -531,7 +531,7 @@ func (d *DatePickerElement) expand(ctx *Context) Element {
 			placeholder = loc.datePlaceholder()
 		}
 		fo := fieldOptions{tooltip: d.tooltip, value: draft, placeholder: placeholder, name: name, labelledBy: labelledBy,
-			describedBy: describedBy, widget: "DatePicker", handle: ret, wire: w,
+			describedBy: describedBy, widget: "DatePicker", purpose: PurposeVerbatim, handle: ret, wire: w,
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, trailing: button}
 		fo.wire.invalid = isInvalid || w.invalid
 		fo.size.setWidth(Full)

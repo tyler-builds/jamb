@@ -44,3 +44,17 @@ type Sample struct {
 	// Style is the element's ui.DrawnStyle.
 	Style any
 }
+
+// TextContext is the focused text field as the host side reports it to a
+// window whose input methods read and edit the text around the caret (see
+// platform.TextContext, whose fields and numbering it has). Focused is clear
+// when no element that takes text has the focus.
+type TextContext struct {
+	Focused       bool
+	Text          string
+	Anchor, Caret int
+	HasText       bool
+	Purpose       uint8 // a platform.TextPurpose
+	Multiline     bool
+	Enter         uint8 // a platform.EnterKey
+}

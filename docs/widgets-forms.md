@@ -176,6 +176,22 @@ ui.TextInput(password).Masked().Revealable().Label("Password") // bullets, with 
 ui.TextInput(query).Icon(icons.Search).Clearable().Label("Search") // an X while it has text, and Escape clears
 ```
 
+- `Purpose(p)` says what a `TextInput` or `TextArea` holds, for a phone's keyboard
+  (on the web, see [web.md](web.md)): `ui.PurposeText`, the default, is prose, whose
+  words the keyboard corrects and suggests and whose sentences start with a capital;
+  `ui.PurposeVerbatim` is typed as it is, as a name, a path, a command or code;
+  `PurposeEmail`, `PurposeURL`, `PurposeNumber`, `PurposeDecimal` and `PurposeTel`
+  are typed as they are with the keys for them; and `PurposeSearch` is prose with a
+  search key. A `Masked` field is a password whatever its purpose, a field with a
+  `Format` is verbatim unless given another, a `NumberInput` is a number, and the date
+  and time pickers are verbatim.
+
+```go
+ui.TextArea(message).Label("Message")                                // corrected, capitalized
+ui.TextInput(branch).Purpose(ui.PurposeVerbatim).Label("Branch")     // typed as it is
+ui.TextInput(email).Purpose(ui.PurposeEmail).Label("Email")          // the keyboard's @ and .
+```
+
 - A `TextInput` with `Format(f)` shows its text in a fixed shape as the user types
   it. `ui.TemplateFormat(spec)` is a template such as `"(999) 999-9999"`, and
   `ui.NumberFormat(ui.NumberOptions{...})` a number with the decimal point, group

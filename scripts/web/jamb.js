@@ -6,7 +6,8 @@
 //	await go.run(result.instance);
 //
 // The app then has the script deliver the display's frames, the pointer, wheel
-// and key events of its canvas, and the text typed in its hidden textarea. The
+// and key events of its canvas, and the edits and the selection of its hidden
+// textarea, to which the script writes the focused text field's text. The
 // script calls functions that the app exports, with numbers, and then runs the
 // app's scheduler, so the app handles each event, and draws each frame, before
 // the browser's callback ends.
@@ -25,6 +26,8 @@
   let closed = true;
   let removers = [];
   const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  let incoming = ""; // the pieces so far of a string the app writes (see textPart)
 
   const mods = (e) => (e.shiftKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.altKey ? 4 : 0) | (e.metaKey ? 8 : 0);
   const on = (target, type, fn, options) => {
@@ -37,6 +40,19 @@
   // write puts the start of s in the app's buffer, and returns the length it
   // wrote, in bytes, and how much of s that was.
   const write = (s) => encoder.encodeInto(s, buffer());
+  // send puts s in the app's buffer, the pieces that do not fit first, each
+  // given to the app as part of the string that the next call delivers, and
+  // returns the length of the last piece, in bytes.
+  const send = (s) => {
+    for (;;) {
+      const { read, written } = write(s);
+      if (read >= s.length) return written;
+      app.jamb_text_part(written);
+      s = s.slice(read);
+    }
+  };
+  // backward returns 1 when the anchor of the textarea's selection is its end.
+  const backward = () => (area.selectionDirection === "backward" ? 1 : 0);
   // handled runs the app until it waits, so that it handles the event now,
   // and prevents the event's default action when the app asked for that.
   const handled = (e, prevent) => {
@@ -61,23 +77,28 @@
     handled(e, app.jamb_key(down, code, name, mods(e), e.repeat ? 1 : 0, e.isComposing || e.keyCode === 229 ? 1 : 0));
   };
   const beforeInput = (e) => handled(e, app.jamb_before_input(write(e.inputType || "").written));
-  // The text typed in the textarea, which the app takes and the textarea then
-  // loses. Text longer than the app's buffer goes in pieces.
-  const input = (e) => {
-    if (e.isComposing) return;
-    let s = area.value, empty = 0;
-    do {
-      const { read, written } = write(s);
-      empty = app.jamb_input(written);
-      s = s.slice(read);
-    } while (s !== "" && empty);
-    if (empty) area.value = "";
+  // edited delivers the textarea's text and selection after an edit: an input
+  // event, or the end of a composition. The textarea holds the text field's
+  // text around the caret, which the app compares with what it held, or else
+  // only what was typed, which the app takes and the textarea then loses.
+  const edited = (ended) => {
+    const n = send(area.value);
+    if (app.jamb_input(n, area.selectionStart, area.selectionEnd, backward(), ended)) area.value = "";
     app.go_scheduler();
   };
+  const input = () => edited(0);
   // composition delivers a step of an input method's composition, as the app
   // numbers them: its start, an update and its end.
   const composition = (kind) => (e) => {
     if (app.jamb_composition(kind, write(e.data || "").written)) area.value = "";
+    app.go_scheduler();
+    if (kind === 2) edited(1);
+  };
+  // selected delivers a change of the textarea's selection, as a phone
+  // keyboard's cursor movement makes.
+  const selected = () => {
+    if (document.activeElement !== area) return;
+    app.jamb_select(area.selectionStart, area.selectionEnd, backward());
     app.go_scheduler();
   };
   const frame = (t) => {
@@ -91,13 +112,13 @@
   globalThis.jambHost = {
     // The version of the calls between the script and the app, which the app
     // checks (hostVersion).
-    version: 1,
+    version: 2,
     // attach gives the script the app's instance. A build that does not export
     // what the script calls, such as one made with Go, listens for itself.
     attach(instance) {
       const e = instance.exports;
       app = e.jamb_frame && e.jamb_pointer && e.jamb_wheel && e.jamb_key && e.jamb_before_input && e.jamb_input &&
-        e.jamb_composition && e.go_scheduler && e.memory ? e : null;
+        e.jamb_text_part && e.jamb_select && e.jamb_composition && e.go_scheduler && e.memory ? e : null;
     },
     get ready() { return app !== null; },
 
@@ -137,6 +158,7 @@
       on(element, "compositionstart", composition(0));
       on(element, "compositionupdate", composition(1));
       on(element, "compositionend", composition(2));
+      on(document, "selectionchange", selected);
     },
     // place moves the textarea to a rectangle of the canvas, in CSS pixels:
     // the caret, where an input method puts its window.
@@ -147,6 +169,20 @@
       s.top = px(r.top + y);
       s.width = px(width);
       s.height = px(height);
+    },
+    // textPart and setText write a string of the app's to the textarea: the
+    // app gives its pieces to textPart, and its last piece, n bytes at the start
+    // of its buffer, to setText, which writes the string when value is 1, and
+    // selects from start to end, in UTF-16 code units, with the anchor at end
+    // when backward is 1.
+    textPart(n) { incoming += decoder.decode(buffer().subarray(0, n)); },
+    setText(n, start, end, backward, value) {
+      if (value) {
+        const s = incoming + decoder.decode(buffer().subarray(0, n));
+        if (area.value !== s) area.value = s;
+      }
+      incoming = "";
+      area.setSelectionRange(start, end, backward ? "backward" : "forward");
     },
     // frame delivers the next display frame.
     frame() { requestAnimationFrame(frame); },

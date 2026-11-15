@@ -17,8 +17,10 @@ import (
 // has focus, the textarea has the page's focus, at the field's caret: a phone
 // shows its keyboard for it, an input method composes in it and places its
 // window by it, and its input events carry the text that keys, a phone's
-// keyboard, an input method or a paste type. The textarea stays empty between
-// events. The canvas has the page's focus otherwise.
+// keyboard, an input method or a paste type. It holds the field's text around
+// the caret, which a phone's keyboard reads to correct and suggest words (see
+// mirror.go), or is empty between events for a field that shows its text to no
+// input method. The canvas has the page's focus otherwise.
 //
 // A phone shows its keyboard only for a focus that a tap's own event makes. So
 // a tap is handled while its event lasts (see runNow): the app takes it and
@@ -47,17 +49,22 @@ type textState struct {
 	moving    bool          // the focus is being moved within the window
 	lastKey   input.Key     // the latest key press delivered, and when
 	lastKeyAt time.Time
+
+	attrs    textAttrs // the textarea's attributes for the focused field (see attrsOf)
+	mirror   mirror    // what the textarea holds of the focused field
+	compData string    // what the input method composes, as its last compositionupdate said
 }
 
 // makeTextArea makes the hidden textarea and listens to it.
 func (w *window) makeTextArea() {
 	doc := js.Global().Get("document")
 	a := doc.Call("createElement", "textarea")
-	for _, kv := range [][2]string{
-		{"autocomplete", "off"}, {"autocorrect", "off"}, {"autocapitalize", "off"}, {"spellcheck", "false"},
-		{"aria-hidden", "true"}, {"tabindex", "-1"},
-	} {
+	for _, kv := range [][2]string{{"autocomplete", "off"}, {"aria-hidden", "true"}, {"tabindex", "-1"}} {
 		a.Call("setAttribute", kv[0], kv[1])
+	}
+	w.text.attrs = attrsOf(platform.TextContext{Purpose: platform.PurposeVerbatim})
+	for i, name := range textAttrNames {
+		a.Call("setAttribute", name, w.text.attrs[i])
 	}
 	st := a.Get("style")
 	for _, kv := range [][2]string{
@@ -81,19 +88,30 @@ func (w *window) makeTextArea() {
 		w.listenKeys(a)
 		w.on(a, "compositionstart", func(js.Value) { w.composition(compositionStart, "") })
 		w.on(a, "compositionupdate", func(e js.Value) { w.composition(compositionUpdate, e.Get("data").String()) })
+		// The textarea's text and selection after an edit.
+		edited := func(ended bool) {
+			if w.areaInput(a.Get("value").String(), a.Get("selectionStart").Int(), a.Get("selectionEnd").Int(),
+				a.Get("selectionDirection").String() == "backward", ended) {
+				a.Set("value", "")
+			}
+		}
 		w.on(a, "compositionend", func(e js.Value) {
 			if w.composition(compositionEnd, e.Get("data").String()) {
 				a.Set("value", "")
 			}
+			edited(true)
 		})
 		w.on(a, "beforeinput", func(e js.Value) {
 			if w.beforeInput(e.Get("inputType").String()) {
 				e.Call("preventDefault")
 			}
 		})
-		w.on(a, "input", func(e js.Value) {
-			if !e.Get("isComposing").Bool() && w.textInput(a.Get("value").String()) {
-				a.Set("value", "")
+		w.on(a, "input", func(js.Value) { edited(false) })
+		doc := js.Global().Get("document")
+		w.on(doc, "selectionchange", func(js.Value) {
+			if doc.Get("activeElement").Equal(a) {
+				w.areaSelect(a.Get("selectionStart").Int(), a.Get("selectionEnd").Int(),
+					a.Get("selectionDirection").String() == "backward")
 			}
 		})
 	}
@@ -144,10 +162,16 @@ const (
 // textarea: text is what is composed so far, or at the end what it commits. It
 // reports, at the end, whether the textarea is to be emptied.
 func (w *window) composition(kind compositionKind, text string) bool {
+	mirrored := w.text.mirror.on
 	switch kind {
 	case compositionStart:
 		w.text.composing = true
+		w.text.compData = ""
 	case compositionUpdate:
+		if mirrored {
+			w.text.compData = text // shown with the textarea's edit that follows (see syncText)
+			return false
+		}
 		Post(func() {
 			w.emit(platform.Event{Kind: platform.EventComposition, Text: text, Cursor: len(text),
 				ClauseStart: len(text), ClauseEnd: len(text)})
@@ -157,6 +181,13 @@ func (w *window) composition(kind compositionKind, text string) bool {
 			return false // canceled (see CancelComposition)
 		}
 		w.text.composing = false
+		if mirrored {
+			// The composition ends, and the textarea's text, with what it
+			// committed, follows (see areaInput).
+			w.text.compData = ""
+			Post(func() { w.emit(platform.Event{Kind: platform.EventComposition}) })
+			return false
+		}
 		Post(func() {
 			w.emit(platform.Event{Kind: platform.EventComposition})
 			if text != "" {
@@ -166,6 +197,159 @@ func (w *window) composition(kind compositionKind, text string) bool {
 		return true
 	}
 	return false
+}
+
+// areaInput handles the textarea's text after an edit: an input event, or the
+// end of a composition (ended), with its selection from start to end, in UTF-16
+// code units, whose anchor is end when backward. It reports whether the
+// textarea is to be emptied.
+func (w *window) areaInput(value string, start, end int, backward, ended bool) bool {
+	m := &w.text.mirror
+	switch {
+	case !m.on && ended:
+		return false // the composition's end delivered its text
+	case !m.on:
+		return w.textInput(value)
+	case !m.valid:
+		return false // the app's text is written to the textarea next (see CancelComposition)
+	}
+	a, b := byteOffset(value, start), byteOffset(value, end)
+	if backward {
+		a, b = b, a
+	}
+	w.syncText(value, a, b)
+	return false
+}
+
+// syncText sends the app what changed in the mirroring textarea, whose text is
+// now s, with the selection from anchor to caret, in bytes: its edit of the
+// field's text, the selection, and while an input method composes, the
+// composition. The composition is not in the field's text: the field shows
+// it at its caret, and it is typed when it ends.
+func (w *window) syncText(s string, anchor, caret int) {
+	m := &w.text.mirror
+	f, comp := s, ""
+	if w.text.composing {
+		cs, ce := compositionIn(s, m.text, w.text.compData, max(anchor, caret))
+		f, comp = s[:cs]+s[ce:], s[cs:ce]
+		anchor, caret = cs, cs
+	}
+	var events []platform.Event
+	if a, b, ins, same := diffText(m.text, f, caret); !same {
+		events = append(events, platform.Event{Kind: platform.EventTextEdit, Start: m.base + a, End: m.base + b, Text: ins})
+		m.text = f
+		m.anchor, m.caret = a+len(ins), a+len(ins)
+	}
+	if anchor != m.anchor || caret != m.caret {
+		events = append(events, platform.Event{Kind: platform.EventTextSelect, Start: m.base + anchor, End: m.base + caret})
+		m.anchor, m.caret = anchor, caret
+	}
+	if w.text.composing {
+		events = append(events, platform.Event{Kind: platform.EventComposition, Text: comp, Cursor: len(comp),
+			ClauseStart: len(comp), ClauseEnd: len(comp)})
+	}
+	if len(events) > 0 {
+		Post(func() {
+			for _, e := range events {
+				w.emit(e)
+			}
+		})
+	}
+}
+
+// areaSelect handles a change of the mirroring textarea's selection that no
+// edit made, as a phone keyboard's cursor movement does: the selection from
+// start to end, in UTF-16 code units, whose anchor is end when backward.
+func (w *window) areaSelect(start, end int, backward bool) {
+	m := &w.text.mirror
+	if !m.on || !m.valid || w.text.composing {
+		return
+	}
+	a, b := byteOffset(m.text, start), byteOffset(m.text, end)
+	if backward {
+		a, b = b, a
+	}
+	if a == m.anchor && b == m.caret {
+		return // as the window wrote it, or as an edit left it
+	}
+	m.anchor, m.caret = a, b
+	base := m.base
+	Post(func() { w.emit(platform.Event{Kind: platform.EventTextSelect, Start: base + a, End: base + b}) })
+}
+
+// SetTextContext implements platform.TextContextWindow. The app calls it in
+// each frame, before SetTextInputRect. It gives the textarea the attributes of
+// the focused field, and writes the field's text and selection to it when they
+// are not what it holds.
+func (w *window) SetTextContext(c platform.TextContext) {
+	if c.Focused {
+		w.setTextAttrs(attrsOf(c))
+	}
+	m := &w.text.mirror
+	if w.text.composing {
+		return // the input method's text is the textarea's until it ends
+	}
+	if !c.HasText {
+		if m.on {
+			*m = mirror{}
+			w.writeArea("", 0, 0, true)
+		}
+		return
+	}
+	anchor, caret := runeStart(c.Text, c.Anchor), runeStart(c.Text, c.Caret)
+	lo, hi := m.window(c.Text, anchor, caret)
+	text := c.Text[lo:hi]
+	anchor, caret = min(max(anchor-lo, 0), len(text)), min(max(caret-lo, 0), len(text))
+	same := m.on && m.valid && m.text == text
+	if same && m.anchor == anchor && m.caret == caret {
+		m.base = lo
+		return
+	}
+	*m = mirror{on: true, valid: true, base: lo, text: text, anchor: anchor, caret: caret}
+	w.writeArea(text, anchor, caret, !same)
+}
+
+// writeArea writes text, when value is set, and the selection from anchor to
+// caret, in bytes, to the textarea.
+func (w *window) writeArea(text string, anchor, caret int, value bool) {
+	a, c := utf16Offset(text, anchor), utf16Offset(text, caret)
+	start, end, backward := min(a, c), max(a, c), c < a
+	if w.hosted {
+		w.hostSetText(text, start, end, backward, value)
+		return
+	}
+	area := w.text.area
+	if value {
+		area.Set("value", text)
+	}
+	dir := "forward"
+	if backward {
+		dir = "backward"
+	}
+	area.Call("setSelectionRange", start, end, dir)
+}
+
+// setTextAttrs gives the textarea the attributes at. A phone's keyboard reads
+// them when the textarea takes the focus, so the textarea takes it again when
+// they change while it has it, in a tap or a key press, the only time a page
+// may focus an element and keep the keyboard shown.
+func (w *window) setTextAttrs(at textAttrs) {
+	if at == w.text.attrs {
+		return
+	}
+	for i, name := range textAttrNames {
+		if at[i] != w.text.attrs[i] {
+			w.text.area.Call("setAttribute", name, at[i])
+		}
+	}
+	w.text.attrs = at
+	if w.text.focused && gesture && !w.text.composing {
+		a := w.text.area
+		w.text.moving = true
+		a.Call("blur")
+		a.Call("focus", map[string]any{"preventScroll": true})
+		w.text.moving = false
+	}
 }
 
 // textInput delivers the text that the textarea's input event typed, and
@@ -181,15 +365,19 @@ func (w *window) textInput(text string) bool {
 	return true
 }
 
-// beforeInput turns the edits that a phone's keyboard makes without a key
-// press, deleting and new lines, into the key presses that the app knows, since
-// the empty textarea has nothing to delete. Text goes on to the input event.
-// inputType is the event's; it reports whether the edit is prevented.
+// beforeInput lets the textarea take the edits of a phone's keyboard and of an
+// input method, and reports whether an edit is prevented; inputType is the
+// event's. A textarea that mirrors the field takes its deletions too, which
+// the input event then sends (see syncText). An empty one has nothing to
+// delete: deleting a character, as new lines in either, become the key presses
+// that the app knows. Undo and redo, as from shaking an iPhone, are the app's
+// keys, and formatting is prevented, which the app's text does not have.
 func (w *window) beforeInput(inputType string) bool {
 	if w.text.composing {
 		return false
 	}
-	var k input.Key
+	mirrored := w.text.mirror.on && w.text.mirror.valid
+	k, m := input.KeyUnknown, input.Modifiers(0)
 	switch inputType {
 	case "deleteContentBackward":
 		k = input.KeyBackspace
@@ -197,17 +385,28 @@ func (w *window) beforeInput(inputType string) bool {
 		k = input.KeyDelete
 	case "insertLineBreak", "insertParagraph":
 		k = input.KeyEnter
-	case "insertText", "insertReplacementText", "insertFromPaste", "insertFromDrop", "insertCompositionText":
+		mirrored = false
+	case "historyUndo":
+		k, m, mirrored = input.KeyZ, input.ModCtrl, false
+	case "historyRedo":
+		k, m, mirrored = input.KeyY, input.ModCtrl, false
+	case "insertText", "insertReplacementText", "insertFromPaste", "insertFromDrop", "insertCompositionText",
+		"insertFromYank", "insertTranspose":
 		return false
 	default:
-		return true // formatting and the like, which the app's text does not have
+		// Formatting, and the deletions of words and lines that only a textarea
+		// with the field's text can make.
+		return !mirrored || len(inputType) < 6 || inputType[:6] != "delete"
 	}
-	if w.text.lastKey == k && time.Since(w.text.lastKeyAt) < recentKey {
+	if mirrored {
+		return false
+	}
+	if m == 0 && w.text.lastKey == k && time.Since(w.text.lastKeyAt) < recentKey {
 		return true // the press itself was delivered
 	}
 	Post(func() {
-		w.emit(platform.Event{Kind: platform.EventKeyDown, Key: k})
-		w.emit(platform.Event{Kind: platform.EventKeyUp, Key: k})
+		w.emit(platform.Event{Kind: platform.EventKeyDown, Key: k, Mods: m})
+		w.emit(platform.Event{Kind: platform.EventKeyUp, Key: k, Mods: m})
 	})
 	return true
 }
@@ -295,7 +494,13 @@ func (w *window) CancelComposition() {
 	a := w.text.area
 	w.text.moving = true
 	a.Call("blur")
-	a.Set("value", "")
+	if w.text.mirror.on {
+		// The textarea keeps the composition as text. The app types it, and its
+		// text is written to the textarea in its next frame.
+		w.text.mirror.valid = false
+	} else {
+		a.Set("value", "")
+	}
 	a.Call("focus", map[string]any{"preventScroll": true})
 	w.text.moving = false
 }

@@ -59,7 +59,8 @@ var inputNames = [inputKinds]string{"key", "move", "click", "scroll"}
 // that are not input.
 func inputKindOf(k platform.EventKind) (inputKind, bool) {
 	switch k {
-	case platform.EventKeyDown, platform.EventKeyUp, platform.EventTextInput:
+	case platform.EventKeyDown, platform.EventKeyUp, platform.EventTextInput, platform.EventTextEdit,
+		platform.EventTextSelect:
 		return inputKey, true
 	case platform.EventMouseMove:
 		return inputMove, true

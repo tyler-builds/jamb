@@ -393,8 +393,16 @@ func TestControlWaits(t *testing.T) {
 func TestControlShot(t *testing.T) {
 	f := newCtlFixture(t, func(ctx *ui.Context) ui.Element { return ui.Div() })
 	f.shot = func(fn func(*image.RGBA, error)) { fn(image.NewRGBA(image.Rect(0, 0, 8, 6)), nil) }
-	_, ch, _ := f.call(ctlRequest{Op: "shot"})
-	g := <-ch // written on another goroutine
+	// The PNG is written, and the answer sent, on another goroutine, which may
+	// answer before call returns: then call has taken the answer from ch.
+	g, ch, ok := f.call(ctlRequest{Op: "shot"})
+	if !ok {
+		select {
+		case g = <-ch:
+		case <-time.After(10 * time.Second):
+			t.Fatal("shot: no answer")
+		}
+	}
 	s, _ := g.result.(ctlShot)
 	if g.err != nil || s.Width != 8 || s.Height != 6 || filepath.Dir(s.Path) != f.c.dir {
 		t.Fatalf("shot: %+v %v", g.result, g.err)
@@ -538,6 +546,10 @@ var testCreate = ui.NewCommand("test.notes.create", "Create a note", func(in ctl
 })
 
 func TestControlActionsAndCommands(t *testing.T) {
+	// The notes outlive the test, as the command does: a run of the test again
+	// in the same process (-count) starts with none.
+	ctlNotes.Set(nil)
+	t.Cleanup(func() { ctlNotes.Set(nil) })
 	saved := 0
 	f := newCtlFixture(t, func(ctx *ui.Context) ui.Element {
 		return ui.Div().Padding(10).OnAction(testSaveAction, func() { saved++ }).

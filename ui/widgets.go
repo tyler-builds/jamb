@@ -593,6 +593,8 @@ type fieldOptions struct {
 	revealable  bool                    // see TextInputElement.Revealable
 	clearable   bool                    // see TextInputElement.Clearable
 	format      *InputFormat            // see TextInputElement.Format
+	purpose     TextPurpose             // see TextInputElement.Purpose
+	purposeSet  bool                    // Purpose was called
 	accept      func(string) bool       // see TextInputElement.Accept
 	marks       func(string) []TextMark // see TextAreaElement.Marks
 	tooltip     string                  // shown over the frame; the field's description when it has none
@@ -1136,7 +1138,10 @@ func (f *fieldOptions) expand(ctx *Context, st *FieldStyle, multiline bool, minR
 		placeholderColor: st.Placeholder.TextColor, part: f.widget + ".Text",
 		readOnly: f.readOnly, disabled: f.disabled, onPasteImage: f.onPasteImg,
 		password: f.masked, revealed: revealed, clearable: f.clearable, format: f.format, accept: f.accept,
-		marks: f.marks,
+		marks: f.marks, purpose: f.purpose,
+	}
+	if f.format != nil && !f.purposeSet {
+		ed.purpose = PurposeVerbatim
 	}
 	if multiline && minRows > 0 {
 		size := t.FontSize
