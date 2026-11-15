@@ -3,6 +3,8 @@ package markdown
 import (
 	"strings"
 	"testing"
+
+	"github.com/tyler-builds/jamb/access"
 )
 
 // A wide table scrolls horizontally inside a page that scrolls vertically.
@@ -11,11 +13,18 @@ import (
 // the web platform's panAxisAngle), so a page scrolled with a finger that
 // drifts sideways over a table scrolls the page.
 func TestTableInScrollingPage(t *testing.T) {
-	cols := strings.Repeat("| column with a long heading ", 12) + "|\n" + strings.Repeat("|---", 12) + "|\n" +
-		"| first " + strings.Repeat("| cell ", 11) + "|\n"
+	// Each column holds a word that does not wrap, so the table is wider than
+	// the page in any font: a column of words that wrap narrows to its longest
+	// word, and twelve of those fit the page in Segoe UI or Arial.
+	word := "|" + strings.Repeat("unbrokenword", 2) + " "
+	cols := strings.Repeat(word, 12) + "|\n" + strings.Repeat("|---", 12) + "|\n" +
+		"| first " + strings.Repeat(word, 11) + "|\n"
 	src := strings.Repeat("A paragraph before the table.\n\n", 8) + cols + "\n" +
 		strings.Repeat("A paragraph after the table.\n\n", 30)
 	u := show(t, func() *ViewElement { return View(src) })
+	if w := u.ByRole(access.RoleDataGrid, "").Bounds().W; w <= 900 {
+		t.Fatalf("the table is %v wide, within the page's 900: it has nothing to scroll", w)
+	}
 	cell := u.ByName("first")
 	at := cell.Bounds()
 
