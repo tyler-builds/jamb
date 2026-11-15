@@ -74,7 +74,11 @@ the page, or in a `<canvas id="jamb">` when the page has one.
 - **Input.** The mouse and touchpad (clicks, double clicks, the wheel), the keyboard (keys by
   their position, and the text they type), and touch: a tap is a click, a drag scrolls with
   momentum, and a drag that starts on a slider, a split divider or another element that takes
-  the drag (`CapturePointer`) moves it.
+  the drag (`CapturePointer`) moves it. A drag scrolls along one axis, which its first 8 pixels
+  decide and which holds until the finger lifts: horizontally only when they go within 30° of
+  horizontal, and vertically otherwise. So a page scrolled with a finger that drifts sideways
+  scrolls the page, even over a table or another element that scrolls sideways inside it, and a
+  deliberately sideways drag scrolls that element.
 - **Long press.** A finger that rests for half a second presses long. On selectable text or in
   a text field it selects the word under it, a drag without lifting selects more words, and
   lifting opens the text's menu (Copy, Paste and the rest). Anywhere else it opens the context

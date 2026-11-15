@@ -273,3 +273,99 @@ func TestLongPressNot(t *testing.T) {
 		t.Error("a finger that lifted pressed long")
 	}
 }
+
+// pan drags a finger from x0, y0 by dx, dy in each of n moves 8 ms apart, with a
+// frame after each, and lifts it right after the last move.
+func pan(w *window, x0, y0, dx, dy float64, n int) {
+	w.pointer(touchEvent(pointerDown, 1, x0, y0, 0))
+	runPosted()
+	x, y, at := x0, y0, 0.0
+	for range n {
+		x, y, at = x+dx, y+dy, at+8
+		w.pointer(touchEvent(pointerMove, 1, x, y, at))
+		w.touchFrame(at)
+	}
+	w.pointer(touchEvent(pointerUp, 1, x, y, at+1))
+	runPosted()
+}
+
+// moved returns how far the scrolls of a pan went, on each axis.
+func moved(scrolls []platform.Event) (x, y float32) {
+	for _, s := range scrolls {
+		x += s.DeltaX
+		y += s.DeltaY
+	}
+	return x, y
+}
+
+// A pan scrolls along one axis, which its first move decides with a bias to
+// vertical: a drag counts as horizontal only within 30° of horizontal. So a
+// page scrolled with a finger that drifts sideways, as over a table that scrolls
+// horizontally, scrolls only the page, and a table scrolled sideways does not
+// move the page.
+func TestPanLocksToAxis(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		dx, dy float64 // each move's
+		x      bool    // the pan is horizontal
+	}{
+		{"vertical", 0, -10, false},
+		{"mostly vertical", 3, -10, false},
+		{"45°", 10, -10, false},
+		{"35° from horizontal", 10, -7, false},
+		{"25° from horizontal", 10, -4.6, true},
+		{"mostly horizontal", -10, 2, true},
+		{"horizontal", -10, 0, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			w, rec := touchWindow(t)
+			withPage(t, w)
+			pan(w, 200, 400, c.dx, c.dy, 10)
+			if len(rec.scrolls) == 0 {
+				t.Fatal("the pan did not scroll")
+			}
+			for _, s := range rec.scrolls {
+				if c.x && s.DeltaY != 0 || !c.x && s.DeltaX != 0 {
+					t.Fatalf("a scroll of %v, %v: a pan scrolls along one axis", s.DeltaX, s.DeltaY)
+				}
+			}
+			x, y := moved(rec.scrolls)
+			if c.x && x != float32(-c.dx*10) || !c.x && y != float32(-c.dy*10) {
+				t.Errorf("the pan scrolled %v, %v; want all of the finger's move along its axis", x, y)
+			}
+		})
+	}
+}
+
+// The axis of a pan holds until the finger lifts: a vertical pan that turns
+// sideways goes on scrolling vertically, and its momentum too.
+func TestPanAxisHolds(t *testing.T) {
+	w, rec := touchWindow(t)
+	withPage(t, w)
+	w.pointer(touchEvent(pointerDown, 1, 200, 400, 0))
+	runPosted()
+	w.pointer(touchEvent(pointerMove, 1, 202, 390, 8)) // past the slop, vertical
+	w.touchFrame(8)
+	at := 8.0
+	for i := range 10 {
+		at += 8
+		w.pointer(touchEvent(pointerMove, 1, 202-float64(i+1)*15, 390, at)) // straight sideways
+		w.touchFrame(at)
+	}
+	w.pointer(touchEvent(pointerUp, 1, 52, 390, at+1))
+	runPosted()
+	if x, _ := moved(rec.scrolls); x != 0 {
+		t.Errorf("a vertical pan scrolled %v horizontally when it turned sideways", x)
+	}
+	if w.in.flinging && w.in.flingVX != 0 {
+		t.Errorf("the momentum of a vertical pan goes sideways at %v", w.in.flingVX)
+	}
+
+	// A fast horizontal pan carries on horizontally only.
+	w, _ = touchWindow(t)
+	withPage(t, w)
+	pan(w, 300, 400, -20, 4, 8)
+	if !w.in.flinging || w.in.flingVY != 0 || w.in.flingVX <= 0 {
+		t.Errorf("a fast horizontal pan carries on at %v, %v; want horizontally", w.in.flingVX, w.in.flingVY)
+	}
+}

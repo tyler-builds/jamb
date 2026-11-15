@@ -22,6 +22,44 @@ const (
 // pan rather than a tap.
 const touchSlop = 8
 
+// A pan scrolls along one axis, which its first move past touchSlop decides
+// and which holds until the finger lifts, momentum included: horizontally only
+// when that move is within panAxisAngle of horizontal, and vertically
+// otherwise, so a finger that drifts a little sideways as it scrolls a page
+// does not scroll a table in it that scrolls horizontally, and a page does not
+// creep up and down as a table is scrolled sideways. tan(30°): iOS and Android
+// lock a scroll's direction in the same way, with a bias to vertical.
+const panAxisAngle = 0.5774 // the tangent of the largest angle from horizontal of a horizontal pan
+
+// panAxis is the axis that a pan scrolls along.
+type panAxis uint8
+
+const (
+	panNone panAxis = iota // not decided: the finger has not moved past touchSlop
+	panX
+	panY
+)
+
+// axisOf returns the axis of a pan whose first move past touchSlop went dx,
+// dy from where the finger went down.
+func axisOf(dx, dy float64) panAxis {
+	if math.Abs(dy) <= math.Abs(dx)*panAxisAngle {
+		return panX
+	}
+	return panY
+}
+
+// along returns the part of a move dx, dy along the axis a.
+func (a panAxis) along(dx, dy float64) (float64, float64) {
+	switch a {
+	case panX:
+		return dx, 0
+	case panY:
+		return 0, dy
+	}
+	return dx, dy
+}
+
 // longPressTime is how long a finger stays where it went down before its
 // touch is a long press, as Android and iOS count it.
 const longPressTime = 500 * time.Millisecond
@@ -59,7 +97,8 @@ type pointerState struct {
 	// the pan carries on with.
 	touchID           int
 	touching, panning bool
-	dragging          bool // the touch drags an element that takes the drag (see platform.TouchHandler)
+	axis              panAxis // the axis the pan scrolls along, once it pans (see axisOf)
+	dragging          bool    // the touch drags an element that takes the drag (see platform.TouchHandler)
 	// longTmr makes the touch a long press, unless the finger moves or lifts
 	// first. held is set when the app acted on the long press, as by opening a
 	// menu: the rest of the touch does nothing.
@@ -480,9 +519,9 @@ func abs(v float32) float32 {
 // itself, as a slider does (see platform.TouchHandler), presses the mouse at
 // once and drags it. Otherwise a finger that lifts before it moves touchSlop is
 // a tap, delivered as a click where it went down; one that moves further pans,
-// delivered as precise scrolling, as a touchpad scrolls, and keeps scrolling
-// with its momentum after it lifts. A touch while that momentum lasts stops it,
-// and is no tap. A finger that stays where it went down for longPressTime
+// delivered as precise scrolling along one axis (see panAxisAngle), as a
+// touchpad scrolls, and keeps scrolling with its momentum after it lifts. A
+// touch while that momentum lasts stops it, and is no tap. A finger that stays where it went down for longPressTime
 // presses long: the app selects the word of a text there, which the finger then
 // drags further, or opens the context menu there (see longPress). Only the
 // first finger counts: a pinch is not recognized yet.
@@ -494,6 +533,7 @@ func (w *window) touchDown(e pointerEvent) bool {
 	}
 	w.focusWindow()
 	p.touching, p.panning, p.dragging, p.held = true, false, false, false
+	p.axis = panNone
 	p.longTmr.stop()
 	p.touchID = e.id
 	p.touchX0, p.touchY0 = e.x, e.y
@@ -537,10 +577,14 @@ func (w *window) touchMove(e pointerEvent) {
 	if p.held || !p.panning && math.Hypot(x-p.touchX0, y-p.touchY0) < touchSlop {
 		return
 	}
+	if !p.panning {
+		p.axis = axisOf(x-p.touchX0, y-p.touchY0)
+	}
 	p.panning = true
 	p.longTmr.stop()
-	p.panDX += p.touchX - x
-	p.panDY += p.touchY - y
+	dx, dy := p.axis.along(p.touchX-x, p.touchY-y)
+	p.panDX += dx
+	p.panDY += dy
 	p.touchX, p.touchY = x, y
 	at := e.at
 	p.moves = append(p.moves, touchMove{at, x, y})
@@ -638,7 +682,7 @@ func (w *window) touchUp(e pointerEvent) {
 		vx, vy, x, y := 0.0, 0.0, float32(0), float32(0)
 		first, last := p.moves[0], p.moves[len(p.moves)-1]
 		if ms := last.at - first.at; ms > 0 && e.at-last.at < flingWindow {
-			vx, vy = (first.x-last.x)/ms, (first.y-last.y)/ms
+			vx, vy = p.axis.along((first.x-last.x)/ms, (first.y-last.y)/ms)
 			x, y = float32(last.x)*w.scale, float32(last.y)*w.scale
 		}
 		Post(func() { w.startFling(vx, vy, x, y) })
