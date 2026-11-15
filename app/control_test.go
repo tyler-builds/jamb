@@ -546,6 +546,10 @@ var testCreate = ui.NewCommand("test.notes.create", "Create a note", func(in ctl
 })
 
 func TestControlActionsAndCommands(t *testing.T) {
+	// The notes outlive the test, as the command does: a run of the test again
+	// in the same process (-count) starts with none.
+	ctlNotes.Set(nil)
+	t.Cleanup(func() { ctlNotes.Set(nil) })
 	saved := 0
 	f := newCtlFixture(t, func(ctx *ui.Context) ui.Element {
 		return ui.Div().Padding(10).OnAction(testSaveAction, func() { saved++ }).
