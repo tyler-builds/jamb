@@ -747,8 +747,9 @@ func TestChordWaitsThenFallsBack(t *testing.T) {
 	if counts["single"] != 0 || len(r.rt.pending) != 1 {
 		t.Fatalf("after ctrl+k: %v, pending %d; want nothing run and one stroke waiting", counts, len(r.rt.pending))
 	}
-	if len(wakes) != 1 || !wakes[0].Equal(r.now.Add(chordTimeout)) {
-		t.Errorf("wake requests %v, want one at the chord timeout", wakes)
+	// The frame after the key asks again for the same wake-up (see wakeForDue).
+	if len(wakes) == 0 || slices.ContainsFunc(wakes, func(w time.Time) bool { return !w.Equal(r.now.Add(chordTimeout)) }) {
+		t.Errorf("wake requests %v, want them at the chord timeout", wakes)
 	}
 
 	r.key(input.KeyT, ctrl)
