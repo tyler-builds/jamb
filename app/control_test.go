@@ -393,8 +393,16 @@ func TestControlWaits(t *testing.T) {
 func TestControlShot(t *testing.T) {
 	f := newCtlFixture(t, func(ctx *ui.Context) ui.Element { return ui.Div() })
 	f.shot = func(fn func(*image.RGBA, error)) { fn(image.NewRGBA(image.Rect(0, 0, 8, 6)), nil) }
-	_, ch, _ := f.call(ctlRequest{Op: "shot"})
-	g := <-ch // written on another goroutine
+	// The PNG is written, and the answer sent, on another goroutine, which may
+	// answer before call returns: then call has taken the answer from ch.
+	g, ch, ok := f.call(ctlRequest{Op: "shot"})
+	if !ok {
+		select {
+		case g = <-ch:
+		case <-time.After(10 * time.Second):
+			t.Fatal("shot: no answer")
+		}
+	}
 	s, _ := g.result.(ctlShot)
 	if g.err != nil || s.Width != 8 || s.Height != 6 || filepath.Dir(s.Path) != f.c.dir {
 		t.Fatalf("shot: %+v %v", g.result, g.err)
