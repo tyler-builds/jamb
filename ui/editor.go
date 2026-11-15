@@ -160,6 +160,8 @@ type editorElement struct {
 	accept func(string) bool
 	// marks styles the text as it is edited (see TextAreaElement.Marks).
 	marks func(string) []TextMark
+	// purpose is what the field holds, for input methods (see TextPurpose).
+	purpose TextPurpose
 }
 
 // hidden reports whether the editor draws its text as bullets (see present).

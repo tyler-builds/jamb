@@ -88,7 +88,18 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   Mac, iPhone or iPad, Command is Ctrl, so Command+C copies.
 - **Text input.** While a text field has focus, a hidden textarea of the page has it too, at
   the field's caret: a phone shows its keyboard, and input methods (IME) compose in the field
-  and put their window by the caret.
+  and put their window by the caret. The textarea holds the field's text around the caret (up
+  to about 2,000 bytes either side) and its selection, as a phone's keyboard needs to see them:
+  it corrects words, capitalizes sentences, suggests and completes words, types a period for a
+  double space, expands text replacements, takes dictation, and its own cursor movement (a long
+  press of the space bar on an iPhone) moves the field's caret. The browser edits the textarea
+  as it would any, and the app takes what changed in it as an edit of the field, with undo; the
+  field's text goes back to the textarea only when the app changed it, as for a key the app
+  handles itself. The field's `Purpose` gives the textarea its `autocorrect`, `autocapitalize`,
+  `spellcheck` and `inputmode` (see [widgets-forms.md](widgets-forms.md)), and its Enter its
+  `enterkeyhint`: a new line in a `TextArea`, Go for a field with `OnSubmit`, Search for a search,
+  and Done otherwise. A `Masked` field, one with a `Format`, a read-only one and an element that
+  takes text itself, such as a code editor, show the keyboard no text, and correct nothing.
 - **Clipboard.** Copying writes the system's clipboard, text or an image
   (`ctx.SetClipboardImage`), and pasting into a text field with Ctrl+V (or the browser's paste)
   reads it: its text, or else its image, such as a screenshot, which a field's `OnPasteImage`
@@ -136,8 +147,10 @@ references to JavaScript values, which every call from the page into Go through 
 does. So jamb keeps both low on a page:
 
 - `jamb.js` delivers frames and input by calling functions that the app exports, with numbers,
-  which makes no references. Moving the pointer, scrolling, typing and animating collect
-  nothing.
+  which makes no references, and passes strings, such as the textarea's text, through a buffer
+  of the app's memory, both ways. Moving the pointer, scrolling, typing and animating collect
+  nothing. A page must load the `jamb.js` of the same jamb version as the app: the app checks
+  the script's version, and listens for itself, more slowly, when it does not match.
 - Events that are rare still arrive through `syscall/js`: the focus, resizing, pasting, and a
   change of the page's settings.
 - Your own code's calls of `syscall/js` count too: a value read each frame collects every few

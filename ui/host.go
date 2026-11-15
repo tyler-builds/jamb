@@ -125,6 +125,18 @@ func (h *runtimeHost) HasMenuBar() bool { return h.rt().hostHasMenuBar() }
 // TextInputRect returns the caret rectangle for the IME window.
 func (h *runtimeHost) TextInputRect() (scene.Rect, bool) { return h.rt().hostTextInputRect() }
 
+// TextContext reports the focused text field to a window whose input methods
+// read and edit the text around the caret (see hostTextContext).
+func (h *runtimeHost) TextContext() uihost.TextContext { return h.rt().hostTextContext() }
+
+// TextEdit replaces the bytes from start to end of the focused field's text with
+// s, an input method's edit (see hostTextEdit).
+func (h *runtimeHost) TextEdit(start, end int, s string) { h.rt().hostTextEdit(start, end, s) }
+
+// TextSelect selects from anchor to caret in the focused field (see
+// hostTextSelect).
+func (h *runtimeHost) TextSelect(anchor, caret int) { h.rt().hostTextSelect(anchor, caret) }
+
 // WindowAreaAt returns the custom title bar area at a point, in logical pixels.
 func (h *runtimeHost) WindowAreaAt(x, y float32) WindowArea { return h.rt().hostWindowAreaAt(x, y) }
 

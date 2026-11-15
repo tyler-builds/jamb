@@ -893,6 +893,10 @@ func (h *host) OnEvent(w platform.Window, e platform.Event) {
 		h.rt.TextInput(e.Text)
 	case platform.EventComposition:
 		h.rh.Compose(e.Text, e.Cursor, e.ClauseStart, e.ClauseEnd)
+	case platform.EventTextEdit:
+		h.rh.TextEdit(e.Start, e.End, e.Text)
+	case platform.EventTextSelect:
+		h.rh.TextSelect(e.Start, e.End)
 	case platform.EventFocus:
 		h.focused = true
 		h.rh.WindowFocus(true)
@@ -916,10 +920,17 @@ func isInput(k platform.EventKind) bool {
 	switch k {
 	case platform.EventMouseMove, platform.EventMouseDown, platform.EventMouseUp, platform.EventScroll,
 		platform.EventGesture, platform.EventKeyDown, platform.EventKeyUp, platform.EventTextInput,
-		platform.EventComposition, platform.EventFileDrop:
+		platform.EventComposition, platform.EventFileDrop, platform.EventTextEdit, platform.EventTextSelect:
 		return true
 	}
 	return false
+}
+
+// textContext returns the focused text field as the runtime reports it, as the
+// platform's TextContext, whose purposes and Enter keys it numbers alike.
+func textContext(c uihost.TextContext) platform.TextContext {
+	return platform.TextContext{Focused: c.Focused, Text: c.Text, Anchor: c.Anchor, Caret: c.Caret, HasText: c.HasText,
+		Purpose: platform.TextPurpose(c.Purpose), Multiline: c.Multiline, Enter: platform.EnterKey(c.Enter)}
 }
 
 // gesturePhase maps the phase of a platform gesture to the one the UI runtime uses.
@@ -1182,6 +1193,12 @@ func (h *host) OnFrame(w platform.Window) bool {
 	if h.insp != nil {
 		h.insp.frame(h.rt, frameStart)
 	}
+	// Tell a window whose input methods read the text around the caret what
+	// the focused field holds, before it is told where the caret is, which
+	// focuses its text input (see platform.TextContextWindow).
+	if tw, ok := w.(platform.TextContextWindow); ok {
+		tw.SetTextContext(textContext(h.rh.TextContext()))
+	}
 	// Tell the OS where the caret is, for input-method (IME) windows.
 	var ime platform.Rect
 	if r, ok := h.rh.TextInputRect(); ok {
@@ -1347,6 +1364,9 @@ type runtimeHost interface {
 	Cursor() input.Cursor
 	HasMenuBar() bool
 	TextInputRect() (scene.Rect, bool)
+	TextContext() uihost.TextContext
+	TextEdit(start, end int, s string)
+	TextSelect(anchor, caret int)
 	WindowAreaAt(x, y float32) ui.WindowArea
 	DragsAt(x, y float32) bool
 	LongPressAt(x, y float32) (taken, drags bool)

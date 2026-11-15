@@ -20,7 +20,7 @@ import "syscall/js"
 
 // hostVersion is the version of the calls between the window and the script:
 // the script's functions and the app's exports.
-const hostVersion = 1
+const hostVersion = 2
 
 // hostEntry is set while a function that the host script calls runs. Such a
 // call runs in no goroutine, so it cannot wait for one (see runNow).
@@ -66,8 +66,9 @@ func (w *window) hostListenText(area js.Value) bool {
 
 // hostTextSize is the size of the buffer that the host script writes an
 // event's strings to (see host_tinygo.go): a key's code and name, an input
-// event's type, or text. It delivers text longer than the buffer in pieces.
-const hostTextSize = 1024
+// event's type, or the textarea's text. Text longer than the buffer goes in
+// pieces, either way.
+const hostTextSize = 4096
 
 // requestFrame asks the browser for the next display frame, which arrives in
 // displayFrame.

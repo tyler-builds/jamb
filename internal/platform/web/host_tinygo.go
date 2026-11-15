@@ -15,12 +15,40 @@ var hostText [hostTextSize]byte
 // hostTextAddress returns the address of hostText in the app's memory.
 func hostTextAddress() int { return int(uintptr(unsafe.Pointer(&hostText[0]))) }
 
-// hostString returns the n bytes at the start of hostText as a string.
+// hostParts holds the pieces of a string longer than hostText that the host
+// script delivered before its last (see hostTextPart).
+var hostParts []byte
+
+// hostString returns the string that the host script delivered: the pieces
+// before, and the n bytes at the start of hostText.
 func hostString(n int32) string {
 	if n < 0 || int(n) > len(hostText) {
+		hostParts = hostParts[:0]
 		return ""
 	}
-	return string(hostText[:n])
+	if len(hostParts) == 0 {
+		return string(hostText[:n])
+	}
+	s := string(append(hostParts, hostText[:n]...))
+	hostParts = hostParts[:0]
+	return s
+}
+
+// hostSetText has the host script write text, when value is set, and the
+// selection from start to end, in UTF-16 code units, to the textarea (see
+// writeArea). The text goes through hostText, in pieces when it is longer.
+func (w *window) hostSetText(text string, start, end int, backward, value bool) {
+	n := 0
+	if value {
+		for len(text) > len(hostText) {
+			k := runeStart(text, len(hostText))
+			copy(hostText[:], text[:k])
+			w.host.Call("textPart", k)
+			text = text[k:]
+		}
+		n = copy(hostText[:], text)
+	}
+	w.host.Call("setText", n, start, end, flag(backward), flag(value))
 }
 
 // hostWindow returns the page's window while the host script delivers its
@@ -120,19 +148,47 @@ func hostBeforeInput(n int32) int32 {
 	return flag(prevent)
 }
 
-// hostInput is text that the textarea's input event typed, the first n bytes
-// of hostText. It returns 1 when the textarea is to be emptied.
+// hostTextPart is a piece of a string longer than hostText, the first n bytes
+// of hostText, which the next call's string continues.
+//
+//export jamb_text_part
+func hostTextPart(n int32) {
+	if n > 0 && int(n) <= len(hostText) {
+		hostParts = append(hostParts, hostText[:n]...)
+	}
+}
+
+// hostInput is the textarea's text after its input event, or after a
+// composition ended (ended is 1), the first n bytes of hostText, with its
+// selection from start to end in UTF-16 code units, whose anchor is end when
+// backward is 1 (see areaInput). It returns 1 when the textarea is to be
+// emptied.
 //
 //export jamb_input
-func hostInput(n int32) int32 {
+func hostInput(n, start, end, backward, ended int32) int32 {
 	w := hostWindow()
+	s := hostString(n)
 	if w == nil {
 		return 0
 	}
 	hostEntry = true
-	empty := w.textInput(hostString(n))
+	empty := w.areaInput(s, int(start), int(end), backward != 0, ended != 0)
 	hostEntry = false
 	return flag(empty)
+}
+
+// hostSelect is a change of the textarea's selection that no edit made: from
+// start to end, in UTF-16 code units, whose anchor is end when backward is 1.
+//
+//export jamb_select
+func hostSelect(start, end, backward int32) {
+	w := hostWindow()
+	if w == nil {
+		return
+	}
+	hostEntry = true
+	w.areaSelect(int(start), int(end), backward != 0)
+	hostEntry = false
 }
 
 // hostComposition is a step of an input method's composition, a

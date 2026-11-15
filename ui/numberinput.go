@@ -416,7 +416,7 @@ func (n *NumberInputElement[T]) expand(ctx *Context) Element {
 
 		fo := fieldOptions{tooltip: n.tooltip, value: draft, name: name, labelledBy: labelledBy, handle: n.focusHandle,
 			onSubmit: submit, onChange: func(string) { invalid.Set(false) }, onBlur: blur, onStep: step,
-			widget: "NumberInput", wire: w, align: n.align}
+			widget: "NumberInput", wire: w, align: n.align, purpose: numberPurpose[T]()}
 		// The invalid frame is drawn thicker and in the danger color (the text color under
 		// high contrast) by fieldOptions.expand, and the message says what is wrong.
 		fo.wire.invalid = isInvalid || w.invalid
@@ -590,4 +590,14 @@ func numberFrom[T int | float64](f float64) T {
 		return T(math.Round(f))
 	}
 	return T(f)
+}
+
+// numberPurpose is the purpose of a NumberInput's text: a whole number for an
+// int, and a number with a decimal point for a float64.
+func numberPurpose[T int | float64]() TextPurpose {
+	var v T
+	if _, ok := any(v).(int); ok {
+		return PurposeNumber
+	}
+	return PurposeDecimal
 }

@@ -553,7 +553,7 @@ func (p *TimePickerElement) expand(ctx *Context) Element {
 			placeholder = loc.timePlaceholder()
 		}
 		fo := fieldOptions{tooltip: p.tooltip, value: draft, placeholder: placeholder, name: name, labelledBy: labelledBy,
-			describedBy: describedBy, widget: "TimePicker", handle: ret, wire: w,
+			describedBy: describedBy, widget: "TimePicker", purpose: PurposeVerbatim, handle: ret, wire: w,
 			onSubmit: func(text string) {
 				// Enter chooses the highlighted time, or applies the text.
 				if open.Peek() && hl.Peek() >= 0 && hl.Peek() < len(times) {

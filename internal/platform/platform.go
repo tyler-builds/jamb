@@ -161,6 +161,72 @@ const (
 	LongPressDrags
 )
 
+// TextContextWindow is optionally implemented by a Window whose input methods
+// read and edit the text around the caret, as a phone's keyboard does in a web
+// page: to correct a word, capitalize a sentence, put a period for a double
+// space, or move the caret. The app tells it of the focused text field in each
+// frame, before SetTextInputRect, and the window sends the edits of the input
+// method as EventTextEdit and EventTextSelect.
+type TextContextWindow interface {
+	SetTextContext(c TextContext)
+}
+
+// TextContext is the focused text field, as an input method sees it. Focused
+// is clear, and the rest zero, when no element that takes text has the focus.
+type TextContext struct {
+	Focused bool
+	// Text is the field's text, and Anchor and Caret are the ends of its
+	// selection, as byte offsets in Text: equal when nothing is selected.
+	// HasText is clear when the field does not show its text to input methods,
+	// as a masked field does not, or when no field has the focus: then they
+	// type, and edit nothing.
+	Text          string
+	Anchor, Caret int
+	HasText       bool
+	// Purpose says what the field holds: whether words in it are corrected
+	// and capitalized, and which keys a phone's keyboard shows.
+	Purpose TextPurpose
+	// Multiline is set for a field that takes new lines, and Enter says what
+	// the Enter key does in the field, for its label on a phone's keyboard.
+	Multiline bool
+	Enter     EnterKey
+}
+
+// TextPurpose is what a text field holds, for input methods (see TextContext).
+type TextPurpose uint8
+
+const (
+	// PurposeText is prose: words are corrected and suggested, and sentences
+	// start with a capital.
+	PurposeText TextPurpose = iota
+	// PurposeVerbatim is text that is typed as it is, such as a name, a
+	// command or code: nothing is corrected or capitalized.
+	PurposeVerbatim
+	// PurposePassword is a secret: nothing is corrected, suggested or learned.
+	PurposePassword
+	// PurposeEmail, PurposeURL, PurposeNumber, PurposeDecimal and PurposeTel
+	// are typed as they are, with the keys for an email address, an address,
+	// digits, a number with a decimal point and a phone number.
+	PurposeEmail
+	PurposeURL
+	PurposeNumber
+	PurposeDecimal
+	PurposeTel
+	// PurposeSearch is a search's query: corrected as prose, with a search key.
+	PurposeSearch
+)
+
+// EnterKey is what the Enter key does in a text field (see TextContext).
+type EnterKey uint8
+
+const (
+	EnterNewLine EnterKey = iota // a new line, or nothing in particular
+	EnterDone                    // ends the editing
+	EnterGo                      // acts on the text
+	EnterSend                    // sends the text, as a message
+	EnterSearch                  // searches for the text
+)
+
 // BackgroundWindow is optionally implemented by a Window that shows the app's
 // background color around what the app draws, as a web page does in the
 // insets of a phone's display. The app sets it to the theme's background.
@@ -435,6 +501,16 @@ const (
 	// gesture is, Scale, PanX and PanY say what changed since the previous
 	// event of the gesture, and X and Y give its center (see GesturePhase).
 	EventGesture
+	// EventTextEdit is sent when an input method edits the focused text field
+	// (see TextContextWindow): Text replaces the bytes from Start to End of the
+	// text of the TextContext the window was last given, and the caret goes
+	// after it. An input method corrects a word, or puts a period for a double
+	// space, so.
+	EventTextEdit
+	// EventTextSelect is sent when an input method moves the caret or selects
+	// in the focused text field: Start is the selection's anchor and End its
+	// caret, as byte offsets in the text of the TextContext.
+	EventTextSelect
 )
 
 // GesturePhase says where a gesture is, for an EventGesture.
@@ -483,6 +559,8 @@ type Event struct {
 	// Cursor, ClauseStart and ClauseEnd are byte offsets in Text of an
 	// EventComposition.
 	Cursor, ClauseStart, ClauseEnd int
+	// Start and End are the range of an EventTextEdit or EventTextSelect.
+	Start, End int
 
 	// Phase, Scale, PanX, PanY and Inertia describe an EventGesture. Scale is
 	// the multiplicative change of the zoom since the previous event, 1 when

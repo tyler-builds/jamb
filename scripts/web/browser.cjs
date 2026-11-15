@@ -5,7 +5,11 @@
 //     tolerance for rounding;
 //   - the page's host script delivers the app's frames and input;
 //   - a click in a text field gives the hidden textarea the focus, typing
-//     there reaches the field, and the field's caret blinks.
+//     there reaches the field, and the field's caret blinks;
+//   - the textarea holds the field's text and caret, so a phone's keyboard can
+//     correct and complete words: the edits it makes there, as iOS Safari
+//     sends them, and an input method's composition, reach the field, and the
+//     app's own edits and caret come back to the textarea.
 //
 // Usage: node browser.cjs DIR X Y, where DIR is the page and X, Y is a point of
 // a text field in its first view, in CSS pixels of a 1280×800 page.
@@ -78,6 +82,88 @@ function compare(page, a, b) {
   }, [a.toString("base64"), b.toString("base64")]);
 }
 
+// cdp returns a DevTools session of the page, for an input method's
+// composition, which Playwright's keyboard does not make.
+const cdp = (page) => page.context().newCDPSession(page);
+
+// mirrors checks the focused field's textarea after "jamb" was typed in it,
+// and reports whether it passed.
+async function mirrors(page, sessionPromise) {
+  const session = await sessionPromise;
+  await page.evaluate(() => {
+    // Count the writes of the app's text to the textarea.
+    const host = globalThis.jambHost, set = host.setText;
+    globalThis.jambWrites = 0;
+    host.setText = function (n, start, end, backward, value) {
+      const area = document.activeElement, before = area.value;
+      set.call(this, n, start, end, backward, value);
+      if (area.value !== before) globalThis.jambWrites++;
+    };
+  });
+  // iosEdit replaces the last back characters of the textarea's text with
+  // text, as iOS Safari does for a correction, a double space or a
+  // suggestion: a beforeinput event, the edit, and an input event.
+  const iosEdit = (back, text, inputType) => page.evaluate(([back, text, inputType]) => {
+    const a = document.activeElement, e = a.value.length, s = e - back;
+    const opts = { inputType, data: text, bubbles: true, cancelable: true };
+    if (!a.dispatchEvent(new InputEvent("beforeinput", opts))) return;
+    a.value = a.value.slice(0, s) + text;
+    a.setSelectionRange(s + text.length, s + text.length);
+    a.dispatchEvent(new InputEvent("input", opts));
+  }, [back, text, inputType]);
+  const state = () => page.evaluate(() => {
+    const a = document.activeElement;
+    return { tag: a.tagName, value: a.value, caret: a.selectionEnd, writes: globalThis.jambWrites,
+      autocorrect: a.getAttribute("autocorrect"), autocapitalize: a.getAttribute("autocapitalize") };
+  });
+  let ok = true;
+  const expect = async (what, value, writes) => {
+    await page.waitForTimeout(150);
+    const st = await state();
+    const pass = st.tag === "TEXTAREA" && st.value === value && st.caret === value.length && st.writes === writes;
+    console.log(`${pass ? "ok" : "FAIL"}: ${what}: the textarea holds ${JSON.stringify(st.value)}, caret ${st.caret}, ` +
+      `${st.writes} writes${pass ? "" : `; want ${JSON.stringify(value)}, caret at its end, ${writes} writes`}`);
+    ok = ok && pass;
+  };
+  const st = await state();
+  console.log("textarea attributes:", st.autocorrect, st.autocapitalize);
+  if (st.autocorrect !== "on" || st.autocapitalize !== "sentences") {
+    console.log("FAIL: the textarea of a prose field does not correct and capitalize");
+    ok = false;
+  }
+  await expect("typed on the keyboard", "jamb", 0);
+  await page.keyboard.type(" teh");
+  await iosEdit(3, "the", "insertReplacementText");
+  await expect("an autocorrection", "jamb the", 0);
+  await page.keyboard.type(" ");
+  await iosEdit(1, ". ", "insertText");
+  await expect("a double space's period", "jamb the. ", 0);
+  await iosEdit(0, "Wor", "insertText");
+  await iosEdit(3, "World ", "insertReplacementText");
+  await expect("a suggestion that completes a word", "jamb the. World ", 0);
+  await iosEdit(6, "", "deleteWordBackward");
+  await expect("a word deleted", "jamb the. ", 0);
+  // Backspace on a keyboard is the app's: the field changes, and the textarea
+  // follows it.
+  await page.keyboard.press("Backspace");
+  await expect("Backspace, which the app handles", "jamb the.", 1);
+  // The keyboard's cursor movement moves the field's caret: Backspace there
+  // deletes the character before it.
+  await page.evaluate(() => {
+    document.activeElement.setSelectionRange(4, 4);
+    document.dispatchEvent(new Event("selectionchange"));
+  });
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("End");
+  await expect("the caret moved by the keyboard", "jam the.", 2);
+  // An input method's composition.
+  await session.send("Input.imeSetComposition", { text: "n", selectionStart: 1, selectionEnd: 1 });
+  await session.send("Input.imeSetComposition", { text: "ni", selectionStart: 2, selectionEnd: 2 });
+  await session.send("Input.insertText", { text: "你" });
+  await expect("a composition", "jam the.你", 2);
+  return ok;
+}
+
 async function main() {
   const server = await serve();
   const url = `http://127.0.0.1:${server.address().port}/`;
@@ -130,6 +216,12 @@ async function main() {
       console.log("FAIL: the text typed does not show in the field");
       failed = true;
     }
+
+    // The textarea mirrors the field (see internal/platform/web/mirror.go).
+    // Each step edits the textarea, or the field through the app, and the
+    // textarea must then hold what the field holds: the app writes its text to
+    // the textarea when they differ, which is counted.
+    if (!(await mirrors(gl, cdp(gl)))) failed = true;
 
     // The focused field's caret blinks, on and then off for 530 ms each: the
     // field draws differently within a blink. The page's focus moving to the
