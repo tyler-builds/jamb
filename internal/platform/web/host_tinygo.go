@@ -60,13 +60,6 @@ func hostWindow() *window {
 	return windows[0]
 }
 
-func flag(b bool) int32 {
-	if b {
-		return 1
-	}
-	return 0
-}
-
 // The functions below are what the host script calls. They are exported the
 // plain way (//export), which runs them on the caller's stack, in no
 // goroutine: a call takes under a microsecond and leaves nothing to collect.

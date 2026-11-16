@@ -190,6 +190,18 @@ type TextContext struct {
 	// the Enter key does in the field, for its label on a phone's keyboard.
 	Multiline bool
 	Enter     EnterKey
+	// Box is where the field shows its text, in physical pixels relative to
+	// the client area: the box its lines are laid out in, as much of it as is
+	// in view. TextX and TextY are where its text starts, the left of its lines
+	// and the top of the first, which lie outside Box when the field has
+	// scrolled its text. FontSize is the size of its text and LineHeight the
+	// distance between its lines, in physical pixels. A window whose input
+	// methods find places in the text by where they are on screen, as an
+	// iPhone's keyboard moves the caret, lays the text out there. Box is empty
+	// when the field reports none, as an element that takes text itself does.
+	Box                  Rect
+	TextX, TextY         float32
+	FontSize, LineHeight float32
 }
 
 // TextPurpose is what a text field holds, for input methods (see TextContext).

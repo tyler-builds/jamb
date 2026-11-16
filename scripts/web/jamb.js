@@ -112,7 +112,7 @@
   globalThis.jambHost = {
     // The version of the calls between the script and the app, which the app
     // checks (hostVersion).
-    version: 2,
+    version: 3,
     // attach gives the script the app's instance. A build that does not export
     // what the script calls, such as one made with Go, listens for itself.
     attach(instance) {
@@ -137,7 +137,9 @@
       on(window, "pointermove", pointer(1));
       on(window, "pointerup", pointer(2));
       on(window, "pointercancel", pointer(3));
-      on(c, "pointerleave", pointer(4));
+      const leave = pointer(4);
+      // The textarea over a text field (see place) is the canvas's.
+      on(c, "pointerleave", (e) => { if (!area || e.relatedTarget !== area) leave(e); });
       // Not passive, so that the app can keep the page from scrolling and zooming.
       on(c, "wheel", wheel, { passive: false });
       on(c, "keydown", key(1));
@@ -159,16 +161,47 @@
       on(element, "compositionupdate", composition(1));
       on(element, "compositionend", composition(2));
       on(document, "selectionchange", selected);
+      // Over a text field, on iOS, the textarea takes the touches and clicks
+      // there, which are the canvas's (see place).
+      on(element, "pointerdown", pointer(0));
+      on(element, "wheel", wheel, { passive: false });
+      on(element, "mousedown", prevent);
+      on(element, "contextmenu", prevent);
     },
-    // place moves the textarea to a rectangle of the canvas, in CSS pixels:
-    // the caret, where an input method puts its window.
-    place(x, y, width, height) {
+    // place moves the textarea to a rectangle of the canvas, in CSS pixels.
+    // With font 0 the rectangle is the caret, where an input method puts its
+    // window. Otherwise it is where a text field shows its text, on iOS, whose
+    // keyboard's trackpad moves the caret by where the text is: the textarea
+    // lays its text out as the field does, with text of the size font, lines
+    // line apart, wrapped when wrap is 1, and scrolled by scrollX and scrollY,
+    // and it takes the touches there. Text smaller than 16 px, at which iOS
+    // zooms the page in when the textarea takes the focus, is 16 px, and the
+    // textarea is scaled down.
+    place(x, y, width, height, font, line, scrollX, scrollY, wrap) {
       const r = canvas.getBoundingClientRect();
       const s = area.style;
       s.left = px(r.left + x);
       s.top = px(r.top + y);
-      s.width = px(width);
-      s.height = px(height);
+      if (!font) {
+        s.width = px(width);
+        s.height = px(height);
+        s.fontSize = "16px";
+        s.lineHeight = "normal";
+        s.transform = "none";
+        s.whiteSpace = "pre";
+        s.pointerEvents = "none";
+        return;
+      }
+      const k = Math.min(font / 16, 1);
+      s.width = px(width / k);
+      s.height = px(height / k);
+      s.fontSize = px(Math.max(font, 16));
+      s.lineHeight = px(line / k);
+      s.transform = "scale(" + k.toFixed(4) + ")";
+      s.whiteSpace = wrap ? "pre-wrap" : "pre";
+      s.pointerEvents = "auto";
+      area.scrollLeft = scrollX / k;
+      area.scrollTop = scrollY / k;
     },
     // textPart and setText write a string of the app's to the textarea: the
     // app gives its pieces to textPart, and its last piece, n bytes at the start

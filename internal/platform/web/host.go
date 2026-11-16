@@ -20,7 +20,7 @@ import "syscall/js"
 
 // hostVersion is the version of the calls between the window and the script:
 // the script's functions and the app's exports.
-const hostVersion = 2
+const hostVersion = 3
 
 // hostEntry is set while a function that the host script calls runs. Such a
 // call runs in no goroutine, so it cannot wait for one (see runNow).
@@ -87,4 +87,12 @@ func (w *window) displayFrame(t float64) {
 	w.rafAsked.Store(false)
 	w.rafFired.Store(true)
 	signal()
+}
+
+// flag is b as the host script's calls take it: 1 for set.
+func flag(b bool) int32 {
+	if b {
+		return 1
+	}
+	return 0
 }

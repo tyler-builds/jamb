@@ -88,8 +88,15 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   Mac, iPhone or iPad, Command is Ctrl, so Command+C copies.
 - **Text input.** While a text field has focus, a hidden textarea of the page has it too, at
   the field's caret: a phone shows its keyboard, and input methods (IME) compose in the field
-  and put their window by the caret. The textarea holds the field's text around the caret (up
-  to about 2,000 bytes either side) and its selection, as a phone's keyboard needs to see them:
+  and put their window by the caret. On an iPhone or an iPad the textarea lies over the
+  field's text instead, laid out as the field lays it out (its box, text size, line height,
+  wrapping and scroll), and takes the touches there, which reach the app as those on the
+  canvas do: iOS moves the caret by where the text is on screen, and the keyboard's trackpad
+  (a long press of the space bar, then a drag) moves the field's caret along a line and from
+  line to line. The textarea's text is transparent and set in the page's system font, so the
+  caret lands where the field's own text is only as nearly as the two fonts agree. The
+  textarea holds the field's text around the caret (up to about 2,000 bytes either side) and
+  its selection, as a phone's keyboard needs to see them:
   it corrects words, capitalizes sentences, suggests and completes words, types a period for a
   double space, expands text replacements, takes dictation, and its own cursor movement (a long
   press of the space bar on an iPhone) moves the field's caret. The browser edits the textarea

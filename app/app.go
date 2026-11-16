@@ -927,10 +927,14 @@ func isInput(k platform.EventKind) bool {
 }
 
 // textContext returns the focused text field as the runtime reports it, as the
-// platform's TextContext, whose purposes and Enter keys it numbers alike.
-func textContext(c uihost.TextContext) platform.TextContext {
+// platform's TextContext, whose purposes and Enter keys it numbers alike, with
+// its geometry in physical pixels at the window's scale s.
+func textContext(c uihost.TextContext, s float32) platform.TextContext {
+	b := c.Box
 	return platform.TextContext{Focused: c.Focused, Text: c.Text, Anchor: c.Anchor, Caret: c.Caret, HasText: c.HasText,
-		Purpose: platform.TextPurpose(c.Purpose), Multiline: c.Multiline, Enter: platform.EnterKey(c.Enter)}
+		Purpose: platform.TextPurpose(c.Purpose), Multiline: c.Multiline, Enter: platform.EnterKey(c.Enter),
+		Box:   platform.Rect{X: int(b[0] * s), Y: int(b[1] * s), W: int(b[2] * s), H: int(b[3] * s)},
+		TextX: c.TextX * s, TextY: c.TextY * s, FontSize: c.FontSize * s, LineHeight: c.LineHeight * s}
 }
 
 // gesturePhase maps the phase of a platform gesture to the one the UI runtime uses.
@@ -1197,7 +1201,7 @@ func (h *host) OnFrame(w platform.Window) bool {
 	// the focused field holds, before it is told where the caret is, which
 	// focuses its text input (see platform.TextContextWindow).
 	if tw, ok := w.(platform.TextContextWindow); ok {
-		tw.SetTextContext(textContext(h.rh.TextContext()))
+		tw.SetTextContext(textContext(h.rh.TextContext(), w.Scale()))
 	}
 	// Tell the OS where the caret is, for input-method (IME) windows.
 	var ime platform.Rect

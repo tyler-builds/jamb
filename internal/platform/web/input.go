@@ -240,27 +240,20 @@ func (w *window) listen() {
 		// the place of setPointerCapture, which throws when the browser no
 		// longer knows the pointer, and a JavaScript exception ends a TinyGo
 		// build.
-		pointer := func(kind pointerKind) func(js.Value) {
-			return func(e js.Value) {
-				if w.pointer(w.pointerOf(kind, e)) {
-					e.Call("preventDefault")
-				}
+		w.on(c, "pointerdown", w.pointerListener(pointerDown))
+		w.on(win, "pointermove", w.pointerListener(pointerMove))
+		w.on(win, "pointerup", w.pointerListener(pointerUp))
+		w.on(win, "pointercancel", w.pointerListener(pointerCancel))
+		leave := w.pointerListener(pointerLeave)
+		w.on(c, "pointerleave", func(e js.Value) {
+			// The textarea over a text field (see placeTextArea) is the canvas's.
+			if a := w.text.area; !a.Truthy() || !e.Get("relatedTarget").Equal(a) {
+				leave(e)
 			}
-		}
-		w.on(c, "pointerdown", pointer(pointerDown))
-		w.on(win, "pointermove", pointer(pointerMove))
-		w.on(win, "pointerup", pointer(pointerUp))
-		w.on(win, "pointercancel", pointer(pointerCancel))
-		w.on(c, "pointerleave", pointer(pointerLeave))
+		})
 		// The wheel listener is not passive, so that it can keep the page from
 		// scrolling and from zooming on Ctrl+wheel.
-		w.on(c, "wheel", func(e js.Value) {
-			x, y := w.cssPos(e)
-			if w.wheel(wheelEvent{x: x, y: y, dx: e.Get("deltaX").Float(), dy: e.Get("deltaY").Float(),
-				mode: e.Get("deltaMode").Int(), mods: mods(e)}) {
-				e.Call("preventDefault")
-			}
-		}, map[string]any{"passive": false})
+		w.on(c, "wheel", w.wheelListener, map[string]any{"passive": false})
 		w.listenKeys(c)
 		w.on(c, "contextmenu", func(e js.Value) { e.Call("preventDefault") })
 		// The mouse events that a browser makes from a touch would move the
@@ -290,6 +283,26 @@ func (w *window) listen() {
 		w.on(win, "resize", func(js.Value) { Post(w.resized) })
 	}
 	w.watchScale()
+}
+
+// pointerListener returns the listener of the pointer events of the kind,
+// for a page without the host script.
+func (w *window) pointerListener(kind pointerKind) func(js.Value) {
+	return func(e js.Value) {
+		if w.pointer(w.pointerOf(kind, e)) {
+			e.Call("preventDefault")
+		}
+	}
+}
+
+// wheelListener is the listener of the wheel, for a page without the host
+// script.
+func (w *window) wheelListener(e js.Value) {
+	x, y := w.cssPos(e)
+	if w.wheel(wheelEvent{x: x, y: y, dx: e.Get("deltaX").Float(), dy: e.Get("deltaY").Float(),
+		mode: e.Get("deltaMode").Int(), mods: mods(e)}) {
+		e.Call("preventDefault")
+	}
 }
 
 // watchScale listens for the next change of the device pixel ratio, which a

@@ -57,4 +57,10 @@ type TextContext struct {
 	Purpose       uint8 // a platform.TextPurpose
 	Multiline     bool
 	Enter         uint8 // a platform.EnterKey
+	// Box is where the field shows its text, and TextX, TextY where its text
+	// starts, FontSize its size and LineHeight the distance between its lines,
+	// in logical pixels (see platform.TextContext). Box is empty when unknown.
+	Box                  [4]float32 // x, y, width, height
+	TextX, TextY         float32
+	FontSize, LineHeight float32
 }
