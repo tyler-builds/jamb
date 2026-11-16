@@ -75,6 +75,7 @@ type textState struct {
 	field      fieldGeometry
 	placed     placement
 	browserSel time.Time
+	fonts      textFonts // the faces of fields the page has (see textfont.go)
 }
 
 // fieldGeometry is where the focused field shows its text, in physical
@@ -84,17 +85,22 @@ type fieldGeometry struct {
 	textX, textY         float32
 	fontSize, lineHeight float32
 	multiline            bool
+	faces                []platform.FontFace
 }
 
 // placement is where the textarea is, in CSS pixels relative to the canvas: at
 // the caret, when font is 0, or over the field's text, whose text size is
 // font, the distance between whose lines is line, which wraps its lines when
-// wrap is set, and which has scrolled its text by scrollX and scrollY.
+// wrap is set, and which has scrolled its text by scrollX and scrollY. family
+// is the font-family list of the field's faces, and wght where on its weight
+// axis the first is drawn, or 0 (see areaFamily).
 type placement struct {
 	x, y, w, h       float64
 	font, line       float64
 	scrollX, scrollY float64
 	wrap             bool
+	family           string
+	wght             float64
 }
 
 // sameBox reports whether p and q put the textarea over the same box, with the
@@ -134,10 +140,22 @@ func (w *window) makeTextArea() {
 		{"overflow", "hidden"}, {"opacity", "0"}, {"background", "transparent"}, {"color", "transparent"},
 		{"caretColor", "transparent"}, {"pointerEvents", "none"}, {"whiteSpace", "pre"},
 		// At 16 px or more, iOS does not zoom the page in when the textarea takes the focus.
-		{"fontSize", px(overlayFontMin)}, {"fontFamily", "system-ui, sans-serif"}, {"transformOrigin", "0 0"},
+		{"fontSize", px(overlayFontMin)}, {"fontFamily", areaFontDefault}, {"transformOrigin", "0 0"},
 		// The touches on the textarea, when it lies over the field, are the
 		// app's (see listenAreaTouches).
 		{"touchAction", "none"}, {"webkitTouchCallout", "none"}, {"webkitTapHighlightColor", "transparent"},
+		// Its text is laid out as jamb's shaper lays it out: the font's own
+		// advances, unhinted, with its default ligatures, nothing synthesized,
+		// spaced, enlarged or hyphenated; lines broken at word boundaries, and
+		// inside a word too long for a line (see textfont.go). Kerning is off:
+		// go-text, jamb's shaper, applies little of a font's GPOS kerning (none
+		// of Inter's pairs of classes, which a browser applies), and the Go
+		// fonts have none.
+		{"textRendering", "geometricPrecision"}, {"fontKerning", "none"}, {"fontVariantLigatures", "normal"},
+		{"fontFeatureSettings", "normal"}, {"fontSynthesis", "none"}, {"fontOpticalSizing", "none"},
+		{"fontWeight", "normal"}, {"fontStyle", "normal"}, {"letterSpacing", "0"}, {"wordSpacing", "0"},
+		{"textIndent", "0"}, {"textTransform", "none"}, {"webkitTextSizeAdjust", "100%"}, {"textSizeAdjust", "100%"},
+		{"hyphens", "manual"}, {"wordBreak", "normal"}, {"overflowWrap", "break-word"}, {"lineBreak", "auto"},
 	} {
 		st.Set(kv[0], kv[1])
 	}
@@ -399,7 +417,7 @@ func (w *window) SetTextContext(c platform.TextContext) {
 	w.text.field = fieldGeometry{}
 	if c.HasText && c.Box.W > 0 && c.Box.H > 0 && c.FontSize > 0 {
 		w.text.field = fieldGeometry{box: c.Box, textX: c.TextX, textY: c.TextY, fontSize: c.FontSize,
-			lineHeight: c.LineHeight, multiline: c.Multiline}
+			lineHeight: c.LineHeight, multiline: c.Multiline, faces: c.Faces}
 	}
 	m := &w.text.mirror
 	if w.text.composing {
@@ -575,10 +593,11 @@ func (w *window) textPlacement() placement {
 	s := float64(w.scale)
 	if f := w.text.field; w.text.overlay && f.fontSize > 0 {
 		b := f.box
+		family, wght := w.areaFamily(f.faces)
 		return placement{x: float64(b.X) / s, y: float64(b.Y) / s, w: float64(b.W) / s, h: float64(b.H) / s,
 			font: float64(f.fontSize) / s, line: float64(f.lineHeight) / s,
 			scrollX: (float64(b.X) - float64(f.textX)) / s, scrollY: (float64(b.Y) - float64(f.textY)) / s,
-			wrap: f.multiline}
+			wrap: f.multiline, family: family, wght: wght}
 	}
 	r := w.text.rect
 	return placement{x: float64(r.X) / s, y: float64(r.Y) / s, w: max(float64(r.W)/s, 1), h: max(float64(r.H)/s, 1)}
@@ -595,13 +614,16 @@ func (w *window) placeTextArea() {
 		return
 	}
 	w.text.placed = p
+	a := w.text.area
+	st := a.Get("style")
+	if p.family != old.family || p.wght != old.wght {
+		w.setAreaFont(st, p)
+	}
 	if w.hosted {
 		w.host.Call("place", p.x, p.y, p.w, p.h, p.font, p.line, p.scrollX, p.scrollY, flag(p.wrap))
 		return
 	}
 	cr := w.canvas.Call("getBoundingClientRect")
-	a := w.text.area
-	st := a.Get("style")
 	st.Set("left", px(cr.Get("left").Float()+p.x))
 	st.Set("top", px(cr.Get("top").Float()+p.y))
 	if p.font == 0 {

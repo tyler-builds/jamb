@@ -1,8 +1,10 @@
 #!/bin/sh
 # browser.sh builds the demo as a page and checks it in Chromium with
 # browser.cjs: it draws with WebGL 2, its frame matches the CPU renderer's, the
-# host script delivers its input, and its text fields take typing. CI runs it in
-# the Web build job.
+# host script delivers its input, and its text fields take typing. On an
+# iPhone, the textarea over a text field lays its text out as the field does:
+# textcheck compares the scans browser.cjs makes of it with jamb's layout,
+# under Node. CI runs it in the Web build job.
 #
 # It needs what build.sh needs, and Node with npm. It installs Playwright, at the
 # version pinned here, in a temporary directory; Playwright downloads Chromium
@@ -25,4 +27,6 @@ fi
 "$out/pw/node_modules/.bin/playwright" install $deps chromium
 
 # The search field of the demo's header.
-NODE_PATH="$out/pw/node_modules" timeout 300 node "$root/scripts/web/browser.cjs" "$out/page" 1000 49
+NODE_PATH="$out/pw/node_modules" timeout 300 node "$root/scripts/web/browser.cjs" "$out/page" 1000 49 "$out/textarea.json"
+cd "$root"
+PATH="$PATH:$(go env GOROOT)/lib/wasm" GOOS=js GOARCH=wasm go run -tags=jamb_embedfonts ./scripts/web/textcheck "$out/textarea.json"

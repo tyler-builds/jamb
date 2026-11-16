@@ -5,6 +5,8 @@
 // methods are not part of ui's public API, so apps and tests never see them.
 package uihost
 
+import "github.com/tyler-builds/jamb/internal/text"
+
 // Of returns the host side of a *ui.Runtime. The ui package sets it when it is
 // initialized; app and ui/uitest assert the result to the interface of the
 // methods they use.
@@ -63,4 +65,7 @@ type TextContext struct {
 	Box                  [4]float32 // x, y, width, height
 	TextX, TextY         float32
 	FontSize, LineHeight float32
+	// Faces are the faces the field's text is drawn with, the first its own
+	// and then its fallbacks (see text.System.Faces), shared and unchanging.
+	Faces []text.FaceData
 }

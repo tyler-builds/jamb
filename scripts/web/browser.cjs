@@ -9,10 +9,14 @@
 //   - the textarea holds the field's text and caret, so a phone's keyboard can
 //     correct and complete words: the edits it makes there, as iOS Safari
 //     sends them, and an input method's composition, reach the field, and the
-//     app's own edits and caret come back to the textarea.
+//     app's own edits and caret come back to the textarea;
+//   - on an iPhone (its user agent), the textarea lies over the field and lays
+//     its text out in the field's own fonts: it is scanned as iOS's keyboard
+//     trackpad hit-tests it, and the scans are written to OUT, where
+//     textcheck (see browser.sh) compares them with jamb's layout.
 //
-// Usage: node browser.cjs DIR X Y, where DIR is the page and X, Y is a point of
-// a text field in its first view, in CSS pixels of a 1280×800 page.
+// Usage: node browser.cjs DIR X Y OUT, where DIR is the page and X, Y is a
+// point of a text field in its first view, in CSS pixels of a 1280×800 page.
 "use strict";
 
 const http = require("http");
@@ -20,7 +24,7 @@ const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
 
-const [dir, fieldX, fieldY] = [process.argv[2], Number(process.argv[3]), Number(process.argv[4])];
+const [dir, fieldX, fieldY, scansOut] = [process.argv[2], Number(process.argv[3]), Number(process.argv[4]), process.argv[5]];
 const types = { ".html": "text/html", ".js": "text/javascript", ".wasm": "application/wasm" };
 
 // The largest difference allowed between the renderers, per channel, and how
@@ -164,6 +168,67 @@ async function mirrors(page, sessionPromise) {
   return ok;
 }
 
+// The texts whose layout in the textarea over a field is compared with jamb's:
+// kerning, ligatures and punctuation, and characters that no font of the page
+// has, which jamb draws as boxes. They fit the demo's search field.
+const overlayTexts = ["Wave To. fi ffl 1,234", "AVA y, r. Ty", "Hi 😀 ok 日本"];
+
+// overlay opens the page as an iPhone's browser, at a desktop's size, focuses
+// the text field with a tap, and checks that the textarea lies over it in the
+// field's fonts, then scans the textarea with each of overlayTexts as iOS's
+// keyboard trackpad hit-tests it: along the middle of each line, the offset of
+// caretPositionFromPoint every quarter pixel. It writes the scans to scansOut
+// and reports whether the textarea was as it should be.
+async function overlay(browser, url) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, hasTouch: true,
+    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" });
+  const page = await ctx.newPage();
+  await page.goto(url);
+  await page.waitForSelector("canvas", { timeout: 60000 });
+  await page.waitForTimeout(2000);
+  await page.touchscreen.tap(fieldX, fieldY);
+  await page.waitForTimeout(500);
+  await page.evaluate(() => document.fonts.ready);
+  const st = await page.evaluate(() => {
+    const a = document.activeElement, cs = getComputedStyle(a);
+    return { tag: a.tagName, pointer: cs.pointerEvents, family: cs.fontFamily,
+      fonts: [...document.fonts].map((f) => f.family + " " + f.status) };
+  });
+  console.log("the textarea over the field: pointer events", st.pointer, "font", st.family, "; the page's fonts:", st.fonts.join(", "));
+  if (st.tag !== "TEXTAREA" || st.pointer !== "auto" || !/^"?jamb-face-/.test(st.family) ||
+    st.fonts.length === 0 || st.fonts.some((f) => !f.endsWith(" loaded"))) {
+    console.log("FAIL: on an iPhone the textarea does not lie over the field in the field's fonts");
+    await ctx.close();
+    return false;
+  }
+  const texts = [];
+  let size = 0, width = 0;
+  for (const t of overlayTexts) {
+    const r = await page.evaluate((s) => {
+      const a = document.activeElement, cs = getComputedStyle(a);
+      const k = new DOMMatrix(cs.transform).a || 1, saved = a.value;
+      const line = parseFloat(cs.lineHeight) * k, rect = a.getBoundingClientRect();
+      a.value = s;
+      a.scrollLeft = 0;
+      const y = rect.top + line / 2, runs = [];
+      let last = -2;
+      for (let x = 0; x <= rect.width; x += 0.25) {
+        const cp = document.caretPositionFromPoint(rect.left + x, y);
+        const o = cp && cp.offsetNode === a ? cp.offset : -1;
+        if (o !== last) { runs.push([x, o]); last = o; }
+      }
+      a.value = saved;
+      return { size: parseFloat(cs.fontSize) * k, width: rect.width, runs };
+    }, t);
+    size = r.size;
+    width = r.width;
+    texts.push({ text: t, lines: [r.runs] });
+  }
+  fs.writeFileSync(scansOut, JSON.stringify({ size, width, wrap: false, texts }));
+  await ctx.close();
+  return true;
+}
+
 async function main() {
   const server = await serve();
   const url = `http://127.0.0.1:${server.address().port}/`;
@@ -239,6 +304,9 @@ async function main() {
       console.log("FAIL: the focused text field's caret does not blink");
       failed = true;
     }
+
+    // On an iPhone the textarea lies over the field in its fonts (see overlay).
+    if (!(await overlay(browser, url))) failed = true;
   } finally {
     await browser.close();
     server.close();

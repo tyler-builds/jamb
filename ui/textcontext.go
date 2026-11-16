@@ -103,6 +103,7 @@ func (rt *Runtime) hostTextContext() uihost.TextContext {
 		z, b := rt.zoom, rt.textBox
 		c.Box = [4]float32{b.box.X * z, b.box.Y * z, b.box.W * z, b.box.H * z}
 		c.TextX, c.TextY, c.FontSize, c.LineHeight = b.x*z, b.y*z, b.size*z, b.lineHeight*z
+		c.Faces = rt.text.Faces(e.textStyle(n))
 	}
 	return c
 }

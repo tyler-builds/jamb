@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -934,7 +935,35 @@ func textContext(c uihost.TextContext, s float32) platform.TextContext {
 	return platform.TextContext{Focused: c.Focused, Text: c.Text, Anchor: c.Anchor, Caret: c.Caret, HasText: c.HasText,
 		Purpose: platform.TextPurpose(c.Purpose), Multiline: c.Multiline, Enter: platform.EnterKey(c.Enter),
 		Box:   platform.Rect{X: int(b[0] * s), Y: int(b[1] * s), W: int(b[2] * s), H: int(b[3] * s)},
-		TextX: c.TextX * s, TextY: c.TextY * s, FontSize: c.FontSize * s, LineHeight: c.LineHeight * s}
+		TextX: c.TextX * s, TextY: c.TextY * s, FontSize: c.FontSize * s, LineHeight: c.LineHeight * s,
+		Faces: platformFaces(c.Faces)}
+}
+
+// faceCache is the last faces platformFaces converted, and what it made of them.
+var faceCache struct {
+	mu   sync.Mutex
+	from []text.FaceData
+	to   []platform.FontFace
+}
+
+// platformFaces returns the faces of a text field as the platform takes them.
+// The runtime gives the same slice while the field's font is the same, and so
+// does platformFaces, so that a frame makes no garbage.
+func platformFaces(faces []text.FaceData) []platform.FontFace {
+	if len(faces) == 0 {
+		return nil
+	}
+	faceCache.mu.Lock()
+	defer faceCache.mu.Unlock()
+	if len(faceCache.from) == len(faces) && &faceCache.from[0] == &faces[0] {
+		return faceCache.to
+	}
+	to := make([]platform.FontFace, len(faces))
+	for i, f := range faces {
+		to[i] = platform.FontFace{Key: f.Key, Data: f.Data, Weight: f.Weight}
+	}
+	faceCache.from, faceCache.to = faces, to
+	return to
 }
 
 // gesturePhase maps the phase of a platform gesture to the one the UI runtime uses.

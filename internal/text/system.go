@@ -63,6 +63,9 @@ type System struct {
 	graphemeText  string
 	graphemeStops []int
 
+	// faceSets are the faces of each primary font, as Faces returns them.
+	faceSets map[*Font]faceSet
+
 	glyphs  map[glyphKey]maskEntry
 	masks   map[MaskKey]maskEntry
 	layouts map[layoutKey]*cachedLayout
@@ -165,6 +168,7 @@ func (sys *System) FontsChanged() {
 	clear(sys.layouts)
 	clear(sys.paras)
 	clear(sys.ellipses)
+	clear(sys.faceSets)
 }
 
 // Atlas returns the mask atlas texture.

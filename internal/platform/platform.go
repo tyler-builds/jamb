@@ -202,6 +202,22 @@ type TextContext struct {
 	Box                  Rect
 	TextX, TextY         float32
 	FontSize, LineHeight float32
+	// Faces are the font files the field's text is drawn with: its own face,
+	// then those of the characters its face lacks, in that order, so that a
+	// window that lays the text out does so as the field does. They are the
+	// same, in the same slice, while the field's font is.
+	Faces []FontFace
+}
+
+// FontFace is a font file a text is drawn with (see TextContext.Faces).
+type FontFace struct {
+	// Key names the face: the same for the same face, and unique to it.
+	Key string
+	// Data is the font file, which must not be changed.
+	Data []byte
+	// Weight is where a variable font is drawn on its weight axis, or 0 for
+	// its default instance.
+	Weight float32
 }
 
 // TextPurpose is what a text field holds, for input methods (see TextContext).

@@ -1,6 +1,7 @@
 package ui_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/tyler-builds/jamb/internal/uihost"
@@ -166,5 +167,29 @@ func TestTextEditsInSingleLineAndLockedFields(t *testing.T) {
 	u.Frame()
 	if one.Get() != "a b" || secret.Get() != "abc" || ro.Get() != "fixed" {
 		t.Errorf("fields %q, %q, %q; want a b, and the masked and read-only ones unchanged", one.Get(), secret.Get(), ro.Get())
+	}
+}
+
+// The focused field reports where its text is and the faces it is drawn
+// with, for a window that lays the same text out (a page's textarea on iOS):
+// the box, its text size as jamb lays it out, whole pixels, and its faces,
+// its own first and the missing-glyph font last.
+func TestTextContextGeometryAndFaces(t *testing.T) {
+	msg := ui.NewSignal("Hello there")
+	u := uitest.New(t, func(ctx *ui.Context) ui.Element {
+		return ui.Div().Padding(10).Child(ui.TextArea(msg).Key("msg").Label("Message").Style(ui.Style{FontSize: 13.5}))
+	})
+	u.Get("msg").Focus()
+	u.Frame()
+	c := hostText(u).TextContext()
+	if c.Box[2] <= 0 || c.Box[3] <= 0 || c.LineHeight <= 0 {
+		t.Fatalf("the text area reports the box %v and line height %v", c.Box, c.LineHeight)
+	}
+	if c.FontSize != 14 {
+		t.Errorf("text of 13.5 reports the size %v, want 14, as it is laid out", c.FontSize)
+	}
+	if len(c.Faces) < 2 || len(c.Faces[0].Data) == 0 || !strings.HasPrefix(c.Faces[0].Key, "jamb-face-") ||
+		!strings.HasPrefix(c.Faces[len(c.Faces)-1].Key, "jamb-notdef-") {
+		t.Errorf("the text area reports %d faces, want its own with its file first and the missing-glyph font last", len(c.Faces))
 	}
 }

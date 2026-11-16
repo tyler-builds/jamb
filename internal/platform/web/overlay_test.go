@@ -117,3 +117,59 @@ func TestTextareaAtCaretForMaskedField(t *testing.T) {
 		t.Errorf("a masked field's textarea takes pointer events %s, want none: it is at the caret", got)
 	}
 }
+
+// The textarea over a field lays its text out in the field's faces: the page
+// is given each face once, from the bytes jamb holds, and the textarea's
+// font-family lists them in order, a variable font at the weight it is drawn
+// at. When a face has loaded, the textarea is placed again.
+func TestTextareaInFieldFonts(t *testing.T) {
+	p := overlayPage(t, "abc")
+	g := js.Global()
+	g.Call("eval", `globalThis.FontFace = function (family, data) {
+		this.family = family; this.size = data.byteLength; this.load = () => Promise.resolve(this);
+	}`)
+	t.Cleanup(func() { g.Delete("FontFace") })
+	fonts := g.Call("eval", `({ list: [], add(f) { this.list.push(f) } })`)
+	g.Get("document").Set("fonts", fonts)
+
+	faces := []platform.FontFace{{Key: "jamb-face-7", Data: []byte{1, 2, 3}, Weight: 550}, {Key: "jamb-notdef-7", Data: []byte{4}}}
+	box := platform.Rect{X: 40, Y: 40, W: 400, H: 120}
+	caret := platform.Rect{X: 100, Y: 40, W: 2, H: 36}
+	place := func() {
+		runPosted()
+		c := p.app.context()
+		c.Box, c.TextX, c.TextY, c.FontSize, c.LineHeight, c.Faces = box, 40, 40, 28, 36, faces
+		p.w.SetTextContext(c)
+		p.w.SetTextInputRect(caret)
+	}
+	place()
+	if got, want := p.style("fontFamily"), `"jamb-face-7", "jamb-notdef-7", system-ui, sans-serif`; got != want {
+		t.Errorf("the textarea's font-family is %s, want %s", got, want)
+	}
+	if got := p.style("fontVariationSettings"); got != `"wght" 550` {
+		t.Errorf("the textarea's font-variation-settings is %s, want the weight the face is drawn at", got)
+	}
+	list := fonts.Get("list")
+	if n := list.Length(); n != 2 || list.Index(0).Get("family").String() != "jamb-face-7" ||
+		list.Index(0).Get("size").Int() != 3 || list.Index(1).Get("size").Int() != 1 {
+		t.Fatalf("the page was given %d faces, want the two, with their bytes", n)
+	}
+	// The faces loading place the textarea again, as their text lays out anew.
+	p.area.Get("style").Set("left", "moved")
+	time.Sleep(10 * time.Millisecond) // the faces' load promises
+	runPosted()
+	if got := p.style("left"); got != "40.00px" {
+		t.Errorf("after the faces loaded the textarea is at %s, want placed again at 40.00px", got)
+	}
+	// Frames with the same faces give the page none again.
+	place()
+	place()
+	if n := list.Length(); n != 2 {
+		t.Errorf("the page was given %d faces after more frames, want the two only", n)
+	}
+	// At the caret, the textarea is in the page's font again.
+	p.placed(platform.Rect{}, 0, 0, 0, 0, caret)
+	if got := p.style("fontFamily"); got != areaFontDefault || p.style("fontVariationSettings") != "normal" {
+		t.Errorf("at the caret the textarea's font is %s, %s; want %s", got, p.style("fontVariationSettings"), areaFontDefault)
+	}
+}

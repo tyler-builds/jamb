@@ -101,13 +101,27 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   wrapping and scroll), and takes the touches there, which reach the app as those on the
   canvas do: iOS moves the caret by where the text is on screen, and the keyboard's trackpad
   (a long press of the space bar, then a drag) moves the field's caret along a line and from
-  line to line. The textarea's text is transparent and set in the page's system font, so the
-  caret lands where the field's own text is only as nearly as the two fonts agree. The
-  textarea holds the field's text around the caret (up to about 2,000 bytes either side) and
-  its selection, as a phone's keyboard needs to see them:
-  it corrects words, capitalizes sentences, suggests and completes words, types a period for a
-  double space, expands text replacements, takes dictation, and its own cursor movement (a long
-  press of the space bar on an iPhone) moves the field's caret. The browser edits the textarea
+  line to line. The textarea's text, which is transparent, is set in the faces the field draws
+  with: the app gives the page the font files it holds (the Go fonts it fetched, or those
+  registered with `App.Font`), which the page does not fetch again, and the textarea lays its
+  text out as jamb does: kerning off and ligatures on, as go-text, jamb's shaper, applies them,
+  the size rounded up to whole pixels, as jamb lays text out, and a character none of the
+  field's fonts has in a font of one glyph as wide as the box jamb draws for it. So the caret
+  lands on the character drawn under the finger, and the lines break where the field's do:
+  measured in WebKit and Chromium, each boundary between two characters is within a third of
+  a pixel of jamb's. Until the page has loaded a face, the textarea is in the system font.
+  Three things still differ: a tab, which jamb draws one fixed width and the browser moves to
+  its next tab stop; the few kerning pairs go-text does apply, about a pixel each; and the
+  text of a field with marks (`TextAreaElement.Marks`, as `markdown.EditMarks`) that a mark
+  draws in another font or weight, or hides, as Markdown's syntax away from the caret, which
+  the textarea lays out in the field's own face, so that the rest of such a line can be a few
+  characters off.
+
+  The textarea holds the field's text around the caret (up to about 2,000 bytes either side)
+  and its selection, as a phone's keyboard needs to see them: it corrects words, capitalizes
+  sentences, suggests and completes words, types a period for a double space, expands text
+  replacements, takes dictation, and its own cursor movement (a long press of the space bar
+  on an iPhone) moves the field's caret. The browser edits the textarea
   as it would any, and the app takes what changed in it as an edit of the field, with undo; the
   field's text goes back to the textarea only when the app changed it, as for a key the app
   handles itself. The field's `Purpose` gives the textarea its `autocorrect`, `autocapitalize`,

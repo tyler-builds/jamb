@@ -795,7 +795,7 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 		// The box the text is laid out in, as much of it as is in view.
 		ch := max(n.lay.H-pad.Top-pad.Bottom-be.Top-be.Bottom, 0)
 		box := scene.Rect{X: cx, Y: cy, W: cw, H: ch}.Intersect(n.clip)
-		rt.textBox = textBox{box: box, x: tx, y: cy, size: st.Size, lineHeight: l.LineHeight}
+		rt.textBox = textBox{box: box, x: tx, y: cy, size: text.LayoutSize(st.Size), lineHeight: l.LineHeight}
 		rt.textBoxID = n.id
 	}
 	if focused {
