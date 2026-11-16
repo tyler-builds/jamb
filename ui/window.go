@@ -84,7 +84,7 @@ func (rt *Runtime) hostDragsAt(x, y float32) bool {
 	x, y = x/rt.zoom, y/rt.zoom
 	for _, n := range rt.hitTest(x, y) {
 		if n.div != nil && n.div.capture {
-			return !n.div.selects
+			return n.div.selects != selectsText
 		}
 	}
 	return false
@@ -112,7 +112,7 @@ func (rt *Runtime) hostLongPress(x, y float32) (taken, drags bool) {
 		if link || n.div == nil {
 			continue
 		}
-		if n.div.selects {
+		if n.div.selects == selectsText {
 			rt.wordPress = true
 			rt.PointerDown(x, y, input.ButtonLeft, 1, 0)
 			rt.wordPress = false

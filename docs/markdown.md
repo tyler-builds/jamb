@@ -19,7 +19,13 @@ ui.Div().Grow(1).ScrollY().
 embeds `ui.Composite`), so it goes straight into a tree. It is a column of blocks
 and does not scroll by itself: put it in a scrolling container, as above. Give it a
 `Key` when its place in the tree may change, since it keeps its state (the parsed
-text, the loaded images, the selections of its text).
+text, the loaded images, the selection of its text).
+
+The view's blocks are one selection: a drag selects across paragraphs, headings,
+lists, quotes, code blocks and table cells, and `Ctrl+C` copies it with a blank line
+between blocks, a line break between list items and table rows, and a tab between
+cells. To select across several views, such as the messages of a chat, put them in a
+`ui.Div().SelectAcross()` (see [Selecting across texts](text.md#selecting-across-texts)).
 
 The view parses its text once, and again only when the text changes. A view built
 on each render of its component costs a parse only when the text is new, as in a
@@ -41,7 +47,7 @@ and no part of `codeedit`.
 | Markdown | Element | For assistive technology |
 | --- | --- | --- |
 | Heading, `#` to `######` | a box with the heading's text | a heading of its level |
-| Paragraph | a selectable rich text | text |
+| Paragraph | a selectable rich text, one selection with the view's other blocks | text |
 | `*em*`, `**strong**`, `~~strike~~`, `` `code` `` | italic, bold, struck and monospace segments of the paragraph's text | part of the text |
 | Hard line break (two spaces or `\` at the end of a line) | a line break in the text | |
 | Link, reference link, autolink, `www.` link | link segments: the `Link` color, underlined under the pointer; a link whose text mixes styles is still one link (see `ui.LinkSegs`) | a link named by its whole text, one Tab stop, which Enter follows |

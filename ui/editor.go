@@ -267,7 +267,7 @@ func (rt *Runtime) buildEditor(e *editorElement, n *node, inh textStyle) {
 		rt.setOverhang(n)
 		return
 	}
-	d := &DivElement{style: s, focusable: true, capture: true, selects: true, autoFocus: e.autoFocus, handle: e.handle}
+	d := &DivElement{style: s, focusable: true, capture: true, selects: selectsText, autoFocus: e.autoFocus, handle: e.handle}
 	d.asPart(e.part)
 	if e.multiline {
 		d.KeyContext("Editor mode=full")

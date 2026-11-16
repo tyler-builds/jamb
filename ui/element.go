@@ -122,9 +122,10 @@ type DivElement struct {
 	overlay Placement
 	sized   sizeSet    // the sizes a sizing method gave the element, for the inspector (see sizing.apply)
 	area    WindowArea // see WindowArea
-	// selects is set on a text whose drag selects it: a finger's drag there
-	// scrolls instead, and its long press selects (see hostLongPress).
-	selects bool
+	// selects is selectsText on a text whose drag selects it: a finger's
+	// drag there scrolls instead, and its long press selects (see
+	// hostLongPress). It is selectsAcross on a SelectAcross element.
+	selects selectKind
 	// kidsSpring is the layout spring of the children that set none of their
 	// own (see ChildrenLayoutSpring).
 	kidsSpring Spring
@@ -153,6 +154,15 @@ type DivElement struct {
 	// cell of a DataGrid; see paintNode).
 	fillFromParent bool
 }
+
+// selectKind says how a DivElement takes part in text selection.
+type selectKind uint8
+
+const (
+	_             selectKind = iota
+	selectsText              // a text or field whose drag selects it
+	selectsAcross            // its selectable texts are one selection (see SelectAcross)
+)
 
 // Div creates an empty container. Children stack vertically (Column) unless
 // Row is called.

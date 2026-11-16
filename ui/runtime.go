@@ -78,6 +78,8 @@ type nodeState struct {
 	canvas *canvasState
 	// sel is the selection of a selectable text (see Selectable).
 	sel *textSelection
+	// group is the selection of a SelectAcross element, across its selectable texts.
+	group *groupSelection
 
 	scrollX, scrollY float32
 	targetX, targetY float32
@@ -458,6 +460,7 @@ type Runtime struct {
 	// that has keyboard focus, or 0 when the element itself has it (see tabPlace).
 	focusLink int
 	blurring  uint64 // the element whose OnBlur is running, see setFocus
+	blurTo    uint64 // where focus goes while blurring's OnBlur runs
 	// keyboardModality is true when the last input was a key press and false
 	// after a pointer press. FocusVisible styles show only while it is true.
 	keyboardModality bool
@@ -493,6 +496,7 @@ type Runtime struct {
 	pendingHandles []*FocusHandle
 	selRects       []text.Rect
 	selReported    reportedSelection // see reportTextSelection
+	selShown       uint64            // the SelectAcross element whose selection this paint shows (see shownSelectGroup)
 	textInput      scene.Rect        // caret of the focused editor, logical pixels
 	hasTextInput   bool
 	reveal         scene.Rect
@@ -1837,7 +1841,7 @@ func (rt *Runtime) buildDiv(e *DivElement, id uint64, parent *node, owner *compo
 	n.ts = inh.inherit(&n.style)
 	if e.hover != nil || e.pressed != nil || e.focused != nil || e.focusWithin != nil || n.style.Transition > 0 ||
 		n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil ||
-		n.style.Spring.Duration > 0 || e.play != nil {
+		n.style.Spring.Duration > 0 || e.play != nil || e.selects == selectsAcross {
 		n.st = rt.state(id)
 		if n.fresh() {
 			// A new element forgets any exit its ID had, and enters now, or

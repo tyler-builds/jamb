@@ -42,6 +42,11 @@ func drawingSection(t *ui.Theme) ui.Element {
 		sample(t, "Selectable text: drag, double-click, Ctrl+C",
 			ui.Div().Width(ui.Px(320)).Child(
 				ui.Text("Request failed with status 503 (Service Unavailable). Reference: 7f3a-91c2.").Selectable())),
+		sample(t, "SelectAcross: selectable texts that one drag selects across",
+			ui.Div().Width(ui.Px(320)).Gap(6).SelectAcross().
+				Child(ui.Text("Deploy failed").Semibold().Selectable()).
+				Child(ui.Text("The health check of web-2 timed out after 30 s.").Selectable()).
+				Child(ui.Text("Run ID: 4c1e-0b7d").Selectable().Mono())),
 		sample(t, "Grid: Auto, Fr(1) and Px(96) columns, a spanning field", gridSample()))
 }
 

@@ -45,7 +45,7 @@ func newBuilder(v *ViewElement, ctx *ui.Context, doc *document, images *imageCac
 
 // document returns the column of the document's blocks, with the view's sizes.
 func (b *builder) document() ui.Element {
-	root := applySizes(b.v.size, ui.Div().Style(b.st.Document))
+	root := applySizes(b.v.size, ui.Div().Style(b.st.Document).SelectAcross())
 	if b.v.label != "" {
 		root.Label(b.v.label)
 	}
