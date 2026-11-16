@@ -319,6 +319,9 @@ func (e *Engine) arrange(n *Node) {
 			cw, ch := n.Measure.Measure(max(n.W-n.padH(), 0))
 			x1 = max(x1, n.Style.Padding.Left+n.Style.Border.Left+cw)
 			y1 = max(y1, n.Style.Padding.Top+n.Style.Border.Top+ch)
+			if o, ok := n.Measure.(Overflower); ok && o.Overflows() {
+				n.ContentW, n.ContentH = x1, y1
+			}
 		}
 		n.setInk(0, 0, x1, y1)
 		return
@@ -331,7 +334,9 @@ func (e *Engine) arrange(n *Node) {
 	}
 	e.arrangeAbsolute(n)
 
-	// Scrollable extent: farthest child edge plus trailing padding.
+	// Scrollable extent: farthest child edge plus trailing padding. A child
+	// that does not clip on an axis adds what overflows its box there (the
+	// line of a NoWrap text wider than the text's box), as CSS counts it.
 	cw, ch := n.W, n.H
 	for _, c := range n.Children {
 		if c.Style.Hidden {
@@ -341,8 +346,21 @@ func (e *Engine) arrange(n *Node) {
 		if c.Style.Position == Floating {
 			continue
 		}
-		cw = max(cw, c.X+c.W+c.Style.Margin.Right+n.Style.Padding.Right+n.Style.Border.Right)
-		ch = max(ch, c.Y+c.H+c.Style.Margin.Bottom+n.Style.Padding.Bottom+n.Style.Border.Bottom)
+		// The trailing padding follows in-flow content; an absolute child ends
+		// where its box does, as in CSS, so one that fills the box (an
+		// indicator, a backdrop) does not overflow it.
+		endX, endY := n.Style.Padding.Right+n.Style.Border.Right, n.Style.Padding.Bottom+n.Style.Border.Bottom
+		if c.Style.Position == Absolute {
+			endX, endY = n.Style.Border.Right, n.Style.Border.Bottom
+		}
+		cw = max(cw, c.X+c.W+c.Style.Margin.Right+endX)
+		ch = max(ch, c.Y+c.H+c.Style.Margin.Bottom+endY)
+		if c.Style.OverflowX == OverflowVisible && c.ContentW > c.W {
+			cw = max(cw, c.X+c.ContentW+endX)
+		}
+		if c.Style.OverflowY == OverflowVisible && c.ContentH > c.H {
+			ch = max(ch, c.Y+c.ContentH+endY)
+		}
 	}
 	n.ContentW, n.ContentH = cw, ch
 

@@ -262,6 +262,11 @@ func (n *node) Baseline(width float32) (float32, bool) {
 	return 0, false
 }
 
+// Overflows implements layout.Overflower: a text is drawn past its box where its
+// lines are longer than the box is wide (a NoWrap text, an unbreakable word), so a
+// scroll container around it can scroll to them.
+func (n *node) Overflows() bool { return n.kind == kindText }
+
 // MinContentWidth implements layout.MinContenter. Text wraps, and so does a text
 // field: its min-content width is the room for fieldMinChars characters, so a field
 // does not shrink to a letter in a shrinking row. The other kinds do not wrap.

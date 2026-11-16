@@ -214,6 +214,16 @@ type MinContenter interface {
 	MinContentWidth() (width float32, wraps bool)
 }
 
+// Overflower is implemented by a leaf whose content is drawn where it runs past
+// the leaf's box, such as a text that does not wrap. When Overflows is true, the
+// leaf's ContentW and ContentH are the size of its content as Measure gives it at
+// the leaf's width, and that overflow counts toward the scrollable extent of the
+// containers it does not clip in. A leaf that draws its content inside its box
+// (an image scaled to fit, a text field that scrolls itself) does not overflow.
+type Overflower interface {
+	Overflows() bool
+}
+
 var (
 	nan = float32(math.NaN())
 	inf = float32(math.Inf(1))

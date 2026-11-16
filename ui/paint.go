@@ -284,7 +284,11 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 			rt.paintCellGrid(n, x, y, n.lay.W, n.lay.H, fg, opacity)
 		}
 	case kindText:
-		if visible {
+		// A text's lines can run past its box (a NoWrap line in a scroll
+		// container), so it is drawn when its ink reaches the clip, though its
+		// box may be scrolled out of it.
+		ink := scene.Rect{X: x + n.lay.InkX0, Y: y + n.lay.InkY0, W: n.lay.InkX1 - n.lay.InkX0, H: n.lay.InkY1 - n.lay.InkY0}
+		if visible || !ink.Intersect(clip).Empty() {
 			rt.paintText(n, x, y, n.lay.W, fg, opacity)
 		}
 	}
