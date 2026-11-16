@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/internal/scene"
 )
 
 // hitTest returns the nodes under (x, y), deepest first.
@@ -53,11 +54,24 @@ func (rt *Runtime) hit(n *node, x, y float32) bool {
 			return true
 		}
 	}
-	if (n.div == nil || !n.div.hitThrough) && n.hit.Contains(x, y) {
+	if (n.div == nil || !n.div.hitThrough) && n.hitRect().Contains(x, y) {
 		rt.hitPath = append(rt.hitPath, n)
 		return true
 	}
 	return false
+}
+
+// hitRect is the area where n takes the pointer: its hit box, and for a text
+// also the lines that run past the box (a NoWrap line in a scroll container),
+// where it is drawn (see paintNode), so that they can be clicked and selected.
+func (n *node) hitRect() scene.Rect {
+	if n.kind != kindText {
+		return n.hit
+	}
+	l := &n.lay
+	x0, y0 := n.hit.X+min(l.InkX0, 0), n.hit.Y+min(l.InkY0, 0)
+	x1, y1 := n.hit.X+max(l.InkX1, n.hit.W), n.hit.Y+max(l.InkY1, n.hit.H)
+	return scene.Rect{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}
 }
 
 // updateHover recomputes the hovered elements and fires enter/leave handlers.
@@ -497,10 +511,16 @@ func (rt *Runtime) Scroll(x, y, dx, dy float32, precise bool, mods input.Modifie
 			}
 		}
 	}
+	// Each axis scrolls the innermost container that can scroll along it, so a
+	// diagonal touchpad scroll over a box that scrolls only sideways (a code
+	// block) scrolls the box sideways and the page around it down.
 	for _, n := range path {
 		st := n.st
 		if st == nil {
 			continue
+		}
+		if dx == 0 && dy == 0 {
+			return
 		}
 		maxX := max(n.lay.ContentW-n.lay.W, 0)
 		maxY := max(n.lay.ContentH-n.lay.H, 0)
@@ -511,9 +531,11 @@ func (rt *Runtime) Scroll(x, y, dx, dy float32, precise bool, mods input.Modifie
 		}
 		if canY {
 			st.targetY = min(max(st.targetY+dy, 0), maxY)
+			dy = 0
 		}
 		if canX {
 			st.targetX = min(max(st.targetX+dx, 0), maxX)
+			dx = 0
 		}
 		if precise {
 			st.scrollX, st.scrollY = st.targetX, st.targetY
@@ -521,7 +543,6 @@ func (rt *Runtime) Scroll(x, y, dx, dy float32, precise bool, mods input.Modifie
 		rt.needPaint = true
 		rt.scrolled = true
 		rt.requestFrame()
-		return
 	}
 }
 
