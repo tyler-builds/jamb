@@ -121,3 +121,36 @@ func TestTextStyleItalicReachesTheTextSystem(t *testing.T) {
 		t.Error("text without Italic is set in the italic face")
 	}
 }
+
+// A canvas whose caret had stopped blinking draws again when the window is activated, and its
+// caret blinks from then: the activation makes its drawing stale.
+func TestCanvasCaretBlinksAgainWhenTheWindowIsActivated(t *testing.T) {
+	base := time.Now()
+	draws, on := 0, false
+	r := newEditorRig(t, func(*Context) Element {
+		return Div().Child(Canvas(func(p *Painter, w, h float32) {
+			draws++
+			on = p.CaretVisible(base)
+		}).Size(Px(100), Px(20)))
+	})
+	r.rt.clock = func() time.Time { return r.now }
+	r.now = base.Add(caretBlinkStop + time.Second)
+	r.rt.Frame(r.now)
+	before := draws
+	r.now = r.now.Add(time.Second)
+	r.rt.Frame(r.now)
+	if draws != before || !on {
+		t.Fatalf("a solid caret's canvas was drawn %d more times (caret on %v), want 0 and on", draws-before, on)
+	}
+	r.rt.hostWindowFocus(true)
+	r.now = r.now.Add(10 * time.Millisecond)
+	r.rt.Frame(r.now)
+	if draws != before+1 || !on {
+		t.Fatalf("the canvas was drawn %d times at the activation (caret on %v), want 1 and on", draws-before, on)
+	}
+	r.now = r.now.Add(r.rt.sys.CaretBlink)
+	r.rt.Frame(r.now)
+	if draws != before+2 || on {
+		t.Fatalf("the canvas was drawn %d times one blink after the activation (caret on %v), want 2 and off", draws-before, on)
+	}
+}

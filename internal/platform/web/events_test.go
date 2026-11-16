@@ -350,3 +350,39 @@ func TestFocusWithinWindow(t *testing.T) {
 		t.Error("the textarea is taken as focused after its blur")
 	}
 }
+
+// A page shown again while the window has the page's focus makes the window
+// active again, which restarts a caret's blink; a page hidden, or shown while
+// another window has the system's focus, does not.
+func TestPageShownAgainActivatesTheWindow(t *testing.T) {
+	w, got := eventWindow(t)
+	doc := js.Global().Get("document")
+	focused := true
+	hasFocus := js.FuncOf(func(js.Value, []js.Value) any { return focused })
+	t.Cleanup(hasFocus.Release)
+	doc.Set("hasFocus", hasFocus)
+
+	doc.Set("visibilityState", "hidden")
+	w.visibilityChanged()
+	runPosted()
+	if !w.pageHidden || len(*got) != 0 {
+		t.Fatalf("hidden page: pageHidden %v, events %v, want true and none", w.pageHidden, kinds(*got))
+	}
+	doc.Set("visibilityState", "visible")
+	w.visibilityChanged()
+	runPosted()
+	if w.pageHidden || !sameKinds(kinds(*got), platform.EventFocus) {
+		t.Fatalf("page shown with the focus: pageHidden %v, events %v, want false and a focus", w.pageHidden, kinds(*got))
+	}
+
+	*got = nil
+	focused = false
+	doc.Set("visibilityState", "hidden")
+	w.visibilityChanged()
+	doc.Set("visibilityState", "visible")
+	w.visibilityChanged()
+	runPosted()
+	if len(*got) != 0 {
+		t.Errorf("page shown without the system's focus: events %v, want none", kinds(*got))
+	}
+}

@@ -239,6 +239,33 @@ async function main() {
       console.log("FAIL: the focused text field's caret does not blink");
       failed = true;
     }
+
+    // The caret blinks again when the page is shown again, as when a phone
+    // comes back to the browser, though it had stopped blinking after 15
+    // seconds without input (caretBlinkStop in ui/editor.go). A headless page
+    // is never hidden, so its visibility is set by hand.
+    await gl.evaluate(() => {
+      globalThis.jambVisibility = "hidden";
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => globalThis.jambVisibility });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await gl.waitForTimeout(16000);
+    await gl.evaluate(() => {
+      globalThis.jambVisibility = "visible";
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await gl.waitForTimeout(100);
+    const shown = await gl.screenshot({ clip });
+    let again = false;
+    for (let i = 0; i < 8 && !again; i++) {
+      await gl.waitForTimeout(150);
+      again = !shown.equals(await gl.screenshot({ clip }));
+    }
+    console.log("caret blinks again when the page is shown again:", again);
+    if (!again) {
+      console.log("FAIL: the caret does not blink when the page is shown again");
+      failed = true;
+    }
   } finally {
     await browser.close();
     server.close();

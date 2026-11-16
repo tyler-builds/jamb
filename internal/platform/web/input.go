@@ -275,10 +275,7 @@ func (w *window) listen() {
 		// Some browsers show the keyboard only for a focus in a touch event.
 		w.syncTextFocus()
 	})
-	w.on(doc, "visibilitychange", func(js.Value) {
-		w.pageHidden = doc.Get("visibilityState").String() == "hidden"
-		Post(w.Wake)
-	})
+	w.on(doc, "visibilitychange", func(js.Value) { w.visibilityChanged() })
 
 	if ro := win.Get("ResizeObserver"); ro.Truthy() {
 		f := js.FuncOf(func(js.Value, []js.Value) any { Post(w.resized); return nil })
@@ -483,6 +480,29 @@ func (w *window) pointerUp(e pointerEvent) {
 	// The release is handled while its event lasts, which lets a click copy
 	// to the system's clipboard (see SetClipboard).
 	runNow(func() { w.emit(platform.Event{Kind: platform.EventMouseUp, X: x, Y: y, Button: b, Mods: m}) })
+}
+
+// visibilityChanged notes that the page went to the background or came back.
+// A page shown again with the window's focus, as when a phone comes back to the
+// browser, makes the window active again, which restarts a caret's blink: a
+// browser need not send the canvas or the textarea a focus event then.
+func (w *window) visibilityChanged() {
+	w.pageHidden = js.Global().Get("document").Get("visibilityState").String() == "hidden"
+	if !w.pageHidden && w.hasPageFocus() {
+		Post(func() { w.emit(platform.Event{Kind: platform.EventFocus}) })
+	}
+	Post(w.Wake)
+}
+
+// hasPageFocus reports whether the window has the page's focus, and the page
+// the system's: the canvas or the textarea is the focused element.
+func (w *window) hasPageFocus() bool {
+	doc := js.Global().Get("document")
+	if !doc.Call("hasFocus").Bool() {
+		return false
+	}
+	active := doc.Get("activeElement")
+	return active.Equal(w.canvas) || active.Equal(w.text.area)
 }
 
 // focusWindow gives the canvas the page's focus, unless the window has it
