@@ -560,6 +560,8 @@ type Runtime struct {
 	// touchX and touchY are where the finger went down.
 	wordPress, touchSelect bool
 	touchX, touchY         float32
+	// handles are the handles of a selection a finger made (see handles.go).
+	handles handleState
 
 	// Menus (see menu.go). ctxMenu is the open context menu. menuReturn is the
 	// focus that the open menu chain returns to when it closes. pointerFocus is

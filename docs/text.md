@@ -164,6 +164,14 @@ selection it lands in, and clears one it lands outside. The menu gives way to th
 menu of an element around the text, so selectable text in a card with a
 `ContextMenu` opens the card's menu.
 
+On a touchscreen (a page on a phone, see [web.md](web.md)), a long press selects the
+word under the finger, and the selection then shows a handle at each end, in a
+selectable text, a text field and a text area alike: a bar with a round knob, in the
+selection's color. Dragging a handle moves that end of the selection, by characters,
+past the other end too, and across the texts of a selection group. The handles go when
+the selection is cleared, and when a key, the mouse or a finger elsewhere is pressed; a
+mouse's selection has none.
+
 ### Selecting across texts
 
 `SelectAcross()` on a `Div` makes the selectable texts inside it one selection, as

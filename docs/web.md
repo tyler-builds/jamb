@@ -81,11 +81,19 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   deliberately sideways drag scrolls that element.
 - **Long press.** A finger that rests for half a second presses long. On selectable text or in
   a text field it selects the word under it, a drag without lifting selects more words, and
-  lifting opens the text's menu (Copy, Paste and the rest). Anywhere else it opens the context
-  menu of the element, as a right click does. A finger's drag over text scrolls: only a long
-  press selects.
+  lifting opens the text's menu (Copy, Paste and the rest), below the selection, or above it
+  where there is no room below. Anywhere else it opens the context menu of the element, as a
+  right click does. A finger's drag over text scrolls: only a long press selects.
   The browser keeps its own shortcuts, such as reloading the page or closing the tab. On a
   Mac, iPhone or iPad, Command is Ctrl, so Command+C copies.
+- **Selection handles.** A selection a finger made shows a handle at each end, as a phone's
+  does: a bar with a round knob, above the start and below the end, in the selection's color.
+  A finger grabs a handle within 22 pixels of it and drags that end of the selection, past the
+  other end too, across the texts of a `SelectAcross` group such as a `markdown.View`, and
+  scrolling a text area or a scroll container at its edge; the menu opens again when the
+  finger lifts. The handles go when the selection is cleared or typed over, and when a key,
+  the mouse or a finger elsewhere is pressed. A mouse's selection has none (see
+  [text.md](text.md#selectable-text)).
 - **Text input.** While a text field has focus, a hidden textarea of the page has it too, at
   the field's caret: a phone shows its keyboard, and input methods (IME) compose in the field
   and put their window by the caret. On an iPhone or an iPad the textarea lies over the

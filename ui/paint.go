@@ -35,8 +35,17 @@ func (rt *Runtime) paint(dt float32) {
 	}
 	rt.paintGhosts(dt)
 	rt.paintFlights(dt) // above the rest of the window (see Matched)
+	// A selection's handles are above its text and what is around it, and
+	// under the overlays, unless the text is in one (see handles.go).
+	overlaid := rt.handlesInOverlay()
+	if !overlaid {
+		rt.paintHandles()
+	}
 	rt.paintOverlays(view, dt)
 	rt.paintFlights(dt) // those inside overlays
+	if overlaid {
+		rt.paintHandles()
+	}
 	rt.paintDrag(view, dt)
 	if len(rt.held) > 0 {
 		// Held content whose box did not draw it has gone (see reflowSpec).
