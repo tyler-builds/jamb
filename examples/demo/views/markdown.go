@@ -11,7 +11,7 @@ import (
 
 // markdownSample is the document of the Markdown page: one of each element.
 const markdownSample = "# Markdown\n\n" +
-	"A `markdown.View` shows this text as jamb elements. Each block is *selectable* text, " +
+	"A `markdown.View` shows this text as jamb elements. Its text is *selectable*, across blocks, " +
 	"with **strong**, *emphasis*, ***both***, ~~strikethrough~~ and `inline code`.  \n" +
 	"A line ending in two spaces breaks here, and [links](https://github.com/tyler-builds/jamb) " +
 	"open with the system, as autolinks do: <https://go.dev> and www.example.com.\n\n" +

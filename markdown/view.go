@@ -10,8 +10,9 @@
 // text changes, so a view built on each render of its component costs a parse only
 // for a new text.
 //
-// Each block's text is a rich text, which the user can select and copy, one block at
-// a time. Headings are headings for assistive technology, with their levels; lists
+// Each block's text is a rich text. The view's blocks are one selection (see
+// ui.DivElement.SelectAcross): a drag selects across paragraphs, lists, code blocks
+// and tables, and Ctrl+C copies all of it. Headings are headings for assistive technology, with their levels; lists
 // are lists of items; links are links, which Tab reaches and Enter follows; a task's
 // check box reports whether it is done.
 //

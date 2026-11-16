@@ -18,6 +18,7 @@ func (rt *Runtime) paint(dt float32) {
 	rt.overlays = rt.overlays[:0]
 	rt.paintGen++
 	rt.reflowStart = false
+	rt.selShown = rt.shownSelectGroup()
 	// The focused element and its ancestors are painted even when they are off
 	// screen: the caret, the input method and revealCaret need them.
 	for n := rt.byID[rt.focusID]; n != nil; n = n.parent {

@@ -1000,9 +1000,9 @@ func (rt *Runtime) setFocus(id uint64) {
 		// Focus stays on the old element while its OnBlur runs. A focus change
 		// the handler makes then finds blurring set, so it does not call OnBlur
 		// for the same element again.
-		rt.blurring = oldID
+		rt.blurring, rt.blurTo = oldID, id
 		old.div.h.onBlur()
-		rt.blurring = 0
+		rt.blurring, rt.blurTo = 0, 0
 		// OnBlur moved focus on. That change ran the focus callbacks and restyles
 		// for its own elements, so this one stops here.
 		if rt.focusID != oldID {

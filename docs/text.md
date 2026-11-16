@@ -157,12 +157,39 @@ Tab stop, so `Ctrl+A` selects all and `Ctrl+C` or `Ctrl+Insert` copies; the acti
 are `text.select-all` and `text.copy` in the `SelectableText` key context. The
 selection is drawn in the text fields' selection colors and cleared when focus
 moves away. A click on a link in selectable rich text still follows the link.
-Selection stays within one text element; it does not run across paragraphs.
+A selection stays within one text element, unless the text is in a selection group.
 
 A right click opens a menu of Copy and Select all. It focuses the text, keeps a
 selection it lands in, and clears one it lands outside. The menu gives way to the
 menu of an element around the text, so selectable text in a card with a
 `ContextMenu` opens the card's menu.
+
+### Selecting across texts
+
+`SelectAcross()` on a `Div` makes the selectable texts inside it one selection, as
+the paragraphs of a web page are. A drag that starts in one text selects to the
+pointer through the others, in tree order: the tail of the first text, all of
+the texts between and the head of the last. Dragging upward works the same way.
+Shift+click extends the selection into another text, and `Ctrl+A` selects the whole
+group. A double-click and a triple-click still select a word and a paragraph of one
+text. In a scroll container, moving the pointer past its edge during the drag
+scrolls the text under the pointer into view, as a drag in a text area does, so the
+selection keeps growing. Only built texts take part: the rows that a `ListOf` or
+`UniformList` has not built are not in the group.
+
+```go
+ui.Div().SelectAcross().
+	Child(ui.Text(title).Semibold().Selectable()).
+	Child(ui.Text(body).Selectable())
+```
+
+Copy puts the selected part of each text on the clipboard. Texts side by side, such as
+the cells of a table row, are separated by a tab. Items of a list (`access.RoleList`,
+`RoleListItem`) and rows of a data grid are separated by a line break. Other blocks,
+such as paragraphs, are separated by a blank line. A `markdown.View` is a group of its
+own. Groups nest, and the outermost one wins, so a `SelectAcross` around several views,
+such as the messages of a chat, joins them into one selection. A selectable text in no
+group behaves as described above. `OnTextSelect` reports a group's whole selection.
 
 ## Relative time
 
