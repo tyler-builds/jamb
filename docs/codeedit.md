@@ -449,7 +449,8 @@ the font file (`ui.Painter.FontName`).
 
 The caret blinks at the system's caret blink rate, from the time of its last edit, move, click,
 focus gain, undo, redo or select all. It stays solid under reduced motion, when the system turns
-blinking off, and after about 15 seconds without activity. It is drawn only while the editor has
+blinking off, and after about 15 seconds without activity, until the window is active again (in a
+web page, also until the page is shown again). It is drawn only while the editor has
 the keyboard focus, and it schedules its next frame only then. Canvas drawings can use the same
 rule through `ui.Painter.CaretVisible`.
 
