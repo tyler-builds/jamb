@@ -68,6 +68,10 @@ type editState struct {
 	// comp is what an input method is composing here (see composition).
 	comp composition
 
+	// runs are the pieces of the last layout, for a window that lays the text
+	// out itself (see textRuns).
+	runs fieldRuns
+
 	// The marks of the value marksV, for a field with marks (see marksOf), and
 	// the syntax hidden when it was last laid out (see marksChanged).
 	marks    []TextMark
@@ -791,6 +795,16 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 		}
 	}
 
+	if focused || rt.menuHeld == n.id {
+		// The box the text is laid out in, as much of it as is in view.
+		ch := max(n.lay.H-pad.Top-pad.Bottom-be.Top-be.Bottom, 0)
+		box := scene.Rect{X: cx, Y: cy, W: cw, H: ch}.Intersect(n.clip)
+		rt.textBox = textBox{box: box, x: tx, y: cy, size: text.LayoutSize(st.Size), lineHeight: l.LineHeight}
+		if e.multiline {
+			rt.textBox.wrap = wrap
+		}
+		rt.textBoxID = n.id
+	}
 	if focused {
 		caretW := rt.caretWidth
 		caret := scene.Rect{X: tx + caretX - caretW/2, Y: cy + caretTop, W: caretW, H: l.LineHeight}

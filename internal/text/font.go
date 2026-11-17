@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"unicode"
 	"weak"
 
@@ -67,9 +68,18 @@ type Font struct {
 	// varied is set for a variable font drawn at another weight than its
 	// default one (see setWeight). Its glyphs are drawn from go-text's
 	// outlines, which apply the variations; sf and DirectWrite draw only the
-	// default instance.
+	// default instance. wght is that weight.
 	varied bool
+	wght   float32
+
+	// data is the font file, and id numbers the font among those parsed, for
+	// laying the same text out elsewhere (see System.Pieces).
+	data []byte
+	id   uint32
 }
+
+// fontIDs numbers the fonts as they are parsed.
+var fontIDs atomic.Uint32
 
 // faces maps shaping faces back to fonts, for rasterization. It holds both
 // weakly, and a font's entry is removed when the font is freed: each System
@@ -110,7 +120,7 @@ func parseFontIndex(name string, data []byte, index int) (*Font, error) {
 		}
 	}
 	f := &Font{Name: name, sf: sf, face: face, upem: float32(sf.UnitsPerEm()), faceIndex: index,
-		colorTables: hasColorTables(data, index)}
+		colorTables: hasColorTables(data, index), data: data, id: fontIDs.Add(1)}
 	var buf sfnt.Buffer
 	m, err := sf.Metrics(&buf, fixed.Int26_6(f.upem*64), font.HintingNone)
 	if err != nil {
@@ -302,7 +312,7 @@ func (f *Font) setWeight(data []byte, w Weight) error {
 		return nil // the default instance, which sf and DirectWrite draw too
 	}
 	f.face.SetVariations([]tsfont.Variation{{Tag: ot.MustNewTag("wght"), Value: float32(w)}})
-	f.varied = true
+	f.varied, f.wght = true, float32(w)
 	return nil
 }
 

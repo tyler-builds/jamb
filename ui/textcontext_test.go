@@ -1,7 +1,9 @@
 package ui_test
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/tyler-builds/jamb/internal/uihost"
 	"github.com/tyler-builds/jamb/ui"
@@ -166,5 +168,97 @@ func TestTextEditsInSingleLineAndLockedFields(t *testing.T) {
 	u.Frame()
 	if one.Get() != "a b" || secret.Get() != "abc" || ro.Get() != "fixed" {
 		t.Errorf("fields %q, %q, %q; want a b, and the masked and read-only ones unchanged", one.Get(), secret.Get(), ro.Get())
+	}
+}
+
+// The focused field reports where its text is and the faces it is drawn
+// with, for a window that lays the same text out (a page's textarea on iOS):
+// the box, its text size as jamb lays it out, whole pixels, and its face,
+// with the missing-glyph font of the face.
+func TestTextContextGeometryAndFaces(t *testing.T) {
+	msg := ui.NewSignal("Hello there")
+	u := uitest.New(t, func(ctx *ui.Context) ui.Element {
+		return ui.Div().Padding(10).Child(ui.TextArea(msg).Key("msg").Label("Message").Style(ui.Style{FontSize: 13.5}))
+	})
+	u.Get("msg").Focus()
+	u.Frame()
+	c := hostText(u).TextContext()
+	if c.Box[2] <= 0 || c.Box[3] <= 0 || c.LineHeight <= 0 {
+		t.Fatalf("the text area reports the box %v and line height %v", c.Box, c.LineHeight)
+	}
+	if c.FontSize != 14 {
+		t.Errorf("text of 13.5 reports the size %v, want 14, as it is laid out", c.FontSize)
+	}
+	if len(c.Faces) != 1 || len(c.Faces[0].Data) == 0 || !strings.HasPrefix(c.Faces[0].Key, "jamb-face-") ||
+		!strings.HasPrefix(c.Faces[0].NotdefKey, "jamb-notdef-") || len(c.Faces[0].Notdef) == 0 {
+		t.Errorf("the text area reports %d faces, want its own, with its file and its missing-glyph font", len(c.Faces))
+	}
+}
+
+// A field reports its text as runs that cover it in order: the syntax that its
+// marks hide as runs of no face and no width, a tab as a run of its own, and
+// the rest in the faces it is drawn in; and where it puts the caret.
+func TestTextContextRuns(t *testing.T) {
+	v := "Use `code` and **bold**\ttab\nnext 😀 日本"
+	msg := ui.NewSignal(v)
+	marks := func(s string) []ui.TextMark {
+		var out []ui.TextMark
+		if i := strings.Index(s, "`code`"); i >= 0 {
+			out = append(out, ui.TextMark{Start: i, End: i + 1, Syntax: true, ScopeStart: i, ScopeEnd: i + 6},
+				ui.TextMark{Start: i + 1, End: i + 5, Style: ui.Highlight{Mono: true}},
+				ui.TextMark{Start: i + 5, End: i + 6, Syntax: true, ScopeStart: i, ScopeEnd: i + 6})
+		}
+		if i := strings.Index(s, "**bold**"); i >= 0 {
+			out = append(out, ui.TextMark{Start: i, End: i + 2, Syntax: true, ScopeStart: i, ScopeEnd: i + 8},
+				ui.TextMark{Start: i + 2, End: i + 6, Style: ui.Highlight{Weight: ui.FontBold}},
+				ui.TextMark{Start: i + 6, End: i + 8, Syntax: true, ScopeStart: i, ScopeEnd: i + 8})
+		}
+		return out
+	}
+	u := uitest.New(t, func(ctx *ui.Context) ui.Element {
+		return ui.Div().Padding(10).Child(ui.TextArea(msg).Key("msg").Label("Message").Marks(marks))
+	})
+	u.Get("msg").Focus()
+	h := hostText(u)
+	h.TextSelect(len(v), len(v)) // the caret at the end: the syntax before it hides
+	u.Frame()
+	c := h.TextContext()
+	if len(c.Runs) == 0 || c.Carets == nil {
+		t.Fatalf("the field reports %d runs, carets %v", len(c.Runs), c.Carets != nil)
+	}
+	at := 0
+	byText := map[string]uihost.TextRun{}
+	for _, r := range c.Runs {
+		if r.Start != at || r.End <= r.Start {
+			t.Fatalf("a run covers %d to %d after the runs reached %d", r.Start, r.End, at)
+		}
+		at = r.End
+		byText[v[r.Start:r.End]] = r
+	}
+	if at != len(v) {
+		t.Fatalf("the runs end at %d of %d", at, len(v))
+	}
+	for _, s := range []string{"`", "**"} {
+		if r, ok := byText[s]; !ok || r.Face != -1 || r.Width != 0 {
+			t.Errorf("the hidden %q is the run %+v (found %v), want one of no face and no width", s, r, ok)
+		}
+	}
+	if r := byText["\t"]; r.Kind != 1 || r.Width <= 0 {
+		t.Errorf("the tab is the run %+v, want a tab run with its width", r)
+	}
+	code, bold, plain := byText["code"], byText["bold"], byText["Use "]
+	if code.Face == plain.Face || bold.Face == plain.Face || code.Face < 0 || code.Face >= len(c.Faces) {
+		t.Errorf("code is in face %d, bold in %d, plain text in %d of %d; want each in its own", code.Face, bold.Face, plain.Face, len(c.Faces))
+	}
+	if r := byText["\n"]; r.Kind != 2 {
+		t.Errorf("the line break is the run %+v, want a break", r)
+	}
+	carets := c.Carets(0, len(v))
+	if n := utf8.RuneCountInString(v) + 1; len(carets) != n || carets[len(carets)-1].Line != 1 {
+		t.Errorf("the field gives %d carets, the last on line %d; want one at each of %d boundaries, the last on the second line",
+			len(carets), carets[len(carets)-1].Line, n)
+	}
+	if c.WrapWidth <= 0 {
+		t.Errorf("a text area's lines wrap at %v", c.WrapWidth)
 	}
 }

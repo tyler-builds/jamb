@@ -82,6 +82,11 @@ func (rt *Runtime) hostWindowAreaAt(x, y float32) WindowArea {
 // everywhere on a phone, and its long press selects (see hostLongPress).
 func (rt *Runtime) hostDragsAt(x, y float32) bool {
 	x, y = x/rt.zoom, y/rt.zoom
+	// A selection's handle takes the drag (see startHandleDrag).
+	if rt.handleAt(x, y) >= 0 {
+		rt.handles.pending = true
+		return true
+	}
 	for _, n := range rt.hitTest(x, y) {
 		if n.div != nil && n.div.capture {
 			return n.div.selects != selectsText
@@ -121,6 +126,9 @@ func (rt *Runtime) hostLongPress(x, y float32) (taken, drags bool) {
 			rt.pressSeg = segRef{}
 			// A press on the text's scroll bar drags the bar instead.
 			rt.touchSelect, rt.touchX, rt.touchY = !rt.sbDrag.active, lx, ly
+			if rt.touchSelect {
+				rt.showHandles()
+			}
 			return true, true
 		}
 		if n.div.capture || n.div.overlay != 0 {

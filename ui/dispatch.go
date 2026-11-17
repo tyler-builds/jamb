@@ -260,6 +260,10 @@ func (rt *Runtime) mouseEvent(n *node, x, y float32) *MouseEvent {
 func (rt *Runtime) PointerMove(x, y float32, mods input.Modifiers) {
 	x, y = x/rt.zoom, y/rt.zoom
 	rt.mouseX, rt.mouseY, rt.mouseIn = x, y, true
+	if rt.handles.dragging {
+		// The dragged end follows the point on its line that the finger held.
+		x, y = x+rt.handles.dx, y+rt.handles.dy
+	}
 	if rt.picking() {
 		rt.pickMove(x, y)
 		return
@@ -311,6 +315,14 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 	x, y = x/rt.zoom, y/rt.zoom
 	rt.mouseX, rt.mouseY, rt.mouseIn = x, y, true
 	rt.touchSelect = false
+	// A finger that went down on a selection's handle drags it (see
+	// hostDragsAt); any other press takes the handles away.
+	pending := rt.handles.pending
+	rt.handles.pending = false
+	if pending && b == input.ButtonLeft && !rt.wordPress && rt.startHandleDrag(x, y) {
+		return
+	}
+	rt.hideHandles()
 	if rt.picking() {
 		rt.pickPress(x, y)
 		return
@@ -403,6 +415,10 @@ func (rt *Runtime) PointerDown(x, y float32, b input.MouseButton, clicks int, mo
 func (rt *Runtime) PointerUp(x, y float32, b input.MouseButton, mods input.Modifiers) {
 	x, y = x/rt.zoom, y/rt.zoom
 	rt.mouseX, rt.mouseY = x, y
+	if rt.handles.dragging && b == input.ButtonLeft {
+		rt.endHandleDrag(x, y)
+		return
+	}
 	if rt.picking() {
 		return // the press was the pick; its release is not the app's
 	}
@@ -452,8 +468,7 @@ func (rt *Runtime) PointerUp(x, y float32, b input.MouseButton, mods input.Modif
 		rt.setPressed(nil)
 		rt.pressSeg = segRef{}
 		if rt.ctxMenu == nil {
-			rt.pointerFocus = rt.focusID
-			rt.openPointerMenu(append([]*node(nil), rt.hitTest(rt.touchX, rt.touchY)...), x, y)
+			rt.openTouchMenu(append([]*node(nil), rt.hitTest(rt.touchX, rt.touchY)...), x, y)
 		}
 		return
 	}
@@ -670,6 +685,9 @@ func (rt *Runtime) KeyDown(k input.Key, mods input.Modifiers, repeat bool) {
 	rt.altArmed = k == input.KeyUnknown && mods == input.ModAlt
 	if k != input.KeyUnknown {
 		rt.setKeyboardModality(true)
+		if rt.ctxMenu == nil {
+			rt.hideHandles() // a key the open menu takes leaves them
+		}
 	}
 	if rt.drag.active && k == input.KeyEscape {
 		rt.cancelDrag() // Escape cancels a drag before any binding sees it

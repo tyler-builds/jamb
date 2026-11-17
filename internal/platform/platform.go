@@ -190,6 +190,80 @@ type TextContext struct {
 	// the Enter key does in the field, for its label on a phone's keyboard.
 	Multiline bool
 	Enter     EnterKey
+	// Box is where the field shows its text, in physical pixels relative to
+	// the client area: the box its lines are laid out in, as much of it as is
+	// in view. TextX and TextY are where its text starts, the left of its lines
+	// and the top of the first, which lie outside Box when the field has
+	// scrolled its text. FontSize is the size of its text and LineHeight the
+	// distance between its lines, in physical pixels. A window whose input
+	// methods find places in the text by where they are on screen, as an
+	// iPhone's keyboard moves the caret, lays the text out there. Box is empty
+	// when the field reports none, as an element that takes text itself does.
+	Box                  Rect
+	TextX, TextY         float32
+	FontSize, LineHeight float32
+	// WrapWidth is the width, in physical pixels, at which the field's lines
+	// wrap, or 0 for a field whose lines do not.
+	WrapWidth float32
+	// Runs are the field's text as the field lays it out, in pieces that
+	// cover it in order, and Faces the font files they are in: a window that
+	// lays each piece out in turn, in its face at FontSize with the font's
+	// own advances (no kerning) and Spacing after each character, a tab as a
+	// box Width wide, a run of no face as nothing, and a break as the end of
+	// a line, and wraps at WrapWidth, puts each character where the field
+	// does. They are the same slices while the field's layout is. Runs is nil
+	// for a field that reports none.
+	Runs  []TextRun
+	Faces []FontFace
+	// Carets returns where the field puts the caret at each character
+	// boundary of its text from the byte start to end, for checking a window
+	// that lays the text out. Nil when Runs is.
+	Carets func(start, end int) []TextCaret
+}
+
+// TextRunKind is what a TextRun is.
+type TextRunKind uint8
+
+// The kinds of TextRun, as text.PieceKind numbers them.
+const (
+	RunText TextRunKind = iota
+	RunTab
+	RunBreak
+	RunNone
+)
+
+// TextRun is a piece of a field's text: the bytes from Start to End of
+// TextContext.Text, on the line Line (0 the first), in Faces[Face] or in no
+// face (-1). Width is its advance, and Spacing what is added after each of
+// its characters to its font's advance, in physical pixels.
+type TextRun struct {
+	Start, End, Line, Face int
+	Kind                   TextRunKind
+	Width, Spacing         float32
+}
+
+// TextCaret is where a field puts its caret at the byte Offset of its text: X
+// physical pixels from the start of its lines, on the line Line.
+type TextCaret struct {
+	Offset int
+	X      float32
+	Line   int
+}
+
+// FontFace is a font file a text is drawn with (see TextContext.Faces).
+type FontFace struct {
+	// Key names the face: the same for the same face, and unique to it.
+	Key string
+	// Data is the font file, which must not be changed.
+	Data []byte
+	// Weight is where a variable font is drawn on its weight axis, or 0 for
+	// its default instance.
+	Weight float32
+	// NotdefKey and Notdef are a font for the characters the face lacks, of
+	// one empty glyph as wide as the face's missing glyph, the box the field
+	// draws for them.
+	NotdefKey string
+	Notdef    []byte
 }
 
 // TextPurpose is what a text field holds, for input methods (see TextContext).

@@ -521,6 +521,7 @@ type contextMenu struct {
 	id       uint64 // the element it is open on
 	host     uint64 // the element it hangs from (see menuHost)
 	x, y     float32
+	h        float32 // the height it hangs from, below and else above (see openTouchMenu)
 	items    []MenuItem
 	keyboard bool   // opened from the keyboard: the first item is highlighted
 	label    string // the name of the element it is open on, for the menu's name
@@ -895,7 +896,7 @@ func contextMenuAt(rt *Runtime, c *contextMenu) Element {
 	// A press in the menu goes no further than the menu: not to the element it
 	// hangs from, whose own press handling (a code editor placing its caret) is
 	// for presses on it.
-	return Div().Key(contextMenuKey).Absolute().Left(c.x).Top(c.y).Size(Px(0), Px(0)).
+	return Div().Key(contextMenuKey).Absolute().Left(c.x).Top(c.y).Size(Px(0), Px(c.h)).
 		OnMouseDown(func(e *MouseEvent) { e.StopPropagation() }).Child(
 		Component(func(ctx *Context) Element {
 			m := &menuView{ctx: ctx, t: ctx.Theme(), items: c.items,

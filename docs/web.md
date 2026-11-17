@@ -81,25 +81,56 @@ the page, or in a `<canvas id="jamb">` when the page has one.
   deliberately sideways drag scrolls that element.
 - **Long press.** A finger that rests for half a second presses long. On selectable text or in
   a text field it selects the word under it, a drag without lifting selects more words, and
-  lifting opens the text's menu (Copy, Paste and the rest). Anywhere else it opens the context
-  menu of the element, as a right click does. A finger's drag over text scrolls: only a long
-  press selects.
+  lifting opens the text's menu (Copy, Paste and the rest), below the selection, or above it
+  where there is no room below. Anywhere else it opens the context menu of the element, as a
+  right click does. A finger's drag over text scrolls: only a long press selects.
   The browser keeps its own shortcuts, such as reloading the page or closing the tab. On a
   Mac, iPhone or iPad, Command is Ctrl, so Command+C copies.
+- **Selection handles.** A selection a finger made shows a handle at each end, as a phone's
+  does: a bar with a round knob, above the start and below the end, in the selection's color.
+  A finger grabs a handle within 22 pixels of it and drags that end of the selection, past the
+  other end too, across the texts of a `SelectAcross` group such as a `markdown.View`, and
+  scrolling a text area or a scroll container at its edge; the menu opens again when the
+  finger lifts. The handles go when the selection is cleared or typed over, and when a key,
+  the mouse or a finger elsewhere is pressed. A mouse's selection has none (see
+  [text.md](text.md#selectable-text)).
 - **Text input.** While a text field has focus, a hidden textarea of the page has it too, at
   the field's caret: a phone shows its keyboard, and input methods (IME) compose in the field
-  and put their window by the caret. The textarea holds the field's text around the caret (up
-  to about 2,000 bytes either side) and its selection, as a phone's keyboard needs to see them:
-  it corrects words, capitalizes sentences, suggests and completes words, types a period for a
-  double space, expands text replacements, takes dictation, and its own cursor movement (a long
-  press of the space bar on an iPhone) moves the field's caret. The browser edits the textarea
-  as it would any, and the app takes what changed in it as an edit of the field, with undo; the
-  field's text goes back to the textarea only when the app changed it, as for a key the app
-  handles itself. The field's `Purpose` gives the textarea its `autocorrect`, `autocapitalize`,
-  `spellcheck` and `inputmode` (see [widgets-forms.md](widgets-forms.md)), and its Enter its
-  `enterkeyhint`: a new line in a `TextArea`, Go for a field with `OnSubmit`, Search for a search,
-  and Done otherwise. A `Masked` field, one with a `Format`, a read-only one and an element that
-  takes text itself, such as a code editor, show the keyboard no text, and correct nothing.
+  and put their window by the caret. On an iPhone or an iPad, an editable element
+  (`contenteditable`, plain text only) takes the textarea's place and lies over the field's
+  text, and takes the touches there, which reach the app as those on the canvas do: iOS moves
+  the caret by where the text is on screen, and the keyboard's trackpad (a long press of the
+  space bar, then a drag) moves the field's caret along a line and from line to line. The
+  element's text, which is transparent, is laid out from the field's own layout: each piece in
+  a span in the face the field draws it in (the font files the app holds, the Go fonts it
+  fetched or those registered with `App.Font`, given to the page, which fetches nothing
+  again), at the size the field lays its text out at; the kerning jamb applies, and the
+  rounding of its advances once it adds up, as the spacing of a character; the syntax that a
+  field's marks hide (`TextAreaElement.Marks`, as `markdown.EditMarks`) in spans of no width;
+  a tab as a box of the width the field gives it; a character none of the field's fonts has in
+  a font of one glyph as wide as the box the field draws for it; and lines that wrap at the
+  field's width. So the caret lands on the character drawn under the finger, in plain text and
+  in code, bold, italic, headings, links, lists, quotes and fenced code alike, and the lines
+  break where the field's do: measured in WebKit and Chromium, each boundary between two
+  characters is within half a pixel of the field's (`scripts/web/browser.cjs` checks it, with
+  `jambEnv.JAMB_TEXT_LAYOUT = "1"`, which has the app give the element the field's carets).
+  Until the page has loaded a face, its pieces are in the system font. A page without the host
+  script, as a build with Go makes, keeps the textarea at the caret.
+
+  The textarea, or the element, holds the field's text around the caret (up to about 2,000
+  bytes either side, from the start of a line) and its selection, as a phone's keyboard needs
+  to see them: it corrects words, capitalizes sentences, suggests and completes words, types a
+  period for a double space, expands text replacements, takes dictation, and its own cursor
+  movement (a long press of the space bar on an iPhone) moves the field's caret. The browser
+  edits it as it would any, and the app takes what changed in its text as an edit of the field,
+  with undo; the field's text goes back to it only when the app changed it, as for a key the
+  app handles itself. The element is split into its spans again after an edit, keeping those
+  whose text is as it should be, so that the browser's own edit stands. The field's `Purpose`
+  gives the textarea its `autocorrect`, `autocapitalize`, `spellcheck` and `inputmode` (see
+  [widgets-forms.md](widgets-forms.md)), and its Enter its `enterkeyhint`: a new line in a
+  `TextArea`, Go for a field with `OnSubmit`, Search for a search, and Done otherwise. A
+  `Masked` field, one with a `Format`, a read-only one and an element that takes text itself,
+  such as a code editor, show the keyboard no text, and correct nothing.
 - **Clipboard.** Copying writes the system's clipboard, text or an image
   (`ctx.SetClipboardImage`), and pasting into a text field with Ctrl+V (or the browser's paste)
   reads it: its text, or else its image, such as a screenshot, which a field's `OnPasteImage`
@@ -163,5 +194,5 @@ listens for itself.
 
 ## Not there yet
 
-Message boxes, saving a file, picking a folder, files dropped on the page, second windows, pinch
-zoom, and handles that adjust a selection after the finger has lifted.
+Message boxes, saving a file, picking a folder, files dropped on the page, second windows and pinch
+zoom.

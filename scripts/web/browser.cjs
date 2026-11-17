@@ -9,10 +9,18 @@
 //   - the textarea holds the field's text and caret, so a phone's keyboard can
 //     correct and complete words: the edits it makes there, as iOS Safari
 //     sends them, and an input method's composition, reach the field, and the
-//     app's own edits and caret come back to the textarea.
+//     app's own edits and caret come back to the textarea;
+//   - on an iPhone (its user agent), an editable element lies over the focused
+//     field and lays its text out as the field does: in the page of fields
+//     (internal/webcheck/fields), each case of overlayCases is typed into a
+//     field, and the element is scanned as iOS's keyboard trackpad hit-tests
+//     it, along each line, against where the field puts its caret at every
+//     character boundary, which the page asks the app for
+//     (jambEnv.JAMB_TEXT_LAYOUT).
 //
-// Usage: node browser.cjs DIR X Y, where DIR is the page and X, Y is a point of
-// a text field in its first view, in CSS pixels of a 1280×800 page.
+// Usage: node browser.cjs DIR X Y FIELDS, where DIR is the page and X, Y is a
+// point of a text field in its first view, in CSS pixels of a 1280×800 page,
+// and FIELDS is the page of fields.
 "use strict";
 
 const http = require("http");
@@ -20,7 +28,7 @@ const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
 
-const [dir, fieldX, fieldY] = [process.argv[2], Number(process.argv[3]), Number(process.argv[4])];
+const [dir, fieldX, fieldY, fieldsDir] = [process.argv[2], Number(process.argv[3]), Number(process.argv[4]), process.argv[5]];
 const types = { ".html": "text/html", ".js": "text/javascript", ".wasm": "application/wasm" };
 
 // The largest difference allowed between the renderers, per channel, and how
@@ -28,9 +36,9 @@ const types = { ".html": "text/html", ".js": "text/javascript", ".wasm": "applic
 const maxDelta = 8;
 const maxOff = 0.001;
 
-function serve() {
+function serve(root = dir) {
   const server = http.createServer((req, res) => {
-    const name = path.join(dir, decodeURIComponent(new URL(req.url, "http://x").pathname));
+    const name = path.join(root, decodeURIComponent(new URL(req.url, "http://x").pathname));
     const file = name.endsWith(path.sep) ? path.join(name, "index.html") : name;
     fs.readFile(file, (err, data) => {
       if (err) {
@@ -164,6 +172,189 @@ async function mirrors(page, sessionPromise) {
   return ok;
 }
 
+// overlayCases are the texts typed into the fields of the page of fields, by
+// the fields they go in (0 a text input, 1 a text area, 2 one with Markdown's
+// marks, 3 one with text of 18 pixels), whose layout in the editable element
+// is compared with the field's: plain text, which drifts from go-text's
+// rounding of advances; tabs; characters no font of the page has, which the
+// field draws as boxes; lines that wrap; paragraphs; and Markdown, whose code
+// is monospace, whose syntax hides away from the caret, and whose headings
+// are bold.
+const overlayCases = [
+  [[0, 1, 3], "The quick brown fox jumps over the lazy dog. To wove fox."],
+  [[0, 1], "a\tb\tc  two  spaces\tend"],
+  [[1], "Thanks 😀 that works 👍🏽 ok 🇺🇸 done 日本語のテキスト"],
+  [[1, 3], "When the session expires the client retries the request once with a fresh token, and if that fails it signs the user out and shows why."],
+  [[1], "first line\nsecond line is a bit longer than the first one\n\nafter a blank line"],
+  [[2], "Use `ctx.Done()` and **bold** then *italic* and ~~gone~~ plain [link](https://x.y) end"],
+  [[2], "# A heading line\n## Smaller heading\nplain after"],
+  [[2], "```go\nfunc main() {\n\tfmt.Println(\"hi\")\n}\n```\nafter the fence"],
+  [[2], "- item one\n- item **two** here\n> quoted *text* here"],
+  [[2], "A long paragraph with `inline code` and **bold words** and *italic ones* that wraps over several lines, with a [link](https://example.com) and `code` at the end."],
+];
+
+// overlayMax is the largest difference allowed, in CSS pixels, between where
+// the element puts the boundary between two characters, the point at which
+// caretPositionFromPoint goes from the one's offset to the other's, and the
+// middle of the field's two carets there. The scan steps by a quarter pixel.
+const overlayMax = 0.5;
+
+// overlayScan scans the focused editable element along each line of the
+// field's carets (from its data-jamb-carets) and returns the largest
+// difference from them, where, and how many boundaries the element has on
+// another line than the field.
+function overlayScan() {
+  const a = document.activeElement, st = a.style, saved = [st.height, st.width];
+  const raw = a.getAttribute("data-jamb-carets");
+  if (!raw) return null;
+  const r0 = a.getBoundingClientRect();
+  st.height = st.width = "3000px"; // the scan reaches lines out of the field's view
+  const r = a.getBoundingClientRect();
+  const off = (node, o) => {
+    if (!a.contains(node)) return -1;
+    const g = document.createRange();
+    g.selectNodeContents(a);
+    g.setEnd(node, o);
+    return g.toString().length;
+  };
+  const lines = new Map();
+  for (const t of raw.split(",")) {
+    const [o, x, y] = t.split(" ").map(Number);
+    const k = (r0.top + y).toFixed(2);
+    if (!lines.has(k)) lines.set(k, []);
+    lines.get(k).push([o, r0.left + x]);
+  }
+  const keys = [...lines.keys()].sort((p, q) => p - q);
+  const lineOf = new Map();
+  keys.forEach((k, i) => { for (const [o] of lines.get(k)) lineOf.set(o, i); });
+  let worst = 0, where = "", moved = 0;
+  keys.forEach((k, li) => {
+    const cs = lines.get(k), xs = new Map(cs);
+    const lo = Math.min(...cs.map((c) => c[1])) - 4, hi = Math.max(...cs.map((c) => c[1])) + 4;
+    let prev = null;
+    const runs = [];
+    for (let x = lo; x <= hi; x += 0.25) {
+      const cp = document.caretPositionFromPoint(x, Number(k));
+      const o = cp ? off(cp.offsetNode, cp.offset) : -1;
+      if (o !== prev) {
+        runs.push([x, o]);
+        prev = o;
+      }
+    }
+    for (let i = 1; i < runs.length; i++) {
+      const [xb, b] = runs[i], p = runs[i - 1][1];
+      if (p < 0 || b <= p) continue;
+      if (!xs.has(p) || !xs.has(b)) {
+        // The offset of a soft wrap is on the end of one line and the start of the next.
+        const lp = lineOf.get(p), lb = lineOf.get(b);
+        if (!((lp === li || lp === li - 1) && (lb === li || lb === li + 1))) moved++;
+        continue;
+      }
+      if (Math.abs(xs.get(p) - xs.get(b)) < 0.01) continue; // text of no width between, as hidden syntax
+      const d = Math.abs(xb - (xs.get(p) + xs.get(b)) / 2);
+      if (d > worst) {
+        worst = d;
+        where = `line ${li + 1}, between the offsets ${p} and ${b}`;
+      }
+    }
+  });
+  st.height = saved[0];
+  st.width = saved[1];
+  const g = document.createRange();
+  g.selectNodeContents(a);
+  return { worst, where, moved, text: g.toString() };
+}
+
+// overlay opens the page of fields as an iPhone's browser, types each case of
+// overlayCases into its fields, and checks that the editable element over the
+// field lays it out as the field does (see overlayScan). It reports whether
+// every case passed.
+async function overlay(browser, url) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true,
+    isMobile: true, userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" });
+  await ctx.addInitScript(() => { window.jambEnv = Object.assign(window.jambEnv || {}, { JAMB_TEXT_LAYOUT: "1" }); });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto(url);
+  await page.waitForSelector("canvas", { timeout: 60000 });
+  await page.waitForTimeout(2000);
+  let ok = true;
+  for (const [fields, text] of overlayCases) {
+    for (const f of fields) {
+      await page.touchscreen.tap(250, 16 + f * 120 + 12);
+      await page.waitForTimeout(300);
+      await page.evaluate(() => getSelection().selectAllChildren(document.activeElement));
+      const lines = text.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (i) {
+          await page.keyboard.press("Enter");
+          await page.waitForTimeout(150);
+        }
+        if (lines[i]) await page.keyboard.insertText(lines[i]);
+        else if (i === 0) await page.keyboard.press("Backspace");
+      }
+      // Selecting all of the field is the browser's change of the element's
+      // selection, after which the element keeps its text where it is for
+      // half a second (see browserSelSettle), as during the keyboard's trackpad.
+      await page.waitForTimeout(700);
+      await page.evaluate(() => document.fonts.ready);
+      const r = await page.evaluate(overlayScan);
+      const pass = r && r.worst <= overlayMax && r.moved === 0 && r.text === text;
+      ok = ok && pass;
+      const name = JSON.stringify(text.length > 40 ? text.slice(0, 40) + "…" : text);
+      if (!r) console.log(`FAIL: field ${f}, ${name}: the element is not laid out from the field (no data-jamb-carets)`);
+      else console.log(`${pass ? "ok" : "FAIL"}: field ${f}, ${name}: boundaries within ${r.worst.toFixed(2)} px` +
+        (r.worst > overlayMax ? ` (${r.where})` : "") + (r.moved ? `, ${r.moved} on another line` : "") +
+        (r.text !== text ? `, and the field holds ${JSON.stringify(r.text)}` : ""));
+    }
+  }
+  // With the editable element focused, as on an iPhone, the caret blinks
+  // again when the page is shown again, as with the textarea.
+  await page.touchscreen.tap(250, 16 + 120 + 12);
+  await page.waitForTimeout(300);
+  const focused = await page.evaluate(() => document.activeElement.getAttribute("contenteditable"));
+  if (focused !== "plaintext-only") {
+    console.log("FAIL: on an iPhone the focused text field's element is not the editable element");
+    ok = false;
+  }
+  if (!(await blinksAgain(page, { x: 16, y: 136, width: 340, height: 100 }, "the editable element's field"))) ok = false;
+  if (errors.length) {
+    console.log("FAIL: the page of fields reported errors:\n" + errors.join("\n"));
+    ok = false;
+  }
+  await ctx.close();
+  return ok;
+}
+
+// blinksAgain reports whether the caret of the focused field, in clip of the
+// page, blinks again when the page is shown again, as when a phone comes back
+// to the browser, though it had stopped blinking after 15 seconds without
+// input (caretBlinkStop in ui/editor.go). A headless page is never hidden, so
+// its visibility is set by hand.
+async function blinksAgain(page, clip, what) {
+  await page.evaluate(() => {
+    globalThis.jambVisibility = "hidden";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => globalThis.jambVisibility });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.waitForTimeout(16000);
+  await page.evaluate(() => {
+    globalThis.jambVisibility = "visible";
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.waitForTimeout(100);
+  const shown = await page.screenshot({ clip });
+  let again = false;
+  for (let i = 0; i < 8 && !again; i++) {
+    await page.waitForTimeout(150);
+    again = !shown.equals(await page.screenshot({ clip }));
+  }
+  console.log(`caret blinks again when the page is shown again, in ${what}:`, again);
+  if (!again) console.log(`FAIL: the caret of ${what} does not blink when the page is shown again`);
+  return again;
+}
+
 async function main() {
   const server = await serve();
   const url = `http://127.0.0.1:${server.address().port}/`;
@@ -240,31 +431,16 @@ async function main() {
       failed = true;
     }
 
-    // The caret blinks again when the page is shown again, as when a phone
-    // comes back to the browser, though it had stopped blinking after 15
-    // seconds without input (caretBlinkStop in ui/editor.go). A headless page
-    // is never hidden, so its visibility is set by hand.
-    await gl.evaluate(() => {
-      globalThis.jambVisibility = "hidden";
-      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => globalThis.jambVisibility });
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    await gl.waitForTimeout(16000);
-    await gl.evaluate(() => {
-      globalThis.jambVisibility = "visible";
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    await gl.waitForTimeout(100);
-    const shown = await gl.screenshot({ clip });
-    let again = false;
-    for (let i = 0; i < 8 && !again; i++) {
-      await gl.waitForTimeout(150);
-      again = !shown.equals(await gl.screenshot({ clip }));
-    }
-    console.log("caret blinks again when the page is shown again:", again);
-    if (!again) {
-      console.log("FAIL: the caret does not blink when the page is shown again");
-      failed = true;
+    // The caret blinks again when the page is shown again (see blinksAgain).
+    if (!(await blinksAgain(gl, clip, "the text field"))) failed = true;
+
+    // On an iPhone the editable element lies over the field, laid out as the
+    // field lays its text out (see overlay).
+    const fieldsServer = await serve(fieldsDir);
+    try {
+      if (!(await overlay(browser, `http://127.0.0.1:${fieldsServer.address().port}/`))) failed = true;
+    } finally {
+      fieldsServer.close();
     }
   } finally {
     await browser.close();

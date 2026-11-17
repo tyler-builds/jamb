@@ -51,6 +51,19 @@ func (w *window) hostSetText(text string, start, end int, backward, value bool) 
 	w.host.Call("setText", n, start, end, flag(backward), flag(value))
 }
 
+// hostLayout has the host script lay the editable element's text out as desc
+// describes it (see layoutDesc). The description goes through hostText, in
+// pieces when it is longer.
+func (w *window) hostLayout(desc string) {
+	for len(desc) > len(hostText) {
+		k := runeStart(desc, len(hostText))
+		copy(hostText[:], desc[:k])
+		w.host.Call("textPart", k)
+		desc = desc[k:]
+	}
+	w.host.Call("layout", copy(hostText[:], desc))
+}
+
 // hostWindow returns the page's window while the host script delivers its
 // events.
 func hostWindow() *window {
@@ -58,13 +71,6 @@ func hostWindow() *window {
 		return nil
 	}
 	return windows[0]
-}
-
-func flag(b bool) int32 {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 // The functions below are what the host script calls. They are exported the

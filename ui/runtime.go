@@ -15,6 +15,7 @@ import (
 	"github.com/tyler-builds/jamb/internal/layout"
 	"github.com/tyler-builds/jamb/internal/scene"
 	"github.com/tyler-builds/jamb/internal/text"
+	"github.com/tyler-builds/jamb/internal/uihost"
 )
 
 type nodeKind uint8
@@ -511,6 +512,13 @@ type Runtime struct {
 	sbDrag         scrollDrag
 	sbScratch      []scrollbar
 
+	// textBox is where the focused editor shows its text, as its paint
+	// recorded it, for a window that lays the text out there (see
+	// hostTextContext); textBoxID is the editor, 0 when none.
+	textBox   textBox
+	textBoxID uint64
+	caretsFn  func(start, end int) []uihost.Caret // fieldCarets, made once
+
 	// Floating overlays and click-outside listeners found by the last paint.
 	overlays []overlayItem
 	outside  []*node
@@ -558,6 +566,8 @@ type Runtime struct {
 	// touchX and touchY are where the finger went down.
 	wordPress, touchSelect bool
 	touchX, touchY         float32
+	// handles are the handles of a selection a finger made (see handles.go).
+	handles handleState
 
 	// Menus (see menu.go). ctxMenu is the open context menu. menuReturn is the
 	// focus that the open menu chain returns to when it closes. pointerFocus is
@@ -1160,7 +1170,7 @@ func (rt *Runtime) layout() {
 func (rt *Runtime) paintFrame(dt float32) {
 	t0 := time.Now()
 	rt.markAccess() // paint moves nodes (scrolling) and records which are drawn
-	rt.hasTextInput = false
+	rt.hasTextInput, rt.textBoxID = false, 0
 	rt.imageDue = time.Time{} // the animated images drawn now set it again
 	// So do the delayed motions.
 	rt.motionDue = time.Time{}
