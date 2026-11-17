@@ -57,9 +57,10 @@ func (l *ListElement) GridSpan(cols, rows int) *ListElement { l.size.setSpan(col
 // ListOf creates a scrolling list of items whose rows may differ in height.
 // Only rows near the viewport are built. Each row's height is measured once
 // it is built and remembered by its key; rows not yet seen are estimated from
-// the mean of the measured ones. The scroll position stays on the item at the
-// top of the viewport, so measurements, inserts and removals above it do not
-// make the view jump.
+// the mean of the measured ones. The scroll position stays on the first row on
+// screen that was already measured, so measurements, inserts and removals above
+// it, and the rows coming into view as the list scrolls, do not make the view
+// jump.
 //
 // row gets the item and its index in items, as Map's function does, for
 // striping or a position such as "3 of 10".
@@ -147,8 +148,12 @@ type varState struct {
 	builtFrom, built int // rows the last expand built, [builtFrom, built)
 	// rows are the rows of the window that the last expand built, by key, for the
 	// list element rowsFor (see expand).
-	rowsFor  *ListElement
-	rows     map[string]*vRow
+	rowsFor *ListElement
+	rows    map[string]*vRow
+	// laid holds the keys of the rows of the window that have been laid out
+	// and measured since they came into it: they are drawn where the list
+	// places them (see capture).
+	laid     map[string]bool
 	inner    float32 // viewport height inside the padding, from the last paint
 	top      float32 // offset of the spacer in the scroll container
 	pad      float32 // space above the rows (Bottom)
@@ -218,13 +223,13 @@ func (vs *varState) end() float64 {
 	return max(vs.hidx.total()+float64(vs.pad)-float64(vs.inner), 0)
 }
 
-// vAnchor is the item at the top of the viewport, taken before the items or
-// their heights change. restore moves the scroll position so that the item
-// keeps its place on screen.
+// vAnchor is an item on screen, taken before the items or their heights
+// change. restore moves the scroll position so that the item keeps its place
+// on screen.
 type vAnchor struct {
 	key   string
 	idx   int
-	off   float32 // distance from the item's top to the scroll offset
+	off   float32 // distance from the item's top to the painted scroll offset
 	ok    bool
 	atEnd bool    // the list was at its end: it stays there
 	end   float64 // its end offset, see varState.end
@@ -243,33 +248,53 @@ func (vs *varState) capture(st *nodeState, atEnd bool) vAnchor {
 	if vs.count == 0 || vs.pad > 0 {
 		return a // nothing to anchor: the rows fit in the viewport
 	}
-	y := float64(st.targetY - vs.top)
+	// The anchor is what the user sees: the offset painted, not the target a
+	// wheel scroll is easing toward, which can be a viewport away. The rows
+	// between them are built and measured on the way, and anchoring at the
+	// target would let their corrections move the rows on screen.
+	//
+	// Of the rows on screen, it is the first one that was laid out and
+	// measured while it was in the window. A row that came into the window in
+	// this frame is placed at an estimate (or at the height it had when it was
+	// last seen) until it is measured; anchored by its top, the correction
+	// would move every row below it, which are the rows the user was reading.
+	y := float64(st.scrollY - vs.top)
 	idx := vs.hidx.find(y)
+	if idx+1 < vs.count && vs.hidx.prefix(idx+1)-y < 1 {
+		idx++ // less than a pixel of the row shows, which is rounding: it is above the view
+	}
+	for i := idx; i < vs.count && vs.hidx.prefix(i) < y+float64(vs.inner); i++ {
+		if vs.laid[vs.keys[i]] {
+			idx = i
+			break
+		}
+	}
 	a.idx, a.key, a.ok = idx, vs.keys[idx], true
 	a.off = float32(y - vs.hidx.prefix(idx))
 	return a
 }
 
-// restore moves the scroll offset (and its target) by the amount the anchor
-// item moved, or to the end if the list was at its end. An anchor whose key is
+// restore moves the scroll offset and its target by the amount the anchor
+// item moved, or to the end if the list was at its end. A scroll easing
+// toward its target keeps the distance it had left. An anchor whose key is
 // gone resolves to the item now at its old index.
 func (vs *varState) restore(st *nodeState, a vAnchor) {
-	var t float32
+	var d float32
 	switch {
 	case vs.count == 0:
-		t = 0
+		d = -st.targetY
 	case a.atEnd:
-		t = st.targetY + float32(vs.end()-a.end)
+		d = float32(vs.end() - a.end)
 	case a.ok:
 		idx, ok := vs.index[a.key]
 		if !ok {
 			idx = min(a.idx, vs.count-1)
 		}
-		t = vs.top + float32(vs.hidx.prefix(idx)) + a.off
+		d = vs.top + float32(vs.hidx.prefix(idx)) + a.off - st.scrollY
 	default:
 		return
 	}
-	if d := t - st.targetY; d != 0 {
+	if d != 0 {
 		if st.targetY == vs.endY {
 			vs.endY += d // the list did not scroll away from where its end was recorded
 		}
@@ -292,7 +317,10 @@ func (l *ListElement) expand(ctx *Context) Element {
 	changed := !vs.sameItems(l)
 	var a vAnchor
 	if changed {
-		a = vs.capture(st, vs.atEnd)
+		// The list was at its end at the last paint, and nothing has scrolled
+		// it since: a scroll in this frame, as the user starts to scroll up
+		// while a chat's reply streams in, takes it away from the end.
+		a = vs.capture(st, vs.atEnd && st.targetY == vs.endY)
 		vs.rebuild(rt, l)
 	}
 	vs.pad = 0
@@ -318,6 +346,7 @@ func (l *ListElement) expand(ctx *Context) Element {
 		vs.rowsFor, vs.rows = l, nil
 	}
 	rows := make(map[string]*vRow, to-from)
+	laid := make(map[string]bool, to-from)
 	for i := from; i < to; i++ {
 		top := vs.pad + float32(vs.hidx.prefix(i))
 		k := vs.keys[i]
@@ -331,9 +360,12 @@ func (l *ListElement) expand(ctx *Context) Element {
 		}
 		vr.wrap = wrap
 		rows[k] = vr
+		if vs.laid[k] {
+			laid[k] = true
+		}
 		spacer.Child(wrap)
 	}
-	vs.rows = rows
+	vs.rows, vs.laid = rows, laid
 	vs.builtFrom, vs.built = from, to
 	container := l.size.apply(Div().ScrollY().styleOf(&l.style)).Role(access.RoleList)
 	if l.label != "" {
@@ -458,9 +490,13 @@ func (rt *Runtime) checkVList(n *node, sy float32) {
 	snapped := false
 	for k, c := range spacer.children {
 		i := vs.builtFrom + k
-		if h := c.lay.H; h > 0 && math.Abs(float64(h-vs.hidx.hs[i])) > 0.5 {
+		h := c.lay.H
+		if h > 0 && math.Abs(float64(h-vs.hidx.hs[i])) > 0.5 {
 			vs.measure(i, h)
 			changed = true
+		}
+		if h > 0 {
+			vs.laid[vs.keys[i]] = true
 		}
 	}
 	if changed {

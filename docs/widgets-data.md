@@ -48,8 +48,13 @@ that a row reads re-renders that row alone. A new slice of items, or a new list
 element from a parent's render, renders every row again. A row's height is measured once it
 is built and remembered by its key while the item stays in the list. A row not yet seen is estimated from the
 mean of the measured heights (32 px before any is measured). The scroll position
-stays on the item at the top of the viewport, so measuring rows above it, or
-inserting and removing items above it, does not make the view jump. Items are
+stays on the first row on screen that was already measured, at the offset drawn
+(not the one a wheel scroll is easing toward), so measuring rows above it,
+inserting and removing items above it, and the rows that come into view as the
+list scrolls up do not make the view jump. A row that changes height keeps its
+top in place, and dragging the scrollbar's thumb moves the content by as much
+as the pointer moves, so the thumb and the pointer can drift apart a little
+until the thumb reaches an end of the track. Items are
 compared by slice identity: a new slice means the items changed, and a slice
 changed in place is not detected. Keys must be unique among the items; a
 duplicate gets a warning once and falls back to its position.
