@@ -9,6 +9,57 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.9] - 2026-11-16
+
+### Added
+
+- `DivElement.SelectAcross` makes the selectable texts inside an element one selection. A drag
+  selects across them, Shift+click extends into another text, `Ctrl+A` selects all of them, and
+  `Ctrl+C` copies the whole selection, with blank lines between blocks, line breaks between list
+  items and table rows, and tabs between cells. Dragging past the edge of a scroll container
+  scrolls it. `OnTextSelect` reports the whole selection.
+- On a touchscreen, a selection a long press made shows a handle at each end, as a phone's does:
+  a bar with a round knob in the selection's color. Dragging a handle moves that end of the
+  selection, past the other end too, in selectable text, text fields and text areas, and across
+  the blocks of a `markdown.View` or another `SelectAcross` group; the text's menu opens again
+  when the finger lifts. A mouse's selection shows no handles.
+
+### Changed
+
+- A `markdown.View` is one selection: a drag selects across its paragraphs, headings, lists, quotes,
+  code blocks and tables, where it used to stop at the edge of the block it started in.
+- The menu that a long press on text opens hangs below the selection, or above it where there is
+  no room below, instead of at the finger, where it covered the end of the selection.
+
+### Fixed
+
+- A text field's caret, and a caret that a canvas draws, blink again when the window becomes active
+  again, and in a web page when the page is shown again, as when a phone comes back to the browser.
+  A caret stops blinking after 15 seconds without input, and stayed solid until the next key or
+  click.
+- On an iPhone or an iPad, the keyboard's trackpad (a long press of the space bar) moves a text
+  field's caret, along a line and from line to line. It used to put the caret at the start of
+  the text and leave it there: iOS finds the caret's place at the finger's point in the focused
+  textarea, and jamb's hidden textarea was a pixel wide and took no touches, so the point fell on
+  the canvas. An editable element now takes the textarea's place on iOS, lies over the field's
+  text and takes the touches there for the app. It is built from the field's own layout: each
+  piece in the face the field draws it in, from the font files jamb holds, with the field's
+  kerning, hidden Markdown syntax at no width, tabs at their width and lines that wrap where the
+  field's do, so the caret lands on the character jamb draws under the finger, in styled text as
+  in plain. Autocorrect, suggestions, the double-space period, dictation, composition and paste
+  go through it as they went through the textarea. A page must load the `jamb.js` of this
+  version; a page without it keeps the textarea at the caret.
+- A scroll container scrolls to the end of a text that runs past its box, such as a `NoWrap` line
+  wider than the container: the text's overflow counts toward the container's scrollable size, as
+  in CSS. A markdown code block with a long line now scrolls sideways and shows its scrollbar,
+  where it used to cut the line off at its edge.
+- The part of a text that runs past its box is drawn, and takes clicks and selection, even when
+  the box itself is scrolled out of view.
+- A wheel or touchpad scroll scrolls each axis in the innermost container that can scroll along
+  it: a diagonal scroll over a code block that scrolls only sideways also scrolls the page.
+- An absolutely positioned child that fills its parent no longer makes the parent's content wider
+  and taller than its box by the parent's padding.
+
 ## [0.8.8] - 2026-11-15
 
 ### Added
@@ -1279,7 +1330,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.8...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.9...HEAD
+[0.8.9]: https://github.com/tyler-builds/jamb/compare/v0.8.8...v0.8.9
 [0.8.8]: https://github.com/tyler-builds/jamb/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/tyler-builds/jamb/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/tyler-builds/jamb/compare/v0.8.5...v0.8.6
