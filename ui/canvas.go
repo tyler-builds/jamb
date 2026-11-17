@@ -372,7 +372,7 @@ func (p *Painter) Now() time.Time { return p.rt.lastFrame }
 // again then, so ask only for a caret that is drawn.
 func (p *Painter) CaretVisible(activity time.Time) bool {
 	rt := p.rt
-	p.caret = caretDraw{used: true, inactive: rt.windowInactive}
+	p.caret = caretDraw{used: true, inactive: rt.windowInactive, restart: rt.caretRestart}
 	if rt.windowInactive {
 		return false
 	}
@@ -413,17 +413,21 @@ type canvasState struct {
 }
 
 // caretDraw is what a drawing asked of a blinking caret: whether it asked, the window state it
-// saw, and when its next change is due (zero when the caret does not change by itself).
+// saw and the window's last activation (caretRestart), and when its next change is due (zero
+// when the caret does not change by itself).
 type caretDraw struct {
 	used     bool
 	inactive bool
+	restart  time.Time
 	due      time.Time
 }
 
 // stale reports whether the caret the drawing showed has changed since: the window became active
-// or inactive, or the blink reached its next change.
+// or inactive, or was activated again, which restarts the blink, or the blink reached its next
+// change.
 func (c caretDraw) stale(rt *Runtime) bool {
-	return c.used && (c.inactive != rt.windowInactive || (!c.due.IsZero() && !rt.lastFrame.Before(c.due)))
+	return c.used && (c.inactive != rt.windowInactive || !c.restart.Equal(rt.caretRestart) ||
+		(!c.due.IsZero() && !rt.lastFrame.Before(c.due)))
 }
 
 // noteDue asks for a frame at t, when a drawing changes by itself. The frame repaints, so the

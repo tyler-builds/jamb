@@ -995,7 +995,11 @@ func (rt *Runtime) hostWindowFocus(focused bool) {
 	// the change to it is painted here (see caretVisible).
 	rt.windowInactive = !focused
 	rt.needPaint = true
-	if !focused {
+	if focused {
+		// The caret blinks again from now, as a native text field's does when
+		// its window is activated, even where it had stopped (caretBlinkStop).
+		rt.caretRestart = rt.now()
+	} else {
 		rt.setPressed(nil)
 		rt.cancelDrag()
 	}

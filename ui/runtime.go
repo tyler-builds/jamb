@@ -468,6 +468,10 @@ type Runtime struct {
 	// windowInactive is set while the window is not the active window (see
 	// WindowFocus). A text field's caret is then neither drawn nor blinked.
 	windowInactive bool
+	// caretRestart is when the window last became active (see WindowFocus): a
+	// caret blinks from it when that is later than the caret's own activity, so a
+	// caret that had stopped blinking blinks again when the user comes back.
+	caretRestart time.Time
 	// revealFocus asks the next paint to scroll the focused element into view
 	// (set by Tab), in its nearest vertically scrolling ancestor.
 	revealFocus bool

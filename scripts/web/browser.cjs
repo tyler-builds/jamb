@@ -309,12 +309,50 @@ async function overlay(browser, url) {
         (r.text !== text ? `, and the field holds ${JSON.stringify(r.text)}` : ""));
     }
   }
+  // With the editable element focused, as on an iPhone, the caret blinks
+  // again when the page is shown again, as with the textarea.
+  await page.touchscreen.tap(250, 16 + 120 + 12);
+  await page.waitForTimeout(300);
+  const focused = await page.evaluate(() => document.activeElement.getAttribute("contenteditable"));
+  if (focused !== "plaintext-only") {
+    console.log("FAIL: on an iPhone the focused text field's element is not the editable element");
+    ok = false;
+  }
+  if (!(await blinksAgain(page, { x: 16, y: 136, width: 340, height: 100 }, "the editable element's field"))) ok = false;
   if (errors.length) {
     console.log("FAIL: the page of fields reported errors:\n" + errors.join("\n"));
     ok = false;
   }
   await ctx.close();
   return ok;
+}
+
+// blinksAgain reports whether the caret of the focused field, in clip of the
+// page, blinks again when the page is shown again, as when a phone comes back
+// to the browser, though it had stopped blinking after 15 seconds without
+// input (caretBlinkStop in ui/editor.go). A headless page is never hidden, so
+// its visibility is set by hand.
+async function blinksAgain(page, clip, what) {
+  await page.evaluate(() => {
+    globalThis.jambVisibility = "hidden";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => globalThis.jambVisibility });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.waitForTimeout(16000);
+  await page.evaluate(() => {
+    globalThis.jambVisibility = "visible";
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.waitForTimeout(100);
+  const shown = await page.screenshot({ clip });
+  let again = false;
+  for (let i = 0; i < 8 && !again; i++) {
+    await page.waitForTimeout(150);
+    again = !shown.equals(await page.screenshot({ clip }));
+  }
+  console.log(`caret blinks again when the page is shown again, in ${what}:`, again);
+  if (!again) console.log(`FAIL: the caret of ${what} does not blink when the page is shown again`);
+  return again;
 }
 
 async function main() {
@@ -392,6 +430,9 @@ async function main() {
       console.log("FAIL: the focused text field's caret does not blink");
       failed = true;
     }
+
+    // The caret blinks again when the page is shown again (see blinksAgain).
+    if (!(await blinksAgain(gl, clip, "the text field"))) failed = true;
 
     // On an iPhone the editable element lies over the field, laid out as the
     // field lays its text out (see overlay).

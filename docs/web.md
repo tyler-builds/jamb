@@ -194,5 +194,5 @@ listens for itself.
 
 ## Not there yet
 
-Message boxes, saving a file, picking a folder, files dropped on the page, second windows, pinch
-zoom, and handles that adjust a selection after the finger has lifted.
+Message boxes, saving a file, picking a folder, files dropped on the page, second windows and pinch
+zoom.
