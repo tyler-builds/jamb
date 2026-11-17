@@ -36,6 +36,7 @@ type scrollbarID struct {
 type scrollDrag struct {
 	scrollbarID
 	grab   float32 // pointer offset into the thumb when the drag started
+	last   float32 // the pointer's position along the axis at the last move
 	active bool
 }
 
@@ -112,11 +113,11 @@ func (rt *Runtime) scrollbarDown(x, y float32) bool {
 	st := sb.n.st
 	id := scrollbarID{sb.n.id, sb.axis}
 	if sb.thumb.Contains(x, y) {
-		grab := y - sb.thumb.Y
+		grab, last := y-sb.thumb.Y, y
 		if sb.axis == axisX {
-			grab = x - sb.thumb.X
+			grab, last = x-sb.thumb.X, x
 		}
-		rt.sbDrag = scrollDrag{scrollbarID: id, grab: grab, active: true}
+		rt.sbDrag = scrollDrag{scrollbarID: id, grab: grab, last: last, active: true}
 	} else {
 		// Page toward the click, animated like a wheel scroll.
 		if sb.axis == axisY {
@@ -149,18 +150,40 @@ func (rt *Runtime) scrollbarDrag(x, y float32) {
 	if sb.axis == axisY {
 		room := sb.track.H - sb.thumb.H
 		if room > 0 {
-			st.targetY = min(max((y-sb.track.Y-rt.sbDrag.grab)/room*sb.max, 0), sb.max)
+			st.targetY = rt.sbDrag.follow(y, sb.track.Y, room, sb.max, st.scrollY)
 			st.scrollY = st.targetY // follow the pointer exactly
 		}
 	} else {
 		room := sb.track.W - sb.thumb.W
 		if room > 0 {
-			st.targetX = min(max((x-sb.track.X-rt.sbDrag.grab)/room*sb.max, 0), sb.max)
+			st.targetX = rt.sbDrag.follow(x, sb.track.X, room, sb.max, st.scrollX)
 			st.scrollX = st.targetX
 		}
 	}
 	rt.needPaint, rt.scrolled = true, true
 	rt.requestFrame()
+}
+
+// follow returns the offset for the pointer at pos along a track that starts
+// at start and leaves room for the thumb to move, scrolling up to limit: the
+// offset cur moved by as much as the pointer moved since the last move. A list
+// that keeps what is on screen in place moves the offset as rows above it are
+// measured (see ListOf), and placing the offset where the pointer is on the
+// track would undo that and jump. Past an end of the track the offset is the
+// end's, and the pointer meets the thumb again there.
+func (d *scrollDrag) follow(pos, start, room, limit, cur float32) float32 {
+	at := (pos - start - d.grab) / room * limit
+	switch {
+	case at <= 0:
+		d.last = start + d.grab
+		return 0
+	case at >= limit:
+		d.last = start + d.grab + room
+		return limit
+	}
+	moved := cur + (pos-d.last)/room*limit
+	d.last = pos
+	return min(max(moved, 0), limit)
 }
 
 func (rt *Runtime) paintScrollbars(n *node, opacity float32) {
