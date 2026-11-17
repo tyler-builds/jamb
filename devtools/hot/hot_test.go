@@ -19,12 +19,17 @@ import (
 
 // restart simulates jamb dev's restart: it writes a checkpoint, forgets this
 // process's signals and reads the checkpoint, as the next build does at start.
-func restart(t *testing.T) {
+// live are what the app still holds when jamb dev asks for the checkpoint: its
+// signals, and the runtimes of its windows, which hold the components' locals
+// and view states. The checkpoint reaches them through weak pointers, so one
+// that the test no longer uses could be collected before it and left out.
+func restart(t *testing.T, live ...any) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "state.json")
 	if _, err := Checkpoint(path); err != nil {
 		t.Fatal(err)
 	}
+	goruntime.KeepAlive(live)
 	fresh()
 	if err := load(path); err != nil {
 		t.Fatal(err)
@@ -83,7 +88,7 @@ func TestSignalsKeepTheirValues(t *testing.T) {
 	clicks := Signal(ui.NewSignal(0), "main:main/clicks")
 	clicks.Set(7)
 
-	restart(t)
+	restart(t, a, b, m, clicks)
 
 	// The new build makes its signals again, in the same order, with their
 	// initial values; each takes its old one.
@@ -115,9 +120,11 @@ func TestSignalsKeepTheirValues(t *testing.T) {
 func TestChangedTypesStartAgain(t *testing.T) {
 	fresh()
 	t.Cleanup(fresh)
-	Signal(ui.NewSignal("hello"), "k").Set("changed")
-	Signal(ui.NewSignal(struct{ A, B int }{1, 2}), "s").Set(struct{ A, B int }{3, 4})
-	restart(t)
+	k := Signal(ui.NewSignal("hello"), "k")
+	k.Set("changed")
+	pair := Signal(ui.NewSignal(struct{ A, B int }{1, 2}), "s")
+	pair.Set(struct{ A, B int }{3, 4})
+	restart(t, k, pair)
 	n := Signal(ui.NewSignal(5), "k") // was a string
 	if n.Peek() != 5 {
 		t.Errorf("a signal whose type changed has %d; want its initial 5", n.Peek())
@@ -140,11 +147,12 @@ func TestValuesThatCannotBeKept(t *testing.T) {
 	fresh()
 	t.Cleanup(fresh)
 	f := Signal(ui.NewSignal(func() {}), "f")
-	_ = f
 	ok := Signal(ui.NewSignal(1), "ok")
 	ok.Set(2)
 	path := filepath.Join(t.TempDir(), "state.json")
 	n, err := Checkpoint(path)
+	goruntime.KeepAlive(f)
+	goruntime.KeepAlive(ok)
 	if err != nil || n != 1 {
 		t.Fatalf("checkpoint kept %d values, %v; want the one without a func", n, err)
 	}
@@ -165,8 +173,7 @@ func TestLocalsKeepTheirValues(t *testing.T) {
 	rt.SetViewport(100, 100, 1)
 	rt.Frame(time.Now())
 	open.Set(true)
-	restart(t)
-	goruntime.KeepAlive(rt) // the checkpoint keeps the locals of live components
+	restart(t, rt) // the checkpoint keeps the locals of live components
 	rt2 := ui.NewRuntime(root, nil, nil)
 	rt2.SetViewport(100, 100, 1)
 	rt2.Frame(time.Now())
@@ -179,11 +186,12 @@ func TestLocalsKeepTheirValues(t *testing.T) {
 func TestCheckpointFile(t *testing.T) {
 	fresh()
 	t.Cleanup(fresh)
-	Signal(ui.NewSignal([]int{1, 2}), "list")
+	list := Signal(ui.NewSignal([]int{1, 2}), "list")
 	path := filepath.Join(t.TempDir(), "state.json")
 	if _, err := Checkpoint(path); err != nil {
 		t.Fatal(err)
 	}
+	goruntime.KeepAlive(list)
 	var f file
 	b, _ := readFile(path)
 	if err := json.Unmarshal(b, &f); err != nil || f.Version != stateVersion || len(f.Entries) != 1 || f.Entries[0].ID != "list#1" {
@@ -214,13 +222,13 @@ func TestStartupWrites(t *testing.T) {
 	sel.Set("note-3") // the user's choices
 	q.Set("lig")
 
-	restart(t)
+	restart(t, sel, q)
 	sel, q = run("note-1") // the same startup
 	if sel.Peek() != "note-3" || q.Peek() != "lig" {
 		t.Fatalf("after a restart with the same startup: selected %q, query %q", sel.Peek(), q.Peek())
 	}
 
-	restart(t)
+	restart(t, sel, q)
 	sel, q = run("note-9") // the data changed: startup selects another note
 	if sel.Peek() != "note-9" || q.Peek() != "lig" {
 		t.Fatalf("after a restart with a new startup value: selected %q, query %q", sel.Peek(), q.Peek())
@@ -230,7 +238,7 @@ func TestStartupWrites(t *testing.T) {
 	}
 
 	// A default changed in the code takes effect.
-	restart(t)
+	restart(t, sel, q)
 	starting()
 	q = Signal(ui.NewSignal("new default"), "store:Open/Store.Query")
 	started()
@@ -282,11 +290,9 @@ func TestLocalsFollowTheirComponent(t *testing.T) {
 	rt := frame()
 	a.Set(1)
 	b.Set(2)
-	restart(t)
 	// A checkpoint keeps the locals of the components that are alive, and the
-	// components live as long as their runtime: a collection before the
-	// checkpoint must not take them.
-	goruntime.KeepAlive(rt)
+	// components live as long as their runtime.
+	restart(t, rt)
 	swapped = true // the code changed: B comes first now
 	frame()
 	if a.Peek() != 1 || b.Peek() != 2 {
@@ -318,7 +324,7 @@ func TestViewStateKept(t *testing.T) {
 	rt.Frame(time.Now())
 	before, _ := rt.Find("row0")
 
-	restart(t)
+	restart(t, rt)
 	rt2 := ui.NewRuntime(root, nil, nil)
 	rt2.SetViewport(300, 300, 1)
 	rt2.Frame(time.Now())
@@ -369,7 +375,7 @@ func TestListScrollKept(t *testing.T) {
 	if before == "" || before == "0" {
 		t.Fatalf("the list did not scroll (top row %q)", before)
 	}
-	restart(t)
+	restart(t, rt)
 	rt2 := ui.NewRuntime(root, nil, nil)
 	rt2.SetViewport(300, 300, 1)
 	for range 3 {
