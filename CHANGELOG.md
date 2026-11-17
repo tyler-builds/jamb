@@ -9,6 +9,19 @@ them in here.
 
 ## [Unreleased]
 
+## [0.8.10] - 2026-11-17
+
+### Fixed
+
+- A `ListOf` scrolled up no longer jumps as the rows coming into view are measured. It keeps in place
+  the first row on screen that was already measured, at the offset drawn rather than the one a wheel
+  scroll eases toward, so the rows being read stay put through wheel, touchpad, finger and fling
+  scrolling.
+- Dragging a scrollbar's thumb moves the content by as much as the pointer moved, so a `ListOf`'s
+  corrections for rows measured on the way are no longer undone by the next move.
+- A Bottom `ListOf` that is scrolled away from its end in the frame that items are added no longer
+  snaps back to the end.
+
 ## [0.8.9] - 2026-11-16
 
 ### Added
@@ -1330,7 +1343,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.9...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.10...HEAD
+[0.8.10]: https://github.com/tyler-builds/jamb/compare/v0.8.9...v0.8.10
 [0.8.9]: https://github.com/tyler-builds/jamb/compare/v0.8.8...v0.8.9
 [0.8.8]: https://github.com/tyler-builds/jamb/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/tyler-builds/jamb/compare/v0.8.6...v0.8.7
