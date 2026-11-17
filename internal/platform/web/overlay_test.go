@@ -3,6 +3,7 @@
 package web
 
 import (
+	"strings"
 	"syscall/js"
 	"testing"
 	"time"
@@ -10,8 +11,8 @@ import (
 	"github.com/tyler-builds/jamb/internal/platform"
 )
 
-// overlayPage is a textPage on iOS, whose textarea lies over the field's text,
-// with a style to read, and a canvas at 0, 0 of the page.
+// overlayPage is a textPage on iOS, whose editable element lies over the
+// field's text, with a style to read, and a canvas at 0, 0 of the page.
 func overlayPage(t *testing.T, text string) *textPage {
 	p := newTextPage(t, text)
 	p.area.Set("style", js.Global().Get("Object").New())
@@ -22,107 +23,155 @@ func overlayPage(t *testing.T, text string) *textPage {
 	return p
 }
 
-// style returns the textarea's style property name.
-func (p *textPage) style(name string) string { return p.area.Get("style").Get(name).String() }
-
-// placed runs a frame of the app, whose field shows its text in box, starting
-// at textX, textY, with text of the size font and lines line apart, and whose
-// caret is at caret, all in physical pixels.
-func (p *textPage) placed(box platform.Rect, textX, textY, font, line float32, caret platform.Rect) {
-	runPosted()
+// fieldOf returns the context of the page's field, which shows its text in box,
+// starting at textX, textY, with text of the size font and lines line apart,
+// wrapping at wrap, laid out as runs, all in physical pixels.
+func (p *textPage) fieldOf(box platform.Rect, textX, textY, font, line, wrap float32, runs []platform.TextRun,
+	faces []platform.FontFace) platform.TextContext {
 	c := p.app.context()
-	c.Box, c.TextX, c.TextY, c.FontSize, c.LineHeight = box, textX, textY, font, line
+	c.Box, c.TextX, c.TextY, c.FontSize, c.LineHeight, c.WrapWidth = box, textX, textY, font, line, wrap
+	c.Runs, c.Faces = runs, faces
+	return c
+}
+
+// frameWith runs a frame of the app, which reports the field as c and its
+// caret at caret.
+func (p *textPage) frameWith(c platform.TextContext, caret platform.Rect) {
+	runPosted()
 	p.w.SetTextContext(c)
 	p.w.SetTextInputRect(caret)
 }
 
-// On iOS the textarea lies over the field's text, laid out as the field lays it
-// out, and takes the touches there; its text is 16 px at least, scaled down to
-// the field's. Elsewhere, and for a field that says nothing of its text, it is
-// at the caret, and takes no touches.
-func TestTextareaOverField(t *testing.T) {
+// plainRuns returns the runs of text laid out on one line, in face 0.
+func plainRuns(text string) []platform.TextRun {
+	return []platform.TextRun{{Start: 0, End: len(text), Face: 0, Width: 100}}
+}
+
+// On iOS the editable element lies over the field's text, laid out at the
+// field's text size and line height, wrapping at its width, its text where the
+// field has scrolled it. Elsewhere, and for a field that says nothing of its
+// text, it is at the caret.
+func TestElementOverField(t *testing.T) {
 	p := overlayPage(t, "alpha beta\ngamma")
 	p.w.scale = 2
 	caret := platform.Rect{X: 100, Y: 40, W: 2, H: 36}
-	// The field's text is 28 px (14 CSS px), its lines 36 apart, scrolled up by
-	// half a line.
-	p.placed(platform.Rect{X: 40, Y: 40, W: 400, H: 120}, 40, 22, 28, 36, caret)
-	for name, want := range map[string]string{
-		"left": "20.00px", "top": "20.00px", "width": "228.57px", "height": "68.57px", "fontSize": "16.00px",
-		"lineHeight": "20.57px", "transform": "scale(0.8750)", "whiteSpace": "pre-wrap", "pointerEvents": "auto",
-	} {
-		if got := p.style(name); got != want {
-			t.Errorf("over the field, the textarea's %s is %s, want %s", name, got, want)
-		}
-	}
-	if top := p.area.Get("scrollTop").Float(); top < 10.28 || top > 10.29 {
-		t.Errorf("the textarea is scrolled to %v, want the field's 9 CSS px at its scale, 10.29", top)
+	c := p.fieldOf(platform.Rect{X: 40, Y: 40, W: 400, H: 120}, 40, 22, 28, 36, 400, plainRuns(p.app.text), nil)
+	p.frameWith(c, caret)
+	want := placement{x: 20, y: 20, w: 200, h: 60, font: 14, line: 18, scrollX: 0, scrollY: 9, wrap: 200}
+	if got := p.w.text.placed; got != want {
+		t.Errorf("over the field, the element is placed %+v, want %+v", got, want)
 	}
 
-	// The caret moving, as typing moves it, leaves the textarea where it is.
-	p.area.Get("style").Set("left", "moved")
-	p.placed(platform.Rect{X: 40, Y: 40, W: 400, H: 120}, 40, 22, 28, 36, platform.Rect{X: 120, Y: 40, W: 2, H: 36})
-	if got := p.style("left"); got != "moved" {
-		t.Errorf("the caret's move placed the textarea again, at %s", got)
+	// The caret moving, as typing moves it, leaves the element where it is.
+	p.frameWith(c, platform.Rect{X: 120, Y: 40, W: 2, H: 36})
+	if got := p.w.text.placed; got != want {
+		t.Errorf("the caret's move placed the element at %+v", got)
 	}
 
-	// While the browser moves the textarea's caret, as iOS's keyboard trackpad
-	// does, the field scrolling to the caret leaves the textarea's scroll.
-	p.area.Set("scrollTop", 3)
+	// While the browser moves the element's caret, as iOS's keyboard trackpad
+	// does, the field scrolling to the caret leaves the element's text where it
+	// is; once the browser is done, the element follows the field.
 	p.area.Call("setSelectionRange", 12, 12)
 	p.w.areaSelect(12, 12, false)
-	p.placed(platform.Rect{X: 40, Y: 40, W: 400, H: 120}, 40, 4, 28, 36, platform.Rect{X: 60, Y: 76, W: 2, H: 36})
-	if top := p.area.Get("scrollTop").Float(); top != 3 {
-		t.Errorf("the field scrolled while the browser moved the caret, and the textarea was scrolled to %v", top)
+	c.TextY = 4
+	p.frameWith(c, platform.Rect{X: 60, Y: 76, W: 2, H: 36})
+	if got := p.w.text.placed.scrollY; got != 9 {
+		t.Errorf("the field scrolled while the browser moved the caret, and the element's text moved to %v", got)
 	}
 	if p.app.caret != 12 {
 		t.Errorf("the browser's caret at 12 moved the field's to %d", p.app.caret)
 	}
-	// Once the browser is done, the textarea follows the field's scroll.
 	p.w.text.browserSel = time.Now().Add(-time.Second)
-	p.placed(platform.Rect{X: 40, Y: 40, W: 400, H: 120}, 40, 4, 28, 36, platform.Rect{X: 60, Y: 76, W: 2, H: 36})
-	if top := p.area.Get("scrollTop").Float(); top < 20.57 || top > 20.58 {
-		t.Errorf("after the browser's move the textarea is scrolled to %v, want the field's 18 CSS px, 20.57", top)
+	p.frameWith(c, platform.Rect{X: 60, Y: 76, W: 2, H: 36})
+	if got := p.w.text.placed.scrollY; got != 18 {
+		t.Errorf("after the browser's move the element's text is scrolled by %v, want the field's 18", got)
 	}
 
 	// A field that says nothing of where its text is, as a code editor: the
-	// textarea is at the caret.
-	p.placed(platform.Rect{}, 0, 0, 0, 0, caret)
-	for name, want := range map[string]string{
-		"left": "50.00px", "top": "20.00px", "width": "1.00px", "height": "18.00px", "fontSize": "16.00px",
-		"transform": "none", "whiteSpace": "pre", "pointerEvents": "none",
-	} {
-		if got := p.style(name); got != want {
-			t.Errorf("at the caret, the textarea's %s is %s, want %s", name, got, want)
-		}
+	// element is at the caret.
+	p.frameWith(p.fieldOf(platform.Rect{}, 0, 0, 0, 0, 0, nil, nil), caret)
+	if got := p.w.text.placed; got != (placement{x: 50, y: 20, w: 1, h: 18}) {
+		t.Errorf("for a field that reports no text box, the element is placed %+v, want at the caret", got)
 	}
 
 	// Elsewhere than on iOS it is at the caret, whatever the field says.
 	q := overlayPage(t, "abc")
 	q.w.text.overlay = false
-	q.placed(platform.Rect{X: 40, Y: 40, W: 400, H: 120}, 40, 22, 28, 36, caret)
-	if got := q.style("width"); got != "2.00px" || q.style("pointerEvents") != "none" {
-		t.Errorf("off iOS the textarea is %s wide, and takes pointer events %s; want at the caret, taking none",
-			got, q.style("pointerEvents"))
+	q.frameWith(q.fieldOf(platform.Rect{X: 40, Y: 40, W: 400, H: 120}, 40, 22, 28, 36, 400, plainRuns("abc"), nil), caret)
+	if got := q.w.text.placed; got.font != 0 || q.w.text.laidOut != "" {
+		t.Errorf("off iOS the textarea is placed %+v and laid out %q; want at the caret, and no layout", got, q.w.text.laidOut)
 	}
 }
 
-// The textarea goes over the field only while it holds the field's text: a
-// masked field's caret has it, with no text.
-func TestTextareaAtCaretForMaskedField(t *testing.T) {
-	p := overlayPage(t, "secret")
-	p.app.noText = true
-	p.placed(platform.Rect{X: 40, Y: 40, W: 400, H: 36}, 40, 40, 28, 36, platform.Rect{X: 100, Y: 40, W: 2, H: 36})
-	if got := p.style("pointerEvents"); got != "none" {
-		t.Errorf("a masked field's textarea takes pointer events %s, want none: it is at the caret", got)
+// The element is laid out from the field's runs: each run clipped to the text
+// the element holds, with its length in UTF-16 code units, its face, its
+// spacing and width in CSS pixels; and each face as a font-family list with its
+// missing-glyph font.
+func TestElementLayoutDesc(t *testing.T) {
+	p := overlayPage(t, "")
+	text := "T😀o **b**\tz\nx"
+	runs := []platform.TextRun{
+		{Start: 0, End: 1, Face: 0, Width: 20, Spacing: -2},              // a kerned T
+		{Start: 1, End: 7, Face: 0, Width: 60},                           // 😀o and a space
+		{Start: 7, End: 9, Face: -1, Kind: platform.RunNone},             // hidden **
+		{Start: 9, End: 10, Face: 1, Width: 18},                          // b, bold
+		{Start: 10, End: 12, Face: -1, Kind: platform.RunNone},           // hidden **
+		{Start: 12, End: 13, Face: -1, Kind: platform.RunTab, Width: 21}, // a tab
+		{Start: 13, End: 14, Face: 0, Width: 16},                         // z
+		{Start: 14, End: 15, Face: -1, Kind: platform.RunBreak},          // the line break
+		{Start: 15, End: 16, Face: 0, Line: 1, Width: 16},                // x
+	}
+	faces := []platform.FontFace{{Key: "jamb-face-1", NotdefKey: "jamb-notdef-1"}, {Key: "jamb-face-2", Weight: 700}}
+	got := p.w.layoutDesc(text, runs, faces, 0, len(text), 2)
+	want := strings.Join([]string{"2",
+		"\"jamb-face-1\", \"jamb-notdef-1\"\tnormal", "\"jamb-face-2\"\t\"wght\" 700",
+		"0 1 0 -1 10", "0 4 0 0 30", "3 2 -1 0 0", "0 1 1 0 9", "3 2 -1 0 0", "1 1 -1 0 10.5", "0 1 0 0 8",
+		"2 1 -1 0 0", "0 1 0 0 8"}, "\n")
+	if got != want {
+		t.Errorf("the layout of %q is\n%s\nwant\n%s", text, got, want)
+	}
+	// Clipped to the text from the bold b to the tab.
+	if got := p.w.layoutDesc(text, runs, faces, 9, 13, 2); !strings.HasSuffix(got, "\"wght\" 700\n0 1 1 0 9\n3 2 -1 0 0\n1 1 -1 0 10.5") {
+		t.Errorf("the layout of the bytes 9 to 13 is\n%s", got)
 	}
 }
 
-// The textarea over a field lays its text out in the field's faces: the page
-// is given each face once, from the bytes jamb holds, and the textarea's
-// font-family lists them in order, a variable font at the weight it is drawn
-// at. When a face has loaded, the textarea is placed again.
-func TestTextareaInFieldFonts(t *testing.T) {
+// The element holds whole lines of the field's text, which it wraps as the
+// field does: the start of the text it holds goes back to the start of its
+// line, and the element's first line is that line.
+func TestElementHoldsWholeLines(t *testing.T) {
+	runs := []platform.TextRun{
+		{Start: 0, End: 10, Line: 0}, {Start: 10, End: 11, Line: 0, Kind: platform.RunBreak},
+		{Start: 11, End: 30, Line: 1}, {Start: 30, End: 50, Line: 2}, {Start: 50, End: 60, Line: 2},
+	}
+	for _, c := range []struct{ i, start, line int }{{0, 0, 0}, {5, 0, 0}, {11, 11, 1}, {29, 11, 1}, {55, 30, 2}, {60, 30, 2}} {
+		if start, line := lineStart(runs, c.i); start != c.start || line != c.line {
+			t.Errorf("lineStart(%d) = %d, %d; want %d, %d", c.i, start, line, c.start, c.line)
+		}
+	}
+
+	// A long text: the element holds from the start of the line that the
+	// window around the caret starts in.
+	long := strings.Repeat("word ", 1000) // 5000 bytes
+	p := overlayPage(t, long)
+	var lines []platform.TextRun
+	for i := 0; i < len(long); i += 50 {
+		lines = append(lines, platform.TextRun{Start: i, End: i + 50, Line: i / 50})
+	}
+	c := p.fieldOf(platform.Rect{X: 0, Y: 0, W: 400, H: 100}, 0, -3000, 28, 36, 400, lines, nil)
+	p.frameWith(c, platform.Rect{X: 10, Y: 10, W: 2, H: 36})
+	m := p.w.text.mirror
+	if m.base%50 != 0 || m.base == 0 || m.base+len(m.text) != len(long) {
+		t.Errorf("the element holds the bytes %d to %d; want from the start of a line to the end", m.base, m.base+len(m.text))
+	}
+	if top := p.w.text.field.top; top != float32(m.base/50)*36 {
+		t.Errorf("the element's first line is %v below the text's top, want line %d's %v", top, m.base/50, float32(m.base/50)*36)
+	}
+}
+
+// The page is given each face, and its missing-glyph font, once, from the
+// bytes jamb holds; when a face has loaded, the element is placed again.
+func TestElementFonts(t *testing.T) {
 	p := overlayPage(t, "abc")
 	g := js.Global()
 	g.Call("eval", `globalThis.FontFace = function (family, data) {
@@ -131,45 +180,42 @@ func TestTextareaInFieldFonts(t *testing.T) {
 	t.Cleanup(func() { g.Delete("FontFace") })
 	fonts := g.Call("eval", `({ list: [], add(f) { this.list.push(f) } })`)
 	g.Get("document").Set("fonts", fonts)
-
-	faces := []platform.FontFace{{Key: "jamb-face-7", Data: []byte{1, 2, 3}, Weight: 550}, {Key: "jamb-notdef-7", Data: []byte{4}}}
-	box := platform.Rect{X: 40, Y: 40, W: 400, H: 120}
+	faces := []platform.FontFace{{Key: "jamb-face-7", Data: []byte{1, 2, 3}, NotdefKey: "jamb-notdef-7", Notdef: []byte{4}}}
+	c := p.fieldOf(platform.Rect{X: 40, Y: 40, W: 400, H: 120}, 40, 40, 28, 36, 400, plainRuns("abc"), faces)
 	caret := platform.Rect{X: 100, Y: 40, W: 2, H: 36}
-	place := func() {
-		runPosted()
-		c := p.app.context()
-		c.Box, c.TextX, c.TextY, c.FontSize, c.LineHeight, c.Faces = box, 40, 40, 28, 36, faces
-		p.w.SetTextContext(c)
-		p.w.SetTextInputRect(caret)
-	}
-	place()
-	if got, want := p.style("fontFamily"), `"jamb-face-7", "jamb-notdef-7", system-ui, sans-serif`; got != want {
-		t.Errorf("the textarea's font-family is %s, want %s", got, want)
-	}
-	if got := p.style("fontVariationSettings"); got != `"wght" 550` {
-		t.Errorf("the textarea's font-variation-settings is %s, want the weight the face is drawn at", got)
-	}
+	p.frameWith(c, caret)
 	list := fonts.Get("list")
 	if n := list.Length(); n != 2 || list.Index(0).Get("family").String() != "jamb-face-7" ||
-		list.Index(0).Get("size").Int() != 3 || list.Index(1).Get("size").Int() != 1 {
-		t.Fatalf("the page was given %d faces, want the two, with their bytes", n)
+		list.Index(0).Get("size").Int() != 3 || list.Index(1).Get("family").String() != "jamb-notdef-7" {
+		t.Fatalf("the page was given %d fonts, want the face and its missing-glyph font, with their bytes", n)
 	}
-	// The faces loading place the textarea again, as their text lays out anew.
-	p.area.Get("style").Set("left", "moved")
+	if !strings.Contains(p.w.text.laidOut, `"jamb-face-7", "jamb-notdef-7"`) {
+		t.Errorf("the element's layout is %q, want its runs in the face", p.w.text.laidOut)
+	}
+	// The faces loading place the element again, as its text lays out anew.
+	p.w.text.placed.x = -1
 	time.Sleep(10 * time.Millisecond) // the faces' load promises
 	runPosted()
-	if got := p.style("left"); got != "40.00px" {
-		t.Errorf("after the faces loaded the textarea is at %s, want placed again at 40.00px", got)
+	if p.w.text.placed.x != 40 {
+		t.Errorf("after the faces loaded the element is at x %v, want placed again at 40", p.w.text.placed.x)
 	}
 	// Frames with the same faces give the page none again.
-	place()
-	place()
+	p.frameWith(c, caret)
+	p.frameWith(c, caret)
 	if n := list.Length(); n != 2 {
-		t.Errorf("the page was given %d faces after more frames, want the two only", n)
+		t.Errorf("the page was given %d fonts after more frames, want the two only", n)
 	}
-	// At the caret, the textarea is in the page's font again.
-	p.placed(platform.Rect{}, 0, 0, 0, 0, caret)
-	if got := p.style("fontFamily"); got != areaFontDefault || p.style("fontVariationSettings") != "normal" {
-		t.Errorf("at the caret the textarea's font is %s, %s; want %s", got, p.style("fontVariationSettings"), areaFontDefault)
+}
+
+// The element goes over the field only while it holds the field's text: a
+// masked field's caret has it, with no text.
+func TestElementAtCaretForMaskedField(t *testing.T) {
+	p := overlayPage(t, "secret")
+	p.app.noText = true
+	c := p.fieldOf(platform.Rect{X: 40, Y: 40, W: 400, H: 36}, 40, 40, 28, 36, 0, plainRuns("secret"), nil)
+	c.HasText = false
+	p.frameWith(c, platform.Rect{X: 100, Y: 40, W: 2, H: 36})
+	if got := p.w.text.placed; got.font != 0 {
+		t.Errorf("a masked field's element is placed %+v, want at the caret", got)
 	}
 }

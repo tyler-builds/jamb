@@ -12,7 +12,7 @@ import (
 // that none of its fonts has, the missing glyph of the text's own face. Last in
 // a browser's list of fonts, it lays such characters out as jamb does, where
 // the browser would otherwise draw them in a font of its own, of other widths
-// (see System.Faces). Its cmap is of format 13, many characters to one glyph,
+// (see FaceData). Its cmap is of format 13, many characters to one glyph,
 // as the last-resort fonts of Apple's systems have.
 func notdefFont(upem, advance uint16, ascent, descent int16) []byte {
 	be := binary.BigEndian

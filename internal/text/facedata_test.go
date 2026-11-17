@@ -2,6 +2,7 @@ package text
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -11,29 +12,97 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 )
 
-// Faces gives the font files text is drawn with, its own face first and the
-// missing-glyph font last, the same slice while the fonts are the same.
-func TestFaces(t *testing.T) {
+// checkPieces fails the test unless the pieces cover the layout's text in
+// order, each line's pieces are as wide as the line, and a text piece's width
+// is what its characters advance in the layout.
+func checkPieces(t *testing.T, l *Layout, pieces []Piece, faces []FaceData) {
+	t.Helper()
+	at := 0
+	widths := make([]float32, len(l.Lines))
+	for _, p := range pieces {
+		if p.Start != at || p.End <= p.Start {
+			t.Fatalf("a piece runs from %d to %d after the pieces reached %d: %+v", p.Start, p.End, at, pieces)
+		}
+		at = p.End
+		if p.Face >= len(faces) || p.Kind == PieceText && p.Face < 0 {
+			t.Errorf("the piece %q has the face %d of %d", l.Text[p.Start:p.End], p.Face, len(faces))
+		}
+		widths[p.Line] += p.Width
+	}
+	if at != len(l.Text) {
+		t.Fatalf("the pieces end at %d of %d", at, len(l.Text))
+	}
+	for i, ln := range l.Lines {
+		var w float32
+		for _, r := range ln.Runs {
+			w += r.Width
+		}
+		if d := widths[i] - w; d > 0.01 || d < -0.01 {
+			t.Errorf("line %d: the pieces are %v wide, the line %v", i, widths[i], w)
+		}
+	}
+}
+
+// A layout's pieces: runs of one face, the tabs and the breaks between
+// paragraphs on their own, in the faces of the spans.
+func TestPieces(t *testing.T) {
 	sys := NewSystem()
-	if err := sys.Registry().Register("f", Regular, goregular.TTF); err != nil {
+	reg := sys.Registry()
+	for _, f := range []struct {
+		w    Weight
+		data []byte
+	}{{Regular, goregular.TTF}, {Medium, gomedium.TTF}} {
+		if err := reg.Register("f", f.w, f.data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := "plain bold\ttab\n\nnext 😀 wraps over a narrow width"
+	bold := strings.Index(s, "bold")
+	l := sys.LayoutSpans(s, Style{Family: "f", Size: 14}, []Span{{Start: bold, End: bold + 4, Weight: Medium}}, 120)
+	pieces, faces := sys.Pieces(l)
+	checkPieces(t, l, pieces, faces)
+	kinds, faceOf := map[string]PieceKind{}, map[string]int{}
+	for _, p := range pieces {
+		kinds[s[p.Start:p.End]] = p.Kind
+		faceOf[s[p.Start:p.End]] = p.Face
+	}
+	if kinds["\t"] != PieceTab || kinds["\n"] != PieceBreak || kinds["bold"] != PieceText {
+		t.Errorf("the pieces are %v; want the tab, the breaks and the span on their own", kinds)
+	}
+	if faceOf["bold"] == faceOf["plain "] || len(faces[0].Notdef) == 0 || faces[0].NotdefKey == "" {
+		t.Errorf("the span is in face %d and the text before it in %d, of %d; want each in its own face, with its missing-glyph font",
+			faceOf["bold"], faceOf["plain "], len(faces))
+	}
+	if len(l.Lines) < 4 {
+		t.Errorf("the text has %d lines; want it wrapped", len(l.Lines))
+	}
+}
+
+// A character whose advance the layout changed, as kerning does, is a piece of
+// its own with the change as its spacing.
+func TestPiecesKerning(t *testing.T) {
+	data, err := os.ReadFile("testdata/SourceSans-VF-HVAR.ttf")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := sys.Registry().Register("f", Medium, gomedium.TTF); err != nil {
+	sys := NewSystem()
+	if err := sys.Registry().Register("k", Regular, data); err != nil {
 		t.Fatal(err)
 	}
-	faces := sys.Faces(Style{Family: "f", Size: 14})
-	if len(faces) < 2 || &faces[0].Data[0] != &goregular.TTF[0] || !strings.HasPrefix(faces[0].Key, "jamb-face-") {
-		t.Fatalf("the faces of Regular text are %d, the first %q; want Go Regular's file first", len(faces), faces[0].Key)
+	l := sys.Layout("AVATAR To", Style{Family: "k", Size: 40}, 1000)
+	pieces, faces := sys.Pieces(l)
+	checkPieces(t, l, pieces, faces)
+	kerned := 0
+	for _, p := range pieces {
+		if p.Spacing != 0 {
+			kerned++
+			if p.End-p.Start != 1 {
+				t.Errorf("the kerned piece %q has more than one character", l.Text[p.Start:p.End])
+			}
+		}
 	}
-	if last := faces[len(faces)-1]; !strings.HasPrefix(last.Key, "jamb-notdef-") {
-		t.Errorf("the last face is %q, want the missing-glyph font", last.Key)
-	}
-	if again := sys.Faces(Style{Family: "f", Size: 20}); &again[0] != &faces[0] {
-		t.Error("the faces of the same font are another slice")
-	}
-	medium := sys.Faces(Style{Family: "f", Size: 14, Weight: Medium})
-	if &medium[0].Data[0] != &gomedium.TTF[0] || medium[0].Key == faces[0].Key {
-		t.Errorf("the faces of Medium text start with %q, want Go Medium's file under a key of its own", medium[0].Key)
+	if kerned == 0 {
+		t.Errorf("no piece of %q carries kerning: %+v", l.Text, pieces)
 	}
 }
 

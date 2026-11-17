@@ -103,19 +103,28 @@ func (rt *Runtime) hostTextContext() uihost.TextContext {
 		z, b := rt.zoom, rt.textBox
 		c.Box = [4]float32{b.box.X * z, b.box.Y * z, b.box.W * z, b.box.H * z}
 		c.TextX, c.TextY, c.FontSize, c.LineHeight = b.x*z, b.y*z, b.size*z, b.lineHeight*z
-		c.Faces = rt.text.Faces(e.textStyle(n))
+		c.WrapWidth = b.wrap * z
+		c.Runs, c.Faces = rt.textRuns(n)
+		if c.Runs != nil {
+			if rt.caretsFn == nil {
+				rt.caretsFn = rt.fieldCarets
+			}
+			c.Carets = rt.caretsFn
+		}
 	}
 	return c
 }
 
 // textBox is where an editor shows its text, in logical window coordinates:
 // the box its lines are laid out in, as much of it as is in view; where its
-// text starts (x, y), outside the box when it has scrolled; and the size of
-// its text and the distance between its lines.
+// text starts (x, y), outside the box when it has scrolled; the size of its
+// text as laid out and the distance between its lines; and the width its
+// lines wrap at.
 type textBox struct {
 	box              scene.Rect
 	x, y             float32
 	size, lineHeight float32
+	wrap             float32 // the width its lines wrap at, or 0
 }
 
 // hostTextEdit replaces the bytes from start to end of the focused field's text

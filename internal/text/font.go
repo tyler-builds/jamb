@@ -73,7 +73,7 @@ type Font struct {
 	wght   float32
 
 	// data is the font file, and id numbers the font among those parsed, for
-	// laying the same text out elsewhere (see System.Faces).
+	// laying the same text out elsewhere (see System.Pieces).
 	data []byte
 	id   uint32
 }

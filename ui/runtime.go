@@ -15,6 +15,7 @@ import (
 	"github.com/tyler-builds/jamb/internal/layout"
 	"github.com/tyler-builds/jamb/internal/scene"
 	"github.com/tyler-builds/jamb/internal/text"
+	"github.com/tyler-builds/jamb/internal/uihost"
 )
 
 type nodeKind uint8
@@ -512,6 +513,7 @@ type Runtime struct {
 	// hostTextContext); textBoxID is the editor, 0 when none.
 	textBox   textBox
 	textBoxID uint64
+	caretsFn  func(start, end int) []uihost.Caret // fieldCarets, made once
 
 	// Floating overlays and click-outside listeners found by the last paint.
 	overlays []overlayItem

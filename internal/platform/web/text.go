@@ -23,17 +23,17 @@ import (
 // mirror.go), or is empty between events for a field that shows its text to no
 // input method. The canvas has the page's focus otherwise.
 //
-// On an iPhone or an iPad, the textarea lies over the focused field's text,
-// laid out as the field lays it out: the same box, text size and line height,
-// wrapping as the field wraps, scrolled as the field has scrolled. Its text
-// and its caret are transparent, and it takes the touches on it, which go to
-// the app as those on the canvas do. iOS moves the caret by where the text is
-// on screen: its keyboard's trackpad (a long press of the space bar) finds
-// the position at the finger's point in the focused element's text, hit-tested
-// as the page is, and a textarea that took no touches, or one a pixel wide at
-// the caret, as elsewhere, left it nothing to find, so the selection went out
-// of the textarea, which then reads its selection as 0. Elsewhere the
-// textarea is at the field's caret, where an input method puts its window.
+// On an iPhone or an iPad, in a page that has the host script, an editable
+// element takes the textarea's place, and lies over the focused field's text,
+// laid out as the field lays it out (see editable.go). Its text and its caret
+// are transparent, and it takes the touches on it, which go to the app as
+// those on the canvas do. iOS moves the caret by where the text is on screen:
+// its keyboard's trackpad (a long press of the space bar) finds the position
+// at the finger's point in the focused element's text, hit-tested as the page
+// is, and a textarea that took no touches, a pixel wide at the caret, as
+// elsewhere, left it nothing to find, so the selection went out of the
+// textarea, which then reads its selection as 0. Elsewhere the textarea is at
+// the field's caret, where an input method puts its window.
 //
 // A phone shows its keyboard only for a focus that a tap's own event makes. So
 // a tap is handled while its event lasts (see runNow): the app takes it and
@@ -55,7 +55,7 @@ const recentKey = 100 * time.Millisecond
 
 // textState is the window's text input.
 type textState struct {
-	area      js.Value      // the hidden textarea
+	area      js.Value      // the hidden textarea, or the editable element (see editable.go)
 	rect      platform.Rect // where text input is, in device pixels; zero for none
 	focused   bool          // the textarea has the page's focus
 	composing bool          // an input method composes in it
@@ -67,15 +67,18 @@ type textState struct {
 	mirror   mirror    // what the textarea holds of the focused field
 	compData string    // what the input method composes, as its last compositionupdate said
 
-	// overlay is set where the textarea lies over the field's text (iOS; see
-	// iosPage). field is the focused field's geometry, from its TextContext,
-	// placed where the textarea was last put, and browserSel when the browser
-	// last moved the textarea's selection itself (see areaSelect).
+	// overlay is set where the editable element takes the textarea's place
+	// and lies over the field's text (iOS, with the host script; see
+	// editable.go). field is the focused field's geometry, from its
+	// TextContext, placed where the element was last put, laidOut the runs it
+	// was last laid out from (see layoutArea), and browserSel when the browser
+	// last moved its selection itself (see areaSelect).
 	overlay    bool
 	field      fieldGeometry
 	placed     placement
+	laidOut    string
 	browserSel time.Time
-	fonts      textFonts // the faces of fields the page has (see textfont.go)
+	fonts      textFonts // the faces of fields the page has (see editable.go)
 }
 
 // fieldGeometry is where the focused field shows its text, in physical
@@ -84,26 +87,24 @@ type fieldGeometry struct {
 	box                  platform.Rect
 	textX, textY         float32
 	fontSize, lineHeight float32
-	multiline            bool
-	faces                []platform.FontFace
+	wrap                 float32 // the width its lines wrap at, or 0
+	top                  float32 // the top of the first line the element holds, from the top of the text
 }
 
-// placement is where the textarea is, in CSS pixels relative to the canvas: at
-// the caret, when font is 0, or over the field's text, whose text size is
-// font, the distance between whose lines is line, which wraps its lines when
-// wrap is set, and which has scrolled its text by scrollX and scrollY. family
-// is the font-family list of the field's faces, and wght where on its weight
-// axis the first is drawn, or 0 (see areaFamily).
+// placement is where the textarea, or the editable element, is, in CSS pixels
+// relative to the canvas: at the caret, when font is 0, or over the field's
+// text, whose text size is font, the distance between whose lines is line,
+// which wraps its lines at the width wrap (0 for none), and which has scrolled
+// its text by scrollX and scrollY; top is the top of the first line the
+// element holds, from the top of the text.
 type placement struct {
 	x, y, w, h       float64
 	font, line       float64
 	scrollX, scrollY float64
-	wrap             bool
-	family           string
-	wght             float64
+	wrap, top        float64
 }
 
-// sameBox reports whether p and q put the textarea over the same box, with the
+// sameBox reports whether p and q put the element over the same box, with the
 // same text, scrolled or not.
 func (p placement) sameBox(q placement) bool {
 	p.scrollX, p.scrollY, q.scrollX, q.scrollY = 0, 0, 0, 0
@@ -117,15 +118,25 @@ func (p placement) sameBox(q placement) bool {
 // finger, which would move the caret again.
 const browserSelSettle = 500 * time.Millisecond
 
-// overlayFontMin is the smallest text size the textarea takes: iOS zooms the
-// page in when a field with smaller text takes the focus. Smaller text is this
-// size, scaled down (see placeTextArea).
-const overlayFontMin = 16
+// areaFontSize is the size of the text of the textarea, and of the editable
+// element: at 16 px or more, iOS does not zoom the page in when it takes the
+// focus. The editable element's text has the field's size, in an element
+// inside it (see jamb.js).
+const areaFontSize = 16
 
-// makeTextArea makes the hidden textarea and listens to it.
+// makeTextArea makes the hidden textarea, or the editable element, and listens
+// to it.
 func (w *window) makeTextArea() {
 	doc := js.Global().Get("document")
-	a := doc.Call("createElement", "textarea")
+	w.text.overlay = w.hosted && iosPage()
+	var a js.Value
+	if w.text.overlay {
+		a = doc.Call("createElement", "div")
+		a.Call("setAttribute", "contenteditable", "plaintext-only")
+		a.Call("setAttribute", "role", "textbox")
+	} else {
+		a = doc.Call("createElement", "textarea")
+	}
 	for _, kv := range [][2]string{{"autocomplete", "off"}, {"aria-hidden", "true"}, {"tabindex", "-1"}} {
 		a.Call("setAttribute", kv[0], kv[1])
 	}
@@ -139,18 +150,17 @@ func (w *window) makeTextArea() {
 		{"margin", "0"}, {"padding", "0"}, {"border", "0"}, {"outline", "none"}, {"resize", "none"},
 		{"overflow", "hidden"}, {"opacity", "0"}, {"background", "transparent"}, {"color", "transparent"},
 		{"caretColor", "transparent"}, {"pointerEvents", "none"}, {"whiteSpace", "pre"},
-		// At 16 px or more, iOS does not zoom the page in when the textarea takes the focus.
-		{"fontSize", px(overlayFontMin)}, {"fontFamily", areaFontDefault}, {"transformOrigin", "0 0"},
-		// The touches on the textarea, when it lies over the field, are the
+		{"fontSize", px(areaFontSize)}, {"fontFamily", areaFontDefault},
+		// The touches on the element, when it lies over the field, are the
 		// app's (see listenAreaTouches).
 		{"touchAction", "none"}, {"webkitTouchCallout", "none"}, {"webkitTapHighlightColor", "transparent"},
-		// Its text is laid out as jamb's shaper lays it out: the font's own
-		// advances, unhinted, with its default ligatures, nothing synthesized,
-		// spaced, enlarged or hyphenated; lines broken at word boundaries, and
-		// inside a word too long for a line (see textfont.go). Kerning is off:
-		// go-text, jamb's shaper, applies little of a font's GPOS kerning (none
-		// of Inter's pairs of classes, which a browser applies), and the Go
-		// fonts have none.
+		// The editable element's text is laid out as jamb's shaper lays it out
+		// (see editable.go): the font's own advances, unhinted, with its default
+		// ligatures, nothing synthesized, spaced, enlarged or hyphenated; lines
+		// broken at word boundaries, and inside a word too long for a line.
+		// Kerning is off: jamb's runs carry the kerning go-text applies, which is
+		// little of a font's (none of Inter's pairs of classes, which a browser
+		// applies).
 		{"textRendering", "geometricPrecision"}, {"fontKerning", "none"}, {"fontVariantLigatures", "normal"},
 		{"fontFeatureSettings", "normal"}, {"fontSynthesis", "none"}, {"fontOpticalSizing", "none"},
 		{"fontWeight", "normal"}, {"fontStyle", "normal"}, {"letterSpacing", "0"}, {"wordSpacing", "0"},
@@ -161,7 +171,6 @@ func (w *window) makeTextArea() {
 	}
 	doc.Get("body").Call("appendChild", a)
 	w.text.area = a
-	w.text.overlay = iosPage()
 	w.removers = append(w.removers, func() { a.Call("remove") })
 
 	w.listenFocus()
@@ -413,11 +422,13 @@ func (w *window) SetTextContext(c platform.TextContext) {
 	if c.Focused {
 		w.setTextAttrs(attrsOf(c))
 	}
-	// The textarea lies over a field whose text it holds (see placeTextArea).
+	// The editable element lies over a field whose text it holds (see
+	// placeTextArea and editable.go).
+	top := w.text.field.top
 	w.text.field = fieldGeometry{}
 	if c.HasText && c.Box.W > 0 && c.Box.H > 0 && c.FontSize > 0 {
 		w.text.field = fieldGeometry{box: c.Box, textX: c.TextX, textY: c.TextY, fontSize: c.FontSize,
-			lineHeight: c.LineHeight, multiline: c.Multiline, faces: c.Faces}
+			lineHeight: c.LineHeight, wrap: c.WrapWidth, top: top}
 	}
 	m := &w.text.mirror
 	if w.text.composing {
@@ -427,11 +438,19 @@ func (w *window) SetTextContext(c platform.TextContext) {
 		if m.on {
 			*m = mirror{}
 			w.writeArea("", 0, 0, true)
+			w.text.laidOut = ""
 		}
 		return
 	}
 	anchor, caret := runeStart(c.Text, c.Anchor), runeStart(c.Text, c.Caret)
 	lo, hi := m.window(c.Text, anchor, caret)
+	if w.text.overlay && len(c.Runs) > 0 {
+		// The element holds whole lines, which it wraps as the field does.
+		var line int
+		lo, line = lineStart(c.Runs, lo)
+		w.text.field.top = float32(line) * c.LineHeight
+	}
+	defer func() { w.layoutArea(c, lo, hi) }()
 	text := c.Text[lo:hi]
 	anchor, caret = min(max(anchor-lo, 0), len(text)), min(max(caret-lo, 0), len(text))
 	same := m.on && m.valid && m.text == text
@@ -440,6 +459,9 @@ func (w *window) SetTextContext(c platform.TextContext) {
 		return
 	}
 	*m = mirror{on: true, valid: true, base: lo, text: text, anchor: anchor, caret: caret}
+	if !same {
+		w.text.laidOut = "" // the text written is laid out anew
+	}
 	w.writeArea(text, anchor, caret, !same)
 }
 
@@ -587,71 +609,49 @@ func (w *window) SetTextInputRect(r platform.Rect) {
 	}
 }
 
-// textPlacement returns where the textarea goes: over the focused field's
-// text, on iOS, when the field says where that is, and at the caret otherwise.
+// textPlacement returns where the textarea, or the editable element, goes:
+// over the focused field's text, on iOS, when the field says where that is,
+// and at the caret otherwise.
 func (w *window) textPlacement() placement {
 	s := float64(w.scale)
 	if f := w.text.field; w.text.overlay && f.fontSize > 0 {
 		b := f.box
-		family, wght := w.areaFamily(f.faces)
 		return placement{x: float64(b.X) / s, y: float64(b.Y) / s, w: float64(b.W) / s, h: float64(b.H) / s,
 			font: float64(f.fontSize) / s, line: float64(f.lineHeight) / s,
 			scrollX: (float64(b.X) - float64(f.textX)) / s, scrollY: (float64(b.Y) - float64(f.textY)) / s,
-			wrap: f.multiline, family: family, wght: wght}
+			wrap: float64(f.wrap) / s, top: float64(f.top) / s}
 	}
 	r := w.text.rect
 	return placement{x: float64(r.X) / s, y: float64(r.Y) / s, w: max(float64(r.W)/s, 1), h: max(float64(r.H)/s, 1)}
 }
 
-// placeTextArea moves the textarea to where textPlacement puts it, when that
-// changed: to the caret, which moves with each character typed, or over the
-// field's text. While the browser moves the textarea's caret itself, as iOS's
-// keyboard trackpad does, the textarea keeps its scroll (see browserSelSettle).
+// placeTextArea moves the textarea, or the editable element, to where
+// textPlacement puts it, when that changed: to the caret, which moves with
+// each character typed, or over the field's text. While the browser moves the
+// element's caret itself, as iOS's keyboard trackpad does, the element keeps
+// its text where it is (see browserSelSettle).
 func (w *window) placeTextArea() {
 	p := w.textPlacement()
 	old := w.text.placed
-	if p == old || p.font > 0 && p.sameBox(old) && time.Since(w.text.browserSel) < browserSelSettle {
+	if p == old {
+		return
+	}
+	if settled := w.text.browserSel.Add(browserSelSettle); p.font > 0 && p.sameBox(old) && time.Now().Before(settled) {
+		w.WakeAt(settled) // a frame then places the element where the field's text is
 		return
 	}
 	w.text.placed = p
-	a := w.text.area
-	st := a.Get("style")
-	if p.family != old.family || p.wght != old.wght {
-		w.setAreaFont(st, p)
-	}
 	if w.hosted {
-		w.host.Call("place", p.x, p.y, p.w, p.h, p.font, p.line, p.scrollX, p.scrollY, flag(p.wrap))
+		w.host.Call("place", p.x, p.y, p.w, p.h, p.font, p.line, p.scrollX, p.scrollY, p.wrap, p.top)
 		return
 	}
+	// A page without the host script has only the textarea, at the caret.
 	cr := w.canvas.Call("getBoundingClientRect")
+	st := w.text.area.Get("style")
 	st.Set("left", px(cr.Get("left").Float()+p.x))
 	st.Set("top", px(cr.Get("top").Float()+p.y))
-	if p.font == 0 {
-		st.Set("width", px(p.w))
-		st.Set("height", px(p.h))
-		st.Set("fontSize", px(overlayFontMin))
-		st.Set("lineHeight", "normal")
-		st.Set("transform", "none")
-		st.Set("whiteSpace", "pre")
-		st.Set("pointerEvents", "none")
-		return
-	}
-	// Text smaller than overlayFontMin is that size, and the textarea is
-	// scaled down to the field's.
-	font, k := max(p.font, overlayFontMin), min(p.font/overlayFontMin, 1)
-	st.Set("width", px(p.w/k))
-	st.Set("height", px(p.h/k))
-	st.Set("fontSize", px(font))
-	st.Set("lineHeight", px(p.line/k))
-	st.Set("transform", "scale("+strconv.FormatFloat(k, 'f', 4, 64)+")")
-	ws := "pre"
-	if p.wrap {
-		ws = "pre-wrap"
-	}
-	st.Set("whiteSpace", ws)
-	st.Set("pointerEvents", "auto")
-	a.Set("scrollLeft", p.scrollX/k)
-	a.Set("scrollTop", p.scrollY/k)
+	st.Set("width", px(p.w))
+	st.Set("height", px(p.h))
 }
 
 // syncTextFocus gives the textarea the page's focus while there is text input,
@@ -683,7 +683,7 @@ func (w *window) CancelComposition() {
 		// text is written to the textarea in its next frame.
 		w.text.mirror.valid = false
 	} else {
-		a.Set("value", "")
+		w.clearArea()
 	}
 	a.Call("focus", map[string]any{"preventScroll": true})
 	w.text.moving = false

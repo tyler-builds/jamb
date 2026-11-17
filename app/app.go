@@ -932,38 +932,61 @@ func isInput(k platform.EventKind) bool {
 // its geometry in physical pixels at the window's scale s.
 func textContext(c uihost.TextContext, s float32) platform.TextContext {
 	b := c.Box
-	return platform.TextContext{Focused: c.Focused, Text: c.Text, Anchor: c.Anchor, Caret: c.Caret, HasText: c.HasText,
+	pc := platform.TextContext{Focused: c.Focused, Text: c.Text, Anchor: c.Anchor, Caret: c.Caret, HasText: c.HasText,
 		Purpose: platform.TextPurpose(c.Purpose), Multiline: c.Multiline, Enter: platform.EnterKey(c.Enter),
 		Box:   platform.Rect{X: int(b[0] * s), Y: int(b[1] * s), W: int(b[2] * s), H: int(b[3] * s)},
 		TextX: c.TextX * s, TextY: c.TextY * s, FontSize: c.FontSize * s, LineHeight: c.LineHeight * s,
-		Faces: platformFaces(c.Faces)}
+		WrapWidth: c.WrapWidth * s}
+	pc.Runs, pc.Faces = platformRuns(c.Runs, c.Faces, s)
+	if carets := c.Carets; carets != nil {
+		pc.Carets = func(start, end int) []platform.TextCaret {
+			cs := carets(start, end)
+			out := make([]platform.TextCaret, len(cs))
+			for i, k := range cs {
+				out[i] = platform.TextCaret{Offset: k.Offset, X: k.X * s, Line: k.Line}
+			}
+			return out
+		}
+	}
+	return pc
 }
 
-// faceCache is the last faces platformFaces converted, and what it made of them.
-var faceCache struct {
-	mu   sync.Mutex
-	from []text.FaceData
-	to   []platform.FontFace
+// runCache is the last runs and faces platformRuns converted, at the scale,
+// and what it made of them.
+var runCache struct {
+	mu      sync.Mutex
+	runs    []uihost.TextRun
+	faces   []text.FaceData
+	scale   float32
+	toRuns  []platform.TextRun
+	toFaces []platform.FontFace
 }
 
-// platformFaces returns the faces of a text field as the platform takes them.
-// The runtime gives the same slice while the field's font is the same, and so
-// does platformFaces, so that a frame makes no garbage.
-func platformFaces(faces []text.FaceData) []platform.FontFace {
-	if len(faces) == 0 {
-		return nil
+// platformRuns returns the runs and faces of a text field as the platform
+// takes them. The runtime gives the same slices while the field's layout is the
+// same, and so does platformRuns, so that a frame makes no garbage.
+func platformRuns(runs []uihost.TextRun, faces []text.FaceData, s float32) ([]platform.TextRun, []platform.FontFace) {
+	if len(runs) == 0 {
+		return nil, nil
 	}
-	faceCache.mu.Lock()
-	defer faceCache.mu.Unlock()
-	if len(faceCache.from) == len(faces) && &faceCache.from[0] == &faces[0] {
-		return faceCache.to
+	rc := &runCache
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	if rc.scale == s && len(rc.runs) == len(runs) && &rc.runs[0] == &runs[0] &&
+		len(rc.faces) == len(faces) && (len(faces) == 0 || &rc.faces[0] == &faces[0]) {
+		return rc.toRuns, rc.toFaces
 	}
-	to := make([]platform.FontFace, len(faces))
+	toRuns := make([]platform.TextRun, len(runs))
+	for i, r := range runs {
+		toRuns[i] = platform.TextRun{Start: r.Start, End: r.End, Line: r.Line, Face: r.Face,
+			Kind: platform.TextRunKind(r.Kind), Width: r.Width * s, Spacing: r.Spacing * s}
+	}
+	toFaces := make([]platform.FontFace, len(faces))
 	for i, f := range faces {
-		to[i] = platform.FontFace{Key: f.Key, Data: f.Data, Weight: f.Weight}
+		toFaces[i] = platform.FontFace{Key: f.Key, Data: f.Data, Weight: f.Weight, NotdefKey: f.NotdefKey, Notdef: f.Notdef}
 	}
-	faceCache.from, faceCache.to = faces, to
-	return to
+	rc.runs, rc.faces, rc.scale, rc.toRuns, rc.toFaces = runs, faces, s, toRuns, toFaces
+	return toRuns, toFaces
 }
 
 // gesturePhase maps the phase of a platform gesture to the one the UI runtime uses.

@@ -63,8 +63,8 @@ type System struct {
 	graphemeText  string
 	graphemeStops []int
 
-	// faceSets are the faces of each primary font, as Faces returns them.
-	faceSets map[*Font]faceSet
+	// faceSets are the FaceData of the fonts Pieces has given (see faceData).
+	faceSets map[*Font]FaceData
 
 	glyphs  map[glyphKey]maskEntry
 	masks   map[MaskKey]maskEntry
