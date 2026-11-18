@@ -458,9 +458,22 @@ func (rt *Runtime) paintText(n *node, x, y, w float32, fg Color, opacity float32
 	if n.rich != nil {
 		l := n.textPaint.layout(rt, n, contentW+0.01)
 		n.rich.lay = l
+		// The backgrounds of the runs go under the selection and the glyphs over
+		// it, as the code editor layers them, so that the selection shows on a
+		// run with a background, such as inline code in markdown.
+		bgs := n.rich.backgrounds
+		if bgs {
+			rt.text.DrawBackgrounds(&rt.scene, l, tx, ty, contentW, rt.scale, align, func(span int) text.RunPaint {
+				return rt.runPaint(n, span, fg, opacity)
+			})
+		}
 		rects := rt.textSelectionRects(n, l, tx, ty, opacity)
 		rt.text.DrawRichCached(&rt.scene, l, &n.textPaint.glyphs, tx, ty, contentW, rt.scale, align, func(span int) text.RunPaint {
-			return rt.runPaint(n, span, fg, opacity)
+			p := rt.runPaint(n, span, fg, opacity)
+			if bgs {
+				p.Background = scene.Color{}
+			}
+			return p
 		})
 		rt.redrawSelected(rects, func(c Color) { rt.text.Draw(&rt.scene, l, tx, ty, contentW, rt.scale, align, c.Alpha(opacity).scene()) })
 		if rt.focusID == n.id && rt.keyboardModality {

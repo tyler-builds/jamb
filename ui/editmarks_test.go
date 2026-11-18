@@ -145,3 +145,30 @@ func TestTextAreaMarksUpAndDownMapThroughHiddenSyntax(t *testing.T) {
 		t.Errorf("Up: caret %d, want just after %q", es.caret, "**ab** ")
 	}
 }
+
+// The selection of a field is drawn over the background of a mark, and its
+// glyphs over both.
+func TestTextAreaSelectionDrawsOverMarkBackground(t *testing.T) {
+	yellow := RGB(255, 255, 0)
+	v := NewSignal("say hi there")
+	r := newEditorRig(t, func(ctx *Context) Element {
+		return TextArea(v).Width(Px(300)).Marks(func(string) []TextMark {
+			return []TextMark{{Start: 4, End: 6, Style: Highlight{Background: yellow}}}
+		})
+	})
+	r.click(5, 5)
+	r.key(input.KeyA, ctrl)
+	n, _ := r.editor()
+	if n == nil {
+		t.Fatal("the field has no focus")
+	}
+	sc := &r.rt.scene
+	bg := quadIndex(sc, yellow.scene())
+	sel := quadIndex(sc, n.editor.selection.scene())
+	if bg < 0 || sel < 0 {
+		t.Fatalf("mark background quad at %d, selection quad at %d; want both drawn", bg, sel)
+	}
+	if sel < bg {
+		t.Errorf("the selection (quad %d) is drawn under the mark's background (quad %d)", sel, bg)
+	}
+}

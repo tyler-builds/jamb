@@ -180,6 +180,9 @@ type richText struct {
 	segs  []Segment   // the owners named by richPaint.owner
 	// interactive is set when some segment is clickable or hoverable.
 	interactive bool
+	// backgrounds is set when some span may be drawn with a background: one
+	// has a Background, or a segment has a hover look.
+	backgrounds bool
 	// lay is the layout last painted, which hit testing reads.
 	lay *text.Layout
 }
@@ -215,6 +218,9 @@ func buildRich(t *TextElement) *richText {
 		if g.onClick != nil || g.hover != nil || g.menu != nil {
 			rt.interactive = true
 		}
+		if g.hover != nil {
+			rt.backgrounds = true
+		}
 	}
 	for _, h := range t.highlights {
 		bounds = append(bounds, h.start, h.end)
@@ -245,6 +251,9 @@ func buildRich(t *TextElement) *richText {
 		}
 		rt.spans = append(rt.spans, sp)
 		rt.paint = append(rt.paint, p)
+		if !p.hl.Background.IsZero() {
+			rt.backgrounds = true
+		}
 	}
 	return rt
 }

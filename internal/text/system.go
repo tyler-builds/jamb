@@ -330,6 +330,28 @@ func (sys *System) DrawRich(sc *scene.Scene, l *Layout, x, y, boxWidth, scale fl
 	sys.DrawRichCached(sc, l, nil, x, y, boxWidth, scale, align, paint)
 }
 
+// DrawBackgrounds draws only the backgrounds of the runs of l, where DrawRich
+// draws them. A caller that draws something between the backgrounds and the
+// glyphs, such as a text selection, calls it first and then DrawRich with paint
+// that gives no Background.
+func (sys *System) DrawBackgrounds(sc *scene.Scene, l *Layout, x, y, boxWidth, scale float32, align int, paint func(span int) RunPaint) {
+	for _, ln := range l.Lines {
+		lx := x
+		switch align {
+		case 1:
+			lx += (boxWidth - ln.Width) / 2
+		case 2:
+			lx += boxWidth - ln.Width
+		}
+		top := y + ln.Top
+		for _, run := range ln.Runs {
+			if bg := paint(run.Span).Background; bg.A > 0 {
+				sc.AddQuad(scene.Quad{Bounds: pixelRect(lx+run.X, top, run.Width, l.LineHeight, scale), Background: bg})
+			}
+		}
+	}
+}
+
 // DrawCache keeps the atlas entries of the glyphs of a text as a draw found them,
 // so that the next draw of the text at the same place takes them from here rather
 // than from the table of glyphs, whose lookup for each glyph was the largest part
