@@ -387,7 +387,8 @@ func (d *Document) applyPlans(k stepKind, plans []plan) error {
 }
 
 // TypeText types s over every selection: each selection is replaced by s. Typing a
-// bracket or a quote closes it, and typing a closer that is already next steps over it.
+// bracket or a quote closes it, and typing a closer, or a quote, that is already next steps
+// over it.
 // A bracket or quote typed over a selection wraps the selection in the pair, and keeps
 // the selection. Typing white space ends an undo step.
 func (d *Document) TypeText(s string) error {
@@ -430,8 +431,9 @@ func (d *Document) typePair(c byte) error {
 		}
 		next, _ := runeAt(t, from)
 		prev, _ := runeBefore(t, from)
-		if !isOpen && next == rune(c) && sel.Empty() {
-			// Step over the closer that is already there.
+		if (!isOpen || quote) && next == rune(c) && sel.Empty() {
+			// Step over the closer that is already there. A quote opens and closes, so any
+			// quote of its kind right after the caret is stepped over.
 			_, n := runeAt(t, from)
 			plans[i] = plan{ch: Change{From: from, To: from}, anchor: n, head: n}
 			continue

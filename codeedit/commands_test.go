@@ -31,6 +31,43 @@ func TestAutoCloseAndTypeOver(t *testing.T) {
 	}
 }
 
+// A quote typed in empty space pairs, and a quote typed before the same quote steps over it,
+// whatever was typed between them, so that typing a whole string gives it once.
+func TestQuotePairsAndTypesOver(t *testing.T) {
+	for _, q := range []string{"'", `"`, "`"} {
+		for _, tc := range []struct {
+			typed []string
+			want  string
+			caret int
+		}{
+			{[]string{q}, "x = " + q + q, 5},
+			{[]string{q, "a", "b", "c", q}, "x = " + q + "abc" + q, 9},
+			{[]string{q, "1", "2", q}, "x = " + q + "12" + q, 8},
+			{[]string{q, "a", " ", q}, "x = " + q + "a " + q, 8},
+			{[]string{q, q}, "x = " + q + q, 6},
+		} {
+			d, c := newTestDoc("x = ")
+			d.SetCaret(d.Len())
+			typeAll(t, d, c, tc.typed...)
+			if d.Text() != tc.want || d.Caret() != tc.caret {
+				t.Errorf("typed %q gave %q caret %d, want %q caret %d", tc.typed, d.Text(), d.Caret(), tc.want, tc.caret)
+			}
+		}
+		d, c := newTestDoc("word")
+		d.SetSelections(Selection{Anchor: 0, Head: 4})
+		typeAll(t, d, c, q)
+		if want := q + "word" + q; d.Text() != want {
+			t.Errorf("%s over a selection gave %q, want %q", q, d.Text(), want)
+		}
+	}
+	// A doubled quote, as SQL escapes one, closes the string and then opens no pair after it.
+	d, c := newTestDoc("")
+	typeAll(t, d, c, "'", "O", "'", "'", "B", "'")
+	if d.Text() != "'O''B'" || d.Caret() != 6 {
+		t.Errorf("typed 'O''B' gave %q caret %d", d.Text(), d.Caret())
+	}
+}
+
 func TestQuoteInsideWordDoesNotPair(t *testing.T) {
 	d, c := newTestDoc("don")
 	d.SetCaret(3)

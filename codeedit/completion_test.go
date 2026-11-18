@@ -294,3 +294,141 @@ func TestCompletionHighlightMovesKeepTheList(t *testing.T) {
 		}
 	}
 }
+
+// An item's edit that inserts text at the start of the replaced word, such as a schema before a
+// table's name, goes before the item's text; an edit that overlaps the word is dropped.
+func TestCompletionEditAtTheWordStart(t *testing.T) {
+	const text = "SELECT * FROM Cus"
+	start := strings.Index(text, "Cus")
+	for _, tc := range []struct {
+		edit Change
+		want string
+	}{
+		{Change{From: start, To: start, Text: "dbo."}, "SELECT * FROM dbo.Customers"},
+		{Change{From: start - 1, To: start, Text: " dbo."}, "SELECT * FROM dbo.Customers"},
+		{Change{From: start, To: start + 2, Text: "dbo."}, "SELECT * FROM Customers"},
+	} {
+		h := newHarness(t, text, func(e *EditorElement) *EditorElement {
+			return e.Completions(fakeCompleter{fn: func(ctx context.Context, q CompletionQuery) (CompletionList, error) {
+				return CompletionList{From: -1, Items: []CompletionItem{{Label: "Customers", Edits: []Change{tc.edit}}}}, nil
+			}})
+		})
+		h.doc.SetCaret(len(text))
+		h.openList()
+		h.key(input.KeyEnter, 0)
+		if got := h.doc.Text(); got != tc.want || h.doc.Caret() != len(tc.want) {
+			t.Errorf("the edit %+v gave %q with the caret at %d, want %q with the caret at the end", tc.edit, got, h.doc.Caret(), tc.want)
+		}
+	}
+}
+
+// With a caret on each of two words, an insertion at the start of each goes before its word, and
+// each caret ends after its own item text.
+func TestCompleteInsertsBeforeEveryWord(t *testing.T) {
+	d, _ := newTestDoc("a Cu\nb Cu")
+	d.SetSelections(Selection{Anchor: 4, Head: 4}, Selection{Anchor: 9, Head: 9})
+	if err := d.complete(2, "Customers", []Change{{From: 2, To: 2, Text: "dbo."}, {From: 7, To: 7, Text: "s."}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := d.Text(), "a dbo.Customers\nb s.Customers"; got != want {
+		t.Fatalf("complete gave %q, want %q", got, want)
+	}
+	if sels := d.Selections(); len(sels) != 2 || sels[0].Head != 15 || sels[1].Head != 29 {
+		t.Errorf("the carets are %+v, want 15 and 29", sels)
+	}
+}
+
+// Typing puts the items that start with the word first, unless the list keeps the provider's
+// order, which it then filters without changing.
+func TestCompletionKeepOrder(t *testing.T) {
+	for _, keep := range []bool{false, true} {
+		h := newHarness(t, "SELECT na", func(e *EditorElement) *EditorElement {
+			return e.Completions(fakeCompleter{fn: func(ctx context.Context, q CompletionQuery) (CompletionList, error) {
+				return CompletionList{From: -1, KeepOrder: keep, Items: []CompletionItem{
+					{Label: "CustomerName"}, {Label: "LastName"}, {Label: "Total"}, {Label: "NameSuffix"}, {Label: "NATIONAL"},
+				}}, nil
+			}})
+		})
+		h.doc.SetCaret(h.doc.Len())
+		h.openList()
+		want := "NameSuffix,NATIONAL,CustomerName,LastName"
+		if keep {
+			want = "CustomerName,LastName,NameSuffix,NATIONAL"
+		}
+		if got := strings.Join(labels(h.ed.view), ","); got != want {
+			t.Errorf("KeepOrder %v: the list shows %s, want %s", keep, got, want)
+		}
+	}
+}
+
+// A character that ends the word closes the list when nothing then matches, however the list
+// opened; a list opened with Ctrl+Space shows that nothing matches until then, and one that opened
+// by itself closes as soon as nothing matches.
+func TestCompletionClosesWhenNothingMatches(t *testing.T) {
+	sql := words("Customers", "CustomerID", "ORDER BY")
+	for _, end := range []string{" ", ",", "(", ";"} {
+		h := newHarness(t, "SELECT * FROM Cus", func(e *EditorElement) *EditorElement { return e.Completions(sql) })
+		vs := h.ed.view
+		h.doc.SetCaret(h.doc.Len())
+		h.openList()
+		h.typeText(end)
+		if vs.completion.open {
+			t.Errorf("typing %q after the word left the list open, showing %v", end, labels(vs))
+		}
+		h.typeText("WHERE")
+		if vs.completion.open {
+			t.Errorf("typing %q and the next word left the list open", end)
+		}
+	}
+
+	// A text with a space in it still matches the words around the space.
+	h := newHarness(t, "ORD", func(e *EditorElement) *EditorElement { return e.Completions(sql) })
+	vs := h.ed.view
+	h.doc.SetCaret(3)
+	h.openList()
+	h.typeText("ER B")
+	if got := labels(vs); !vs.completion.open || len(got) != 1 || got[0] != "ORDER BY" {
+		t.Errorf("typing ER B left the list open %v, showing %v, want ORDER BY", vs.completion.open, got)
+	}
+
+	// Ctrl+Space on a word that matches nothing says so, while the word goes on.
+	h = newHarness(t, "xyz", func(e *EditorElement) *EditorElement { return e.Completions(sql) })
+	vs = h.ed.view
+	h.doc.SetCaret(3)
+	h.openList()
+	h.typeText("q")
+	if !vs.completion.open || len(vs.completion.shown) != 0 {
+		t.Fatalf("Ctrl+Space on a word that matches nothing: open %v, showing %v", vs.completion.open, labels(vs))
+	}
+	if _, ok := h.rt.Find("codeedit.completions"); !ok {
+		t.Error("the list that says nothing matches is not shown")
+	}
+	h.typeText(" ")
+	if vs.completion.open {
+		t.Error("a space after a word that matches nothing left the list open")
+	}
+
+	// A list opened by a trigger character closes when nothing matches, and when its answer is
+	// empty.
+	h = newHarness(t, "dbo", func(e *EditorElement) *EditorElement { return e.Completions(sql) })
+	vs = h.ed.view
+	h.doc.SetCaret(3)
+	h.typeText(".")
+	h.waitFor("the completions", func() bool { return !vs.completion.loading })
+	h.typeText("C")
+	if !vs.completion.open || len(vs.completion.shown) != 2 {
+		t.Fatalf("typing C after the trigger: open %v, showing %v", vs.completion.open, labels(vs))
+	}
+	h.typeText("z")
+	if vs.completion.open {
+		t.Errorf("a list opened by a trigger character stayed open, showing %v", labels(vs))
+	}
+	h = newHarness(t, "dbo", func(e *EditorElement) *EditorElement { return e.Completions(words()) })
+	vs = h.ed.view
+	h.doc.SetCaret(3)
+	h.typeText(".")
+	h.waitFor("the answer", func() bool { return !vs.completion.loading })
+	if vs.completion.open {
+		t.Error("an empty answer to a trigger character left the list open")
+	}
+}
