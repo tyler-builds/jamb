@@ -369,6 +369,7 @@ func testTabsParts(t *testing.T, v TabsVariant, applied map[string]bool) {
 		{part: "Tabs.TabFocusVisible", set: func(s *TabsStyle, m Style) { s.TabFocusVisible = m }, key: "settings/tab:a",
 			act: func(t *testing.T, r *accessRig) { focusNode(r, keyNode(t, r.rt, "settings/tab:a")) }},
 		{part: "Tabs.Panel", set: func(s *TabsStyle, m Style) { s.Panel = m }, key: "settings/panel"},
+		{part: "Tabs.Root", set: func(s *TabsStyle, m Style) { s.Root = m }, key: "settings"},
 	}
 	if v == TabsUnderline {
 		cases = append(cases, tabsCase{part: "Tabs.Indicator", set: func(s *TabsStyle, m Style) { s.Indicator = m }})

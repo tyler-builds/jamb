@@ -55,6 +55,8 @@ type TreeStyle struct {
 
 // treeDefaults sets d to the built-in look of a tree, from the colors of t. Under
 // high contrast the selected row is the Highlight color with HighlightText on it.
+// The description grows from no width, so it takes only the room the label or the
+// RenderRow content leaves.
 func treeDefaults(d *TreeStyle, t *Theme) {
 	ring := Shadow{Spread: 2, Color: t.FocusRing}
 	*d = TreeStyle{
@@ -65,7 +67,7 @@ func treeDefaults(d *TreeStyle, t *Theme) {
 		Chevron: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(16), Height: Px(16),
 			NoShrink: true, TextColor: t.TextMuted},
 		Icon:             Style{TextColor: t.TextMuted},
-		Description:      Style{TextColor: t.TextMuted, Grow: 1, MinWidth: Px(0)},
+		Description:      Style{TextColor: t.TextMuted, Grow: 1, Basis: Px(0), MinWidth: Px(0)},
 		TreeFocusVisible: Style{Shadows: []Shadow{ring}},
 		Indent:           18,
 	}
@@ -290,6 +292,10 @@ func (h *TreeHandle) request(op treeOp) {
 // is still the node's label. fn is called again when the row's pointer state
 // changes, with the state in the PartState (Selected for the selected row). The
 // content is hidden from assistive technology.
+//
+// The content is a single line, as the rows are a fixed height apart: give its
+// text NoWrap. It keeps its own width before the node's description, which takes
+// the room left, and in a tree too narrow for it, it is clipped at the row's end.
 func (tv *TreeElement) RenderRow(fn func(node TreeNode, state PartState) Element) *TreeElement {
 	tv.renderRow = fn
 	return tv
@@ -707,7 +713,10 @@ func (tv *TreeElement) row(st *TreeStyle, t *Theme, r treeRow, i int, sel string
 		}
 		row.Child(chev)
 		if tv.renderRow != nil {
-			row.Child(Div().AccessHidden().Child(tv.renderRow(node, ps)))
+			// The content is one line: it may shrink below its width and is clipped
+			// there, since the rows are a fixed height apart.
+			row.Child(Div().AccessHidden().MinWidth(Px(0)).styleOf(&Style{OverflowX: OverflowHidden}).
+				Child(tv.renderRow(node, ps)))
 		} else {
 			if r.icon != nil {
 				row.Child(Div().asPart("Tree.Icon").styleOf(&st.Icon).Child(Icon(r.icon).Size(16)))

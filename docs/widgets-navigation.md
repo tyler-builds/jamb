@@ -18,6 +18,8 @@ ui.Tabs(section,                                  // *ui.Signal[T], for any comp
 	ui.Tab[string]{Value: "usage", Label: "Usage", Disabled: true, Panel: usagePanel},
 ).Key("settings-tabs").Label("Settings sections").KeepMounted().OnChange(func(v string) { ... })
 ui.Tabs(filter, tabs...).Variant(ui.TabsSegmented)   // one row of segments, the selected one filled
+ui.Tabs(view, tabs...).Variant(ui.TabsSegmented).Small() // a button's sizes: Small, default, Large
+ui.Tabs(doc, tabs...).Styles(ui.TabsStyle{Root: ui.Style{Clear: ui.ClearGap}}) // the panel right under the tabs
 ui.Tabs(view, tabs...).Styles(ui.TabsStyle{Indicator: ui.Style{Height: ui.Px(3)}}) // parts: see Styling
 ui.Tabs(count, tabs...).RenderTab(func(tab ui.Tab[int], s ui.PartState) ui.Element { ... }) // your content in each tab
 ui.Tabs(view, tabs...).OnReselect(func(v string) { refresh(v) }) // the selected tab clicked again
@@ -74,8 +76,16 @@ th.Reveal("src/main.go") // opens the nodes above it and scrolls it into view
   color, and no accent fill. Under high contrast the selected segment is filled in
   Highlight. For the accent fill, set it with `Styles`:
   `ui.Tabs(...).Variant(ui.TabsSegmented).Styles(ui.TabsStyle{TabSelected: ui.Style{Background: t.Accent, TextColor: t.AccentText}})`. Both
-  variants keep the same keys, keyboard behavior and accessible names. The parts
-  of a tab list (`Bar`, `List`, `Tab`, `TabSelected`, `TabHover`, `TabDisabled`,
+  variants keep the same keys, keyboard behavior and accessible names.
+  `Small()` and `Large()` size the tabs as `Button.Small` and `Button.Large` size a
+  button, as a `ToggleGroup`'s sizes do: a segmented track is as tall as a button
+  of the same size (34 px by default, 28 small, 40 large), and an underline tab is
+  that height and 2 px for its line. The tab list and the panel are a column, the
+  `Root` part, 12 px apart: its `Gap` sets the space, and `Clear: ui.ClearGap` puts
+  the panel right under the tabs. The line under the tabs of `TabsUnderline` is
+  the bottom border of `List`, or of `Bar` while the bar is shown, so that it runs
+  under the bar's buttons too; style the part that draws it. The parts
+  of a tab list (`Root`, `Bar`, `List`, `Tab`, `TabSelected`, `TabHover`, `TabDisabled`,
   `TabFocusVisible`, `Indicator`, `Panel`, `DropLine`, `ScrollButton`, `MenuButton`) are set with `Styles` or the theme, and
   `RenderTab` draws each tab's content yourself. A tab's accessible name stays its
   `Label`, so a count the user must hear belongs in the label.
@@ -168,7 +178,11 @@ th.Reveal("src/main.go") // opens the nodes above it and scrolls it into view
   the row's pointer state changes. `ContextMenu` opens a menu for a row, built with
   its key: a right click selects the row first, as File Explorer does, and Shift+F10
   or the Menu key opens the menu of the selected row while the tree has focus. An
-  empty result opens nothing. The description part is `Description` in `TreeStyle`.
+  empty result opens nothing. The description part is `Description` in `TreeStyle`;
+  it takes the room the label leaves (its default basis is 0).
+  `RenderRow` content is a single line, since the rows are a fixed height apart:
+  give its text `NoWrap`. It keeps its own width before the description, and in a
+  tree too narrow for it, it is clipped at the row's end.
 - **Tree from code.** A `TreeHandle` (`NewTreeHandle`, passed with `Tree.Handle`)
   opens and closes nodes by key with `Expand` and `Collapse`, opens or closes all of
   them with `ExpandAll` and `CollapseAll`, and opens the nodes above a key and scrolls

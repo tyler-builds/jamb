@@ -532,7 +532,8 @@ type contextMenu struct {
 
 // ContextMenu opens a menu when the element is right-clicked, or when it has
 // focus and Shift+F10 or the Menu key is pressed. The menu opens at the pointer,
-// or below the focused element for the keyboard. build runs when the menu
+// or below the focused element for the keyboard: below the row or cell it
+// highlights when it is a list, a tree or a grid. build runs when the menu
 // opens; an empty result opens nothing. The menu closes as the menus of a menu
 // bar do.
 func (d *DivElement) ContextMenu(build func() []MenuItem) *DivElement {
@@ -543,7 +544,7 @@ func (d *DivElement) ContextMenu(build func() []MenuItem) *DivElement {
 // DropdownMenu wraps trigger so that a click opens a menu below it. Enter,
 // Space or Down opens it too, while trigger or a control in it has focus. build
 // runs when the menu opens; an empty result opens nothing. The wrapper keeps
-// the size of the trigger. The menu closes on a second click, on a press
+// the size of the trigger, and its parent aligns it as it would the trigger. The menu closes on a second click, on a press
 // outside it, or with Escape, and focus returns to where it was.
 func DropdownMenu(trigger Element, build func() []MenuItem) *DropdownMenuElement {
 	return &DropdownMenuElement{trigger: trigger, build: build}
@@ -607,7 +608,10 @@ func (dm *DropdownMenuElement) expand(ctx *Context) Element {
 			path.Set(highlightPath(built, keyboard))
 			open.Set(true)
 		}
-		d := Div().AlignSelf(Start).Shrink(0).AccessExpanded(open.Get()).
+		// The wrapper is laid out as its trigger would be in its place: its parent
+		// aligns it, a row centers it as it does a button, and a column keeps it at
+		// the trigger's width rather than stretching it.
+		d := Div().Row().Shrink(0).styleOf(&Style{fitWidth: true}).AccessExpanded(open.Get()).
 			OnClick(func() {
 				if open.Peek() {
 					closeMenu(true)
@@ -840,6 +844,10 @@ func (rt *Runtime) inContextMenu(id uint64) bool {
 // openFocusedMenu opens a context menu for the keyboard, below what has focus:
 // the menu of the focused link of a rich text, or else of the nearest element on
 // the focus path that has one. It reports whether it did.
+//
+// When what has focus is a list, a tree or a grid, the menu opens below the item
+// it highlights (the active row or cell) and takes that item's name, as Windows
+// places a menu opened with Shift+F10 or the Menu key at the focused item.
 func (rt *Runtime) openFocusedMenu() bool {
 	if n := rt.byID[rt.focusID]; n != nil && rt.focusedLink() != nil {
 		if build := segMenu(n.rich.segs, rt.focusLink-1); build != nil {
@@ -854,7 +862,18 @@ func (rt *Runtime) openFocusedMenu() bool {
 		return false
 	}
 	f := rt.nodeRect(path[0])
-	rt.openContextMenu(target, target.div.contextMenu, f.X, f.Y+f.H, true, "")
+	x, y, label := f.X, f.Y+f.H, ""
+	if row := highlightedRow(path[0]); row != nil {
+		// A row scrolled out of the focused element's box anchors nothing: the
+		// menu stays below the element, as when nothing is highlighted.
+		if r := rt.nodeRect(row); r.Y+r.H > f.Y && r.Y < f.Y+f.H {
+			x, y = max(r.X, f.X), min(r.Y+r.H, f.Y+f.H)
+		}
+		if role, ok := accessRole(row); ok {
+			label = (&accessBuilder{rt: rt}).name(row, absorbsText(role))
+		}
+	}
+	rt.openContextMenu(target, target.div.contextMenu, x, y, true, label)
 	return rt.ctxMenu != nil
 }
 
