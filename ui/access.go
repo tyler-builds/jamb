@@ -594,11 +594,16 @@ func (rt *Runtime) scrollIntoView(n *node) {
 		return
 	}
 	var left, top float32
+	var prev *node // the child of c that holds n
 	for p := n; p != nil && p != c; p = p.parent {
 		left += p.lay.X
 		top += p.lay.Y
+		prev = p
 	}
-	revealRange(c, top, top+n.lay.H)
+	if prev != stickyHeader(c) {
+		// A list's header is at the top of the view however far it scrolls.
+		revealRange(c, top, top+n.lay.H)
+	}
 	if c.style.OverflowX == OverflowScroll {
 		revealRangeX(c, left, left+n.lay.W)
 	}

@@ -362,6 +362,7 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		}
 	}
 	var sx, sy float32
+	var header *node // the list's header, which keeps the top of the viewport (see stickyHeader)
 	if n.st != nil && (s.OverflowX == OverflowScroll || s.OverflowY == OverflowScroll) {
 		if n.div != nil && n.div.vlist != nil && n.div.vlist.before != nil && !rt.inGhost {
 			n.div.vlist.before(n)
@@ -378,11 +379,7 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		// the labels beside them did not.
 		sx = rt.snapScroll(sx, max(n.lay.ContentW-n.lay.W, 0))
 		sy = rt.snapScroll(sy, max(n.lay.ContentH-n.lay.H, 0))
-		if n.div != nil && n.div.vlist != nil && n.div.vlist.sticky && len(n.children) > 1 {
-			// The header is the child after the rows. It is moved to the top of
-			// the viewport before the children are painted.
-			n.children[1].style.OffsetY = sy
-		}
+		header = stickyHeader(n)
 		if n.div != nil && n.div.vlist != nil && n.div.vlist.pin != nil && !rt.inGhost {
 			n.div.vlist.pin(n, sx)
 		}
@@ -394,6 +391,12 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		box.ox, box.oy = x-sx, y-sy
 	}
 	for _, c := range n.order {
+		cx, cy := x-sx, y-sy
+		if c == header {
+			// The header scrolls sideways with the rows, and not down with them: it
+			// is painted, culled and hit at the top of the viewport.
+			cy = y
+		}
 		if c.flags&(flagNoDisplay|flagOverlay|flagReplaced|flagMatched) != 0 {
 			if c.flags&(flagNoDisplay|flagReplaced) != 0 {
 				// Nothing of an element hidden by Display is drawn, or hit, nor
@@ -411,7 +414,7 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 				}
 				continue
 			}
-			if rt.deferFlight(c, x-sx, y-sy, childClip, opacity, fg) {
+			if rt.deferFlight(c, cx, cy, childClip, opacity, fg) {
 				// It flies: drawn after the rest of the window.
 				n.painted = append(n.painted, c)
 				continue
@@ -423,11 +426,11 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 		// (they are registered when built), and an element that was not drawn
 		// has no ghost to fade out when it is removed.
 		if rt.unculled == 0 && !rt.inGhost && c.keepGen != rt.paintGen &&
-			!inkVisible(&c.lay, x-sx, y-sy, childClip) &&
-			(c.flags&flagLayoutSpring == 0 || !springInk(c, x-sx, y-sy, childClip)) {
+			!inkVisible(&c.lay, cx, cy, childClip) &&
+			(c.flags&flagLayoutSpring == 0 || !springInk(c, cx, cy, childClip)) {
 			continue
 		}
-		rt.paintNode(c, x-sx, y-sy, childClip, opacity, fg, dt)
+		rt.paintNode(c, cx, cy, childClip, opacity, fg, dt)
 		n.painted = append(n.painted, c)
 	}
 	if box != nil && len(rt.held) > 0 {
