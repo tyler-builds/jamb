@@ -1,10 +1,12 @@
 // Package actions holds the actions of jamb's text fields and text areas: the
-// commands their keys run, such as Undo, Copy and MoveWordLeft. Bind them to
-// other keys, put them in menus, or turn their keys off:
+// commands their keys run, such as Undo, Copy and MoveWordLeft, and those of a
+// DataGrid, GridCopy and GridCopyWithHeaders. Bind them to other keys, put them in
+// menus, or turn their keys off:
 //
 //	ui.BindIn("Editor", "ctrl+d", actions.DeleteForward)
 //	ui.BindIn("Editor", "ctrl+z", ui.Unbind(actions.Undo))
 //	ui.MenuItem{Action: actions.Copy}
+//	ui.BindIn("DataGrid", "ctrl+shift+h", actions.GridCopyWithHeaders)
 //
 // ui.DefaultBindings maps the usual keys to them. Every action here is hidden
 // (see ui.Action.Hide), so a command palette leaves them out.
@@ -54,8 +56,14 @@ var (
 	Cancel            = find("editor.cancel")              // Cancel
 )
 
+// The actions of a DataGrid, looked up by name.
+var (
+	GridCopy            = find("data-grid.copy")              // Copy: the grid's selection, as tab-separated values
+	GridCopyWithHeaders = find("data-grid.copy-with-headers") // Copy with headers: the same, the columns' headers first
+)
+
 func find(name string) *ui.Action {
-	for _, a := range ui.EditorActions() {
+	for _, a := range append(ui.EditorActions(), ui.DataGridActions()...) {
 		if a.Name() == name {
 			return a
 		}

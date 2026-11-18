@@ -212,7 +212,7 @@ func builtinBindings() []Binding {
 		BindIn("CommandPalette > Editor", "pagedown", commandPalettePageDown),
 		BindIn("CommandPalette > Editor", "enter", commandPaletteRun),
 		BindIn("CommandPalette > Editor", "escape", commandPaletteClose),
-	}, selectableTextBindings()...)
+	}, append(selectableTextBindings(), dataGridBindings()...)...)
 }
 
 // editorMoveTo puts the caret at p. Without extend the selection collapses

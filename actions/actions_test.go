@@ -61,3 +61,16 @@ func TestEveryEditorActionHasAVariable(t *testing.T) {
 		}
 	}
 }
+
+// Every DataGrid action of ui has exactly one variable here.
+func TestEveryDataGridActionHasAVariable(t *testing.T) {
+	vars := []*ui.Action{GridCopy, GridCopyWithHeaders}
+	for i, a := range ui.DataGridActions() {
+		if vars[i] != a {
+			t.Errorf("ui's data grid action %q has no variable in package actions", a.Name())
+		}
+	}
+	if len(vars) != len(ui.DataGridActions()) {
+		t.Errorf("package actions has %d data grid actions, ui %d", len(vars), len(ui.DataGridActions()))
+	}
+}

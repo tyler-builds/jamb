@@ -248,6 +248,9 @@ type Strings struct {
 	// SelectAll names the corner of a grid's row headers, which selects every cell (see
 	// DataGrid.RowHeaders).
 	SelectAll string
+	// CopyTooLarge is announced when a copy of a grid's selection is refused because it
+	// has more cells than limit (see DataGrid.CopyText).
+	CopyTooLarge func(cells, limit int) string
 	// LoadingMore names the row at the end of a grid while it loads more rows, and is
 	// announced when the loading starts (see DataGrid.LoadingMore).
 	LoadingMore string
@@ -650,10 +653,14 @@ func englishStrings() *Strings {
 		EndOfRange:   "End of range",
 		InRange:      "In range",
 
-		NoResults:               "No results",
-		NoRows:                  "No rows",
-		LoadingMore:             "Loading more rows",
-		SelectAll:               "Select all",
+		NoResults:   "No results",
+		NoRows:      "No rows",
+		LoadingMore: "Loading more rows",
+		SelectAll:   "Select all",
+		CopyTooLarge: func(cells, limit int) string {
+			return "Not copied: the selection has " + strconv.Itoa(cells) + " cells, more than the " +
+				strconv.Itoa(limit) + " a copy takes."
+		},
 		NoMatchingCommands:      "No matching commands",
 		CouldNotLoadSuggestions: "Couldn't load suggestions",
 		SuggestionCount: func(n int) string {

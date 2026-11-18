@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/tyler-builds/jamb/actions"
 	"github.com/tyler-builds/jamb/ui"
 )
 
@@ -315,8 +316,9 @@ func layoutText(st ui.ColumnState) string {
 
 // shipmentsPart is the second data grid of the section: 240 shipments that load 60 at
 // a time, with a movable, pinned and grouped column layout that the app saves, and
-// buttons that scroll and focus the grid from code. A grid of six shipments under it
-// selects cells.
+// buttons that scroll and focus the grid from code. A grid of twelve shipments under
+// it selects cells, rows and columns as a SQL client's results grid does, and copies
+// them.
 func shipmentsPart(ctx *ui.Context, t *ui.Theme) ui.Element {
 	rows := ui.Local(ctx, "ship.rows", shipments(0, 60))
 	order := ui.Local(ctx, "ship.order", []string(nil))
@@ -324,7 +326,7 @@ func shipmentsPart(ctx *ui.Context, t *ui.Theme) ui.Element {
 	saved := ui.Local(ctx, "ship.saved", ui.ColumnState{})
 	loading := ui.Local(ctx, "ship.loading", false)
 	handle := ui.Local(ctx, "ship.handle", ui.NewDataGridHandle()).Peek()
-	cells := ui.Local(ctx, "ship.cells", []ui.CellKey(nil))
+	picked := ui.Local(ctx, "ship.picked", []ui.CellRange(nil))
 
 	reset := func() {
 		order.Set(nil)
@@ -357,13 +359,17 @@ func shipmentsPart(ctx *ui.Context, t *ui.Theme) ui.Element {
 		}).
 		LoadingMore(loading.Get()).Handle(handle).
 		Empty(ui.Text("No shipments")).Style(ui.Style{Height: ui.Px(320)})
-	sixRows := shipments(0, 6)
-	small := ui.DataGrid(sixRows, func(r shipRow) string { return r.ID },
+	results := shipments(0, 12)
+	small := ui.DataGrid(results, func(r shipRow) string { return r.ID },
 		ui.DataColumn[shipRow]{Header: "Order", Width: 130, Text: func(r shipRow) string { return r.ID }},
 		ui.DataColumn[shipRow]{Header: "Customer", Width: 170, Text: func(r shipRow) string { return r.Customer }},
 		ui.DataColumn[shipRow]{Header: "Carrier", Width: 120, Text: func(r shipRow) string { return r.Carrier }},
 		ui.DataColumn[shipRow]{Header: "Weight", Width: 120, Align: ui.End, Text: func(r shipRow) string { return fmt.Sprintf("%.1f kg", r.Weight) }},
-	).Label("Cell selection").CellSelection(ui.SelectionMultiple, cells).Style(ui.Style{Height: ui.Px(190)})
+	).Label("Cell selection").CellRanges(ui.SelectionMultiple, picked).RowHeaders().HeaderSelects().
+		Density(ui.DataGridCompact).Handle(handle2(ctx)).
+		ContextMenu(func(shipRow, string) []ui.MenuItem {
+			return []ui.MenuItem{{Action: actions.GridCopy}, {Action: actions.GridCopyWithHeaders}}
+		}).Style(ui.Style{Height: ui.Px(250)})
 
 	return ui.Div().Column().Gap(12).
 		Child(ui.Divider()).
@@ -379,8 +385,39 @@ func shipmentsPart(ctx *ui.Context, t *ui.Theme) ui.Element {
 			Child(ui.Button("Scroll to Week 20").Secondary().Small().OnClick(func() { handle.ScrollToColumn("Week 20") })).
 			Child(ui.Button("Reset columns").Secondary().Small().OnClick(reset))).
 		Child(grid).
-		Child(ui.Text("Cell selection: click a cell, Shift+click for a rectangle, Ctrl+Space for a column, Shift+Space for a row, Ctrl+A for all.").
+		Child(ui.Text("Cell selection: click or drag over cells, click a row's number or a column's header, or the corner for all; " +
+			"Ctrl adds, Shift extends. The arrow in a header sorts. Ctrl+C copies the selection for a spreadsheet, " +
+			"Ctrl+Shift+C with the headers.").
 			FontSize(13).TextColor(t.TextMuted)).
 		Child(small).
-		Child(ui.Text(fmt.Sprintf("%d cells selected", len(cells.Get()))).FontSize(13).TextColor(t.TextMuted))
+		Child(ui.Div().Row().Align(ui.Center).Gap(10).
+			Child(ui.Text(selectionText(picked.Get())).FontSize(13).TextColor(t.TextMuted)).
+			Child(ui.Button("Copy with headers").Secondary().Small().OnClick(func() { handle2(ctx).Copy(true) })))
+}
+
+// handle2 is the handle of the grid that selects cells, for its copy button.
+func handle2(ctx *ui.Context) *ui.DataGridHandle {
+	return ui.Local(ctx, "ship.handle2", ui.NewDataGridHandle()).Peek()
+}
+
+// selectionText describes a selection of cells: its ranges, each of whole rows,
+// whole columns or a block.
+func selectionText(rs []ui.CellRange) string {
+	if len(rs) == 0 {
+		return "Nothing selected"
+	}
+	var parts []string
+	for _, r := range rs {
+		switch {
+		case r.Rows.All && r.Columns.All && len(r.Rows.Keys)+len(r.Columns.Keys) == 0:
+			parts = append(parts, "every cell")
+		case r.Columns.All && len(r.Columns.Keys) == 0:
+			parts = append(parts, fmt.Sprintf("%d rows", len(r.Rows.Keys)))
+		case r.Rows.All && len(r.Rows.Keys) == 0:
+			parts = append(parts, fmt.Sprintf("%d columns", len(r.Columns.Keys)))
+		default:
+			parts = append(parts, fmt.Sprintf("a block of %d by %d", len(r.Rows.Keys), len(r.Columns.Keys)))
+		}
+	}
+	return "Selected: " + strings.Join(parts, ", ")
 }

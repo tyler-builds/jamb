@@ -85,6 +85,10 @@ type DataColumn[T any] struct {
 	// Value is the text that an edit starts with, when it differs from Text, such as
 	// the raw number of a formatted one. Nil means Text.
 	Value func(row T) string
+	// CopyText is the text of a cell when the selection is copied (see
+	// DataGridElement.CopyText), when it differs from Text, such as the full value of
+	// a shortened one. Nil means Text.
+	CopyText func(row T) string
 	// Editor replaces the text field of an edit with what it returns, such as a
 	// Select, a NumberInput or a CheckBox. value is the pending value, which starts
 	// as Value (or Text); change sets the pending value; commit saves it through Edit
@@ -503,6 +507,7 @@ type DataGridElement[T any] struct {
 	onCollapse   func(key string)
 	headSelects  bool // a click on a column's header selects the column (see HeaderSelects)
 	rowHeaders   bool // see RowHeaders
+	copyText     func(c DataGridCopy[T]) string
 }
 
 // HeaderSelects makes a click on a column's header select the column, as in a
@@ -889,6 +894,7 @@ type DataGridHandle struct {
 	row, col       string
 	hasRow, hasCol bool
 	focus          bool
+	copy           func(headers bool) // the copy of the grid's last build
 }
 
 // NewDataGridHandle creates a handle to pass to DataGrid.Handle.
@@ -914,6 +920,16 @@ func (h *DataGridHandle) ScrollToColumn(key string) {
 func (h *DataGridHandle) FocusCell(rowKey, colKey string) {
 	h.row, h.hasRow, h.col, h.hasCol, h.focus = rowKey, true, colKey, true, true
 	h.request()
+}
+
+// Copy copies the grid's selection to the clipboard now, as Ctrl+C does, or with the
+// headers of its columns first, as Ctrl+Shift+C does, when withHeaders is set. It is
+// for a toolbar button or a menu of the app's that takes focus from the grid. It does
+// nothing before the grid is first built.
+func (h *DataGridHandle) Copy(withHeaders bool) {
+	if h.copy != nil {
+		h.copy(withHeaders)
+	}
 }
 
 func (h *DataGridHandle) request() {
@@ -2968,6 +2984,44 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		return g.rowMenu(rows[sh.order[p]], cols[c].key())
 	}
+	// copySelection puts the selection on the clipboard as text (see CopyText), with the
+	// headers of its columns first when headers is set. A grid that selects rows copies
+	// its rows, and with nothing selected the copy is the focused cell.
+	copySelection := func(headers bool) {
+		if n == 0 || nc == 0 {
+			return
+		}
+		var rs []CellRange
+		switch {
+		case g.cellOn:
+			rs = rangeSel.Peek()
+		case g.mode != SelectionNone && len(sel.Peek()) > 0:
+			rs = []CellRange{{Rows: keysIn(sel.Peek()...), Columns: allKeys}}
+		}
+		src := dgCopySource[T]{n: len(sh.order), row: func(q int) T { return rows[sh.order[q]] }, key: keyAt, cols: cols, sel: rs}
+		c, cells := copyOf(src, headers, g.copyText != nil)
+		if cells == 0 {
+			q := min(max(cur.Peek().pos, 0), n-1)
+			src.sel = []CellRange{cellRange(q, colOf(cur.Peek().colKey, cur.Peek().col))}
+			c, cells = copyOf(src, headers, g.copyText != nil)
+		}
+		var text string
+		switch {
+		case g.copyText != nil:
+			text = g.copyText(c)
+		case cells > dataGridCopyMax:
+			Announce(strs.CopyTooLarge(cells, dataGridCopyMax), access.Assertive)
+			return
+		default:
+			text = c.Text()
+		}
+		if text != "" {
+			rt.setClipboard(text)
+		}
+	}
+	if h := g.gridHandle; h != nil {
+		h.copy = copySelection
+	}
 	rc := dgRowCtx[T]{t: t, ctx: ctx, st: &st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed, startN: startN, endN: endN,
 		built: built, cells: cellsOn, rowHeadW: rowHeadW, onRowHead: onRowHead, click: click, colAt: colAt, activate: activate, ops: ops, store: store}
@@ -3020,6 +3074,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 					e.StopPropagation()
 				}
 			}).
+			KeyContext("DataGrid").
+			OnAction(dataGridCopy, func() { copySelection(false) }).
+			OnAction(dataGridCopyHeaders, func() { copySelection(true) }).
 			OnFocus(func() { focused.Set(true) }).
 			OnBlur(func() { focused.Set(false) }).
 			OnTextInput(typeText)
@@ -3345,6 +3402,7 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 	// The handlers act on the row where it is now (m.q), through the closures of the
 	// grid's last build (sh.live), since the row may be kept for later builds.
 	live := &sh.live
+	rt := rc.ctx.rt
 	i := sh.order[q]
 	k := sh.keys[i]
 	v := rows[i]
@@ -3379,9 +3437,17 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 		r.AccessSelected(on)
 	}
 	r.OnMouseDown(func(e *MouseEvent) {
-		if e.Button == input.ButtonLeft {
+		switch e.Button {
+		case input.ButtonLeft:
 			sh.pressed, sh.ctl = true, false
 			live.press(m.q, live.colAt(m.q, e.X), e.Mods)
+		case input.ButtonRight:
+			// A right-press focuses the grid before its context menu opens, as File
+			// Explorer does, so that the menu's actions (such as actions.GridCopy) run on
+			// the grid, and focus returns to it when the menu closes.
+			if !sh.focus.Focused() && !rt.focusInside(sh.focus.id) {
+				sh.focus.FocusNow()
+			}
 		}
 	})
 	if g.cellOn && g.cellMode == SelectionMultiple {
