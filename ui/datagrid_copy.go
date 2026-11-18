@@ -33,7 +33,7 @@ func dataGridBindings() []Binding {
 
 // dataGridCopyMax is the most cells a copy of a DataGrid's selection makes text of by
 // itself. A copy runs on the UI thread, since it reads the app's rows: 400,000 short
-// cells take about 30 ms and 13 MB (BenchmarkDataGridCopy100k), so the limit is a few
+// cells take about 25 ms and 13 MB (BenchmarkDataGridCopy100k), so the limit is a few
 // tenths of a second and some tens of MB, which the platform's clipboard then copies
 // again. A larger selection is not copied, and a message is announced; CopyText lets
 // an app copy more.

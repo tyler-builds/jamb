@@ -398,8 +398,14 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst, 
 //     toggles the focused cell, Shift+Space selects its row, Ctrl+Space its column,
 //     and Ctrl+A every cell. After Ctrl+Space, Shift extends whole columns, and after
 //     Shift+Space whole rows.
+//   - Ctrl+C and Ctrl+Insert copy the selection as tab-separated text, and
+//     Ctrl+Shift+C copies it with the headers of its columns (see CopyText). They are
+//     the actions of DataGridActions, bound in the grid's key context, "DataGrid".
+//   - With RowHeaders, Left from the first column moves to the row's header, and Up
+//     from the first row's header to the corner (see RowHeaders).
 //   - Enter activates the focused row, and calls OnActivate with it.
-//   - On a header cell, Enter and Space sort by its column (see Sort). On a
+//   - On a header cell, Enter and Space sort by its column (see Sort); with
+//     HeaderSelects, Space selects the column instead. On a
 //     resizable header cell, Ctrl+Left and Ctrl+Right narrow and widen the column by
 //     8 logical pixels. On a movable header cell (see DataColumn.Movable),
 //     Ctrl+Shift+Left and Ctrl+Shift+Right move the column one place, and its new
@@ -427,7 +433,8 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst, 
 // starts an edit. A click on a control in a cell (see DataColumn.Interactive)
 // focuses and operates the control; it moves the cursor to the cell but does not
 // select or activate the row. A click on a header sorts by its column: ascending,
-// then descending, then not sorted. Dragging the edge of a resizable header
+// then descending, then not sorted; with HeaderSelects it selects the column, and the
+// header's arrow sorts. Dragging the edge of a resizable header
 // resizes its column, and a double-click on the edge fits the column to the rows
 // in view. Dragging a movable header moves its column: a line shows the side of the
 // header under the pointer that it lands on. A column header stays at the top of

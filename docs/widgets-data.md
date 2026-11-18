@@ -198,7 +198,7 @@ picked.Set([]ui.CellRange{
 })
 ```
 
-Ctrl+A and a Ctrl+click that follows it each take well under a millisecond on 100,000 rows of 4 columns with `CellRanges`, against more than 100 ms and 38 MB when every cell had a key (`BenchmarkDataGridSelectAll100k`, `BenchmarkDataGridCtrlClickAfterSelectAll100k`).
+Ctrl+A and a Ctrl+click that follows it each take well under a millisecond on 100,000 rows of 4 columns with `CellRanges`, against about 49 ms and 38 MB when every cell had a key (`BenchmarkDataGridSelectAll100k`, `BenchmarkDataGridCtrlClickAfterSelectAll100k`).
 
 **Row and column headers.** `RowHeaders()` and `HeaderSelects()` make the grid select as SQL Server Management Studio's results grid does. Both are off by default, so a grid's header click still sorts.
 
@@ -238,7 +238,7 @@ For assistive technology a row's header is a `HeaderItem` with the row's number 
 - A cell's text is `DataColumn.CopyText`, or `Text` without it; a column with neither copies empty fields. A header is the column's `Header`.
 - A field with a tab, a line break or a double quote is put in double quotes, with each double quote doubled, which a spreadsheet such as Excel reads back as one cell on a paste.
 - `CopyText(fn)` replaces the whole text: `fn` gets a `ui.DataGridCopy[T]` with the copied `Rows` (as `T`) and `Columns` (keys), `Headers` for Ctrl+Shift+C, `Selected(row, col)` for a cell, and `Text()`, the default text. An empty result copies nothing, for an app that writes the clipboard itself.
-- A copy runs on the UI thread, since it reads the app's rows: Ctrl+C of 100,000 rows of 4 columns takes about 30 ms and 13 MB (`BenchmarkDataGridCopy100k`). A selection of more than 2,000,000 cells is not copied, and a message is announced (`Strings.CopyTooLarge`); with `CopyText` the app decides, and `fn` is still called.
+- A copy runs on the UI thread, since it reads the app's rows: Ctrl+C of 100,000 rows of 4 columns takes about 25 ms and 13 MB (`BenchmarkDataGridCopy100k`). A selection of more than 2,000,000 cells is not copied, and a message is announced (`Strings.CopyTooLarge`); with `CopyText` the app decides, and `fn` is still called.
 
 **Interactive and editable cells.** A cell that holds controls, or an editor, is still the grid's one Tab stop: the controls and the editor are not in the Tab order, and the grid's keys reach them through the focus. The model follows the WAI-ARIA grid pattern (https://www.w3.org/WAI/ARIA/apg/patterns/grid/), which describes two states without naming them: grid navigation, in which the grid holds focus, and the cell's own widgets, which Enter or F2 move focus into. In the second state Tab and Shift+Tab move to the next and previous widget, which the pattern lets wrap inside the cell or leave the grid; this grid wraps inside the cell. Escape (the pattern's "restores grid navigation") or F2 returns to grid navigation on the same cell. The keys a control uses (the arrows of a text field, Enter on a button) belong to the control. An edit saves on Enter and on Tab, and when focus leaves its editor (a click elsewhere in the grid), as a spreadsheet does. Escape is the only cancel. This blur save is a choice of this grid, not a rule of the pattern.
 
