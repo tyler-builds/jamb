@@ -226,6 +226,14 @@ path, and passed over elsewhere. While a menu is open, the focus path is the
 one of the element the menu returns focus to, where it runs its actions, so a
 menu bar opened from an editor shows the editor's keys.
 
+`KeysFor` is not reactive: it reads no signal, so a component that calls it in
+its render, such as for a toolbar button's tooltip, keeps the keys it got when it
+last rendered, even after focus moves into or out of the binding's context. Menus
+and the command palette are built when they open, so they are current. To keep a
+tooltip current, read `h.FocusWithin()` on the handle of the element that has the
+context in the same render, so the component re-renders when focus enters or
+leaves it.
+
 **The Pause key.** `"pause"` names the Pause/Break key, and `"break"` is the
 same key: `ui.Bind("alt+break", CancelQuery)` binds Alt+Pause, and menus show
 it as "Alt+Pause". With Ctrl held, Windows and Linux report the key as Break

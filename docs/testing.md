@@ -181,15 +181,15 @@ On the UI:
 - `u.ClickAt(x, y, mods...)` clicks the point `x`, `y` of the window, in the
   logical pixels of `Bounds`, with any modifiers held. Whatever is there takes the
   click.
-
-Every click goes through the same path: the pointer moves to the point, the button
-is pressed and released there, and a frame runs, which a [recording](#motion)
-marks as following an input.
 - `u.Type(text)` types into whatever has focus.
 - `u.Press(keys)` presses keys, written as for `ui.Bind`: `"enter"`, `"tab"`,
   `"shift+tab"`, `"ctrl+a"`, `"f2"`, or a chord such as `"ctrl+k ctrl+s"`.
   Press sends the key events only, not the text a key would type. Use `Type`
   for text.
+
+Every click goes through the same path: the pointer moves to the point, the button
+is pressed and released there, and a frame runs, which a [recording](#motion)
+marks as following an input.
 
 Focus is shown as keyboard focus (the `FocusVisible` styles, the focus ring)
 after a key press, and not after a click or `Focus`. That is why the example
