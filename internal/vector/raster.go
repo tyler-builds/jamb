@@ -47,12 +47,25 @@ type rasterizer struct {
 	crossings []crossing // used by fillReference in the tests
 	frac      []float32  // per pixel: the partial coverage of span ends
 	run       []float32  // per pixel boundary: where full coverage starts and stops
+	// rows holds, for each row of the last fill, the pixels it set.
+	rows []rowSpan
+	full []float32 // fillRect's row that every scanline crosses
 }
 
+// rowSpan is the pixels of one row that a fill set: x0 up to x1, none when
+// x0 >= x1.
+type rowSpan struct{ x0, x1 int32 }
+
 // fill sets cov (w*h values from 0 to 1) to the coverage of polys under rule,
-// within the rows y0..y1 it returns; rows outside are left alone, at 0 when
-// cov was zeroed.
-func (r *rasterizer) fill(polys [][]Point, rule FillRule, w, h int, cov []float32) (y0, y1 int) {
+// within the rows y0..y1 it returns, which lie within top..bottom (0 <= top,
+// bottom <= h). In each row y it sets only r.rows[y-y0], and leaves the rest of
+// the row alone, as it leaves the rows outside; they hold 0 when cov was zeroed.
+// So the work of a fill follows the size of its shape, not of the canvas.
+func (r *rasterizer) fill(polys [][]Point, rule FillRule, w, h, top, bottom int, cov []float32) (y0, y1 int) {
+	r.rows = r.rows[:0]
+	if y0, y1, ok := r.fillRect(polys, w, top, bottom, cov); ok {
+		return y0, y1
+	}
 	r.edges = r.edges[:0]
 	minY, maxY := float32(math.Inf(1)), float32(math.Inf(-1))
 	for _, poly := range polys {
@@ -74,23 +87,18 @@ func (r *rasterizer) fill(polys [][]Point, rule FillRule, w, h int, cov []float3
 		return 0, 0
 	}
 	r.sortEdges(h)
-	y0 = max(int(math.Floor(float64(minY))), 0)
-	y1 = min(int(math.Ceil(float64(maxY))), h)
+	y0 = max(int(math.Floor(float64(minY))), top)
+	y1 = min(int(math.Ceil(float64(maxY))), bottom)
 	if y0 >= y1 {
 		return 0, 0
 	}
-	if cap(r.frac) < w+2 {
-		r.frac = make([]float32, w+2)
-		r.run = make([]float32, w+2)
-	}
-	frac, run := r.frac[:w+2], r.run[:w+2]
+	frac, run := r.buffers(w)
 	r.active, r.xs = r.active[:0], r.xs[:0]
 	next := 0
 	const weight = 1.0 / subsamples
 	for y := y0; y < y1; y++ {
-		clear(frac)
-		clear(run)
-		touched := false
+		// lo..hi are the indexes of frac and run this row adds to.
+		lo, hi := w+1, -1
 		for s := range subsamples {
 			sy := float32(y) + (float32(s)+0.5)/subsamples
 			for next < len(r.edges) && r.edges[next].y0 <= sy {
@@ -123,22 +131,116 @@ func (r *rasterizer) fill(polys [][]Point, rule FillRule, w, h int, cov []float3
 				if !was && now {
 					start = r.xs[k]
 				} else if was && !now {
-					span(frac, run, start, r.xs[k], w, weight)
-					touched = true
+					if i0, i1, ok := span(frac, run, start, r.xs[k], w, weight); ok {
+						lo, hi = min(lo, i0), max(hi, i1)
+					}
 				}
 			}
 		}
-		if !touched {
-			continue
-		}
-		row := cov[y*w : (y+1)*w]
-		acc := float32(0)
-		for x := range w {
-			acc += run[x]
-			row[x] = min(max(acc+frac[x], 0), 1)
-		}
+		r.rows = append(r.rows, r.settle(frac, run, lo, hi, w, cov[y*w:(y+1)*w]))
 	}
 	return y0, y1
+}
+
+// buffers returns frac and run for a canvas w pixels wide. Between fills they
+// are all 0.
+func (r *rasterizer) buffers(w int) (frac, run []float32) {
+	if cap(r.frac) < w+2 {
+		r.frac = make([]float32, w+2)
+		r.run = make([]float32, w+2)
+	}
+	return r.frac[:w+2], r.run[:w+2]
+}
+
+// settle sets row to the coverage that the spans of one row of pixels added to
+// frac and run at the indexes lo to hi, sets those back to 0, and returns the
+// pixels it set.
+func (r *rasterizer) settle(frac, run []float32, lo, hi, w int, row []float32) rowSpan {
+	if hi < lo {
+		return rowSpan{}
+	}
+	// run holds steps of 1/subsamples, which add up exactly, so the coverage is
+	// 0 before lo and past hi, where the row is left as it is.
+	end := min(hi+1, w)
+	acc := float32(0)
+	for x := lo; x < end; x++ {
+		acc += run[x]
+		row[x] = min(max(acc+frac[x], 0), 1)
+	}
+	clear(frac[lo : hi+1])
+	clear(run[lo : hi+1])
+	return rowSpan{int32(lo), int32(end)}
+}
+
+// fillRect is fill for a single rectangle with sides along the axes, the shape
+// a grid draws most, and reports whether polys is one. It gives the coverage
+// fill gives: each row is the same spans, added up the same way, and only the
+// number of scanlines that cross it differs, so rows crossed by all of them
+// copy one row worked out once.
+func (r *rasterizer) fillRect(polys [][]Point, w, top, bottom int, cov []float32) (y0, y1 int, ok bool) {
+	if len(polys) != 1 || len(polys[0]) != 4 {
+		return 0, 0, false
+	}
+	p := polys[0]
+	for _, q := range p {
+		if isBad(q) {
+			return 0, 0, false
+		}
+	}
+	if !(p[0].Y == p[1].Y && p[1].X == p[2].X && p[2].Y == p[3].Y && p[3].X == p[0].X) &&
+		!(p[0].X == p[1].X && p[1].Y == p[2].Y && p[2].X == p[3].X && p[3].Y == p[0].Y) {
+		return 0, 0, false
+	}
+	xa, xb := min(p[0].X, p[2].X), max(p[0].X, p[2].X)
+	ya, yb := min(p[0].Y, p[2].Y), max(p[0].Y, p[2].Y)
+	if ya == yb {
+		return 0, 0, true // no edge crosses a scanline, as in fill
+	}
+	y0 = max(int(math.Floor(float64(ya))), top)
+	y1 = min(int(math.Ceil(float64(yb))), bottom)
+	if y0 >= y1 {
+		return 0, 0, true
+	}
+	frac, run := r.buffers(w)
+	const weight = 1.0 / subsamples
+	// row adds the spans of n scanlines and settles them into dst, as fill does
+	// for a row that n of its scanlines cross.
+	row := func(n int, dst []float32) rowSpan {
+		lo, hi := w+1, -1
+		for range n {
+			if i0, i1, ok := span(frac, run, xa, xb, w, weight); ok {
+				lo, hi = min(lo, i0), max(hi, i1)
+			}
+		}
+		return r.settle(frac, run, lo, hi, w, dst)
+	}
+	var full rowSpan // the row that all scanlines cross, in r.full
+	haveFull := false
+	for y := y0; y < y1; y++ {
+		dst := cov[y*w : (y+1)*w]
+		if float32(y) >= ya && float32(y+1) <= yb {
+			// Every scanline of the row lies within ya..yb.
+			if !haveFull {
+				if cap(r.full) < w {
+					r.full = make([]float32, w)
+				}
+				full, haveFull = row(subsamples, r.full[:w]), true
+			}
+			copy(dst[full.x0:full.x1], r.full[full.x0:full.x1])
+			r.rows = append(r.rows, full)
+			continue
+		}
+		// The scanlines that fill takes the edges up at and drops them at.
+		n := 0
+		for s := range subsamples {
+			sy := float32(y) + (float32(s)+0.5)/subsamples
+			if ya <= sy && sy < yb {
+				n++
+			}
+		}
+		r.rows = append(r.rows, row(n, dst))
+	}
+	return y0, y1, true
 }
 
 // sortEdges sorts r.edges by y0, as the scanlines take them up. It counts the edges
@@ -223,16 +325,17 @@ func isBad(p Point) bool {
 
 // span adds the coverage of a scanline from x0 to x1, weighted by wt: the
 // partly covered pixels at its ends to frac, and the fully covered ones
-// between as a step in run.
-func span(frac, run []float32, x0, x1 float32, w int, wt float32) {
+// between as a step in run. It adds to indexes i0 to i1 of them, and reports
+// whether it added anything.
+func span(frac, run []float32, x0, x1 float32, w int, wt float32) (i0, i1 int, ok bool) {
 	x0, x1 = max(x0, 0), min(x1, float32(w))
 	if x0 >= x1 {
-		return
+		return 0, 0, false
 	}
-	i0, i1 := int(x0), int(x1)
+	i0, i1 = int(x0), int(x1)
 	if i0 == i1 {
 		frac[i0] += (x1 - x0) * wt
-		return
+		return i0, i1, true
 	}
 	frac[i0] += (float32(i0+1) - x0) * wt
 	run[i0+1] += wt
@@ -240,4 +343,5 @@ func span(frac, run []float32, x0, x1 float32, w int, wt float32) {
 	if i1 < w {
 		frac[i1] += (x1 - float32(i1)) * wt
 	}
+	return i0, i1, true
 }

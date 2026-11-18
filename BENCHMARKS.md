@@ -1,7 +1,7 @@
 # Benchmarks
 
-This file reports jamb's measured performance. The text draw cache of 2026-11-11
-comes first, then the 3,000-row benchmark of 2026-11-10; then the v0.4.0 update of 2026-10-23: it measured again what the release's resize fix changed, and the GPUI
+This file reports jamb's measured performance. Canvas fills of 2026-11-18 come
+first, then the text draw cache of 2026-11-11, then the 3,000-row benchmark of 2026-11-10; then the v0.4.0 update of 2026-10-23: it measured again what the release's resize fix changed, and the GPUI
 comparison. The current results of the performance work, dated 2026-10-22, follow
 it. They are compared with the results of 2026-10-21, which
 were measured before the performance work of 2026-10-22 and follow them. Each
@@ -10,6 +10,48 @@ measurements (2026-10-06 to 2026-10-14) follow under
 [Earlier measurements](#earlier-measurements), with their original dates. Where a
 later figure replaces an earlier one, the earlier figure is marked superseded and
 kept, so the history stays readable.
+
+## Canvas fills (2026-11-18)
+
+A canvas fill worked out the coverage of each row its shape crosses across the whole width of the
+canvas, and then looked at every pixel of those rows to draw it, so a small shape cost more on a
+wider canvas. A profile put nearly all of the time in those two loops. A fill now keeps, for each
+row, to the pixels its shape's edges reach. A rectangle with sides along the axes works out the
+row its edges cross whole once and copies it to the rows below. `Clip` made a mask the size of
+the canvas on each call; a mask now holds only the clip's bounds, in memory reused from the
+masks of earlier clips, and a fill under a clip works out only the clip's rows. What is
+drawn does not change: a test draws scenes with the code as it was and checks the bytes, and
+the 13,349 images of every icon at seven sizes came out the same.
+
+Measured on Linux, Intel Core i5-11600K, Go 1.27.4, `-count 10` with each run of `main` at
+`ab4b3bf` followed by one of the branch, medians compared by benchstat. Other work kept the load
+at 11 to 23 on 12 threads, so the spread is wide (up to ±100%); every change below has p = 0.000.
+
+| Benchmark | main | Branch | Change | B/op, main / branch |
+|---|--:|--:|--:|--:|
+| `FillCells`, 400 cells of 8 by 8, canvas 200 wide | 2.61 ms | 277 µs | -89% | 72 / 72 KiB |
+| `FillCells`, canvas 800 wide | 6.02 ms | 271 µs | -96% | 72 / 72 KiB |
+| `FillCells`, canvas 3,200 wide | 20.8 ms | 274 µs | -99% | 72 / 72 KiB |
+| `ClipCells`, 100 clipped cells, canvas 200 wide | 2.64 ms | 138 µs | -95% | 15.7 MiB / 36 KiB |
+| `ClipCells`, canvas 800 wide | 11.1 ms | 148 µs | -99% | 61.8 MiB / 36 KiB |
+| `ClipCells`, canvas 3,200 wide | 25.9 ms | 132 µs | -99.5% | 244.6 MiB / 36 KiB |
+| `Grid1600x900`, a grid of results drawn on a cleared canvas | 53.5 ms | 1.60 ms | -97% | 31 / 30 KiB |
+| `ui` `CanvasGrid`, the same grid redrawn in a 1600 by 900 window | 51.9 ms | 2.23 ms | -96% | 44 / 44 KiB |
+| `codeedit` `ScrollFrame50kLines` | 714 µs | 237 µs | -67% | 35 / 36 KiB |
+| `codeedit` `KeystrokeWrapped50kLines` | 982 µs | 540 µs | -45% | 33 / 39 KiB |
+
+`ClipCells` makes 1,400 allocations rather than 1,500; the others make as many as before. The
+2,800 allocations of `FillCells` are the paths' flattened points, 7 for each fill, which this
+change leaves. `ChartStroke`, `ChartStrokeDense` and `ChartArea`, whose shapes cross the whole
+canvas, did not change (p > 0.19).
+
+To reproduce:
+
+```
+go test -run '^$' -bench 'FillCells|ClipCells|Grid1600|Chart' -benchmem -count=10 ./internal/vector
+go test -run '^$' -bench 'CanvasGrid' -benchmem -count=10 ./ui
+go test -run '^$' -bench 'ScrollFrame50kLines|KeystrokeWrapped50kLines' -benchmem -count=10 ./codeedit
+```
 
 ## Text draw cache (2026-11-11)
 

@@ -165,7 +165,7 @@ func TestFillMatchesTheReference(t *testing.T) {
 	for n, polys := range cases {
 		for _, rule := range []FillRule{NonZero, EvenOdd} {
 			got, want := make([]float32, w*h), make([]float32, w*h)
-			gy0, gy1 := r.fill(polys, rule, w, h, got)
+			gy0, gy1 := r.fill(polys, rule, w, h, 0, h, got)
 			wy0, wy1 := ref.fillReference(polys, rule, w, h, want)
 			if gy0 != wy0 || gy1 != wy1 {
 				t.Fatalf("case %d, rule %d: rows %d..%d, want %d..%d", n, rule, gy0, gy1, wy0, wy1)
