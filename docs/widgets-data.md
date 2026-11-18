@@ -17,6 +17,10 @@ h.ScrollToItem(5000)                    // scrolls the least amount that shows r
 Assistive technology reads a list with its number of items. `Label` names it, such as
 "Search results"; both kinds of list take it.
 
+A row that is a `Div` with a `ZIndex` is drawn over the other rows, as it would be over
+its siblings: something it draws past its edges, such as a focus ring, is not covered
+by the row below.
+
 ## Variable-height lists
 
 When rows differ in height, use `ui.ListOf`. It takes the items, a key for each
@@ -140,6 +144,7 @@ The grid's methods:
 - `Sort(s)`: the `ui.SortState` (`Key` and `Desc`) in `s`. A click on a header cycles the column through ascending, descending and not sorted. A nil `s` keeps the sort in the grid.
 - `OnActivate(fn)`: runs `fn` with the row, on Enter or a double-click.
 - The look of the states is a fill or a line, not a change of weight: a selected row has the `RowSelected` fill, a sorted column has its arrow (`SortIndicator`), and the text keeps its weight. A selected row or cell (`RowSelected`, `CellSelected`) is the accent at 0.28 alpha on a dark theme and 0.20 on a light one: about 1.36:1 against the row under it, the strongest at which the focused cell's ring keeps 3:1 on it, with text at more than 10:1. A row's or a column's header selected whole (`RowHeaderSelected`, `HeaderCellSelected`) is the solid accent with `AccentText`, so it stands apart from the cells' fill. The theme's `DataGrid` and `Styles` replace any of them.
+- A selection reads as one block: between two selected cells of a column, two selected rows, or two selected row headers, the separator under the row (the `Row` part's bottom border) is covered by the selection's fill, and at the selection's edge, next to a cell that is not selected, the separator stays. A selected cell that joins the one below it is filled first with the grid's background and its row's fill (striped or hovered), so that its translucent fill looks the same over the separator as over the rest of the row, and the focused cell and its row are drawn over their neighbors, so that its ring stays whole. The line at the inner edge of pinned columns (`PinnedEdge`), the row headers' edge and the header's bottom line stay inside a selection: they mark the frozen parts of the grid, not cells.
 - `Density(d)`: `ui.DataGridComfortable` (36 logical pixels a row, the default) or `ui.DataGridCompact` (26). `Striped()` draws every other row in `RowAlternate`.
 - `Loading(on)`: shows a progress ring over the rows. The rows, the focus and the selection stay.
 - `Empty(el)`: what the grid shows with no rows. The default is "No rows". A `ui.Empty` state fits here (see [widgets-feedback.md](widgets-feedback.md#empty-states)).

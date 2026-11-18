@@ -1230,6 +1230,7 @@ type dgRowSig struct {
 	level      int  // the level of a tree row
 	kids, open bool // a tree row has children, and is open
 	num        int  // the number the row's header shows, or zero without row headers
+	join       bool // the row and the one below it are selected (see joinBelow)
 }
 
 // dgRowMemo is a built row of a grid: its element, what it was built from, and the
@@ -3455,6 +3456,7 @@ func (g *DataGridElement[T]) rowFor(rc *dgRowCtx[T], q int) Element {
 	if rc.rowHeadW > 0 {
 		sig.num = q + 1
 	}
+	sig.join = sig.selected && rc.selected[rc.keyBelow(q)]
 	pos, size := q+1, sh.n
 	if t := sh.tree; t != nil {
 		pos, size = t.pos[i], t.size[i]
@@ -3511,8 +3513,21 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 	}
 	if on {
 		r.styleOf(&st.RowSelected)
+		if rc.selected[rc.keyBelow(q)] {
+			// The separator between two selected rows is not drawn, so that the selection
+			// reads as one block: the row's fill covers it (see joinBelow). Its width goes
+			// to the padding, so the cells keep their height.
+			if bw := r.style.borderEdges().Bottom; bw > 0 {
+				pad := r.style.Padding
+				pad.Bottom += bw
+				r.styleOf(&Style{Clear: ClearBorder}).styleOf(&Style{Padding: pad})
+			}
+		}
 	} else {
 		r.hoverOf(&st.RowHover)
+	}
+	if !rc.onHeader && q == rc.cursorPos {
+		r.ZIndex(dgZFocus) // the list draws the cursor's row over the others (see joinBelow)
 	}
 	// A row reports its place in the grid, for the hit test, and its place in the set for
 	// assistive technology: among the shown rows, or among its siblings in a tree. In a
@@ -3574,6 +3589,7 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 		r.Child(g.rowHeader(rc, q, m, k, on))
 	}
 	var names []string
+	joins := false // the cell being built joins the selected cell below it (see joinBelow)
 	// skip is the width of the columns not built since the last cell, which a spacer
 	// hidden from assistive technology takes.
 	var skip float32
@@ -3613,6 +3629,9 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 			ci, picked := c, rc.cells.has(k, cl.key())
 			if picked {
 				cell.styleOf(&st.CellSelected)
+				if below := rc.keyBelow(q); below != "" && rc.cells.has(below, cl.key()) {
+					joins = true
+				}
 			}
 			cell.AccessSelected(picked)
 			cell.access().selectWith = func(ctrl bool) {
@@ -3633,6 +3652,9 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 		}
 		a := cell.access()
 		if !onHeader && !rc.onRowHead && q == cursorPos && c == cursorCol {
+			if cl.Pin == PinNone {
+				cell.ZIndex(dgZFocus)
+			}
 			a.highlighted = true
 			if hasFocus {
 				cell.styleOf(&st.CellFocused)
@@ -3731,6 +3753,10 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 					Child(Icon(icons.Alert).Size(14).Color(st.EditorMessage.TextColor)).
 					Child(Text(ed.err).NoWrap())))
 		}
+		if joins {
+			joinBelow(cell, st, true)
+			joins = false
+		}
 		r.Child(cell)
 	}
 	spacer()
@@ -3739,6 +3765,48 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 	}
 	return r
 }
+
+// keyBelow returns the key of the row shown under the row at q, or "" for the last.
+func (rc *dgRowCtx[T]) keyBelow(q int) string {
+	if q+1 >= len(rc.sh.order) {
+		return ""
+	}
+	return rc.sh.keys[rc.sh.order[q+1]]
+}
+
+// joinBelow makes d, a selected cell or row header whose neighbor below is selected
+// too, reach over the separator under its row (the Row part's bottom border), so that
+// the selection's fill is one block with no line between its rows. Its padding grows by
+// as much, so its content stays where it was. A cell at the edge of the selection does
+// not join, so the edge stays crisp.
+//
+// A cell's fill is translucent, and over the separator it would show the line through
+// it, so the cell is first filled with the grid's background and its row's fill, as a
+// pinned cell is (fillFromParent): over the separator it then looks as it does over the
+// rest of its row, striped or hovered. That fill is opaque, so the focused cell and its
+// row are drawn over their neighbors (see dgZFocus), and its ring is not covered. A row
+// header's fill is opaque already.
+func joinBelow(d *DivElement, st *DataGridStyle, opaque bool) {
+	bw := st.Row.borderEdges().Bottom
+	if bw <= 0 {
+		return
+	}
+	pad := d.style.Padding
+	pad.Bottom += bw
+	d.styleOf(&Style{Margin: Edges{Bottom: -bw}, Padding: pad})
+	if opaque && !d.fillFromParent {
+		d.fillFromParent, d.fillBase = true, st.Grid.Background
+	}
+}
+
+// The paint order of the parts of a grid, among their siblings: the focused cell over
+// the other cells of its row and the cursor's row over the other rows (dgZFocus), so
+// that the focused cell's ring is not covered by an opaque neighbor (see joinBelow); the
+// pinned cells and the row headers over both (dgZPinned), as the cells scroll under them.
+const (
+	dgZFocus  = 1
+	dgZPinned = 2
+)
 
 // rowHeader returns the header of the row with the key k at position q (see
 // RowHeaders): its number, a header item of the row for assistive technology. It is
@@ -3752,9 +3820,13 @@ func (g *DataGridElement[T]) rowHeader(rc *dgRowCtx[T], q int, m *dgRowMemo, k s
 	if g.cellOn {
 		whole = rc.cells.wholeRow(k)
 	}
-	rh := Div().asPart("DataGrid.RowHeader").styleOf(&st.RowHeader).styleOf(&Style{Basis: Px(rc.rowHeadW)}).ZIndex(1)
+	rh := Div().asPart("DataGrid.RowHeader").styleOf(&st.RowHeader).styleOf(&Style{Basis: Px(rc.rowHeadW)}).ZIndex(dgZPinned)
 	if whole {
 		rh.styleOf(&st.RowHeaderSelected)
+		below := rc.keyBelow(q)
+		if g.cellOn && below != "" && rc.cells.wholeRow(below) || !g.cellOn && rc.selected[below] {
+			joinBelow(rh, st, false)
+		}
 	}
 	rh.Role(access.RoleHeaderItem).Label(num).AccessCell(q+1, 0)
 	if rc.onRowHead && !rc.onHeader && q == rc.cursorPos {
@@ -3819,7 +3891,7 @@ func (g *DataGridElement[T]) editor(rc *dgRowCtx[T], cl DataColumn[T]) Element {
 // the state of its row and drawn over the cells that scroll under it. The cell at
 // the inner edge of its region, edge, has the PinnedEdge border on that side.
 func pinCell(d *DivElement, st *DataGridStyle, pin ColumnPin, edge bool) {
-	d.ZIndex(1)
+	d.ZIndex(dgZPinned)
 	d.fillFromParent, d.fillBase = true, st.Grid.Background
 	if edge {
 		side := Edges{Right: 1}
@@ -3896,7 +3968,7 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 	h := Div().asPart("DataGrid.Header").styleOf(&st.Header).Width(Px(width))
 	if ho.rowHeadW > 0 {
 		// The corner, over the row headers, selects every cell (see RowHeaders).
-		cn := Div().asPart("DataGrid.Corner").styleOf(&st.Corner).styleOf(&Style{Basis: Px(ho.rowHeadW)}).ZIndex(1)
+		cn := Div().asPart("DataGrid.Corner").styleOf(&st.Corner).styleOf(&Style{Basis: Px(ho.rowHeadW)}).ZIndex(dgZPinned)
 		cn.Role(access.RoleButton).Label(strs.SelectAll).hoverOf(&st.HeaderCellHover)
 		if ho.onCorner {
 			cn.access().highlighted = true
@@ -4123,7 +4195,7 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 	// for sighted users: each header cell is described by its group.
 	gr := Div().styleOf(&st.Header).AccessHidden()
 	if ho.rowHeadW > 0 {
-		gr.Child(Div().styleOf(&st.Corner).styleOf(&Style{Basis: Px(ho.rowHeadW)}).ZIndex(1))
+		gr.Child(Div().styleOf(&st.Corner).styleOf(&Style{Basis: Px(ho.rowHeadW)}).ZIndex(dgZPinned))
 	}
 	for _, run := range ho.runs {
 		var basis, grow float32
