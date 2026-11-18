@@ -58,8 +58,9 @@ type CompletionItem struct {
 	// Kind is what the item is.
 	Kind CompletionKind
 	// Edits are more changes made with the item, such as an import, in the byte offsets of the
-	// query's text. They follow the text typed since, and an edit that overlaps the replaced
-	// word is dropped.
+	// query's text. They follow the text typed since. An edit that overlaps the replaced word
+	// is dropped; one that inserts text at the word's start, such as a qualifier, goes before
+	// the item's text.
 	Edits []Change
 }
 
@@ -68,9 +69,13 @@ type CompletionList struct {
 	// From is the byte offset of the query's text where the replaced text starts, which ends
 	// at the caret. -1 is the start of the word before the caret.
 	From int
-	// Items are the completions, in the order the list shows them. The editor shows at most
-	// maxCompletions of them.
+	// Items are the completions. The list shows the ones that the typed word matches, at most
+	// maxCompletions of them: those that start with the word first and then the others, each in
+	// the order given, or all in the order given when KeepOrder is set.
 	Items []CompletionItem
+	// KeepOrder says that the items are ranked already: typing filters them but keeps their
+	// order, instead of putting the items that start with the typed word first.
+	KeepOrder bool
 	// Incomplete says that the list is not all there is: the editor asks again as the word
 	// grows, instead of only filtering the items it has.
 	Incomplete bool
@@ -101,7 +106,10 @@ const completionDebounce = 100 * time.Millisecond
 // the provider's trigger characters is typed, and on Ctrl+Space. Typing filters it, matching the
 // typed word against each item's Filter or Label in order, ignoring case. Up, Down, PageUp and
 // PageDown move the highlight, Enter and Tab accept it, and Escape, a click, the loss of focus and
-// a move of the caret off the word close the list. The keyboard focus stays in the editor.
+// a move of the caret off the word close the list, as does a character that ends the word, such
+// as a space, when nothing matches then. A list that opened on a trigger character also closes
+// when nothing matches; one opened with Ctrl+Space says so. The keyboard focus stays in the
+// editor.
 func (e *EditorElement) Completions(p CompletionProvider) *EditorElement { e.complete = p; return e }
 
 // completionState is the completion list of an editor: whether it is open, the start of the word
@@ -109,9 +117,11 @@ func (e *EditorElement) Completions(p CompletionProvider) *EditorElement { e.com
 // the highlighted one, the changes made since the request's text, and the request on its way.
 type completionState struct {
 	open       bool
+	invoked    bool // the user asked for the list, with Ctrl+Space, rather than a trigger character
 	loading    bool
 	failed     bool
 	incomplete bool
+	keepOrder  bool // the provider's order is kept; see CompletionList.KeepOrder
 	from, end  int
 	items      []CompletionItem
 	shown      []int
@@ -132,7 +142,9 @@ func (vs *viewState) triggerCompletion(why CompletionTrigger, char rune) {
 	caret := vs.doc.Caret()
 	if !cs.open {
 		cs.from, cs.items, cs.shown, cs.sel, cs.top = vs.wordStart(caret), nil, nil, 0, 0
+		cs.invoked = false
 	}
+	cs.invoked = cs.invoked || why == TriggerInvoked
 	cs.open, cs.loading, cs.failed, cs.end, cs.since = true, true, false, caret, nil
 	prov := vs.completeP
 	q := CompletionQuery{Query: vs.request(caret), Trigger: why, Char: char}
@@ -156,8 +168,12 @@ func (vs *viewState) completionAnswer(l CompletionList, err error) {
 		cs.from = min(mapSince(cs.since, l.From), vs.doc.Caret())
 	}
 	cs.items = l.Items[:min(len(l.Items), maxCompletions)]
-	cs.incomplete = l.Incomplete
+	cs.incomplete, cs.keepOrder = l.Incomplete, l.KeepOrder
 	vs.filterCompletions()
+	if len(cs.shown) == 0 && !cs.invoked {
+		vs.closeCompletion() // "No results" answers only a list the user asked for
+		return
+	}
 	ui.Announce(strs.SuggestionCount(len(cs.shown)), access.Polite)
 	vs.touch()
 }
@@ -187,7 +203,9 @@ func (vs *viewState) completionEdited(c Change) {
 
 // followCompletion brings the open list up to date after an edit: it closes when the caret has
 // left the word, asks again when the answer was canceled by the edit or is incomplete, and is
-// filtered with the word as it is now.
+// filtered with the word as it is now. It closes too when nothing matches the word and the word
+// ends with a character that is not a word character, such as a space after the word, and, for a
+// list that opened by itself, when nothing matches and no answer is on its way.
 func (vs *viewState) followCompletion() {
 	cs := &vs.completion
 	if !cs.open {
@@ -216,6 +234,13 @@ func (vs *viewState) followCompletion() {
 		})
 	}
 	vs.filterCompletions()
+	if len(cs.shown) == 0 && !cs.loading && !cs.failed {
+		r, _ := runeBefore(vs.doc.text.Snapshot(), caret)
+		if caret > cs.from && charClass(r) != 1 || !cs.invoked && !cs.incomplete {
+			vs.closeCompletion()
+			return
+		}
+	}
 	vs.touch()
 }
 
@@ -261,7 +286,7 @@ func (vs *viewState) wordStart(p int) int {
 
 // filterCompletions keeps the items that the word typed matches: its characters appear in the
 // item's Filter or Label in order, whatever their case. The items that start with the word come
-// first, in the provider's order, and then the others.
+// first, in the provider's order, and then the others, unless the provider's order is kept.
 func (vs *viewState) filterCompletions() {
 	cs := &vs.completion
 	word := strings.ToLower(string(vs.doc.textSlice(cs.from, max(vs.doc.Caret(), cs.from))))
@@ -273,7 +298,7 @@ func (vs *viewState) filterCompletions() {
 		}
 		f = strings.ToLower(f)
 		switch {
-		case strings.HasPrefix(f, word):
+		case strings.HasPrefix(f, word) && !cs.keepOrder:
 			prefix = append(prefix, i)
 		case subsequence(word, f):
 			rest = append(rest, i)
@@ -373,36 +398,52 @@ func (vs *viewState) acceptCompletion() bool {
 
 // complete replaces the n bytes before each caret, or as many as its row has, and each selection,
 // with insert, and makes the changes extra in the same step. The carets go after the inserted
-// text. An extra change that overlaps another change is dropped.
+// text. An extra change that overlaps a replaced range is dropped; one that inserts text at the
+// start of a replaced range, as LSP's additional edits may, goes before the inserted text.
 func (d *Document) complete(n int, insert string, extra []Change) error {
 	t := d.text.Snapshot()
-	var changes []Change
-	for _, s := range d.sels {
+	// part is a change of the step, and the selection whose word it replaces, or -1 for an extra
+	// change.
+	type part struct {
+		Change
+		sel int
+	}
+	var words []part
+	for i, s := range d.sels {
 		a, b := s.Range()
 		from := max(a-n, d.LineStart(d.RowOf(a)))
-		changes = append(changes, Change{From: d.clampBoundary(t, from), To: b, Text: insert})
+		words = append(words, part{Change{From: d.clampBoundary(t, from), To: b, Text: insert}, i})
 	}
-	carets := slices.Clone(changes)
+	// The extra changes come first, so that an insertion at the start of a word stays before
+	// the word's change when the parts are sorted.
+	var parts []part
 	for _, c := range extra {
 		if c.From < 0 || c.To > t.Len() || !t.IsBoundary(c.From) || !t.IsBoundary(c.To) {
 			continue
 		}
 		overlaps := false
-		for _, o := range changes {
-			if c.From < o.To && o.From < c.To || c.From == o.From {
+		for _, o := range words {
+			if c.From < o.To && o.From < c.To || c.From == o.From && c.From != c.To {
 				overlaps = true
 				break
 			}
 		}
 		if !overlaps {
-			changes = append(changes, c)
+			parts = append(parts, part{c, -1})
 		}
 	}
-	slices.SortStableFunc(changes, func(a, b Change) int { return a.From - b.From })
-	sels := make([]Selection, len(carets))
-	for i, c := range carets {
-		p := mapThrough(changes, c.From, false) + len(insert)
-		sels[i] = Selection{Anchor: p, Head: p}
+	parts = append(parts, words...)
+	slices.SortStableFunc(parts, func(a, b part) int { return a.From - b.From })
+	changes := make([]Change, len(parts))
+	sels := make([]Selection, len(words))
+	delta := 0 // what the parts before the one at hand change the length of the text by
+	for i, p := range parts {
+		changes[i] = p.Change
+		if p.sel >= 0 {
+			at := p.From + delta + len(insert)
+			sels[p.sel] = Selection{Anchor: at, Head: at}
+		}
+		delta += len(p.Text) - (p.To - p.From)
 	}
 	if err := d.apply(stepOther, changes, &selectionPost{sels: sels, primary: d.primary}); err != nil && len(extra) > 0 {
 		return d.complete(n, insert, nil) // the extra changes did not fit; the item goes in alone

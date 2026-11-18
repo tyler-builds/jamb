@@ -100,7 +100,7 @@ value, so an app can rebind it with `ui.BindIn("CodeEditor", keys, action)` or t
 | Escape | Keep the primary caret only. |
 | Enter | New line, with the indent of the line; one more indent after an opening bracket, and a line of its own between a pair. |
 | Tab, Shift+Tab | Indent or outdent the selected rows; a caret inserts spaces to the next tab stop. |
-| Typed brackets and quotes | Close the pair, step over a closer that is already there, and wrap a selection. An apostrophe after a letter does not pair. |
+| Typed brackets and quotes | Close the pair, step over a closer or the same quote that is already there, and wrap a selection. An apostrophe after a letter does not pair. |
 | Backspace, Delete, Ctrl+Backspace, Ctrl+Delete | Delete. Backspace between an empty pair deletes both. |
 | Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z | Undo and redo. |
 | Ctrl+C, Ctrl+X, Ctrl+V | Copy, cut and paste through the UI clipboard. With several selections and as many lines in the clipboard, each selection takes one line. |
@@ -280,14 +280,20 @@ with it, such as an import, in the offsets of the query's text.
 
 Typing filters the list: an item matches when the characters of the typed word appear in its filter
 text in order, ignoring case, and the items that start with the word come first. A list marked
+`KeepOrder` is ranked by the provider already: typing filters it but keeps the items in the order
+given. When nothing matches, a list opened with Ctrl+Space shows "No results"
+(`ui.Strings.NoResults`) and a list opened by a trigger character closes, once no answer is on its
+way; either closes when the word is followed by a character that is not a word character, such as a
+space, a comma or a parenthesis, and nothing matches the text typed since it opened. A list marked
 `Incomplete` is asked for again as the word grows (`TriggerIncomplete`), 100 milliseconds after the
 last keystroke; a keystroke while a request is on its way cancels it and asks again at once. Up,
-Down, PageUp and PageDown move the highlight, Enter and Tab accept it, and Escape, a click, the
-loss of focus, an undo, and a move of the caret before the word or past where typing left it close
-the list. Accepting replaces the word before every caret with the item's text, makes its edits,
-mapped through the text typed since the request, and is one undo step; an edit that overlaps the
-replaced word is dropped. A read-only editor has no completions. The `Doc` of the highlighted item
-shows under the list.
+Down, PageUp and PageDown move the highlight, Enter and Tab accept it, and Escape, a click, the loss
+of focus, an undo, and a move of the caret before the word or past where typing left it close the
+list. Accepting replaces the word before every caret with the item's text, makes its edits, mapped
+through the text typed since the request, and is one undo step; an edit that overlaps the replaced
+word is dropped, and one that inserts text at the word's start, such as a schema before a table's
+name, goes before the item's text. A read-only editor has no completions. The `Doc` of the
+highlighted item shows under the list.
 
 The keyboard focus stays in the editor, as with a combobox: the list is a list for assistive
 technology (`ui.Strings.Suggestions`), its highlighted item is the selected one, the number of
