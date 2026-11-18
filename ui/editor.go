@@ -746,6 +746,10 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	// Cut and Copy are of what shows.
 	selected := (focused || rt.menuHeld == n.id) && !composing && es.hasSelection() &&
 		(!e.selection.IsZero() || !e.selectionText.IsZero())
+	if shown != "" && len(spans) > 0 {
+		// The backgrounds of the marks go under the selection, the glyphs over it.
+		rt.text.DrawBackgrounds(&rt.scene, l, tx, cy, cw, rt.scale, 0, func(i int) text.RunPaint { return pr.runPaint(i, fg, opacity) })
+	}
 	if selected {
 		a, b := es.selection()
 		sel := e.selection.Alpha(opacity)
@@ -780,7 +784,11 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 		}
 	} else {
 		if len(spans) > 0 {
-			rt.text.DrawRich(&rt.scene, l, tx, cy, cw, rt.scale, 0, func(i int) text.RunPaint { return pr.runPaint(i, fg, opacity) })
+			rt.text.DrawRich(&rt.scene, l, tx, cy, cw, rt.scale, 0, func(i int) text.RunPaint {
+				p := pr.runPaint(i, fg, opacity)
+				p.Background = scene.Color{}
+				return p
+			})
 		} else {
 			rt.text.Draw(&rt.scene, l, tx, cy, cw, rt.scale, 0, fg.Alpha(opacity).scene())
 		}

@@ -331,3 +331,38 @@ func TestRichDumpShowsConcatenatedText(t *testing.T) {
 		t.Error("Find does not locate the rich text by key")
 	}
 }
+
+// quadIndex returns the index in sc.Quads of the first quad with background bg,
+// or -1.
+func quadIndex(sc *scene.Scene, bg scene.Color) int {
+	for i, q := range sc.Quads {
+		if q.Background == bg {
+			return i
+		}
+	}
+	return -1
+}
+
+// The selection of selectable rich text is drawn over the background of a
+// segment, not under it, so that it shows on a segment with an opaque
+// background, such as inline code in markdown; the glyphs stay over both.
+func TestSelectionDrawsOverSegmentBackground(t *testing.T) {
+	yellow := RGB(255, 255, 0)
+	r := textSelectRig(t, Rich(Seg("in "), Seg("code").Mono().Background(yellow), Seg(" here")).Selectable())
+	x0, y := r.at(t, 0)
+	x1, _ := r.at(t, len("in code here"))
+	r.drag(x0, y, x1, y)
+	r.key(input.KeyC, ctrl)
+	if got := r.rt.memClipboard; got != "in code here" {
+		t.Fatalf("copied %q, want the whole text, code and all", got)
+	}
+	sc := &r.rt.scene
+	bg := quadIndex(sc, yellow.scene())
+	sel := quadIndex(sc, r.rt.theme.Accent.Alpha(0.32).scene())
+	if bg < 0 || sel < 0 {
+		t.Fatalf("background quad at %d, selection quad at %d; want both drawn", bg, sel)
+	}
+	if sel < bg {
+		t.Errorf("the selection (quad %d) is drawn under the segment's background (quad %d)", sel, bg)
+	}
+}
