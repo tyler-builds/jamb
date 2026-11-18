@@ -126,7 +126,8 @@ The `Compare` of a column is easier to write with `ui.SortBy(key)`, which orders
 The grid's methods:
 
 - `Selection(mode, keys)`: `ui.SelectionNone`, `ui.SelectionSingle` or `ui.SelectionMultiple`. The keys of the selected rows are kept in `keys`, so the app reads the selection and can set it. A nil `keys` keeps the selection in the grid.
-- `CellSelection(mode, cells)`: selects cells instead of rows, kept in `cells` as `ui.CellKey{Row, Column}` keys, which follow their rows and columns through a sort or a move. It replaces `Selection`: the later of the two calls applies, and the development warnings say so. The cells are the items of the selection for assistive technology, and a selected cell has the `CellSelected` fill. Ctrl+A makes a key for every cell, so with 100,000 rows `cells` is a large slice.
+- `CellRanges(mode, ranges)`: selects cells instead of rows, kept in `ranges` as blocks of cells (`ui.CellRange{Rows, Columns}`), which name their rows and columns by key and so follow them through a sort or a move. It replaces `Selection`: the later of the two calls applies, and the development warnings say so. The cells are the items of the selection for assistive technology, and a selected cell has the `CellSelected` fill. See Selecting cells below.
+- `CellSelection(mode, cells)`: the same selection kept as a `ui.CellKey{Row, Column}` for each selected cell. The grid keeps its selection as ranges either way, and fills `cells` from them; `CellSelection` and `CellRanges` can be given together, and a value the app sets in either selects those cells. Ctrl+A on 100,000 rows of 4 columns fills `cells` with 400,000 keys, so a grid of many rows should use `CellRanges`.
 - `ColumnOrder(keys)`, `ColumnWidths(ws)` and `OnColumnsChange(fn)`: the order of the columns (by key) and the widths the user sets (by key, at the 100 percent Text size) kept in signals, so an app can save and restore them. A saved order survives new columns: an unknown key is dropped and the columns it does not name follow in their given order. `fn` gets a `ui.ColumnState{Order, Widths}` after each change the user makes: the end of a drag of a column's edge, each keyboard resize step, an auto-fit, and a move. It does not run on each move of a drag. The focus and an open edit follow their column when it moves.
 - `Movable()`: lets the user move every column, as `DataColumn.Movable` does for one.
 - `Handle(h)`: a `ui.NewDataGridHandle()` scrolls the grid from code by key: `ScrollToRow(key)` in the sorted order, `ScrollToColumn(key)`, and `FocusCell(rowKey, colKey)`, which moves the focused cell, scrolls it into view and focuses the grid without changing the selection. A request applies at the grid's next build; a key that names nothing does nothing.
@@ -171,11 +172,27 @@ With `CellSelection` the keys select cells:
 | --- | --- |
 | Arrows, Home, End, PageDown, PageUp | Move to the cell and select it |
 | Ctrl with a move | Moves the focus without selecting. The anchor stays |
-| Shift with a move | Selects the rectangle of cells from the anchor cell to the focused one (multiple) |
+| Shift with a move | Selects the rectangle of cells from the anchor cell to the focused one (multiple). After Ctrl+Space the rectangle has every row, and after Shift+Space every column, so Shift+Right adds a whole column and Shift+Down a whole row |
+| Ctrl+Shift with a move | As Shift, and keeps the rest of the selection: the cells selected beside the anchor's range |
 | Space | Toggles the focused cell (multiple), or selects it (single) |
-| Shift+Space | Selects the cells of the focused row (multiple) |
-| Ctrl+Space | Selects the cells of the focused column (multiple) |
+| Shift+Space | Selects the focused row (multiple) |
+| Ctrl+Space | Selects the focused column (multiple) |
 | Ctrl+A | Selects every cell (multiple) |
+
+**Selecting cells.** With `CellRanges` (or `CellSelection`) one selection holds whole rows, whole columns and blocks of cells together, as SQL Server Management Studio's results grid does. It is a list of `ui.CellRange`, and a cell is selected when a range of the list has it. Each side of a range is a `ui.KeySet`: the keys in `Keys`, or with `All` every key but those in `Keys`. Ctrl+A makes one range of every row and every column, Ctrl+Space one range of every row in the focused column, and Shift+Space one range of the focused row in every column, so they cost the same with 10 rows or 100,000. A Ctrl+click in such a range takes the cell out by splitting the range in two, not by listing the cells. A range of every row has the rows that are added later too, as a selected column does in a spreadsheet; a Shift+click or a drag lists the keys of the rows it covers, and those follow their rows through a sort, as a list of cells does. `CellRange.Has` and `KeySet.Has` test a cell or a key.
+
+```go
+picked := ui.NewSignal([]ui.CellRange(nil))
+grid := ui.DataGrid(results, rowKey, cols...).CellRanges(ui.SelectionMultiple, picked)
+
+// Select the Total column, and row r7.
+picked.Set([]ui.CellRange{
+	{Rows: ui.KeySet{All: true}, Columns: ui.KeySet{Keys: []string{"Total"}}},
+	{Rows: ui.KeySet{Keys: []string{"r7"}}, Columns: ui.KeySet{All: true}},
+})
+```
+
+Ctrl+A and a Ctrl+click that follows it each take well under a millisecond on 100,000 rows of 4 columns with `CellRanges`, against more than 100 ms and 38 MB when every cell had a key (`BenchmarkDataGridSelectAll100k`, `BenchmarkDataGridCtrlClickAfterSelectAll100k`).
 
 **Interactive and editable cells.** A cell that holds controls, or an editor, is still the grid's one Tab stop: the controls and the editor are not in the Tab order, and the grid's keys reach them through the focus. The model follows the WAI-ARIA grid pattern (https://www.w3.org/WAI/ARIA/apg/patterns/grid/), which describes two states without naming them: grid navigation, in which the grid holds focus, and the cell's own widgets, which Enter or F2 move focus into. In the second state Tab and Shift+Tab move to the next and previous widget, which the pattern lets wrap inside the cell or leave the grid; this grid wraps inside the cell. Escape (the pattern's "restores grid navigation") or F2 returns to grid navigation on the same cell. The keys a control uses (the arrows of a text field, Enter on a button) belong to the control. An edit saves on Enter and on Tab, and when focus leaves its editor (a click elsewhere in the grid), as a spreadsheet does. Escape is the only cancel. This blur save is a choice of this grid, not a rule of the pattern.
 
@@ -205,7 +222,7 @@ The cell's `Text`, when it is set, is still the cell's accessible name in an int
 
 Alt is not used by the grid, so the host keeps its menu and navigation keys.
 
-**Mouse.** A click selects a row: Ctrl toggles it and Shift extends the selection from the anchor. With `CellSelection` a click selects a cell, Ctrl+click toggles it, and Shift+click selects the rectangle from the anchor cell. A double-click activates the row. A click on a header cell sorts. Dragging the edge of a resizable header cell resizes its column, and the cursor is the east-west resize cursor over the edge. A double-click on the edge fits the column to the text of the rows in view; in a tree's first column the fit includes each row's indent and chevron. Dragging a movable header cell moves its column: a line (`DropIndicator`) shows the side of the header under the pointer that it lands on, and a press that does not move 4 px is still a click that sorts. A right-press opens the context menu (see `ContextMenu`).
+**Mouse.** A click selects a row: Ctrl toggles it and Shift extends the selection from the anchor. With `CellRanges` or `CellSelection` a click selects a cell, Ctrl+click toggles it, Shift+click selects the rectangle from the anchor cell, and Ctrl+Shift+click adds that rectangle to the rest of the selection. A double-click activates the row. A click on a header cell sorts. Dragging the edge of a resizable header cell resizes its column, and the cursor is the east-west resize cursor over the edge. A double-click on the edge fits the column to the text of the rows in view; in a tree's first column the fit includes each row's indent and chevron. Dragging a movable header cell moves its column: a line (`DropIndicator`) shows the side of the header under the pointer that it lands on, and a press that does not move 4 px is still a click that sorts. A right-press opens the context menu (see `ContextMenu`).
 
 **Pinned columns.** A pinned column stays at its end of the grid while the others scroll under it. Its cells are filled with the grid's background and then their row's fill, so a hovered, selected or striped row shows through them; `CellPinned` styles them, and `PinnedEdge` is the cell at the inner edge of the pinned columns, with a 1 px border by default. A column that the focus moves to, or that `ScrollToColumn` names, is scrolled clear of the pinned columns.
 
