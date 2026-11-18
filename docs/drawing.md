@@ -57,7 +57,8 @@ ui.Div().Radius(14).ScrollY()                             // children are clippe
 
 `ui.Canvas(draw)` is an element you paint with shapes, as an HTML canvas: charts,
 graphs, diagrams and custom widgets. `draw` gets a `*ui.Painter` and the canvas's
-content size in logical pixels:
+content size in logical pixels, rounded to whole display pixels as a `Div`'s
+background is:
 
 ```go
 ui.Canvas(func(p *ui.Painter, w, h float32) {
@@ -83,15 +84,69 @@ ui.Canvas(func(p *ui.Painter, w, h float32) {
   `Alpha`.
 - **Text.** `Text` places one line at a point, aligned with `Align` and `VAlign`,
   in the inherited text color unless `Color` is set (`p.TextColor()` returns it,
-  to draw shapes that match), and `MeasureText` sizes it. Text uses the text renderer (ClearType where it is
-  on) and is drawn over the shapes; it follows the transform's position but is
-  not rotated, scaled or clipped.
+  to draw shapes that match), and `MeasureText` sizes it. `ctx.MeasureText` in a
+  render returns the same size, to size what depends on text before drawing, such
+  as a grid's columns. Text uses the text renderer (ClearType where it is on); it
+  follows the transform's position but is not rotated or scaled.
+- **Text and clipping.** `Clip` clips text as it clips shapes, to the bounding box
+  of the clip's path, which is the path itself for a rectangle such as a grid's
+  cell. Draw order does not hold for text: all the text of a canvas is drawn over
+  all its shapes, whatever order they were drawn in, so a shape drawn after text
+  does not cover it. Draw what must cover text, such as a tooltip or a frozen
+  header over scrolled cells, as an element over the canvas, a child of it or a
+  sibling, or clip the text away from it.
+
+### Crisp lines
+
+A line 1 logical pixel wide is 1.25 display pixels at 125%, and is blurred across
+two rows of pixels wherever it lies. `p.PixelScale()` is the number of display
+pixels in a logical pixel (the display scale times the zoom), and `p.Snap(x, y)`
+moves a point to the nearest corner of a display pixel. A line whose edge is
+snapped and whose width is a whole number of display pixels is crisp, as `Div`
+borders are:
+
+```go
+k := p.PixelScale()
+thick := max(1, float32(math.Round(float64(k)))) / k // 1 logical px, whole display pixels, as a border
+for _, y := range rowEdges {
+	x0, y0 := p.Snap(0, y)
+	x1, _ := p.Snap(w, y)
+	p.FillRect(x0, y0, x1-x0, thick, t.Border) // or 1/k for a hairline of one display pixel
+}
+```
+
+A stroke is centered on its path, so a crisp stroke of width `thick` runs along
+`y0 + thick/2`. `Snap` works in the current coordinates, through `Translate` and
+`Scale`.
+
+### When the canvas draws
 
 Shapes are drawn on the CPU (`internal/vector`) at the display's resolution, and
 the drawing is kept: `draw` runs again only when the component that made the
 canvas renders, or when its size, the display scale or the zoom changes. Read the
 signals the drawing depends on in the component's render. A chart of 1000 points
 at 800x400 pixels takes about 10 ms to draw.
+
+`CanvasKey(key)` says what the drawing depends on, for a canvas whose component
+renders more often than the drawing changes, such as a grid that renders for a
+hover or a status line: while the key equals the last drawing's, a render keeps
+the drawing and `draw` does not run. A change of size, scale, zoom or text color
+still draws it again.
+
+```go
+type gridKey struct{ rev, first, sel int }
+
+ui.Canvas(drawCells).Size(ui.Full, ui.Full).
+	CanvasKey(gridKey{rev: data.Rev(), first: first, sel: sel})
+```
+
+The key is compared with `==`. `CanvasKey` panics on a key that `==` would panic
+on later: a slice, a map, a func, or a struct, array or interface that holds one.
+Use numbers, strings, pointers and structs of them, such as a revision number of
+the data rather than the data.
+
+The size of the canvas itself, to work out which rows and columns fit, comes from
+`OnResize` (see [an element's size](layout.md#an-elements-size)), in the same frame.
 
 The canvas is a `Div` (300x150 by default): size it with `Size`, take the pointer
 with `OnMouseMove` and the others, whose `LocalX` and `LocalY` are canvas

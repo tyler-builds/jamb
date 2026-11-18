@@ -68,6 +68,9 @@ const (
 // nodeState is per-element state that survives rebuilds, keyed by element ID.
 type nodeState struct {
 	gridCols int // the column count last reported to OnGridColumns
+	// size is the content size last reported to OnResize, and sized whether one was.
+	size  [2]float32
+	sized bool
 
 	// imageStart is when an animated image was first drawn (see imageTexture).
 	imageStart time.Time
@@ -394,6 +397,9 @@ type Runtime struct {
 
 	needLayout, needPaint bool
 	animating             bool // something animates: the next frame must come
+	// watchFired is set when reportLayout called an OnGridColumns or OnResize,
+	// until the frame builds what it changed (see takeWatchFired).
+	watchFired bool
 	// reflowSnap snaps the layout springs to their places in the next frame's
 	// paints: the window's size, zoom or text scale changed (see layoutSpring).
 	// reflowSnapIn is above zero while painting inside a UniformList that has
@@ -427,7 +433,7 @@ type Runtime struct {
 	pausedAnims  map[*componentInstance]struct{}    // running Animate instances the last paint did not draw (see settleAnims)
 	graceAnims   map[*componentInstance]struct{}    // Animate instances the last paint did not draw, given one more render first
 	listStale    bool                               // a UniformList (or a strip whose extent changed) must rebuild before the frame ends
-	gridWatches  map[uint64]*node                   // the grids with OnGridColumns, by node ID (see reportGridColumns)
+	layWatches   map[uint64]*node                   // the elements with OnGridColumns or OnResize, by node ID (see reportLayout)
 	splitWatches map[*componentInstance]*splitWatch // the splits that size their panes from their length (see splitsResized)
 	titleWatches map[*componentInstance]float32     // the title bars with a centered element, and the inset each rendered with (see titleBarsResized)
 	toasts       []*toastEntry                      // the stack of toasts, oldest first (see Context.Toast)
@@ -1065,12 +1071,16 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 	}
 	// A split sizes its panes from its own length, and a title bar places its centered element
 	// from its sides, so one whose length or sides changed in this layout renders again before
-	// the frame is painted (see layoutWatchesResized).
-	for i := 0; i < 2 && relayout && rt.layoutWatchesResized(); i++ {
+	// the frame is painted (see layoutWatchesResized), as does what an OnResize or an
+	// OnGridColumns changed.
+	for i := 0; i < 2 && relayout && rt.layoutChanged(); i++ {
 		if rt.hasDirty.Load() {
 			rt.buildDirty()
 		}
 		rt.layout()
+	}
+	if rt.takeWatchFired() {
+		rt.listStale = true // still changing: built after the paint, before the frame ends
 	}
 	if v := rt.pendingView; v != nil && rt.tree != nil {
 		rt.pendingView = nil
@@ -1099,6 +1109,9 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 		}
 		if rt.needLayout {
 			rt.layout()
+			if rt.takeWatchFired() {
+				rt.listStale = true
+			}
 		}
 		rt.paintFrame(0)
 		painted = true
@@ -1174,7 +1187,7 @@ func (rt *Runtime) layout() {
 	rt.engine.Compute(&rt.tree.lay, rt.viewW, max(rt.viewH-rt.titleBarHeight, 0))
 	rt.tree.lay.Y = rt.titleBarHeight
 	rt.needLayout, rt.needPaint = false, true
-	rt.reportGridColumns()
+	rt.reportLayout()
 	rt.stats.LaidOut = true
 	rt.stats.LayoutTime += time.Since(t0)
 	rt.stats.NodesLaidOut += rt.engine.Arranged
@@ -1501,7 +1514,7 @@ func (rt *Runtime) retireNode(n *node, mayExit bool) {
 	leaving := rt.byID[n.id] == n
 	if leaving {
 		delete(rt.byID, n.id)
-		delete(rt.gridWatches, n.id)
+		delete(rt.layWatches, n.id)
 		if n.st != nil {
 			// What the element would have reported at its end will not come.
 			n.st.enterDone.cancel()
@@ -1853,13 +1866,13 @@ func (rt *Runtime) buildDiv(e *DivElement, id uint64, parent *node, owner *compo
 			}
 		}
 	}
-	if e.onGridCols() != nil {
-		if rt.gridWatches == nil {
-			rt.gridWatches = map[uint64]*node{}
+	if e.watchesLayout() {
+		if rt.layWatches == nil {
+			rt.layWatches = map[uint64]*node{}
 		}
-		rt.gridWatches[n.id] = n
-	} else if rt.gridWatches != nil {
-		delete(rt.gridWatches, n.id)
+		rt.layWatches[n.id] = n
+	} else if rt.layWatches != nil {
+		delete(rt.layWatches, n.id)
 	}
 	rt.attachFocus(n)
 	n.style = rt.resolveStyle(n)
@@ -2252,20 +2265,50 @@ func contains(ids []uint64, id uint64) bool {
 func (rt *Runtime) isHovered(id uint64) bool { return contains(rt.hoverIDs, id) }
 func (rt *Runtime) isPressed(id uint64) bool { return contains(rt.pressIDs, id) }
 
-// reportGridColumns calls the OnGridColumns of each grid whose column count has
-// changed since it was last reported. It runs after layout, whether or not the
-// grid is drawn, since an empty grid has no height to be drawn in. What the
-// functions change is built before the frame ends (see listStale).
-func (rt *Runtime) reportGridColumns() {
-	for id, n := range rt.gridWatches {
-		if rt.byID[id] != n || n.div == nil || n.div.onGridCols() == nil || n.flags&flagNoDisplay != 0 {
+// reportLayout calls the OnGridColumns of each grid whose column count has
+// changed since it was last reported, and the OnResize of each element whose
+// content size has. It runs after layout, whether or not the element is drawn,
+// since an empty grid has no height to be drawn in. What the functions change
+// is built and laid out before the frame is painted (see layoutChanged).
+func (rt *Runtime) reportLayout() {
+	for id, n := range rt.layWatches {
+		if rt.byID[id] != n || n.div == nil || n.flags&flagNoDisplay != 0 {
 			continue
 		}
 		st := rt.state(id)
-		if cols := n.lay.GridColumns(); cols > 0 && cols != st.gridCols {
-			st.gridCols = cols
-			n.div.onGridCols()(cols)
-			rt.listStale = true
+		if fn := n.div.onGridCols(); fn != nil {
+			if cols := n.lay.GridColumns(); cols > 0 && cols != st.gridCols {
+				st.gridCols = cols
+				fn(cols)
+				rt.watchFired = true
+			}
+		}
+		if fn := n.div.onResize(); fn != nil {
+			s := &n.style
+			be := s.borderEdges()
+			w := max(n.lay.W-be.Left-be.Right-s.Padding.Left-s.Padding.Right, 0)
+			h := max(n.lay.H-be.Top-be.Bottom-s.Padding.Top-s.Padding.Bottom, 0)
+			if !st.sized || st.size != [2]float32{w, h} {
+				st.size, st.sized = [2]float32{w, h}, true
+				fn(w, h)
+				rt.watchFired = true
+			}
 		}
 	}
+}
+
+// layoutChanged reports whether the last layout resized a split or a title bar
+// (see layoutWatchesResized) or called an OnGridColumns or OnResize.
+func (rt *Runtime) layoutChanged() bool {
+	resized := rt.layoutWatchesResized()
+	fired := rt.takeWatchFired()
+	return resized || fired
+}
+
+// takeWatchFired reports whether an OnGridColumns or OnResize was called since
+// it was last asked, and clears it.
+func (rt *Runtime) takeWatchFired() bool {
+	f := rt.watchFired
+	rt.watchFired = false
+	return f
 }

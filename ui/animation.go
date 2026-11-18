@@ -298,6 +298,9 @@ func (rt *Runtime) settleAnims(painted bool) {
 		}
 		if rt.needLayout {
 			rt.layout()
+			if rt.takeWatchFired() {
+				rt.listStale = true // built in the next frame
+			}
 		}
 		rt.paintFrame(0)
 	}
