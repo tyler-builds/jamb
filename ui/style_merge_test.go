@@ -113,3 +113,23 @@ func look[T any](fill func(st *T)) T {
 	fill(&st)
 	return st
 }
+
+// TestMergeOneSide checks the one-side padding of docs/styling.md: Edges{Left: 24}
+// merged over a style with padding sets the left side and keeps the others, on a
+// plain Style and on a field's frame, whose default padding is 10 across.
+func TestMergeOneSide(t *testing.T) {
+	got := Style{Padding: XY(10, 4), Margin: All(2)}.Merge(Style{Padding: Edges{Left: 24}, Margin: Edges{Top: 8}})
+	if want := (Edges{Top: 4, Right: 10, Bottom: 4, Left: 24}); got.Padding != want {
+		t.Errorf("padding %+v, want %+v", got.Padding, want)
+	}
+	if want := (Edges{Top: 8, Right: 2, Bottom: 2, Left: 2}); got.Margin != want {
+		t.Errorf("margin %+v, want %+v", got.Margin, want)
+	}
+
+	r := newAccessRig(func(ctx *Context) Element {
+		return Div().Column().Child(TextInput(NewSignal("")).Label("Name").Style(Style{Padding: Edges{Left: 24}}))
+	})
+	if got, want := partNode(t, r.rt, "TextInput.Frame", "").style.Padding, (Edges{Right: 10, Left: 24}); got != want {
+		t.Errorf("frame padding %+v, want %+v", got, want)
+	}
+}

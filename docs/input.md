@@ -286,6 +286,17 @@ context such as `!Editor`. A key press that a single-stroke binding consumes
 types no text when it is printable (letters, digits, space, `=` and `-`). A key
 that waits for a chord keeps its text, which is typed if the chord is replayed.
 
+The chords of a package's default bindings count too. The code editor binds `ctrl+k ctrl+i`,
+so an app's `ctrl+k` waits up to a second while the editor has focus. To make a key run at once,
+unbind the chord it starts, and bind its action to another key if it is still wanted:
+
+```go
+ui.BindIn("CodeEditor", "ctrl+k ctrl+i", ui.Unbind(codeedit.CmdShowHover)),
+ui.BindIn("CodeEditor", "ctrl+shift+i", codeedit.CmdShowHover),
+```
+
+The editor's keys are listed in [Keys](codeedit.md#keys) of the code editor.
+
 **Keymap files.** Key bindings can also come from a JSON file, so users can
 change them without code. `app.Window` takes the file and the actions it may
 name:

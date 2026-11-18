@@ -97,7 +97,9 @@ The canvas is a `Div` (300x150 by default): size it with `Size`, take the pointe
 with `OnMouseMove` and the others, whose `LocalX` and `LocalY` are canvas
 coordinates when it has no padding or border, and add children to lay elements
 over the drawing. Assistive technology sees an image named by `Label`, and the
-children stay in the accessibility tree, inside the image.
+children stay in the accessibility tree, inside the image. A canvas that draws a grid
+or a table reports its cells with children laid over them; see
+[Custom and virtualized grids](accessibility.md#custom-and-virtualized-grids).
 
 The default size wins over insets, as an explicit size does in CSS, so a canvas
 that fills its parent as a background layer needs `Size(ui.Full, ui.Full)` as

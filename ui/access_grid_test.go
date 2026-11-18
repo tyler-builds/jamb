@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/tyler-builds/jamb/access"
@@ -114,5 +115,88 @@ func TestAccessGridCellPositionAndLevelPanicOnBadNumbers(t *testing.T) {
 			}()
 			fn()
 		}()
+	}
+}
+
+// The examples of "Custom and virtualized grids" in docs/accessibility.md: a grid
+// that builds only the rows on screen, and one drawn on a canvas, report the
+// shape of the whole data and the place of each built cell, with no warnings.
+func TestAccessGridOfACustomGrid(t *testing.T) {
+	cols := []string{"id", "name"}
+	rows := make([][]string, 1000)
+	for i := range rows {
+		rows[i] = []string{strconv.Itoa(i + 1), "row " + strconv.Itoa(i+1)}
+	}
+	first, last := 500, 519 // the rows on screen
+
+	// The grid of Divs, as the guide has it.
+	r := newAccessRig(func(ctx *Context) Element {
+		grid := Div().Role(access.RoleDataGrid).Label("Results").AccessGrid(len(rows), len(cols)).ScrollY()
+		head := Div().Row()
+		for c, name := range cols {
+			head.Child(Div().Role(access.RoleHeaderItem).AccessCell(0, c+1).Width(Px(120)).Child(Text(name)))
+		}
+		grid.Child(head)
+		for r := first; r <= last; r++ {
+			row := Div().Row().Key(strconv.Itoa(r)) // no role: its cells sit in the grid
+			for c, v := range rows[r] {
+				row.Child(Div().Role(access.RoleDataItem).AccessCell(r+1, c+1).Width(Px(120)).Child(Text(v)))
+			}
+			grid.Child(row)
+		}
+		return grid.Height(Px(300))
+	})
+	checkCustomGrid(t, r, "row 501")
+	grid := accesstest.Find(t, r.tree(), access.RoleDataGrid, "Results")
+	if !grid.Scroll.Container {
+		t.Errorf("the grid's scroll container is not reported")
+	}
+
+	// The grid drawn on a canvas, with a Div over each cell on screen.
+	var down []float32
+	const cw, ch = 120, 20
+	r = newAccessRig(func(ctx *Context) Element {
+		var cells []Element
+		for c, name := range cols {
+			cells = append(cells, Div().Absolute().Left(float32(c*cw)).Top(0).Size(Px(cw), Px(ch)).
+				Role(access.RoleHeaderItem).AccessCell(0, c+1).Label(name))
+		}
+		for r := first; r <= last; r++ {
+			for c := range cols {
+				cells = append(cells, Div().Absolute().Left(float32(c*cw)).Top(float32((r-first+1)*ch)).
+					Size(Px(cw), Px(ch)).Role(access.RoleDataItem).AccessCell(r+1, c+1).Label(rows[r][c]))
+			}
+		}
+		return Div().Child(Canvas(func(p *Painter, w, h float32) {}).Size(Px(240), Px(440)).
+			Role(access.RoleDataGrid).Label("Results").AccessGrid(len(rows), len(cols)).
+			OnMouseDown(func(e *MouseEvent) { down = append(down, e.LocalX, e.LocalY) }).
+			Children(cells...))
+	})
+	checkCustomGrid(t, r, "row 501")
+	// A press on a cell's Div reaches the canvas, in the canvas's coordinates.
+	r.clickAt(cw+10, ch+5)
+	if len(down) != 2 || down[0] != cw+10 || down[1] != ch+5 {
+		t.Errorf("the canvas got presses at %v, want one at (%v, %v)", down, cw+10, ch+5)
+	}
+}
+
+// checkCustomGrid checks the tree of the guide's grid of 1000 rows by 2 columns
+// with rows 501 to 520 built, whose first cell of the second column is name.
+func checkCustomGrid(t *testing.T, r *accessRig, name string) {
+	t.Helper()
+	tr := r.tree()
+	grid := accesstest.Find(t, tr, access.RoleDataGrid, "Results")
+	if grid.GridRows != 1000 || grid.GridColumns != 2 {
+		t.Errorf("grid shape %d by %d, want 1000 by 2", grid.GridRows, grid.GridColumns)
+	}
+	if h := accesstest.Find(t, tr, access.RoleHeaderItem, "name"); h.GridColumn != 2 {
+		t.Errorf("the name header heads column %d, want 2", h.GridColumn)
+	}
+	if c := accesstest.Find(t, tr, access.RoleDataItem, name); c.GridRow != 501 || c.GridColumn != 2 {
+		t.Errorf("%q at row %d, column %d, want row 501, column 2", name, c.GridRow, c.GridColumn)
+	}
+	accesstest.Absent(t, tr, access.RoleDataItem, "row 1")
+	if len(r.warnings) != 0 {
+		t.Errorf("warnings: %v", r.warnings)
 	}
 }

@@ -298,7 +298,9 @@ ctx.Window().MessageBox(dialog.MessageOptions{
   sets are `ButtonsOK`, `ButtonsOKCancel`, `ButtonsYesNo` and
   `ButtonsYesNoCancel`. `Default` is the button Enter chooses; zero means the
   first button of the set.
-- A callback is not run on a headless runtime, which has no window.
+- A callback is not run on a headless runtime, which has no window. A test gives
+  the runtime a fake window that embeds `ui.NopWindow` and answers the dialog; see
+  [The window](testing.md#the-window-file-dialogs-and-message-boxes) in testing.md.
 - The owner window is disabled while its dialog is open, as Windows does for
   any modal dialog, so it takes no input. Its frames, and those of the app's
   other windows, keep drawing: a timer on the owner renders them while the

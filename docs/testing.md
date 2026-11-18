@@ -388,6 +388,50 @@ u.Press("ctrl+v")
 
 `u.ClipboardImage()` and `u.SetClipboardImage(img)` do the same for images.
 
+## The window: file dialogs and message boxes
+
+A headless runtime has no window, so the [native dialogs](windows.md#native-dialogs) of
+`ctx.Window()` (`OpenFiles`, `SaveFile`, `PickFolder`, `MessageBox`) do nothing and never
+call back. To test code that opens one, give the runtime a fake window with
+`u.Runtime().SetWindow`. The fake embeds `ui.NopWindow`, which has every method of
+`ui.Window`, and overrides the ones the test answers:
+
+```go
+// The view: a button that saves the query.
+ui.Button("Export").OnClick(func() {
+	ctx.Window().SaveFile(dialog.FileOptions{Name: "query.sql"}, func(r dialog.FileResult) {
+		if r.Err == nil && !r.Canceled {
+			os.WriteFile(r.Paths[0], []byte("select 1;"), 0o644)
+		}
+	})
+})
+
+// The test.
+type fakeWindow struct {
+	ui.NopWindow
+	save func(dialog.FileResult) // the callback of the last SaveFile, which the test answers
+}
+
+func (f *fakeWindow) SaveFile(o dialog.FileOptions, done func(dialog.FileResult)) { f.save = done }
+
+func TestExportSaves(t *testing.T) {
+	u := uitest.New(t, root)
+	fw := &fakeWindow{}
+	u.Runtime().SetWindow(fw)
+
+	u.ByRole(access.RoleButton, "Export").Click()
+	path := filepath.Join(t.TempDir(), "out.sql")
+	fw.save(dialog.FileResult{Paths: []string{path}}) // the user chose path
+	u.Frame()
+	if got, _ := os.ReadFile(path); string(got) != "select 1;" { ... }
+}
+```
+
+Answer `dialog.FileResult{Canceled: true}` to test a cancel, and record the
+`dialog.FileOptions` to check the name and filters offered. This example is a
+test of the package (`ui/uitest/guide_window_test.go`); the notes app tests its
+import and export this way in `examples/notes/views/files_test.go`.
+
 ## Without uitest
 
 `ui.Runtime` has the lower-level calls that uitest builds on: `Frame`,

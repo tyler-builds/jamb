@@ -24,7 +24,8 @@ ui.Div()                       // flex container; children stack vertically by d
   .Wrap()                      // flow children onto more lines (chips, tags, galleries)
   .Gap(8).Padding(16).PaddingX(12).PaddingY(6).Margin(4).MarginTop(8)
   .PaddingLeft(4).PaddingRight(4).PaddingTop(2).PaddingBottom(2).MarginLeft(2).MarginRight(2)
-                               // each side alone; PaddingEdges sets all four at once
+                               // each side alone; PaddingEdges sets all four at once;
+                               // in a ui.Style it is a field: Padding: ui.Edges{Left: 4}
   .Width(ui.Px(240)).Height(ui.Full).Size(w, h).MinWidth(...).MaxWidth(ui.Px(1100))
   .Grow(1).Shrink(0).Basis(ui.Px(0))          // Basis(0)+Grow(1) = equal columns
   .Align(ui.Center).Justify(ui.SpaceBetween).Center().AlignSelf(ui.End)
@@ -55,7 +56,8 @@ ui.Div()                       // flex container; children stack vertically by d
                                // hit first; flips to the other side if it doesn't fit
   .OnClickOutside(fn)          // any button pressed outside (an Overlay's parent counts as inside);
                                // on an Overlay, Escape also runs fn (see Actions and key bindings)
-  .Tooltip("Save")             // label below after 500 ms of hover; every control has .Tooltip too
+  .Tooltip("Save")             // label below after 500 ms of hover; every control has .Tooltip too;
+                               // Text, Icon and Image do not: wrap them in a Div with .Tooltip
   .Key("stable-id").Child(el).Children(els...)
 
 ui.Text("hi").FontSize(15).Semibold().Italic().TextColor(c).Truncate().MaxLines(2).Align(ui.Center)
@@ -76,7 +78,7 @@ ui.IconButton(icons.Bell)
 ui.Button("Save").Loading(saving)                // a busy ring; inert, but keeps its focus, Tab stop and width
 ui.TextInput(signal).Placeholder("Search…").Icon(icons.Search).OnSubmit(fn).OnChange(fn)
 ui.TextArea(signal).Placeholder("Start writing…").MinRows(10)    // multi-line editor
-  // both: .Borderless() .AutoFocus() .FocusHandle(h) .Style(ui.Style{FontSize: 28})
+  // both: .Borderless() .AutoFocus() .FocusHandle(h) .Style(ui.Style{FontSize: 28}) .Mono()
   // both: .ReadOnly(true) (focusable, selectable, copyable; not editable) and .Disabled(true)
   // TextInput also: .Small() (28 px, like Button.Small) and .Large() (40 px, 16 px text); so do
   // Select, Combobox, NumberInput, DatePicker and TimePicker, so a row of them lines up

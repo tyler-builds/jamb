@@ -106,6 +106,8 @@ grid or a calendar and `AccessCell` to a data item or a header item; on another 
 they are not reported, and the development warnings say so, as they do for a data
 item in row 0. `AccessPosition` and `AccessLevel` apply to an item of any role. All
 four panic on numbers that describe no place, such as a position past the size.
+A grid that builds only its visible rows, or draws its cells on a canvas, uses the same
+calls; see [Custom and virtualized grids](#custom-and-virtualized-grids) below.
 
 `Expanded` and `Selected` declare the state; the element's click handler makes
 the change, so a click on an expandable row must toggle it. Expand and select
@@ -148,3 +150,48 @@ The automated checks, the Accessibility Insights scans and the live UI Automatio
 check are in [Tools](tools.md#tools-for-humans-and-coding-agents). The manual pass with
 Narrator and NVDA, with the expected results for each task in the demo and the
 notes app, is in [docs/accessibility-testing.md](accessibility-testing.md).
+
+## Custom and virtualized grids
+
+A grid you build yourself describes itself as `DataGrid` does. The grid element has
+`Role(access.RoleDataGrid)`, a `Label`, and `AccessGrid` with the rows and columns of
+the whole data, built or not. Only the cells on screen are built, each a data item
+with `AccessCell` at its place in the whole data: the 501st row is row 501 wherever it
+is on screen. The headers are header items in row 0.
+
+```go
+// cols are the column names, rows every row of the result, first to last the rows on screen.
+grid := ui.Div().Role(access.RoleDataGrid).Label("Results").AccessGrid(len(rows), len(cols)).ScrollY()
+head := ui.Div().Row()
+for c, name := range cols {
+	head.Child(ui.Div().Role(access.RoleHeaderItem).AccessCell(0, c+1).Width(ui.Px(120)).Child(ui.Text(name)))
+}
+grid.Child(head)
+for r := first; r <= last; r++ {
+	row := ui.Div().Row().Key(strconv.Itoa(r)) // no role: its cells sit in the grid
+	for c, v := range rows[r] {
+		row.Child(ui.Div().Role(access.RoleDataItem).AccessCell(r+1, c+1).Width(ui.Px(120)).Child(ui.Text(v)))
+	}
+	grid.Child(row)
+}
+```
+
+A row that is not built has no cells in the tree. Assistive technology that asks for
+one gets nothing, and can scroll the grid to it when the element with the grid role is
+the one that scrolls, as `ScrollY` makes it here.
+
+A grid drawn on a [canvas](drawing.md#canvas) has no cells of its own: the canvas is
+one image. Give the canvas the grid role, and lay a `Div` with no fill over each cell
+on screen, with its place, size, role and `AccessCell`, and the cell's text as its
+`Label`. The drawing does not change, and a press on a cell still reaches the canvas's
+`OnMouseDown` in the canvas's coordinates:
+
+```go
+cell := ui.Div().Absolute().Left(x).Top(y).Size(ui.Px(w), ui.Px(h)).
+	Role(access.RoleDataItem).AccessCell(r+1, c+1).Label(rows[r][c])
+ui.Canvas(drawCells).Role(access.RoleDataGrid).Label("Results").
+	AccessGrid(len(rows), len(cols)).Children(cells...) // the headers' and the cells' Divs
+```
+
+Each visible cell costs one `Div`. `ui/access_grid_test.go` checks both examples: the
+shape is the whole data's, each built cell has its place, and there are no warnings.

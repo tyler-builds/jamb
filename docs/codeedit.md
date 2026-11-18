@@ -41,9 +41,17 @@ every window (`ui.RegisterDefaultBindings`). An app's own bindings win over them
 a command to another key, or turn a key off:
 
 ```go
-rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+k", codeedit.CmdFind))
 rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+d", ui.Unbind(codeedit.CmdAddNextOccurrence)))
+rt.AddBindings(
+	ui.BindIn("CodeEditor", "ctrl+k ctrl+i", ui.Unbind(codeedit.CmdShowHover)), // frees Ctrl+K
+	ui.BindIn("CodeEditor", "ctrl+k", codeedit.CmdFind),
+	ui.BindIn("CodeEditor", "ctrl+shift+i", codeedit.CmdShowHover), // the hover on another key
+)
 ```
+
+Ctrl+K Ctrl+I is the editor's only chord. While it is bound, an app's Ctrl+K, global or in
+`CodeEditor`, waits up to a second in the editor for the second key (see
+[chords](input.md#actions-and-key-bindings)); unbinding the chord, as above, makes Ctrl+K run at once.
 
 `Editor` returns an element. Its options chain: `Key`, `Label`, `LineNumbers`, `ReadOnly`,
 `TabSize` (4 by default), `CommentPrefix`, `Size`, the sizing methods (`Width`, `Height`,
