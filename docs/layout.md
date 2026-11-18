@@ -95,6 +95,27 @@ The style fields are `GridColumns`, `GridRows`, `ColSpan` and `RowSpan`, so a th
 or a `Style` value can set them too. It is a subset of CSS grid: there are no named
 areas, explicit line placement, dense packing or subgrids.
 
+## An element's size
+
+`OnResize(fn)` on a `Div` (and a `Canvas`, which is one) calls `fn(w, h)` with the
+size of its content box, inside its border and padding, in logical pixels: when it is
+first laid out and each time the size changes, as CSS's `ResizeObserver` reports it.
+Use it for a view that works out what is visible from its own size, such as a grid
+drawn on a canvas that draws only the rows that fit:
+
+```go
+size := ui.Local(ctx, "size", [2]float32{})
+rows := int(size.Get()[1]/rowHeight) + 1
+return ui.Canvas(drawRows(first, rows)).Size(ui.Full, ui.Full).
+	OnResize(func(w, h float32) { size.Set([2]float32{w, h}) })
+```
+
+What `fn` sets is built and laid out again before the frame is painted, so the view
+is never drawn with the size of the frame before. An element that is not displayed
+is not reported. A size that depends on the view's own content can change again
+when the content does; the frame stops after two passes, and any further change is
+built in the next frame, as `OnGridColumns` is.
+
 ## Split panes
 
 `ui.Split(panes...)` lays out panes side by side, with a divider between each two that

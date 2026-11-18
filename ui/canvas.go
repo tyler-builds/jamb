@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"math"
+	"reflect"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
@@ -12,15 +14,16 @@ import (
 
 // Canvas creates an element that draw paints with shapes, as an HTML canvas
 // does: charts, graphs, diagrams and custom widgets. draw receives a Painter
-// and the size of the content box in logical pixels, with 0, 0 at its top-left
-// and y going down.
+// and the size of the content box in logical pixels, rounded to whole display
+// pixels, with 0, 0 at its top-left and y going down.
 //
 // The drawing is kept between frames. draw runs again when the component that
-// made the canvas renders again, when the canvas's size, the display scale or
-// the zoom changes, or when a caret it drew with Painter.CaretVisible blinks, so
-// read the signals the drawing depends on in the component's render, not only
-// in draw. Shapes are drawn on the CPU, at the
-// display's resolution, and text with the text renderer, over the shapes.
+// made the canvas renders again (or, with CanvasKey, when the key changes),
+// when the canvas's size, the display scale or the zoom changes, or when a
+// caret it drew with Painter.CaretVisible blinks, so read the signals the
+// drawing depends on in the component's render, not only in draw. Shapes are
+// drawn on the CPU, at the display's resolution, and text with the text
+// renderer, over the shapes.
 //
 // The canvas is a Div: size it with Size (300 x 150 by default), handle the
 // pointer with OnMouseMove and the others (MouseEvent.LocalX and LocalY are in
@@ -44,6 +47,30 @@ func Canvas(draw func(p *Painter, w, h float32)) *DivElement {
 	return d
 }
 
+// CanvasKey says what a Canvas's drawing depends on: while key is equal to the
+// key of the last drawing, the drawing is kept when the component that made the
+// canvas renders again, and draw does not run. It still runs when the canvas's
+// size, the display scale, the zoom or the inherited text color changes. A nil
+// key, the default, draws again on each render.
+//
+// Use it for a drawing that is costly and changes less often than its
+// component renders, such as a grid that renders for each hover of a row:
+//
+//	ui.Canvas(drawCells).CanvasKey(gridKey{rev: data.Rev(), first: first, sel: sel})
+//
+// The key is compared with ==, so it must be comparable: a number, a string, a
+// pointer or a struct of them. CanvasKey panics on a slice, a map or a func, or
+// a struct or array that holds one, which == would panic on later. A key of
+// the data's revision, or a pointer that changes when the data does, is the
+// usual choice. On an element that is not a Canvas it does nothing.
+func (d *DivElement) CanvasKey(key any) *DivElement {
+	if key != nil && !reflect.ValueOf(key).Comparable() {
+		panic(fmt.Sprintf("ui: CanvasKey: a key of type %T is not comparable; use a number, a string, a pointer or a struct of them", key))
+	}
+	d.canvasKey = key
+	return d
+}
+
 // Painter draws the shapes and text of a Canvas. Its methods are only valid
 // while the canvas's draw function runs.
 type Painter struct {
@@ -53,6 +80,17 @@ type Painter struct {
 	fg    Color
 	texts *[]canvasText
 	caret caretDraw // what the drawing asked of the caret blink (see CaretVisible)
+	// clip is the bounds of the current clip in the drawing's pixels, which text
+	// is clipped to, and clips the clips that Save remembered.
+	clip  textClip
+	clips []textClip
+}
+
+// textClip is the rectangle that canvas text is clipped to, in the drawing's
+// physical pixels; on is false while nothing is clipped.
+type textClip struct {
+	r  scene.Rect
+	on bool
 }
 
 // TextColor returns the text color the canvas inherits, as text in its place
@@ -64,6 +102,7 @@ type canvasText struct {
 	x, y  float32 // the top-left of the text, logical pixels from the canvas's
 	l     *text.Layout
 	color Color
+	clip  textClip // the clip when the text was placed
 }
 
 // Paint is what fills or strokes a shape: a Color, or a gradient made with
@@ -282,10 +321,18 @@ func (p *Painter) Stroke(path *Path, s StrokeStyle) {
 }
 
 // Save remembers the transform, clip and alpha, which Restore brings back.
-func (p *Painter) Save() { p.c.Save() }
+func (p *Painter) Save() {
+	p.c.Save()
+	p.clips = append(p.clips, p.clip)
+}
 
 // Restore brings back the transform, clip and alpha that the last Save remembered.
-func (p *Painter) Restore() { p.c.Restore() }
+func (p *Painter) Restore() {
+	p.c.Restore()
+	if n := len(p.clips); n > 0 {
+		p.clip, p.clips = p.clips[n-1], p.clips[:n-1]
+	}
+}
 
 // Translate moves the origin of later drawing by x, y.
 func (p *Painter) Translate(x, y float32) { p.c.Transform(vector.Translate(x, y)) }
@@ -298,12 +345,23 @@ func (p *Painter) Scale(sx, sy float32) { p.c.Transform(vector.Scale(sx, sy)) }
 // Text is placed with the rotation but is not drawn rotated.
 func (p *Painter) Rotate(angle float32) { p.c.Transform(vector.Rotate(angle)) }
 
-// Clip limits later shapes to the inside of path, until Restore. Text is not
-// clipped.
+// Clip limits later drawing to the inside of path, within the clip already
+// set, until Restore. Shapes are clipped to the path; text is clipped to the
+// path's bounding box, which is the path itself for a rectangle, such as a cell
+// of a grid.
 func (p *Painter) Clip(path *Path) {
-	if path != nil {
-		p.c.Clip(&path.v, path.rule())
+	if path == nil {
+		return
 	}
+	p.c.Clip(&path.v, path.rule())
+	var r scene.Rect // nothing, for an empty path
+	if x0, y0, x1, y1, ok := path.v.Transform(p.c.Matrix()).Bounds(); ok {
+		r = scene.Rect{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}
+	}
+	if p.clip.on {
+		r = p.clip.r.Intersect(r)
+	}
+	p.clip = textClip{r: r, on: true}
 }
 
 // Alpha fades later drawing by a, from 0 to 1, until Restore. It multiplies
@@ -323,30 +381,42 @@ func (p *Painter) Text(x, y float32, s string, st TextFormat) {
 	if c.IsZero() {
 		c = p.fg
 	}
-	*p.texts = append(*p.texts, canvasText{x: x, y: y, l: l, color: c})
+	*p.texts = append(*p.texts, canvasText{x: x, y: y, l: l, color: c, clip: p.clip})
 }
 
 // MeasureText returns the size of s drawn with st, to place labels.
+// Context.MeasureText returns the same size outside a drawing.
 func (p *Painter) MeasureText(s string, st TextFormat) (w, h float32) {
 	l := p.layout(s, st)
 	return l.Width, l.Height
 }
 
-func (p *Painter) layout(s string, st TextFormat) *text.Layout {
-	return p.rt.text.Layout(s, p.textStyle(st), float32(math.Inf(1)))
+// MeasureText returns the size in logical pixels of s drawn on a canvas with st,
+// as Painter.MeasureText returns it, to size what depends on text before it is
+// drawn, such as the columns of a grid drawn on a canvas.
+func (c *Context) MeasureText(s string, st TextFormat) (w, h float32) {
+	l := c.rt.canvasLayout(s, st)
+	return l.Width, l.Height
 }
 
-// textStyle returns the text style that st draws with: its family, weight, italic and size, with the
-// theme's text size and the Text size setting applied.
-func (p *Painter) textStyle(st TextFormat) text.Style {
+func (p *Painter) layout(s string, st TextFormat) *text.Layout { return p.rt.canvasLayout(s, st) }
+
+// canvasLayout lays out s as Painter.Text draws it with st.
+func (rt *Runtime) canvasLayout(s string, st TextFormat) *text.Layout {
+	return rt.text.Layout(s, rt.canvasTextStyle(st), float32(math.Inf(1)))
+}
+
+// canvasTextStyle returns the text style that st draws with: its family, weight, italic and size,
+// with the theme's text size and the Text size setting applied.
+func (rt *Runtime) canvasTextStyle(st TextFormat) text.Style {
 	ts := text.Style{Size: st.FontSize, Weight: st.Weight, Italic: st.Italic, NoWrap: true}
 	if st.Mono {
 		ts.Family = text.FamilyMono
 	}
 	if ts.Size == 0 {
-		ts.Size = p.rt.theme.FontSize
+		ts.Size = rt.theme.FontSize
 	}
-	ts.Size *= p.rt.textFactor // the Text size setting
+	ts.Size *= rt.textFactor // the Text size setting
 	if ts.Weight == 0 {
 		ts.Weight = text.Regular
 	}
@@ -357,7 +427,29 @@ func (p *Painter) textStyle(st TextFormat) text.Style {
 // Mono text on Windows. It is "" when the font declares no name. The name is for assistive
 // technology and the inspector; drawing does not use it.
 func (p *Painter) FontName(st TextFormat) string {
-	return p.rt.text.FaceName(p.textStyle(st))
+	return p.rt.text.FaceName(p.rt.canvasTextStyle(st))
+}
+
+// PixelScale returns the number of display pixels in a logical pixel of the
+// drawing: the display scale times the zoom, such as 1.25 at 125%. A line
+// 1/PixelScale() wide is one display pixel wide.
+func (p *Painter) PixelScale() float32 { return p.k }
+
+// Snap returns the point nearest x, y, in the current coordinates, that lies on
+// a corner of the display's pixels. A line or a rectangle whose edges are
+// snapped, and whose width is a whole number of display pixels (see
+// PixelScale), is drawn crisp rather than blurred across two rows of pixels.
+// Under a transform that rotates or skews, the point is still snapped in the
+// display's pixels.
+func (p *Painter) Snap(x, y float32) (float32, float32) {
+	m := p.c.Matrix()
+	inv, ok := m.Invert()
+	if !ok {
+		return x, y
+	}
+	pt := m.Apply(vector.Point{X: x, Y: y})
+	pt = inv.Apply(vector.Point{X: round(pt.X), Y: round(pt.Y)})
+	return pt.X, pt.Y
 }
 
 // Now returns the time of the frame being painted, the clock that CaretVisible blinks on. A
@@ -472,10 +564,15 @@ func (rt *Runtime) paintCanvas(n *node, x, y, w, h float32, fg Color, opacity fl
 		cs.el, cs.key, cs.fg, cs.pw, cs.ph = n.div, n.div.canvasKey, fg, pw, ph
 		cs.texts = cs.texts[:0]
 		cs.vc.Reset(pw, ph)
-		k := float32(pw) / box.W
-		cs.vc.SetTransform(vector.Scale(k, float32(ph)/box.H))
+		// The drawing is in logical pixels at the display's scale, the same in both
+		// directions, so that a logical pixel is the same whole number of display
+		// pixels as in the rest of the window (see Painter.Snap). draw gets the size
+		// of the drawing's pixels, which is the content box rounded to them, as a
+		// Div's background is.
+		k := rt.scale
+		cs.vc.SetTransform(vector.Scale(k, k))
 		pt := &Painter{c: cs.vc, rt: rt, k: k, fg: fg, texts: &cs.texts}
-		n.div.canvas(pt, box.W, box.H)
+		n.div.canvas(pt, float32(pw)/k, float32(ph)/k)
 		cs.caret = pt.caret
 		img := cs.vc.Image()
 		if cs.tex == nil || cs.tex.Width != pw || cs.tex.Height != ph {
@@ -507,8 +604,26 @@ func (rt *Runtime) paintCanvas(n *node, x, y, w, h float32, fg Color, opacity fl
 		return
 	}
 	rt.scene.PushClip(dst)
+	var clip textClip // the clip pushed for the text being drawn
 	for _, t := range cs.texts {
-		rt.text.Draw(&rt.scene, t.l, box.X+t.x, box.Y+t.y, 0, rt.scale, 0, t.color.Alpha(opacity).scene())
+		if t.clip != clip {
+			if clip.on {
+				rt.scene.PopClip()
+			}
+			if clip = t.clip; clip.on {
+				r := clip.r
+				r.X, r.Y = r.X+dst.X, r.Y+dst.Y
+				rt.scene.PushClip(r)
+			}
+		}
+		if clip.on && (clip.r.W <= 0 || clip.r.H <= 0) {
+			continue // clipped away
+		}
+		// Text is placed from the drawing's top-left pixel, as the shapes are.
+		rt.text.Draw(&rt.scene, t.l, dst.X/rt.scale+t.x, dst.Y/rt.scale+t.y, 0, rt.scale, 0, t.color.Alpha(opacity).scene())
+	}
+	if clip.on {
+		rt.scene.PopClip()
 	}
 	rt.scene.PopClip()
 }

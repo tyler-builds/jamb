@@ -80,7 +80,8 @@ type handlers struct {
 type DivElement struct {
 	canvas func(p *Painter, w, h float32) // see Canvas
 	// canvasKey, when set, says what the drawing depends on: it is drawn again
-	// when the key changes, rather than whenever the element is built (see SVG).
+	// when the key changes, rather than whenever the element is built (see
+	// CanvasKey and SVG).
 	canvasKey    any
 	grid         *cellGrid // see CellGrid
 	style        Style
@@ -98,7 +99,7 @@ type DivElement struct {
 	actions      []actionHandler // see OnAction
 	drops        []DropTarget    // see OnDrop
 	handle       *FocusHandle
-	watch        *divWatch    // OnGridColumns and OnTextSelect, which few elements set
+	watch        *divWatch    // OnGridColumns, OnResize and OnTextSelect, which few elements set
 	extent       *extentWatch // set by Tabs: paint reports the element's scroll offset and range (see extentWatch)
 	vlist        *listState   // set on the scroll container of a UniformList
 	vrows        *varState    // set on the scroll container of a ListOf
@@ -332,10 +333,26 @@ func (d *DivElement) Grid(columns ...Length) *DivElement {
 // changing the children in fn does not change it again.
 func (d *DivElement) OnGridColumns(fn func(n int)) *DivElement { d.watches().gridCols = fn; return d }
 
+// OnResize calls fn with the size of the element's content box, inside its
+// border and padding, in logical pixels, when it is first laid out and each
+// time the size changes. fn may set signals:
+// what it changes is built and laid out again before the frame is painted, so
+// it is never shown a frame late. Use it for a custom view that works out
+// what is visible from its own size:
+//
+//	size := ui.Local(ctx, "size", [2]float32{})
+//	rows := int(size.Get()[1] / rowHeight)
+//	ui.Canvas(drawRows(first, rows)).Size(ui.Full, ui.Full).
+//		OnResize(func(w, h float32) { size.Set([2]float32{w, h}) })
+//
+// An element that is not displayed (see Display) is not reported.
+func (d *DivElement) OnResize(fn func(w, h float32)) *DivElement { d.watches().resize = fn; return d }
+
 // divWatch holds the functions that report on an element after layout or paint.
 // Few elements set one, so they share a pointer and DivElement keeps its size.
 type divWatch struct {
 	gridCols   func(n int)         // see OnGridColumns
+	resize     func(w, h float32)  // see OnResize
 	textSelect func(TextSelection) // see OnTextSelect
 }
 
@@ -352,6 +369,19 @@ func (d *DivElement) onGridCols() func(n int) {
 		return nil
 	}
 	return d.watch.gridCols
+}
+
+// onResize is the element's OnResize, or nil.
+func (d *DivElement) onResize() func(w, h float32) {
+	if d.watch == nil {
+		return nil
+	}
+	return d.watch.resize
+}
+
+// watchesLayout reports whether the element has an OnGridColumns or an OnResize.
+func (d *DivElement) watchesLayout() bool {
+	return d.watch != nil && (d.watch.gridCols != nil || d.watch.resize != nil)
 }
 
 // onTextSelect is the element's OnTextSelect, or nil.
