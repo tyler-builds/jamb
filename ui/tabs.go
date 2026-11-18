@@ -57,11 +57,14 @@ const (
 // the Styles of the instance. The states are parts of their own: TabSelected
 // applies to the selected tab, TabDisabled to a disabled one, TabHover while
 // the pointer is over an enabled tab that is not selected, and TabFocusVisible
-// while the tab has keyboard focus. Bar is the row that holds the strip with the
-// Prefix, the Suffix, the scroll buttons and the overflow menu's button; it is
-// built only when one of them is shown. ScrollButton and MenuButton are the Root
-// of those buttons. See docs/styling.md.
+// while the tab has keyboard focus. Root is the column of the tab list and the
+// panel: its Gap is the space between them. Bar is the row that holds the strip
+// with the Prefix, the Suffix, the scroll buttons and the overflow menu's button;
+// it is built only when one of them is shown, and then it draws the line under the
+// tabs of TabsUnderline, which List draws otherwise. ScrollButton and MenuButton
+// are the Root of those buttons. See docs/styling.md.
 type TabsStyle struct {
+	Root            Style // the column of the tab list and the panel
 	Bar             Style // the row of the prefix, the strip, its buttons and the suffix
 	List            Style // the strip that holds the tabs
 	Tab             Style // each tab
@@ -79,6 +82,7 @@ type TabsStyle struct {
 // mergeFrom applies o on top of s in place, part by part (see Style.mergeFrom).
 // Under plain the indicator's height is the system's too, as in plain.
 func (s *TabsStyle) mergeFrom(o *TabsStyle, plain bool) {
+	s.Root.mergeFrom(&o.Root, plain)
 	s.Bar.mergeFrom(&o.Bar, plain)
 	s.List.mergeFrom(&o.List, plain)
 	s.Tab.mergeFrom(&o.Tab, plain)
@@ -99,20 +103,45 @@ func (s *TabsStyle) mergeFrom(o *TabsStyle, plain bool) {
 	s.MenuButton.mergeFrom(&o.MenuButton, plain)
 }
 
-// tabsDefaults sets d to the built-in look of a tab list of variant v, from the
-// colors of th.
-func tabsDefaults(d *TabsStyle, th *Theme, v TabsVariant) {
+// tabsDefaults sets d to the built-in look of a tab list of variant v and control
+// size size, from the colors of th. inBar is set when the strip is in the bar (see
+// TabsStyle.Bar), which then draws the line under the tabs of TabsUnderline, so
+// that the line runs under the bar's buttons too.
+//
+// A tab of TabsUnderline is a button's height and 2 px for the indicator; the
+// track of TabsSegmented, with its border and padding, is a button's height.
+func tabsDefaults(d *TabsStyle, th *Theme, v TabsVariant, size controlSize, inBar bool) {
 	ring := Shadow{Spread: 2, Color: th.FocusRing}
+	h, _, fs := size.field()
+	px := float32(12)
+	switch size {
+	case sizeSmall:
+		px = 8
+	case sizeLarge:
+		px = 16
+	}
+	line := Style{BorderEdges: Edges{Bottom: 1}, BorderColor: th.Border}
 	*d = TabsStyle{
+		Root: Style{Direction: Column, Gap: 12},
 		Bar:  Style{Direction: Row, Align: Center, Gap: 4},
-		List: Style{Direction: Row, Gap: 4, BorderEdges: Edges{Bottom: 1}, BorderColor: th.Border},
-		Tab: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(36), Padding: XY(12, 0),
+		List: Style{Direction: Row, Gap: 4},
+		Tab: Style{Direction: Row, Align: Center, Gap: 6, MinHeight: Px(h + 2), Padding: XY(px, 0),
 			NoShrink: true, Radius: th.Radius / 2, TextColor: th.TextMuted, Transition: th.Motion.hover(), Spring: th.Motion.Spring},
 		TabHover:        Style{Background: th.SurfaceHover},
 		TabSelected:     Style{TextColor: th.Text},
 		TabFocusVisible: Style{Shadows: []Shadow{ring}},
 		Indicator:       Style{Height: Px(2), Background: th.Accent, Transition: 120 * time.Millisecond},
 		DropLine:        Style{Width: Px(2), Background: th.Accent},
+	}
+	if size != sizeDefault {
+		d.Tab.FontSize = fs
+	}
+	switch {
+	case v != TabsUnderline:
+	case inBar:
+		d.Bar.mergeFrom(&line, false)
+	default:
+		d.List.mergeFrom(&line, false)
 	}
 	if th.HighContrast {
 		// Under high contrast a disabled tab is GrayText, not dimmed.
@@ -124,7 +153,7 @@ func tabsDefaults(d *TabsStyle, th *Theme, v TabsVariant) {
 		// A quiet control: a sunken track, and a raised selected segment with no accent fill.
 		d.List = Style{Direction: Row, Gap: 2, Padding: All(2), Radius: th.Radius,
 			Background: th.Panel, BorderWidth: 1, BorderColor: th.Border, fitWidth: true}
-		d.Tab.MinHeight = Px(30)
+		d.Tab.MinHeight = Px(h - 6) // the track's border and padding take 3 px a side
 		d.Tab.Radius = max(th.Radius-2, 0)
 		d.TabSelected = Style{Background: th.SurfaceActive, TextColor: th.Text}
 		d.TabHover = Style{TextColor: th.Text}
@@ -133,6 +162,7 @@ func tabsDefaults(d *TabsStyle, th *Theme, v TabsVariant) {
 			// Under high contrast the selected segment keeps the system's accent fill,
 			// which is what marks it there.
 			d.List.Padding = All(3)
+			d.Tab.MinHeight = Px(h - 8)
 			d.Tab.Radius = max(th.Radius-3, 0)
 			d.TabHover = Style{Background: th.SurfaceHover}
 			d.TabSelected = Style{Background: th.Accent, TextColor: th.AccentText}
@@ -140,12 +170,12 @@ func tabsDefaults(d *TabsStyle, th *Theme, v TabsVariant) {
 	}
 }
 
-// resolveTabs sets st to the look of a tab list: the defaults of v, merged with
-// the theme's Tabs and then the instance's Styles. Under high contrast the two
-// overrides are plain (see plainStyle).
-func resolveTabs(ctx *Context, v TabsVariant, inst, st *TabsStyle) {
+// resolveTabs sets st to the look of a tab list: the defaults of v, size and
+// inBar, merged with the theme's Tabs and then the instance's Styles. Under high
+// contrast the two overrides are plain (see plainStyle).
+func resolveTabs(ctx *Context, v TabsVariant, size controlSize, inBar bool, inst, st *TabsStyle) {
 	th := ctx.Theme()
-	tabsDefaults(st, th, v)
+	tabsDefaults(st, th, v, size, inBar)
 	st.layered(ctx,
 		themeLayer(&th.Tabs), instanceLayer(inst))
 }
@@ -184,6 +214,7 @@ type TabsElement[T comparable] struct {
 	onClose     func(T) // see OnClose
 	keep        bool    // see KeepMounted
 	variant     TabsVariant
+	ctlSize     controlSize // see Small and Large
 	styles      TabsStyle
 	renderTab   func(Tab[T], PartState) Element
 	size        sizing       // the tab list's sizes, from the sizing methods (see Sizing in docs/styling.md)
@@ -280,6 +311,15 @@ func (t *TabsElement[T]) KeepMounted() *TabsElement[T] { t.keep = true; return t
 // TabsSegmented. The behavior is the same in both.
 func (t *TabsElement[T]) Variant(v TabsVariant) *TabsElement[T] { t.variant = v; return t }
 
+// Small makes the tabs use the small control size, as Button.Small does: the track
+// of TabsSegmented is as tall as a small button, and the tabs' text and padding are
+// smaller.
+func (t *TabsElement[T]) Small() *TabsElement[T] { t.ctlSize = sizeSmall; return t }
+
+// Large makes the tabs use the large control size, as Button.Large does. Small and
+// Large replace each other.
+func (t *TabsElement[T]) Large() *TabsElement[T] { t.ctlSize = sizeLarge; return t }
+
 // Styles sets the look of the parts of the tab list, for this instance only.
 // Set fields win over the theme's Tabs and the defaults; see TabsStyle and
 // docs/styling.md. Calling Styles again merges with the earlier values.
@@ -365,7 +405,6 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		th := ctx.Theme()
 		strs := ctx.Strings()
 		var st TabsStyle
-		resolveTabs(ctx, t.variant, &t.styles, &st)
 		cur := t.selected.Get()
 		// order is the order of the values once the user has moved a tab (see
 		// Reorderable); until then the tabs are shown in the order given.
@@ -441,6 +480,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 		e := ext.Get()
 		over := e.over
 		inBar := t.prefix != nil || t.suffix != nil || t.menu || over && buttons
+		resolveTabs(ctx, t.variant, t.ctlSize, inBar, &t.styles, &st)
 		// view is what the strip showed last: whether it was in the bar, and the
 		// selected tab it scrolled to. The bar comes and goes with the scroll buttons
 		// when nothing else is in it, and the strip is built anew then: focus in it
@@ -548,7 +588,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 				tab.Child(Div().AccessHidden().Child(t.renderTab(tb, ps)))
 			} else {
 				if tb.Icon != nil {
-					tab.Child(Icon(tb.Icon).Size(16))
+					tab.Child(Icon(tb.Icon).Size(buttonIconSize(t.ctlSize)))
 				}
 				if capped {
 					tab.Child(Text(tb.Label).Truncate()).Tooltip(tb.Label)
@@ -743,7 +783,7 @@ func (t *TabsElement[T]) expand(ctx *Context) Element {
 			}).Key(t.tabKey(tb.Value)))
 		}
 
-		group := Div().Column().Gap(12).Grow(1).MinHeight(Px(0)).Key(t.scope()).
+		group := Div().asPart("Tabs.Root").Grow(1).MinHeight(Px(0)).styleOf(&st.Root).Key(t.scope()).
 			// Ctrl+Tab and Ctrl+Shift+Tab reach here from the tab list and from the
 			// panel, since both are inside the group.
 			OnKeyDown(func(e *KeyEvent) {

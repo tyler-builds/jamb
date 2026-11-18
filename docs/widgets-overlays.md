@@ -59,6 +59,13 @@ ui.MenuBar(
 - **Placement.** A menu is an `Overlay` below its anchor. It flips above and
   shifts to stay inside the window, as other overlays do. A submenu opens to the
   right of its row and flips to the left when there is no room.
+  A context menu opens at the pointer for a right click. Shift+F10 or the Menu key
+  opens it below the focused element, or, when that element is a list, a tree or a
+  grid, below the item it highlights (the focused row or cell), as Windows places a
+  menu opened from the keyboard; the menu then takes that item's name.
+  A `DropdownMenu` is laid out as its trigger would be in its place: a row with
+  `Align(ui.Center)` centers it beside the other buttons, and a column keeps it at
+  the trigger's width.
 - **Focus.** A menu takes keyboard focus when it opens. Closing it (Escape,
   choosing an item, or a press outside) returns focus to the element that had it
   before the press, or to the focused element for a keyboard open. A press
