@@ -425,10 +425,11 @@ Ctrl+Shift+Tab to its tabs (see Navigation and layout).
 
 **Data grids.** A `DataGrid`'s body has the context `DataGrid`. Its copy keys are the
 actions `actions.GridCopy` (Ctrl+C and Ctrl+Insert) and `actions.GridCopyWithHeaders`
-(Ctrl+Shift+C), bound in that context by `ui.DefaultBindings()`, so an app rebinds them
-or puts them in the grid's context menu as it does the text fields' (see
-[Data grids](widgets-data.md#data-grids)). A text field in an edited cell is deeper, so
-its own Ctrl+C copies the field's text.
+(Ctrl+Shift+C), bound by `ui.DefaultBindings()` in `DataGrid && !DataGridCell`, so an app
+rebinds them or puts them in the grid's context menu as it does the text fields' (see
+[Data grids](widgets-data.md#data-grids)). A cell that holds controls or an editor has the
+context `DataGridCell`, so while one of them has focus its own keys win, and the grid does
+not copy from under it.
 
 **Palettes.** A command palette's search field is an `Editor` inside a
 `KeyContext("Palette")`. Its keys therefore belong to `"Palette > Editor"`:

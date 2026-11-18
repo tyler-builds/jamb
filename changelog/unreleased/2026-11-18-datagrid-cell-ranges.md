@@ -5,4 +5,4 @@
 
 ### Changed
 
-- `DataGrid.CellSelection` is now filled from the grid's ranges, and can be given with `CellRanges`. Ctrl+A no longer builds a set of every cell for the grid's own use, so it is about 9 times faster with `CellSelection` too (49 to 5.7 ms on 100,000 rows of 4 columns).
+- `DataGrid.CellSelection` is now filled from the grid's ranges, and can be given with `CellRanges`: a value the app sets in either selects those cells, and the grid sets the other to match. Ctrl+A no longer builds a set of every cell for the grid's own use, so it is about 9 times faster with `CellSelection` too (49 to 5.7 ms on 100,000 rows of 4 columns).

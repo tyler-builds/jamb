@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 	"unsafe"
@@ -400,7 +401,8 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst, 
 //     Shift+Space whole rows.
 //   - Ctrl+C and Ctrl+Insert copy the selection as tab-separated text, and
 //     Ctrl+Shift+C copies it with the headers of its columns (see CopyText). They are
-//     the actions of DataGridActions, bound in the grid's key context, "DataGrid".
+//     the actions of DataGridActions, bound in the grid's key context, "DataGrid",
+//     except while a control or an editor in a cell has focus (see DataGridActions).
 //   - With RowHeaders, Left from the first column moves to the row's header, and Up
 //     from the first row's header to the corner (see RowHeaders).
 //   - Enter activates the focused row, and calls OnActivate with it.
@@ -428,7 +430,9 @@ func resolveDataGrid(ctx *Context, d DataGridDensity, textFactor float32, inst, 
 //
 // A click selects a row (Ctrl toggles it, Shift extends the selection), or a cell
 // when the grid selects cells (Shift selects the rectangle from the anchor, and
-// Ctrl+Shift adds it to the rest of the selection), and a
+// Ctrl+Shift adds it to the rest of the selection; a drag selects the rectangle it
+// covers, and a drag held past an edge of the rows in view scrolls them, or the
+// columns, and selects what comes into view), and a
 // double-click activates it, except on an editable cell, where a double-click
 // starts an edit. A click on a control in a cell (see DataColumn.Interactive)
 // focuses and operates the control; it moves the cursor to the cell but does not
@@ -575,16 +579,13 @@ type dgHeadOps[T any] struct {
 	runs []dgGroupRun
 	// The selection from the headers (see HeaderSelects and RowHeaders). selects says a
 	// press on a header cell selects its column, and pickCol selects it. cellSel says the
-	// grid selects cells, and whole reports whether column c is selected whole. dragTo and
-	// dragEnd follow a drag across the headers. rowHeadW is the width of the corner, zero
-	// without row headers; corner selects everything, and onCorner says the cursor is on
-	// it.
+	// grid selects cells, and whole reports whether column c is selected whole. rowHeadW
+	// is the width of the corner, zero without row headers; corner selects everything,
+	// and onCorner says the cursor is on it.
 	selects  bool
 	cellSel  bool
 	pickCol  func(c int, mods input.Modifiers)
 	whole    func(c int) bool
-	dragTo   func(x, y float32)
-	dragEnd  func()
 	rowHeadW float32
 	corner   func()
 	onCorner bool
@@ -1115,11 +1116,8 @@ type dgLive struct {
 	ops       dgOps
 	cursorCol int
 	setOpen   func(key string, v bool)
-	// rowHead selects the row at q, from its header, with the modifiers mods; dragTo
-	// extends a drag of the selection to the window's (x, y), and dragEnd ends it.
+	// rowHead selects the row at q, from its header, with the modifiers mods.
 	rowHead func(q int, mods input.Modifiers)
-	dragTo  func(x, y float32)
-	dragEnd func()
 	// press is a mouse press on the cell at (q, c): a click, which starts a drag.
 	press func(q, c int, mods input.Modifiers)
 }
@@ -1330,7 +1328,10 @@ type dgShared[T any] struct {
 	rangeSel   *dgSel
 	cellsIdent unsafe.Pointer
 	cellsN     int
-	warnedSel  bool
+	// rangesIdent and rangesN are the ranges last written or read with them.
+	rangesIdent unsafe.Pointer
+	rangesN     int
+	warnedSel   bool
 
 	// The displayed positions built by the last frame: [builtLo, builtHi).
 	builtLo, builtHi int
@@ -1347,6 +1348,7 @@ type dgShared[T any] struct {
 	selDrag      uint8
 	dragQ, dragC int
 	dragKeep     bool
+	dragAt       time.Time // the frame of the last step of dragScroll
 
 	// The column edge being dragged.
 	dragging     bool
@@ -1782,12 +1784,21 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	if g.cellOn {
 		rs := rangeSel.Get()
 		if g.cells != nil {
-			// A value the app has set in the cells of CellSelection selects those cells.
+			// A value the app has set in the cells of CellSelection selects those cells,
+			// and one it has set in the ranges is listed in the cells: each is told from the
+			// grid's own by the slice the grid last wrote.
 			cs := g.cells.Get()
-			if id := unsafe.Pointer(unsafe.SliceData(cs)); id != sh.cellsIdent || len(cs) != sh.cellsN {
-				sh.cellsIdent, sh.cellsN = id, len(cs)
+			switch rid := unsafe.Pointer(unsafe.SliceData(rs)); {
+			case unsafe.Pointer(unsafe.SliceData(cs)) != sh.cellsIdent || len(cs) != sh.cellsN:
+				sh.cellsIdent, sh.cellsN = unsafe.Pointer(unsafe.SliceData(cs)), len(cs)
 				rs = rangesOfCells(cs)
+				sh.rangesIdent, sh.rangesN = unsafe.Pointer(unsafe.SliceData(rs)), len(rs)
 				rangeSel.Set(rs)
+			case rid != sh.rangesIdent || len(rs) != sh.rangesN:
+				sh.rangesIdent, sh.rangesN = rid, len(rs)
+				cs = cellsOfRanges(rs, n, keyAt, colKeys)
+				sh.cellsIdent, sh.cellsN = unsafe.Pointer(unsafe.SliceData(cs)), len(cs)
+				g.cells.Set(cs)
 			}
 		}
 		cellsOn = sh.rangesSelection(rs)
@@ -2125,6 +2136,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		rangeSel.Set(rs)
 		if g.cells != nil {
 			// The cells of CellSelection are the ranges listed cell by cell.
+			sh.rangesIdent, sh.rangesN = unsafe.Pointer(unsafe.SliceData(rs)), len(rs)
 			cs := cellsOfRanges(rs, len(sh.order), keyAt, colKeys)
 			sh.cellsIdent, sh.cellsN = unsafe.Pointer(unsafe.SliceData(cs)), len(cs)
 			g.cells.Set(cs)
@@ -2881,24 +2893,36 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		return 0, 0, false
 	}
-	// rowAt returns the displayed position of the row under the window's (x, y).
-	rowAt := func(x, y float32) (int, bool) {
-		for _, nd := range rt.hitTest(x, y) {
-			if d := nd.div; d != nil && d.acc != nil && d.acc.gridRow > 0 &&
-				(d.part == "DataGrid.Row" || d.part == "DataGrid.Cell" || d.part == "DataGrid.RowHeader") {
-				return d.acc.gridRow - 1, true
-			}
+	// dragPoint returns the row and the column of the cells under the window's (x, y),
+	// for a drag of the selection: a point past an edge of the rows in view, or outside
+	// the grid, takes the nearest row and column in view, so that the drag follows the
+	// pointer on one axis while the other is outside. The rows are found from their
+	// height and the scroll, not by a hit test, so a row that is not built is found too.
+	dragPoint := func(x, y float32) (q, c int, ok bool) {
+		body := rt.byID[sh.focus.id]
+		if body == nil || body.st == nil || n == 0 || nc == 0 || sh.builtHi <= sh.builtLo {
+			return 0, 0, false
 		}
-		return 0, false
+		r := rt.nodeRect(body)
+		be := body.style.borderEdges()
+		top, bottom := r.Y+be.Top+headerH, r.Bottom()-be.Bottom
+		y = min(max(y, top), max(bottom-1, top))
+		q = min(max(int((y-top+body.st.scrollY)/rowH), 0), n-1)
+		left, right := r.X+be.Left+rowHeadW, r.X+be.Left+sh.visW
+		x = min(max(x, left), max(right-1, left))
+		// The cells of any built row lie where those of every row do.
+		c = colAt(min(max(q, sh.builtLo), sh.builtHi-1), x)
+		return q, c, true
 	}
-	// headerAt returns the column of the header cell under the window's (x, y).
-	headerAt := func(x, y float32) (int, bool) {
-		for _, nd := range rt.hitTest(x, y) {
-			if d := nd.div; d != nil && d.part == "DataGrid.HeaderCell" && d.acc != nil && d.acc.gridCol > 0 {
-				return d.acc.gridCol - 1, true
-			}
+	// cursorTo moves the cursor to (q, c), on the header when header is set, without
+	// scrolling: a drag of the selection scrolls by itself (see dragScroll).
+	cursorTo := func(q, c int, header bool) {
+		k := ""
+		if !header {
+			k = keyAt(q)
 		}
-		return 0, false
+		cur.Set(dgCursor{key: k, pos: q, col: c, colKey: cols[c].key(), header: header})
+		handle.request()
 	}
 	// startDrag starts a drag of the selection of the kind kind from (q, c), after a
 	// press with the modifiers mods has selected there. Only a multiple selection of
@@ -2906,36 +2930,82 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	startDrag := func(kind uint8, q, c int, mods input.Modifiers) {
 		if g.cellOn && g.cellMode == SelectionMultiple {
 			sh.selDrag, sh.dragQ, sh.dragC, sh.dragKeep = kind, q, c, mods&input.ModCtrl != 0
+			sh.dragAt = time.Time{}
 		}
 	}
 	// dragTo extends the drag of the selection to the window's (x, y), as Shift+click
 	// there would: over the cells a rectangle, down the row headers whole rows, and across
-	// the column headers whole columns. The element that started it holds the pointer,
-	// so a move with no button held, after a release outside the window, ends it.
+	// the column headers whole columns. The grid's body holds the pointer while the
+	// button is down, so a drag ends when it no longer does.
 	dragTo := func(x, y float32) {
-		if rt.captureID == 0 {
+		if sh.selDrag != dgDragNone && rt.captureID != sh.focus.id {
 			sh.selDrag = dgDragNone
+		}
+		if sh.selDrag == dgDragNone {
+			return
+		}
+		q, cl, ok := dragPoint(x, y)
+		if !ok {
+			return
 		}
 		c := colOf(cur.Peek().colKey, cur.Peek().col)
 		switch sh.selDrag {
 		case dgDragCells:
-			if q, cl, ok := cellAt(x, y); ok && q < n && (q != sh.dragQ || cl != sh.dragC) {
+			if q != sh.dragQ || cl != sh.dragC {
 				sh.dragQ, sh.dragC = q, cl
 				extend(q, cl, dgSpan{}, sh.dragKeep)
-				place(q, cl, false)
+				cursorTo(q, cl, false)
 			}
 		case dgDragRows:
-			if q, ok := rowAt(x, y); ok && q < n && q != sh.dragQ {
+			if q != sh.dragQ {
 				sh.dragQ = q
 				extend(q, c, dgSpan{cols: true}, sh.dragKeep)
-				place(q, c, false)
+				cursorTo(q, c, false)
 			}
 		case dgDragCols:
-			if cl, ok := headerAt(x, y); ok && cl < nc && cl != sh.dragC && n > 0 {
+			if cl != sh.dragC {
 				sh.dragC = cl
-				extend(min(max(cur.Peek().pos, 0), n-1), cl, dgSpan{rows: true}, sh.dragKeep)
-				focusCol(cl)
+				p := min(max(cur.Peek().pos, 0), n-1)
+				extend(p, cl, dgSpan{rows: true}, sh.dragKeep)
+				cursorTo(p, cl, cur.Peek().header)
 			}
+		}
+	}
+	// dragScroll scrolls the rows, and the columns, toward the pointer while a drag of
+	// the selection holds it past an edge of the rows in view, as a spreadsheet does:
+	// from nothing at the edge to dragScrollSpeed a zone beyond it, as a drag of an
+	// element scrolls (see edgeSpeed). It runs at each paint of the body nd, and asks for
+	// the next frame while it scrolls; the selection then extends to the row or column
+	// that came into view.
+	dragScroll := func(nd *node) {
+		if sh.selDrag == dgDragNone || rt.captureID != nd.id {
+			return
+		}
+		dt := float32(0.016)
+		if !sh.dragAt.IsZero() {
+			dt = min(max(float32(rt.lastFrame.Sub(sh.dragAt).Seconds()), 0), 0.1)
+		}
+		sh.dragAt = rt.lastFrame
+		r := rt.nodeRect(nd)
+		be := nd.style.borderEdges()
+		moved := false
+		step := func(pos, lo, hi, maxScroll float32, target, scroll *float32) {
+			v := edgeSpeed(pos, lo-dragScrollZone, hi+dragScrollZone)
+			if next := min(max(*target+v*dragScrollSpeed*dt, 0), max(maxScroll, 0)); v != 0 && next != *target {
+				*target, *scroll = next, next
+				moved = true
+			}
+		}
+		if sh.selDrag != dgDragCols {
+			step(rt.mouseY, r.Y+be.Top+headerH, r.Bottom()-be.Bottom, nd.lay.ContentH-nd.lay.H, &nd.st.targetY, &nd.st.scrollY)
+		}
+		if sh.selDrag != dgDragRows && total > sh.visW {
+			lo := r.X + be.Left + startW
+			step(rt.mouseX, lo, lo+sh.visW-startW-endW, nd.lay.ContentW-nd.lay.W, &nd.st.targetX, &nd.st.scrollX)
+		}
+		if moved {
+			rt.animating, rt.needPaint, rt.scrolled = true, true, true
+			rt.Post(func() { dragTo(rt.mouseX, rt.mouseY) })
 		}
 	}
 	dragEnd := func() { sh.selDrag = dgDragNone }
@@ -3034,7 +3104,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		built: built, cells: cellsOn, rowHeadW: rowHeadW, onRowHead: onRowHead, click: click, colAt: colAt, activate: activate, ops: ops, store: store}
 	sh.live = dgLive{click: click, colAt: colAt, activate: activate, ops: ops, cursorCol: col,
 		setOpen: func(key string, v bool) { g.setOpen(store, sh, key, v) },
-		rowHead: pressRow, dragTo: dragTo, dragEnd: dragEnd,
+		rowHead: pressRow,
 		press: func(q, c int, mods input.Modifiers) {
 			click(q, c, mods)
 			startDrag(dgDragCells, q, c, mods)
@@ -3082,6 +3152,15 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				}
 			}).
 			KeyContext("DataGrid").
+			// The body holds the pointer from a press until its release: a drag of the
+			// selection follows it (see dragTo), and the release clears what the press set
+			// for the click that follows, after that click, even when no click follows.
+			CapturePointer().
+			OnMouseMove(func(e *MouseEvent) { dragTo(e.X, e.Y) }).
+			OnMouseUp(func(*MouseEvent) {
+				dragEnd()
+				rt.Post(func() { sh.pressed, sh.headPress = false, false })
+			}).
 			OnAction(dataGridCopy, func() { copySelection(false) }).
 			OnAction(dataGridCopyHeaders, func() { copySelection(true) }).
 			OnFocus(func() { focused.Set(true) }).
@@ -3098,6 +3177,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	list.before = func(nd *node) {
 		sh.viewH = nd.lay.H
+		dragScroll(nd)
 		// A custom editor takes focus when it is painted, on its first control; until
 		// then the focus is not inside the cell, so the blur check below waits. When
 		// focus has left the editing cell, the edit is saved, as a text field's is.
@@ -3269,8 +3349,6 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		cellSel:  g.cellOn,
 		pickCol:  pressColumn,
 		whole:    func(c int) bool { return g.cellOn && curSel().wholeColumn(cols[c].key()) },
-		dragTo:   dragTo,
-		dragEnd:  dragEnd,
 		rowHeadW: rowHeadW,
 		corner: func() {
 			selectEverything()
@@ -3457,13 +3535,6 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 			}
 		}
 	})
-	if g.cellOn && g.cellMode == SelectionMultiple {
-		// A drag from a press on a cell or a row's header selects the cells or rows it
-		// crosses: the row holds the pointer, and finds what is under it.
-		r.CapturePointer().
-			OnMouseMove(func(e *MouseEvent) { live.dragTo(e.X, e.Y) }).
-			OnMouseUp(func(*MouseEvent) { live.dragEnd() })
-	}
 	r.OnClick(func() {
 		if sh.pressed {
 			sh.pressed = false
@@ -3583,8 +3654,11 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 			cell.Child(chev)
 		}
 		if cl.Interactive || cl.Edit != nil {
-			// The controls of the cell are not Tab stops: the grid is the one stop.
+			// The controls of the cell are not Tab stops: the grid is the one stop. The
+			// cell's key context keeps the grid's copy keys from its controls and its
+			// editor (see dataGridBindings).
 			cell.tabSkip = true
+			cell.KeyContext("DataGridCell")
 			ci := c
 			cell.OnMouseDown(func(e *MouseEvent) {
 				// A press on a control, or in the editor, which has focus, moves the
@@ -3918,22 +3992,19 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 				ho.pickCol(ci, mods)
 			}
 			move := ho.movable(cl)
-			hc.CapturePointer().
-				OnMouseDown(func(e *MouseEvent) {
-					if e.Button != input.ButtonLeft {
-						return
-					}
-					// A drag from a movable column that is selected whole moves it; any
-					// other drag selects the columns it crosses.
-					drags := move && e.Mods == 0 && ho.whole(ci)
-					sh.headPress = true
-					ho.pickCol(ci, e.Mods)
-					if !drags {
-						ho.stopDrag()
-					}
-				}).
-				OnMouseMove(func(e *MouseEvent) { ho.dragTo(e.X, e.Y) }).
-				OnMouseUp(func(*MouseEvent) { ho.dragEnd() })
+			hc.OnMouseDown(func(e *MouseEvent) {
+				if e.Button != input.ButtonLeft {
+					return
+				}
+				// A drag from a movable column that is selected whole moves it; any
+				// other drag selects the columns it crosses.
+				drags := move && e.Mods == 0 && ho.whole(ci)
+				sh.headPress = true
+				ho.pickCol(ci, e.Mods)
+				if !drags {
+					ho.stopDrag()
+				}
+			})
 		}
 		if sortable {
 			// With HeaderSelects a mouse press has selected the column, and the click is
@@ -3983,7 +4054,10 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 			hc.draggingOf(&source).OnDrag(Drag(dgColDrag{grid: sh, key: key}).Preview(func() Element {
 				return Div().Padding(6).styleOf(&st.HeaderCell).Background(st.Header.Background).Border(1, st.Header.BorderColor).
 					Child(Text(label))
-			}).End(func(DragEnd) { ho.setMark(dgColMark{}) }))
+			}).End(func(DragEnd) {
+				ho.setMark(dgColMark{})
+				sh.headPress = false // a drop runs no click to clear it
+			}))
 		}
 		if cl.Resizable {
 			ci, key, cl := c, cl.key(), cl

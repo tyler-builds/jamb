@@ -16,18 +16,24 @@ var (
 // as text that a spreadsheet takes (Ctrl+C and Ctrl+Insert), and Copy with headers,
 // which puts the headers of its columns first (Ctrl+Shift+C). They run on the grid
 // that has focus, so they can be bound to other keys in the grid's key context,
-// "DataGrid", and put in its context menu. Keymap files may name them. The actions
-// package has each of them as a variable.
+// "DataGrid", and put in its context menu. The default keys are bound in
+// "DataGrid && !DataGridCell", which leaves out a focused control or editor in a
+// cell. Keymap files may name them. The actions package has each of them as a
+// variable.
 func DataGridActions() []*Action { return []*Action{dataGridCopy, dataGridCopyHeaders} }
 
 // dataGridBindings are the default keys of a DataGrid's actions. Ctrl+C and
 // Ctrl+Shift+C copy, as in SQL Server Management Studio's results grid, and
-// Ctrl+Insert copies, as it does in Windows' text controls.
+// Ctrl+Insert copies, as it does in Windows' text controls. They apply while the grid
+// itself has focus, not a control or an editor in one of its cells, whose cell has the
+// key context "DataGridCell": the control's own keys win, and a key it does not bind
+// does nothing rather than copy the grid from under it.
 func dataGridBindings() []Binding {
+	const ctx = "DataGrid && !DataGridCell"
 	return []Binding{
-		BindIn("DataGrid", "ctrl+c", dataGridCopy),
-		BindIn("DataGrid", "ctrl+insert", dataGridCopy),
-		BindIn("DataGrid", "ctrl+shift+c", dataGridCopyHeaders),
+		BindIn(ctx, "ctrl+c", dataGridCopy),
+		BindIn(ctx, "ctrl+insert", dataGridCopy),
+		BindIn(ctx, "ctrl+shift+c", dataGridCopyHeaders),
 	}
 }
 
