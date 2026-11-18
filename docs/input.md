@@ -98,7 +98,20 @@ keyboard focus. `ClearShadows` removes it, and a `FocusVisible` style replaces i
 
 Custom elements ask `ctx.KeyboardFocus()` (true when this element has focus and
 focus is keyboard-driven) and draw their own ring; the component re-renders
-when that changes.
+when that changes. `ctx.Focused()` is true whenever the element has focus,
+after a click too, and re-renders the component the same way.
+
+To ask about another element, read its handle in the render:
+`h.Focused()` (the element has focus) and `h.FocusWithin()` (it or an element
+inside it has focus). The component re-renders when the answer changes, and not
+for focus moves that leave it as it was. So a toolbar enables the buttons that
+act on an editor while the editor has focus:
+
+```go
+editor := ui.NewFocusHandle()
+ui.Button("Execute").Disabled(!editor.Focused()) // in the toolbar's component
+ui.TextArea(query).FocusHandle(editor)
+```
 
 - **Built-in rings.** `Button` and `IconButton` draw a 2 px ring in
   `theme.FocusRing` when keyboard-focused. The ring is a `Shadow` with spread
@@ -195,9 +208,30 @@ app.Window{Bindings: []ui.Binding{                   // or rt.AddBindings(...)
 	ui.BindIn("Editor", "ctrl+z", ui.Unbind(actions.Undo)), // Ctrl+Z is no longer Undo in fields
 }}
 ctx.Dispatch(NewNote)                                // runs along the focus path; false if unhandled
-ctx.KeysFor(NewNote)                                 // "Ctrl+N", for tooltips
+ctx.KeysFor(NewNote)                                 // "Ctrl+N", for tooltips and menus
 ctx.AvailableActions()                               // actions handled on the focus path, deepest first
 ```
+
+**Shown keys.** Menus, tooltips and the command palette show an action's keys
+with `KeysFor`. For an action bound to several keys, it shows the binding
+marked `Primary`, and otherwise the one added last:
+
+```go
+ui.Bind("f5", Execute).Primary(), ui.Bind("ctrl+e", Execute), ui.Bind("alt+x", Execute) // menus show F5
+ui.BindIn("Editor", "ctrl+enter", Run).Primary(), ui.Bind("f5", Run) // Ctrl+Enter in an editor, F5 elsewhere
+```
+
+A primary `BindIn` binding is shown where its expression matches the focus
+path, and passed over elsewhere. While a menu is open, the focus path is the
+one of the element the menu returns focus to, where it runs its actions, so a
+menu bar opened from an editor shows the editor's keys.
+
+**The Pause key.** `"pause"` names the Pause/Break key, and `"break"` is the
+same key: `ui.Bind("alt+break", CancelQuery)` binds Alt+Pause, and menus show
+it as "Alt+Pause". With Ctrl held, Windows and Linux report the key as Break
+(`VK_CANCEL`, the `Break` keysym); jamb reports it as `input.KeyPause` with Ctrl
+held, so `"ctrl+pause"` and `"ctrl+break"` both bind it. Alt held with Pause is
+not a tap of Alt, so it does not focus the menu bar.
 
 `action.Hide()` marks an action for menus and command palettes to leave out;
 `action.Hidden()` tells them. Hidden actions still run and still appear in

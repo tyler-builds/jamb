@@ -872,7 +872,7 @@ var keyCodes = func() map[string]input.Key {
 		"Space": input.KeySpace, "ArrowLeft": input.KeyLeft, "ArrowRight": input.KeyRight,
 		"ArrowUp": input.KeyUp, "ArrowDown": input.KeyDown, "Home": input.KeyHome, "End": input.KeyEnd,
 		"PageUp": input.KeyPageUp, "PageDown": input.KeyPageDown, "Insert": input.KeyInsert,
-		"Equal": input.KeyEqual, "Minus": input.KeyMinus, "ContextMenu": input.KeyMenu,
+		"Equal": input.KeyEqual, "Minus": input.KeyMinus, "ContextMenu": input.KeyMenu, "Pause": input.KeyPause,
 		"Slash": input.KeySlash, "Backslash": input.KeyBackslash, "BracketLeft": input.KeyLeftBracket,
 		"BracketRight": input.KeyRightBracket, "Semicolon": input.KeySemicolon, "Quote": input.KeyApostrophe,
 		"Comma": input.KeyComma, "Period": input.KeyPeriod, "Backquote": input.KeyBacktick,

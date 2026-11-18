@@ -110,6 +110,7 @@ func (rt *Runtime) park(inst *componentInstance) {
 	if ids[rt.focusID] {
 		inst.refocus = rt.focusID
 		rt.focusID = 0
+		rt.focusMoved()
 	}
 	if ids[rt.captureID] {
 		rt.captureID = 0
@@ -182,6 +183,7 @@ func (rt *Runtime) adopt(inst *componentInstance, parent *node) {
 	if inst.refocus != 0 {
 		if rt.byID[inst.refocus] != nil {
 			rt.focusID = inst.refocus
+			rt.focusMoved()
 		}
 		inst.refocus = 0
 	}

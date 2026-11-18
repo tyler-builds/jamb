@@ -1052,6 +1052,7 @@ func (rt *Runtime) setFocus(id uint64) {
 			n.owner.invalidate()
 		}
 	}
+	rt.focusMoved()
 	rt.requestFrame()
 }
 

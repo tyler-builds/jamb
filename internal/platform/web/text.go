@@ -47,6 +47,8 @@ var keyNames = map[string]input.Key{
 	"Escape": input.KeyEscape, "ArrowLeft": input.KeyLeft, "ArrowRight": input.KeyRight, "ArrowUp": input.KeyUp,
 	"ArrowDown": input.KeyDown, "Home": input.KeyHome, "End": input.KeyEnd, "PageUp": input.KeyPageUp,
 	"PageDown": input.KeyPageDown,
+	// The Pause key, which a browser on Windows names "Cancel" with Ctrl held.
+	"Pause": input.KeyPause, "Cancel": input.KeyPause,
 }
 
 // recentKey is how soon after a key press an edit counts as that press's,

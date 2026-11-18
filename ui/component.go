@@ -362,6 +362,13 @@ func (c *Context) isFocused() bool {
 	return c.rt.focusID != 0 && c.rt.focusID == expandedID(c.id)
 }
 
+// Focused reports whether the element produced by this render has keyboard
+// focus, however it got it: a click, Tab, or a FocusHandle. The component
+// re-renders when it changes. To ask about another element, such as whether
+// the editor that a toolbar acts on is focused, read FocusHandle.Focused or
+// FocusHandle.FocusWithin in the render.
+func (c *Context) Focused() bool { return c.isFocused() }
+
 // KeyboardFocus reports whether the element produced by this render has focus
 // and focus is keyboard-driven, the case in which FocusVisible styles show.
 // Custom elements draw their focus ring with it. The component re-renders

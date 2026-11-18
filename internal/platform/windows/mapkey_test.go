@@ -33,3 +33,13 @@ func TestMapKeyPunctuation(t *testing.T) {
 		}
 	}
 }
+
+// TestMapKeyPause checks that the Pause key maps to KeyPause, also as Windows reports it with
+// Ctrl held (VK_CANCEL).
+func TestMapKeyPause(t *testing.T) {
+	for _, vk := range []uintptr{0x13, 0x03} {
+		if got := mapKey(vk); got != input.KeyPause {
+			t.Errorf("mapKey(%#x) = %d, want KeyPause", vk, got)
+		}
+	}
+}

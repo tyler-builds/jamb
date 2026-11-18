@@ -85,6 +85,21 @@ type Binding struct {
 	action  *Action
 	pred    *contextPredicate // nil for global bindings
 	layer   string            // "" for bindings from AddBindings; see SetBindings
+	primary bool              // see Primary
+}
+
+// Primary marks b as the binding that menus, tooltips and the command palette show
+// for its action, and returns b. An action bound to several keys, such as F5, Ctrl+E
+// and Alt+X, otherwise shows the binding added last:
+//
+//	ui.Bind("f5", execute).Primary(), ui.Bind("ctrl+e", execute), ui.Bind("alt+x", execute)
+//
+// KeysFor prefers a primary binding that applies where focus is: a global one always
+// does, and one from BindIn does when its expression matches. A primary binding that
+// does not apply there, or that a later NoAction or Unbind turns off, is passed over.
+func (b Binding) Primary() Binding {
+	b.primary = true
+	return b
 }
 
 // keystroke is one key press with the modifiers held.
@@ -124,7 +139,8 @@ func (s keystroke) typesText() bool {
 // "f2".
 // Modifiers are ctrl, shift, alt and super; keys are a-z, 0-9, f1-f12,
 // enter, escape (or esc), backspace, delete, tab, space, left, right, up,
-// down, home, end, pageup, pagedown, insert, and the punctuation keys = - / \ [ ] ; ' , . `.
+// down, home, end, pageup, pagedown, insert, pause (or break: the Pause/Break key), and the
+// punctuation keys = - / \ [ ] ; ' , . `.
 // Bind panics on a malformed keys string.
 //
 // The punctuation keys name the physical key as the US layout prints it, so "ctrl+shift+["
@@ -191,6 +207,7 @@ var keyNames = map[string]input.Key{
 	"space": input.KeySpace, "left": input.KeyLeft, "right": input.KeyRight,
 	"up": input.KeyUp, "down": input.KeyDown, "home": input.KeyHome, "end": input.KeyEnd,
 	"pageup": input.KeyPageUp, "pagedown": input.KeyPageDown, "insert": input.KeyInsert,
+	"pause": input.KeyPause, "break": input.KeyPause, // one key, Pause/Break
 	"=": input.KeyEqual, "-": input.KeyMinus,
 	"/": input.KeySlash, "\\": input.KeyBackslash, "[": input.KeyLeftBracket, "]": input.KeyRightBracket,
 	";": input.KeySemicolon, "'": input.KeyApostrophe, ",": input.KeyComma, ".": input.KeyPeriod,
@@ -222,7 +239,7 @@ func parseKeys(keys string) ([]keystroke, error) {
 		k, ok := parseKeyName(name)
 		if !ok {
 			return nil, fmt.Errorf("unknown key %q; use a-z, 0-9, f1-f12, enter, escape, backspace, "+
-				"delete, tab, space, left, right, up, down, home, end, pageup, pagedown, insert, "+
+				"delete, tab, space, left, right, up, down, home, end, pageup, pagedown, insert, pause, "+
 				"or one of = - / \\ [ ] ; ' , . `", name)
 		}
 		s.key = k
@@ -292,6 +309,8 @@ func keyLabel(k input.Key) string {
 		return "PageDown"
 	case input.KeyInsert:
 		return "Insert"
+	case input.KeyPause:
+		return "Pause"
 	case input.KeyEqual:
 		return "="
 	case input.KeyMinus:
@@ -437,21 +456,69 @@ func (rt *Runtime) Dispatch(a *Action) bool {
 	return true
 }
 
-// KeysFor returns the display text of the most recently added binding for a,
-// such as "Ctrl+Shift+P" or "Ctrl+K Ctrl+T", or "" if a is not bound. A
-// binding that a later NoAction or Unbind turns off does not count.
+// KeysFor returns the display text of a binding for a, such as "Ctrl+Shift+P"
+// or "Ctrl+K Ctrl+T", or "" if a is not bound. It is the most recently added
+// binding marked Primary that applies where focus is (while a menu is open, the
+// element the menu returns focus to), and otherwise the most recently added
+// binding for a. A binding that a later NoAction or Unbind turns off does not
+// count.
 func (rt *Runtime) KeysFor(a *Action) string {
+	if a.disables() {
+		return ""
+	}
 	keymap := rt.bindings()
+	fallback := -1
+	var stack []keyCtx
+	stacked := false
 	for i := len(keymap) - 1; i >= 0; i-- {
-		if b := keymap[i]; b.action == a && !a.disables() && !turnedOffLater(keymap, i) {
-			labels := make([]string, len(b.strokes))
-			for j, s := range b.strokes {
-				labels[j] = strokeLabel(s)
+		b := keymap[i]
+		if b.action != a || turnedOffLater(keymap, i) {
+			continue
+		}
+		if b.primary {
+			if b.pred == nil {
+				return bindingLabel(b)
 			}
-			return strings.Join(labels, " ")
+			if !stacked {
+				stack, stacked = contextStack(rt.shortcutPath()), true
+			}
+			if _, ok := b.pred.depthOf(stack); ok {
+				return bindingLabel(b)
+			}
+		}
+		if fallback < 0 {
+			fallback = i
 		}
 	}
-	return ""
+	if fallback < 0 {
+		return ""
+	}
+	return bindingLabel(keymap[fallback])
+}
+
+// bindingLabel is the display text of b's keys, such as "Ctrl+K Ctrl+T".
+func bindingLabel(b Binding) string {
+	labels := make([]string, len(b.strokes))
+	for j, s := range b.strokes {
+		labels[j] = strokeLabel(s)
+	}
+	return strings.Join(labels, " ")
+}
+
+// shortcutPath is the focus path that KeysFor matches contexts against: the path
+// keys take, or, while a menu is open, the path of the element it returns focus
+// to, where the menu runs its actions.
+func (rt *Runtime) shortcutPath() []*node {
+	if r := rt.menuReturn; r != nil && !r.none && r.rt == rt {
+		if n := rt.byID[r.id]; n != nil {
+			var path []*node
+			for ; n != nil; n = n.parent {
+				path = append(path, n)
+			}
+			return rt.withOwner(path)
+		}
+	}
+	return rt.withOwner(rt.keyPath())
 }
 
 // turnedOffLater reports whether a binding added after keymap[i] turns it off:
@@ -487,8 +554,8 @@ func (rt *Runtime) AvailableActions() []*Action {
 // Dispatch runs a along the focus path; see Runtime.Dispatch.
 func (c *Context) Dispatch(a *Action) bool { return c.rt.Dispatch(a) }
 
-// KeysFor returns the display text of a's most recent binding; see
-// Runtime.KeysFor.
+// KeysFor returns the display text of a's binding, its primary binding when it
+// has one; see Runtime.KeysFor.
 func (c *Context) KeysFor(a *Action) string { return c.rt.KeysFor(a) }
 
 // AvailableActions lists the actions on the focus path; see

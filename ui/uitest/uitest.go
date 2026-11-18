@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
+	"github.com/tyler-builds/jamb/input"
 	"github.com/tyler-builds/jamb/internal/render"
 	"github.com/tyler-builds/jamb/internal/render/soft"
 	"github.com/tyler-builds/jamb/internal/scene"
@@ -362,6 +363,35 @@ func (u *UI) byNode(desc string, find func(*access.Tree) *access.Node) *Element 
 func (u *UI) Click(key string) {
 	u.tb.Helper()
 	u.Get(key).Click()
+}
+
+// ClickAt clicks the left button at x, y in the window, in the logical pixels of
+// Element.Bounds, with mods held. Whatever is at that point takes the click, as a
+// pointer's would.
+func (u *UI) ClickAt(x, y float32, mods ...input.Modifiers) {
+	u.tb.Helper()
+	z := u.rt.Zoom()
+	u.pressAt(x*z, y*z, input.ButtonLeft, 1, joinMods(mods))
+}
+
+// pressAt moves the pointer to x, y, in the coordinates of the pointer methods
+// (logical pixels before the zoom), and clicks button there with mods held, as the
+// clicks-th click of a series. The frame it runs is recorded as following an input.
+func (u *UI) pressAt(x, y float32, b input.MouseButton, clicks int, mods input.Modifiers) {
+	u.acted()
+	u.rt.PointerMove(x, y, mods)
+	u.rt.PointerDown(x, y, b, clicks, mods)
+	u.rt.PointerUp(x, y, b, mods)
+	u.Frame()
+}
+
+// joinMods returns the modifiers of mods held together.
+func joinMods(mods []input.Modifiers) input.Modifiers {
+	var m input.Modifiers
+	for _, x := range mods {
+		m |= x
+	}
+	return m
 }
 
 // dump returns the element tree, for failure messages.

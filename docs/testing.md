@@ -153,13 +153,19 @@ u.Get("toolbar").ByRole(access.RoleButton, "Remove").Click()
 
 ## Acting
 
-On an element, at its center:
+On an element, at its center unless the call takes a point:
 
 - `e.Click()`, `e.DoubleClick()`, `e.RightClick()`. A right click opens the
   element's context menu. `Click` and `DoubleClick` fail the test when the
   element is disabled, or busy as a `Button` with `Loading(true)` is, since the
   click would do nothing; wait for it with `WaitFor(..., func() bool { return
   !e.Disabled() && !e.States().Has(access.StateBusy) })`.
+- `e.ClickWith(mods)` clicks with modifiers held, such as `input.ModCtrl` to add a
+  row to a grid's selection or `input.ModShift` to extend it. `e.ClickAt(dx, dy,
+  mods...)` clicks the point `dx`, `dy` from the element's top-left corner, in the
+  logical pixels of `Bounds`, such as a point on a canvas; the handlers see it as
+  the event's `LocalX`, `LocalY`. It fails the test when the point is outside the
+  element. Both fail as `Click` does for a disabled or busy element.
 - `e.Hover()` moves the pointer there. Advance the clock to show a tooltip.
 - `e.Scroll(dx, dy)` turns the wheel over it by logical pixels. A positive `dy`
   shows what is below. The scroll container moves at once.
@@ -172,6 +178,13 @@ On an element, at its center:
 On the UI:
 
 - `u.Click(key)` is `u.Get(key).Click()`.
+- `u.ClickAt(x, y, mods...)` clicks the point `x`, `y` of the window, in the
+  logical pixels of `Bounds`, with any modifiers held. Whatever is there takes the
+  click.
+
+Every click goes through the same path: the pointer moves to the point, the button
+is pressed and released there, and a frame runs, which a [recording](#motion)
+marks as following an input.
 - `u.Type(text)` types into whatever has focus.
 - `u.Press(keys)` presses keys, written as for `ui.Bind`: `"enter"`, `"tab"`,
   `"shift+tab"`, `"ctrl+a"`, `"f2"`, or a chord such as `"ctrl+k ctrl+s"`.

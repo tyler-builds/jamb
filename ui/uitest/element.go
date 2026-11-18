@@ -146,6 +146,33 @@ func (e *Element) Click() {
 	e.press(input.ButtonLeft, 1)
 }
 
+// ClickWith clicks the left button at the center of the element with mods held,
+// such as input.ModCtrl to add a row to a selection or input.ModShift to extend it.
+// It fails the test as Click does.
+func (e *Element) ClickWith(mods input.Modifiers) {
+	e.u.tb.Helper()
+	e.mustTakeInput("click")
+	x, y := e.center()
+	e.u.pressAt(x, y, input.ButtonLeft, 1, mods)
+}
+
+// ClickAt clicks the left button at dx, dy from the element's top-left corner, in
+// the logical pixels of Bounds, with mods held, such as a point on a canvas. The
+// handlers see the point as the event's LocalX and LocalY. It fails the test as
+// Click does, and when the point is outside the element; to click anywhere in the
+// window, use UI.ClickAt.
+func (e *Element) ClickAt(dx, dy float32, mods ...input.Modifiers) {
+	e.u.tb.Helper()
+	e.mustTakeInput("click")
+	r := e.Bounds()
+	if dx < 0 || dy < 0 || dx > r.W || dy > r.H {
+		e.u.tb.Fatalf("uitest: ClickAt(%v, %v) is outside the %s, which is %v by %v; use UI.ClickAt for a point anywhere in the window",
+			dx, dy, e.desc, r.W, r.H)
+	}
+	z := e.u.rt.Zoom()
+	e.u.pressAt((r.X+dx)*z, (r.Y+dy)*z, input.ButtonLeft, 1, joinMods(mods))
+}
+
 // DoubleClick clicks the left button twice at the center of the element.
 func (e *Element) DoubleClick() {
 	e.u.tb.Helper()
@@ -226,12 +253,7 @@ func (e *Element) Perform(a access.Action) {
 func (e *Element) press(b input.MouseButton, clicks int) {
 	e.u.tb.Helper()
 	x, y := e.center()
-	e.u.acted()
-	rt := e.u.rt
-	rt.PointerMove(x, y, 0)
-	rt.PointerDown(x, y, b, clicks, 0)
-	rt.PointerUp(x, y, b, 0)
-	e.u.Frame()
+	e.u.pressAt(x, y, b, clicks, 0)
 }
 
 // center returns the element's center in the coordinates of the pointer
