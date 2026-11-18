@@ -849,6 +849,11 @@ type FocusHandle struct {
 	id      uint64
 	pending bool
 	none    bool // "nothing focused", from FocusedHandle; id is 0
+	// readers are the components (and Computeds) whose render read Focused or
+	// FocusWithin, and focused and within the values they read (see focusMoved).
+	readers         []observer
+	focused, within bool
+	listedIn        *Runtime // the runtime whose focusReads list h, if any
 }
 
 // NewFocusHandle creates a handle; attach it to one element.
@@ -876,8 +881,95 @@ func (h *FocusHandle) Blur() {
 	}
 }
 
-// Focused reports whether the element has keyboard focus.
-func (h *FocusHandle) Focused() bool { return h.rt != nil && h.id != 0 && h.rt.focusID == h.id }
+// Focused reports whether the element has keyboard focus. Read in a render, it
+// re-renders the component when that changes, so a toolbar can enable the buttons
+// that act on an editor while the editor is focused.
+func (h *FocusHandle) Focused() bool {
+	h.track()
+	return h.isFocused()
+}
+
+// FocusWithin reports whether the element or an element inside it has keyboard
+// focus. Read in a render, it re-renders the component when that changes.
+func (h *FocusHandle) FocusWithin() bool {
+	h.track()
+	return h.isWithin()
+}
+
+func (h *FocusHandle) isFocused() bool { return h.rt != nil && h.id != 0 && h.rt.focusID == h.id }
+
+func (h *FocusHandle) isWithin() bool {
+	if h.rt == nil || h.id == 0 || h.rt.focusID == 0 {
+		return false
+	}
+	for n := h.rt.byID[h.rt.focusID]; n != nil; n = n.parent {
+		if n.id == h.id {
+			return true
+		}
+	}
+	return false
+}
+
+// track subscribes the component that is rendering, if any, to the focus of h's
+// element: focusMoved re-renders it when Focused or FocusWithin changes.
+func (h *FocusHandle) track() {
+	t := tracking.Load()
+	if t == nil {
+		return
+	}
+	if !slices.Contains(h.readers, t.o) {
+		h.readers = append(h.readers, t.o)
+		t.o.addDep(h)
+	}
+	h.focused, h.within = h.isFocused(), h.isWithin()
+	h.list()
+}
+
+// list adds h to its runtime's handles whose focus is read, if it has readers.
+func (h *FocusHandle) list() {
+	if h.rt != nil && h.listedIn != h.rt && len(h.readers) > 0 {
+		h.listedIn = h.rt
+		h.rt.focusReads = append(h.rt.focusReads, h)
+	}
+}
+
+// unsubscribe drops reader o, as it renders again or goes away.
+func (h *FocusHandle) unsubscribe(o observer) {
+	if i := slices.Index(h.readers, o); i >= 0 {
+		h.readers = slices.Delete(h.readers, i, i+1)
+	}
+}
+
+// recheck re-renders h's readers if Focused or FocusWithin is no longer what they read.
+func (h *FocusHandle) recheck() {
+	f, w := h.isFocused(), h.isWithin()
+	if f == h.focused && w == h.within {
+		return
+	}
+	h.focused, h.within = f, w
+	for _, o := range slices.Clone(h.readers) {
+		o.invalidate()
+	}
+}
+
+// focusMoved tells the readers of FocusHandle.Focused and FocusWithin that focus
+// moved: those whose value changed re-render. Handles that nothing reads any more
+// are dropped from the list.
+func (rt *Runtime) focusMoved() {
+	keep := rt.focusReads[:0]
+	for _, h := range rt.focusReads {
+		if h.rt != rt || h.listedIn != rt || len(h.readers) == 0 {
+			if h.listedIn == rt {
+				h.listedIn = nil
+			}
+			continue
+		}
+		keep = append(keep, h)
+		h.recheck()
+	}
+	clear(rt.focusReads[len(keep):])
+	rt.focusReads = keep
+}
 
 // FocusNow focuses the element at once, or clears focus for a "nothing
 // focused" handle, and reports whether it did. If the element is no longer in

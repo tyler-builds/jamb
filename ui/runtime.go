@@ -436,7 +436,10 @@ type Runtime struct {
 	toastAt      time.Time                          // when the toasts last ran their time
 	toastMax     int                                // how many toasts show at once (0: the default)
 	toastRegion  uint64                             // the node ID of the toast region, 0 when none is shown
-	hasToaster   bool                               // a Toaster has been rendered in this runtime's window
+	toasters     map[*componentInstance]bool        // the Toasters mounted in this runtime's window
+	focusReads   []*FocusHandle                     // the handles whose focus a render read (see FocusHandle.Focused)
+	hasToaster   *Signal[bool]                      // len(toasters) > 0 (see Context.HasToaster)
+	toasterFlip  bool                               // hasToaster changed during this frame's build
 	toastWarned  bool                               // the warning for a toast without a Toaster has been reported
 	toastReturn  uint64                             // the focus before the toast region took it (F6)
 	scrolled     bool
@@ -717,6 +720,7 @@ func NewRuntime(root func(ctx *Context) Element, theme *Theme, ts *text.System) 
 		sys:        SystemSettings{TextScale: 100, CaretBlink: defaultCaretBlink, CaretWidth: 1},
 		textFactor: 1,
 		toastVer:   NewSignal(0),
+		hasToaster: NewSignal(false),
 		caretWidth: defaultCaretWidth,
 		text:       ts,
 		maximized:  NewSignal(false),
@@ -1033,9 +1037,16 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 	rt.animInsts = nil
 	if rt.rootInst == nil || rt.hasDirty.Load() {
 		rt.buildDirty()
+		// A Toaster mounted or removed by this build re-renders the components that read
+		// HasToaster before it, so the frame does not show them out of date.
+		if rt.toasterFlip && rt.hasDirty.Load() {
+			rt.buildDirty()
+		}
+		rt.toasterFlip = false
 	}
 	// Focus requests resolve now, against the freshly built tree. A "nothing
 	// focused" handle (id 0) clears focus.
+	focusWas := rt.focusID
 	for _, h := range rt.pendingHandles {
 		if h.pending && h.rt == rt && (h.none || rt.byID[h.id] != nil) {
 			h.pending = false
@@ -1043,6 +1054,11 @@ func (rt *Runtime) frame(now time.Time) *scene.Scene {
 		}
 	}
 	rt.pendingHandles = slices.DeleteFunc(rt.pendingHandles, func(h *FocusHandle) bool { return !h.pending })
+	if rt.focusID != focusWas && rt.hasDirty.Load() {
+		// The components that show focus (a field's caret, a toolbar that reads
+		// FocusHandle.Focused) show the focus it moved to in this frame.
+		rt.buildDirty()
+	}
 	relayout := rt.needLayout
 	if rt.needLayout {
 		rt.layout()
@@ -1314,6 +1330,7 @@ func (rt *Runtime) rebuildDirty() {
 	}
 	if rt.focusID != 0 && rt.byID[rt.focusID] == nil {
 		rt.focusID, rt.focusLink = 0, 0
+		rt.focusMoved()
 	}
 	if rt.composing != 0 && rt.byID[rt.composing] == nil {
 		// The field went away while an input method composed in it.
@@ -1969,6 +1986,11 @@ func (rt *Runtime) attachFocus(n *node) {
 	}
 	if h := d.handle; h != nil {
 		h.rt, h.id = rt, n.id
+		if len(h.readers) > 0 {
+			// A component that read the handle's focus before its element was built.
+			h.list()
+			h.recheck()
+		}
 		if h.pending && !slices.Contains(rt.pendingHandles, h) {
 			rt.pendingHandles = append(rt.pendingHandles, h)
 		}

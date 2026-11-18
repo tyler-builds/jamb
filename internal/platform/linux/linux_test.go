@@ -63,7 +63,8 @@ func TestKeyMapping(t *testing.T) {
 		}
 	}
 	for sym, want := range map[uint32]input.Key{0xff0d: input.KeyEnter, 0xfe20: input.KeyTab, 0xffbe: input.KeyF1,
-		0xffc9: input.KeyF12, 0xff9c: input.KeyEnd, 0xffb5: input.Key5, 0xff67: input.KeyMenu} {
+		0xffc9: input.KeyF12, 0xff9c: input.KeyEnd, 0xffb5: input.Key5, 0xff67: input.KeyMenu,
+		0xff13: input.KeyPause, 0xff6b: input.KeyPause} {
 		if got := keyOfSym(sym); got != want {
 			t.Errorf("keyOfSym(%#x) = %v, want %v", sym, got, want)
 		}

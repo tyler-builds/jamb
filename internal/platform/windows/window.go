@@ -1089,6 +1089,8 @@ func mapKey(vk uintptr) input.Key {
 		return input.Key0
 	case win32.VK_APPS:
 		return input.KeyMenu
+	case 0x13, 0x03: // VK_PAUSE; VK_CANCEL, which Windows reports for Ctrl+Pause
+		return input.KeyPause
 	}
 	return input.KeyUnknown
 }

@@ -71,6 +71,9 @@ ctx.DismissToast("upload")                                              // remov
   bottom-right corner over the content, so put the `Toaster` last in the root element.
   Its enter and exit motion jumps to its end under reduced motion. A window with no
   `Toaster` shows no toast; the first toast there is reported as a development warning.
+  A widget that reports with a toast asks `ctx.HasToaster()` and shows something else
+  when there is none, such as a status line. The component re-renders when the first
+  `Toaster` is mounted and when the last one is removed.
 - **Toasts and focus.** A toast does not take focus. F6 moves focus into the toast
   region, named "Notifications", and F6 again returns it to the element that had it,
   as Windows moves between the regions of a window

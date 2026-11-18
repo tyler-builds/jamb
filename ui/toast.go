@@ -151,6 +151,37 @@ type toastEntry struct {
 	refocus     bool         // the focus was on the action, which an update may remove
 }
 
+// HasToaster reports whether the window has a Toaster mounted, which Toast shows its
+// toasts in. A widget that reports with a toast can show something else when there is
+// none. The component re-renders when it changes: when the first Toaster is mounted,
+// and when the last one is removed.
+func (c *Context) HasToaster() bool { return c.rt.hasToaster.Get() }
+
+// toasterMounted counts the Toaster that ctx renders as mounted, until it is disposed.
+func (rt *Runtime) toasterMounted(ctx *Context) {
+	inst := ctx.inst
+	if inst == nil || rt.toasters[inst] {
+		return
+	}
+	if rt.toasters == nil {
+		rt.toasters = map[*componentInstance]bool{}
+	}
+	rt.toasters[inst] = true
+	rt.setHasToaster()
+	ctx.OnDispose(func() {
+		delete(rt.toasters, inst)
+		rt.setHasToaster()
+	})
+}
+
+// setHasToaster brings hasToaster up to date with the Toasters mounted.
+func (rt *Runtime) setHasToaster() {
+	if has := len(rt.toasters) > 0; has != rt.hasToaster.Peek() {
+		rt.hasToaster.Set(has)
+		rt.toasterFlip = true
+	}
+}
+
 // Toast shows a notification with text in the window's Toaster. It is announced
 // to assistive technology: politely for info and success, assertively for
 // warning and error. It does not take focus, so typing carries on where it was.
@@ -228,7 +259,7 @@ func (t *Toast) stylesOf(st *ToastStyle) *Toast {
 // queues its announcement for the next frame. When the stack is over its maximum,
 // the oldest toast that is not hovered or focused goes. An update takes no room.
 func (rt *Runtime) toast(id string, v ToastVariant, text string) *Toast {
-	if !rt.hasToaster && !rt.toastWarned && rt.warn != nil {
+	if !rt.hasToaster.Peek() && !rt.toastWarned && rt.warn != nil {
 		// Reported once: a window without a Toaster shows no toast at all, which is
 		// easy to miss in development.
 		rt.toastWarned = true
@@ -530,7 +561,7 @@ func (tv *ToasterElement) Placement(p ToastPlacement) *ToasterElement { tv.place
 func (tv *ToasterElement) expand(ctx *Context) Element {
 	rt := ctx.rt
 	rt.toastVer.Get() // re-render when the stack changes
-	rt.hasToaster = true
+	rt.toasterMounted(ctx)
 	if tv.max > 0 {
 		rt.toastMax = tv.max
 	}

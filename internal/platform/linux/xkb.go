@@ -319,6 +319,8 @@ func keyOfSym(sym uint32) input.Key {
 		return input.KeyInsert
 	case 0xff67:
 		return input.KeyMenu
+	case 0xff13, 0xff6b: // Pause; Break, which the key types with Ctrl held
+		return input.KeyPause
 	case 0xffab: // KP_Add
 		return input.KeyEqual
 	case 0xffad: // KP_Subtract

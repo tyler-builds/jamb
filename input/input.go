@@ -203,4 +203,8 @@ const (
 	KeyComma        // ,<
 	KeyPeriod       // .>
 	KeyBacktick     // `~
+	// KeyPause is the Pause/Break key. Windows reports Ctrl+Pause as a key of its own
+	// (VK_CANCEL), and Linux as Break; the adapters report both as KeyPause with Ctrl held, so
+	// the one name covers the physical key with any modifiers.
+	KeyPause
 )

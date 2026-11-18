@@ -487,7 +487,7 @@ var keyNames = map[string]input.Key{
 	"pageup": input.KeyPageUp, "pagedown": input.KeyPageDown,
 	"=": input.KeyEqual, "plus": input.KeyEqual, "-": input.KeyMinus, "minus": input.KeyMinus, "0": input.Key0,
 	"home": input.KeyHome, "end": input.KeyEnd, "space": input.KeySpace, "insert": input.KeyInsert,
-	"menu": input.KeyMenu,
+	"menu": input.KeyMenu, "pause": input.KeyPause, "break": input.KeyPause,
 	// The punctuation keys name the physical key, as the US layout prints it (see ui.Bind).
 	"/": input.KeySlash, "\\": input.KeyBackslash, "[": input.KeyLeftBracket, "]": input.KeyRightBracket,
 	";": input.KeySemicolon, "'": input.KeyApostrophe, ",": input.KeyComma, ".": input.KeyPeriod,

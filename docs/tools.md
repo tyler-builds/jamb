@@ -28,7 +28,7 @@ These environment variables work with any jamb app, with no code changes:
 
 `JAMB_SCRIPT` keys are `enter`, `escape` (or `esc`), `tab`, `backspace`,
 `delete`, `insert`, `space`, the arrows, `home`, `end`, `pageup`, `pagedown`,
-`menu` (the Apps key), `f1` to `f12`, `a` to `z`, `0` to `9`, `=` and `-`, with the modifiers `ctrl`,
+`menu` (the Apps key), `pause` (or `break`), `f1` to `f12`, `a` to `z`, `0` to `9`, `=` and `-`, with the modifiers `ctrl`,
 `shift`, `alt` and `super`. An unknown key or modifier stops the script with an
 error when the script is loaded. In `move`, `click`, `rclick`, `down`, `up` and
 `scroll`, `#KEY` in place of `X Y` aims at the center of the element with that

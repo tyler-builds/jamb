@@ -13,6 +13,7 @@ func TestKeyCodes(t *testing.T) {
 		"KeyA": input.KeyA, "KeyZ": input.KeyZ, "Digit0": input.Key0, "Digit9": input.Key9,
 		"F1": input.KeyF1, "F12": input.KeyF12, "Enter": input.KeyEnter, "NumpadEnter": input.KeyEnter,
 		"ArrowLeft": input.KeyLeft, "Backquote": input.KeyBacktick, "ContextMenu": input.KeyMenu,
+		"Pause": input.KeyPause,
 	} {
 		if got := keyCodes[code]; got != want {
 			t.Errorf("keyCodes[%q] = %v, want %v", code, got, want)
