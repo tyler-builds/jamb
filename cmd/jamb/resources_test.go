@@ -123,8 +123,9 @@ func TestVersionInfoResource(t *testing.T) {
 		t.Fatal("no en-US string table")
 	}
 	want := map[string]string{
+		version.Comments:         "A demo.",
 		version.CompanyName:      "Jamb Examples",
-		version.FileDescription:  cfg.Description,
+		version.FileDescription:  "Jamb Demo",
 		version.InternalName:     "jamb-demo",
 		version.LegalCopyright:   "Copyright 2026 The jamb Authors",
 		version.OriginalFilename: "jamb-demo.exe",
@@ -133,6 +134,27 @@ func TestVersionInfoResource(t *testing.T) {
 	for key, value := range want {
 		if got := (*strs)[key]; got != value {
 			t.Errorf("%s = %q; want %q", key, got, value)
+		}
+	}
+}
+
+// TestVersionInfoNameFallback checks that a config with a blank display name
+// still names the executable, by its name.
+func TestVersionInfoNameFallback(t *testing.T) {
+	cfg := validConfig()
+	cfg.DisplayName = " "
+	rs, err := buildResources(&cfg, image.NewNRGBA(image.Rect(0, 0, 256, 256)), "0.1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	vi, err := version.FromBytes(rs.Get(winres.RT_VERSION, winres.ID(1), version.LangDefault))
+	if err != nil {
+		t.Fatalf("version resource: %v", err)
+	}
+	strs := vi.Table()[version.LangDefault]
+	for _, key := range []string{version.FileDescription, version.ProductName} {
+		if got := (*strs)[key]; got != "jamb-demo" {
+			t.Errorf("%s = %q; want the name, %q", key, got, "jamb-demo")
 		}
 	}
 }
