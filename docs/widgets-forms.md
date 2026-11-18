@@ -192,6 +192,16 @@ ui.TextInput(branch).Purpose(ui.PurposeVerbatim).Label("Branch")     // typed as
 ui.TextInput(email).Purpose(ui.PurposeEmail).Label("Email")          // the keyboard's @ and .
 ```
 
+- `Mono()` shows the text of a `TextInput` or `TextArea` in the monospace font, as
+  `Text.Mono()` does, for code, paths and IDs. It is
+  `Styles(ui.FieldStyle{Text: ui.Style{FontFamily: "mono"}})`, so it wins over the
+  theme's `Field`, and of it and a `Styles` call that sets a font family, the later
+  call wins.
+
+```go
+ui.TextArea(query).Mono().Purpose(ui.PurposeVerbatim).Label("Query")
+```
+
 - A `TextInput` with `Format(f)` shows its text in a fixed shape as the user types
   it. `ui.TemplateFormat(spec)` is a template such as `"(999) 999-9999"`, and
   `ui.NumberFormat(ui.NumberOptions{...})` a number with the decimal point, group

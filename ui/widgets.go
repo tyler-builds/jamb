@@ -816,6 +816,15 @@ func (ti *TextInputElement) Small() *TextInputElement { ti.ctlSize = sizeSmall; 
 // Small and Large replace each other.
 func (ti *TextInputElement) Large() *TextInputElement { ti.ctlSize = sizeLarge; return ti }
 
+// Mono shows the text in the monospace font, as TextElement.Mono does, for
+// code, paths and IDs. It is the same as
+// Styles(FieldStyle{Text: Style{FontFamily: "mono"}}), so it wins over the
+// theme's Field, and of it and a Styles call that sets a FontFamily, the later
+// call wins.
+func (ti *TextInputElement) Mono() *TextInputElement {
+	return ti.stylesOf(&FieldStyle{Text: Style{FontFamily: "mono"}})
+}
+
 // The sizing methods give the field's frame a size. A field is textFieldWidth wide
 // by default, so Width(Full) fills its container, and the frame never shrinks below
 // the room for a few characters (see MinWidth). See Sizing in docs/styling.md.
@@ -999,6 +1008,13 @@ func (ta *TextAreaElement) GridSpan(cols, rows int) *TextAreaElement {
 
 // MinRows sets the minimum height in lines (default 3).
 func (ta *TextAreaElement) MinRows(n int) *TextAreaElement { ta.minRows = n; return ta }
+
+// Mono shows the text in the monospace font, as TextElement.Mono does, for
+// code and logs. It is the same as
+// Styles(FieldStyle{Text: Style{FontFamily: "mono"}}); see TextInputElement.Mono.
+func (ta *TextAreaElement) Mono() *TextAreaElement {
+	return ta.Styles(FieldStyle{Text: Style{FontFamily: "mono"}})
+}
 
 // Borderless drops the frame and padding, for full-pane editors. The Frame part
 // is not drawn, so its styles do not apply.

@@ -14,7 +14,7 @@ import (
 // ui's text field actions are; the others are listed. An app binds other keys, or turns one
 // off, with its own bindings, which win over the defaults:
 //
-//	rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+k", codeedit.CmdFind))
+//	rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+shift+f", codeedit.CmdFind))
 //	rt.AddBindings(ui.BindIn("CodeEditor", "ctrl+z", ui.Unbind(codeedit.CmdUndo)))
 var (
 	CmdMoveLeft          = ui.NewAction("codeedit.move-left", "Move left").Hide()

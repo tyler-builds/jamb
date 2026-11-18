@@ -214,8 +214,11 @@ type Style struct {
 	// bottom, left) in place of BorderWidth. See BorderEdges.
 	BorderEdges Edges
 	// Padding is the space between the border and the content, on each side.
+	// Edges{Left: 24} sets one side: a zero side is unset, so merged over a
+	// style with padding, it keeps that style's other sides.
 	Padding Edges
-	// Margin is the space outside the border, on each side.
+	// Margin is the space outside the border, on each side, set one side at a
+	// time as Padding is.
 	Margin Edges
 	// Inset holds the offsets of an Absolute element from the edges of its parent.
 	Inset Edges

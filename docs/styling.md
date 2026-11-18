@@ -23,6 +23,9 @@ its style struct.
 The parts are plain `ui.Style` values, so every field of `ui.Style` works in a part:
 size, padding, margin, background, border, radius, shadow, opacity, text color, font
 size and weight, transition. See [Styling](theming.md#styling) for the list.
+Padding and margin are `ui.Edges`, so one side is `ui.Style{Padding: ui.Edges{Left: 24}}`
+(a `Style` has no `PaddingLeft`; that is a `Div` method). A zero side is unset, so merged over
+a part's default padding it changes the left side and keeps the others.
 
 ```go
 tabs := ui.Tabs(view, tabs...).Styles(ui.TabsStyle{
