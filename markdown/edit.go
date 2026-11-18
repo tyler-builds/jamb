@@ -1,7 +1,9 @@
 package markdown
 
 import (
+	"slices"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -40,7 +42,26 @@ func EditMarks(st EditStyle) func(string) []ui.TextMark {
 		st.Heading = ui.Highlight{Weight: ui.FontBold}
 	}
 	st.Code.Mono = true
-	return func(v string) []ui.TextMark { return editMarks(v, st) }
+	return func(v string) []ui.TextMark {
+		lastMarks.Lock()
+		defer lastMarks.Unlock()
+		if !lastMarks.ok || lastMarks.v != v || lastMarks.st != st {
+			lastMarks.v, lastMarks.st, lastMarks.marks, lastMarks.ok = v, st, editMarks(v, st), true
+		}
+		return slices.Clone(lastMarks.marks)
+	}
+}
+
+// lastMarks is the text that a function of EditMarks last read, with its
+// style and its marks. A text area asks for the marks of its text each time
+// the UI it is in is built, which makes a new function each time, so a long
+// text was read over at each build as well as at each edit.
+var lastMarks struct {
+	sync.Mutex
+	v     string
+	st    EditStyle
+	marks []ui.TextMark
+	ok    bool
 }
 
 func editMarks(v string, st EditStyle) []ui.TextMark {

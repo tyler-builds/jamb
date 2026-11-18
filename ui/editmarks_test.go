@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"math/rand/v2"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/tyler-builds/jamb/input"
+	"github.com/tyler-builds/jamb/internal/text"
 )
 
 // boldMarks marks each "**text**" of a line as bold, with its stars as syntax:
@@ -170,5 +173,98 @@ func TestTextAreaSelectionDrawsOverMarkBackground(t *testing.T) {
 	}
 	if sel < bg {
 		t.Errorf("the selection (quad %d) is drawn under the mark's background (quad %d)", sel, bg)
+	}
+}
+
+// slowSpans is how presentMarks styled the pieces of a text before it swept
+// its marks: each piece between the bounds of the marks and the hidden ranges
+// takes the marks over it, in their order, from all of them.
+func slowSpans(v string, marks []TextMark, hide [][2]int) ([]text.Span, []Highlight) {
+	bounds := []int{0, len(v)}
+	for _, m := range marks {
+		bounds = append(bounds, m.Start, m.End)
+	}
+	for _, r := range hide {
+		bounds = append(bounds, r[0], r[1])
+	}
+	slices.Sort(bounds)
+	bounds = slices.Compact(bounds)
+	var spans []text.Span
+	var paint []Highlight
+	removed := 0
+	for i := 0; i+1 < len(bounds); i++ {
+		x, y := bounds[i], bounds[i+1]
+		if slices.ContainsFunc(hide, func(r [2]int) bool { return r[0] <= x && y <= r[1] }) {
+			removed += y - x
+			continue
+		}
+		var hl Highlight
+		for _, m := range marks {
+			if m.Start <= x && y <= m.End {
+				hl = hl.over(m.Style)
+			}
+		}
+		if hl == (Highlight{}) {
+			continue
+		}
+		s, t := x-removed, y-removed
+		if k := len(spans) - 1; k >= 0 && paint[k] == hl && spans[k].End == s {
+			spans[k].End = t
+			continue
+		}
+		sp := text.Span{Start: s, End: t, Weight: hl.Weight, Italic: hl.Italic}
+		if hl.Mono {
+			sp.Family = text.FamilyMono
+		}
+		spans, paint = append(spans, sp), append(paint, hl)
+	}
+	return spans, paint
+}
+
+// Marks that overlap, nest and come in any order style the text as they did
+// when each piece looked at every mark: later marks over earlier ones.
+func TestPresentMarksCombinesOverlappingMarksInOrder(t *testing.T) {
+	looks := []Highlight{
+		{Weight: FontBold},
+		{Italic: true},
+		{Color: Hex("#ff0000")},
+		{Color: Hex("#0000ff"), Underline: true},
+		{Mono: true, Background: Hex("#eeeeee")},
+	}
+	rng := rand.New(rand.NewPCG(1, 2))
+	for round := range 200 {
+		v := strings.Repeat("ab cd ", 1+rng.IntN(20))
+		var marks []TextMark
+		for range rng.IntN(12) {
+			a := rng.IntN(len(v))
+			b := a + 1 + rng.IntN(len(v)-a)
+			m := TextMark{Start: a, End: b, Style: looks[rng.IntN(len(looks))]}
+			if rng.IntN(3) == 0 {
+				m.Syntax, m.ScopeStart, m.ScopeEnd = true, max(a-2, 0), min(b+2, len(v))
+			}
+			marks = append(marks, m)
+		}
+		marks = cleanMarks(marks, v)
+		hide := hiddenSyntax(marks, rng.IntN(2) == 0, rng.IntN(len(v)), rng.IntN(len(v)))
+		p := presentMarks(v, marks, hide)
+		spans, paint := slowSpans(v, marks, hide)
+		if !slices.Equal(p.spans, spans) || !slices.Equal(p.paint, paint) {
+			t.Fatalf("round %d: %q with marks %+v, hiding %v:\nspans %+v paint %+v\nwant  %+v paint %+v",
+				round, v, marks, hide, p.spans, p.paint, spans, paint)
+		}
+	}
+}
+
+// A long text with many marks, as a large paste of Markdown is, is drawn in
+// time that grows with its length. Each piece of it used to look at every
+// mark, and a paste of a few hundred kilobytes stopped the app for seconds at
+// each key, or for minutes in a web page.
+func BenchmarkPresentMarksLargeText(b *testing.B) {
+	v := strings.Repeat("some **bold** and **more** text\n", 6000) // about 200 KB
+	marks := cleanMarks(boldMarks(v), v)
+	hide := hiddenSyntax(marks, true, 0, 0)
+	b.ReportAllocs()
+	for b.Loop() {
+		presentMarks(v, marks, hide)
 	}
 }

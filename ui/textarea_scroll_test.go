@@ -198,3 +198,73 @@ func TestTextAreaMaxHeightIsNoScrollArea(t *testing.T) {
 		t.Errorf("no text area named Notes:\n%s", tr.Dump())
 	}
 }
+
+// A text area draws the lines of its text that are in view, not all of them:
+// a large paste scrolls in a small frame, and each frame sent every glyph of it
+// to the renderer. The lines come into view as the text scrolls.
+func TestTextAreaDrawsTheLinesInView(t *testing.T) {
+	line := "a line of the text that was pasted\n"
+	v := NewSignal(strings.Repeat(line, 2000) + "the last line")
+	r := newEditorRig(t, boundedTextArea(v, 0))
+	visible := 140 / 10 * len(line) // the most a line 10 pixels tall or more shows of it
+	if g := frame(r.rt).Glyphs; g > 3*visible {
+		t.Fatalf("the frame has %d glyphs; want those of the lines in view, at most %d", g, 3*visible)
+	}
+	r.click(20, 20)
+	r.key(input.KeyEnd, ctrl) // to the end of the text, which scrolls into view
+	frame(r.rt)
+	g := frame(r.rt).Glyphs
+	if g > 3*visible {
+		t.Fatalf("scrolled to the end, the frame has %d glyphs; want at most %d", g, 3*visible)
+	}
+	if g < len("the last line") {
+		t.Errorf("scrolled to the end, the frame has %d glyphs; want the last lines'", g)
+	}
+	_, es := r.editor()
+	if es == nil || es.caret != len(v.Peek()) {
+		t.Fatalf("the caret is not at the end of the text")
+	}
+}
+
+// In a long text that scrolls, the backgrounds of marks are drawn for the
+// lines in view only, and the selection still goes over them: the lines in
+// view of a large paste of Markdown show the selection on inline code.
+func TestTextAreaSelectionOverMarkBackgroundsInView(t *testing.T) {
+	yellow := RGB(255, 255, 0)
+	line := "some `code` here\n"
+	v := NewSignal(strings.Repeat(line, 2000))
+	codeMarks := func(s string) []TextMark {
+		var ms []TextMark
+		for i := 0; i+len(line) <= len(s); i += len(line) {
+			ms = append(ms, TextMark{Start: i + 5, End: i + 11, Style: Highlight{Background: yellow}})
+		}
+		return ms
+	}
+	r := newEditorRig(t, func(ctx *Context) Element {
+		return Div().Height(Full).ScrollY().Child(TextArea(v).MinRows(1).MaxHeight(Px(140)).Width(Full).Marks(codeMarks))
+	})
+	r.click(20, 20)
+	r.key(input.KeyEnd, ctrl) // scrolled to the end
+	r.key(input.KeyA, ctrl)
+	n, _ := r.editor()
+	if n == nil {
+		t.Fatal("the field has no focus")
+	}
+	sc := &r.rt.scene
+	var bgs []int
+	for i, q := range sc.Quads {
+		if q.Background == yellow.scene() {
+			bgs = append(bgs, i)
+		}
+	}
+	if len(bgs) == 0 || len(bgs) > 3*140/10 {
+		t.Fatalf("%d mark backgrounds drawn; want those of the lines in view, at most %d", len(bgs), 3*140/10)
+	}
+	sel := quadIndex(sc, n.editor.selection.scene())
+	if sel < 0 {
+		t.Fatal("no selection drawn")
+	}
+	if sel < bgs[len(bgs)-1] {
+		t.Errorf("the selection (quad %d) is drawn under a mark's background (quad %d)", sel, bgs[len(bgs)-1])
+	}
+}

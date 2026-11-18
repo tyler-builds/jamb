@@ -102,3 +102,22 @@ func TestEditMarksScopes(t *testing.T) {
 		}
 	}
 }
+
+// The functions of EditMarks share the marks of the text last read, which a
+// text area asks for again each time its UI is built, with a new function: each
+// gets them as its own, for its style.
+func TestEditMarksOfTheSameText(t *testing.T) {
+	plain := EditStyle{}
+	muted := EditStyle{Syntax: ui.Highlight{Color: ui.Hex("#888888")}}
+	a, b := "a **bold** b", "`code` and _it_"
+	for _, c := range []struct {
+		st EditStyle
+		v  string
+	}{{plain, a}, {plain, a}, {muted, a}, {plain, b}, {plain, a}, {muted, b}, {muted, b}} {
+		got := EditMarks(c.st)(c.v)
+		if want := EditMarks(c.st)(c.v + " ")[:len(got)]; !slices.Equal(got, want) {
+			t.Fatalf("%q in %+v: marks %+v, want %+v", c.v, c.st, got, want)
+		}
+		got[0] = ui.TextMark{} // the caller's to change
+	}
+}

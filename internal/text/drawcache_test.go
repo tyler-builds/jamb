@@ -3,6 +3,7 @@ package text
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/tyler-builds/jamb/internal/scene"
@@ -285,7 +286,7 @@ func TestLayoutRefReuse(t *testing.T) {
 		t.Fatal("LayoutRef and LayoutSpans return different layouts")
 	}
 	if r.narrow == nil {
-		t.Fatal("want a wrapped layout, which uses the unconstrained one too")
+		t.Fatal("want a wrapped layout")
 	}
 	for range 300 {
 		if l, ok := sys.Reuse(r); !ok || l != r.Layout() {
@@ -331,5 +332,60 @@ func TestDrawCacheColorGlyphs(t *testing.T) {
 	}
 	if hits := checkCachedDraws(t, sys, steps); hits < 4 {
 		t.Errorf("%d draws from the cache, want at least 4", hits)
+	}
+}
+
+// Editing a long text makes a new layout of all of it at each edit, and a new
+// paragraph as long as the text when it is one line. The caches keep no more
+// than their budget of such text beyond what the last few frames used, however
+// many edits there are, and keep what those frames used.
+func TestCachesKeepABudgetOfText(t *testing.T) {
+	sys := NewSystem()
+	st := Style{Size: 14}
+	// The lines of the document are alike, so it is quick to lay out: one
+	// paragraph, shaped once.
+	doc := strings.Repeat("A line of a long document that was pasted.\n", 1000) // about 40 KB
+	for i := range 60 {
+		sys.Layout(doc+strings.Repeat("x", i), st, 600)
+		sys.EndFrame()
+		if limit := cacheTextBudget + 2*cacheKeepFrames*(len(doc)+60); sys.layoutText > limit {
+			t.Fatalf("after %d edits the layouts hold %d bytes of text; want at most %d", i+1, sys.layoutText, limit)
+		}
+	}
+	const budget = 16 << 10
+	line := strings.Repeat("one long line ", 300) // about 4 KB
+	for i := range 40 {
+		sys.Layout(line+strings.Repeat("y", i), st, 600)
+		sys.EndFrame()
+		sys.trimCaches(budget)
+		if limit := budget + 2*cacheKeepFrames*(len(line)+40); sys.paraText > limit {
+			t.Fatalf("after %d edits the paragraphs hold %d bytes of text; want at most %d", i+1, sys.paraText, limit)
+		}
+	}
+	held := 0
+	for k := range sys.layouts {
+		held += len(k.text)
+	}
+	if held != sys.layoutText {
+		t.Errorf("the layouts hold %d bytes of text, and their count says %d", held, sys.layoutText)
+	}
+	held = 0
+	for k := range sys.paras {
+		held += len(k.text)
+	}
+	if held != sys.paraText {
+		t.Errorf("the paragraphs hold %d bytes of text, and their count says %d", held, sys.paraText)
+	}
+
+	// What the last frame used is kept.
+	r := sys.LayoutRef(line, st, nil, 600)
+	sys.EndFrame()
+	sys.trimCaches(0)
+	if _, ok := sys.Reuse(r); !ok {
+		t.Error("the layout of the last frame was evicted")
+	}
+	sys.FontsChanged()
+	if sys.layoutText != 0 || sys.paraText != 0 {
+		t.Errorf("with the caches cleared they count %d and %d bytes", sys.layoutText, sys.paraText)
 	}
 }
