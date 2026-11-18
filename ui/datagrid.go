@@ -316,7 +316,7 @@ func dataGridDefaults(st *DataGridStyle, t *Theme, d DataGridDensity, textFactor
 		Row: Style{Direction: Row, Align: Center, MinHeight: Px(h), NoShrink: true,
 			BorderEdges: line, BorderColor: t.Border, TextColor: t.Text},
 		RowHover:     Style{Background: t.SurfaceHover},
-		RowSelected:  Style{Background: t.AccentSoft},
+		RowSelected:  Style{Background: dataGridSelectionFill(t)},
 		RowAlternate: Style{Background: t.Panel},
 		// A cell takes the height of its row even with no content, so an empty cell
 		// (an interactive column's cell with no control) still has a bounding box.
@@ -333,7 +333,7 @@ func dataGridDefaults(st *DataGridStyle, t *Theme, d DataGridDensity, textFactor
 		PinnedEdge:    Style{BorderColor: t.Border},
 		HeaderGroup: Style{Direction: Row, Align: Center, Justify: Center, AlignSelf: Stretch, Padding: Edges{Left: 8, Right: 8},
 			NoShrink: true, OverflowX: OverflowHidden, BorderEdges: Edges{Bottom: 1}, BorderColor: t.Border},
-		CellSelected: Style{Background: t.AccentSoft},
+		CellSelected: Style{Background: dataGridSelectionFill(t)},
 		// A tree's indent and chevron are 16 logical pixels wide at the Text size 100 percent.
 		TreeIndent:  Style{Width: Px(16 * textFactor), NoShrink: true},
 		TreeChevron: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(16 * textFactor), NoShrink: true, TextColor: t.TextMuted},
@@ -342,10 +342,10 @@ func dataGridDefaults(st *DataGridStyle, t *Theme, d DataGridDensity, textFactor
 		RowHeader: Style{Direction: Row, Align: Center, Justify: End, AlignSelf: Stretch, Padding: Edges{Left: 4, Right: 8},
 			NoShrink: true, OverflowX: OverflowHidden, Background: t.Panel, BorderEdges: Edges{Right: 1}, BorderColor: t.Border,
 			TextColor: t.TextMuted},
-		// A header of a row or a column selected whole is a stronger fill than a selected
-		// cell's, so that the selected rows and columns are found at a glance.
-		RowHeaderSelected:  Style{Background: t.Accent.Alpha(0.3), TextColor: t.Text},
-		HeaderCellSelected: Style{Background: t.Accent.Alpha(0.3), TextColor: t.Text},
+		// A header of a row or a column selected whole is the solid accent, stronger than a
+		// selected cell's fill, so that the selected rows and columns are found at a glance.
+		RowHeaderSelected:  Style{Background: t.Accent, TextColor: t.AccentText},
+		HeaderCellSelected: Style{Background: t.Accent, TextColor: t.AccentText},
 		Corner: Style{AlignSelf: Stretch, NoShrink: true, Background: t.Panel, BorderEdges: Edges{Right: 1},
 			BorderColor: t.Border},
 	}
@@ -356,6 +356,19 @@ func dataGridDefaults(st *DataGridStyle, t *Theme, d DataGridDensity, textFactor
 		st.HeaderCellSelected = Style{Background: t.Accent, TextColor: t.AccentText}
 		st.EditorMessage.BorderColor, st.EditorMessage.TextColor = t.Text, t.Text
 	}
+}
+
+// dataGridSelectionFill is the fill of a selected row or cell: the accent at 0.28
+// alpha on a dark theme and at 0.20 on a light one. They are the strongest at which the
+// built-in themes keep the focus ring (FocusRing) of a cell at 3:1 on the fill, over a
+// plain, striped or hovered row, and muted text (a tree's chevron) at 4.5:1. Against
+// the row under them they are about 1.36:1, where AccentSoft was 1.2:1, so a selected
+// range is seen at a glance; text keeps more than 10:1 on them (see TestContrast).
+func dataGridSelectionFill(t *Theme) Color {
+	if t.Dark {
+		return t.Accent.Alpha(0.28)
+	}
+	return t.Accent.Alpha(0.20)
 }
 
 // resolveDataGrid sets st to the look of a DataGrid: the defaults, merged with the
@@ -3955,7 +3968,12 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 			if sorted.Desc {
 				glyph = icons.ChevronDown
 			}
-			hc.Child(Div().asPart("DataGrid.SortIndicator").styleOf(&st.SortIndicator).Child(Icon(glyph).Size(12)))
+			ind := Div().asPart("DataGrid.SortIndicator").styleOf(&st.SortIndicator)
+			if whole {
+				// On a selected column's header the arrow takes the header's text color.
+				ind.styleOf(&Style{TextColor: st.HeaderCellSelected.TextColor})
+			}
+			hc.Child(ind.Child(Icon(glyph).Size(12)))
 		case sortable && ho.selects:
 			// When a press on the header selects its column, the sort is the arrow's: a
 			// sortable column shows it while not sorted too, in the header's color.
@@ -3967,6 +3985,9 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 					glyph = icons.ChevronDown
 				}
 				ind.styleOf(&st.SortIndicator)
+			}
+			if whole {
+				ind.styleOf(&Style{TextColor: st.HeaderCellSelected.TextColor})
 			}
 			if alignOf(cl.Align) == Start {
 				// The arrow is at the end of the header cell, where it is found at once.
