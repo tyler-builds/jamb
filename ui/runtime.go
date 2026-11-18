@@ -530,7 +530,9 @@ type Runtime struct {
 
 	// Floating overlays and click-outside listeners found by the last paint.
 	overlays []overlayItem
-	outside  []*node
+	// overlayTmp is scratch space for paintOverlays, which moves nested overlays.
+	overlayTmp []overlayItem
+	outside    []*node
 	// paintGen counts paints. unculled is above zero while painting inside a
 	// scaled node, where the culling test (in unscaled coordinates) does not
 	// apply, so nothing is culled there.
@@ -1882,7 +1884,7 @@ func (rt *Runtime) buildDiv(e *DivElement, id uint64, parent *node, owner *compo
 	}
 	n.lay.Style.MatchParentWidth = e.matchAnchor
 	n.lay.Style.Hidden = e.noDisplay
-	n.ts = inh.inherit(&n.style)
+	n.ts = coverInherit(n, inh).inherit(&n.style)
 	if e.hover != nil || e.pressed != nil || e.focused != nil || e.focusWithin != nil || n.style.Transition > 0 ||
 		n.style.OverflowX == OverflowScroll || n.style.OverflowY == OverflowScroll || e.enter != nil || e.exit != nil ||
 		n.style.Spring.Duration > 0 || e.play != nil || e.selects == selectsAcross {
@@ -2237,7 +2239,7 @@ func (rt *Runtime) restyleNode(n *node) {
 // applyInherited updates inherited text style below n, invalidating layout
 // of text whose font changed. It stops where nothing changes.
 func (rt *Runtime) applyInherited(n *node, inh textStyle) {
-	ts := inh.inherit(&n.style)
+	ts := coverInherit(n, inh).inherit(&n.style)
 	if ts == n.ts {
 		return
 	}
@@ -2248,6 +2250,20 @@ func (rt *Runtime) applyInherited(n *node, inh textStyle) {
 	for _, c := range n.children {
 		rt.applyInherited(c, ts)
 	}
+}
+
+// coverInherit returns the text style that n inherits, given its parent's, inh. A
+// dialog's cover inherits the root's, as if it were declared in the root, since
+// it covers the window rather than the element it is declared in.
+func coverInherit(n *node, inh textStyle) textStyle {
+	if !n.covers() || n.parent == nil {
+		return inh
+	}
+	top := n.parent
+	for top.parent != nil {
+		top = top.parent
+	}
+	return top.ts
 }
 
 // invalidateLayout marks n and its ancestors for re-layout.

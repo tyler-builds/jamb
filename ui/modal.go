@@ -19,11 +19,17 @@ const modalMargin = 24
 
 // ModalElement is a dialog drawn over the window: a dimmed backdrop, and a
 // panel centered on it with a title, a body and footer buttons. Build it only
-// while it is open, as a dropdown is built only while it is open. Place it last
-// in the window's root element, which must fill the window:
+// while it is open, as a dropdown is built only while it is open. Declare it
+// anywhere in the tree, such as next to the button that opens it:
 //
 //	ui.If(open.Get(), ui.Modal("New project", form).
 //		Footer(cancel, create).Default(create).OnClose(close))
+//
+// Wherever it is declared, the backdrop covers the whole window and is drawn
+// above everything else in it, and the panel is centered in the window. The
+// elements it is declared in don't clip it, move it, fade it or style its text,
+// and a press on the backdrop or the panel does not reach them. Of two open
+// modals, the one opened last is on top.
 //
 // Keyboard focus moves into the modal when it opens, and Tab and Shift+Tab
 // cycle through its fields and buttons only. Focus returns to the element that
@@ -219,8 +225,9 @@ func (m *ModalElement) closeShown() bool {
 // CloseButton(false) is called. Escape closes it while focus is inside it, and
 // Enter runs its default button only then. A press outside it does not close it
 // unless CloseOnClickOutside is called. Several non-modal dialogs can be open, and
-// the one that was last pressed or focused is on top. A modal that opens later
-// covers them, as it covers the window.
+// the one that was last pressed or focused is on top. Like a modal, it is placed
+// in the window wherever it is declared. Non-modal dialogs are drawn above the
+// rest of the window, under its menus, popovers and tooltips, and under any modal.
 func (m *ModalElement) NonModal() *ModalElement {
 	m.nonModal = true
 	return m
@@ -348,7 +355,7 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		// There is no scrim. The layer is transparent and covers the window, and
 		// hitThrough lets a press on it reach the window behind. The panel sits at its
 		// side, or in the middle, inside the margin.
-		layer := Div().Absolute().Inset(0).Padding(margin).
+		layer := Div().Overlay(placeCover).Width(Full).Height(Full).Padding(margin).
 			Enter(Fade(), Animation{Duration: ctx.Theme().Motion.enter(140 * time.Millisecond)}).
 			Exit(Fade(), Animation{Duration: ctx.Theme().Motion.exit(90 * time.Millisecond)}).
 			Child(panel)
@@ -368,9 +375,10 @@ func (m *ModalElement) expand(ctx *Context) Element {
 		layer.modal = spec
 		return layer
 	}
-	// The backdrop's padding is the margin around the panel, so a panel of 100% is the
-	// window less the margin.
-	backdrop := Div().asPart(part+".Scrim").Absolute().Inset(0).styleOf(&st.Scrim).Padding(margin).
+	// The backdrop covers the window wherever the modal is declared (see placeCover).
+	// Its padding is the margin around the panel, so a panel of 100% is the window
+	// less the margin.
+	backdrop := Div().asPart(part+".Scrim").Overlay(placeCover).Width(Full).Height(Full).styleOf(&st.Scrim).Padding(margin).
 		Focusable().TabStop(false).
 		Enter(Fade(), Animation{Duration: ctx.Theme().Motion.enter(140 * time.Millisecond)}).
 		Exit(Fade(), Animation{Duration: ctx.Theme().Motion.exit(90 * time.Millisecond)}).
@@ -384,7 +392,7 @@ func (m *ModalElement) expand(ctx *Context) Element {
 	return backdrop
 }
 
-// topModal returns the backdrop of the last open Modal in the tree, or nil. A
+// topModal returns the backdrop of the Modal that opened last, or nil. A
 // non-modal dialog is not a modal, so it does not trap focus or keys.
 //
 // The answer changes only when the tree does: a build pass bumps rt.gen, and a
@@ -400,12 +408,13 @@ func (rt *Runtime) topModal() *node {
 	return top
 }
 
-// walkTopModal finds the answer of topModal by walking the whole tree.
+// walkTopModal finds the answer of topModal by walking the whole tree: the modal
+// that opened last, which is painted on top (see stackOverlays).
 func (rt *Runtime) walkTopModal() *node {
 	var top *node
 	var walk func(n *node)
 	walk = func(n *node) {
-		if n.div != nil && n.div.modal != nil && !n.div.modal.nonModal {
+		if n.div != nil && n.div.modal != nil && !n.div.modal.nonModal && (top == nil || rt.modalSeq(n) >= rt.modalSeq(top)) {
 			top = n
 		}
 		for _, c := range n.children {
@@ -429,6 +438,12 @@ func (rt *Runtime) modalMounted(n *node) {
 	if n.div.modal.nonModal {
 		rt.stackDialog(n)
 	}
+}
+
+// modalSeq returns the place of the dialog at n in the order the open dialogs
+// opened in, or -1 when it has no frame.
+func (rt *Runtime) modalSeq(n *node) int {
+	return slices.IndexFunc(rt.modals, func(f modalFrame) bool { return f.id == n.id })
 }
 
 // stackDialog gives the non-modal dialog at n the highest raise number.
@@ -550,7 +565,7 @@ func (rt *Runtime) focusDialog() *node {
 }
 
 // nonModalDialogs returns the open non-modal dialogs, the topmost first: the one
-// painted last is on top.
+// raised last, which is painted last (see stackOverlays).
 func (rt *Runtime) nonModalDialogs() []*node {
 	var out []*node
 	var walk func(n *node)
@@ -570,6 +585,7 @@ func (rt *Runtime) nonModalDialogs() []*node {
 		walk(rt.tree)
 	}
 	slices.Reverse(out)
+	slices.SortStableFunc(out, func(a, b *node) int { return cmp.Compare(rt.raised[b.id], rt.raised[a.id]) })
 	return out
 }
 

@@ -890,6 +890,9 @@ func (rt *Runtime) revealCaret() bool {
 	const margin = 12
 	moved := false
 	for a := n.parent; a != nil; a = a.parent {
+		if a.covers() {
+			break // a dialog does not scroll what it is declared in, which is behind it
+		}
 		if a.style.OverflowY != OverflowScroll || a.st == nil {
 			continue
 		}
@@ -921,9 +924,10 @@ func (rt *Runtime) revealCaret() bool {
 	return moved
 }
 
-// hasScrollYAncestor reports whether a node is inside a vertical scroll container.
+// hasScrollYAncestor reports whether a node is inside a vertical scroll container,
+// within the dialog it is in, if any.
 func hasScrollYAncestor(n *node) bool {
-	for a := n.parent; a != nil; a = a.parent {
+	for a := n.parent; a != nil && !a.covers(); a = a.parent {
 		if a.style.OverflowY == OverflowScroll && a.st != nil {
 			return true
 		}

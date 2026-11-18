@@ -13,12 +13,10 @@ import (
 func (rt *Runtime) hitTest(x, y float32) []*node {
 	rt.hitPath = rt.hitPath[:0]
 	// Overlays first, topmost last painted. Events on one bubble through its
-	// anchor and ancestors, as in the tree.
+	// anchor and ancestors, as in the tree, up to a dialog's cover.
 	for i := len(rt.overlays) - 1; i >= 0; i-- {
 		if ov := rt.overlays[i]; !ov.ghost && rt.hit(ov.n, x, y) {
-			for p := ov.n.parent; p != nil; p = p.parent {
-				rt.hitPath = append(rt.hitPath, p)
-			}
+			rt.appendAncestors(ov.n)
 			return rt.hitPath
 		}
 	}
@@ -27,9 +25,7 @@ func (rt *Runtime) hitTest(x, y float32) []*node {
 	if mr := rt.match; mr != nil {
 		for i := len(mr.flights) - 1; i >= 0; i-- {
 			if f := &mr.flights[i]; !f.ghost && rt.hit(f.n, x, y) {
-				for p := f.n.parent; p != nil; p = p.parent {
-					rt.hitPath = append(rt.hitPath, p)
-				}
+				rt.appendAncestors(f.n)
 				return rt.hitPath
 			}
 		}
@@ -38,6 +34,22 @@ func (rt *Runtime) hitTest(x, y float32) []*node {
 		rt.hit(rt.tree, x, y)
 	}
 	return rt.hitPath
+}
+
+// appendAncestors adds the ancestors of n to the hit path, up to and including the
+// cover of the dialog that n is in. A dialog covers the window, so a press in it,
+// or on a modal's backdrop, does not reach the elements that the dialog is
+// declared in, which are behind it.
+func (rt *Runtime) appendAncestors(n *node) {
+	if n.covers() {
+		return
+	}
+	for p := n.parent; p != nil; p = p.parent {
+		rt.hitPath = append(rt.hitPath, p)
+		if p.covers() {
+			return
+		}
+	}
 }
 
 // hit adds n and the element under (x, y) to the hit path, if any. Only the
@@ -184,7 +196,9 @@ func (rt *Runtime) updateTooltip(path []*node) {
 }
 
 // clickOutside tells every listener that the press at path was outside it.
-// For an overlay, its anchor counts as inside.
+// For an overlay, its anchor counts as inside. A press in a dialog is inside the
+// elements it is declared in, such as a popover that holds it, though the path
+// stops at the dialog (see appendAncestors).
 func (rt *Runtime) clickOutside(path []*node) {
 	in := func(id uint64) bool {
 		for _, n := range path {
@@ -192,10 +206,22 @@ func (rt *Runtime) clickOutside(path []*node) {
 				return true
 			}
 		}
+		if k := len(path); k > 0 && path[k-1].covers() {
+			for p := path[k-1].parent; p != nil; p = p.parent {
+				if p.id == id {
+					return true
+				}
+			}
+		}
 		return false
 	}
-	// A press that a modal takes is not outside a non-modal dialog that it covers.
+	// A press that a modal takes is not outside a non-modal dialog that it covers,
+	// nor outside another modal under it, or anything in one.
 	modal := rt.topModal() != nil
+	var top *node // the backdrop of the modal that took the press
+	if k := len(path); k > 0 && path[k-1].covers() && !path[k-1].div.modal.nonModal {
+		top = path[k-1]
+	}
 	for _, o := range append([]*node(nil), rt.outside...) {
 		if in(o.id) || (o.div.overlay != 0 && o.parent != nil && in(o.parent.id)) || rt.undisplayed(o) {
 			continue
@@ -203,10 +229,24 @@ func (rt *Runtime) clickOutside(path []*node) {
 		if p := o.parent; modal && p != nil && p.div != nil && p.div.modal != nil && p.div.modal.nonModal {
 			continue
 		}
+		if c := enclosingCover(o); top != nil && c != nil && c != top {
+			continue
+		}
 		if fn := o.div.h.onClickOutside; fn != nil {
 			fn()
 		}
 	}
+}
+
+// enclosingCover returns the cover of the dialog that n is in, n itself if it is
+// one, or nil.
+func enclosingCover(n *node) *node {
+	for ; n != nil; n = n.parent {
+		if n.covers() {
+			return n
+		}
+	}
+	return nil
 }
 
 func (rt *Runtime) updateCursor(path []*node) {

@@ -154,9 +154,9 @@ ui.Popover(ui.Button("Filters").Icon(icons.Filter), func() ui.Element {
 
 `ui.Drawer(title, body)` is a modal panel that slides in from an edge of the
 window: settings, details or filters that need more room. It behaves as a
-`ui.Modal` does (build it only while open, last in the window's root element;
-focus moves in and returns, Tab stays inside, Escape closes it), and a press on the
-backdrop also closes it. A left or right drawer is 360 px wide and as tall as the
+`ui.Modal` does (build it only while open, anywhere in the tree; it covers the
+window, focus moves in and returns, Tab stays inside, Escape closes it), and a press
+on the backdrop also closes it. A left or right drawer is 360 px wide and as tall as the
 window; a top or bottom one is 280 px high and as wide as the window.
 
 ```go
@@ -215,8 +215,8 @@ ui.HoverCard(ui.Button("Dana Lee").Ghost().Small(), func() ui.Element {
 `ui.Modal` is a dialog in the app's own look: a dimmed backdrop, and a panel
 centered on it with a title, a body and footer buttons. Its look is `ui.ModalStyle`
 (`Theme.Modal` or `.Styles(...)`). Build it only while it
-is open, and place it last in the window's root element, which must fill the
-window:
+is open. Declare it anywhere in the tree, such as next to the button that opens it,
+inside a toolbar or a component:
 
 ```go
 ui.If(open.Get(), ui.Modal("New project", form).
@@ -231,6 +231,22 @@ ui.If(open.Get(), ui.Modal("New project", form).
 
 ![The New project dialog after a failed submit, with a character typed in the Name field: the error clears and the field keeps focus](screenshots/modal-new-project-typing.png)
 
+- The backdrop is a window-level overlay: wherever the modal is declared, it covers
+  the whole window (under the default title bar, if the window has one) and is
+  drawn above everything else in it, including what is declared after it, and the
+  panel is centered in the window. A scrolled or clipped ancestor, or one with an
+  opacity, an offset or a scale, does not clip, move or fade it, and the modal's
+  text takes the root element's style, not that of the element it is declared in.
+- A press outside the panel reaches the backdrop only, never the elements behind
+  it, and a press in the panel does not reach the elements the modal is declared
+  in. A modal declared out of view, in a scrolled-away row, still opens over the
+  window, and its focus does not scroll that row into view.
+- Menus, popups and tooltips opened from inside the modal are drawn above it. Of
+  two open modals, the one opened last is on top and takes the input, wherever each
+  is declared; a press in it does not close the one under it.
+- Assistive technology finds the dialog as a child of the window, after the app's
+  other content, wherever it is declared (the default title bar's buttons, when the
+  window has one, come after it). Several dialogs keep their order in the tree.
 - Focus moves into the modal when it opens: to the first field of the body that
   Tab reaches, else to the default button. Tab and Shift+Tab cycle through the
   modal only. When the modal closes, focus returns to the element that had it,
@@ -266,9 +282,10 @@ around the button (`ModalStyle`, or `DrawerStyle` for a drawer).
 ### Non-modal dialogs
 
 `NonModal()` makes a modal or a drawer non-modal, for a dialog that leaves the
-window in use while it is open, such as a find bar or a properties sheet. Place
-non-modal dialogs before the modals in the window's root element, so that a modal
-is drawn over them:
+window in use while it is open, such as a find bar or a properties sheet. Like a
+modal, it can be declared anywhere in the tree and is placed in the window. It is
+drawn above the rest of the window, under the window's menus, popovers and
+tooltips, and under any modal:
 
 ```go
 ui.If(open.Get(), ui.Modal("Find", findField).NonModal().
@@ -341,8 +358,7 @@ ui.If(asking.Get(), ui.AlertDialog("Delete 3 files?", "They cannot be restored."
 Ctrl+Shift+P: a field, and under it the commands whose names match what is typed,
 each with its key binding. It is open while `open` is true, and sets it to false
 when it closes itself. Place it last in the window's root element, which must fill
-the window, as a modal is placed; its panel floats 48 px below the top of the
-window, centered. Its look is `ui.CommandPaletteStyle` (`Theme.CommandPalette` or
+the window; its panel floats 48 px below the top of the window, centered. Its look is `ui.CommandPaletteStyle` (`Theme.CommandPalette` or
 `.Styles(...)`).
 
 ```go

@@ -97,6 +97,11 @@ func (rt *Runtime) detachLayer() {
 	}
 }
 
+// isLayerRoot reports whether n is the root node of one of the host's layers.
+func (rt *Runtime) isLayerRoot(n *node) bool {
+	return slices.ContainsFunc(rt.layers, func(l *hostLayer) bool { return l.inst != nil && l.inst.root == n })
+}
+
 // HostLayerShown reports whether the host layer is attached to the window's
 // tree, so that what it renders shows. It is false before SetHostLayer, before
 // the first frame, and while the app's root element is not a Div.

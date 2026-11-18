@@ -88,8 +88,8 @@ func resolveAlertDialog(ctx *Context, i AlertDialogIntent, inst, st *AlertDialog
 // a cancel button. It is a Modal with a fixed layout: an icon and the title, the
 // message and an optional Body, and the buttons at the end of the footer, the
 // app's Actions first, then Cancel, then the confirm button. Build it only while
-// it is open, last in the window's root element, as a Modal is, and remove it in
-// the confirm and cancel functions:
+// it is open, anywhere in the tree, as a Modal is, and remove it in the confirm
+// and cancel functions:
 //
 //	ui.If(asking.Get(), ui.AlertDialog("Delete 3 files?", "They cannot be restored.").
 //		Intent(ui.AlertDialogDestructive).
