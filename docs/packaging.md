@@ -32,8 +32,8 @@ in one message.
 | Field | Meaning |
 |---|---|
 | `name` | The executable's name without `.exe`: starts with a letter, then letters, digits, `-` and `_`, at most 64 characters. |
-| `displayName` | The name users see: Start, the taskbar, the installer and the package. It also names the install folder, so it cannot contain `\ / : * ? " < > \|`. |
-| `description` | A short description, shown in file properties, the installer and the package. |
+| `displayName` | The name users see: Start, the taskbar, Task Manager, the installer and the package. It is the executable's file description and product name, which Windows shows as the program's name. It also names the install folder, so it cannot contain `\ / : * ? " < > \|`. |
+| `description` | A short description of what the app does. It goes in the executable's comments, the Apps & features entry and the package; Windows never shows it as the app's name. |
 | `version` | A semantic version, `MAJOR.MINOR.PATCH`. Each part is 0 to 65535, and Windows stores it as `MAJOR.MINOR.PATCH.0`. Pre-release and build suffixes have no Windows form and are rejected. |
 | `publisher` | The publisher's display name, shown as the company in file properties, the installer and the package. |
 | `publisherSubject` | The subject of the signing certificate, starting with `CN=`, such as `CN=Example`. The MSIX publisher must equal the certificate's subject exactly, so for a certificate from a certificate authority copy the whole subject. For the Store, use the publisher value that Partner Center shows for the app. |
@@ -67,7 +67,9 @@ refused with the replacement to use.
 
 - The icon, in 16, 24, 32, 48, 64, 128 and 256 px.
 - Version information: file and product version (`version` with `.0`), company,
-  product name, description, original and internal file names, and copyright.
+  `displayName` as both the file description and the product name (Task Manager and
+  other Windows lists show the file description as the program's name),
+  `description` as the comments, original and internal file names, and copyright.
 - An application manifest with per-monitor v2 DPI awareness, which matches what
   the framework sets at run time; Common Controls version 6, which `TaskDialog`
   needs; Windows 10 and 11 as the supported OS; long path names; and `asInvoker`,

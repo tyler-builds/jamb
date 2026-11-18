@@ -3,6 +3,7 @@ package main
 import (
 	"image"
 	"os"
+	"strings"
 
 	"github.com/tc-hib/winres"
 	"github.com/tc-hib/winres/version"
@@ -28,14 +29,23 @@ func buildResources(cfg *config, icon image.Image, winVersion string) (*winres.R
 		return nil, err
 	}
 
+	// Task Manager, the "Open with" list and other Windows surfaces show
+	// FileDescription as the program's name, so it holds the display name, as
+	// ProductName does, and the description goes in Comments. jamb.json
+	// requires displayName; name is the fallback for a config built in code.
+	name := cfg.DisplayName
+	if strings.TrimSpace(name) == "" {
+		name = cfg.Name
+	}
 	vi := version.Info{}
 	fields := []struct{ key, value string }{
+		{version.Comments, cfg.Description},
 		{version.CompanyName, cfg.Publisher},
-		{version.FileDescription, cfg.Description},
+		{version.FileDescription, name},
 		{version.InternalName, cfg.Name},
 		{version.LegalCopyright, cfg.Copyright},
 		{version.OriginalFilename, cfg.Name + ".exe"},
-		{version.ProductName, cfg.DisplayName},
+		{version.ProductName, name},
 	}
 	for _, f := range fields {
 		if f.value == "" {
