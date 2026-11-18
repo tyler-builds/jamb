@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"cmp"
+	"slices"
 	"time"
 
 	"github.com/tyler-builds/jamb/access"
@@ -55,7 +57,7 @@ func placeOverlay(p Placement, gap float32, a scene.Rect, w, h float32, view sce
 	switch p {
 	case placeWindow:
 		return view.X, view.Y
-	case edgeLeft, edgeTop:
+	case placeCover, edgeLeft, edgeTop:
 		return a.X, a.Y
 	case edgeRight:
 		return a.X + a.W - w, a.Y
@@ -117,22 +119,88 @@ func placeOverlay(p Placement, gap float32, a scene.Rect, w, h float32, view sce
 }
 
 // paintOverlays paints the overlays collected during the main paint, in
-// order. Overlays found inside an overlay are appended and painted after it,
-// so nested ones end up on top.
+// order. The overlays found inside an overlay are painted right after it, before
+// the overlays that follow it, so nested ones end up on top of their own overlay:
+// a dialog's menus are above the dialog, and under a dialog stacked over it.
 func (rt *Runtime) paintOverlays(view scene.Rect, dt float32) {
 	for i := 0; i < len(rt.overlays); i++ {
 		it := rt.overlays[i] // copy: painting may append to the slice
 		n := it.n
+		mark := len(rt.overlays)
 		if it.exiting {
 			rt.paintGhost(n, dt)
-			continue
+		} else {
+			x, y := placeOverlay(n.div.overlay, n.div.overlayGap, it.anchor, n.lay.W, n.lay.H, view)
+			prev := rt.inGhost
+			rt.inGhost = it.ghost
+			rt.paintNode(n, x-n.lay.X, y-n.lay.Y, view, it.opacity, it.fg, dt)
+			rt.inGhost = prev
 		}
-		x, y := placeOverlay(n.div.overlay, n.div.overlayGap, it.anchor, n.lay.W, n.lay.H, view)
-		prev := rt.inGhost
-		rt.inGhost = it.ghost
-		rt.paintNode(n, x-n.lay.X, y-n.lay.Y, view, it.opacity, it.fg, dt)
-		rt.inGhost = prev
+		if added := len(rt.overlays) - mark; added > 0 && mark > i+1 {
+			// Move the overlays just found from the end to after this one.
+			rt.overlayTmp = append(rt.overlayTmp[:0], rt.overlays[mark:]...)
+			copy(rt.overlays[i+1+added:], rt.overlays[i+1:mark])
+			copy(rt.overlays[i+1:], rt.overlayTmp)
+			clear(rt.overlayTmp)
+		}
 	}
+}
+
+// placeCover places an overlay over the app's part of the window: the root
+// element's box, which is the window under the default title bar if there is one.
+// A Modal's backdrop and a non-modal dialog's layer use it, so that the dialog
+// covers the window wherever it is declared in the tree (see stackOverlays).
+const placeCover Placement = 121
+
+// covers reports whether n is a dialog's cover: a Modal's backdrop or a non-modal
+// dialog's layer, an overlay over the whole window (see placeCover).
+func (n *node) covers() bool { return n.div != nil && n.div.overlay == placeCover }
+
+// coverItem returns the overlay item of the cover c, found while painting: it is
+// placed over the root's box, and it takes the root's text color and full opacity,
+// not those of the element it is declared in, unless it is inside an exiting
+// element, whose fade it follows.
+func (rt *Runtime) coverItem(c *node, opacity float32, fg Color) overlayItem {
+	it := overlayItem{n: c, anchor: rt.tree.abs, opacity: 1, fg: rt.theme.Text, ghost: rt.inGhost}
+	if tc := rt.tree.style.TextColor; !tc.IsZero() {
+		it.fg = tc
+	}
+	if rt.inGhost {
+		it.opacity, it.fg = opacity, fg
+	}
+	return it
+}
+
+// stackOverlays orders the overlays that the main paint found, before they are
+// painted: the layers of non-modal dialogs first, in the order they were raised,
+// then the other overlays in tree order, then the backdrops of modals, in the
+// order they opened. So a modal is above everything else in the window wherever it
+// is declared, and the newest modal is on top.
+func (rt *Runtime) stackOverlays() {
+	if !slices.ContainsFunc(rt.overlays, func(it overlayItem) bool { return it.n.covers() }) {
+		return
+	}
+	band := func(n *node) int {
+		switch {
+		case !n.covers() || n.div.modal == nil:
+			return 1
+		case n.div.modal.nonModal:
+			return 0
+		}
+		return 2
+	}
+	slices.SortStableFunc(rt.overlays, func(a, b overlayItem) int {
+		ba, bb := band(a.n), band(b.n)
+		switch {
+		case ba != bb:
+			return cmp.Compare(ba, bb)
+		case ba == 0:
+			return cmp.Compare(rt.raised[a.n.id], rt.raised[b.n.id])
+		case ba == 2:
+			return cmp.Compare(rt.modalSeq(a.n), rt.modalSeq(b.n))
+		}
+		return 0
+	})
 }
 
 // TooltipStyle is the look of each part of a tooltip. A part's style merges over

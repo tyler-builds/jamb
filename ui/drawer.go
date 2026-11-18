@@ -26,7 +26,8 @@ type DrawerStyle = ModalStyle
 // DrawerElement is a panel that slides in from an edge of the window over a
 // dimmed backdrop, with a title, a body and footer buttons: settings, details
 // or filters that need more room than a popover. It is a modal: build it only
-// while it is open, last in the window's root element, as a Modal is.
+// while it is open, anywhere in the tree, as a Modal is; it is against the edge
+// of the window wherever it is declared.
 //
 //	ui.If(open.Get(), ui.Drawer("Filters", filters).
 //		Side(ui.DrawerRight).Footer(reset, apply).OnClose(close))

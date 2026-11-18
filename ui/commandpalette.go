@@ -103,8 +103,8 @@ func resolveCommandPalette(ctx *Context, inst, st *CommandPaletteStyle) {
 // CommandPaletteElement is a floating panel that lists commands to run: a search
 // field, and below it the commands whose names match what is typed, each with its
 // key binding. It is open while its signal is true. Place it last in the window's
-// root element, which must fill the window, as a Modal is placed; its panel floats
-// near the top of the window, centered.
+// root element, which must fill the window; its panel floats near the top of the
+// window, centered.
 //
 //	open := ui.NewSignal(false)
 //	ui.Div().OnAction(showPalette, func() { open.Set(true) }).

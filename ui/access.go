@@ -553,9 +553,13 @@ func (rt *Runtime) setExpandedFrom(n *node, open bool) {
 	rt.clickNode(n)
 }
 
-// scrollContainer returns the nearest scroll container above n, or nil.
+// scrollContainer returns the nearest scroll container above n, or nil. The
+// search ends at a dialog's cover: what the dialog is declared in is behind it.
 func scrollContainer(n *node) *node {
-	for p := n.parent; p != nil; p = p.parent {
+	if n.covers() {
+		return nil
+	}
+	for p := n.parent; p != nil && !p.covers(); p = p.parent {
 		if isScroll(p) {
 			return p
 		}
@@ -638,6 +642,11 @@ type accessBuilder struct {
 	// issues holds the problem found with an element while it was built, one
 	// message per element, reported with the other warnings.
 	issues map[access.ID]string
+	// hoisted holds the dialogs found below the root's children and outside any
+	// other dialog, which are emitted as children of the window; hoist is the one
+	// being emitted.
+	hoisted []*node
+	hoist   *node
 }
 
 // accessRelation is a LabelledBy or DescribedBy whose keys are resolved once
@@ -668,6 +677,15 @@ func (rt *Runtime) buildAccessIssues() (*access.Tree, map[access.ID]accessTarget
 		for _, id := range b.emit(rt.tree, false) {
 			b.byID[id].Parent = access.RootID
 			root.Children = append(root.Children, id)
+		}
+		// The dialogs declared deeper in the tree are children of the window, after
+		// its other children, as they cover the window (see placeCover).
+		for _, n := range b.hoisted {
+			b.hoist = n
+			for _, id := range b.emit(n, false) {
+				b.byID[id].Parent = access.RootID
+				root.Children = append(root.Children, id)
+			}
 		}
 	}
 	for _, r := range b.rels {
@@ -770,6 +788,10 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 	}
 	d := n.div
 	if d == nil || d.noDisplay || (d.acc != nil && d.acc.hidden) {
+		return nil
+	}
+	if n.covers() && n != b.hoist && n.parent != b.rt.tree && enclosingCover(n.parent) == nil {
+		b.hoisted = append(b.hoisted, n)
 		return nil
 	}
 	if d.acc != nil && d.acc.inert {

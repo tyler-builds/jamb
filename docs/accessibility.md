@@ -20,6 +20,8 @@ What is automatic, with no app code:
 - Menus, menu bars and menu items carry their roles, checked and disabled
   states, and nesting level. A `Modal` is a dialog named by its title, and an
   `AlertDialog` an alert dialog named by its title and described by its message.
+  Either is a child of the window, after its other content, wherever it is
+  declared in the tree, since it covers the window.
   A `NonModal` dialog is a dialog that is not a modal window: UI Automation reports
   IsModal and IsTopmost as false for it, and F6 moves focus between the window and
   the dialog.

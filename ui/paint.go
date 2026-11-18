@@ -24,6 +24,13 @@ func (rt *Runtime) paint(dt float32) {
 	for n := rt.byID[rt.focusID]; n != nil; n = n.parent {
 		n.keepGen = rt.paintGen
 	}
+	// So are the open dialogs and their ancestors: a dialog covers the window
+	// wherever it is declared, even in a part of the window scrolled out of view.
+	for _, f := range rt.modals {
+		for n := rt.byID[f.id]; n != nil && n.keepGen != rt.paintGen; n = n.parent {
+			n.keepGen = rt.paintGen
+		}
+	}
 	if mr := rt.match; mr != nil {
 		mr.flights, mr.done = mr.flights[:0], 0
 		if len(mr.in) > 0 || len(mr.out) > 0 {
@@ -33,6 +40,7 @@ func (rt *Runtime) paint(dt float32) {
 	if rt.tree.flags&flagNoDisplay == 0 {
 		rt.paintNode(rt.tree, 0, 0, view, 1, rt.theme.Text, dt)
 	}
+	rt.stackOverlays()
 	rt.paintGhosts(dt)
 	rt.paintFlights(dt) // above the rest of the window (see Matched)
 	// A selection's handles are above its text and what is around it, and
@@ -394,8 +402,11 @@ func (rt *Runtime) paintNode(n *node, ox, oy float32, clip scene.Rect, opacity f
 			}
 			if c.flags&flagOverlay != 0 {
 				// Painted later, on top of everything and unclipped. n.abs and
-				// clip are the anchor's.
-				if anchorVisible(n.abs, clip) {
+				// clip are the anchor's. A dialog's cover is over the window
+				// wherever its anchor is.
+				if c.covers() {
+					rt.overlays = append(rt.overlays, rt.coverItem(c, opacity, fg))
+				} else if anchorVisible(n.abs, clip) {
 					rt.overlays = append(rt.overlays, overlayItem{n: c, anchor: n.abs, opacity: opacity, fg: fg, ghost: rt.inGhost})
 				}
 				continue
