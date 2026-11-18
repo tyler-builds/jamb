@@ -514,6 +514,10 @@ func (s *DataGridStyle) mergeFrom(o *DataGridStyle, plain bool) {
 	s.CellSelected.mergeFrom(&o.CellSelected, plain)
 	s.TreeIndent.mergeFrom(&o.TreeIndent, plain)
 	s.TreeChevron.mergeFrom(&o.TreeChevron, plain)
+	s.RowHeader.mergeFrom(&o.RowHeader, plain)
+	s.RowHeaderSelected.mergeFrom(&o.RowHeaderSelected, plain)
+	s.HeaderCellSelected.mergeFrom(&o.HeaderCellSelected, plain)
+	s.Corner.mergeFrom(&o.Corner, plain)
 }
 
 // layered merges layers over s, the built-in look, in order (see layeredRecorded).

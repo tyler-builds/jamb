@@ -245,6 +245,9 @@ type Strings struct {
 	NoResults string
 	// NoRows is the message shown when a grid has no rows.
 	NoRows string
+	// SelectAll names the corner of a grid's row headers, which selects every cell (see
+	// DataGrid.RowHeaders).
+	SelectAll string
 	// LoadingMore names the row at the end of a grid while it loads more rows, and is
 	// announced when the loading starts (see DataGrid.LoadingMore).
 	LoadingMore string
@@ -650,6 +653,7 @@ func englishStrings() *Strings {
 		NoResults:               "No results",
 		NoRows:                  "No rows",
 		LoadingMore:             "Loading more rows",
+		SelectAll:               "Select all",
 		NoMatchingCommands:      "No matching commands",
 		CouldNotLoadSuggestions: "Couldn't load suggestions",
 		SuggestionCount: func(n int) string {

@@ -123,11 +123,25 @@ func gridCell(t *access.Tree, grid *access.Node, row, col int) *access.Node {
 	return cell
 }
 
-// gridHeaders returns the header items of the grid, in column order.
+// gridHeaders returns the column header items of the grid, in column order: the
+// header items that do not head a row.
 func gridHeaders(t *access.Tree, grid *access.Node) []*access.Node {
 	var hs []*access.Node
 	gridWalk(t, grid, func(n *access.Node) bool {
-		if n.Role == access.RoleHeaderItem {
+		if n.Role == access.RoleHeaderItem && n.GridRow == 0 {
+			hs = append(hs, n)
+		}
+		return true
+	})
+	return hs
+}
+
+// rowHeaders returns the built row header items of the grid, those with a GridRow, or
+// the one of the 1-based row row when row is not 0.
+func rowHeaders(t *access.Tree, grid *access.Node, row int) []*access.Node {
+	var hs []*access.Node
+	gridWalk(t, grid, func(n *access.Node) bool {
+		if n.Role == access.RoleHeaderItem && n.GridRow > 0 && (row == 0 || n.GridRow == row) {
 			hs = append(hs, n)
 		}
 		return true
@@ -209,17 +223,18 @@ func uiaGridColumnCount(this, out uintptr) uintptr {
 	return windowOut(this, out, func(n *access.Node) int32 { return int32(n.GridColumns) })
 }
 
-// The Table pattern. The row headers are empty: a grid's rows have no header
-// items. The column headers are the header items of the grid.
+// The Table pattern. The row headers are the header items with a row, those that are
+// built (see DataGrid.RowHeaders), and the column headers are the other header items.
 func uiaTableRowHeaders(this, out uintptr) uintptr {
 	c, hr := enter(this, out)
 	if hr != hrOK {
 		return hr
 	}
-	if _, _, ok := c.current(); !ok {
+	n, t, ok := c.current()
+	if !ok {
 		return hrElementNotAvailable
 	}
-	putPtr(out, providerArray(c, nil))
+	putPtr(out, providerArray(c, rowHeaders(t, n, 0)))
 	return hrOK
 }
 
@@ -280,16 +295,22 @@ func uiaGridItemContainingGrid(this, out uintptr) uintptr {
 	return hrOK
 }
 
-// The TableItem pattern of a cell: no row headers, and the header of its column.
+// The TableItem pattern of a cell: the header of its row, when the grid has one, and
+// the header of its column.
 func uiaTableItemRowHeaderItems(this, out uintptr) uintptr {
 	c, hr := enter(this, out)
 	if hr != hrOK {
 		return hr
 	}
-	if _, _, ok := c.current(); !ok {
+	n, t, ok := c.current()
+	if !ok {
 		return hrElementNotAvailable
 	}
-	putPtr(out, providerArray(c, nil))
+	var mine []*access.Node
+	if g := gridOf(t, n); g != nil && n.GridRow > 0 {
+		mine = rowHeaders(t, g, n.GridRow)
+	}
+	putPtr(out, providerArray(c, mine))
 	return hrOK
 }
 

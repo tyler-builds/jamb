@@ -22,6 +22,7 @@ func testDataGridParts(t *testing.T, applied map[string]bool) {
 	testDataGridEditParts(t, applied)
 	testDataGridColumnParts(t, applied)
 	testDataGridTreeParts(t, applied)
+	testDataGridHeaderParts(t, applied)
 	type dgCase struct {
 		part  string
 		set   func(*DataGridStyle, Style)
@@ -250,5 +251,37 @@ func TestDataGridKeysMoveSelectionInEachMode(t *testing.T) {
 	r.press(input.KeyDown, input.ModShift)
 	if got := sel2.Peek(); len(got) != 3 {
 		t.Errorf("Shift+Down twice from row 1 selected %v, want three rows", got)
+	}
+}
+
+// testDataGridHeaderParts checks the parts of the row headers, the corner and a
+// selected column (see RowHeaders and HeaderSelects).
+func testDataGridHeaderParts(t *testing.T, applied map[string]bool) {
+	mark := Style{Background: markBG}
+	for _, p := range []string{"RowHeader", "RowHeaderSelected", "HeaderCellSelected", "Corner"} {
+		applied["DataGrid."+p] = true
+	}
+	all := []CellRange{{Rows: KeySet{All: true}, Columns: KeySet{Keys: []string{"N"}}}, {Rows: keysIn("i1"), Columns: KeySet{All: true}}}
+	build := func(st DataGridStyle) *accessRig {
+		return newAccessRig(func(ctx *Context) Element {
+			return DataGrid(dgItems(6), func(x dgItem) string { return x.ID }, dgColumns()...).Label("Runs").
+				CellRanges(SelectionMultiple, NewSignal(all)).RowHeaders().HeaderSelects().Styles(st)
+		})
+	}
+	cases := []struct {
+		part  string
+		st    DataGridStyle
+		drawn string
+	}{
+		{"RowHeader", DataGridStyle{RowHeader: mark}, "DataGrid.RowHeader"},
+		{"RowHeaderSelected", DataGridStyle{RowHeaderSelected: mark}, "DataGrid.RowHeader"},
+		{"HeaderCellSelected", DataGridStyle{HeaderCellSelected: mark}, "DataGrid.HeaderCell"},
+		{"Corner", DataGridStyle{Corner: mark}, "DataGrid.Corner"},
+	}
+	for _, c := range cases {
+		r := build(c.st)
+		if !anyMarked(r.rt, c.drawn, false) {
+			t.Errorf("%s: the style does not reach a node that draws %s", c.part, c.drawn)
+		}
 	}
 }

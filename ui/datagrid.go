@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -204,6 +205,10 @@ const (
 // In a tree (see Children) the first column has two parts more: TreeIndent is the
 // space of each level above a row, and TreeChevron is the chevron that opens and closes
 // a row with children, or the space it leaves for a row without.
+//
+// With RowHeaders, RowHeader is the header at the start of each row, RowHeaderSelected
+// the header of a row selected whole, and Corner the cell above the row headers. A
+// column selected whole has HeaderCellSelected on its header cell.
 type DataGridStyle struct {
 	// Grid is the frame of the grid.
 	Grid Style
@@ -259,6 +264,17 @@ type DataGridStyle struct {
 	// TreeChevron is the chevron that opens and closes a row with children, in the first
 	// column of a tree. A row without children leaves its space empty.
 	TreeChevron Style
+	// RowHeader is the header at the start of each row, which shows the row's number
+	// (see RowHeaders).
+	RowHeader Style
+	// RowHeaderSelected is the header of a row whose every cell is selected, or of a
+	// selected row.
+	RowHeaderSelected Style
+	// HeaderCellSelected is the header cell of a column whose every cell is selected.
+	HeaderCellSelected Style
+	// Corner is the cell at the start of the header row, above the row headers, which
+	// selects every cell (see RowHeaders).
+	Corner Style
 }
 
 // dataGridGutter is the width kept clear at the right of a DataGrid's body for its
@@ -316,10 +332,23 @@ func dataGridDefaults(st *DataGridStyle, t *Theme, d DataGridDensity, textFactor
 		// A tree's indent and chevron are 16 logical pixels wide at the Text size 100 percent.
 		TreeIndent:  Style{Width: Px(16 * textFactor), NoShrink: true},
 		TreeChevron: Style{Direction: Row, Align: Center, Justify: Center, Width: Px(16 * textFactor), NoShrink: true, TextColor: t.TextMuted},
+		// A row header is a narrow column of numbers at the start of the rows, in the
+		// header's colors, and stays in view as the columns scroll sideways.
+		RowHeader: Style{Direction: Row, Align: Center, Justify: End, AlignSelf: Stretch, Padding: Edges{Left: 4, Right: 8},
+			NoShrink: true, OverflowX: OverflowHidden, Background: t.Panel, BorderEdges: Edges{Right: 1}, BorderColor: t.Border,
+			TextColor: t.TextMuted},
+		// A header of a row or a column selected whole is a stronger fill than a selected
+		// cell's, so that the selected rows and columns are found at a glance.
+		RowHeaderSelected:  Style{Background: t.Accent.Alpha(0.3), TextColor: t.Text},
+		HeaderCellSelected: Style{Background: t.Accent.Alpha(0.3), TextColor: t.Text},
+		Corner: Style{AlignSelf: Stretch, NoShrink: true, Background: t.Panel, BorderEdges: Edges{Right: 1},
+			BorderColor: t.Border},
 	}
 	if t.HighContrast {
 		st.RowSelected = Style{Background: t.Accent, TextColor: t.AccentText}
 		st.CellSelected = Style{Background: t.Accent, TextColor: t.AccentText}
+		st.RowHeaderSelected = Style{Background: t.Accent, TextColor: t.AccentText}
+		st.HeaderCellSelected = Style{Background: t.Accent, TextColor: t.AccentText}
 		st.EditorMessage.BorderColor, st.EditorMessage.TextColor = t.Text, t.Text
 	}
 }
@@ -472,7 +501,33 @@ type DataGridElement[T any] struct {
 	expanded     *Signal[[]string] // the open rows of a tree, when the app keeps them (see Expanded)
 	onExpand     func(key string)
 	onCollapse   func(key string)
+	headSelects  bool // a click on a column's header selects the column (see HeaderSelects)
+	rowHeaders   bool // see RowHeaders
 }
+
+// HeaderSelects makes a click on a column's header select the column, as in a
+// spreadsheet, when the grid selects cells (see CellRanges): Ctrl+click adds the
+// column to the selection or takes it out, Shift+click selects the columns from the
+// anchor's, and a drag across the headers selects the columns it crosses. The sort
+// moves to the arrow in the header: a sortable column shows it while not sorted too, and
+// a click on it sorts. Enter on a header cell sorts, and Space selects its column, with
+// Ctrl and Shift as for the click. A drag that starts on a movable column (see
+// DataColumn.Movable) that is selected whole moves the column. Without it a click on a
+// header sorts, and a grid that selects rows ignores it.
+func (g *DataGridElement[T]) HeaderSelects() *DataGridElement[T] { g.headSelects = true; return g }
+
+// RowHeaders shows a header at the start of each row, with the row's number in the order
+// shown, and a corner above them that selects every cell (or every row). A click on a
+// row's header selects the row: Ctrl+click adds it to the selection or takes it out,
+// Shift+click selects the rows from the anchor's, and a drag down the headers selects
+// the rows it crosses. In a grid that selects rows the header acts as a click on its row.
+// The headers stay in view as the columns scroll sideways. The keys reach them: Left
+// from the first column moves to the row's header, where Space selects the row (with
+// Ctrl and Shift as for the click), Shift+Up and Shift+Down extend the rows, and Up
+// from the first row's header moves to the corner, where Space selects every cell.
+// The headers are header items of their rows for assistive technology, and the corner
+// is a button named "Select all".
+func (g *DataGridElement[T]) RowHeaders() *DataGridElement[T] { g.rowHeaders = true; return g }
 
 // Movable lets the user move every column of the grid, as DataColumn.Movable does
 // for one column.
@@ -506,6 +561,21 @@ type dgHeadOps[T any] struct {
 	startN, endN int
 	// runs are the pieces of the row of the groups of columns, or nil without it.
 	runs []dgGroupRun
+	// The selection from the headers (see HeaderSelects and RowHeaders). selects says a
+	// press on a header cell selects its column, and pickCol selects it. cellSel says the
+	// grid selects cells, and whole reports whether column c is selected whole. dragTo and
+	// dragEnd follow a drag across the headers. rowHeadW is the width of the corner, zero
+	// without row headers; corner selects everything, and onCorner says the cursor is on
+	// it.
+	selects  bool
+	cellSel  bool
+	pickCol  func(c int, mods input.Modifiers)
+	whole    func(c int) bool
+	dragTo   func(x, y float32)
+	dragEnd  func()
+	rowHeadW float32
+	corner   func()
+	onCorner bool
 }
 
 // dgGroupRun is a piece of the row of the groups of columns: the columns [from, to)
@@ -945,7 +1015,18 @@ type dgCursor struct {
 	col    int
 	colKey string
 	header bool
+	// rowHead puts the cursor on the row's header, or on the corner with header (see
+	// RowHeaders). col stays the column it had.
+	rowHead bool
 }
+
+// The drags of a selection (see dgShared.selDrag).
+const (
+	dgDragNone uint8 = iota
+	dgDragCells
+	dgDragRows
+	dgDragCols
+)
 
 // dgSpan says whether a range of a cell selection has every row (rows) and every
 // column (cols), as the selection of a column or of a row does.
@@ -987,9 +1068,11 @@ type dgRowCtx[T any] struct {
 	rowH                 float32
 	cursorPos, cursorCol int
 	onHeader, hasFocus   bool
-	startN, endN         int    // the numbers of the columns pinned to the start and the end
-	built                []bool // the columns whose cells are built, or nil for all of them
-	cells                *dgSel // the selected cells, when the grid selects cells
+	startN, endN         int     // the numbers of the columns pinned to the start and the end
+	built                []bool  // the columns whose cells are built, or nil for all of them
+	cells                *dgSel  // the selected cells, when the grid selects cells
+	rowHeadW             float32 // the width of the row headers, or zero without them
+	onRowHead            bool    // the cursor is on a row's header (see dgCursor.rowHead)
 	ed                   dgEdit
 	click                func(q, cl int, mods input.Modifiers)
 	colAt                func(q int, x float32) int
@@ -1009,6 +1092,13 @@ type dgLive struct {
 	ops       dgOps
 	cursorCol int
 	setOpen   func(key string, v bool)
+	// rowHead selects the row at q, from its header, with the modifiers mods; dragTo
+	// extends a drag of the selection to the window's (x, y), and dragEnd ends it.
+	rowHead func(q int, mods input.Modifiers)
+	dragTo  func(x, y float32)
+	dragEnd func()
+	// press is a mouse press on the cell at (q, c): a click, which starts a drag.
+	press func(q, c int, mods input.Modifiers)
 }
 
 // dgRowLook is what every row of a grid is built from, beyond the row itself: when
@@ -1024,6 +1114,7 @@ type dgRowLook struct {
 	striped      bool
 	mode         SelectionMode
 	tree         bool
+	rowHeadW     float32
 }
 
 // dgColLook is what a row's cell is built from, of its column.
@@ -1039,7 +1130,7 @@ type dgColLook struct {
 // same reports whether the rows built from l and o are built the same.
 func (l *dgRowLook) same(o *dgRowLook) bool {
 	if l.theme != o.theme || l.highContrast != o.highContrast || l.startN != o.startN || l.endN != o.endN ||
-		l.striped != o.striped || l.mode != o.mode || l.tree != o.tree ||
+		l.striped != o.striped || l.mode != o.mode || l.tree != o.tree || l.rowHeadW != o.rowHeadW ||
 		!slices.Equal(l.xs, o.xs) || !slices.Equal(l.built, o.built) || len(l.cols) != len(o.cols) ||
 		!sameDataGridStyle(&l.st, &o.st) {
 		return false
@@ -1067,12 +1158,12 @@ func sameDataGridStyle(a, b *DataGridStyle) bool {
 }
 
 // styles returns the styles of the parts of s, all but Editor.
-func (s *DataGridStyle) styles() [24]*Style {
-	return [24]*Style{&s.Grid, &s.GridFocusVisible, &s.Header, &s.HeaderCell, &s.HeaderCellHover,
+func (s *DataGridStyle) styles() [28]*Style {
+	return [28]*Style{&s.Grid, &s.GridFocusVisible, &s.Header, &s.HeaderCell, &s.HeaderCellHover,
 		&s.HeaderCellSorted, &s.SortIndicator, &s.ResizeHandle, &s.Row, &s.RowHover, &s.RowSelected,
 		&s.RowAlternate, &s.Cell, &s.CellFocused, &s.Empty, &s.CellEditing, &s.EditorMessage,
 		&s.DropIndicator, &s.CellPinned, &s.PinnedEdge, &s.HeaderGroup, &s.CellSelected, &s.TreeIndent,
-		&s.TreeChevron}
+		&s.TreeChevron, &s.RowHeader, &s.RowHeaderSelected, &s.HeaderCellSelected, &s.Corner}
 }
 
 // sameStyle reports whether a and b are the same style. The slices are compared by
@@ -1104,6 +1195,7 @@ type dgRowSig struct {
 	odd        bool // the row is an odd one of a striped grid
 	level      int  // the level of a tree row
 	kids, open bool // a tree row has children, and is open
+	num        int  // the number the row's header shows, or zero without row headers
 }
 
 // dgRowMemo is a built row of a grid: its element, what it was built from, and the
@@ -1223,6 +1315,15 @@ type dgShared[T any] struct {
 	// a mouse press on a row, so that the click that follows does not select twice.
 	viewW   float32
 	pressed bool
+	// headPress is set by a mouse press on a header cell or the corner, so that the
+	// click that follows does not act a second time (see HeaderSelects).
+	headPress bool
+	// selDrag is the drag of a selection that a press started: over the cells, down
+	// the row headers or across the column headers. dragQ and dragC are where it has
+	// reached, and dragKeep keeps the rest of the selection (a press with Ctrl).
+	selDrag      uint8
+	dragQ, dragC int
+	dragKeep     bool
 
 	// The column edge being dragged.
 	dragging     bool
@@ -1694,6 +1795,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	col := colOf(cursor.colKey, cursor.col)
 	onHeader := cursor.header
+	onRowHead := cursor.rowHead && g.rowHeaders
 	hasFocus := focused.Get()
 	ed := edit.Get()
 	ed.col = colOf(ed.colKey, ed.col)
@@ -1706,10 +1808,16 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		return p
 	}
 
-	// The width of each column, and where each one starts.
+	// The width of each column, and where each one starts. The row headers come first,
+	// as wide as the longest number (see RowHeaders).
+	var rowHeadW float32
+	if g.rowHeaders {
+		rowHeadW = max(textWidth(rt, strings.Repeat("0", len(strconv.Itoa(max(n, 1)))))+18, 32*rt.textFactor)
+	}
 	ws := widths.Get()
 	cw := make([]float32, nc)
 	xs := make([]float32, nc+1)
+	xs[0] = rowHeadW
 	for i, cl := range cols {
 		cw[i] = cl.width(ws) * rt.textFactor // the columns grow with the Text size, as the rows do
 		xs[i+1] = xs[i] + cw[i]
@@ -1867,6 +1975,33 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			handle.request()
 		}
 	}
+	// placeHead moves the cursor to the header of row q, or to the corner with header
+	// (see RowHeaders), and keeps its column. The row headers are always in view.
+	placeHead := func(q int, header bool) {
+		c := cur.Peek()
+		k := ""
+		if !header && q >= 0 && q < len(sh.order) {
+			k = keyAt(q)
+		}
+		cur.Set(dgCursor{key: k, pos: q, col: c.col, colKey: c.colKey, header: header, rowHead: true})
+		if !header && len(sh.order) > 0 {
+			handle.ScrollToItem(q)
+		} else {
+			handle.request()
+		}
+	}
+	// focusCol moves the cursor to column cl, in its row or on the header, and scrolls
+	// the column into view but not the rows: a click on a column's header leaves the
+	// rows where they are.
+	focusCol := func(cl int) {
+		c := cur.Peek()
+		cur.Set(dgCursor{key: c.key, pos: c.pos, col: cl, colKey: cols[cl].key(), header: c.header})
+		if cols[cl].Pin == PinNone {
+			sh.reveal = true
+			sh.revealX0, sh.revealX1 = xs[cl], xs[cl+1]
+		}
+		handle.request()
+	}
 	movable := func(cl DataColumn[T]) bool { return cl.Movable || g.movable }
 	// moveColumn moves the column at from of vc, the columns in the order they are
 	// shown, to the index to, and announces where it is now.
@@ -1914,7 +2049,7 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		if !moveColumn(vc, f, f+dir) || vc[f].Pin != PinNone {
 			return
 		}
-		var x float32
+		x := rowHeadW
 		for _, k := range colOrder.Peek()[:f+dir] {
 			x += cw[colPos[k]]
 		}
@@ -2093,6 +2228,55 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 			anchor.Set(k)
 		}
 		place(q, cl, false)
+	}
+	// pickRow selects the row at q from its header (see RowHeaders), with the modifiers
+	// mods: alone, added or taken out with Ctrl, or the rows from the anchor's with
+	// Shift. The anchor's range then has every column, so Shift extends whole rows. In
+	// a grid that selects rows it is a click on the row.
+	pickRow := func(q int, mods input.Modifiers) {
+		c := colOf(cur.Peek().colKey, cur.Peek().col)
+		ctrl, shift := mods&input.ModCtrl != 0, mods&input.ModShift != 0
+		switch {
+		case n == 0 || nc == 0:
+		case !g.cellOn:
+			click(q, c, mods)
+		case g.cellMode != SelectionMultiple:
+			pick(q, c, cellRange(q, c), dgSpan{})
+		case shift:
+			extend(q, c, dgSpan{cols: true}, ctrl)
+		case ctrl:
+			toggle(q, c, rowRange(q), dgSpan{cols: true}, curSel().wholeRow(keyAt(q)))
+		default:
+			pick(q, c, rowRange(q), dgSpan{cols: true})
+		}
+	}
+	// pickColumn selects column c from its header (see HeaderSelects), as pickRow does a
+	// row. The anchor's range then has every row, so Shift extends whole columns.
+	pickColumn := func(c int, mods input.Modifiers) {
+		if n == 0 || nc == 0 || !g.cellOn || g.cellMode != SelectionMultiple {
+			return
+		}
+		q := min(max(cur.Peek().pos, 0), n-1)
+		ctrl, shift := mods&input.ModCtrl != 0, mods&input.ModShift != 0
+		switch {
+		case shift:
+			extend(q, c, dgSpan{rows: true}, ctrl)
+		case ctrl:
+			toggle(q, c, colRange(c), dgSpan{rows: true}, curSel().wholeColumn(cols[c].key()))
+		default:
+			pick(q, c, colRange(c), dgSpan{rows: true})
+		}
+	}
+	// selectEverything selects every cell, or every row of a grid that selects rows, as
+	// Ctrl+A and the corner of the row headers do.
+	selectEverything := func() {
+		switch {
+		case n == 0:
+		case g.cellOn && g.cellMode == SelectionMultiple:
+			selectAll()
+		case !g.cellOn && g.mode == SelectionMultiple:
+			selectKeys(rangeKeys(0, n-1))
+		}
 	}
 	// startEdit starts an edit of the cell at displayed position q and column cl,
 	// with text in the editor. The editor takes focus when it is built.
@@ -2344,11 +2528,94 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		r, _ := utf8.DecodeRuneInString(s)
 		// A custom editor is started by Enter or F2, not by typing: its value is not text.
-		if !sh.focus.Focused() || onHeader || n == 0 || nc == 0 || cols[col].Edit == nil || cols[col].Editor != nil ||
+		if !sh.focus.Focused() || onHeader || cur.Peek().rowHead || n == 0 || nc == 0 || cols[col].Edit == nil || cols[col].Editor != nil ||
 			r == ' ' || !unicode.IsPrint(r) {
 			return
 		}
 		startEdit(p, col, s)
+	}
+
+	// moveHead moves the cursor to the header of row q (see RowHeaders). Shift extends
+	// whole rows from the anchor, and Ctrl+Shift keeps the rest of the selection; a plain
+	// move only moves. In a grid that selects rows the move selects as on the row.
+	moveHead := func(q int, ctrl, shift bool) {
+		c := colOf(cur.Peek().colKey, cur.Peek().col)
+		switch {
+		case !g.cellOn:
+			moveRow(q, c, ctrl, shift)
+		case shift && g.cellMode == SelectionMultiple:
+			extend(q, c, dgSpan{cols: true}, ctrl)
+		}
+		placeHead(q, false)
+	}
+	// headKeys handles a key press while the cursor is on a row's header, or on the
+	// corner when onHeader is set (see RowHeaders), and reports whether it used the key.
+	// The keys it does not use act as they do on the first column.
+	headKeys := func(e *KeyEvent, p int, onHeader, ctrl, shift bool, step int) bool {
+		switch e.Key {
+		case input.KeyLeft:
+		case input.KeyRight:
+			switch {
+			case nc == 0:
+			case onHeader:
+				place(p, 0, true)
+			case n > 0:
+				moveRow(p, 0, ctrl, shift)
+			}
+		case input.KeyUp:
+			switch {
+			case onHeader || n == 0:
+			case p == 0:
+				placeHead(0, true)
+			default:
+				moveHead(p-1, ctrl, shift)
+			}
+		case input.KeyDown:
+			switch {
+			case n == 0:
+			case onHeader:
+				placeHead(0, false)
+			case p+1 < n:
+				moveHead(p+1, ctrl, shift)
+			default:
+				askMore()
+			}
+		case input.KeyPageDown, input.KeyPageUp:
+			switch {
+			case n == 0:
+			case e.Key == input.KeyPageUp && !onHeader:
+				moveHead(max(p-step, 0), ctrl, shift)
+			case e.Key == input.KeyPageDown:
+				if !onHeader && p == n-1 {
+					askMore()
+				}
+				moveHead(min(p+step, n-1), ctrl, shift)
+			}
+		case input.KeyHome, input.KeyEnd:
+			if !ctrl {
+				return false // Home and End move to the first and last cell of the row
+			}
+			if n > 0 && e.Key == input.KeyEnd {
+				moveHead(n-1, ctrl, shift)
+			} else if n > 0 {
+				moveHead(0, ctrl, shift)
+			}
+		case input.KeySpace, input.KeyEnter:
+			switch {
+			case e.Repeat:
+			case onHeader:
+				selectEverything()
+			case n == 0:
+			case e.Key == input.KeyEnter:
+				activate(p)
+			default:
+				pickRow(p, e.Mods)
+			}
+		case input.KeyF2:
+		default:
+			return false
+		}
+		return true
 	}
 
 	// keys handles a key press on the grid, and reports whether it used the key.
@@ -2371,6 +2638,9 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		ctrl := e.Mods&input.ModCtrl != 0
 		shift := e.Mods&input.ModShift != 0
 		step := max(int((sh.viewH-headerH)/rowH), 1)
+		if g.rowHeaders && cur.Peek().rowHead && headKeys(e, p, onHeader, ctrl, shift, step) {
+			return true
+		}
 		switch e.Key {
 		case input.KeyLeft, input.KeyRight:
 			dir := 1
@@ -2394,6 +2664,17 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 					}
 					return true
 				}
+			}
+			if g.rowHeaders && dir < 0 && col == 0 && !ctrl && !shift {
+				placeHead(p, onHeader) // Left from the first column moves to the row's header
+				return true
+			}
+			if onHeader && shift && g.headSelects && g.cellOn && nc > 0 {
+				// Shift+Left and Shift+Right on a header extend the columns selected.
+				c := min(max(col+dir, 0), nc-1)
+				place(p, c, true)
+				pickColumn(c, input.ModShift)
+				return true
 			}
 			switch {
 			case nc == 0:
@@ -2463,7 +2744,10 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				return true
 			}
 			if onHeader {
-				if e.Key == input.KeySpace || e.Key == input.KeyEnter {
+				// With HeaderSelects, Space selects the column and Enter sorts.
+				if e.Key == input.KeySpace && g.headSelects && g.cellOn {
+					pickColumn(col, e.Mods)
+				} else {
 					sortBy(col)
 				}
 				return true
@@ -2574,6 +2858,84 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		}
 		return 0, 0, false
 	}
+	// rowAt returns the displayed position of the row under the window's (x, y).
+	rowAt := func(x, y float32) (int, bool) {
+		for _, nd := range rt.hitTest(x, y) {
+			if d := nd.div; d != nil && d.acc != nil && d.acc.gridRow > 0 &&
+				(d.part == "DataGrid.Row" || d.part == "DataGrid.Cell" || d.part == "DataGrid.RowHeader") {
+				return d.acc.gridRow - 1, true
+			}
+		}
+		return 0, false
+	}
+	// headerAt returns the column of the header cell under the window's (x, y).
+	headerAt := func(x, y float32) (int, bool) {
+		for _, nd := range rt.hitTest(x, y) {
+			if d := nd.div; d != nil && d.part == "DataGrid.HeaderCell" && d.acc != nil && d.acc.gridCol > 0 {
+				return d.acc.gridCol - 1, true
+			}
+		}
+		return 0, false
+	}
+	// startDrag starts a drag of the selection of the kind kind from (q, c), after a
+	// press with the modifiers mods has selected there. Only a multiple selection of
+	// cells drags.
+	startDrag := func(kind uint8, q, c int, mods input.Modifiers) {
+		if g.cellOn && g.cellMode == SelectionMultiple {
+			sh.selDrag, sh.dragQ, sh.dragC, sh.dragKeep = kind, q, c, mods&input.ModCtrl != 0
+		}
+	}
+	// dragTo extends the drag of the selection to the window's (x, y), as Shift+click
+	// there would: over the cells a rectangle, down the row headers whole rows, and across
+	// the column headers whole columns. The element that started it holds the pointer,
+	// so a move with no button held, after a release outside the window, ends it.
+	dragTo := func(x, y float32) {
+		if rt.captureID == 0 {
+			sh.selDrag = dgDragNone
+		}
+		c := colOf(cur.Peek().colKey, cur.Peek().col)
+		switch sh.selDrag {
+		case dgDragCells:
+			if q, cl, ok := cellAt(x, y); ok && q < n && (q != sh.dragQ || cl != sh.dragC) {
+				sh.dragQ, sh.dragC = q, cl
+				extend(q, cl, dgSpan{}, sh.dragKeep)
+				place(q, cl, false)
+			}
+		case dgDragRows:
+			if q, ok := rowAt(x, y); ok && q < n && q != sh.dragQ {
+				sh.dragQ = q
+				extend(q, c, dgSpan{cols: true}, sh.dragKeep)
+				place(q, c, false)
+			}
+		case dgDragCols:
+			if cl, ok := headerAt(x, y); ok && cl < nc && cl != sh.dragC && n > 0 {
+				sh.dragC = cl
+				extend(min(max(cur.Peek().pos, 0), n-1), cl, dgSpan{rows: true}, sh.dragKeep)
+				focusCol(cl)
+			}
+		}
+	}
+	dragEnd := func() { sh.selDrag = dgDragNone }
+	// pressRow selects the row at q for a press on its header (see RowHeaders), and moves
+	// the cursor to the row, in its column.
+	pressRow := func(q int, mods input.Modifiers) {
+		if q >= n || nc == 0 {
+			return
+		}
+		pickRow(q, mods)
+		c := colOf(cur.Peek().colKey, cur.Peek().col)
+		place(q, c, false)
+		startDrag(dgDragRows, q, c, mods)
+	}
+	// pressColumn selects column c for a press on its header (see HeaderSelects).
+	pressColumn := func(c int, mods input.Modifiers) {
+		if c >= nc || n == 0 {
+			return
+		}
+		pickColumn(c, mods)
+		focusCol(c)
+		startDrag(dgDragCols, cur.Peek().pos, c, mods)
+	}
 	// menu builds the context menu of the grid. The menu is built before the press
 	// reaches the rows, so a press finds its cell itself, and moves the cursor there
 	// and selects the row as the rule of File Explorer says. The keyboard opens the
@@ -2608,9 +2970,14 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	}
 	rc := dgRowCtx[T]{t: t, ctx: ctx, st: &st, sh: sh, rows: rows, cols: cols, xs: xs, selected: selected, rowH: rowH,
 		cursorPos: p, cursorCol: col, onHeader: onHeader, hasFocus: hasFocus, ed: ed, startN: startN, endN: endN,
-		built: built, cells: cellsOn, click: click, colAt: colAt, activate: activate, ops: ops, store: store}
+		built: built, cells: cellsOn, rowHeadW: rowHeadW, onRowHead: onRowHead, click: click, colAt: colAt, activate: activate, ops: ops, store: store}
 	sh.live = dgLive{click: click, colAt: colAt, activate: activate, ops: ops, cursorCol: col,
-		setOpen: func(key string, v bool) { g.setOpen(store, sh, key, v) }}
+		setOpen: func(key string, v bool) { g.setOpen(store, sh, key, v) },
+		rowHead: pressRow, dragTo: dragTo, dragEnd: dragEnd,
+		press: func(q, c int, mods input.Modifiers) {
+			click(q, c, mods)
+			startDrag(dgDragCells, q, c, mods)
+		}}
 	rc.memoOK = g.prepareRowMemo(&rc)
 	// A row within a viewport of rows of the end asks for more rows when it is built.
 	near := n - max(int(sh.viewH/rowH), 1)
@@ -2734,8 +3101,8 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 	if headerH > rowH {
 		runs = groupRuns(cols)
 	}
-	if startN+endN > 0 {
-		// The pinned cells, and the row of LoadingMore, are moved by the sideways
+	if startN+endN > 0 || rowHeadW > 0 {
+		// The pinned cells, the row headers and the corner, and the row of LoadingMore, are moved by the sideways
 		// scroll before they are painted, so that they stay where they are on the
 		// screen. The cells are drawn over the cells that scroll under them, and they
 		// are not culled at the place their layout gives them.
@@ -2766,7 +3133,12 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				// groups, whose pieces are those of groupRuns, and that row.
 				hdr := nd.children[1]
 				if headerH > rowH && len(hdr.children) == 2 {
-					for i, c := range hdr.children[0].children {
+					pieces := hdr.children[0].children
+					if rowHeadW > 0 && len(pieces) > 0 {
+						move(pieces[0], sx) // the space over the row headers
+						pieces = pieces[1:]
+					}
+					for i, c := range pieces {
 						if i < len(runs) {
 							offset(c, runs[i].pin)
 						}
@@ -2775,9 +3147,13 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				}
 				i := 0
 				for _, c := range hdr.children {
-					if c.div != nil && c.div.part == "DataGrid.HeaderCell" {
+					switch {
+					case c.div == nil:
+					case c.div.part == "DataGrid.HeaderCell":
 						offset(c, pinOf(i))
 						i++
+					case c.div.part == "DataGrid.Corner":
+						move(c, sx)
 					}
 				}
 			}
@@ -2788,8 +3164,12 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 				}
 				for _, r := range w.children {
 					for _, c := range r.children {
-						if d := c.div; d != nil && d.part == "DataGrid.Cell" && d.acc != nil {
+						switch d := c.div; {
+						case d == nil:
+						case d.part == "DataGrid.Cell" && d.acc != nil:
 							offset(c, pinOf(d.acc.gridCol-1))
+						case d.part == "DataGrid.RowHeader":
+							move(c, sx)
 						}
 					}
 				}
@@ -2820,6 +3200,19 @@ func (g *DataGridElement[T]) build(ctx *Context) Element {
 		startN: startN,
 		endN:   endN,
 		runs:   runs,
+		// The selection from the headers.
+		selects:  g.headSelects && g.cellOn && g.cellMode == SelectionMultiple,
+		cellSel:  g.cellOn,
+		pickCol:  pressColumn,
+		whole:    func(c int) bool { return g.cellOn && curSel().wholeColumn(cols[c].key()) },
+		dragTo:   dragTo,
+		dragEnd:  dragEnd,
+		rowHeadW: rowHeadW,
+		corner: func() {
+			selectEverything()
+			sh.focus.Focus()
+		},
+		onCorner: onRowHead && onHeader,
 	}
 	list.header = g.headerRow(&st, sh, rows, cols, cw, width, sortState, sortCol, col, onHeader, hasFocus,
 		t.HighContrast, sortBy, setWidth, func(i int) float32 { return autoFitWidth(rt, &st, sh, rows, cols, i) }, ho, strs)
@@ -2867,7 +3260,7 @@ func (g *DataGridElement[T]) prepareRowMemo(rc *dgRowCtx[T]) bool {
 		return false
 	}
 	look := dgRowLook{theme: rc.t, highContrast: rc.t.HighContrast, xs: rc.xs, built: rc.built,
-		startN: rc.startN, endN: rc.endN, striped: g.striped, mode: g.mode, tree: sh.tree != nil}
+		startN: rc.startN, endN: rc.endN, striped: g.striped, mode: g.mode, tree: sh.tree != nil, rowHeadW: rc.rowHeadW}
 	copyLarge(&look.st, rc.st)
 	look.cols = make([]dgColLook, len(rc.cols))
 	for c, cl := range rc.cols {
@@ -2900,6 +3293,12 @@ func (g *DataGridElement[T]) rowFor(rc *dgRowCtx[T], q int) Element {
 	sig := dgRowSig{gen: sh.lookGen, selected: rc.selected[k], cursor: -1, odd: g.striped && q%2 == 1}
 	if !rc.onHeader && q == rc.cursorPos {
 		sig.cursor, sig.focused = rc.cursorCol, rc.hasFocus
+		if rc.onRowHead {
+			sig.cursor = -2
+		}
+	}
+	if rc.rowHeadW > 0 {
+		sig.num = q + 1
 	}
 	pos, size := q+1, sh.n
 	if t := sh.tree; t != nil {
@@ -2982,9 +3381,16 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 	r.OnMouseDown(func(e *MouseEvent) {
 		if e.Button == input.ButtonLeft {
 			sh.pressed, sh.ctl = true, false
-			live.click(m.q, live.colAt(m.q, e.X), e.Mods)
+			live.press(m.q, live.colAt(m.q, e.X), e.Mods)
 		}
 	})
+	if g.cellOn && g.cellMode == SelectionMultiple {
+		// A drag from a press on a cell or a row's header selects the cells or rows it
+		// crosses: the row holds the pointer, and finds what is under it.
+		r.CapturePointer().
+			OnMouseMove(func(e *MouseEvent) { live.dragTo(e.X, e.Y) }).
+			OnMouseUp(func(*MouseEvent) { live.dragEnd() })
+	}
 	r.OnClick(func() {
 		if sh.pressed {
 			sh.pressed = false
@@ -3006,6 +3412,9 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 			}
 			live.click(m.q, live.cursorCol, mods)
 		}
+	}
+	if rc.rowHeadW > 0 {
+		r.Child(g.rowHeader(rc, q, m, k, on))
 	}
 	var names []string
 	// skip is the width of the columns not built since the last cell, which a spacer
@@ -3066,7 +3475,7 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 			})
 		}
 		a := cell.access()
-		if !onHeader && q == cursorPos && c == cursorCol {
+		if !onHeader && !rc.onRowHead && q == cursorPos && c == cursorCol {
 			a.highlighted = true
 			if hasFocus {
 				cell.styleOf(&st.CellFocused)
@@ -3171,6 +3580,58 @@ func (g *DataGridElement[T]) row(rc *dgRowCtx[T], q int, m *dgRowMemo) *DivEleme
 	return r
 }
 
+// rowHeader returns the header of the row with the key k at position q (see
+// RowHeaders): its number, a header item of the row for assistive technology. It is
+// drawn in RowHeaderSelected while the row is selected whole, which on says for a grid
+// that selects rows. A press selects the row, and a drag down the headers the rows it
+// crosses (see DataGridElement.RowHeaders).
+func (g *DataGridElement[T]) rowHeader(rc *dgRowCtx[T], q int, m *dgRowMemo, k string, on bool) *DivElement {
+	st, sh, live := rc.st, rc.sh, &rc.sh.live
+	num := strconv.Itoa(q + 1)
+	whole := on
+	if g.cellOn {
+		whole = rc.cells.wholeRow(k)
+	}
+	rh := Div().asPart("DataGrid.RowHeader").styleOf(&st.RowHeader).styleOf(&Style{Basis: Px(rc.rowHeadW)}).ZIndex(1)
+	if whole {
+		rh.styleOf(&st.RowHeaderSelected)
+	}
+	rh.Role(access.RoleHeaderItem).Label(num).AccessCell(q+1, 0)
+	if rc.onRowHead && !rc.onHeader && q == rc.cursorPos {
+		rh.access().highlighted = true
+		if rc.hasFocus {
+			rh.styleOf(&st.CellFocused)
+		}
+	}
+	if g.cellOn && g.cellMode == SelectionMultiple {
+		// The header is an item of the selection, selected while its row is selected whole.
+		rh.AccessSelected(whole)
+		rh.access().selectWith = func(ctrl bool) {
+			mods := input.Modifiers(0)
+			if ctrl {
+				mods = input.ModCtrl
+			}
+			live.rowHead(m.q, mods)
+		}
+	}
+	rh.Child(Text(num).NoWrap()).
+		OnMouseDown(func(e *MouseEvent) {
+			if e.Button == input.ButtonLeft {
+				sh.pressed, sh.ctl = true, false
+				live.rowHead(m.q, e.Mods)
+				e.StopPropagation()
+			}
+		}).
+		OnClick(func() {
+			if sh.pressed {
+				sh.pressed = false
+				return
+			}
+			live.rowHead(m.q, 0) // a click from an assistive technology
+		})
+	return rh
+}
+
 // editor returns the content of an editing cell: its text editor. The editor takes
 // the grid's keys as described in DataGrid, and its frame is invalid while the last
 // save failed. The message of that save is drawn by row, under the cell.
@@ -3273,6 +3734,29 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 	strs *Strings) *DivElement {
 	changed, widthOf := ho.changed, ho.widthOf
 	h := Div().asPart("DataGrid.Header").styleOf(&st.Header).Width(Px(width))
+	if ho.rowHeadW > 0 {
+		// The corner, over the row headers, selects every cell (see RowHeaders).
+		cn := Div().asPart("DataGrid.Corner").styleOf(&st.Corner).styleOf(&Style{Basis: Px(ho.rowHeadW)}).ZIndex(1)
+		cn.Role(access.RoleButton).Label(strs.SelectAll).hoverOf(&st.HeaderCellHover)
+		if ho.onCorner {
+			cn.access().highlighted = true
+			if hasFocus {
+				cn.styleOf(&st.CellFocused)
+			}
+		}
+		h.Child(cn.OnMouseDown(func(e *MouseEvent) {
+			if e.Button == input.ButtonLeft {
+				sh.headPress = true
+				ho.corner()
+			}
+		}).OnClick(func() {
+			if sh.headPress {
+				sh.headPress = false
+				return
+			}
+			ho.corner()
+		}))
+	}
 	for c, cl := range cols {
 		sortable := cl.Compare != nil
 		isSorted := c == sortCol
@@ -3287,7 +3771,7 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 		}
 		hc := Div().asPart("DataGrid.HeaderCell").styleOf(&st.HeaderCell).
 			styleOf(&Style{Basis: Px(cw[c]), Grow: cl.Grow, Justify: alignOf(cl.Align)})
-		hc.Role(access.RoleHeaderItem).Label(name)
+		hc.Role(access.RoleHeaderItem).Label(name).AccessCell(0, c+1)
 		if cl.Group != "" {
 			hc.Description(cl.Group)
 		}
@@ -3296,33 +3780,96 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 		}
 		a := hc.access()
 		a.status = status
-		if onHeader && c == col {
+		if onHeader && c == col && !ho.onCorner {
 			a.highlighted = true
 			if hasFocus {
 				hc.styleOf(&st.CellFocused)
 			}
 		}
-		if sortable {
+		if sortable || ho.selects {
 			hc.hoverOf(&st.HeaderCellHover).Cursor(CursorPointer)
 		}
 		if isSorted {
 			hc.styleOf(&st.HeaderCellSorted)
+		}
+		whole := ho.cellSel && ho.whole(c)
+		if whole {
+			hc.styleOf(&st.HeaderCellSelected)
 		}
 		if cl.RenderHeader != nil {
 			hc.Child(Div().AccessHidden().Child(cl.RenderHeader(cl.Header, PartState{Selected: isSorted, HighContrast: highContrast})))
 		} else {
 			hc.Child(Text(cl.Header).Truncate())
 		}
-		if isSorted {
+		ci := c
+		switch {
+		case isSorted && !ho.selects:
 			glyph := icons.ChevronUp
 			if sorted.Desc {
 				glyph = icons.ChevronDown
 			}
 			hc.Child(Div().asPart("DataGrid.SortIndicator").styleOf(&st.SortIndicator).Child(Icon(glyph).Size(12)))
+		case sortable && ho.selects:
+			// When a press on the header selects its column, the sort is the arrow's: a
+			// sortable column shows it while not sorted too, in the header's color.
+			glyph := icons.ChevronsUpDown
+			ind := Div().asPart("DataGrid.SortIndicator").AccessHidden().Cursor(CursorPointer)
+			if isSorted {
+				glyph = icons.ChevronUp
+				if sorted.Desc {
+					glyph = icons.ChevronDown
+				}
+				ind.styleOf(&st.SortIndicator)
+			}
+			if alignOf(cl.Align) == Start {
+				// The arrow is at the end of the header cell, where it is found at once.
+				hc.Child(Div().Grow(1))
+			}
+			hc.Child(ind.Child(Icon(glyph).Size(12)).
+				OnMouseDown(func(e *MouseEvent) {
+					if e.Button == input.ButtonLeft {
+						sh.headPress = false
+						ho.stopDrag()
+						e.StopPropagation()
+					}
+				}).
+				OnClick(func() { sortBy(ci) }))
+		}
+		if ho.selects {
+			hc.AccessSelected(whole)
+			hc.access().selectWith = func(ctrl bool) {
+				mods := input.Modifiers(0)
+				if ctrl {
+					mods = input.ModCtrl
+				}
+				ho.pickCol(ci, mods)
+			}
+			move := ho.movable(cl)
+			hc.CapturePointer().
+				OnMouseDown(func(e *MouseEvent) {
+					if e.Button != input.ButtonLeft {
+						return
+					}
+					// A drag from a movable column that is selected whole moves it; any
+					// other drag selects the columns it crosses.
+					drags := move && e.Mods == 0 && ho.whole(ci)
+					sh.headPress = true
+					ho.pickCol(ci, e.Mods)
+					if !drags {
+						ho.stopDrag()
+					}
+				}).
+				OnMouseMove(func(e *MouseEvent) { ho.dragTo(e.X, e.Y) }).
+				OnMouseUp(func(*MouseEvent) { ho.dragEnd() })
 		}
 		if sortable {
-			ci := c
+			// With HeaderSelects a mouse press has selected the column, and the click is
+			// assistive technology's Invoke, which sorts.
 			hc.OnClick(func() {
+				if sh.headPress {
+					sh.headPress = false
+					return
+				}
 				if !sh.edgePress {
 					sortBy(ci)
 				}
@@ -3407,6 +3954,9 @@ func (g *DataGridElement[T]) headerRow(st *DataGridStyle, sh *dgShared[T], rows 
 	// columns: each takes their widths and their shares of the spare width. It is
 	// for sighted users: each header cell is described by its group.
 	gr := Div().styleOf(&st.Header).AccessHidden()
+	if ho.rowHeadW > 0 {
+		gr.Child(Div().styleOf(&st.Corner).styleOf(&Style{Basis: Px(ho.rowHeadW)}).ZIndex(1))
+	}
 	for _, run := range ho.runs {
 		var basis, grow float32
 		for c := run.from; c < run.to; c++ {

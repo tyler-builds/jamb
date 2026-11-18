@@ -64,7 +64,7 @@ const (
 	RoleProgressBar               // progress: a read-only Range when determinate, no range when busy (see Node.Range)
 	RoleDataGrid                  // a grid of rows and columns, such as a DataGrid (see Node.GridRows)
 	RoleDataItem                  // a cell of a data grid (see Node.GridRow and Node.GridColumn)
-	RoleHeaderItem                // a column header of a data grid, with its sort state in its name
+	RoleHeaderItem                // a column header of a data grid, with its sort state in its name, or a row header (see Node.GridRow)
 	RoleCalendar                  // a month of days, a grid with a header of weekday names (see DatePicker)
 	RoleStatusBar                 // the bar along the bottom of a window that shows its status (see StatusBar)
 	RoleToolBar                   // a row of controls that is one Tab stop, named by its label (see Toolbar)
@@ -411,8 +411,9 @@ type Node struct {
 	GridRows, GridColumns int
 	// GridRow and GridColumn are the 1-based position of a RoleDataItem among the cells of
 	// its grid; 0 when the node is not a cell. A RoleHeaderItem may have a GridColumn, the
-	// column it heads, and has no GridRow; without one it heads the column of its place
-	// among the grid's header items.
+	// column it heads, and has no GridRow; without either it heads the column of its place
+	// among the grid's column headers. A RoleHeaderItem with a GridRow and no GridColumn
+	// heads that row instead: it is a row header.
 	GridRow, GridColumn int
 	// ItemStatus is the status of an item, such as "sorted ascending" for a header item
 	// (UI Automation ItemStatus); empty when there is none.
