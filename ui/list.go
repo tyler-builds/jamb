@@ -252,6 +252,18 @@ type listState struct {
 	snap   bool
 }
 
+// stickyHeader returns the header of the list whose scroll container is n, or
+// nil: the child after the rows (see UniformListElement.expand). It is laid out
+// at the top of the content, and paint keeps it at the top of the viewport: it
+// moves sideways with the rows and not down. It is painted, culled and hit
+// there, so its place on the screen is the one paint gives it.
+func stickyHeader(n *node) *node {
+	if n.div == nil || n.div.vlist == nil || !n.div.vlist.sticky || len(n.children) < 2 {
+		return nil
+	}
+	return n.children[1]
+}
+
 // listOverscan is the number of rows built beyond the viewport on each side.
 const listOverscan = 4
 

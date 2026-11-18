@@ -114,14 +114,16 @@ func (rt *Runtime) Find(key string) (Rect, bool) {
 // by the latest paint reports where it was drawn, transitions and motions
 // included. Any other node, one culled as off screen, reports the rectangle
 // its layout gives it, with its static offsets and the current scroll offsets
-// of its ancestors. Overlays are placed by paint, so an overlay that was not
-// painted reports the rectangle it was last painted at.
+// of its ancestors (a list's header does not scroll down; see stickyHeader).
+// Overlays are placed by paint, so an overlay that was not painted reports the
+// rectangle it was last painted at.
 func (rt *Runtime) nodeRect(n *node) scene.Rect {
 	if n.paintGen == rt.paintGen {
 		return n.abs
 	}
 	var x, y float32
-	for a := n; a != nil; a = a.parent {
+	var prev *node // the child of a on the way up from n
+	for a := n; a != nil; prev, a = a, a.parent {
 		if a.flags&flagOverlay != 0 {
 			return n.abs
 		}
@@ -129,7 +131,9 @@ func (rt *Runtime) nodeRect(n *node) scene.Rect {
 		y += a.lay.Y + a.style.OffsetY
 		if a != n && a.st != nil && (a.style.OverflowX == OverflowScroll || a.style.OverflowY == OverflowScroll) {
 			x -= a.st.scrollX
-			y -= a.st.scrollY
+			if prev != stickyHeader(a) {
+				y -= a.st.scrollY
+			}
 		}
 	}
 	return scene.Rect{X: x, Y: y, W: n.lay.W, H: n.lay.H}
