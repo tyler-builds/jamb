@@ -224,17 +224,17 @@ func TestDataGridHeaderDragsPastTheEdgeScroll(t *testing.T) {
 		return g.RowHeaders().HeaderSelects().Width(ui.Px(220))
 	})
 	grid := r.ByRole(access.RoleDataGrid, "Results").Bounds()
-	// The columns first: a header is not found by the access tree after the rows scroll.
-	r.hold(r.header("OrderID"), grid.X+grid.W+30, grid.Y+10, 600*time.Millisecond)
-	r.release(grid.X+grid.W+30, grid.Y+10)
-	got := r.ranges.Peek()
-	if len(got) != 1 || !got[0].Rows.All || strings.Join(got[0].Columns.Keys, " ") != "OrderID Customer Status Total" {
-		t.Errorf("a drag across the headers held right of the grid selected %+v, want every column", got)
-	}
 	r.hold(r.header("2"), grid.X+grid.W+40, grid.Y+grid.H+15, 500*time.Millisecond)
 	r.release(grid.X+grid.W+40, grid.Y+grid.H+15)
-	got = r.ranges.Peek()
+	got := r.ranges.Peek()
 	if len(got) != 1 || !got[0].Columns.All || len(got[0].Rows.Keys) < 16 {
 		t.Errorf("a drag down the row headers held below the grid selected %+v, want whole rows scrolled into view", got)
+	}
+	// The rows have scrolled: the headers are still where they are shown.
+	r.hold(r.header("OrderID"), grid.X+grid.W+30, grid.Y+10, 600*time.Millisecond)
+	r.release(grid.X+grid.W+30, grid.Y+10)
+	got = r.ranges.Peek()
+	if len(got) != 1 || !got[0].Rows.All || strings.Join(got[0].Columns.Keys, " ") != "OrderID Customer Status Total" {
+		t.Errorf("a drag across the headers held right of the grid selected %+v, want every column", got)
 	}
 }
