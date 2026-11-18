@@ -5,6 +5,7 @@ import (
 	"image"
 	"math"
 	"os"
+	"slices"
 	"strings"
 
 	tsfont "github.com/go-text/typesetting/font"
@@ -70,6 +71,9 @@ type System struct {
 	masks   map[MaskKey]maskEntry
 	layouts map[layoutKey]*cachedLayout
 	frame   int
+	// layoutText and paraText are the bytes of text that the layouts and the
+	// paragraphs cached hold (see trimCaches).
+	layoutText, paraText int
 
 	raster  vector.Rasterizer
 	scratch *image.Alpha
@@ -167,6 +171,7 @@ func (sys *System) FontsChanged() {
 	clear(sys.reg.byRune)
 	clear(sys.layouts)
 	clear(sys.paras)
+	sys.layoutText, sys.paraText = 0, 0
 	clear(sys.ellipses)
 	clear(sys.faceSets)
 }
@@ -207,6 +212,22 @@ func (sys *System) LayoutRef(s string, st Style, spans []Span, maxWidth float32)
 		st.Weight = Regular
 	}
 	sk := spansKey(spans)
+	// A text whose lines wrap at the width has no use for its unconstrained
+	// layout, which would be a second layout of all of it at each change of a
+	// long text: its narrow layout is looked up, or it is made when the
+	// unconstrained one would be wider, which its paragraphs tell.
+	if st.MaxLines == 0 && !st.NoWrap && maxWidth < unbounded {
+		if _, ok := sys.layouts[layoutKey{s, st, float32(math.Inf(1)), sk}]; !ok {
+			if c, ok := sys.layouts[layoutKey{s, st, maxWidth, sk}]; ok {
+				c.lastUsed = sys.frame
+				return LayoutRef{l: c.l, narrow: c}
+			}
+			if w, _ := sys.naturalSize(s, st, spans); w > maxWidth {
+				narrow := sys.cached(s, st, spans, sk, maxWidth)
+				return LayoutRef{l: narrow.l, narrow: narrow}
+			}
+		}
+	}
 	// The unconstrained layout answers every width at or above its natural
 	// width, so look it up first.
 	full := sys.cached(s, st, spans, sk, float32(math.Inf(1)))
@@ -222,14 +243,53 @@ func (sys *System) LayoutRef(s string, st Style, spans []Span, maxWidth float32)
 // reports false when one of them has been dropped from the cache since, and then
 // the caller asks LayoutRef again.
 func (sys *System) Reuse(r LayoutRef) (*Layout, bool) {
-	if r.full == nil || r.full.evicted || r.narrow != nil && r.narrow.evicted {
+	if r.l == nil || r.full != nil && r.full.evicted || r.narrow != nil && r.narrow.evicted {
 		return nil, false
 	}
-	r.full.lastUsed = sys.frame
+	if r.full != nil {
+		r.full.lastUsed = sys.frame
+	}
 	if r.narrow != nil {
 		r.narrow.lastUsed = sys.frame
 	}
 	return r.l, true
+}
+
+// Size returns the width and height of LayoutSpans(s, st, spans, maxWidth).
+// For a text without MaxLines, it makes no layout that it does not already
+// have when the unconstrained one would answer: it takes the size from the
+// lines of the paragraphs. A field is measured at widths its text
+// fits in, and drawn at one it wraps at, and a long text that each edit
+// changes would be laid out unconstrained only to be measured.
+func (sys *System) Size(s string, st Style, spans []Span, maxWidth float32) (w, h float32) {
+	if st.Size <= 0 {
+		st.Size = 14
+	}
+	if st.Weight == 0 {
+		st.Weight = Regular
+	}
+	if st.MaxLines == 0 {
+		if st.NoWrap {
+			maxWidth = float32(math.Inf(1)) // one line for each paragraph, at any width
+		}
+		sk := spansKey(spans)
+		if c, ok := sys.layouts[layoutKey{s, st, float32(math.Inf(1)), sk}]; ok && c.l.Width <= maxWidth {
+			c.lastUsed = sys.frame
+			return c.l.Width, c.l.Height
+		} else if !ok {
+			if c, ok := sys.layouts[layoutKey{s, st, maxWidth, sk}]; ok {
+				c.lastUsed = sys.frame
+				return c.l.Width, c.l.Height
+			}
+			if w, h := sys.naturalSize(s, st, spans); w <= maxWidth {
+				return w, h
+			}
+			l := sys.cached(s, st, spans, sk, maxWidth).l
+			return l.Width, l.Height
+		}
+	}
+	l := sys.LayoutSpans(s, st, spans, maxWidth)
+	return l.Width, l.Height
 }
 
 // minContent is the width that asks build for the min-content layout of a text:
@@ -279,27 +339,89 @@ func (sys *System) cached(s string, st Style, spans []Span, sk string, maxWidth 
 	}
 	c := &cachedLayout{l: sys.build(s, st, spans, maxWidth), lastUsed: sys.frame}
 	sys.layouts[k] = c
+	sys.layoutText += len(s)
 	return c
 }
 
-// EndFrame evicts layouts that have not been used for a while. Call once per
-// rendered frame.
+// cacheTextBudget is how many bytes of text the layouts cached, and the
+// paragraphs cached, may each hold beyond those of the last cacheKeepFrames
+// frames. A layout takes some 60 bytes for each byte of its text, and each
+// edit of a long text makes new ones: without a limit, typing in a field that
+// holds a large paste kept a layout of all of it for each key, for the 240
+// frames a layout is kept, which ran a web page out of memory.
+const cacheTextBudget = 1 << 20
+
+// cacheKeepFrames is how many of the last frames trimCaches keeps all the
+// layouts of: the windows of an app share the text system, and each counts
+// its frames in it.
+const cacheKeepFrames = 2
+
+// EndFrame evicts layouts that have not been used for a while, and the oldest
+// ones when they hold more text than cacheTextBudget. Call once per rendered
+// frame.
 func (sys *System) EndFrame() {
 	sys.frame++
+	sys.trimCaches(cacheTextBudget)
 	if sys.frame%120 != 0 {
 		return
 	}
 	for k, c := range sys.layouts {
 		if sys.frame-c.lastUsed > 240 {
-			c.evicted = true
-			delete(sys.layouts, k)
+			sys.dropLayout(k, c)
 		}
 	}
 	for k, c := range sys.paras {
 		if sys.frame-c.lastUsed > 240 {
-			delete(sys.paras, k)
+			sys.dropPara(k)
 		}
 	}
+}
+
+func (sys *System) dropLayout(k layoutKey, c *cachedLayout) {
+	c.evicted = true
+	delete(sys.layouts, k)
+	sys.layoutText -= len(k.text)
+}
+
+func (sys *System) dropPara(k paraKey) {
+	delete(sys.paras, k)
+	sys.paraText -= len(k.text)
+}
+
+// trimCaches evicts the layouts and the paragraphs that were used longest ago,
+// and not in the last cacheKeepFrames frames, until each cache holds no more
+// than budget bytes of text.
+func (sys *System) trimCaches(budget int) {
+	before := sys.frame - cacheKeepFrames
+	if sys.layoutText > budget {
+		for _, k := range oldestFirst(sys.layouts, before, func(c *cachedLayout) int { return c.lastUsed }) {
+			if sys.layoutText <= budget {
+				break
+			}
+			sys.dropLayout(k, sys.layouts[k])
+		}
+	}
+	if sys.paraText > budget {
+		for _, k := range oldestFirst(sys.paras, before, func(c *cachedPara) int { return c.lastUsed }) {
+			if sys.paraText <= budget {
+				break
+			}
+			sys.dropPara(k)
+		}
+	}
+}
+
+// oldestFirst returns the keys of the entries of m whose last use (used) is
+// earlier than the frame numbered before, the least recently used first.
+func oldestFirst[K comparable, V any](m map[K]V, before int, used func(V) int) []K {
+	var keys []K
+	for k, v := range m {
+		if used(v) < before {
+			keys = append(keys, k)
+		}
+	}
+	slices.SortFunc(keys, func(a, b K) int { return used(m[a]) - used(m[b]) })
+	return keys
 }
 
 // Draw emits glyph sprites for l into sc. (x, y) is the top-left of the text
@@ -350,6 +472,38 @@ func (sys *System) DrawBackgrounds(sc *scene.Scene, l *Layout, x, y, boxWidth, s
 			}
 		}
 	}
+}
+
+// DrawBackgroundsLines is DrawBackgrounds for the lines of l from from up to to
+// only (see DrawRichLines).
+func (sys *System) DrawBackgroundsLines(sc *scene.Scene, l *Layout, from, to int, x, y, boxWidth, scale float32, align int, paint func(span int) RunPaint) {
+	if part := l.lineRange(from, to); part != nil {
+		sys.DrawBackgrounds(sc, part, x, y, boxWidth, scale, align, paint)
+	}
+}
+
+// DrawRichLines is DrawRich for the lines of l from from up to to only, such as
+// those of a long text that are in view (see Layout.LinesIn).
+func (sys *System) DrawRichLines(sc *scene.Scene, l *Layout, from, to int, x, y, boxWidth, scale float32, align int, paint func(span int) RunPaint) {
+	if part := l.lineRange(from, to); part != nil {
+		sys.DrawRich(sc, part, x, y, boxWidth, scale, align, paint)
+	}
+}
+
+// lineRange returns l with only its lines from from up to to, which keep their
+// places, as each has its own Top: l itself when that is all of them, and nil
+// when it is none.
+func (l *Layout) lineRange(from, to int) *Layout {
+	from, to = max(from, 0), min(to, len(l.Lines))
+	switch {
+	case from == 0 && to == len(l.Lines):
+		return l
+	case from >= to:
+		return nil
+	}
+	part := *l
+	part.Lines = l.Lines[from:to]
+	return &part
 }
 
 // DrawCache keeps the atlas entries of the glyphs of a text as a draw found them,

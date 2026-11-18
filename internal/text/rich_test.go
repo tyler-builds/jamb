@@ -1,6 +1,9 @@
 package text
 
 import (
+	"fmt"
+	"math"
+	"math/rand/v2"
 	"slices"
 	"strings"
 	"testing"
@@ -320,5 +323,118 @@ func TestSpansKeepBidiVisualOrder(t *testing.T) {
 				t.Errorf("bold span: run directions %v, want %v", runDirs(bold), runDirs(plain))
 			}
 		})
+	}
+}
+
+// A paragraph finds its own spans among all of the text's by search: the same
+// spans that touch it as a look through all of them finds, empty spans and
+// spans across its ends too. A text of many paragraphs, as a large paste is,
+// used to look through every span for each paragraph.
+func TestSpansInFindsTheSpansOfARange(t *testing.T) {
+	rng := rand.New(rand.NewPCG(3, 4))
+	for round := range 300 {
+		l := &Layout{}
+		pos := 0
+		for range rng.IntN(10) {
+			a := pos + rng.IntN(4)
+			b := a + rng.IntN(5) // may be empty
+			l.runeSpans = append(l.runeSpans, runeSpan{start: a, end: b})
+			pos = b
+		}
+		n := pos + 3
+		for start := 0; start <= n; start++ {
+			for end := start; end <= n; end++ {
+				var want, got []int
+				lo, hi := l.spansIn(start, end)
+				for i, sp := range l.runeSpans {
+					if max(sp.start, start) < min(sp.end, end) {
+						want = append(want, i)
+						if i >= lo && i < hi {
+							got = append(got, i)
+						}
+					}
+				}
+				if !slices.Equal(got, want) {
+					t.Fatalf("round %d: spans %+v, range [%d,%d): searched %d..%d, which has %v of %v",
+						round, l.runeSpans, start, end, lo, hi, got, want)
+				}
+			}
+		}
+	}
+}
+
+// Each of many paragraphs, each with its spans, is shaped in its spans' faces.
+func TestSpansOfManyParagraphs(t *testing.T) {
+	var sb strings.Builder
+	var spans []Span
+	for i := range 50 {
+		line := fmt.Sprintf("line %d has bold here\n", i)
+		at := sb.Len() + strings.Index(line, "bold")
+		spans = append(spans, Span{Start: at, End: at + 4, Weight: Bold})
+		sb.WriteString(line)
+	}
+	l := testSys.LayoutSpans(sb.String(), richStyle(), spans, inf)
+	bold := testSys.Registry().Font(FamilySans, Bold, false)
+	seen := map[int]bool{}
+	for _, ln := range l.Lines {
+		for _, r := range ln.Runs {
+			for _, g := range r.Glyphs {
+				if (r.Span >= 0) != (g.font == bold) {
+					t.Fatalf("a glyph of span %d is in the wrong face", r.Span)
+				}
+			}
+			if r.Span >= 0 {
+				seen[r.Span] = true
+			}
+		}
+	}
+	if len(seen) != len(spans) {
+		t.Errorf("%d of the %d spans have runs", len(seen), len(spans))
+	}
+}
+
+// Size gives the size of the layout LayoutSpans makes, and unconstrained it
+// gives it from the paragraphs without making that layout. A text that wraps
+// at the width it is laid out at is not laid out unconstrained as well.
+func TestSizeIsTheLayoutsSize(t *testing.T) {
+	texts := []string{
+		"", "one", "one\n", "\n\n", "one\ntwo words\n\nthree 😀 four\tfive\n",
+		"a long line of words that wraps at a narrow width but not when it is unconstrained",
+		strings.Repeat("a line of a long text\n", 300),
+	}
+	bold := func(s string) []Span {
+		if i := strings.Index(s, "words"); i >= 0 {
+			return []Span{{Start: i, End: i + 5, Weight: Bold}}
+		}
+		return nil
+	}
+	for _, st := range []Style{{Size: 14}, {Size: 16, LineHeight: 1.5}, {Size: 14, NoWrap: true}} {
+		for _, s := range texts {
+			for _, width := range []float32{float32(math.Inf(1)), 1e9, 120} {
+				sys := NewSystem()
+				w, h := sys.Size(s, st, bold(s), width)
+				l := NewSystem().LayoutSpans(s, st, bold(s), width)
+				if w != l.Width || h != l.Height {
+					t.Errorf("%d bytes in %+v at %v: size %v×%v, layout %v×%v", len(s), st, width, w, h, l.Width, l.Height)
+				}
+				if width >= 1e9 && len(sys.layouts) != 0 { // the text fits: its size is its paragraphs'
+					t.Errorf("%d bytes in %+v: the size made %d layouts", len(s), st, len(sys.layouts))
+				}
+			}
+		}
+	}
+
+	sys := NewSystem()
+	long := texts[len(texts)-2]
+	if sys.LayoutSpans(long, Style{Size: 14}, nil, 120) != sys.LayoutSpans(long, Style{Size: 14}, nil, 120) {
+		t.Error("a wrapped layout is not cached")
+	}
+	for k := range sys.layouts {
+		if k.width != 120 {
+			t.Errorf("a text that wraps at 120 was laid out at %v too", k.width)
+		}
+	}
+	if l := sys.LayoutSpans("short", Style{Size: 14}, nil, 120); l != sys.LayoutSpans("short", Style{Size: 14}, nil, 500) {
+		t.Error("a text that fits does not share its unconstrained layout between widths")
 	}
 }

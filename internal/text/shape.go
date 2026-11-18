@@ -159,6 +159,15 @@ func (l *Layout) spanAt(r int) int {
 	return -1
 }
 
+// spansIn returns the indices from lo up to hi of the spans that may touch
+// runes [start, end). Spans are sorted and do not overlap, so they are found by
+// search, and a paragraph costs its own spans, not all of the text's.
+func (l *Layout) spansIn(start, end int) (lo, hi int) {
+	lo = sort.Search(len(l.runeSpans), func(i int) bool { return l.runeSpans[i].end > start })
+	hi = lo + sort.Search(len(l.runeSpans)-lo, func(i int) bool { return l.runeSpans[lo+i].start >= end })
+	return lo, hi
+}
+
 const unbounded = 1 << 24
 
 // fontmap resolves the font for each rune: the primary font when it has the
@@ -192,22 +201,7 @@ func fx(v fixed.Int26_6) float32 { return float32(v) / 64 }
 
 // build shapes, wraps and positions s with spans. maxWidth may be +Inf.
 func (sys *System) build(s string, st Style, spans []Span, maxWidth float32) *Layout {
-	primary := sys.reg.Font(st.Family, st.Weight, st.Italic)
-	scale := st.Size / primary.upem
-	l := &Layout{Text: s, Style: st}
-	l.Ascent = primary.ascent * scale
-	natural := (primary.ascent + primary.descent) * scale
-	l.LineHeight = natural
-	if st.LineHeight > 0 {
-		l.LineHeight = st.LineHeight * st.Size
-	}
-	l.runes = []rune(s)
-	l.byteOf = make([]int, 0, len(l.runes)+1)
-	for i := range s {
-		l.byteOf = append(l.byteOf, i)
-	}
-	l.byteOf = append(l.byteOf, len(s))
-	l.setSpans(spans)
+	l, primary, natural := sys.newLayout(s, st, spans)
 
 	wrapW := maxWidth
 	if st.NoWrap && st.MaxLines == 0 || math.IsInf(float64(wrapW), 1) || wrapW > unbounded {
@@ -255,6 +249,56 @@ func (sys *System) build(s string, st Style, spans []Span, maxWidth float32) *La
 	return l
 }
 
+// newLayout returns a layout of s with no lines yet, its primary font, and the
+// natural height of a line in it.
+func (sys *System) newLayout(s string, st Style, spans []Span) (l *Layout, primary *Font, natural float32) {
+	primary = sys.reg.Font(st.Family, st.Weight, st.Italic)
+	scale := st.Size / primary.upem
+	l = &Layout{Text: s, Style: st}
+	l.Ascent = primary.ascent * scale
+	natural = (primary.ascent + primary.descent) * scale
+	l.LineHeight = natural
+	if st.LineHeight > 0 {
+		l.LineHeight = st.LineHeight * st.Size
+	}
+	l.runes = []rune(s)
+	l.byteOf = make([]int, 0, len(l.runes)+1)
+	for i := range s {
+		l.byteOf = append(l.byteOf, i)
+	}
+	l.byteOf = append(l.byteOf, len(s))
+	l.setSpans(spans)
+	return l, primary, natural
+}
+
+// naturalSize returns the width and height of the unconstrained layout of s,
+// as build makes it, from the lines of its paragraphs, which it shapes and
+// caches as build does, without making the layout. st has no MaxLines.
+func (sys *System) naturalSize(s string, st Style, spans []Span) (w, h float32) {
+	l, primary, _ := sys.newLayout(s, st, spans)
+	size := fixed.Int26_6(st.Size*64 + 0.5)
+	lines := 0
+	for start := 0; ; {
+		end := start
+		for end < len(l.runes) && l.runes[end] != '\n' {
+			end++
+		}
+		if end == start {
+			lines++
+		} else {
+			for _, ln := range sys.paragraph(l, primary, size, start, end, unbounded).lines {
+				w = max(w, ln.Width)
+				lines++
+			}
+		}
+		if end >= len(l.runes) {
+			break
+		}
+		start = end + 1
+	}
+	return w, float32(max(lines, 1)) * l.LineHeight
+}
+
 type paraKey struct {
 	text  string
 	font  *Font
@@ -268,9 +312,10 @@ type cachedPara struct {
 	lastUsed int
 }
 
-// cachedParagraph appends the lines of paragraph [start, end), shaping it
-// only if this text, font, size, width and spans have not been seen recently.
-func (sys *System) cachedParagraph(l *Layout, primary *Font, size fixed.Int26_6, start, end int, wrapW float32) []Line {
+// paragraph returns the cached lines of paragraph [start, end) of l, with rune
+// indices relative to its start, shaping it only if this text, font, size,
+// width and spans have not been seen recently.
+func (sys *System) paragraph(l *Layout, primary *Font, size fixed.Int26_6, start, end int, wrapW float32) *cachedPara {
 	k := paraKey{string(l.runes[start:end]), primary, size, wrapW, paraSpanKey(l, start, end)}
 	c, ok := sys.paras[k]
 	if !ok {
@@ -279,9 +324,16 @@ func (sys *System) cachedParagraph(l *Layout, primary *Font, size fixed.Int26_6,
 		sys.wrapParagraph(scratch, 0, end-start, size, wrapW, sys.pieces(l, start, end))
 		c = &cachedPara{lines: scratch.Lines}
 		sys.paras[k] = c
+		sys.paraText += len(k.text)
 	}
 	c.lastUsed = sys.frame
-	for _, ln := range c.lines {
+	return c
+}
+
+// cachedParagraph appends the lines of paragraph [start, end), shaping it
+// only if this text, font, size, width and spans have not been seen recently.
+func (sys *System) cachedParagraph(l *Layout, primary *Font, size fixed.Int26_6, start, end int, wrapW float32) []Line {
+	for _, ln := range sys.paragraph(l, primary, size, start, end, wrapW).lines {
 		ln.RuneStart += start
 		ln.RuneEnd += start
 		runs := make([]Run, len(ln.Runs))
@@ -313,7 +365,8 @@ func paraSpanKey(l *Layout, start, end int) string {
 		return ""
 	}
 	var b strings.Builder
-	for _, sp := range l.runeSpans {
+	lo, hi := l.spansIn(start, end)
+	for _, sp := range l.runeSpans[lo:hi] {
 		if sp.start >= end || sp.end <= sp.start || sp.end <= start {
 			continue
 		}
@@ -337,7 +390,9 @@ func (sys *System) pieces(l *Layout, start, end int) []piece {
 	plain := sys.reg.Font(st.Family, st.Weight, st.Italic)
 	var out []piece
 	pos := start
-	for i, sp := range l.runeSpans {
+	lo, hi := l.spansIn(start, end)
+	for i := lo; i < hi; i++ {
+		sp := l.runeSpans[i]
 		a, b := max(sp.start, start), min(sp.end, end)
 		if a >= b {
 			continue
@@ -787,6 +842,14 @@ func (l *Layout) LineOf(pos int) int {
 		}
 	}
 	return max(len(l.Lines)-1, 0)
+}
+
+// LinesIn returns the lines of l that lie at least in part between top and
+// bottom, measured down from its top, as the indices from from up to to.
+func (l *Layout) LinesIn(top, bottom float32) (from, to int) {
+	from = sort.Search(len(l.Lines), func(i int) bool { return l.Lines[i].Top+l.LineHeight > top })
+	to = from + sort.Search(len(l.Lines)-from, func(i int) bool { return l.Lines[from+i].Top >= bottom })
+	return from, to
 }
 
 // LineBounds returns the byte range [start, end) of line i, excluding a

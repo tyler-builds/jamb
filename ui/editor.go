@@ -78,6 +78,7 @@ type editState struct {
 	marksV   string
 	marksSet bool
 	hid      [][2]int
+	present  presentCache
 
 	// From the last paint, for hit testing. While a composition shows, the
 	// layout is of the text with the composition in it. drawn is what the
@@ -235,12 +236,14 @@ func (n *node) measureEditor(maxWidth float32) (float32, float32) {
 		pr := n.rt.presentDrawn(n, v)
 		v, spans = pr.shown, pr.spans
 	}
-	w := maxWidth
+	// Lines wrap where paintEditor wraps them, a hair past the width, so that
+	// the layout measured is the one painted: a long text is laid out once.
+	w := maxWidth + 0.01
 	if !e.multiline {
 		w = float32(math.Inf(1))
 	}
-	l := n.rt.text.LayoutSpans(v, e.textStyle(n), spans, w)
-	return l.Width + 2, l.Height // room for the caret at the end
+	lw, lh := n.rt.text.Size(v, e.textStyle(n), spans, w)
+	return lw + 2, lh // room for the caret at the end
 }
 
 // buildEditor realizes an editor element. Its handlers live on a synthetic
@@ -746,16 +749,28 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 	// Cut and Copy are of what shows.
 	selected := (focused || rt.menuHeld == n.id) && !composing && es.hasSelection() &&
 		(!e.selection.IsZero() || !e.selectionText.IsZero())
+	// What is out of view is not drawn: only the lines in view, and a line more
+	// on either side for glyphs that reach past their line. A long text that
+	// scrolls in the field, such as a large paste, would otherwise send all of
+	// its glyphs to the renderer in each frame.
+	cull := rt.unculled == 0 && !rt.inGhost
+	inView := func(r text.Rect) bool {
+		return !cull || cy+r.Y < n.clip.Y+n.clip.H && cy+r.Y+r.H > n.clip.Y
+	}
+	from, to := 0, len(l.Lines)
+	if cull {
+		from, to = l.LinesIn(n.clip.Y-cy-l.LineHeight, n.clip.Y+n.clip.H-cy+l.LineHeight)
+	}
 	if shown != "" && len(spans) > 0 {
 		// The backgrounds of the marks go under the selection, the glyphs over it.
-		rt.text.DrawBackgrounds(&rt.scene, l, tx, cy, cw, rt.scale, 0, func(i int) text.RunPaint { return pr.runPaint(i, fg, opacity) })
+		rt.text.DrawBackgroundsLines(&rt.scene, l, from, to, tx, cy, cw, rt.scale, 0, func(i int) text.RunPaint { return pr.runPaint(i, fg, opacity) })
 	}
 	if selected {
 		a, b := es.selection()
 		sel := e.selection.Alpha(opacity)
 		rt.selRects = l.SelectionRects(pos(a), pr.endShown(b), rt.selRects[:0])
 		for _, r := range rt.selRects {
-			if !e.selection.IsZero() {
+			if !e.selection.IsZero() && inView(r) {
 				rt.scene.AddQuad(scene.Quad{
 					Bounds:     rt.px(scene.Rect{X: tx + r.X, Y: cy + r.Y, W: r.W, H: r.H}),
 					Background: sel.scene(),
@@ -783,21 +798,25 @@ func (rt *Runtime) paintEditor(n *node, x, y, w float32, fg Color, opacity float
 			rt.text.Draw(&rt.scene, pl, tx, cy, cw, rt.scale, 0, pc.Alpha(opacity).scene())
 		}
 	} else {
+		paint := func(i int) text.RunPaint { return text.RunPaint{Color: fg.Alpha(opacity).scene()} }
 		if len(spans) > 0 {
-			rt.text.DrawRich(&rt.scene, l, tx, cy, cw, rt.scale, 0, func(i int) text.RunPaint {
+			paint = func(i int) text.RunPaint {
 				p := pr.runPaint(i, fg, opacity)
-				p.Background = scene.Color{}
+				p.Background = scene.Color{} // drawn under the selection, above
 				return p
-			})
-		} else {
-			rt.text.Draw(&rt.scene, l, tx, cy, cw, rt.scale, 0, fg.Alpha(opacity).scene())
+			}
 		}
+		rt.text.DrawRichLines(&rt.scene, l, from, to, tx, cy, cw, rt.scale, 0, paint)
 		if selected && !e.selectionText.IsZero() {
 			// The selected text is drawn again over its background, clipped to the
 			// selection, in the selection's text color (HighlightText under high contrast).
+			sel := func(int) text.RunPaint { return text.RunPaint{Color: e.selectionText.Alpha(opacity).scene()} }
 			for _, r := range rt.selRects {
+				if !inView(r) {
+					continue
+				}
 				rt.scene.PushClip(rt.px(scene.Rect{X: tx + r.X, Y: cy + r.Y, W: r.W, H: r.H}))
-				rt.text.Draw(&rt.scene, l, tx, cy, cw, rt.scale, 0, e.selectionText.Alpha(opacity).scene())
+				rt.text.DrawRichLines(&rt.scene, l, from, to, tx, cy, cw, rt.scale, 0, sel)
 				rt.scene.PopClip()
 			}
 		}

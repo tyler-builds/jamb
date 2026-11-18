@@ -31,7 +31,7 @@ type TextMark struct {
 // cleanMarks returns marks with their ranges inside v and on rune boundaries,
 // and leaves out empty ones.
 func cleanMarks(marks []TextMark, v string) []TextMark {
-	out := marks[:0:0]
+	out := make([]TextMark, 0, len(marks))
 	for _, m := range marks {
 		m.Start, m.End = clampToRune(v, m.Start), clampToRune(v, m.End)
 		if m.End <= m.Start {
@@ -93,7 +93,22 @@ func (rt *Runtime) presentDrawn(n *node, v string) presented {
 	a, b := es.selection()
 	hide := hiddenSyntax(es.marksOf(e, v), rt.focusID == n.id, a, b)
 	es.hid = hide
-	return presentMarks(v, es.marks, hide)
+	// A frame lays the field out and paints it, and asks more than once; what
+	// it draws changes only with the value, its marks and what they hide.
+	if p := &es.present; !p.ok || p.v != v || !slices.Equal(p.marks, es.marks) || !equalRanges(p.hide, hide) {
+		*p = presentCache{v: v, marks: es.marks, hide: hide, drawn: presentMarks(v, es.marks, hide), ok: true}
+	}
+	return es.present.drawn
+}
+
+// presentCache is what presentDrawn last made of a value, its marks and the
+// syntax they hide.
+type presentCache struct {
+	v     string
+	marks []TextMark
+	hide  [][2]int
+	drawn presented
+	ok    bool
 }
 
 // marksChanged notes a change of what a field with marks hides, after its caret,
@@ -151,9 +166,27 @@ func presentMarks(v string, marks []TextMark, hide [][2]int) presented {
 	}
 	slices.Sort(bounds)
 	bounds = slices.Compact(bounds)
-	removed, h := 0, 0
+	// The pieces between bounds go in order, and each is covered by the marks
+	// that start at or before it and end after its start: active, by their
+	// place in marks, so that they combine in that order. Marks are taken in
+	// order of where they start, so that each piece looks only at the few marks
+	// over it, however many the text has.
+	byStart := make([]int, len(marks))
+	for i := range byStart {
+		byStart[i] = i
+	}
+	slices.SortStableFunc(byStart, func(a, b int) int { return marks[a].Start - marks[b].Start })
+	var active []int
+	removed, h, next := 0, 0, 0
 	for i := 0; i+1 < len(bounds); i++ {
 		x, y := bounds[i], bounds[i+1]
+		active = slices.DeleteFunc(active, func(k int) bool { return marks[k].End <= x })
+		for ; next < len(byStart) && marks[byStart[next]].Start <= x; next++ {
+			if k := byStart[next]; marks[k].End > x {
+				at, _ := slices.BinarySearch(active, k)
+				active = slices.Insert(active, at, k)
+			}
+		}
 		for h < len(hide) && hide[h][1] <= x {
 			h++
 		}
@@ -162,10 +195,8 @@ func presentMarks(v string, marks []TextMark, hide [][2]int) presented {
 			continue
 		}
 		var hl Highlight
-		for _, m := range marks {
-			if m.Start <= x && y <= m.End {
-				hl = hl.over(m.Style)
-			}
+		for _, k := range active {
+			hl = hl.over(marks[k].Style) // the piece is all inside the mark: its end is a bound
 		}
 		if hl == (Highlight{}) {
 			continue
