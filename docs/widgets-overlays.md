@@ -237,8 +237,9 @@ ui.If(open.Get(), ui.Modal("New project", form).
 - Menus, popups and tooltips opened from inside the modal are drawn above it. Of
   two open modals, the one opened last is on top and takes the input, wherever each
   is declared; a press in it does not close the one under it.
-- Assistive technology finds the dialog as a child of the window, after the
-  window's other content, wherever it is declared.
+- Assistive technology finds the dialog as a child of the window, after the app's
+  other content, wherever it is declared (the default title bar's buttons, when the
+  window has one, come after it). Several dialogs keep their order in the tree.
 - Focus moves into the modal when it opens: to the first field of the body that
   Tab reaches, else to the default button. Tab and Shift+Tab cycle through the
   modal only. When the modal closes, focus returns to the element that had it,

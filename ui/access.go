@@ -553,6 +553,22 @@ func (rt *Runtime) setExpandedFrom(n *node, open bool) {
 	rt.clickNode(n)
 }
 
+// flushHoisted appends to kids the IDs of the dialogs found so far outside any
+// other dialog, in tree order, and forgets them. A dialog covers the window, so it
+// is read after the app's content wherever it is declared: the root element's
+// children list the app's content, then its dialogs, then the host's layers (see
+// SetHostLayer), whose own dialogs come last.
+func (b *accessBuilder) flushHoisted(kids []access.ID) []access.ID {
+	for len(b.hoisted) > 0 {
+		n := b.hoisted[0]
+		b.hoisted = b.hoisted[1:]
+		b.hoist = n
+		kids = append(kids, b.emit(n, false)...)
+	}
+	b.hoist = nil
+	return kids
+}
+
 // scrollContainer returns the nearest scroll container above n, or nil. The
 // search ends at a dialog's cover: what the dialog is declared in is behind it.
 func scrollContainer(n *node) *node {
@@ -642,9 +658,9 @@ type accessBuilder struct {
 	// issues holds the problem found with an element while it was built, one
 	// message per element, reported with the other warnings.
 	issues map[access.ID]string
-	// hoisted holds the dialogs found below the root's children and outside any
-	// other dialog, which are emitted as children of the window; hoist is the one
-	// being emitted.
+	// hoisted holds the dialogs found outside any other dialog and not yet
+	// emitted, which are placed after the app's content (see flushHoisted); hoist
+	// is the one being emitted.
 	hoisted []*node
 	hoist   *node
 }
@@ -678,14 +694,11 @@ func (rt *Runtime) buildAccessIssues() (*access.Tree, map[access.ID]accessTarget
 			b.byID[id].Parent = access.RootID
 			root.Children = append(root.Children, id)
 		}
-		// The dialogs declared deeper in the tree are children of the window, after
-		// its other children, as they cover the window (see placeCover).
-		for _, n := range b.hoisted {
-			b.hoist = n
-			for _, id := range b.emit(n, false) {
-				b.byID[id].Parent = access.RootID
-				root.Children = append(root.Children, id)
-			}
+		// The dialogs are placed among the root element's children (see
+		// flushHoisted); any left, under a root that lists no children, follow them.
+		for _, id := range b.flushHoisted(nil) {
+			b.byID[id].Parent = access.RootID
+			root.Children = append(root.Children, id)
 		}
 	}
 	for _, r := range b.rels {
@@ -790,7 +803,7 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 	if d == nil || d.noDisplay || (d.acc != nil && d.acc.hidden) {
 		return nil
 	}
-	if n.covers() && n != b.hoist && n.parent != b.rt.tree && enclosingCover(n.parent) == nil {
+	if n.covers() && n != b.hoist && enclosingCover(n.parent) == nil {
 		b.hoisted = append(b.hoisted, n)
 		return nil
 	}
@@ -805,7 +818,13 @@ func (b *accessBuilder) emit(n *node, absorbed bool) []access.ID {
 	absorbs := ok && absorbsText(role)
 	var kids []access.ID
 	for _, c := range n.children {
+		if n == b.rt.tree && b.rt.isLayerRoot(c) {
+			kids = b.flushHoisted(kids)
+		}
 		kids = append(kids, b.emit(c, absorbed || absorbs)...)
+	}
+	if n == b.rt.tree {
+		kids = b.flushHoisted(kids)
 	}
 	if !ok {
 		if d.acc != nil && d.acc.details != "" {

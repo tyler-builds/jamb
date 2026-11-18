@@ -2,6 +2,7 @@ package ui_test
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 	"time"
 
@@ -184,8 +185,9 @@ func TestModalFocusWhereverDeclared(t *testing.T) {
 	}
 }
 
-// The accessibility tree has the modal as a dialog of the window, wherever it is
-// declared, and the window's elements stay in it as they are.
+// The accessibility tree has the modal as a dialog of the window, after the
+// window's other content, wherever it is declared, and the window's elements stay
+// in it as they are.
 func TestModalAccessWhereverDeclared(t *testing.T) {
 	for _, place := range placements {
 		u, _ := openCover(t, place, false)
@@ -200,6 +202,9 @@ func TestModalAccessWhereverDeclared(t *testing.T) {
 		if dialog == nil || dialog.Parent != access.RootID {
 			t.Errorf("%s: the dialog is not a child of the window: %+v", place, dialog)
 			continue
+		}
+		if kids := tree.Node(access.RootID).Children; kids[len(kids)-1] != dialog.ID {
+			t.Errorf("%s: the dialog is not the last of the window's children: %v, dialog %v", place, kids, dialog.ID)
 		}
 		if !u.ByRole(access.RoleToolBar, "Main").HasRole(access.RoleButton, "New Query") {
 			t.Errorf("%s: the toolbar's button left the toolbar", place)
@@ -447,6 +452,18 @@ func TestModalUnderDefaultTitleBar(t *testing.T) {
 		p := u.ByRole(access.RoleDialog, "Connect to Server").Bounds()
 		if cy := p.Y + p.H/2; abs(cy-(top+(500-top)/2)) > 1 {
 			t.Errorf("%s: the panel is centered at y %v, want the middle of the window under the title bar", place, cy)
+		}
+		// The dialog is read after the app's content and before the title bar's
+		// buttons, as a modal declared last in the root was.
+		var order []string
+		tree := u.Tree()
+		for _, id := range tree.Node(access.RootID).Children {
+			if n := tree.Node(id); n.Name == "Ready" || n.Name == "Connect to Server" || n.Name == "Minimize" {
+				order = append(order, n.Name)
+			}
+		}
+		if want := []string{"Ready", "Connect to Server", "Minimize"}; !slices.Equal(order, want) {
+			t.Errorf("%s: the window's children are in the order %q, want %q", place, order, want)
 		}
 	}
 }
