@@ -10,8 +10,9 @@ type Canvas struct {
 	states []state
 	layers []layer
 	r      rasterizer
-	cov    []float32
-	sh     shader // the shader of the fill being drawn (see draw)
+	cov    []float32 // the coverage of the fill being drawn; all 0 between fills
+	sh     shader    // the shader of the fill being drawn (see draw)
+	spare  []*mask   // masks no state holds, to reuse
 	// Tolerance is how far, in pixels, flattened curves may stray; 0 means
 	// 0.05, which loses no visible area to the straight segments.
 	Tolerance float32
@@ -19,8 +20,22 @@ type Canvas struct {
 
 type state struct {
 	m     Matrix
-	clip  []float32 // coverage of the clip, w*h; nil when nothing is clipped
+	clip  *mask // nil when nothing is clipped
 	alpha float32
+}
+
+// mask is the coverage of a clip within its bounds, x0..x1 by y0..y1 in
+// pixels; outside them it is 0. A state holds the mask it clipped to, and those
+// above it hold the same one until they clip again.
+type mask struct {
+	x0, y0, x1, y1 int
+	cov            []float32 // (x1-x0)*(y1-y0) values, row by row
+}
+
+// at returns the row of m at y, which lies within its bounds, from x0 to x1.
+func (m *mask) at(y int) []float32 {
+	w := m.x1 - m.x0
+	return m.cov[(y-m.y0)*w : (y-m.y0+1)*w]
 }
 
 type layer struct {
@@ -45,6 +60,12 @@ func (c *Canvas) Reset(w, h int) {
 		c.cov = make([]float32, w*h)
 	} else {
 		clear(c.img.Pix)
+	}
+	for len(c.states) > 1 {
+		c.pop()
+	}
+	if len(c.states) > 0 && c.states[0].clip != nil {
+		c.spare = append(c.spare, c.states[0].clip)
 	}
 	c.states = append(c.states[:0], state{m: Identity, alpha: 1})
 	c.layers = c.layers[:0]
@@ -81,7 +102,24 @@ func (c *Canvas) Restore() {
 	for n := len(c.layers); n > 0 && c.layers[n-1].depth >= len(c.states)-1; n = len(c.layers) {
 		c.PopLayer()
 	}
-	c.states = c.states[:len(c.states)-1]
+	c.pop()
+}
+
+// pop drops the top state, of two or more, keeping its mask to reuse when the
+// state below does not hold it too.
+func (c *Canvas) pop() {
+	n := len(c.states)
+	if m := c.states[n-1].clip; m != nil && m != c.states[n-2].clip {
+		c.spare = append(c.spare, m)
+	}
+	c.states = c.states[:n-1]
+}
+
+// owns reports whether the top state made its own clip, which no state below it
+// holds.
+func (c *Canvas) owns() bool {
+	n := len(c.states)
+	return c.states[n-1].clip != nil && (n == 1 || c.states[n-1].clip != c.states[n-2].clip)
 }
 
 // Transform applies m before the current transform, so later drawing is in
@@ -101,14 +139,69 @@ func (c *Canvas) SetAlpha(a float32) { c.top().alpha *= min(max(a, 0), 1) }
 // within the current clip.
 func (c *Canvas) Clip(p *Path, rule FillRule) {
 	w, h := c.img.Rect.Dx(), c.img.Rect.Dy()
-	mask := make([]float32, w*h)
-	c.r.fill(c.polys(p, nil), rule, w, h, mask)
-	if old := c.top().clip; old != nil {
-		for i := range mask {
-			mask[i] *= old[i]
+	st := c.top()
+	old := st.clip
+	top, bottom := 0, h
+	if old != nil {
+		top, bottom = old.y0, old.y1
+	}
+	var y0, y1 int
+	if top < bottom {
+		y0, y1 = c.r.fill(c.polys(p, nil), rule, w, h, top, bottom, c.cov)
+	}
+	// The mask's bounds are those of what p covers, within the old mask's:
+	// outside them the coverage of p or the old mask is 0, and so is their product.
+	rows := c.r.rows
+	x0, my0, x1, my1 := w, y1, 0, y0
+	for y := y0; y < y1; y++ {
+		if sp := rows[y-y0]; sp.x0 < sp.x1 {
+			x0, x1 = min(x0, int(sp.x0)), max(x1, int(sp.x1))
+			my0, my1 = min(my0, y), y+1
 		}
 	}
-	c.top().clip = mask
+	if old != nil {
+		x0, x1 = max(x0, old.x0), min(x1, old.x1)
+	}
+	if x0 >= x1 || my0 >= my1 {
+		x0, my0, x1, my1 = 0, 0, 0, 0
+	}
+	m := c.newMask(x0, my0, x1, my1)
+	for y := my0; y < my1; y++ {
+		row := m.at(y)
+		copy(row, c.cov[y*w+x0:y*w+x1])
+		if old != nil {
+			o := old.at(y)[x0-old.x0 : x1-old.x0]
+			for i := range row {
+				row[i] *= o[i]
+			}
+		}
+	}
+	for y := y0; y < y1; y++ {
+		sp := rows[y-y0]
+		clear(c.cov[y*w+int(sp.x0) : y*w+int(sp.x1)]) // leave c.cov zeroed
+	}
+	if c.owns() {
+		c.spare = append(c.spare, old)
+	}
+	st.clip = m
+}
+
+// newMask returns a mask of the bounds x0..x1 by y0..y1, reusing a spare one,
+// with its coverage left for the caller to set.
+func (c *Canvas) newMask(x0, y0, x1, y1 int) *mask {
+	var m *mask
+	if n := len(c.spare); n > 0 {
+		m, c.spare = c.spare[n-1], c.spare[:n-1]
+	} else {
+		m = &mask{}
+	}
+	m.x0, m.y0, m.x1, m.y1 = x0, y0, x1, y1
+	n := (x1 - x0) * (y1 - y0)
+	if cap(m.cov) < n {
+		m.cov = make([]float32, n)
+	}
+	m.cov = m.cov[:n]
+	return m
 }
 
 // PushLayer starts a layer: drawing goes into it until PopLayer (or the
@@ -192,7 +285,15 @@ func (c *Canvas) draw(polys [][]Point, paint Paint, rule FillRule) {
 	}
 	dst := c.target()
 	w, h := dst.Rect.Dx(), dst.Rect.Dy()
-	y0, y1 := c.r.fill(polys, rule, w, h, c.cov)
+	clip := st.clip
+	top, bottom := 0, h
+	if clip != nil {
+		top, bottom = clip.y0, clip.y1
+		if top >= bottom {
+			return // the clip covers nothing
+		}
+	}
+	y0, y1 := c.r.fill(polys, rule, w, h, top, bottom, c.cov)
 	// An opaque solid color that fully covers a pixel replaces what is under it. The
 	// blend below then keeps none of the pixel, so its bytes are the color's, and
 	// the pixel is written directly: it gives the same bytes as the blend does.
@@ -203,14 +304,27 @@ func (c *Canvas) draw(polys [][]Point, paint Paint, rule FillRule) {
 		px[k] = uint8(min(sh.solid[k]+0.5, 255))
 	}
 	for y := y0; y < y1; y++ {
+		sp := c.r.rows[y-y0]
+		lo, hi := int(sp.x0), int(sp.x1)
+		if lo >= hi {
+			continue
+		}
 		row := c.cov[y*w : (y+1)*w]
-		for x, cv := range row {
+		// Only the pixels fill set can be covered, and of them only those in the
+		// clip's bounds drawn.
+		xa, xb := lo, hi
+		var cl []float32
+		if clip != nil {
+			xa, xb = max(lo, clip.x0), min(hi, clip.x1)
+			cl = clip.at(y)
+		}
+		for x := xa; x < xb; x++ {
+			cv := row[x]
 			if cv == 0 {
 				continue
 			}
-			row[x] = 0 // leave the buffer zeroed for the next fill
-			if st.clip != nil {
-				cv *= st.clip[y*w+x]
+			if cl != nil {
+				cv *= cl[x-clip.x0]
 				if cv == 0 {
 					continue
 				}
@@ -233,5 +347,6 @@ func (c *Canvas) draw(polys [][]Point, paint Paint, rule FillRule) {
 				p[k] = uint8(min(src[k]*cv+float32(p[k])*keep+0.5, 255))
 			}
 		}
+		clear(row[lo:hi]) // leave the buffer zeroed for the next fill
 	}
 }
