@@ -58,3 +58,19 @@ func BenchmarkDataGridCopy100k(b *testing.B) {
 		b.Fatalf("the copy is %d bytes", len(s))
 	}
 }
+
+// TestDataGridCopyLeavesOutClosedTreeRows checks that a copy of every cell of a tree has
+// the rows shown, in their order, and not the rows of a closed group.
+func TestDataGridCopyLeavesOutClosedTreeRows(t *testing.T) {
+	r := newAccessRig(func(ctx *Context) Element {
+		return DataGrid(dgProcTree(), func(x dgProc) string { return x.ID }, dgProcColumns()...).Label("Processes").
+			Children(func(x dgProc) []dgProc { return x.Kids }).Expanded(NewSignal([]string{"g1"})).
+			CellRanges(SelectionMultiple, NewSignal([]CellRange{{Rows: KeySet{All: true}, Columns: KeySet{All: true}}}))
+	})
+	focusNode(r, dgBody(t, r))
+	r.press(input.KeyC, input.ModCtrl)
+	want := "chrome\t300\r\ntab a\t100\r\ntab b\t200\r\nzsh\t50\r\nleaf\t10"
+	if s, _ := r.rt.clipboard(); s != want {
+		t.Errorf("Ctrl+C copied %q, want %q", s, want)
+	}
+}
