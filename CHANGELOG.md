@@ -9,6 +9,130 @@ them in here.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-18
+
+The `jamb` command is released with it as `cmd/jamb/v0.4.4`, with the short forms of `jamb ctl clock`
+(`clock +500`, `settle`, `seek` and `live`) from 0.8.4 and the executable's name below.
+
+### Added
+
+- `Div.OnResize(fn)` reports the size of an element's content box when it is first laid out and
+  each time it changes. What `fn` sets is built and laid out before the frame is painted, so a view
+  drawn on a canvas never shows the rows of the size before.
+- `ctx.MeasureText(s, format)` measures canvas text in a render, with the same result as
+  `Painter.MeasureText`, to size a grid's columns before it is drawn.
+- `Painter.PixelScale()` and `Painter.Snap(x, y)` draw lines that are crisp at any display scale:
+  docs/drawing.md shows a 1 px line that stays on one row of pixels at 125%.
+- `Div.CanvasKey(key)` keeps a canvas's drawing while the key is unchanged, instead of drawing
+  again on each render of its component. It panics on a key that cannot be compared.
+- `codeedit.CompletionList.KeepOrder` keeps a provider's ranking: typing filters the items but no
+  longer puts the ones that start with the typed word first.
+- `DataGrid.CellRanges` keeps a grid's cell selection as blocks of cells (`ui.CellRange`, `ui.KeySet`): whole rows, whole columns and rectangles together. Ctrl+A, Ctrl+Space and Shift+Space add one range whatever the number of rows, so Ctrl+A on 100,000 rows of 4 columns takes 0.4 ms and 0.4 MB, where it took 49 ms and 38 MB.
+- Ctrl+Shift with a click or a move extends a cell selection from the anchor and keeps the rest of it, and Shift extends whole columns after Ctrl+Space and whole rows after Shift+Space.
+- A `DataGrid` copies its selection: Ctrl+C (and Ctrl+Insert) puts it on the clipboard as tab-separated text that spreadsheets paste into cells, and Ctrl+Shift+C puts the columns' headers first. The rows and columns are copied as shown (moved, pinned, sorted and filtered), a selection that is not a rectangle keeps each cell under its column, and cells with tabs, line breaks or quotes are quoted. The keys are the actions `actions.GridCopy` and `actions.GridCopyWithHeaders` (`ui.DataGridActions`), bound in the `DataGrid` key context. They do not run while a control or an editor in a cell has focus (its cell has the context `DataGridCell`), so the control's own keys win. `DataColumn.CopyText`, `DataGrid.CopyText` and `DataGridHandle.Copy` change the text or copy from code.
+- `DataGrid.RowHeaders` shows a header with the row's number at the start of each row, and a corner that selects every cell. A click on a row's header selects the row, Ctrl+click adds or removes it, Shift+click extends, and a drag down the headers selects the rows it crosses. The keys reach the headers: Left from the first column, then Space, Shift+Up and Shift+Down; Up from the first row's header reaches the corner. Row headers are header items of their rows for assistive technology.
+- `DataGrid.HeaderSelects` makes a click on a column's header select the column in a grid that selects cells, with Ctrl, Shift and drags as for the rows; the sort moves to the header's arrow and to Enter. The default is unchanged: a header click sorts.
+- A drag over the cells of a grid that selects cells selects the rectangle it covers. A drag of a selection (over the cells, down the row headers or across the column headers) held past an edge of the rows in view scrolls the rows or columns toward the pointer and selects what comes into view.
+- `DataGridStyle` has the parts `RowHeader`, `RowHeaderSelected`, `HeaderCellSelected` and `Corner`.
+- `AccessCell(row, 0)` on a header item makes it the header of the row, which the Windows Table pattern reports as a row header.
+- `TextInputElement.Mono` and `TextAreaElement.Mono` show a field's text in the monospace
+  font, as `TextElement.Mono` does. Each is the same as
+  `Styles(ui.FieldStyle{Text: ui.Style{FontFamily: "mono"}})`.
+- `input.KeyPause`, the Pause/Break key, on Windows, Linux and the web. Bindings name it `pause`,
+  or `break` (`ui.Bind("alt+break", cancel)`), and menus show it as Pause. Ctrl+Pause, which
+  Windows and Linux report as Break, is `KeyPause` with Ctrl held.
+- `Binding.Primary` marks the binding that menus, tooltips and the command palette show for an
+  action bound to several keys. `KeysFor` shows a primary binding where its context applies,
+  and otherwise the binding added last, as before.
+- `ctx.HasToaster()` reports whether the window has a `Toaster` mounted, and re-renders the
+  component when the first one is mounted or the last one removed.
+- `ctx.Focused()` reports whether the component's element has focus, however it got it.
+  `FocusHandle.Focused` re-renders a component that reads it in its render when it changes, and
+  the new `FocusHandle.FocusWithin` reports focus on the element or inside it, the same way.
+- `uitest`: `Element.ClickWith(mods)`, `Element.ClickAt(dx, dy, mods...)` and
+  `UI.ClickAt(x, y, mods...)` click with modifiers held or at a point, as `Click` does.
+- `Tabs.Small()` and `Tabs.Large()` size the tabs as `Button.Small` and `Button.Large` size a
+  button, as a `ToggleGroup`'s sizes do.
+- `TabsStyle.Root`, the column of the tab list and the panel. Its `Gap` is the space between them,
+  12 px by default; `Root: ui.Style{Clear: ui.ClearGap}` puts the panel right under the tabs.
+
+### Changed
+
+- `jamb package` names a Windows executable by the app's `displayName`: the version information's
+  file description, which Task Manager shows as the program's name, and its product name are the
+  display name (or `name` without one), and `description` moves to the comments. The file
+  description was the `description`, so an app was listed under its tagline.
+- `Painter.Clip` clips canvas text as well as shapes, to the clip's bounding box, so the text of a
+  grid's cell stays in the cell. Text is still drawn over all the canvas's shapes.
+- A canvas draws at the display scale in both directions. At a scale such as 125%, `draw` gets
+  the content size rounded to whole display pixels, and the drawing is no longer stretched by up
+  to a pixel to fill them, so its pixels line up with the rest of the window's.
+- A completion list that opened on a trigger character closes when nothing matches, rather than
+  showing "No results"; a list opened with Ctrl+Space still says so.
+- `DataGrid.CellSelection` is now filled from the grid's ranges, and can be given with `CellRanges`: a value the app sets in either selects those cells, and the grid sets the other to match. Ctrl+A no longer builds a set of every cell for the grid's own use, so it is about 9 times faster with `CellSelection` too (49 to 5.7 ms on 100,000 rows of 4 columns).
+- A right-press on a `DataGrid` row focuses the grid before its context menu opens, so that the menu's actions run on the grid.
+- A `DataGrid`'s selected rows and cells have a stronger default fill (`RowSelected`, `CellSelected`): the accent at 0.28 alpha on a dark theme and 0.20 on a light one, in place of `AccentSoft`. A selected range now stands at about 1.36:1 against the rows under it, where it was 1.2:1, while text keeps more than 10:1 and the focused cell's ring 3:1 on it. The headers of a row or a column selected whole are the solid accent with `AccentText`. A theme's `DataGrid` or an instance's `Styles` still replace them.
+- A selected range, row or column reads as one block: the fill covers the separators between its rows, while its edge keeps the line. The focused cell's ring stays whole over it.
+- A `UniformList` row that is a `Div` with a `ZIndex` is drawn over the other rows.
+- A `Modal`, `Drawer` or `AlertDialog` can be declared anywhere in the tree, such as next to the
+  button that opens it, rather than only as the last child of the root. Its backdrop is now a
+  window-level overlay: it covers the whole window and is drawn above everything else, the panel is
+  centered in the window, a press outside the panel reaches only the backdrop, and the dialog is a
+  child of the window in the accessibility tree, after the app's other content. A non-modal dialog is placed in the window the same
+  way. Of two open modals, the one opened last is on top.
+- The segmented `Tabs` track is 34 px high by default, as tall as a `Button`; it was 36 px.
+- While a `Tabs` shows its bar (a prefix, a suffix, the scroll buttons or the overflow menu), the
+  line under the tabs of `TabsUnderline` is the bar's bottom border rather than the strip's, so it
+  also runs under the bar's buttons. A border set on `Bar` no longer doubles up with the strip's,
+  and `List: {Clear: ui.ClearBorder}` is no longer needed with it.
+- A `DropdownMenu` is laid out as its trigger would be: its parent aligns it, rather than it always
+  going to the top, and in a column it keeps the trigger's width.
+
+### Fixed
+
+- Canvas fills no longer get slower as the canvas gets wider. A fill works only on the pixels its
+  shape covers, and a rectangle with sides along the axes, the shape a grid draws most, is filled
+  faster still: 400 small cells take about the same time on a canvas 200 or 3,200 pixels wide, and
+  a 1,600 by 900 grid redraws in about 2 ms rather than 50. `Painter.Clip` no longer allocates a
+  mask the size of the canvas on each call; it keeps only the clip's bounds and reuses the memory.
+  What is drawn does not change.
+- The code editor's completion list closes when a space, a comma, a parenthesis or another
+  character that ends the word leaves nothing matching, instead of staying open with "No results"
+  while the next word is typed.
+- A completion item's edit that inserts text at the start of the replaced word, such as `dbo.`
+  before a table's name, is made before the item's text instead of being dropped.
+- Typing a quote in the code editor steps over the same quote right after the caret, so typing
+  `'abc'` gives `'abc'` rather than `'abc''`.
+- A `DataGrid`'s header takes the pointer where it is drawn once the rows have scrolled down by more
+  than its height. A click on a header cell sorts again, its edge resizes and fits the column, a
+  movable header can be dragged, and a right-press opens the header's menu, rather than the press
+  going to the row scrolled under the header. The header is no longer culled on such a scroll, and
+  the access tree reports the header items at their places on screen rather than off screen.
+- docs/codeedit.md's example of binding Ctrl+K in the editor now unbinds the editor's
+  Ctrl+K Ctrl+I chord first. Without that, Ctrl+K waits up to a second for the chord's
+  second key; docs/input.md says so where it explains chords.
+- A text area that holds a large text, such as a paste of a few hundred kilobytes of Markdown, no
+  longer runs a web page out of memory or stops the app for seconds at each key. The text system
+  keeps at most about a megabyte of text in the layouts and paragraphs it caches, beyond those of
+  the last frames, where it kept a layout of all of the text for each edit of the last 240 frames.
+  A text area draws only the lines in view, lays its text out once for each edit, and styles its
+  marks in time that grows with the text's length rather than with its square; `markdown.EditMarks`
+  reads a text once for the functions made for it in successive builds of the UI.
+- A press in a modal no longer closes another modal open under it.
+- Alt+Pause no longer focuses the menu bar when Alt is released before Pause.
+- The selection of selectable rich text shows over a segment with a background, such as inline code
+  in a `markdown.View`, rather than being hidden under it. The selection of a text field shows over
+  the background of a mark in the same way. Backgrounds are drawn first, then the selection, then
+  the text, as the code editor draws them.
+- Shift+F10 or the Menu key on a `Tree`, `ListBox` or `DataGrid` opens the context menu below the
+  selected row or the focused cell, named after it, as Windows places a menu opened from the
+  keyboard. It opened at the bottom of the whole control, named "Actions" or after the control.
+- `Tree.RenderRow` content keeps its width beside a node's description, so its text no longer wraps
+  and rows no longer overlap. The description grows from no width (`Basis` 0) and takes the room
+  left. Row content is a single line: content wider than the tree is clipped.
+- The overflow menu's button of `Tabs` sits on the middle of the bar, as a `DropdownMenu` in any
+  centered row now does; it was 4.5 px too high.
+
 ## [0.8.10] - 2026-11-17
 
 ### Fixed
@@ -1343,7 +1467,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.8.10...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/tyler-builds/jamb/compare/v0.8.10...v0.9.0
 [0.8.10]: https://github.com/tyler-builds/jamb/compare/v0.8.9...v0.8.10
 [0.8.9]: https://github.com/tyler-builds/jamb/compare/v0.8.8...v0.8.9
 [0.8.8]: https://github.com/tyler-builds/jamb/compare/v0.8.7...v0.8.8
