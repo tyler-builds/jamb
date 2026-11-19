@@ -1,7 +1,7 @@
 # Benchmarks
 
-This file reports jamb's measured performance. Canvas fills of 2026-11-18 come
-first, then the text draw cache of 2026-11-11, then the 3,000-row benchmark of 2026-11-10; then the v0.4.0 update of 2026-10-23: it measured again what the release's resize fix changed, and the GPUI
+This file reports jamb's measured performance. The DataGrid selection ranges and the canvas fills of
+2026-11-18 come first, then the text draw cache of 2026-11-11, then the 3,000-row benchmark of 2026-11-10; then the v0.4.0 update of 2026-10-23: it measured again what the release's resize fix changed, and the GPUI
 comparison. The current results of the performance work, dated 2026-10-22, follow
 it. They are compared with the results of 2026-10-21, which
 were measured before the performance work of 2026-10-22 and follow them. Each
@@ -10,6 +10,29 @@ measurements (2026-10-06 to 2026-10-14) follow under
 [Earlier measurements](#earlier-measurements), with their original dates. Where a
 later figure replaces an earlier one, the earlier figure is marked superseded and
 kept, so the history stays readable.
+
+## DataGrid selection ranges (2026-11-18)
+
+A DataGrid that selects cells keeps its selection as ranges (`CellRanges`): Ctrl+A, a row or a
+column is one range whatever the number of rows, and a Ctrl+click in it splits the range rather
+than copying a key for every cell. `CellSelection`'s `[]CellKey` is now filled from the ranges, and
+the grid no longer builds a set of every selected cell for its own use. Measured on Linux, Intel
+Core i5-11600K, Go 1.27.4, `-benchtime 10x -count 6`, medians, `origin/main` at `ab4b3bf` against
+the branch, on 100,000 rows of 4 columns. Each figure includes the frame that shows the change.
+
+| Benchmark | main (`CellSelection`) | `CellSelection` | `CellRanges` | Allocated, main / `CellSelection` / `CellRanges` |
+|---|--:|--:|--:|--:|
+| `DataGridSelectAll100k` (Ctrl+A) | 49.0 ms | 5.7 ms | 0.37 ms | 38.3 MB / 14.8 MB / 0.36 MB |
+| `DataGridCtrlClickAfterSelectAll100k` (Ctrl+click after Ctrl+A) | 48.9 ms | 5.5 ms | 0.38 ms | 38.3 MB / 14.8 MB / 0.35 MB |
+| `DataGridCopy100k` (Ctrl+C of every cell) | none | | 24.8 ms | 13.4 MB |
+| `DataGridKeyFrame100k` (a key press, rows selection) | 0.109 ms | | 0.114 ms | 534 / 569 allocs |
+
+The key frame of a grid that selects rows makes 35 allocations more, for the closures of the row
+and column headers and the copy, which every build makes; its time is within the noise.
+
+```
+go test -run '^$' -bench 'SelectAll100k|DataGridKeyFrame100k|DataGridSort100k|DataGridCopy100k' -benchmem -benchtime 10x -count 6 ./ui
+```
 
 ## Canvas fills (2026-11-18)
 

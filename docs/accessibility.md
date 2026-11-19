@@ -91,6 +91,7 @@ ui.ProgressRing().Label("Sending reply") // a busy indicator: no range, named "L
 ui.Div().Label("Projects").Badged(ui.Badge(6).Noun("items")) // named "Projects, 6 items"
 ui.Div().Role(access.RoleDataGrid).AccessGrid(3, 2)     // a table of 3 rows of data (the header row not counted) and 2 columns
 ui.Div().Role(access.RoleHeaderItem).AccessCell(0, 2)   // the header of column 2
+ui.Div().Role(access.RoleHeaderItem).AccessCell(3, 0)   // the header of row 3
 ui.Div().Role(access.RoleDataItem).AccessCell(1, 2)     // the cell in row 1, column 2
 ui.Div().Role(access.RoleListItem).AccessPosition(2, 5) // "2 of 5"
 ui.Div().Role(access.RoleListItem).AccessLevel(2)       // an item of a list nested in another
@@ -103,11 +104,13 @@ by row and column (NVDA's Ctrl+Alt+arrows, Narrator's table keys) and reads each
 cell's column header. Its cells are the data items under it with `AccessCell`, at any
 depth (a row element with no role of its own is left out of the tree), and its
 column headers are the header items under it. Rows and columns count from 1, and the
-header row is not one of the rows: a header item takes row 0. A cell's name is its
+header row is not one of the rows: a header item takes row 0. A header item in column 0
+is a row's header instead, such as `DataGrid.RowHeaders` makes, and the Table pattern
+reports it as the header of that row. A cell's name is its
 text, and the links in it stay links of their own. `AccessGrid` applies to a data
 grid or a calendar and `AccessCell` to a data item or a header item; on another role
 they are not reported, and the development warnings say so, as they do for a data
-item in row 0. `AccessPosition` and `AccessLevel` apply to an item of any role. All
+item in row 0 or column 0. `AccessPosition` and `AccessLevel` apply to an item of any role. All
 four panic on numbers that describe no place, such as a position past the size.
 A grid that builds only its visible rows, or draws its cells on a canvas, uses the same
 calls; see [Custom and virtualized grids](#custom-and-virtualized-grids) below.

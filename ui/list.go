@@ -303,6 +303,9 @@ func (l *UniformListElement) expand(ctx *Context) Element {
 		// A row with a layout spring moves with its wrapper, which the list
 		// places: the wrapper springs.
 		wrap.style.LayoutSpring = layoutSpringOf(r)
+		// A row drawn over its siblings is drawn over the other rows: its wrapper takes
+		// its ZIndex (see DataGrid, whose cursor row is).
+		wrap.style.ZIndex = zIndexOf(r)
 		if !l.ownPos {
 			setListPosition(wrap, r, i+1, l.count)
 		}

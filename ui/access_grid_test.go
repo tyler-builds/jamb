@@ -19,6 +19,7 @@ func TestAccessGridAndCellSetTheShapeAndPositions(t *testing.T) {
 			Div().Role(access.RoleDataItem).AccessCell(1, 2).Child(Text("2026")),
 			Div().Role(access.RoleDataItem).AccessCell(2, 1).Child(Text("notes")),
 			Div().Role(access.RoleDataItem).AccessCell(2, 2).Child(Text("2025")),
+			Div().Role(access.RoleHeaderItem).AccessCell(2, 0).Child(Text("Second")),
 		)
 	})
 	tr := r.tree()
@@ -30,6 +31,10 @@ func TestAccessGridAndCellSetTheShapeAndPositions(t *testing.T) {
 	if year.GridRow != 0 || year.GridColumn != 2 {
 		t.Fatalf("header at row %d, column %d, want row 0, column 2", year.GridRow, year.GridColumn)
 	}
+	second := accesstest.Find(t, tr, access.RoleHeaderItem, "Second")
+	if second.GridRow != 2 || second.GridColumn != 0 {
+		t.Fatalf("row header at row %d, column %d, want row 2 and no column", second.GridRow, second.GridColumn)
+	}
 	notes := accesstest.Find(t, tr, access.RoleDataItem, "notes")
 	if notes.GridRow != 2 || notes.GridColumn != 1 {
 		t.Fatalf("cell at row %d, column %d, want row 2, column 1", notes.GridRow, notes.GridColumn)
@@ -40,14 +45,15 @@ func TestAccessGridAndCellSetTheShapeAndPositions(t *testing.T) {
 }
 
 // AccessGrid and AccessCell on roles they do not apply to are not reported, and warn;
-// so does a data item in row 0.
+// so does a data item in row 0 or column 0.
 func TestAccessGridAndCellOnOtherRolesWarn(t *testing.T) {
 	r := newAccessRig(func(ctx *Context) Element {
 		return Div().Column().Children(
 			Div().Role(access.RoleList).Label("Shapes").AccessGrid(3, 2),
 			Div().Role(access.RoleListItem).AccessCell(1, 1).Child(Text("Square")),
 			Div().Role(access.RoleDataGrid).Label("Grid").AccessGrid(1, 1).
-				Child(Div().Role(access.RoleDataItem).AccessCell(0, 1).Child(Text("Header?"))),
+				Child(Div().Role(access.RoleDataItem).AccessCell(0, 1).Child(Text("Header?"))).
+				Child(Div().Role(access.RoleDataItem).AccessCell(1, 0).Child(Text("Row header?"))),
 		)
 	})
 	tr := r.tree()
@@ -65,6 +71,9 @@ func TestAccessGridAndCellOnOtherRolesWarn(t *testing.T) {
 	}
 	if got := warningsContaining(r.warnings, "data item has row 0"); len(got) != 1 {
 		t.Errorf("warnings = %v, want one for the data item in row 0", r.warnings)
+	}
+	if got := warningsContaining(r.warnings, "data item has column 0"); len(got) != 1 {
+		t.Errorf("warnings = %v, want one for the data item in column 0", r.warnings)
 	}
 }
 
@@ -96,7 +105,7 @@ func TestAccessPositionAndLevelOfAnItem(t *testing.T) {
 func TestAccessGridCellPositionAndLevelPanicOnBadNumbers(t *testing.T) {
 	cases := map[string]func(){
 		"AccessGrid(-1, 2)":     func() { Div().AccessGrid(-1, 2) },
-		"AccessCell(1, 0)":      func() { Div().AccessCell(1, 0) },
+		"AccessCell(0, 0)":      func() { Div().AccessCell(0, 0) },
 		"AccessCell(-1, 1)":     func() { Div().AccessCell(-1, 1) },
 		"AccessPosition(0, 3)":  func() { Div().AccessPosition(0, 3) },
 		"AccessPosition(4, 3)":  func() { Div().AccessPosition(4, 3) },

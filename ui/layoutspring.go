@@ -367,6 +367,14 @@ func layoutSpringOf(e Element) Spring {
 	return Spring{}
 }
 
+// zIndexOf returns the ZIndex of e, when it is a div, and 0 otherwise.
+func zIndexOf(e Element) int {
+	if d, ok := e.(*DivElement); ok && d != nil {
+		return d.style.ZIndex
+	}
+	return 0
+}
+
 // describe names n for a warning: its kind, and its text when it has some.
 func (n *node) describe() string {
 	switch n.kind {

@@ -8,4 +8,4 @@
 # before its first frame and the other faces when text uses them; compiled in,
 # the nine Go fonts were 315 KB of each build.
 hello 981665
-demo 1725409
+demo 1814054

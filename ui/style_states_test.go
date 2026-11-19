@@ -73,6 +73,8 @@ var layerStateNotDrawn = map[string]string{
 	"DataGrid.CellFocused":            "a focused cell is not reached by focusing the grid headlessly",
 	"DataGrid.CellEditing":            "the editor of a cell is open only after an edit starts",
 	"DataGrid.CellSelected":           "a cell is selected only in a grid that selects cells, which the table's grid does not",
+	"DataGrid.RowHeaderSelected":      "row headers are drawn only with RowHeaders, which the table's grid does not set",
+	"DataGrid.HeaderCellSelected":     "a column is selected whole only in a grid that selects cells, which the table's grid does not",
 	"DropdownMenu.ItemHighlighted":    "the menu's items are drawn while the menu is open",
 	"DropdownMenu.ItemDisabled":       "the menu's items are drawn while the menu is open",
 	"ContextMenu.ItemHighlighted":     "the menu's items are drawn while the menu is open",

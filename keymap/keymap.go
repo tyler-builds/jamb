@@ -42,8 +42,8 @@ type member struct {
 
 // Parse reads a keymap file (see the package documentation) and returns its
 // bindings in file order. actions are the actions the file may name, in
-// addition to the text-field actions (ui.EditorActions) and ui.NoAction, which
-// are always available. Every problem is reported, naming its section (1-based),
+// addition to the text-field actions (ui.EditorActions), the data grid's
+// (ui.DataGridActions) and ui.NoAction, which are always available. Every problem is reported, naming its section (1-based),
 // context and keys; the valid bindings are returned along with the errors,
 // joined.
 func Parse(data []byte, actions []*ui.Action) ([]ui.Binding, error) {
@@ -52,7 +52,7 @@ func Parse(data []byte, actions []*ui.Action) ([]ui.Binding, error) {
 		return nil, &formatError{fmt.Errorf("a keymap is a JSON array of sections: %w", err)}
 	}
 	known := map[string]*ui.Action{ui.NoAction.Name(): ui.NoAction}
-	for _, a := range append(ui.EditorActions(), actions...) {
+	for _, a := range append(append(ui.EditorActions(), ui.DataGridActions()...), actions...) {
 		known[a.Name()] = a
 	}
 	var out []ui.Binding

@@ -213,12 +213,14 @@ func (d *DivElement) AccessGrid(rows, cols int) *DivElement {
 //
 // It applies to an element with the role access.RoleDataItem, a cell of the data, or
 // access.RoleHeaderItem, the header of the column col. The header row is not one of
-// the table's rows, so a header item's row is not reported: pass 0. A data item in
-// row 0 has no position, and a cell of another role reports none; the development
-// warnings report both. AccessCell panics when row is negative or col is less than 1.
+// the table's rows, so a header item's row is not reported: pass 0. A header item in
+// column 0 is the header of the row row instead, such as a row's number at its start:
+// AccessCell(3, 0). A data item in row 0 or column 0 has no position, and a cell of
+// another role reports none; the development warnings report them. AccessCell panics
+// when row or col is negative, or both are 0.
 func (d *DivElement) AccessCell(row, col int) *DivElement {
-	if row < 0 || col < 1 {
-		panic(fmt.Sprintf("ui.AccessCell(%d, %d): the row must not be negative and the column must be 1 or more", row, col))
+	if row < 0 || col < 0 || row == 0 && col == 0 {
+		panic(fmt.Sprintf("ui.AccessCell(%d, %d): the row and the column must not be negative, and one must be 1 or more", row, col))
 	}
 	a := d.access()
 	a.gridRow, a.gridCol = row, col
@@ -902,6 +904,10 @@ func (b *accessBuilder) gridPlace(an *access.Node, a *accessInfo, role access.Ro
 		b.issue(an.ID, fmt.Sprintf("AccessGrid applies to a data grid or a calendar, not a %s; the shape is not reported", role))
 	}
 	switch {
+	case role == access.RoleHeaderItem && a.gridCol == 0 && a.gridRow > 0:
+		an.GridRow = a.gridRow // the header of a row
+	case a.gridCol == 0 && a.gridRow > 0 && role == access.RoleDataItem:
+		b.issue(an.ID, "data item has column 0 in AccessCell; the columns of a grid are counted from 1")
 	case a.gridCol == 0:
 	case role == access.RoleDataItem:
 		an.GridRow, an.GridColumn = a.gridRow, a.gridCol

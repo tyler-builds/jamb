@@ -122,6 +122,22 @@ func contrastPairs(th *Theme) []contrastPair {
 			contrastPair{name: "RatingEmptyStar_on_" + s.name, role: "empty rating star (TextSubtle)", fg: th.TextSubtle, bg: s.c, min: minNonText},
 		)
 	}
+	for _, s := range []struct {
+		name string
+		c    Color
+	}{{"Surface", th.Surface}, {"Panel", th.Panel}, {"SurfaceHover", th.SurfaceHover}} {
+		fill := over(dataGridSelectionFill(th), s.c)
+		ps = append(ps,
+			// datagrid.go: a selected row or cell is the selection fill over the row's
+			// Surface, Panel (striped) or SurfaceHover; the focused cell's ring is drawn on it.
+			contrastPair{name: "GridSelected_Text_on_" + s.name, role: "selected grid cell or row (dataGridSelectionFill)", fg: th.Text, bg: fill, min: minText},
+			contrastPair{name: "GridSelected_TextMuted_on_" + s.name, role: "tree chevron in a selected row (TextMuted)", fg: th.TextMuted, bg: fill, min: minText},
+			contrastPair{name: "GridSelected_FocusRing_on_" + s.name, role: "focused cell's ring on a selected range", fg: th.FocusRing, bg: fill, min: minNonText},
+		)
+	}
+	// datagrid.go: the header of a row or a column selected whole is AccentText on Accent.
+	ps = append(ps, contrastPair{name: "GridHeaderSelected_on_Accent", role: "selected row or column header (AccentText on Accent)",
+		fg: th.AccentText, bg: th.Accent, min: minText})
 	ps = append(ps, badgePairs(th)...)
 	ps = append(ps, progressPairs(th)...)
 	ps = append(ps, alertPairs(th)...)

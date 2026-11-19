@@ -17,6 +17,10 @@ h.ScrollToItem(5000)                    // scrolls the least amount that shows r
 Assistive technology reads a list with its number of items. `Label` names it, such as
 "Search results"; both kinds of list take it.
 
+A row that is a `Div` with a `ZIndex` is drawn over the other rows, as it would be over
+its siblings: something it draws past its edges, such as a focus ring, is not covered
+by the row below.
+
 ## Variable-height lists
 
 When rows differ in height, use `ui.ListOf`. It takes the items, a key for each
@@ -117,6 +121,7 @@ ui.DataGrid(runs, func(r run) string { return r.ID },
 | `Edit` | Makes the cells editable: `Edit(row, value) error` saves the value, or returns the error that keeps the editor open. Set Value (assistive technology) runs it too |
 | `Editor` | Replaces the text field of an edit with a custom editor, such as a `ui.Select` (see Custom editors below) |
 | `Value` | The text an edit starts with, when it differs from `Text` (a raw number for a formatted one). Nil means `Text` |
+| `CopyText` | The text of a cell when the selection is copied, when it differs from `Text` (the full value of a shortened one). Nil means `Text` |
 | `Movable` | Lets the user move the column, by dragging its header or with Ctrl+Shift+Left and Right on it (see the keyboard and mouse below) |
 | `Pin` | `ui.PinStart` or `ui.PinEnd` keeps the column at the start or the end of the grid as the other columns scroll sideways. The pinned columns are shown before and after the others; a column moves only among the columns of its pin |
 | `Group` | Columns next to each other with the same group share one cell, of their width, in a row above the header (`HeaderGroup`). A group that a pin or a move splits is drawn in pieces. For assistive technology the group is the description of each column's header, and the row of groups is hidden |
@@ -126,15 +131,20 @@ The `Compare` of a column is easier to write with `ui.SortBy(key)`, which orders
 The grid's methods:
 
 - `Selection(mode, keys)`: `ui.SelectionNone`, `ui.SelectionSingle` or `ui.SelectionMultiple`. The keys of the selected rows are kept in `keys`, so the app reads the selection and can set it. A nil `keys` keeps the selection in the grid.
-- `CellSelection(mode, cells)`: selects cells instead of rows, kept in `cells` as `ui.CellKey{Row, Column}` keys, which follow their rows and columns through a sort or a move. It replaces `Selection`: the later of the two calls applies, and the development warnings say so. The cells are the items of the selection for assistive technology, and a selected cell has the `CellSelected` fill. Ctrl+A makes a key for every cell, so with 100,000 rows `cells` is a large slice.
+- `CellRanges(mode, ranges)`: selects cells instead of rows, kept in `ranges` as blocks of cells (`ui.CellRange{Rows, Columns}`), which name their rows and columns by key and so follow them through a sort or a move. It replaces `Selection`: the later of the two calls applies, and the development warnings say so. The cells are the items of the selection for assistive technology, and a selected cell has the `CellSelected` fill. See Selecting cells below.
+- `CellSelection(mode, cells)`: the same selection kept as a `ui.CellKey{Row, Column}` for each selected cell. The grid keeps its selection as ranges either way, and fills `cells` from them; `CellSelection` and `CellRanges` can be given together: a value the app sets in either selects those cells, and the grid sets the other to match, so the two always hold the same selection. Ctrl+A on 100,000 rows of 4 columns fills `cells` with 400,000 keys, so a grid of many rows should use `CellRanges`.
 - `ColumnOrder(keys)`, `ColumnWidths(ws)` and `OnColumnsChange(fn)`: the order of the columns (by key) and the widths the user sets (by key, at the 100 percent Text size) kept in signals, so an app can save and restore them. A saved order survives new columns: an unknown key is dropped and the columns it does not name follow in their given order. `fn` gets a `ui.ColumnState{Order, Widths}` after each change the user makes: the end of a drag of a column's edge, each keyboard resize step, an auto-fit, and a move. It does not run on each move of a drag. The focus and an open edit follow their column when it moves.
 - `Movable()`: lets the user move every column, as `DataColumn.Movable` does for one.
-- `Handle(h)`: a `ui.NewDataGridHandle()` scrolls the grid from code by key: `ScrollToRow(key)` in the sorted order, `ScrollToColumn(key)`, and `FocusCell(rowKey, colKey)`, which moves the focused cell, scrolls it into view and focuses the grid without changing the selection. A request applies at the grid's next build; a key that names nothing does nothing.
+- `RowHeaders()`: shows a header at the start of each row with its number, and a corner above them that selects every cell (or every row, in a grid that selects rows). The headers stay in view as the columns scroll sideways. See Row and column headers below.
+- `HeaderSelects()`: with `CellRanges` or `CellSelection`, a click on a column's header selects the column instead of sorting, and the sort moves to the header's arrow. See Row and column headers below.
+- `Handle(h)`: a `ui.NewDataGridHandle()` scrolls the grid from code by key: `ScrollToRow(key)` in the sorted order, `ScrollToColumn(key)`, and `FocusCell(rowKey, colKey)`, which moves the focused cell, scrolls it into view and focuses the grid without changing the selection. A request applies at the grid's next build; a key that names nothing does nothing. `Copy(withHeaders)` copies the selection at once, as Ctrl+C or Ctrl+Shift+C does, for a toolbar button that takes focus from the grid.
+- `CopyText(fn)`: replaces the text that a copy puts on the clipboard (see Copying below).
 - `ContextMenu(build)` and `HeaderContextMenu(build)`: menus built with the row and the column key, or the column key of a header. A right-press on a row that is not selected moves the focus there and selects the row; on a selected row it keeps the selection, as File Explorer does. Shift+F10 or the Menu key opens the menu of the focused cell, or of the header cell while the focus is on the header. An empty result opens nothing.
 - `LoadMore(hasMore, fn)` and `LoadingMore(on)`: while `hasMore` is true, `fn` runs once when the rows within a viewport of the end are built, or when Down, PageDown or Ctrl+End is pressed on the last row, and again only after the number of rows changes. In a tree the rows counted are every row given, children included, so opening or closing a row does not ask again. It runs after the frame, never while the grid is built. `LoadingMore(true)` shows a row after the last one with a small progress ring and "Loading more rows" (`Strings.LoadingMore`), announced politely; it is not one of the grid's rows for assistive technology.
 - `Sort(s)`: the `ui.SortState` (`Key` and `Desc`) in `s`. A click on a header cycles the column through ascending, descending and not sorted. A nil `s` keeps the sort in the grid.
 - `OnActivate(fn)`: runs `fn` with the row, on Enter or a double-click.
-- The look of the states is a fill or a line, not a change of weight: a selected row has the `RowSelected` fill, a sorted column has its arrow (`SortIndicator`), and the text keeps its weight.
+- The look of the states is a fill or a line, not a change of weight: a selected row has the `RowSelected` fill, a sorted column has its arrow (`SortIndicator`), and the text keeps its weight. A selected row or cell (`RowSelected`, `CellSelected`) is the accent at 0.28 alpha on a dark theme and 0.20 on a light one: about 1.36:1 against the row under it, the strongest at which the focused cell's ring keeps 3:1 on it, with text at more than 10:1. A row's or a column's header selected whole (`RowHeaderSelected`, `HeaderCellSelected`) is the solid accent with `AccentText`, so it stands apart from the cells' fill. The theme's `DataGrid` and `Styles` replace any of them.
+- A selection reads as one block: between two selected cells of a column, two selected rows, or two selected row headers, the separator under the row (the `Row` part's bottom border) is covered by the selection's fill, and at the selection's edge, next to a cell that is not selected, the separator stays. A selected cell that joins the one below it is filled first with the grid's background and its row's fill (striped or hovered), so that its translucent fill looks the same over the separator as over the rest of the row, and the focused cell and its row are drawn over their neighbors, so that its ring stays whole. The line at the inner edge of pinned columns (`PinnedEdge`), the row headers' edge and the header's bottom line stay inside a selection: they mark the frozen parts of the grid, not cells.
 - `Density(d)`: `ui.DataGridComfortable` (36 logical pixels a row, the default) or `ui.DataGridCompact` (26). `Striped()` draws every other row in `RowAlternate`.
 - `Loading(on)`: shows a progress ring over the rows. The rows, the focus and the selection stay.
 - `Empty(el)`: what the grid shows with no rows. The default is "No rows". A `ui.Empty` state fits here (see [widgets-feedback.md](widgets-feedback.md#empty-states)).
@@ -164,6 +174,8 @@ Rows are identified by their keys, which must be unique and stable. The focus, t
 | Ctrl+Left, Ctrl+Right | On a resizable header cell, narrows or widens the column by 8 logical pixels |
 | Ctrl+Shift+Left, Ctrl+Shift+Right | On a movable header cell, moves the column one place among the columns of its pin, and announces its new place ("Status moved to position 2 of 5", `Strings.ColumnMoved`). On a header cell that cannot move, resizes as Ctrl does |
 | Shift+F10, Menu | Opens the context menu of the focused cell, or of the header cell (`ContextMenu`, `HeaderContextMenu`) |
+| Ctrl+C, Ctrl+Insert | Copies the selection as tab-separated text (`actions.GridCopy`; see Copying) |
+| Ctrl+Shift+C | Copies the selection with the headers of its columns first (`actions.GridCopyWithHeaders`) |
 
 With `CellSelection` the keys select cells:
 
@@ -171,11 +183,67 @@ With `CellSelection` the keys select cells:
 | --- | --- |
 | Arrows, Home, End, PageDown, PageUp | Move to the cell and select it |
 | Ctrl with a move | Moves the focus without selecting. The anchor stays |
-| Shift with a move | Selects the rectangle of cells from the anchor cell to the focused one (multiple) |
+| Shift with a move | Selects the rectangle of cells from the anchor cell to the focused one (multiple). After Ctrl+Space the rectangle has every row, and after Shift+Space every column, so Shift+Right adds a whole column and Shift+Down a whole row |
+| Ctrl+Shift with a move | As Shift, and keeps the rest of the selection: the cells selected beside the anchor's range |
 | Space | Toggles the focused cell (multiple), or selects it (single) |
-| Shift+Space | Selects the cells of the focused row (multiple) |
-| Ctrl+Space | Selects the cells of the focused column (multiple) |
+| Shift+Space | Selects the focused row (multiple) |
+| Ctrl+Space | Selects the focused column (multiple) |
 | Ctrl+A | Selects every cell (multiple) |
+
+**Selecting cells.** With `CellRanges` (or `CellSelection`) one selection holds whole rows, whole columns and blocks of cells together, as SQL Server Management Studio's results grid does. It is a list of `ui.CellRange`, and a cell is selected when a range of the list has it. Each side of a range is a `ui.KeySet`: the keys in `Keys`, or with `All` every key but those in `Keys`. Ctrl+A makes one range of every row and every column, Ctrl+Space one range of every row in the focused column, and Shift+Space one range of the focused row in every column, so they cost the same with 10 rows or 100,000. A Ctrl+click in such a range takes the cell out by splitting the range in two, not by listing the cells. A range of every row has the rows that are added later too, as a selected column does in a spreadsheet; a Shift+click or a drag lists the keys of the rows it covers, and those follow their rows through a sort, as a list of cells does. `CellRange.Has` and `KeySet.Has` test a cell or a key.
+
+```go
+picked := ui.NewSignal([]ui.CellRange(nil))
+grid := ui.DataGrid(results, rowKey, cols...).CellRanges(ui.SelectionMultiple, picked)
+
+// Select the Total column, and row r7.
+picked.Set([]ui.CellRange{
+	{Rows: ui.KeySet{All: true}, Columns: ui.KeySet{Keys: []string{"Total"}}},
+	{Rows: ui.KeySet{Keys: []string{"r7"}}, Columns: ui.KeySet{All: true}},
+})
+```
+
+Ctrl+A and a Ctrl+click that follows it each take well under a millisecond on 100,000 rows of 4 columns with `CellRanges`, against about 49 ms and 38 MB when every cell had a key (`BenchmarkDataGridSelectAll100k`, `BenchmarkDataGridCtrlClickAfterSelectAll100k`).
+
+**Row and column headers.** `RowHeaders()` and `HeaderSelects()` make the grid select as SQL Server Management Studio's results grid does. Both are off by default, so a grid's header click still sorts.
+
+```go
+ui.DataGrid(results, rowKey, cols...).Label("Results").
+	CellRanges(ui.SelectionMultiple, picked).
+	RowHeaders().    // row numbers, and the corner that selects everything
+	HeaderSelects()  // a click on a column's header selects the column
+```
+
+- A click on a row's header selects the row; on a column's header (with `HeaderSelects`), the column; on the corner, every cell.
+- Ctrl+click on a header adds its row or column to the selection, or takes it out when it is selected whole. Shift+click selects the rows or columns from the anchor's, and Ctrl+Shift+click adds them to the rest.
+- A drag down the row headers selects the rows it crosses, and a drag across the column headers the columns. A drag over the cells selects the rectangle from the cell it started on. A drag that starts on the header of a movable column (`DataColumn.Movable`) that is selected whole moves the column, as before; from any other header it selects. A drag held past an edge of the rows in view, or outside the grid, scrolls the rows (or the columns) toward the pointer and selects the rows and columns that come into view, faster the farther past the edge the pointer is, up to the speed of an element's drag at a scroll container's edge; with the pointer outside the grid on the other axis, the drag keeps the nearest row or column. The rows scroll only while the button is held.
+- With `HeaderSelects`, a sortable column shows its arrow while it is not sorted too, at the end of the header cell, and a click on the arrow sorts as a header click did. Enter on a focused header cell sorts.
+- A row's header is drawn in `RowHeaderSelected` while its row is selected whole, and a column's header cell in `HeaderCellSelected` while its column is. `RowHeader` and `Corner` are the other parts.
+- In a grid that selects rows (`Selection`), a row's header acts as a click on its row, and `HeaderSelects` does nothing.
+
+| Key | Action, with row headers or `HeaderSelects` |
+| --- | --- |
+| Left on the first column | Moves to the row's header. Right moves back to the first cell |
+| Space on a row's header | Selects the row. Ctrl+Space adds it or takes it out, Shift+Space selects the rows from the anchor's |
+| Shift+Up, Shift+Down on a row's header | Extend the selection by whole rows; PageUp, PageDown, Ctrl+Home and Ctrl+End move along the headers too. A move without Shift does not select |
+| Up on the first row's header | Moves to the corner. Space or Enter there selects every cell |
+| Space on a column's header (`HeaderSelects`) | Selects the column. Ctrl+Space adds it or takes it out, Shift+Space selects the columns from the anchor's |
+| Shift+Left, Shift+Right on a column's header (`HeaderSelects`) | Extend the selection by whole columns |
+| Enter on a column's header | Sorts by the column |
+
+Ctrl+Space and Shift+Space on a cell still select its column and its row, and Ctrl+A every cell, so the keyboard reaches all of it without the headers too.
+
+For assistive technology a row's header is a `HeaderItem` with the row's number (`GridRow`, and no column), which the Table pattern reports as the header of its row; the corner is a button named "Select all" (`Strings.SelectAll`). With a multiple selection of cells, row headers, and column headers with `HeaderSelects`, are items of the selection: each is selected while its row or column is selected whole, and its Select action selects the row or column.
+
+**Copying.** Ctrl+C copies the selection as text that a spreadsheet pastes into cells, and Ctrl+Shift+C puts a line of the columns' headers first, as SQL Server Management Studio's results grid does. Ctrl+Insert copies too. The keys are the actions `actions.GridCopy` and `actions.GridCopyWithHeaders`, bound in the grid's key context as `DataGrid && !DataGridCell`, so an app rebinds them, turns them off with `ui.Unbind`, or puts them in the grid's context menu (`ui.MenuItem{Action: actions.GridCopy}`); a right-press focuses the grid before its menu opens, so the menu's actions copy from it. A grid that selects rows (`Selection`) copies its selected rows, every column of them. With nothing selected the copy is the focused cell. A cell that holds controls or an editor (an `Interactive` or editable column) has the key context `DataGridCell`, so while a control or an editor in a cell has focus the grid's copy keys do not run: the control's own keys win (an editor's Ctrl+C copies its text), and a key it does not bind, such as Ctrl+Shift+C in a text field, does nothing.
+
+- The text is the rows that have a selected cell, a line each, and on each line the columns that have a selected cell, separated by tabs; the lines are separated by CR LF, with no line break after the last. A rectangle copies as it is.
+- A selection that is not a rectangle, such as a row and a few cells of other rows, or two blocks in different rows and columns, copies the rows and the columns that have a selected cell, and leaves an empty field for each cell among them that is not selected. Every cell keeps its column, so a paste into a spreadsheet puts each value under its header. Excel refuses a copy of several blocks unless they share their rows or their columns; this grid copies any selection, in the one shape that keeps the columns.
+- The rows and columns are copied as the user sees them: the columns in the order shown, moved and pinned ones included, and the rows in the order of the sort. A row the app has filtered out of the data, or a row closed in a tree, is not shown and not copied, even when it is selected.
+- A cell's text is `DataColumn.CopyText`, or `Text` without it; a column with neither copies empty fields. A header is the column's `Header`.
+- A field with a tab, a line break or a double quote is put in double quotes, with each double quote doubled, which a spreadsheet such as Excel reads back as one cell on a paste.
+- `CopyText(fn)` replaces the whole text: `fn` gets a `ui.DataGridCopy[T]` with the copied `Rows` (as `T`) and `Columns` (keys), `Headers` for Ctrl+Shift+C, `Selected(row, col)` for a cell, and `Text()`, the default text. An empty result copies nothing, for an app that writes the clipboard itself.
+- A copy runs on the UI thread, since it reads the app's rows: Ctrl+C of 100,000 rows of 4 columns takes about 25 ms and 13 MB (`BenchmarkDataGridCopy100k`). A selection of more than 2,000,000 cells is not copied, and a message is announced (`Strings.CopyTooLarge`); with `CopyText` the app decides, and `fn` is still called.
 
 **Interactive and editable cells.** A cell that holds controls, or an editor, is still the grid's one Tab stop: the controls and the editor are not in the Tab order, and the grid's keys reach them through the focus. The model follows the WAI-ARIA grid pattern (https://www.w3.org/WAI/ARIA/apg/patterns/grid/), which describes two states without naming them: grid navigation, in which the grid holds focus, and the cell's own widgets, which Enter or F2 move focus into. In the second state Tab and Shift+Tab move to the next and previous widget, which the pattern lets wrap inside the cell or leave the grid; this grid wraps inside the cell. Escape (the pattern's "restores grid navigation") or F2 returns to grid navigation on the same cell. The keys a control uses (the arrows of a text field, Enter on a button) belong to the control. An edit saves on Enter and on Tab, and when focus leaves its editor (a click elsewhere in the grid), as a spreadsheet does. Escape is the only cancel. This blur save is a choice of this grid, not a rule of the pattern.
 
@@ -205,7 +273,7 @@ The cell's `Text`, when it is set, is still the cell's accessible name in an int
 
 Alt is not used by the grid, so the host keeps its menu and navigation keys.
 
-**Mouse.** A click selects a row: Ctrl toggles it and Shift extends the selection from the anchor. With `CellSelection` a click selects a cell, Ctrl+click toggles it, and Shift+click selects the rectangle from the anchor cell. A double-click activates the row. A click on a header cell sorts. Dragging the edge of a resizable header cell resizes its column, and the cursor is the east-west resize cursor over the edge. A double-click on the edge fits the column to the text of the rows in view; in a tree's first column the fit includes each row's indent and chevron. Dragging a movable header cell moves its column: a line (`DropIndicator`) shows the side of the header under the pointer that it lands on, and a press that does not move 4 px is still a click that sorts. A right-press opens the context menu (see `ContextMenu`).
+**Mouse.** A click selects a row: Ctrl toggles it and Shift extends the selection from the anchor. The grid holds the pointer from a press until its release, so a drag of a selection follows the pointer outside the grid (see Row and column headers). With `CellRanges` or `CellSelection` a click selects a cell, Ctrl+click toggles it, Shift+click selects the rectangle from the anchor cell, and Ctrl+Shift+click adds that rectangle to the rest of the selection. A drag over the cells selects the rectangle from the cell it started on. A double-click activates the row. A click on a header cell sorts, unless `HeaderSelects` is set (see Row and column headers). Dragging the edge of a resizable header cell resizes its column, and the cursor is the east-west resize cursor over the edge. A double-click on the edge fits the column to the text of the rows in view; in a tree's first column the fit includes each row's indent and chevron. Dragging a movable header cell moves its column: a line (`DropIndicator`) shows the side of the header under the pointer that it lands on, and a press that does not move 4 px is still a click that sorts. A right-press opens the context menu (see `ContextMenu`).
 
 **Pinned columns.** A pinned column stays at its end of the grid while the others scroll under it. Its cells are filled with the grid's background and then their row's fill, so a hovered, selected or striped row shows through them; `CellPinned` styles them, and `PinnedEdge` is the cell at the inner edge of the pinned columns, with a 1 px border by default. A column that the focus moves to, or that `ScrollToColumn` names, is scrolled clear of the pinned columns.
 
@@ -213,7 +281,7 @@ Alt is not used by the grid, so the host keeps its menu and navigation keys.
 
 **Sorting.** A sort of 100,000 rows takes about 8 ms in the benchmark (`BenchmarkDataGridSort100k`), which is under the 50 ms at which a sort would move to a worker thread, so the sort runs on the UI thread. Only one column sorts at a time: Shift+click does not add a second sort (see `docs/accessibility-design-phases-i-m.md`, Phase I).
 
-**Accessibility.** The grid is a `DataGrid` control with the Grid and Table patterns. Its `RowCount` is every row of the data, built or not, and its `ColumnCount` is the number of columns. Each cell is a `DataItem` with the GridItem and TableItem patterns, and each row is a `ListItem` with the SelectionItem pattern. Each header cell is a `HeaderItem` that Invoke sorts, with its sort state in its name ("Duration, sorted descending") and in its ItemStatus. Selection uses the Selection pattern, which says whether it takes many items; with `CellSelection` the cells are its items, and the rows are not. The columns are numbered in the order they are shown, so a moved or pinned column changes its column number. GetItem answers only for the cells that are built: a row out of view, or a column out of view in a grid wider than its view, gives nothing, and the client scrolls the grid to it. See `docs/accessibility-design-phases-i-m.md`, Phase I. In a tree, `RowCount` is the rows shown, and a row reports its level and its place among its siblings (see Tree rows). A grid you build yourself, of `Div`s or on a canvas, reports the same with `AccessGrid` and `AccessCell`; see [Custom and virtualized grids](accessibility.md#custom-and-virtualized-grids).
+**Accessibility.** The grid is a `DataGrid` control with the Grid and Table patterns. Its `RowCount` is every row of the data, built or not, and its `ColumnCount` is the number of columns. Each cell is a `DataItem` with the GridItem and TableItem patterns, and each row is a `ListItem` with the SelectionItem pattern. Each header cell is a `HeaderItem` that Invoke sorts, with its sort state in its name ("Duration, sorted descending") and in its ItemStatus. With `RowHeaders` each row's header is a `HeaderItem` of its row, which the Table and TableItem patterns report as row headers. Selection uses the Selection pattern, which says whether it takes many items; with `CellRanges` or `CellSelection` the cells are its items, and the rows are not. The columns are numbered in the order they are shown, so a moved or pinned column changes its column number. GetItem answers only for the cells that are built: a row out of view, or a column out of view in a grid wider than its view, gives nothing, and the client scrolls the grid to it. See `docs/accessibility-design-phases-i-m.md`, Phase I. In a tree, `RowCount` is the rows shown, and a row reports its level and its place among its siblings (see Tree rows). A grid you build yourself, of `Div`s or on a canvas, reports the same with `AccessGrid` and `AccessCell`; see [Custom and virtualized grids](accessibility.md#custom-and-virtualized-grids).
 
 **Tree rows.** `Children(fn)` makes the rows a tree. The rows given to `DataGrid` are the top level, and `fn` returns the children of a row, nil or empty for a row with none. A row with children shows a chevron in the first column, which opens and closes it, and its children are shown under it while it is open. Keys are unique across the whole tree. The grid computes no totals: a group row is an ordinary row that the app builds, with its summed values. The children of a row are sorted among their siblings by the sort, so a group sorts among the groups. `SortChildrenOnly()` keeps the top rows in the order given and sorts only the rows under them: the top rows are then sections, such as Task Manager's Apps, Background processes and Windows processes, which keep their place while the rows in them sort.
 

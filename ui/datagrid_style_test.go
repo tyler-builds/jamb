@@ -22,6 +22,7 @@ func testDataGridParts(t *testing.T, applied map[string]bool) {
 	testDataGridEditParts(t, applied)
 	testDataGridColumnParts(t, applied)
 	testDataGridTreeParts(t, applied)
+	testDataGridHeaderParts(t, applied)
 	type dgCase struct {
 		part  string
 		set   func(*DataGridStyle, Style)
@@ -250,5 +251,65 @@ func TestDataGridKeysMoveSelectionInEachMode(t *testing.T) {
 	r.press(input.KeyDown, input.ModShift)
 	if got := sel2.Peek(); len(got) != 3 {
 		t.Errorf("Shift+Down twice from row 1 selected %v, want three rows", got)
+	}
+}
+
+// testDataGridHeaderParts checks the parts of the row headers, the corner and a
+// selected column (see RowHeaders and HeaderSelects).
+func testDataGridHeaderParts(t *testing.T, applied map[string]bool) {
+	mark := Style{Background: markBG}
+	for _, p := range []string{"RowHeader", "RowHeaderSelected", "HeaderCellSelected", "Corner"} {
+		applied["DataGrid."+p] = true
+	}
+	all := []CellRange{{Rows: KeySet{All: true}, Columns: KeySet{Keys: []string{"N"}}}, {Rows: keysIn("i1"), Columns: KeySet{All: true}}}
+	build := func(st DataGridStyle) *accessRig {
+		return newAccessRig(func(ctx *Context) Element {
+			return DataGrid(dgItems(6), func(x dgItem) string { return x.ID }, dgColumns()...).Label("Runs").
+				CellRanges(SelectionMultiple, NewSignal(all)).RowHeaders().HeaderSelects().Styles(st)
+		})
+	}
+	cases := []struct {
+		part  string
+		st    DataGridStyle
+		drawn string
+	}{
+		{"RowHeader", DataGridStyle{RowHeader: mark}, "DataGrid.RowHeader"},
+		{"RowHeaderSelected", DataGridStyle{RowHeaderSelected: mark}, "DataGrid.RowHeader"},
+		{"HeaderCellSelected", DataGridStyle{HeaderCellSelected: mark}, "DataGrid.HeaderCell"},
+		{"Corner", DataGridStyle{Corner: mark}, "DataGrid.Corner"},
+	}
+	for _, c := range cases {
+		r := build(c.st)
+		if !anyMarked(r.rt, c.drawn, false) {
+			t.Errorf("%s: the style does not reach a node that draws %s", c.part, c.drawn)
+		}
+	}
+}
+
+// TestDataGridSelectionFill checks the default fill of a selected row and cell in the
+// dark and the light theme, and that the theme's DataGrid and an instance's Styles
+// still replace it.
+func TestDataGridSelectionFill(t *testing.T) {
+	for _, base := range []*Theme{DarkTheme(), LightTheme()} {
+		var st DataGridStyle
+		dataGridDefaults(&st, base, DataGridComfortable, 1)
+		want := base.Accent.Alpha(0.20)
+		if base.Dark {
+			want = base.Accent.Alpha(0.28)
+		}
+		if st.RowSelected.Background != want || st.CellSelected.Background != want {
+			t.Errorf("%s: the selection fill is %v and %v, want %v", base.Name, st.RowSelected.Background, st.CellSelected.Background, want)
+		}
+		theme := *base
+		theme.DataGrid = DataGridStyle{RowSelected: Style{Background: Hex("#101010")}}
+		r := newThemedRig(&theme, partDataGrid(6, DataGridStyle{CellSelected: Style{Background: markBG}}, NewSignal([]string{"i1"}), NewSignal(SortState{})))
+		if got := dgRowNode(t, r, "i1").style.Background; got != Hex("#101010") {
+			t.Errorf("%s: a selected row has %v, want the theme's fill", base.Name, got)
+		}
+		var inst DataGridStyle
+		resolveDataGrid(&Context{rt: r.rt}, DataGridComfortable, 1, &DataGridStyle{CellSelected: Style{Background: markBG}}, &inst)
+		if inst.CellSelected.Background != markBG {
+			t.Errorf("%s: the instance's CellSelected is %v, want its own fill", base.Name, inst.CellSelected.Background)
+		}
 	}
 }

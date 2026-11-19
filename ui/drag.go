@@ -461,6 +461,21 @@ func (rt *Runtime) autoscrollDrag(dt float32) bool {
 	return scrolled
 }
 
+// edgeSpeed is the share of dragScrollSpeed, from -1 to 1, at which a drag at pos
+// scrolls a view from lo to hi: toward the edge it is within dragScrollZone of, faster
+// the closer it is, and at full speed at the edge and past it. A DataGrid's drag of a
+// selection passes a view grown by the zone, so that it scrolls only past the edge.
+func edgeSpeed(pos, lo, hi float32) float32 {
+	// near is how close to an edge the pointer is, from 0 (out of the zone) to 1.
+	near := func(d float32) float32 {
+		if d >= dragScrollZone {
+			return 0
+		}
+		return (dragScrollZone - max(d, 0)) / dragScrollZone
+	}
+	return near(hi-pos) - near(pos-lo)
+}
+
 // scrollAtEdge scrolls n toward the pointer's edge, if the pointer is near one.
 func (rt *Runtime) scrollAtEdge(n *node, horizontal bool, dt float32) bool {
 	r := rt.nodeRect(n)
@@ -473,14 +488,7 @@ func (rt *Runtime) scrollAtEdge(n *node, horizontal bool, dt float32) bool {
 		maxScroll = max(n.lay.ContentW-n.lay.W, 0)
 		cur, scroll = &n.st.targetX, &n.st.scrollX
 	}
-	// near is how close to an edge the pointer is, from 0 (out of the zone) to 1.
-	near := func(d float32) float32 {
-		if d >= dragScrollZone {
-			return 0
-		}
-		return (dragScrollZone - max(d, 0)) / dragScrollZone
-	}
-	dir := near(hi-pos) - near(pos-lo)
+	dir := edgeSpeed(pos, lo, hi)
 	if dir == 0 {
 		return false
 	}

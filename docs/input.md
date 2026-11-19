@@ -373,7 +373,8 @@ which map keys to actions:
 A value is an action name, `null` for `NoAction`, or `{"unbind": name}` for
 `Unbind`. Later sections and later keys win, as code order does. The file's
 bindings come after `Bindings`, so they override the defaults. The text-field
-actions (`ui.EditorActions()`) and `NoAction` can always be named.
+actions (`ui.EditorActions()`), the data grid's (`ui.DataGridActions()`) and
+`NoAction` can always be named.
 
 `keymap.Parse(data, actions)` parses the bytes of a file, and
 `keymap.Load(path, actions)` reads one. Both return the valid bindings and
@@ -421,6 +422,14 @@ Alt+Left, Shift+Delete, Shift+Enter in a single-line field, Ctrl+Shift+Backspace
 is no longer handled by a field, so it bubbles on. Shift+Tab and Ctrl+Tab are
 unbound in fields, so they move focus as before. A `Tabs` group binds Ctrl+Tab and
 Ctrl+Shift+Tab to its tabs (see Navigation and layout).
+
+**Data grids.** A `DataGrid`'s body has the context `DataGrid`. Its copy keys are the
+actions `actions.GridCopy` (Ctrl+C and Ctrl+Insert) and `actions.GridCopyWithHeaders`
+(Ctrl+Shift+C), bound by `ui.DefaultBindings()` in `DataGrid && !DataGridCell`, so an app
+rebinds them or puts them in the grid's context menu as it does the text fields' (see
+[Data grids](widgets-data.md#data-grids)). A cell that holds controls or an editor has the
+context `DataGridCell`, so while one of them has focus its own keys win, and the grid does
+not copy from under it.
 
 **Palettes.** A command palette's search field is an `Editor` inside a
 `KeyContext("Palette")`. Its keys therefore belong to `"Palette > Editor"`:
