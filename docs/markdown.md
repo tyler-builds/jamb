@@ -100,6 +100,7 @@ screen reader says that it is a table, and its size, from the Grid pattern.
 | `Images(func(src string) (*ui.ImageSource, error))` | sets the image loader |
 | `BaseDir(dir)` | sets the directory of the default image loader |
 | `Code(h markdown.CodeHighlighter)` | colors the code blocks (see Code blocks) |
+| `CopyCode(on bool)` | gives each code block a button that copies its code (see Code blocks); off by default |
 | `Width`, `Height`, `MinWidth`, `MinHeight`, `MaxWidth`, `MaxHeight`, `Grow`, `GridSpan` | size the view's box, as the ui widgets' sizing methods do (see [Sizing](styling.md#sizing)); they win over the `Document` part |
 
 `OnTaskToggle` calls its function with the task's index (0 for the first task of the
@@ -223,6 +224,36 @@ again. `ctx` is done when the view no longer shows the block: when the view goes
 away, or when its text changes and the new text does not have the block. The
 highlighter can then drop the work.
 
+### Copy buttons
+
+`CopyCode(true)` gives each code block, fenced or indented, a copy button: a small
+icon button in the block's top right corner. It copies the block's code as it is
+written between the fences, without the fence, the language or a trailing line
+break, and without the indentation of a list item that holds the block. After a copy
+its icon turns into a check for 1.5 seconds, and `ui.Strings.Copied` is announced to
+assistive technology. Its tooltip is `MarkdownCopyCode` ("Copy code"), and its name
+"Copy" (`ui.Strings.Copy`). Code in a line has no button.
+
+```go
+markdown.View(reply).Code(code).CopyCode(true)
+```
+
+The button always shows: a touch has no hover, so a button that showed only under
+the pointer would not be there for a finger, and Tab stops on it. It is the muted
+`ui.CopyButton`, which takes the text color under the pointer, and it sits over the
+block's corner, centered on the first line, on the block's background, outside the
+box that scrolls, so it stays put when the block scrolls. It moves neither the block
+nor its text: the block keeps its size, and the text its place. The block's right
+padding grows to make room for the button, so a long first line, scrolled to its
+end, ends clear of it; until then the button covers the part of the first line
+under it, as the line's end is past the block's edge anyway. Selecting the code,
+`Ctrl+C`, a right click on the code and scrolling sideways work as they do without
+the button, and a selection across the document holds none of its words.
+
+It is off by default because it adds a control, and a tab stop, to every code block:
+an app that shows Markdown as a document to read, such as a README, may not want
+one, and apps that update jamb keep their look.
+
 ## Parts
 
 The parts of a view are set with `ViewElement.Styles(markdown.Style{...})`, or for
@@ -249,6 +280,7 @@ view.Styles(markdown.Style{Paragraph: ui.Style{LineHeight: 1.6}})
 | `Link`, `LinkHover` | link text, and link text under the pointer (`TextColor`, `Background`) | the theme's `Link` color; underlined under the pointer |
 | `InlineCode` | code in a line (`TextColor`, `Background`) | the text color on `SurfaceActive` |
 | `CodeBlock` | the box and text of code blocks | the code editor's colors, a border, the theme's radius, padding 12, monospace |
+| `CodeCopy` | the box behind a code block's copy button, from a gap before it to the block's border (see Copy buttons): its background, radius, border and padding | the code block's background and radius; padding that places the button |
 | `Quote` | the box of block quotes | a 3-pixel line on the left, muted text |
 | `List` | the column of a tight list's items | a gap of 4 |
 | `ListMarker` | bullets and numbers | muted, at least 18 wide, aligned to the end |
@@ -269,8 +301,8 @@ The parts are documented here and in the package doc. They are not listed in
 The words that the view adds to a document are the `Markdown…` fields of the
 window's `ui.Strings`: `MarkdownImage` (the name of an image without alternative
 text), `MarkdownImageNotShown` (the placeholder's text), `MarkdownTask` (the name of
-a task's check box when the task has no text), `MarkdownCode` and
-`MarkdownFootnotes`. They are English in every built-in pack (see
+a task's check box when the task has no text), `MarkdownCode`, `MarkdownCopyCode`
+(the tooltip of a code block's copy button) and `MarkdownFootnotes`. They are English in every built-in pack (see
 [Translations](translations.md)).
 
 ## Performance
