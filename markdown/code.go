@@ -50,9 +50,54 @@ func (b *builder) codeBlock(lines *text.Segments, lang string) ui.Element {
 		sb.Write(seg.Value(b.doc.src))
 	}
 	code := strings.TrimSuffix(strings.ReplaceAll(sb.String(), "\r\n", "\n"), "\n")
-	return ui.Div().Style(b.st.CodeBlock).ScrollX().Label(b.s.MarkdownCode(lang)).
-		Child(ui.Rich(b.codeSegments(lang, code)...).NoWrap().Selectable())
+	text := ui.Rich(b.codeSegments(lang, code)...).NoWrap().Selectable()
+	block := ui.Div().Style(b.st.CodeBlock).ScrollX().Label(b.s.MarkdownCode(lang))
+	if !b.v.copyCode {
+		return block.Child(text)
+	}
+	// The copy button sits over the block's top right corner, centered on its first
+	// line, outside the box that scrolls, so it stays there when the block scrolls.
+	// The block's right padding makes room for the button and a gap, so that the end
+	// of a long first line scrolls clear of it. Neither moves the block or its text.
+	cb := &b.st.CodeBlock
+	fs := cb.FontSize
+	if fs <= 0 {
+		fs = b.t.FontSize
+	}
+	if fs <= 0 {
+		fs = 14
+	}
+	lh := cb.LineHeight
+	if lh <= 0 {
+		lh = 1.4
+	}
+	bt, bw := cb.BorderWidth, cb.BorderWidth // the top and right borders
+	if cb.BorderEdges != (ui.Edges{}) {
+		bt, bw = cb.BorderEdges.Top, cb.BorderEdges.Right
+	}
+	top := max(bt+cb.Padding.Top+fs*lh/2-codeCopySize/2, 2)
+	right := max(top, 2)
+	block.Style(ui.Style{Padding: ui.Edges{Right: max(cb.Padding.Right, codeCopySize+right+codeCopyGap)}})
+	// The box behind the button reaches the block's border, so that the end of a long
+	// line does not show between the button and the border, and starts a gap before
+	// the button.
+	corner := ui.Style{Background: cb.Background, Radius: cb.Radius,
+		Padding: ui.Edges{Left: codeCopyGap, Right: max(right-bw, 0)}}
+	corner.MergeFrom(&b.st.CodeCopy)
+	return ui.Div().MinWidth(ui.Px(0)).
+		Child(block.Child(text)).
+		Child(ui.Div().Absolute().Top(top).Right(bw).Style(corner).
+			Child(ui.CopyButton(code).Small().Tooltip(b.s.MarkdownCopyCode).
+				Width(ui.Px(codeCopySize)).Height(ui.Px(codeCopySize))))
 }
+
+// codeCopySize is the width and the height of a code block's copy button (see
+// ViewElement.CopyCode).
+const codeCopySize = 28
+
+// codeCopyGap is the room between the end of a code block's long first line,
+// scrolled to its end, and the copy button.
+const codeCopyGap = 4
 
 // codeSegments returns code as segments of rich text, colored by the view's
 // highlighter when it has one and it has the ranges, and plain otherwise.

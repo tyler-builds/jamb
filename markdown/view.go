@@ -26,7 +26,8 @@
 //
 // Code blocks are in the monospace font, and scroll sideways when a line is long.
 // They are plain unless the view has a CodeHighlighter (see Code), such as the one of
-// the mdcode package, which colors them with the theme's syntax colors.
+// the mdcode package, which colors them with the theme's syntax colors. CopyCode
+// gives each one a button that copies its code.
 //
 // EditMarks formats Markdown in a text area as it is typed, through
 // ui.TextAreaElement.Marks: the text shows bold, code and links, and their syntax
@@ -55,7 +56,9 @@ type ViewElement struct {
 	images  func(src string) (*ui.ImageSource, error)
 	baseDir string
 	code    CodeHighlighter
-	size    sizes // see Width
+	// copyCode gives each code block a copy button (see CopyCode).
+	copyCode bool
+	size     sizes // see Width
 	// onLinkMenu builds the context menu of a link (see OnLinkMenu).
 	onLinkMenu func(url string) []ui.MenuItem
 }
@@ -154,6 +157,20 @@ func (v *ViewElement) BaseDir(dir string) *ViewElement { v.baseDir = dir; return
 // plain. See CodeHighlighter, and the mdcode package for one built on the code
 // editor's highlighter.
 func (v *ViewElement) Code(h CodeHighlighter) *ViewElement { v.code = h; return v }
+
+// CopyCode sets whether each code block has a copy button: a small icon button in
+// the block's top right corner that copies the block's code, as it is written
+// between the fences, without a trailing line break. After a copy its icon turns
+// into a check for a moment, and the confirmation (ui.Strings.Copied) is announced
+// to assistive technology. Code in a line has none. It is off by default.
+//
+// The button always shows, so that a touch reaches it as a pointer does, and Tab
+// stops on it. It sits over the block's corner, centered on the first line, on the
+// block's background; it moves neither the block nor its text, and the end of a
+// long first line scrolls clear of it. Selecting the code, scrolling it sideways
+// and the text's own menu work as they do without it. Its look is the CodeCopy
+// part of Styles.
+func (v *ViewElement) CopyCode(on bool) *ViewElement { v.copyCode = on; return v }
 
 // The sizing methods give the view's box a size, as they do for the widgets of the ui
 // package, and win over the Document part of Styles. See Sizing in docs/styling.md.

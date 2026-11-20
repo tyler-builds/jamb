@@ -28,6 +28,11 @@ type Style struct {
 	// CodeBlock is the box of a code block, which scrolls sideways when a line is
 	// long, and its text: background, border, radius, padding and font.
 	CodeBlock ui.Style
+	// CodeCopy is the box behind the copy button of a code block (see
+	// ViewElement.CopyCode), from a small gap before the button to the block's
+	// border: its background, which is the code block's by default so that code
+	// under the button does not show through, its radius, border and padding.
+	CodeCopy ui.Style
 	// Quote is the box of a block quote: its border, padding, gap and text color.
 	Quote ui.Style
 	// List is the column of the items of a tight list: its Gap is the space between
@@ -69,6 +74,7 @@ func (s *Style) mergeFrom(o *Style, plain bool) {
 	mergePart(&s.LinkHover, &o.LinkHover, plain)
 	mergePart(&s.InlineCode, &o.InlineCode, plain)
 	mergePart(&s.CodeBlock, &o.CodeBlock, plain)
+	mergePart(&s.CodeCopy, &o.CodeCopy, plain)
 	mergePart(&s.Quote, &o.Quote, plain)
 	mergePart(&s.List, &o.List, plain)
 	mergePart(&s.ListMarker, &o.ListMarker, plain)
@@ -116,6 +122,7 @@ func (s *Style) plain() {
 	plainPart(&s.LinkHover)
 	plainPart(&s.InlineCode)
 	plainPart(&s.CodeBlock)
+	plainPart(&s.CodeCopy)
 	plainPart(&s.Quote)
 	plainPart(&s.List)
 	plainPart(&s.ListMarker)
@@ -196,7 +203,7 @@ func highContrast(st *Style, t *ui.Theme) {
 // merged with the theme's markdown.Style (see ui.ThemeStyle), then with the view's
 // Styles. Under high contrast the colors of the theme's style and of the Styles are
 // dropped, and the parts take the system colors (see highContrast). The layers are
-// read where they are and merged into st: a Style is 22 parts of 109 values each,
+// read where they are and merged into st: a Style is 23 parts of 109 values each,
 // which a web build cannot afford to copy (see ui.Style.MergeFrom).
 func (v *ViewElement) resolveStyle(ctx *ui.Context, st *Style) {
 	t := ctx.Theme()

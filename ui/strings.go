@@ -493,6 +493,8 @@ type Strings struct {
 	// MarkdownCode names a code block from the language of its fence, such as
 	// "Code, go". The language may be empty.
 	MarkdownCode func(language string) string
+	// MarkdownCopyCode is the tooltip of the copy button of a code block.
+	MarkdownCopyCode string
 	// MarkdownFootnotes names the list of footnotes at the end of a document.
 	MarkdownFootnotes string
 
@@ -822,6 +824,7 @@ func englishStrings() *Strings {
 			}
 			return "Code, " + language
 		},
+		MarkdownCopyCode:  "Copy code",
 		MarkdownFootnotes: "Footnotes",
 
 		// The English forms follow CLDR 48.2's relativeTime long forms (en).
