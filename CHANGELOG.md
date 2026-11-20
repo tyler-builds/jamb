@@ -9,6 +9,16 @@ them in here.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-20
+
+### Added
+
+- `markdown.ViewElement.CopyCode(true)` gives each code block a copy button in its top right
+  corner, which copies the block's code without the fence, the language or a trailing line break.
+  Its icon turns into a check for a moment after a copy. It always shows, so a touch reaches it,
+  and moves neither the block nor its text. It is off by default. The `CodeCopy` part of
+  `markdown.Style` styles the box behind it, and `ui.Strings.MarkdownCopyCode` is its tooltip.
+
 ## [0.9.0] - 2026-11-18
 
 The `jamb` command is released with it as `cmd/jamb/v0.4.4`, with the short forms of `jamb ctl clock`
@@ -1467,7 +1477,8 @@ signals. This is the first release, and the API may change before 1.0.
 - Text is held in a persistent rope with a line index.
 - Startup and idle figures are measured in [BENCHMARKS.md](BENCHMARKS.md).
 
-[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/tyler-builds/jamb/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/tyler-builds/jamb/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/tyler-builds/jamb/compare/v0.8.10...v0.9.0
 [0.8.10]: https://github.com/tyler-builds/jamb/compare/v0.8.9...v0.8.10
 [0.8.9]: https://github.com/tyler-builds/jamb/compare/v0.8.8...v0.8.9
