@@ -111,7 +111,7 @@ flag is internal and is not part of the API.
 | The AppID equals `identityName` | Packaging goes on. The comparison is exact, case included. |
 | They differ, and `--installer` or `--msix` builds a package | Packaging stops with both values, the line of `identityName` in `jamb.json`, and the places in the app's Go files that hold the AppID. |
 | They differ, and only the zip is built | A warning. The zip does not use `identityName`. |
-| The app sets no `AppID` | A warning. The app then uses none of the features that need the ID (`Notify`, `JumpList` and `SingleInstance` require one), but the installer still gives the shortcut `identityName`. |
+| The app sets no `AppID` | A warning. The app then uses none of the features that need the ID (`Notify`, `JumpList` and `SingleInstance` require one), and the installer leaves its shortcut without an ID: a shortcut with an ID that the running app does not have is a taskbar button of its own when it is pinned. |
 | The app is built with a jamb version without the flag | A note, and the app is not run: an older app would open its window. |
 | The executable cannot run here: `--arch arm64` on an x64 PC, or a host other than Windows | A warning. Windows on Arm runs both architectures. |
 | The app does not answer: it exits without the answer, for example because it reads its own command-line flags before `Run` and refuses the unknown one, or it does not answer within 10 seconds | A warning with the reason, and the app is stopped if it is still running. |
@@ -139,9 +139,11 @@ from a script that jamb generates from `jamb.json`. The installer:
   the installed program once with the internal flag `--jamb-stamp-shortcut <AppID>`,
   which sets the ID on the shortcut that carries the program's target, and exits without
   opening a window. The flag is internal and is not part of the API. A failure is not
-  fatal: the program sets the ID itself at its first `Notify`. An app built by a jamb
-  version without the flag would open its window instead, so rebuild such an app with
-  `jamb package`;
+  fatal: the program sets the ID itself each time it starts (see
+  [Jump list and packaging](os-integration.md#jump-list-and-packaging)). An app built by
+  a jamb version without the flag would open its window instead, so rebuild such an app
+  with `jamb package`. When the [AppID check](#appid-check) finds that the app sets no
+  `AppID`, the step is left out;
 - offers a desktop shortcut as an optional component, off by default;
 - registers the app in Apps & features under `identityName`, with the display
   name, version, publisher, description, icon and estimated size;

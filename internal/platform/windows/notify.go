@@ -477,6 +477,10 @@ func WriteShortcut(path, target, appID string) error {
 // window.
 func InitializeCOM() { win32.OleInitialize() }
 
+// WithCOM runs fn with COM initialized on the calling goroutine's thread, which is
+// locked for the call, for shortcut calls off the UI thread.
+func WithCOM(fn func()) { win32.WithCOM(fn) }
+
 // ReadShortcut returns the target path and the Application User Model ID of the shortcut
 // at path. The ID is empty when the shortcut has none. The shortcut is loaded but not
 // resolved, so a target that is missing or on an unavailable drive does not delay the read.

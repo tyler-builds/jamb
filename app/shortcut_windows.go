@@ -53,7 +53,7 @@ func stampShortcut(appID string) error {
 	if err != nil {
 		return err
 	}
-	action, path := chooseShortcut(appID, exe, "", findShortcuts(startMenuRoots(user)))
+	action, path := chooseShortcut(appID, exe, "", findShortcuts(startMenuRoots(user), exe))
 	switch action {
 	case shortcutKeep:
 		return nil
@@ -82,15 +82,21 @@ func startMenuRoots(user string) []string {
 	return roots
 }
 
-// findShortcuts returns the shortcut files (.lnk) in the roots and their subfolders, in
-// search order, with what registration needs about each. A shortcut that cannot be read
-// is skipped. It needs COM on the calling thread: the UI thread has it, and so does the
-// stamp flag, which initializes it.
-func findShortcuts(roots []string) []shortcutCandidate {
+// findShortcuts returns the shortcut files (.lnk) in the roots and their subfolders that
+// may start the program exe, in search order, with what registration needs about each. A
+// shortcut whose file does not hold exe's file name is not loaded (see mayTarget), and one
+// that cannot be read is skipped. It needs COM on the calling thread: the UI thread has
+// it, and so do the stamp flag, which initializes it, and stampAtStart, which runs it in
+// windows.WithCOM.
+func findShortcuts(roots []string, exe string) []shortcutCandidate {
+	name := filepath.Base(exe)
 	var found []shortcutCandidate
 	for _, root := range roots {
 		filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() || !strings.EqualFold(filepath.Ext(path), ".lnk") {
+				return nil
+			}
+			if data, err := os.ReadFile(path); err != nil || !mayTarget(data, name) {
 				return nil
 			}
 			target, appID, err := windows.ReadShortcut(path)
@@ -102,6 +108,35 @@ func findShortcuts(roots []string) []shortcutCandidate {
 		})
 	}
 	return found
+}
+
+// stampAtStart gives the program's Start menu shortcuts the AppID where they lack it (see
+// startupStamps). The installer's stamp does not reach every shortcut: not one the user
+// made for a zip install, nor one from an installer without the stamp or whose stamp
+// failed. It runs on a goroutine of its own, since the Start menu may hold hundreds of
+// shortcuts, and writes the shortcuts on the UI thread, where Notify writes them too. A
+// failure is printed, and the app runs on.
+func stampAtStart(appID string) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	user, err := userPrograms()
+	if err != nil {
+		return
+	}
+	var paths []string
+	windows.WithCOM(func() { paths = startupStamps(appID, exe, findShortcuts(startMenuRoots(user), exe)) })
+	if len(paths) == 0 {
+		return
+	}
+	postUI(func() {
+		for _, path := range paths {
+			if err := windows.SetShortcutAppID(path, appID); err != nil {
+				fmt.Fprintf(os.Stderr, "jamb: setting the AppID on the Start menu shortcut %s: %v\n", path, err)
+			}
+		}
+	})
 }
 
 // writable reports whether the file at path can be opened for writing. Nothing is

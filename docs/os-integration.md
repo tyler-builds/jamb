@@ -155,11 +155,20 @@ crashed app does not block later launches.
   build. Two `go run` runs with the same `AppID` also share one instance.
 - **Zip and installer.** The app sets its `AppID` at startup, which is enough for
   the taskbar and the jump list. Windows groups the taskbar button with a Start menu
-  entry only when that shortcut carries the `AppID`. NSIS's `CreateShortcut` cannot
-  set the `System.AppUserModel.ID` property, so the `jamb package` installer runs the
-  installed program once with an internal flag, which sets the ID on the installer's
-  shortcut and exits (see [Installer](packaging.md#installer)). A zip install has no such
-  shortcut; the app sets the ID on its own shortcut at its first `Notify`.
+  entry, and with a shortcut pinned from it, only when that shortcut carries the
+  `AppID`; otherwise the pinned shortcut and the running app are two buttons. NSIS's
+  `CreateShortcut` cannot set the `System.AppUserModel.ID` property, so the
+  `jamb package` installer runs the installed program once with an internal flag,
+  which sets the ID on the installer's shortcut and exits (see
+  [Installer](packaging.md#installer)). Each time it starts, the app also sets the ID
+  on every Start menu shortcut to its executable that lacks it or has another and that
+  it can write, in the user's and the all-users Programs folders. That covers a
+  shortcut the user made for a zip install, one from an older installer, and a stamp
+  that failed. The check runs on a goroutine of its own, and reads only the shortcuts
+  whose file holds the executable's name. It creates no shortcut: a zip install gets
+  one at its first `Notify` (see [What is written, and when](#what-is-written-and-when)).
+  Windows copies a shortcut when it is pinned, so a pin made before its shortcut had
+  the ID stays a separate button: unpin it, and pin it again.
 - **MSIX.** A packaged app has an identity from its package, and Windows keys the
   jump list and Recent documents by the package's ID, `<PackageFamilyName>!App`.
   `AppID` is not used for those in a packaged process, so the jump list works
@@ -466,6 +475,8 @@ err := app.Notify(app.Notification{
 
 The first `Notify` of a process writes the registration below, for the current user
 only. Nothing is written at import time, and that process does not write it again.
+Apart from it, an app with an `AppID` sets the ID on its existing Start menu shortcuts
+when it starts, but creates none (see [Jump list and packaging](#jump-list-and-packaging)).
 The paths use the executable that is running, so a moved program needs a new first
 `Notify` (a new process) to point the registration at its new location.
 

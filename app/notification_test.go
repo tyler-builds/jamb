@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -353,6 +354,87 @@ func TestChooseShortcut(t *testing.T) {
 			action, path := chooseShortcut(appID, exe, created, tt.found)
 			if action != tt.action || path != tt.path {
 				t.Errorf("chooseShortcut = %d, %q; want %d, %q", action, path, tt.action, tt.path)
+			}
+		})
+	}
+}
+
+// At startup, every writable Start menu shortcut to the program that does not carry the
+// AppID gets it, so that a shortcut pinned from any of them groups with the running app;
+// nothing is created.
+func TestStartupStamps(t *testing.T) {
+	const appID = "JambExamples.Notes"
+	exe, other, user, all := "/apps/Notes Pro.exe", "/apps/Other.exe", "/user/Programs/Notes Pro.lnk", "/all/Programs/Notes Pro/Notes Pro.lnk"
+	if runtime.GOOS == "windows" {
+		exe, other = `C:\Apps\Notes Pro.exe`, `C:\Apps\Other.exe`
+		user = `C:\Users\x\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Notes Pro.lnk`
+		all = `C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Notes Pro\Notes Pro.lnk`
+	}
+	tests := []struct {
+		name  string
+		found []shortcutCandidate
+		want  []string
+	}{
+		{"none found creates nothing", nil, nil},
+		{"a shortcut without the AppID is stamped",
+			[]shortcutCandidate{{Path: all, Target: exe, Writable: true}}, []string{all}},
+		{"a shortcut with the AppID is left alone",
+			[]shortcutCandidate{{Path: user, Target: exe, AppID: appID, Writable: true}}, nil},
+		{"a shortcut with another AppID is stamped",
+			[]shortcutCandidate{{Path: user, Target: exe, AppID: "Other.App", Writable: true}}, []string{user}},
+		{"a shortcut that cannot be written is left alone",
+			[]shortcutCandidate{{Path: all, Target: exe}}, nil},
+		{"another program's shortcut is left alone",
+			[]shortcutCandidate{{Path: user, Target: other, Writable: true}}, nil},
+		{"a shortcut is stamped beside one that has the AppID",
+			[]shortcutCandidate{{Path: user, Target: exe, AppID: appID, Writable: true}, {Path: all, Target: exe, Writable: true}}, []string{all}},
+		{"every shortcut without the AppID is stamped, in search order",
+			[]shortcutCandidate{{Path: user, Target: exe, Writable: true}, {Path: all, Target: exe, Writable: true}}, []string{user, all}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := startupStamps(appID, exe, tt.found); !slices.Equal(got, tt.want) {
+				t.Errorf("startupStamps = %q; want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// Only a shortcut file that holds the program's file name, as 8-bit or UTF-16 text in
+// any ASCII case, is loaded.
+func TestMayTarget(t *testing.T) {
+	utf16 := func(s string) []byte {
+		var b []byte
+		for i := 0; i < len(s); i++ {
+			b = append(b, s[i], 0)
+		}
+		return b
+	}
+	lnk := func(parts ...[]byte) []byte {
+		data := []byte("L\x00\x00\x00\x01\x14\x02\x00")
+		for _, p := range parts {
+			data = append(append(data, p...), 0xFF, 0x00)
+		}
+		return data
+	}
+	tests := []struct {
+		name string
+		data []byte
+		exe  string
+		want bool
+	}{
+		{"the name as 8-bit text", lnk([]byte(`C:\Apps\Notes Pro.exe`)), "Notes Pro.exe", true},
+		{"the name as UTF-16 text", lnk(utf16(`C:\Apps\Notes Pro.exe`)), "Notes Pro.exe", true},
+		{"another case", lnk(utf16(`C:\APPS\NOTES PRO.EXE`)), "Notes Pro.exe", true},
+		{"another program", lnk([]byte(`C:\Apps\Other.exe`), utf16(`C:\Apps\Other.exe`)), "Notes Pro.exe", false},
+		{"a name that only starts the same", lnk(utf16(`C:\Apps\Notes.exe`)), "Notes Pro.exe", false},
+		{"a name with other than ASCII is always loaded", lnk(utf16(`C:\Apps\Other.exe`)), "Notizen Über.exe", true},
+		{"an empty name is always loaded", lnk(), "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := mayTarget(tt.data, tt.exe); got != tt.want {
+				t.Errorf("mayTarget = %v; want %v", got, tt.want)
 			}
 		})
 	}

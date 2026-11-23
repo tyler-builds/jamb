@@ -35,31 +35,32 @@ const appIDTimeout = 10 * time.Second
 // identityName in jamb.json. A mismatch is an error when strict is set, which is when
 // an installer or an MSIX is built, since both are keyed by identityName; for a zip
 // alone it is a warning. When the check cannot be made, it is skipped with a warning or
-// a note, and packaging goes on.
-func checkAppID(dir, exe, arch string, cfg *config, strict bool) error {
+// a note, and packaging goes on. noAppID reports that the app answered, and sets no
+// AppID: the installer then leaves its shortcut without one (see installerFields.Stamp).
+func checkAppID(dir, exe, arch string, cfg *config, strict bool) (noAppID bool, err error) {
 	if !canRunHere(runtime.GOOS, runtime.GOARCH, arch) {
 		pkgf("warning: the AppID check is skipped, since a windows/%s executable cannot run on this %s/%s machine; make sure the app calls App.AppID(%q), the identityName of jamb.json", arch, runtime.GOOS, runtime.GOARCH, cfg.IdentityName)
-		return nil
+		return false, nil
 	}
 	if !takesFlag(exe, printAppIDFlag) {
 		pkgf("note: the AppID check is skipped, since the app is built with a jamb version that cannot report its AppID; update the app's jamb dependency to have App.AppID checked against identityName")
-		return nil
+		return false, nil
 	}
 	appID, problem := runForAppID(exe, appIDTimeout)
 	if problem != "" {
 		pkgf("warning: the AppID check is skipped: %s; make sure the app calls App.AppID(%q), the identityName of jamb.json", problem, cfg.IdentityName)
-		return nil
+		return false, nil
 	}
 	if appID == cfg.IdentityName {
-		return nil
+		return false, nil
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, configFile))
 	msg := appIDMismatch(cfg.IdentityName, appID, configFile+lineSuffix(jsonKeyLine(data, "identityName")), appIDCallSites(dir, appID))
 	if appID == "" || !strict {
 		pkgf("warning: %s", msg)
-		return nil
+		return appID == "", nil
 	}
-	return errors.New(msg)
+	return false, errors.New(msg)
 }
 
 // canRunHere reports whether a windows/arch executable runs on a hostOS/hostArch

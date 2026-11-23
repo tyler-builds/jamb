@@ -250,7 +250,8 @@ func packageApp(o packageOptions) error {
 	}
 	// The check runs before signing, so a mismatch stops packaging before the sign
 	// command is asked for anything.
-	if err := checkAppID(o.dir, exe, o.arch, cfg, makensis != "" || makeappx != ""); err != nil {
+	noAppID, err := checkAppID(o.dir, exe, o.arch, cfg, makensis != "" || makeappx != "")
+	if err != nil {
 		return err
 	}
 	if sign != nil {
@@ -285,7 +286,7 @@ func packageApp(o packageOptions) error {
 	if makensis != "" {
 		setupName := base + "-setup.exe"
 		setupPath := filepath.Join(work, setupName)
-		if err := buildInstaller(makensis, stage, setupPath, o.dir, exe, extras, cfg, icon, winVersion); err != nil {
+		if err := buildInstaller(makensis, stage, setupPath, o.dir, exe, extras, cfg, icon, winVersion, !noAppID); err != nil {
 			return err
 		}
 		if sign != nil {

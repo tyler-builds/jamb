@@ -57,6 +57,19 @@ type BITMAP struct {
 	BmBits       uintptr
 }
 
+// WithCOM runs fn on the calling goroutine's thread with COM initialized for it,
+// as a single-threaded apartment, and locks the goroutine to the thread for the
+// call. It is for work on a goroutine of its own, off the UI thread, such as
+// reading shortcuts. A thread that already has COM keeps it.
+func WithCOM(fn func()) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	if hr, _, _ := procCoInitializeEx.Call(0, coinitApartmentThreaded|coinitDisableOLE1DDE); uint32(hr) != rpcEChangedMode {
+		defer procCoUninitialize.Call()
+	}
+	fn()
+}
+
 // FileIcon returns the icon of the file at path, about size pixels square: the
 // file's own icon at exactly that size when the file holds icons (an executable,
 // a library or an .ico file), or else the icon of its type, at the small or the

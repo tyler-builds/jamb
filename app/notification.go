@@ -505,6 +505,60 @@ func chooseShortcut(appID, exe, created string, found []shortcutCandidate) (shor
 	return shortcutCreate, created
 }
 
+// startupStamps returns the Start menu shortcuts that an app stamps with its AppID when
+// it starts: each writable shortcut in found whose target is exe and whose AppID is not
+// appID, in search order. Windows shows a shortcut pinned from the Start menu and the
+// running app as one taskbar button only when both carry the same AppID, so every
+// shortcut to the program gets it, not only the one that registration settles on (see
+// chooseShortcut). Nothing is created: the shortcut that a zip install's first Notify
+// writes is for notifications, and an app that starts without notifying has asked for
+// none.
+func startupStamps(appID, exe string, found []shortcutCandidate) []string {
+	var paths []string
+	for _, c := range found {
+		if samePath(c.Target, exe) && c.AppID != appID && c.Writable {
+			paths = append(paths, c.Path)
+		}
+	}
+	return paths
+}
+
+// mayTarget reports whether the shortcut file data may start the program whose file name
+// is name, such as "Notes.exe": whether the name is in the file as 8-bit or as UTF-16
+// text, ignoring the case of ASCII letters. A shortcut holds its target's file name in
+// both forms, so the search skips loading, through COM, the shortcuts to other programs.
+// A name with other than ASCII characters, whose case and 8-bit form vary, is not looked
+// for: every shortcut may target it.
+func mayTarget(data []byte, name string) bool {
+	if name == "" {
+		return true
+	}
+	for i := 0; i < len(name); i++ {
+		if name[i] >= 0x80 {
+			return true
+		}
+	}
+	lower := make([]byte, len(data))
+	for i, b := range data {
+		lower[i] = asciiLower(b)
+	}
+	want := make([]byte, len(name))
+	wide := make([]byte, 0, 2*len(name))
+	for i := 0; i < len(name); i++ {
+		want[i] = asciiLower(name[i])
+		wide = append(wide, want[i], 0)
+	}
+	return bytes.Contains(lower, want) || bytes.Contains(lower, wide)
+}
+
+// asciiLower returns b in lower case when it is an ASCII capital letter.
+func asciiLower(b byte) byte {
+	if 'A' <= b && b <= 'Z' {
+		return b + 'a' - 'A'
+	}
+	return b
+}
+
 // samePath reports whether a and b name the same file: both are made absolute and
 // cleaned, and compared without case, as Windows file names are.
 func samePath(a, b string) bool {

@@ -190,7 +190,7 @@ func TestInstallerCompilesWithMakensis(t *testing.T) {
 	out := filepath.Join(dir, "setup.exe")
 	cfg := validConfig()
 	icon := image.NewNRGBA(image.Rect(0, 0, 256, 256))
-	if err := buildInstaller(makensis, stage, out, appDir, exe, nil, &cfg, icon, "0.1.0.0"); err != nil {
+	if err := buildInstaller(makensis, stage, out, appDir, exe, nil, &cfg, icon, "0.1.0.0", true); err != nil {
 		t.Fatal(err)
 	}
 	f, err := pe.Open(out)
@@ -222,5 +222,10 @@ func TestInstallerStampsOnlyAnAppThatTakesTheFlag(t *testing.T) {
 	}
 	if !takesStampFlag(with) || takesStampFlag(without) || takesStampFlag(filepath.Join(dir, "missing.exe")) {
 		t.Error("takesStampFlag does not tell an app that takes the flag from one that does not")
+	}
+	// An app that the AppID check found to set no AppID is not stamped either: the
+	// shortcut's ID would differ from the running app's, which has none.
+	if !stampsShortcut(with, true) || stampsShortcut(with, false) || stampsShortcut(without, true) {
+		t.Error("stampsShortcut does not stamp exactly an app that takes the flag and sets an AppID")
 	}
 }
