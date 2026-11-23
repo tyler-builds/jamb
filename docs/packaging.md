@@ -65,14 +65,18 @@ refused with the replacement to use.
 
 ## What the executable contains
 
-- The icon, in 16, 24, 32, 48, 64, 128 and 256 px.
+- The icon, in 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96, 128 and 256 px.
+  Explorer shows it, and each window of the running app takes its small and big
+  icons from it, at the exact sizes of every display scale up to 300% (see
+  [Window icon](windows.md#window-icon)).
 - Version information: file and product version (`version` with `.0`), company,
   `displayName` as both the file description and the product name (Task Manager and
   other Windows lists show the file description as the program's name),
   `description` as the comments, original and internal file names, and copyright.
 - An application manifest with per-monitor v2 DPI awareness, which matches what
   the framework sets at run time; Common Controls version 6, which `TaskDialog`
-  needs; Windows 10 and 11 as the supported OS; long path names; and `asInvoker`,
+  needs, and which scales a window icon down from a larger image when the icon has
+  no image of the size; Windows 10 and 11 as the supported OS; long path names; and `asInvoker`,
   so the app never asks for elevation.
 - A build with `-trimpath -ldflags "-s -w -H=windowsgui"`, `GOOS=windows`,
   `CGO_ENABLED=0`. The GUI subsystem means no console window opens.

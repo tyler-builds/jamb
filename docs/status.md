@@ -96,6 +96,10 @@ The milestone status, and the known limitations and next steps.
   in `internal/platform/windows/chrome.go`). Not checked automatically, so check
   these by hand: dragging the title bar to move the window and to snap it to an
   edge, Win+ arrows, the drop shadow and the rounded corners.
+  Window icons: a window test (`JAMB_LIVE_TESTS`) checks that `WM_GETICON` gives
+  both icons at the sizes of each DPI. A packaged app's taskbar button, thumbnail,
+  Alt+Tab and caption icon have not been checked by hand yet (see
+  [Window icon](windows.md#window-icon)).
   Images and glyph textures are shared per device and stay resident after
   the window that used them closes. A lost GPU device is rebuilt
   automatically; see [GPU device loss](architecture.md#gpu-device-loss) for what was checked

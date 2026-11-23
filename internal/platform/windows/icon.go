@@ -15,19 +15,11 @@ import (
 // executable (cmd/jamb, which writes the icon as resource 1).
 const exeIconResource = 1
 
-// iconSize returns the side, in pixels, of a small icon at dpi, such as a
-// notification area icon or a taskbar overlay. metric is
-// GetSystemMetricsForDpi(SM_CXSMICON); when it reports nothing, the size is
-// 16 pixels at 96 DPI, scaled.
-func iconSize(dpi uint32, metric func(dpi uint32) int32) int {
-	if s := int(metric(dpi)); s > 0 {
-		return s
-	}
-	return max(16, (16*int(dpi)+48)/96)
-}
-
 // smallIconMetric is the system's small icon size at dpi.
 func smallIconMetric(dpi uint32) int32 { return win32.SystemMetricsForDpi(win32.SM_CXSMICON, dpi) }
+
+// bigIconMetric is the system's big icon size at dpi.
+func bigIconMetric(dpi uint32) int32 { return win32.SystemMetricsForDpi(win32.SM_CXICON, dpi) }
 
 // iconPixels returns img scaled to size pixels square, as the rows CreateIcon
 // takes: 32-bit blue, green, red, alpha, top row first, straight alpha.
@@ -65,4 +57,78 @@ func makeIcon(img image.Image, size int) (icon uintptr, owned bool, err error) {
 		return icon, true, nil
 	}
 	return win32.LoadIcon(0, win32.IDI_APPLICATION, size, true), false, nil
+}
+
+// windowIcon returns the icon of a window at size pixels square: img when it is
+// set, or else the executable's icon. The caller destroys it. It returns 0 when
+// img is nil and the executable has no icon, as a program built without jamb
+// package has none: such a window keeps the icon Windows gives it.
+func windowIcon(img image.Image, size int) uintptr {
+	if img != nil {
+		if icon, err := newIcon(img, size); err == nil {
+			return icon
+		}
+	}
+	return win32.LoadIcon(win32.GetModuleHandle(), exeIconResource, size, false)
+}
+
+// windowIcons are the small and big icons a window has been given with
+// WM_SETICON, and the sizes they were made at. The window made them, and
+// destroys them when it gets others or is destroyed.
+type windowIcons struct {
+	small, big         uintptr
+	smallSize, bigSize int
+}
+
+// updateIcons gives the window its small and big icons at the sizes of its DPI,
+// from WindowOptions.Icon or the executable's icon, each made at exactly its
+// size rather than one size stretched. It does nothing when the sizes have not
+// changed, so it runs again cheaply on every DPI change. A window without an
+// icon to give keeps the one Windows gives it.
+func (w *window) updateIcons() {
+	small, big := iconSize(w.dpi, smallIconMetric), bigIconSize(w.dpi, bigIconMetric)
+	if small == w.icons.smallSize && big == w.icons.bigSize {
+		return
+	}
+	w.icons.smallSize, w.icons.bigSize = small, big
+	w.icons.small = w.replaceIcon(win32.ICON_SMALL, w.icons.small, windowIcon(w.opts.Icon, small))
+	w.icons.big = w.replaceIcon(win32.ICON_BIG, w.icons.big, windowIcon(w.opts.Icon, big))
+}
+
+// replaceIcon gives the window icon as its small or big icon, destroys old, and
+// returns the icon the window now has. An icon of 0 leaves old in place.
+func (w *window) replaceIcon(which int, old, icon uintptr) uintptr {
+	if icon == 0 {
+		return old
+	}
+	win32.SetWindowIcon(w.hwnd, which, icon)
+	win32.DestroyIcon(old)
+	return icon
+}
+
+// destroyIcons takes the window's icons from it and destroys them, as the
+// window is destroyed.
+func (w *window) destroyIcons() {
+	if w.icons.small != 0 {
+		win32.SetWindowIcon(w.hwnd, win32.ICON_SMALL, 0)
+	}
+	if w.icons.big != 0 {
+		win32.SetWindowIcon(w.hwnd, win32.ICON_BIG, 0)
+	}
+	win32.DestroyIcon(w.icons.small)
+	win32.DestroyIcon(w.icons.big)
+	w.icons = windowIcons{}
+}
+
+// classIcons returns the big and small icons of the window class, from the
+// executable's icon at the sizes of the system DPI, or 0 when the executable has
+// none. The class keeps them for the life of the process. Each window gets its
+// own at its DPI (see updateIcons); the class's stand in where Windows reads the
+// class rather than the window.
+func classIcons() (big, small uintptr) {
+	dpi := win32.GetDpiForSystem()
+	inst := win32.GetModuleHandle()
+	big = win32.LoadIcon(inst, exeIconResource, bigIconSize(dpi, bigIconMetric), false)
+	small = win32.LoadIcon(inst, exeIconResource, iconSize(dpi, smallIconMetric), false)
+	return big, small
 }

@@ -1,3 +1,5 @@
+//go:build windows
+
 #include "textflag.h"
 
 // elementFromPointStub is the vtable entry of IRawElementProviderFragmentRoot::
