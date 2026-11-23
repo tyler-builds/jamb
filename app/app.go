@@ -51,6 +51,13 @@ type Window struct {
 	Title  string
 	Width  int // logical pixels; default 1024
 	Height int // logical pixels; default 720
+	// Icon is the window's icon on Windows: in its title bar, on its taskbar
+	// button and thumbnail, and in Alt+Tab. It is drawn from the image at each
+	// size Windows shows, for the window's DPI. Nil uses the executable's icon,
+	// which jamb package embeds, so a packaged app needs no Icon; a program built
+	// without an icon keeps the one Windows gives it. Other platforms ignore it.
+	// Give an image of 256 pixels or more, so that no size is scaled up.
+	Icon image.Image
 	// MinWidth is the smallest width that the user can resize the window to, in logical pixels.
 	MinWidth int
 	// MinHeight is the smallest height that the user can resize the window to, in logical pixels.
@@ -539,6 +546,7 @@ func openWindow(cfg Window, handle *appWindow) (*host, error) {
 		MinWidth: cfg.MinWidth, MinHeight: cfg.MinHeight, Dark: cfg.themeFor(systemSettings(h.dev).Dark).Dark,
 		CustomTitleBar: cfg.Chrome == ChromeCustom,
 		Corners:        platform.Corners(cfg.Corners),
+		Icon:           cfg.Icon,
 		NoActivate:     h.dev.noActivate,
 	}
 	if h.primary && h.dev.position != nil {

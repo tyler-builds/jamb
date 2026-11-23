@@ -19,9 +19,12 @@ const (
 	recommendedIconSize = 256
 )
 
-// icoSizes are the images of the .ico file, one per size Windows shows
-// (small icons, taskbar, Explorer and the large views).
-var icoSizes = []int{16, 24, 32, 48, 64, 128, 256}
+// icoSizes are the images of the .ico file, one per size Windows shows (small
+// icons, taskbar, Explorer and the large views). A window's small and big icons
+// are 16 and 32 pixels at 100% scale; the sizes between hold both at every scale
+// Windows offers up to 300% (125% is 20 and 40, 175% is 28 and 56, and so on),
+// so the running app loads each at its exact size rather than scaling another.
+var icoSizes = []int{16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96, 128, 256}
 
 // msixLogos are the logo files of the MSIX package, each with its size at
 // 100% scale. Every logo is written at 100%, 200% and 400% scale.

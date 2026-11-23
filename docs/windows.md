@@ -142,6 +142,37 @@ An app that saves as it goes, such as the notes example, has nothing to report
 while its writes succeed. Its `Unsaved` reports the notes only when the write as
 the window closes fails, so the user can try again rather than lose them.
 
+### Window icon
+
+On Windows, each window shows its icon in its title bar, on its taskbar button and
+in the button's thumbnail, and in Alt+Tab. jamb gives every window it opens (the
+first window, `app.Open` windows, floating dock windows, the inspector) two icons:
+a small one, which the title bar and the thumbnail's title row show, and a big one,
+which the taskbar button and Alt+Tab show. Each is made at exactly the size Windows
+asks for at the window's DPI (`SM_CXSMICON` and `SM_CXICON`: 16 and 32 pixels at
+100%, 24 and 48 at 150%), and both are made again when the window moves to a
+monitor with another scale.
+
+- **From the executable.** By default the icons come from the executable's icon
+  resource, which `jamb package` embeds with an image for each of those sizes up to
+  300% (see [What the executable contains](packaging.md#what-the-executable-contains)).
+  A size the icon does not hold is scaled down from the next larger image. A
+  packaged app needs no code for this.
+- **From an image.** `app.Window{Icon: img}` gives one window an icon drawn from
+  `img` at each size, for an unpackaged run or a window that should look different
+  from the app. Give a square image of 256 pixels, so that no size is scaled up.
+- **Without either.** A program built with `go build` or `go run` has no icon
+  resource. Its windows get no icon from jamb and show the one Windows gives them,
+  as before.
+
+A window with a custom title bar draws no system caption icon; the taskbar, its
+thumbnail and Alt+Tab still show the window's icons.
+
+To check a packaged app by hand on Windows: its taskbar button is sharp at 100%
+and 150% scale, the thumbnail that shows when the pointer rests on the button
+has the icon in its title row, Alt+Tab and the title bar show it, and all of
+them stay sharp after the window is moved to a monitor with another scale.
+
 ## Custom title bars
 
 `app.Window{Chrome: app.ChromeCustom}` removes the operating system's title

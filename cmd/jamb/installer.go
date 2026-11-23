@@ -46,7 +46,7 @@ type installerFields struct {
 	OutFile       string
 	UninstallKey  string
 	AppID         string // the app's AppID, which is identityName
-	Stamp         bool   // the executable takes the internal flag that stamps its shortcut (see stampFlag)
+	Stamp         bool   // stamp the shortcut: the executable takes stampFlag, and does not answer the AppID check with none
 	Scheme        string // the URI scheme of the app's notifications, from protocolScheme
 	ShortcutName  string // the file name, without .lnk, of the shortcut that jamb may write
 	EstimatedSize int64
@@ -102,7 +102,9 @@ func findMakensis(path string) (string, error) {
 // buildInstaller writes the NSIS script and the icon into dir, and compiles the
 // installer to out with makensis. The installer copies the executable, the extra
 // files and the LICENSE and NOTICE files of appDir, the same files as the zip.
-func buildInstaller(makensis, dir, out, appDir, exe string, extras []string, cfg *config, icon image.Image, winVersion string) error {
+// hasAppID is false when the AppID check found that the app sets no AppID; the
+// installer then does not stamp its shortcut (see installerFields.Stamp).
+func buildInstaller(makensis, dir, out, appDir, exe string, extras []string, cfg *config, icon image.Image, winVersion string, hasAppID bool) error {
 	licenses, err := licenseFiles(appDir)
 	if err != nil {
 		return err
@@ -143,7 +145,7 @@ func buildInstaller(makensis, dir, out, appDir, exe string, extras []string, cfg
 		OutFile:       out,
 		UninstallKey:  `Software\Microsoft\Windows\CurrentVersion\Uninstall\` + cfg.IdentityName,
 		AppID:         cfg.IdentityName,
-		Stamp:         takesStampFlag(exe),
+		Stamp:         stampsShortcut(exe, hasAppID),
 		Scheme:        scheme,
 		ShortcutName:  cfg.Name,
 		EstimatedSize: (size + 1023) / 1024,
@@ -177,6 +179,14 @@ const stampFlag = "--jamb-stamp-shortcut"
 // so the installer runs it only when the flag's text is in the executable.
 func takesStampFlag(path string) bool {
 	return takesFlag(path, stampFlag)
+}
+
+// stampsShortcut reports whether the installer runs the executable at path to stamp its
+// shortcut: when it takes stampFlag, and hasAppID is set. An app that sets no AppID runs
+// without one, and Windows shows a pinned shortcut whose AppID the running app does not
+// have as a taskbar button of its own, so its shortcut is better left without one.
+func stampsShortcut(path string, hasAppID bool) bool {
+	return hasAppID && takesStampFlag(path)
 }
 
 // takesFlag reports whether the executable at path knows one of the internal flags of

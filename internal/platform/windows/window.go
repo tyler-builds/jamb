@@ -80,6 +80,8 @@ type window struct {
 	// the button while the taskbar has made one (see taskbar.go).
 	taskbar    taskbarState
 	taskbarBtn *comTaskbarButton
+	// icons are the window's small and big icons at its DPI (see updateIcons).
+	icons windowIcons
 }
 
 // The state of the UI thread, shared by all windows of the process.
@@ -93,6 +95,8 @@ var (
 	uiThread atomic.Uint32
 	// quitRequested ends the loop; it is set on the UI thread (see Quit).
 	quitRequested bool
+	// classRegistered is set once Run has registered the window class.
+	classRegistered bool
 
 	postMu sync.Mutex
 	posted []func()
@@ -109,18 +113,27 @@ func Run(start func() error) error {
 	win32.EnablePerMonitorDPI()
 	win32.OleInitialize()
 	inst := win32.GetModuleHandle()
-	className, _ := syscall.UTF16PtrFromString("JambWindow")
-	wc := win32.WNDCLASSEXW{
-		Style:         win32.CS_DBLCLKS,
-		LpfnWndProc:   syscall.NewCallback(wndProc),
-		HInstance:     inst,
-		HCursor:       win32.LoadCursor(win32.IDC_ARROW),
-		LpszClassName: className,
+	// The class is registered once per process, so that Run may run again, as the
+	// window tests do.
+	if !classRegistered {
+		className, _ := syscall.UTF16PtrFromString("JambWindow")
+		big, small := classIcons()
+		wc := win32.WNDCLASSEXW{
+			Style:         win32.CS_DBLCLKS,
+			LpfnWndProc:   syscall.NewCallback(wndProc),
+			HInstance:     inst,
+			HIcon:         big,
+			HCursor:       win32.LoadCursor(win32.IDC_ARROW),
+			LpszClassName: className,
+			HIconSm:       small,
+		}
+		wc.CbSize = uint32(sizeofWndClass)
+		if _, err := win32.RegisterClassEx(&wc); err != nil {
+			return fmt.Errorf("platform/windows: RegisterClassExW failed: %v", err)
+		}
+		classRegistered = true
 	}
-	wc.CbSize = uint32(sizeofWndClass)
-	if _, err := win32.RegisterClassEx(&wc); err != nil {
-		return fmt.Errorf("platform/windows: RegisterClassExW failed: %v", err)
-	}
+	quitRequested = false
 	// Creating the thread's message queue first lets Post reach the loop from
 	// any goroutine once uiThread is set.
 	var msg win32.MSG
@@ -287,6 +300,8 @@ func Open(opts platform.WindowOptions, h platform.Handler) (platform.Window, err
 		y := work.Top + (work.Bottom-work.Top-wh)/2
 		win32.SetWindowPos(hwnd, x, y, ww, wh, win32.SWP_NOZORDER|win32.SWP_NOACTIVATE)
 	}
+	// The icons are made for the DPI of the monitor the window was placed on.
+	w.updateIcons()
 	win32.SetDarkTitleBar(hwnd, opts.Dark)
 	if pref, ok := cornerPreference[opts.Corners]; ok {
 		win32.SetCornerPreference(hwnd, pref)
@@ -738,6 +753,7 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 
 	case win32.WM_DPICHANGED:
 		w.dpi = uint32(win32.HIWORD(wp))
+		w.updateIcons()
 		r := (*win32.RECT)(ptr(lp))
 		// A window placed on another monitor before OnCreate has no runtime yet, so
 		// the handler hears of the scale once the window is ready.
@@ -959,6 +975,7 @@ func wndProc(hwnd uintptr, msg uint32, wp, lp uintptr) uintptr {
 		w.dm.destroy()
 		w.dm = nil
 		w.destroyTaskbar()
+		w.destroyIcons()
 		w.endAccess()
 		if w.ready {
 			w.ready = false

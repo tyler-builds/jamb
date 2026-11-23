@@ -13,7 +13,8 @@ import (
 // offsets of 64-bit Windows; shell_test.go checks the sizes.
 
 var (
-	gdi32 = syscall.NewLazyDLL("gdi32.dll")
+	gdi32    = syscall.NewLazyDLL("gdi32.dll")
+	comctl32 = syscall.NewLazyDLL("comctl32.dll")
 
 	procShellNotifyIconW       = shell32.NewProc("Shell_NotifyIconW")
 	procRegisterWindowMessageW = user32.NewProc("RegisterWindowMessageW")
@@ -25,6 +26,8 @@ var (
 	procDestroyIcon            = user32.NewProc("DestroyIcon")
 	procIsWindowVisible        = user32.NewProc("IsWindowVisible")
 	procLoadImageW             = user32.NewProc("LoadImageW")
+	procSendMessageW           = user32.NewProc("SendMessageW")
+	procLoadIconWithScaleDown  = comctl32.NewProc("LoadIconWithScaleDown")
 	procCreateBitmap           = gdi32.NewProc("CreateBitmap")
 	procCreateDIBSection       = gdi32.NewProc("CreateDIBSection")
 	procDeleteObject           = gdi32.NewProc("DeleteObject")
@@ -65,7 +68,16 @@ const (
 	TPM_BOTTOMALIGN = 0x0020
 	TPM_RETURNCMD   = 0x0100
 
+	SM_CXICON   = 11
 	SM_CXSMICON = 49
+
+	// WM_SETICON and WM_GETICON set and read a window's icons; wParam is
+	// ICON_SMALL (the caption, the taskbar thumbnail's title row) or ICON_BIG
+	// (Alt+Tab, the taskbar button).
+	WM_GETICON = 0x007F
+	WM_SETICON = 0x0080
+	ICON_SMALL = 0
+	ICON_BIG   = 1
 
 	IMAGE_ICON      = 1
 	LR_DEFAULTCOLOR = 0x0000
@@ -167,16 +179,45 @@ func TrackPopupMenu(menu uintptr, flags uint32, x, y int32, hwnd uintptr) uint32
 }
 
 // LoadIcon loads the icon resource name (an ID, as MAKEINTRESOURCE gives it) of
-// module, scaled to size pixels square. A module of 0 with name IDI_APPLICATION
-// is the standard application icon. A shared icon belongs to the system and is
-// not destroyed; any other is the caller's, to destroy with DestroyIcon. It
-// returns 0 when there is no such icon.
+// module at size pixels square. A module of 0 with name IDI_APPLICATION is the
+// standard application icon. A shared icon belongs to the system and is not
+// destroyed; any other is the caller's, to destroy with DestroyIcon. It returns
+// 0 when there is no such icon.
+//
+// An icon that is not shared is made from the image of the resource that has
+// exactly that size, or else scaled down from the next larger one, with
+// LoadIconWithScaleDown. That function is in version 6 of the common controls,
+// which a program gets through its manifest (jamb package writes one); without
+// it, LoadImage picks the nearest image and stretches it.
 func LoadIcon(module, name uintptr, size int, shared bool) uintptr {
+	if !shared && procLoadIconWithScaleDown.Find() == nil {
+		var icon uintptr
+		hr, _, _ := procLoadIconWithScaleDown.Call(module, name, uintptr(size), uintptr(size), uintptr(unsafe.Pointer(&icon)))
+		if int32(hr) >= 0 && icon != 0 {
+			return icon
+		}
+	}
 	flags := uintptr(LR_DEFAULTCOLOR)
 	if shared {
 		flags = LR_SHARED
 	}
 	r, _, _ := procLoadImageW.Call(module, name, IMAGE_ICON, uintptr(size), uintptr(size), flags)
+	return r
+}
+
+// SetWindowIcon gives the window hwnd its small or big icon (which is ICON_SMALL
+// or ICON_BIG) with WM_SETICON, and returns the icon it had. The window does not
+// own its icons: the caller destroys the old one when it made it, and keeps the
+// new one until the window has another or is destroyed.
+func SetWindowIcon(hwnd uintptr, which int, icon uintptr) uintptr {
+	r, _, _ := procSendMessageW.Call(hwnd, WM_SETICON, uintptr(which), icon)
+	return r
+}
+
+// WindowIcon returns the small or big icon (ICON_SMALL or ICON_BIG) that the
+// window hwnd has been given with WM_SETICON, or 0.
+func WindowIcon(hwnd uintptr, which int) uintptr {
+	r, _, _ := procSendMessageW.Call(hwnd, WM_GETICON, uintptr(which), 0)
 	return r
 }
 

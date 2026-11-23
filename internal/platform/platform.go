@@ -53,6 +53,10 @@ type WindowOptions struct {
 	CustomTitleBar bool
 	// Corners selects how the window's corners are drawn (see app.Corners).
 	Corners Corners
+	// Icon is the window's icon, drawn at each size the system shows it at.
+	// Nil is the executable's icon, which jamb package embeds. Only Windows
+	// uses it; other platforms ignore it.
+	Icon image.Image
 	// NoActivate shows the window without activating it, and the adapter never
 	// asks the system to make it the foreground window: showing, restoring and
 	// Focus leave the active window alone. Only Windows does this. It is for

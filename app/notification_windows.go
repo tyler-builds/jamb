@@ -163,7 +163,7 @@ func register(appID string, protocol bool) error {
 	if err != nil {
 		return fmt.Errorf("app.Notify: %w", err)
 	}
-	p := planNotifyRegistration(appID, exe, programs, findShortcuts(startMenuRoots(programs)), protocol)
+	p := planNotifyRegistration(appID, exe, programs, findShortcuts(startMenuRoots(programs), exe), protocol)
 	if err := writeRegistration(p); err != nil {
 		return err
 	}
@@ -218,6 +218,9 @@ func (a *App) setNotifications() {
 		s.scheme = notifyscheme.Activation(a.appID)
 	}
 	notifyCurrent.Store(s)
+	if s.appID != "" && !s.packaged {
+		go stampAtStart(s.appID)
+	}
 	windows.SetToastCallbacks(
 		// The events run on the thread Windows raises them on, so the click is posted.
 		func(arguments string) { postUI(func() { deliverActivation(arguments) }) },

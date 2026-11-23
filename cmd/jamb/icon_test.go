@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -90,7 +91,7 @@ func TestIconSizes(t *testing.T) {
 	if err := icon.SaveICO(&buf); err != nil {
 		t.Fatal(err)
 	}
-	want := []int{16, 24, 32, 48, 64, 128, 256}
+	want := []int{16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96, 128, 256}
 	got := icoWidths(t, buf.Bytes())
 	if len(got) != len(want) {
 		t.Fatalf("ico widths = %v; want %v", got, want)
@@ -98,6 +99,20 @@ func TestIconSizes(t *testing.T) {
 	for i := range want {
 		if got[i] != want[i] {
 			t.Fatalf("ico widths = %v; want %v", got, want)
+		}
+	}
+}
+
+// The .ico holds a window's small (16 px) and big (32 px) icon at every scale
+// Windows offers up to 300%, so the app loads each at its size and none is
+// scaled from another image (see updateIcons in internal/platform/windows).
+func TestIconHoldsWindowIconSizes(t *testing.T) {
+	for _, scale := range []int{100, 125, 150, 175, 200, 225, 250, 300} {
+		for _, base := range []int{16, 32} {
+			size := base * scale / 100
+			if !slices.Contains(icoSizes, size) {
+				t.Errorf("at %d%%, the %d px icon is %d px, which the .ico does not hold", scale, base, size)
+			}
 		}
 	}
 }

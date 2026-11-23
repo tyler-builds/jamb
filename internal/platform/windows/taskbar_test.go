@@ -122,22 +122,6 @@ func nan() float64 {
 	return zero / zero
 }
 
-// TestIconSize checks the small icon size at each DPI: the system's metric when
-// it has one, else 16 pixels at 96 DPI, scaled and never below 16.
-func TestIconSize(t *testing.T) {
-	system := func(metric int32) func(uint32) int32 {
-		return func(uint32) int32 { return metric }
-	}
-	if got := iconSize(144, system(24)); got != 24 {
-		t.Errorf("with the metric 24 at 144 DPI, size = %d; want 24", got)
-	}
-	for dpi, want := range map[uint32]int{96: 16, 120: 20, 144: 24, 168: 28, 192: 32, 0: 16} {
-		if got := iconSize(dpi, system(0)); got != want {
-			t.Errorf("without a metric at %d DPI, size = %d; want %d", dpi, got, want)
-		}
-	}
-}
-
 // TestIconPixels checks the byte order of the icon rows: blue, green, red, alpha.
 func TestIconPixels(t *testing.T) {
 	img := image.NewNRGBA(image.Rect(0, 0, 2, 2))
